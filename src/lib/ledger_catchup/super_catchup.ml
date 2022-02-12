@@ -846,147 +846,160 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         | Failed | Finished | Root _ ->
             return ()
         | To_download download_job ->
-            O1trace.time_execution "in_super_catchup_fstm_to_download"
-              (fun () ->
-                let start_time = Time.now () in
-                let%bind b, attempts =
-                  step (Downloader.Job.result download_job)
-                in
-                [%log' debug t.logger]
-                  ~metadata:
-                    [ ("state_hash", State_hash.to_yojson state_hash)
-                    ; ( "donwload_number"
-                      , `Int
-                          (Hashtbl.count t.nodes ~f:(fun node ->
-                               Node.State.Enum.equal
-                                 (Node.State.enum node.state)
-                                 To_download)) )
-                    ; ("total_nodes", `Int (Hashtbl.length t.nodes))
-                    ; ( "node_states"
-                      , let s = Node.State.Enum.Table.create () in
-                        Hashtbl.iter t.nodes ~f:(fun node ->
-                            Hashtbl.incr s (Node.State.enum node.state)) ;
-                        `List
-                          (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                               `List [ Node.State.Enum.to_yojson k; `Int v ]))
-                      )
-                    ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-                    ; ("downloader", Downloader.to_yojson downloader)
-                    ]
-                  "download finished $state_hash" ;
-                node.attempts <- attempts ;
-                Mina_metrics.(
-                  Gauge.set Catchup.download_time
-                    Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                set_state t node (To_initial_validate b) ;
-                run_node node)
+            let%bind () =
+              O1trace.time_execution "in_super_catchup_fstm_to_download"
+                (fun () ->
+                  let start_time = Time.now () in
+                  let%map b, attempts =
+                    step (Downloader.Job.result download_job)
+                  in
+                  [%log' debug t.logger]
+                    ~metadata:
+                      [ ("state_hash", State_hash.to_yojson state_hash)
+                      ; ( "donwload_number"
+                        , `Int
+                            (Hashtbl.count t.nodes ~f:(fun node ->
+                                 Node.State.Enum.equal
+                                   (Node.State.enum node.state)
+                                   To_download)) )
+                      ; ("total_nodes", `Int (Hashtbl.length t.nodes))
+                      ; ( "node_states"
+                        , let s = Node.State.Enum.Table.create () in
+                          Hashtbl.iter t.nodes ~f:(fun node ->
+                              Hashtbl.incr s (Node.State.enum node.state)) ;
+                          `List
+                            (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
+                                 `List [ Node.State.Enum.to_yojson k; `Int v ]))
+                        )
+                      ; ("total_jobs", `Int (Downloader.total_jobs downloader))
+                      ; ("downloader", Downloader.to_yojson downloader)
+                      ]
+                    "download finished $state_hash" ;
+                  node.attempts <- attempts ;
+                  Mina_metrics.(
+                    Gauge.set Catchup.download_time
+                      Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                  set_state t node (To_initial_validate b))
+            in
+            run_node node
         | To_initial_validate b ->
-            O1trace.time_execution "in_super_catchup_fstm_to_initial_validate"
-              (fun () ->
-                let start_time = Time.now () in
-                match%bind
-                  step
-                    ( initial_validate ~precomputed_values ~logger ~trust_system
-                        ~batcher:initial_validation_batcher ~frontier
-                        ~unprocessed_transition_cache
-                        { b with
-                          data = { With_hash.data = b.data; hash = state_hash }
-                        }
-                    |> Deferred.map ~f:(fun x -> Ok x) )
-                with
-                | Error (`Error e) ->
-                    (* TODO: Log *)
-                    (* Validation failed. Record the failure and go back to download. *)
-                    failed ~error:e ~sender:b.sender `Initial_validate
-                | Error `Couldn't_reach_verifier ->
-                    retry ()
-                | Ok result -> (
-                    Mina_metrics.(
-                      Gauge.set Catchup.initial_validation_time
-                        Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                    match result with
-                    | `In_frontier hash ->
-                        finish t node
-                          (Ok (Transition_frontier.find_exn frontier hash)) ;
-                        Deferred.return (Ok ())
-                    | `Building_path tv ->
-                        set_state t node (To_verify tv) ;
-                        run_node node ))
-        | To_verify tv ->
-            O1trace.time_execution "in_super_catchup_fstm_to_verify" (fun () ->
-                let start_time = Time.now () in
-                let iv = Cached.peek tv in
-                (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
-                match%bind
-                  step
-                    (* TODO: give the batch verifier a way to somehow throw away stuff if
-                       this node gets removed from the tree. *)
-                    ( Verify_work_batcher.verify verify_work_batcher iv
-                    |> Deferred.map ~f:Result.return )
-                with
-                | Error _e ->
-                    [%log' debug t.logger] "Couldn't reach verifier. Retrying"
-                      ~metadata:
-                        [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
-                    (* No need to redownload in this case. We just wait a little and try again. *)
-                    retry ()
-                | Ok result -> (
-                    Mina_metrics.(
-                      Gauge.set Catchup.verification_time
-                        Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                    match result with
-                    | Error () ->
-                        [%log' warn t.logger]
-                          "verification failed! redownloading"
-                          ~metadata:
-                            [ ( "state_hash"
-                              , State_hash.to_yojson node.state_hash )
-                            ] ;
-                        ( match iv.sender with
-                        | Local ->
-                            ()
-                        | Remote peer ->
-                            Trust_system.(
-                              record trust_system logger peer
-                                Actions.(Sent_invalid_proof, None))
-                            |> don't_wait_for ) ;
-                        ignore
-                          ( Cached.invalidate_with_failure tv
-                            : External_transition.Initial_validated.t
-                              Envelope.Incoming.t ) ;
-                        failed ~sender:iv.sender `Verify
-                    | Ok av ->
-                        let av =
-                          { av with
+            let%bind () =
+              O1trace.time_execution "in_super_catchup_fstm_to_initial_validate"
+                (fun () ->
+                  let start_time = Time.now () in
+                  match%bind
+                    step
+                      ( initial_validate ~precomputed_values ~logger
+                          ~trust_system ~batcher:initial_validation_batcher
+                          ~frontier ~unprocessed_transition_cache
+                          { b with
                             data =
-                              External_transition
-                              .skip_frontier_dependencies_validation
-                                `This_transition_belongs_to_a_detached_subtree
-                                av.data
+                              { With_hash.data = b.data; hash = state_hash }
                           }
-                        in
-                        let av = Cached.transform tv ~f:(fun _ -> av) in
-                        set_state t node (Wait_for_parent av) ;
-                        run_node node ))
+                      |> Deferred.map ~f:(fun x -> Ok x) )
+                  with
+                  | Error (`Error e) ->
+                      (* TODO: Log *)
+                      (* Validation failed. Record the failure and go back to download. *)
+                      failed ~error:e ~sender:b.sender `Initial_validate
+                  | Error `Couldn't_reach_verifier ->
+                      retry ()
+                  | Ok result -> (
+                      Mina_metrics.(
+                        Gauge.set Catchup.initial_validation_time
+                          Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                      match result with
+                      | `In_frontier hash ->
+                          finish t node
+                            (Ok (Transition_frontier.find_exn frontier hash)) ;
+                          return ()
+                      | `Building_path tv ->
+                          set_state t node (To_verify tv) ;
+                          return () ))
+            in
+            run_node node
+        | To_verify tv ->
+            let%bind () =
+              O1trace.time_execution "in_super_catchup_fstm_to_verify"
+                (fun () ->
+                  let start_time = Time.now () in
+                  let iv = Cached.peek tv in
+                  (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
+                  match%bind
+                    step
+                      (* TODO: give the batch verifier a way to somehow throw away stuff if
+                         this node gets removed from the tree. *)
+                      ( Verify_work_batcher.verify verify_work_batcher iv
+                      |> Deferred.map ~f:Result.return )
+                  with
+                  | Error _e ->
+                      [%log' debug t.logger] "Couldn't reach verifier. Retrying"
+                        ~metadata:
+                          [ ("state_hash", State_hash.to_yojson node.state_hash)
+                          ] ;
+                      (* No need to redownload in this case. We just wait a little and try again. *)
+                      retry ()
+                  | Ok result -> (
+                      Mina_metrics.(
+                        Gauge.set Catchup.verification_time
+                          Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                      match result with
+                      | Error () ->
+                          [%log' warn t.logger]
+                            "verification failed! redownloading"
+                            ~metadata:
+                              [ ( "state_hash"
+                                , State_hash.to_yojson node.state_hash )
+                              ] ;
+                          ( match iv.sender with
+                          | Local ->
+                              ()
+                          | Remote peer ->
+                              Trust_system.(
+                                record trust_system logger peer
+                                  Actions.(Sent_invalid_proof, None))
+                              |> don't_wait_for ) ;
+                          ignore
+                            ( Cached.invalidate_with_failure tv
+                              : External_transition.Initial_validated.t
+                                Envelope.Incoming.t ) ;
+                          failed ~sender:iv.sender `Verify
+                      | Ok av ->
+                          let av =
+                            { av with
+                              data =
+                                External_transition
+                                .skip_frontier_dependencies_validation
+                                  `This_transition_belongs_to_a_detached_subtree
+                                  av.data
+                            }
+                          in
+                          let av = Cached.transform tv ~f:(fun _ -> av) in
+                          set_state t node (Wait_for_parent av) ;
+                          return () ))
+            in
+            run_node node
         | Wait_for_parent av ->
-            O1trace.time_execution "in_super_catchup_fstm_wait_for_parent"
-              (fun () ->
-                let%bind parent =
-                  step
-                    (let parent = Hashtbl.find_exn t.nodes node.parent in
-                     match%map.Async.Deferred Ivar.read parent.result with
-                     | Ok `Added_to_frontier ->
-                         Ok parent.state_hash
-                     | Error _ ->
-                         ignore
-                           ( Cached.invalidate_with_failure av
-                             : External_transition.Almost_validated.t
-                               Envelope.Incoming.t ) ;
-                         finish t node (Error ()) ;
-                         Error `Finished)
-                in
-                set_state t node (To_build_breadcrumb (`Parent parent, av)) ;
-                run_node node)
+            let%bind () =
+              O1trace.time_execution "in_super_catchup_fstm_wait_for_parent"
+                (fun () ->
+                  let%map parent =
+                    step
+                      (let parent = Hashtbl.find_exn t.nodes node.parent in
+                       match%map.Async.Deferred Ivar.read parent.result with
+                       | Ok `Added_to_frontier ->
+                           Ok parent.state_hash
+                       | Error _ ->
+                           ignore
+                             ( Cached.invalidate_with_failure av
+                               : External_transition.Almost_validated.t
+                                 Envelope.Incoming.t ) ;
+                           finish t node (Error ()) ;
+                           Error `Finished)
+                  in
+                  set_state t node (To_build_breadcrumb (`Parent parent, av)))
+            in
+            run_node node
         | To_build_breadcrumb (`Parent parent_hash, c) ->
             O1trace.time_execution "in_super_catchup_fstm_to_build_breadcrumb"
               (fun () ->
