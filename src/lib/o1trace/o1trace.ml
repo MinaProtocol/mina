@@ -133,6 +133,10 @@ let time_execution' (name : string) (f : unit -> 'a) =
   x
 
 let time_execution (name : string) (f : unit -> 'a) =
+  let rec find_recursive_call (fiber : Fiber.t) =
+    if String.equal fiber.thread.name name then Some fiber
+    else Option.bind fiber.parent ~f:find_recursive_call
+  in
   let ctx = Scheduler.current_execution_context () in
   let parent = Execution_context.find_local ctx Fiber.ctx_id in
   if
@@ -140,7 +144,14 @@ let time_execution (name : string) (f : unit -> 'a) =
         String.equal p.thread.name name)
   then f ()
   else
-    let ctx = Fiber.apply_to_context (Fiber.register name parent) ctx in
+    let fiber =
+      match Option.bind parent ~f:find_recursive_call with
+      | Some fiber ->
+          fiber
+      | None ->
+          Fiber.register name parent
+    in
+    let ctx = Fiber.apply_to_context fiber ctx in
     match Scheduler.within_context ctx f with
     | Error () ->
         failwithf
