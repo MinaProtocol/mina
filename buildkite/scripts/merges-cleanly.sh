@@ -8,7 +8,11 @@ echo 'Testing for conflicts between the current branch `'"${CURRENT}"'` and `'"$
 # The git merge-tree command shows the content of a 3-way merge without
 # touching the index, which we can then search for conflict markers.
 
+# Tell git where to find ssl certs
+git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
+# Fetch a fresh copy of the repo
 git fetch origin
+# Check mergeability
 git merge-tree `git merge-base origin/$BRANCH HEAD` HEAD origin/$BRANCH | grep -A 25 "^+<<<<<<<"
 
 RET=$?
