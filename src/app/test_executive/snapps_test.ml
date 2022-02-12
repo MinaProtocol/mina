@@ -221,16 +221,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           in
           [%log info] "Sent payment" )
     in
+    let timeout = Network_time_span.Slots 2 in
     let%bind () =
       section "Wait for snapp, payment inclusion in transition frontier"
         (let%bind () =
            wait_for t
+           @@ Wait_condition.with_timeouts ~soft_timeout:timeout
+                ~hard_timeout:timeout
            @@ Wait_condition.snapp_to_be_included_in_frontier
                 ~parties:parties_valid
          in
          [%log info] "Snapps transaction included in transition frontier" ;
          let%map () =
            wait_for t
+           @@ Wait_condition.with_timeouts ~soft_timeout:timeout
+                ~hard_timeout:timeout
            @@ Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
                 ~receiver_pub_key ~amount
          in
