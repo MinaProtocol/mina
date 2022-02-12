@@ -78,6 +78,11 @@ module Reader : sig
 
   val iter' : 'a t -> f:('a Base.Queue.t -> unit Deferred.t) -> unit Deferred.t
 
+  val iter_until :
+       'a t
+    -> f:('a -> [ `Continue | `Stop ] Deferred.t)
+    -> [ `Eof | `Terminated ] Deferred.t
+
   (** See [fold_without_pushback reader ~init ~f] *)
   val iter_without_pushback :
        ?consumer:Pipe.Consumer.t

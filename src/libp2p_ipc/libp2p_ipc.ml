@@ -268,7 +268,6 @@ let create_push_message ~validation_id ~validation_result =
 let stream_messages pipe =
   let open Capnp.Codecs in
   let stream = FramedStream.empty compression in
-  let complete = ref false in
   let r, w = Strict_pipe.(create Synchronous) in
   let rec read_frames () =
     match FramedStream.get_next_frame stream with
@@ -276,27 +275,19 @@ let stream_messages pipe =
         let%bind () = Strict_pipe.Writer.write w (Ok msg) in
         read_frames ()
     | Error FramingError.Unsupported ->
-        complete := true ;
-        Strict_pipe.Writer.write w
-          (Or_error.error_string "unsupported capnp frame header")
+        let%map () =
+          Strict_pipe.Writer.write w
+            (Or_error.error_string "unsupported capnp frame header")
+        in
+        `Stop
     | Error FramingError.Incomplete ->
-        Deferred.unit
-  in
-
-  let rec scheduler_loop () =
-    let%bind () = Scheduler.yield () in
-    if !complete then Deferred.unit
-    else
-      let%bind () = read_frames () in
-      scheduler_loop ()
+        return `Continue
   in
   don't_wait_for
-    (let%map () =
-       Strict_pipe.Reader.iter pipe
-         ~f:(Fn.compose Deferred.return (FramedStream.add_fragment stream))
-     in
-     complete := true) ;
-  don't_wait_for (scheduler_loop ()) ;
+    (Deferred.ignore_m
+       (Strict_pipe.Reader.iter_until pipe ~f:(fun fragment ->
+            FramedStream.add_fragment stream fragment ;
+            read_frames ()))) ;
   r
 
 let read_incoming_messages reader =

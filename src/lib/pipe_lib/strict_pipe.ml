@@ -112,6 +112,16 @@ module Reader0 = struct
 
   let iter' reader ~f = Pipe.iter' reader.reader ~f
 
+  let iter_until reader ~f =
+    match%map
+      fold_until reader ~init:() ~f:(fun () x ->
+          match%map f x with `Continue -> `Continue () | `Stop -> `Stop ())
+    with
+    | `Eof () ->
+        `Eof
+    | `Terminated () ->
+        `Terminated
+
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
