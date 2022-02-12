@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Parties.t plus another for the payment receiver
         *)
     ; block_producers =
-        List.init 9 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
+        List.init 11 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
     ; num_snark_workers = 0
     }
 
@@ -35,7 +35,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter block_producer_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
-    let node = List.nth_exn block_producer_nodes 0 in
+    let node = List.hd_exn block_producer_nodes in
     let[@warning "-8"] (Parties parties0 : Mina_base.User_command.t), _, _, _ =
       Quickcheck.random_value
         (Mina_base.User_command_generators.parties_with_ledger ())
