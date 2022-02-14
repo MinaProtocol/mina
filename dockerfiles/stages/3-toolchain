@@ -4,6 +4,8 @@
 #################################################################################################
 FROM opam-deps AS toolchain
 
+ARG deb_codename=focal
+
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
 
@@ -49,23 +51,22 @@ RUN sudo apt-get update -y \
     postgresql-contrib \
     perl \
     pkg-config \
-    python \
-    python-flake8 \
-    python-jinja2 \
-    python-pip \
-    python3-flake8 \
-    python3-jinja2 \
-    python3-pip \
     rubygems \
     zlib1g-dev
 
-# -- python dependencies (largely installed above from apt)
+# -- Debian Buster python dependencies (largely installed above from apt)
+# Buster images are used in our migrated integration tests which reqiure python2 jinja2
+# Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
 RUN test "$deb_codename" = "buster" \
       && sudo apt-get install -y \
-        python3-sexpdata \
-        python-sexpdata \
-      || sudo pip install readchar sexpdata \
-      && sudo pip3 install readchar sexpdata
+          python \
+          python-pip \
+          python-jinja2 \
+          python-flake8 \
+          python-sexpdata \
+          python3-sexpdata \
+      && sudo pip install readchar \
+      || exit 0
 
 # --- deb-s3 tool
 RUN curl -sLO https://github.com/deb-s3/deb-s3/releases/download/0.11.3/deb-s3-0.11.3.gem \
@@ -84,8 +85,7 @@ RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terra
     && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
 
 # --- Google Cloud tools
-RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" \
-    && echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
     && sudo apt-get update -y \
     && sudo apt-get install -y google-cloud-sdk kubectl
