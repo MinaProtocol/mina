@@ -105,11 +105,10 @@ let check :
                         in
                         Some (vk, stmt, pi) ))
           in
-          let v =
+          let v : User_command.Valid.t =
             User_command.Poly.Parties
               { Parties.fee_payer
-              ; other_parties =
-                  List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
+              ; other_parties = Parties.Call_forest.map other_parties ~f:fst
               ; memo
               }
           in

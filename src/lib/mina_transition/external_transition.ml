@@ -1312,9 +1312,15 @@ module Staged_ledger_validation = struct
             (Staged_ledger.current_ledger_proof transitioned_staged_ledger)
             ~f:target_hash_of_ledger_proof
             ~default:
-              ( Precomputed_values.genesis_ledger precomputed_values
-              |> Lazy.force |> Ledger.merkle_root
-              |> Frozen_ledger_hash.of_ledger_hash )
+              (let ledger =
+                 Precomputed_values.genesis_ledger precomputed_values
+                 |> Lazy.force
+               in
+               { Ledger_commitment.tree =
+                   ledger |> Ledger.merkle_root
+                   |> Frozen_ledger_hash.of_ledger_hash
+               ; next_available_token = Ledger.next_available_token ledger
+               })
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in
@@ -1327,8 +1333,9 @@ module Staged_ledger_validation = struct
             `Incorrect_target_staged_ledger_hash
         ; Option.some_if
             (not
-               (Frozen_ledger_hash.equal target_ledger_hash
-                  (Blockchain_state.snarked_ledger_hash blockchain_state)))
+               (Ledger_commitment.Value.equal target_ledger_hash
+                  ( Blockchain_state.registers blockchain_state
+                  |> Registers.ledger )))
             `Incorrect_target_snarked_ledger_hash
         ]
     in

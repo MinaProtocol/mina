@@ -533,12 +533,12 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_base58_check source.ledger)
+              Frozen_ledger_hash.to_base58_check source.ledger.tree)
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_base58_check target.ledger)
+              Frozen_ledger_hash.to_base58_check target.ledger.tree)
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -1654,7 +1654,7 @@ module Types = struct
           ; field_no_status "parties"
               ~typ:(non_null (list (non_null party_display)))
               ~args:[] ~doc:"Parties involved in the snapp transaction"
-              ~resolve:(fun _ cmd -> Parties.parties cmd.With_hash.data)
+              ~resolve:(fun _ cmd -> Parties.parties_list cmd.With_hash.data)
           ])
   end
 
@@ -2697,7 +2697,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%map body = body in
             let predicate = nonce in
-            Party.Predicated.Poly.{ body; predicate })
+            ({ body; predicate; caller = () } : Party.Predicated.Fee_payer.t))
           ~fields:
             [ arg "body" ~doc:"fee payer party"
                 ~typ:(non_null snapp_fee_payer_party_body)
@@ -2723,7 +2723,7 @@ module Types = struct
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Fee_payer.{ data; authorization })
+            Ok ({ data; authorization } : Party.Fee_payer.t))
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
                 ~typ:(non_null snapp_party_predicated_fee_payer)
@@ -2818,18 +2818,31 @@ module Types = struct
                 ~typ:nonce
             ]
 
+      let call_type =
+        enum "CallType" ~doc:"Type of a party call"
+          ~values:
+            (List.map [ Party.Call_type.Call; Delegate_call ] ~f:(fun c ->
+                 enum_value ~value:c
+                   ( match c with
+                   | Call ->
+                       "CALL"
+                   | Delegate_call ->
+                       "DELEGATECALL" )))
+
       let snapp_party_predicated =
         obj "SnappPartyPredicated"
-          ~coerce:(fun body_result predicate_result ->
+          ~coerce:(fun body_result predicate_result caller ->
             let open Result.Let_syntax in
             let%bind body = body_result in
             let%bind predicate = predicate_result in
-            Ok Party.Predicated.Poly.{ body; predicate })
+            Ok ({ body; predicate; caller } : Party.Predicated.Wire.t))
           ~fields:
             [ arg "body" ~doc:"Body of the party predicated"
                 ~typ:(non_null snapp_party_body)
             ; arg "predicate" ~doc:"Predicate of the party predicated"
                 ~typ:(non_null snapp_predicate)
+            ; arg "caller" ~doc:"Caller of the party predicated"
+                ~typ:(non_null call_type)
             ]
 
       let snapp_proof =
@@ -2863,7 +2876,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind data = predicated_result in
             let%bind authorization = authorization_result in
-            Ok Party.{ data; authorization })
+            Ok ({ data; authorization } : Party.Wire.t))
           ~fields:
             [ arg "data" ~doc:"Predicated party"
                 ~typ:(non_null snapp_party_predicated)
@@ -4007,7 +4020,7 @@ module Mutations = struct
                 result_of_exn Signed_command_memo.create_from_string_exn memo
                   ~error:"Invalid `memo` provided.")
           in
-          { Parties.fee_payer; other_parties; memo }
+          Parties.of_wire { fee_payer; other_parties; memo }
         in
         match parties_result with
         | Ok parties ->

@@ -39,8 +39,10 @@ let display
   ; token_id = Token_id.to_string token_id
   ; excess = Amount.to_string excess
   ; ledger =
-      Visualization.display_prefix_of_string
-      @@ Frozen_ledger_hash.to_base58_check ledger
+      sprintf "%s:%s"
+        ( Visualization.display_prefix_of_string
+        @@ Frozen_ledger_hash.to_base58_check ledger.tree )
+        (Token_id.to_string ledger.next_available_token)
   ; success
   ; failure_status =
       Option.value_map failure_status ~default:"<no failure>"
@@ -54,7 +56,10 @@ let dummy : t =
   ; full_transaction_commitment = Parties.Transaction_commitment.empty
   ; token_id = Token_id.default
   ; excess = Amount.zero
-  ; ledger = Frozen_ledger_hash.empty_hash
+  ; ledger =
+      { tree = Frozen_ledger_hash.empty_hash
+      ; next_available_token = Token_id.(next default)
+      }
   ; success = true
   ; failure_status = None
   }
@@ -63,7 +68,8 @@ let empty = dummy
 
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Generator.Let_syntax in
-  let%map ledger = Frozen_ledger_hash.gen
+  let%map tree = Frozen_ledger_hash.gen
+  and next_available_token = Token_id.gen
   and excess = Amount.gen
   and transaction_commitment = Impl.Field.Constant.gen
   and frame = Impl.Field.Constant.gen
@@ -79,7 +85,7 @@ let gen : t Quickcheck.Generator.t =
   ; transaction_commitment
   ; full_transaction_commitment = transaction_commitment
   ; token_id
-  ; ledger
+  ; ledger = { Ledger_commitment.tree; next_available_token }
   ; excess
   ; success
   ; failure_status
@@ -105,7 +111,7 @@ let to_input
      ; field full_transaction_commitment
      ; Token_id.to_input token_id
      ; Amount.to_input excess
-     ; Ledger_hash.to_input ledger
+     ; Ledger_commitment.to_input ledger
      ; packed (Mina_base.Util.field_of_bool success, 1)
     |]
 
@@ -125,7 +131,7 @@ module Checked = struct
       ~full_transaction_commitment:(f Field.Assert.equal)
       ~token_id:(f !Token_id.Checked.Assert.equal)
       ~excess:(f !Currency.Amount.Checked.assert_equal)
-      ~ledger:(f !Ledger_hash.assert_equal)
+      ~ledger:(f Ledger_commitment.Checked.Assert.equal)
       ~success:(f Impl.Boolean.Assert.( = ))
       ~failure_status:(f (fun () () -> ()))
 
@@ -137,7 +143,8 @@ module Checked = struct
       ~full_transaction_commitment:(f Field.equal)
       ~token_id:(f !Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Checked.equal)
-      ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
+      ~ledger:(f Ledger_commitment.Checked.equal)
+      ~success:(f Impl.Boolean.equal)
       ~failure_status:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
@@ -161,7 +168,7 @@ module Checked = struct
        ; field full_transaction_commitment
        ; Token_id.Checked.to_input token_id
        ; Amount.var_to_input excess
-       ; Ledger_hash.var_to_input ledger
+       ; Ledger_commitment.Checked.to_input ledger
        ; packed ((success :> Snark_params.Tick.Field.Var.t), 1)
       |]
 end
@@ -187,7 +194,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Field.typ
     ; Token_id.typ
     ; Amount.typ
-    ; Ledger_hash.typ
+    ; Ledger_commitment.typ
     ; Boolean.typ
     ; failure_status_typ
     ]

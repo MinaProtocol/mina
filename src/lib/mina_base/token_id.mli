@@ -42,6 +42,8 @@ val default : t
 (** An invalid token ID.
 
     This ID should only be used as a dummy value.
+    We use this ID inside of Party.t bodies to indicate that the body is
+    trying to create a new token type.
 *)
 val invalid : t
 

@@ -228,15 +228,19 @@ let create_expected_statement ~constraint_constants
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source =
-      { ledger = source_merkle_root
+      { ledger =
+          { tree = source_merkle_root
+          ; next_available_token = next_available_token_before
+          }
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
-      ; next_available_token = next_available_token_before
       ; local_state = empty_local_state
       }
   ; target =
-      { ledger = target_merkle_root
+      { ledger =
+          { tree = target_merkle_root
+          ; next_available_token = next_available_token_after
+          }
       ; pending_coinbase_stack = pending_coinbase_after
-      ; next_available_token = next_available_token_after
       ; local_state = empty_local_state
       }
   ; fee_excess
@@ -275,8 +279,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         else Or_error.error_string "Invalid pending coinbase stack state"
       and () =
         if
-          Token_id.equal s.target.next_available_token
-            s'.source.next_available_token
+          Token_id.equal s.target.ledger.next_available_token
+            s'.source.ledger.next_available_token
         then Ok ()
         else
           Or_error.error_string
@@ -567,11 +571,12 @@ struct
       let open Or_error.Let_syntax in
       let%map () =
         clarify_error
-          (Frozen_ledger_hash.equal reg1.ledger reg2.ledger)
+          (Frozen_ledger_hash.equal reg1.ledger.tree reg2.ledger.tree)
           "did not connect with snarked ledger hash"
       and () =
         clarify_error
-          (Token_id.equal reg1.next_available_token reg2.next_available_token)
+          (Token_id.equal reg1.ledger.next_available_token
+             reg2.ledger.next_available_token)
           "did not connect with next available token"
       and () =
         clarify_error

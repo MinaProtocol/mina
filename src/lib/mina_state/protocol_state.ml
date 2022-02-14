@@ -142,9 +142,9 @@ module Body = struct
   let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.registers.ledger
+    { snarked_ledger_hash = t.blockchain_state.registers.ledger.tree
     ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
+        t.blockchain_state.registers.ledger.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length_var cs
     ; min_window_density = C.min_window_density_var cs
@@ -166,9 +166,9 @@ module Body = struct
   let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.registers.ledger
+    { snarked_ledger_hash = t.blockchain_state.registers.ledger.tree
     ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
+        t.blockchain_state.registers.ledger.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length cs
     ; min_window_density = C.min_window_density cs

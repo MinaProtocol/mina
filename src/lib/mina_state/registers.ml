@@ -6,29 +6,27 @@ module Impl = Pickles.Impls.Step
 module Stable = struct
   module V1 = struct
     type ('ledger, 'pending_coinbase_stack, 'token_id, 'local_state) t =
-      { ledger : 'ledger
+      { ledger : ('ledger, 'token_id) Ledger_commitment.Stable.V1.t
       ; pending_coinbase_stack : 'pending_coinbase_stack
-      ; next_available_token : 'token_id
       ; local_state : 'local_state
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
 end]
 
+let next_available_token t = t.ledger.next_available_token
+
 let gen =
   let open Quickcheck.Generator.Let_syntax in
-  let%map ledger = Frozen_ledger_hash.gen
+  let%map ledger = Ledger_commitment.gen
   and pending_coinbase_stack = Pending_coinbase.Stack.gen
-  and next_available_token = Token_id.gen_non_default
   and local_state = Local_state.gen in
-  { ledger; pending_coinbase_stack; next_available_token; local_state }
+  { ledger; pending_coinbase_stack; local_state }
 
-let to_input
-    { ledger; pending_coinbase_stack; next_available_token; local_state } =
+let to_input { ledger; pending_coinbase_stack; local_state } =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-    [| Frozen_ledger_hash.to_input ledger
+    [| Ledger_commitment.to_input ledger
      ; Pending_coinbase.Stack.to_input pending_coinbase_stack
-     ; Token_id.to_input next_available_token
      ; Local_state.to_input local_state
     |]
 
@@ -66,21 +64,18 @@ module Checked = struct
     , Local_state.Checked.t )
     t
 
-  let to_input
-      { ledger; pending_coinbase_stack; next_available_token; local_state } =
+  let to_input { ledger; pending_coinbase_stack; local_state } =
     Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-      [| Frozen_ledger_hash.var_to_input ledger
+      [| Ledger_commitment.Checked.to_input ledger
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
-       ; Token_id.Checked.to_input next_available_token
        ; Local_state.Checked.to_input local_state
       |]
 
   let equal t1 t2 =
     let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
     let f eq acc field = eq (Field.get field t1) (Field.get field t2) :: acc in
-    Fields.fold ~init:[] ~ledger:(f !Frozen_ledger_hash.equal_var)
+    Fields.fold ~init:[] ~ledger:(f Ledger_commitment.Checked.equal)
       ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
-      ~next_available_token:(f !Token_id.Checked.equal)
       ~local_state:(fun acc f ->
         Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc)
     |> Impl.Boolean.all

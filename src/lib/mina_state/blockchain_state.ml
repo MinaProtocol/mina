@@ -46,9 +46,11 @@ module Poly = struct
         ; genesis_ledger_hash
         ; timestamp
         ; registers =
-            { Registers.ledger = snarked_ledger_hash
+            { Registers.ledger =
+                { tree = snarked_ledger_hash
+                ; next_available_token = snarked_next_available_token
+                }
             ; pending_coinbase_stack = ()
-            ; next_available_token = snarked_next_available_token
             ; local_state = Local_state.dummy
             }
         }
@@ -65,10 +67,10 @@ Poly.
   , to_hlist
   , of_hlist )]
 
-let snarked_ledger_hash (t : _ Poly.t) = t.registers.ledger
+let snarked_ledger_hash (t : _ Poly.t) = t.registers.ledger.tree
 
 let snarked_next_available_token (t : _ Poly.t) =
-  t.registers.next_available_token
+  t.registers.ledger.next_available_token
 
 module Value = struct
   [%%versioned
@@ -116,8 +118,7 @@ let data_spec =
   let open Data_spec in
   [ Staged_ledger_hash.typ
   ; Frozen_ledger_hash.typ
-  ; Registers.typ
-      [ Frozen_ledger_hash.typ; Typ.unit; Token_id.typ; Local_state.typ ]
+  ; Registers.typ [ Ledger_commitment.typ; Typ.unit; Local_state.typ ]
   ; Block_time.Checked.typ
   ]
 
@@ -136,16 +137,9 @@ let var_to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger
-        ; pending_coinbase_stack = ()
-        ; next_available_token
-        ; local_state
-        } =
-      registers
-    in
+    let { ledger; pending_coinbase_stack = (); local_state } = registers in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.var_to_input ledger
-       ; Token_id.Checked.to_input next_available_token
+      [| Ledger_commitment.Checked.to_input ledger
        ; Local_state.Checked.to_input local_state
       |]
   in
@@ -165,18 +159,9 @@ let to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger
-        ; pending_coinbase_stack = ()
-        ; next_available_token
-        ; local_state
-        } =
-      registers
-    in
+    let { ledger; pending_coinbase_stack = (); local_state } = registers in
     Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.to_input ledger
-       ; Token_id.to_input next_available_token
-       ; Local_state.to_input local_state
-      |]
+      [| Ledger_commitment.to_input ledger; Local_state.to_input local_state |]
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
@@ -195,9 +180,11 @@ let negative_one
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
   ; registers =
-      { ledger = genesis_ledger_hash
+      { ledger =
+          { tree = genesis_ledger_hash
+          ; next_available_token = snarked_next_available_token
+          }
       ; pending_coinbase_stack = ()
-      ; next_available_token = snarked_next_available_token
       ; local_state = Local_state.dummy
       }
   ; timestamp = consensus_constants.genesis_state_timestamp
@@ -212,12 +199,7 @@ type display = (string, string, string, Local_state.display, string) Poly.t
 let display
     ({ staged_ledger_hash
      ; genesis_ledger_hash
-     ; registers =
-         { ledger
-         ; pending_coinbase_stack = ()
-         ; next_available_token
-         ; local_state
-         }
+     ; registers = { ledger; pending_coinbase_stack = (); local_state }
      ; timestamp
      } :
       Value.t) : display =
@@ -229,10 +211,13 @@ let display
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; registers =
       { ledger =
-          Visualization.display_prefix_of_string
-          @@ Frozen_ledger_hash.to_base58_check ledger
+          { Ledger_commitment.tree =
+              Visualization.display_prefix_of_string
+              @@ Frozen_ledger_hash.to_base58_check ledger.tree
+          ; next_available_token =
+              Token_id.to_string ledger.next_available_token
+          }
       ; pending_coinbase_stack = ()
-      ; next_available_token = Token_id.to_string next_available_token
       ; local_state = Local_state.display local_state
       }
   ; timestamp =

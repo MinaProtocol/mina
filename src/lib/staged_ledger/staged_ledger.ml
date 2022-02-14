@@ -235,14 +235,13 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ~constraint_constants ~next_available_token
+  let verify_scan_state_after_apply ~constraint_constants
       ~pending_coinbase_stack ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
-      ; next_available_token
       ; local_state = Mina_state.Local_state.empty
       ; pending_coinbase_stack
       }
@@ -282,8 +281,10 @@ module T = struct
         ~registers_end:
           { local_state = Mina_state.Local_state.empty
           ; ledger =
-              Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; next_available_token = Ledger.next_available_token ledger
+              { tree =
+                  Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+              ; next_available_token = Ledger.next_available_token ledger
+              }
           ; pending_coinbase_stack
           }
     in
@@ -309,8 +310,10 @@ module T = struct
         ~registers_end:
           { local_state = Mina_state.Local_state.empty
           ; ledger =
-              Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; next_available_token = Ledger.next_available_token ledger
+              { tree =
+                  Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+              ; next_available_token = Ledger.next_available_token ledger
+              }
           ; pending_coinbase_stack
           }
     in
@@ -372,8 +375,10 @@ module T = struct
     in
     f ~constraint_constants
       ~snarked_registers:
-        ( { ledger = snarked_frozen_ledger_hash
-          ; next_available_token = snarked_next_available_token
+        ( { ledger =
+              { tree = snarked_frozen_ledger_hash
+              ; next_available_token = snarked_next_available_token
+              }
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
@@ -583,14 +588,18 @@ module T = struct
     in
     ( applied_txn
     , { Transaction_snark.Statement.source =
-          { ledger = source_merkle_root
-          ; next_available_token = next_available_token_before
+          { ledger =
+              { tree = source_merkle_root
+              ; next_available_token = next_available_token_before
+              }
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
           ; local_state = empty_local_state
           }
       ; target =
-          { ledger = target_merkle_root
-          ; next_available_token = next_available_token_after
+          { ledger =
+              { tree = target_merkle_root
+              ; next_available_token = next_available_token_after
+              }
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
@@ -1004,10 +1013,12 @@ module T = struct
           else
             Deferred.(
               verify_scan_state_after_apply ~constraint_constants
-                ~next_available_token:
-                  (Sparse_ledger.next_available_token !local_ledger)
-                (Frozen_ledger_hash.of_ledger_hash
-                   (Sparse_ledger.merkle_root !local_ledger))
+                { tree =
+                    Frozen_ledger_hash.of_ledger_hash
+                      (Sparse_ledger.merkle_root !local_ledger)
+                ; next_available_token =
+                    Sparse_ledger.next_available_token !local_ledger
+                }
                 ~pending_coinbase_stack:latest_pending_coinbase_stack
                 scan_state'
               >>| to_staged_ledger_or_error))
@@ -2241,7 +2252,9 @@ let%test_module "staged ledger tests" =
      fun stmts ->
       let prover_seed =
         One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
-            p ^ Frozen_ledger_hash.to_bytes stmt.target.ledger)
+            p
+            ^ Frozen_ledger_hash.to_bytes stmt.target.ledger.tree
+            ^ Token_id.to_string stmt.target.ledger.next_available_token)
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
@@ -2494,10 +2507,7 @@ let%test_module "staged ledger tests" =
                 { parties.fee_payer with authorization = fee_payer_signature }
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
-              let other_parties_hash =
-                Parties.Call_forest.With_hashes.other_parties_hash
-                  parties.other_parties
-              in
+              let other_parties_hash = Parties.other_parties_hash parties in
               let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
                   Snapp_predicate.Protocol_state.digest protocol_state
@@ -2519,8 +2529,8 @@ let%test_module "staged ledger tests" =
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
-                List.map parties.other_parties
-                  ~f:(fun { data; authorization } ->
+                Parties.Call_forest.map parties.other_parties
+                  ~f:(fun { data; authorization } : Party.t ->
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
@@ -2551,9 +2561,7 @@ let%test_module "staged ledger tests" =
                       | Proof _ | None_given ->
                           authorization
                     in
-                    { Party.data
-                    ; authorization = authorization_with_valid_signature
-                    })
+                    { data; authorization = authorization_with_valid_signature })
               in
               let parties' =
                 { parties with

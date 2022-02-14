@@ -153,7 +153,8 @@ let of_transition external_transition tracked_participants
     }
   in
   let next_available_token =
-    protocol_state.blockchain_state.registers.next_available_token
+    Mina_state.Registers.next_available_token
+      protocol_state.blockchain_state.registers
   in
   let transactions, _next_available_token =
     List.fold calculated_transactions

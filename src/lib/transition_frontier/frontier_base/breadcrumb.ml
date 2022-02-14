@@ -377,7 +377,8 @@ module For_tests = struct
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
-        make_next_consensus_state ~snarked_ledger_hash:previous_registers.ledger
+        make_next_consensus_state
+          ~snarked_ledger_hash:previous_registers.ledger.tree
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hash }

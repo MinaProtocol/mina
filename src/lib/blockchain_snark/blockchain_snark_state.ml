@@ -52,14 +52,12 @@ module Impl = Pickles.Impls.Step
 let non_pc_registers_equal_var t1 t2 =
   Impl.make_checked (fun () ->
       let module F = Core_kernel.Field in
-      let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
       let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
       Registers.Fields.fold ~init:[]
-        ~ledger:(f !Frozen_ledger_hash.equal_var)
+        ~ledger:(f Ledger_commitment.Checked.equal)
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
           acc)
-        ~next_available_token:(f !Token_id.Checked.equal)
         ~local_state:(fun acc f ->
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc)
       |> Impl.Boolean.all)
@@ -68,9 +66,8 @@ let non_pc_registers_equal t1 t2 =
   let module F = Core_kernel.Field in
   let f eq field = eq (F.get field t1) (F.get field t2) in
   Registers.Fields.for_all
-    ~ledger:(f Frozen_ledger_hash.equal)
-    ~pending_coinbase_stack:(f Unit.equal)
-    ~next_available_token:(f Token_id.equal) ~local_state:(f Local_state.equal)
+    ~ledger:(f Ledger_commitment.Value.equal)
+    ~pending_coinbase_stack:(f Unit.equal) ~local_state:(f Local_state.equal)
 
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:

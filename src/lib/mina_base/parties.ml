@@ -428,6 +428,9 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.data.body.public_key (fee_token t)
 
+let other_parties_list (t : t) : Party.t list =
+  Call_forest.fold t.other_parties ~init:[] ~f:(Fn.flip List.cons) |> List.rev
+
 let parties_list (t : t) : Party.t list =
   Call_forest.fold t.other_parties
     ~init:[ Party.of_fee_payer (fee_payer_party t) ]
