@@ -1947,6 +1947,7 @@ type AccountPredicate =
   module Parties = Mina_base_kernel.Parties
   module Snapp_state = Mina_base_kernel.Snapp_state
   module Token_id = Mina_base_kernel.Token_id
+  module Snapp_basic = Mina_base_kernel.Snapp_basic
 
   let field (x : js_field) : Impl.field =
     match x##.value with Constant x -> x | x -> As_prover.read_var x
@@ -1977,7 +1978,7 @@ type AccountPredicate =
 
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
-      Mina_base_kernel.Snapp_basic.Or_ignore.Check (elt x##.value)
+      Snapp_basic.Or_ignore.Check (elt x##.value)
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
@@ -2054,7 +2055,7 @@ type AccountPredicate =
 
   let set_or_keep (type a) elt (x : a set_or_keep) =
     if Js.to_bool x##.set##toBoolean then
-      Mina_base_kernel.Snapp_basic.Set_or_keep.Set (elt x##.value)
+      Snapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
   let body (b : party_body) : Party.Body.t =
@@ -2159,39 +2160,58 @@ type AccountPredicate =
 
   let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
 
-  (* TODO: I'm stuck on this... don't understand how to create many of the checked types from more basic checked type like Field.t *)
-  (* example: how to create an Or_ignore.Checked.t *)
-  (* it may be the case that there is some shortcut by going to the checked hash input directly! *)
-  (* module Checked = struct
-       let field (x : js_field) = x##.value
+  (*
+     TODO: to de-scope initial version, the following types are converted
+     by just assuming them to be constant and introducing witnesses out of thin air
 
-       let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
-         { x = field pk##.g##.x
-         ; is_odd = Bigint.(test_bit (of_field (field pk##.g##.y)) 0)
-         }
+     * public_key
+     * receipt_chain_hash in predicate
+  *)
+  module Checked = struct
+    let read_field_value = field
 
-       let uint32 (x : js_uint32) : Field.t = field x##.value
+    let field (x : js_field) = x##.value
 
-       let uint64 (x : js_uint64) : Field.t = field x##.value
+    let bool (x : bool_class Js.t) = x##.value
 
-       let int64 (x : js_int64) =
-         let x =
-           x##uint64Value |> field |> Field.Constant.to_string
-           |> Unsigned.UInt64.of_string
-           |> (fun x -> x)
-           |> Unsigned.UInt64.to_int64
-         in
-         { Currency.Signed_poly.sgn =
-             (if Int64.is_negative x then Sgn.Neg else Sgn.Pos)
-         ; magnitude =
-             Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 (Int64.abs x))
-         }
+    let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.var =
+      { x = field pk##.g##.x
+      ; is_odd =
+          Impl.Boolean.var_of_value
+            Bigint.(test_bit (of_field (read_field_value pk##.g##.y)) 0)
+          (* TODO not checked ^^^ *)
+      }
 
-       let or_ignore (type a) elt (x : a or_ignore) =
-         if Js.to_bool x##.check##toBoolean then
-           Mina_base_kernel.Snapp_basic.Or_ignore.Check (elt x##.value)
-         else Ignore
+    let uint32 (x : js_uint32) : Field.t = field x##.value
 
+    let uint64 (x : js_uint64) : Field.t = field x##.value
+
+    (* let int64 (x : js_int64) =
+       let x =
+         x##uint64Value |> field |> Field.Constant.to_string
+         |> Unsigned.UInt64.of_string
+         |> (fun x -> x)
+         |> Unsigned.UInt64.to_int64
+       in
+       { Currency.Signed_poly.sgn =
+           (if Int64.is_negative x then Sgn.Neg else Sgn.Pos)
+       ; magnitude =
+           Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 (Int64.abs x))
+       } *)
+
+    let or_ignore (type a b) (transform : a -> b) (x : a or_ignore) =
+      Snapp_basic.Or_ignore.Checked.Explicit
+        { Snapp_basic.Flagged_option.is_some = x##.check##.value
+        ; data = transform x##.value
+        }
+
+    let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
+      Snapp_basic.Or_ignore.Checked.Implicit
+        { Snapp_predicate.Closed_interval.lower = transform x##.lower
+        ; upper = transform x##.upper
+        }
+
+    (*
        let closed_interval f (c : 'a closed_interval) :
            _ Snapp_predicate.Closed_interval.t =
          { lower = f c##.lower; upper = f c##.upper }
@@ -2266,7 +2286,7 @@ type AccountPredicate =
 
        let set_or_keep (type a) elt (x : a set_or_keep) =
          if Js.to_bool x##.set##toBoolean then
-           Mina_base_kernel.Snapp_basic.Set_or_keep.Set (elt x##.value)
+           Snapp_basic.Set_or_keep.Set (elt x##.value)
          else Keep
 
        let body (b : party_body) : Party.Body.Checked.t =
@@ -2315,63 +2335,48 @@ type AccountPredicate =
          ; predicate =
              uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
          }
+         *)
 
-       let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-         let module Account_nonce = Mina_numbers.Account_nonce.Checked in
-         match Js.to_string t##.type_ with
-         | "accept" ->
-             Nonce_or_accept { nonce = Account_nonce.zero; accept = Boolean.true_ }
-         | "nonce" ->
-             let nonce_js : js_uint32 = Obj.magic t##.value in
-             let nonce = Account_nonce.Unsafe.of_field (uint32 nonce_js) in
-             Nonce_or_accept { nonce; accept = Boolean.false_ }
-         | "full" ->
-             (* type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
-             { balance : 'balance
-             ; nonce : 'nonce
-             ; receipt_chain_hash : 'receipt_chain_hash
-             ; public_key : 'pk
-             ; delegate : 'pk
-             ; state : 'field Snapp_state.V.Stable.V1.t
-             ; sequence_state : 'field
-             ; proved_state : 'bool
-             } *)
-             (* type t =
-             ( Balance.var Numeric.Checked.t
-             , Account_nonce.Checked.t Numeric.Checked.t
-             , Receipt.Chain_hash.var Hash.Checked.t
-             , Public_key.Compressed.var Eq_data.Checked.t
-             , Field.Var.t Eq_data.Checked.t
-             , Boolean.var Eq_data.Checked.t )
-             Poly.Stable.Latest.t *)
-             let ( ^ ) = Fn.compose in
-             let predicate : full_account_predicate = Obj.magic t##.value in
-             let balance_js = predicate##.balance in
-             let module Or_ignore = Mina_base_kernel.Snapp_basic.Or_ignore in
-             let to_upper = Currency.Balance.Checked.Unsafe.of_field ^ uint64 in
-             let balance = Or_ignore.Checked.Implicit (closed_interval to_upper predicate##.balance) in
-             Full
-               { balance
-               ; nonce =
-                   Check
-                     (closed_interval
-                        (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
-                        p##.nonce)
-               ; receipt_chain_hash = or_ignore field predicate##.receiptChainHash
-               ; public_key = or_ignore public_key predicate##.publicKey
-               ; delegate = or_ignore public_key predicate##.delegate
-               ; state =
-                   Pickles_types.Vector.init Snapp_state.Max_state_size.n
-                     ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
-               ; sequence_state = or_ignore field predicate##.sequenceState
-               ; proved_state =
-                   or_ignore
-                     (fun x -> Js.to_bool x##toBoolean)
-                     predicate##.provedState
-               }
-         | s ->
-             failwithf "bad predicate type: %s" s ()
+    let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
+      let module Account_nonce = Mina_numbers.Account_nonce.Checked in
+      match Js.to_string t##.type_ with
+      | "accept" ->
+          Nonce_or_accept { nonce = Account_nonce.zero; accept = Boolean.true_ }
+      | "nonce" ->
+          let nonce_js : js_uint32 = Obj.magic t##.value in
+          let nonce = Account_nonce.Unsafe.of_field (uint32 nonce_js) in
+          Nonce_or_accept { nonce; accept = Boolean.false_ }
+      | "full" ->
+          let ( ^ ) = Fn.compose in
+          let predicate : full_account_predicate = Obj.magic t##.value in
+          Full
+            { balance =
+                numeric
+                  (Currency.Balance.Checked.Unsafe.of_field ^ uint64)
+                  predicate##.balance
+            ; nonce =
+                numeric
+                  (Account_nonce.Unsafe.of_field ^ uint32)
+                  predicate##.nonce
+            ; receipt_chain_hash =
+                or_ignore
+                  (* TODO: read_field_value assumes constant *)
+                  ( Mina_base_kernel.Receipt.Chain_hash.var_of_t
+                  ^ read_field_value )
+                  predicate##.receiptChainHash
+            ; public_key = or_ignore public_key predicate##.publicKey
+            ; delegate = or_ignore public_key predicate##.delegate
+            ; state =
+                Pickles_types.Vector.init Snapp_state.Max_state_size.n
+                  ~f:(fun i ->
+                    or_ignore field (array_get_exn predicate##.state i))
+            ; sequence_state = or_ignore field predicate##.sequenceState
+            ; proved_state = or_ignore bool predicate##.provedState
+            }
+      | s ->
+          failwithf "bad predicate type: %s" s ()
 
+    (*
        let party (party : party) : Party.Predicated.Checked.t =
          { body = body party##.body; predicate = predicate party##.predicate }
 
@@ -2388,7 +2393,8 @@ type AccountPredicate =
          ; protocol_state = protocol_state parties##.protocolState
          ; memo = Mina_base_kernel.Signed_command_memo.empty
          }
-     end *)
+    *)
+  end
 
   (* TODO create checked versions!!! *)
   (* TODO hash two parties together in the correct way *)
