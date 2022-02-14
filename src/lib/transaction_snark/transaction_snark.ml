@@ -32,6 +32,8 @@ let with_top_hash_logging f =
     top_hash_logging_enabled := old ;
     raise err
 
+let empty_next_available_token = Mina_base.Token_id.(next default)
+
 module Proof_type = struct
   [%%versioned
   module Stable = struct
@@ -168,26 +170,30 @@ module Statement = struct
       ; fee_excess = t.fee_excess
       ; sok_digest = t.sok_digest
       ; source =
-          { ledger = t.source
+          { ledger =
+              { tree = t.source
+              ; next_available_token = t.next_available_token_before
+              }
           ; pending_coinbase_stack =
               t.pending_coinbase_stack_state.Pending_coinbase_stack_state.source
-          ; next_available_token = t.next_available_token_before
           ; local_state = Local_state.empty
           }
       ; target =
-          { ledger = t.target
+          { ledger =
+              { tree = t.target
+              ; next_available_token = t.next_available_token_after
+              }
           ; pending_coinbase_stack = t.pending_coinbase_stack_state.target
-          ; next_available_token = t.next_available_token_after
           ; local_state = Local_state.empty
           }
       }
 
-    let typ ledger_hash amount pending_coinbase fee_excess token_id sok_digest
+    let typ ledger_commitment amount pending_coinbase fee_excess sok_digest
         local_state_typ =
       let registers =
         let open Registers in
         Tick.Typ.of_hlistable
-          [ ledger_hash; pending_coinbase; token_id; local_state_typ ]
+          [ ledger_commitment; pending_coinbase; local_state_typ ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
       in
@@ -299,9 +305,9 @@ module Statement = struct
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
-      Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
-        Pending_coinbase.Stack.typ Fee_excess.typ Token_id.typ
-        Sok_message.Digest.typ Local_state.typ
+      Poly.typ Ledger_commitment.typ Currency.Amount.typ
+        Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
+        Local_state.typ
 
     let to_input { source; target; supply_increase; fee_excess; sok_digest } =
       let input =
@@ -393,9 +399,8 @@ module Statement = struct
           Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
       end in
       Registers.Fields.to_list
-        ~ledger:(check (module Ledger_hash))
+        ~ledger:(check (module Ledger_commitment.Value))
         ~pending_coinbase_stack:(check (module PC))
-        ~next_available_token:(check (module Token_id))
         ~local_state:(check (module Local_state))
       |> Or_error.combine_errors_unit
     in
@@ -422,9 +427,17 @@ module Statement = struct
     and fee_excess = Fee_excess.gen
     and supply_increase = Currency.Amount.gen in
     let source, target =
-      let t1, t2 = (source.next_available_token, target.next_available_token) in
-      ( { source with next_available_token = Token_id.min t1 t2 }
-      , { target with next_available_token = Token_id.max t1 t2 } )
+      let t1, t2 =
+        (source.ledger.next_available_token, target.ledger.next_available_token)
+      in
+      ( { source with
+          ledger =
+            { source.ledger with next_available_token = Token_id.min t1 t2 }
+        }
+      , { target with
+          ledger =
+            { target.ledger with next_available_token = Token_id.max t1 t2 }
+        } )
     in
     ({ source; target; fee_excess; supply_increase; sok_digest = () } : t)
 end
@@ -1188,7 +1201,7 @@ module Base = struct
 
     module Global_state = struct
       type t =
-        { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+        { ledger : Ledger_commitment.Checked.t * Sparse_ledger.t Prover_value.t
         ; fee_excess : Amount.Signed.var
         ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
         }
@@ -1196,7 +1209,8 @@ module Base = struct
 
     let implied_root account incl =
       let open Impl in
-      List.foldi incl ~init:(With_hash.hash account)
+      List.foldi incl
+        ~init:(Lazy.force (With_hash.hash account))
         ~f:(fun height acc (b, h) ->
           let l = Field.if_ b ~then_:h ~else_:acc
           and r = Field.if_ b ~then_:acc ~else_:h in
@@ -1569,27 +1583,31 @@ module Base = struct
       end
 
       module Account = struct
-        type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+        type t = (Account.Checked.Unhashed.t, Field.t Lazy.t) With_hash.t
 
         let token_owner (t : t) = t.data.token_permissions.token_owner
 
-        let account_with_hash (account : Account.Checked.Unhashed.t) =
+        let account_with_hash (account : Account.Checked.Unhashed.t) : t =
           With_hash.of_data account ~hash_data:(fun a ->
-              let a =
-                { a with
-                  snapp =
-                    ( Snapp_account.Checked.digest a.snapp
-                    , As_prover.Ref.create (fun () -> None) )
-                }
-              in
-              run_checked (Account.Checked.digest a))
+              lazy
+                (let a =
+                   { a with
+                     snapp =
+                       ( Snapp_account.Checked.digest a.snapp
+                       , As_prover.Ref.create (fun () -> None) )
+                   }
+                 in
+                 run_checked (Account.Checked.digest a)))
 
         type timing = Account_timing.var
 
         let timing (account : t) : timing = account.data.timing
 
-        let set_timing (timing : timing) (account : t) : t =
-          { account with data = { account.data with timing } }
+        let set_timing (account : t) (timing : timing) : t =
+          account_with_hash { account.data with timing }
+
+        let set_token_id (account : t) (token_id : Token_id.var) : t =
+          account_with_hash { account.data with token_id }
       end
 
       module Opt = struct
@@ -1625,7 +1643,7 @@ module Base = struct
 
         let is_empty ({ hash = x; _ } : t) = Field.equal empty x
 
-        let empty : t = { hash = empty; data = V.create (fun () -> []) }
+        let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
         let hash_cons hash h_tl =
           Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
@@ -1801,7 +1819,7 @@ module Base = struct
 
         let is_empty ({ hash = x; _ } : t) = Field.equal empty x
 
-        let empty : t = { hash = empty; data = V.create (fun () -> []) }
+        let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
         let exists_elt (elt_ref : (Value.frame, _) With_hash.t V.t) :
             Stack_frame.t =
@@ -1930,6 +1948,8 @@ module Base = struct
         let default = Token_id.(var_of_t default)
 
         let invalid = Token_id.(var_of_t invalid)
+
+        let next (t : t) : t = run_checked (Token_id.Checked.next t)
       end
 
       module Public_key = struct
@@ -1950,7 +1970,7 @@ module Base = struct
           , Call_stack.t
           , Token_id.t
           , Amount.t
-          , Ledger_hash.var * Sparse_ledger.t V.t
+          , Ledger_commitment.Checked.t * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t
           , failure_status )
@@ -1973,17 +1993,20 @@ module Base = struct
         include Inputs
 
         module Ledger = struct
-          type t = Ledger_hash.var * Sparse_ledger.t V.t
+          type t = Ledger_commitment.Checked.t * Sparse_ledger.t V.t
 
           type inclusion_proof = (Boolean.var * Field.t) list
 
-          let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
-            ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
+          let if_ b ~then_:((xt, rt) : t) ~else_:((xe, re) : t) =
+            ( Ledger_commitment.Checked.if_ b ~then_:xt ~else_:xe
             , V.if_ b ~then_:rt ~else_:re )
 
           let empty ~depth () : t =
             let t = Sparse_ledger.empty ~depth () in
-            ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
+            ( { tree = Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
+              ; next_available_token =
+                  Mina_base.Token_id.var_of_t empty_next_available_token
+              }
             , V.create (fun () -> t) )
 
           let idx ledger id = Sparse_ledger.find_index_exn ledger id
@@ -1994,7 +2017,7 @@ module Base = struct
               (read Signature_lib.Public_key.Compressed.typ body.public_key)
               (read Mina_base.Token_id.typ body.token_id)
 
-          let get_account { party; _ } (_root, ledger) =
+          let get_account { party; _ } ((_root, ledger) : t) =
             let idx =
               V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
             in
@@ -2020,8 +2043,11 @@ module Base = struct
             in
             (account, incl)
 
-          let set_account (_root, ledger) (a, incl) =
-            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
+          let set_account (({ tree = _; next_available_token }, ledger) : t)
+              ((a, incl) : Account.t * _) : t =
+            ( { tree = implied_root a incl |> Ledger_hash.var_of_hash_packed
+              ; next_available_token
+              }
             , V.map ledger
                 ~f:
                   As_prover.(
@@ -2079,10 +2105,10 @@ module Base = struct
                       let idx = idx ledger (Mina_base.Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
 
-          let check_inclusion (root, _) (account, incl) =
+          let check_inclusion ((ledger, _) : t) (account, incl) =
             with_label __LOC__
               (fun () -> Field.Assert.equal (implied_root account incl))
-              (Ledger_hash.var_to_hash_packed root)
+              (Ledger_hash.var_to_hash_packed ledger.tree)
 
           let check_account public_key token_id
               (({ data = account; _ }, _) : Account.t * _) =
@@ -2107,6 +2133,17 @@ module Base = struct
                          account.token_id)
                   ]) ;
             `Is_new is_new
+
+          let next_available_token ((ledger, _) : t) : Token_id.t =
+            ledger.next_available_token
+
+          let set_next_available_token ((ledger, v) : t) (id : Token_id.t) : t =
+            ( { ledger with next_available_token = id }
+            , V.map v ~f:(fun l ->
+                  { l with
+                    next_available_token =
+                      As_prover.read Mina_base.Token_id.typ id
+                  }) )
         end
 
         module Party = struct
@@ -2197,7 +2234,8 @@ module Base = struct
 
         module Global_state = struct
           type t = Global_state.t =
-            { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+            { ledger :
+                Ledger_commitment.Checked.t * Sparse_ledger.t Prover_value.t
             ; fee_excess : Amount.Signed.t
             ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
             }
@@ -2500,9 +2538,8 @@ module Base = struct
             ; ledger = fst local.ledger
             }) ;
       with_label __LOC__ (fun () ->
-          run_checked
-            (Frozen_ledger_hash.assert_equal (fst global.ledger)
-               statement.target.ledger)) ;
+          Ledger_commitment.Checked.Assert.equal (fst global.ledger)
+            statement.target.ledger) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Checked.assert_equal statement.supply_increase
@@ -2598,8 +2635,9 @@ module Base = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_init pending_coinbase_stack_before
-      pending_coinbase_after next_available_token state_body
+      { Ledger_commitment.tree = root; next_available_token }
+      pending_coinbase_stack_init pending_coinbase_stack_before
+      pending_coinbase_after state_body
       ({ signer; signature; payload } as txn : Transaction_union.var) =
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
@@ -3418,8 +3456,7 @@ module Base = struct
         (module Shifted)
         statement.source.ledger pending_coinbase_init
         statement.source.pending_coinbase_stack
-        statement.target.pending_coinbase_stack
-        statement.source.next_available_token state_body t
+        statement.target.pending_coinbase_stack state_body t
     in
     let%bind fee_excess =
       (* Use the default token for the fee excess if it is zero.
@@ -3450,7 +3487,8 @@ module Base = struct
     in
     Checked.all_unit
       [ [%with_label "equal roots"]
-          (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
+          (Frozen_ledger_hash.assert_equal root_after
+             statement.target.ledger.tree)
       ; [%with_label "equal supply_increases"]
           (Currency.Amount.Checked.assert_equal supply_increase
              statement.supply_increase)
@@ -3458,7 +3496,7 @@ module Base = struct
           (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
       ; [%with_label "equal next available tokens"]
           (Token_id.Checked.Assert.equal next_available_token_after
-             statement.target.next_available_token)
+             statement.target.ledger.next_available_token)
       ]
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
@@ -3544,20 +3582,23 @@ module Merge = struct
       ; [%with_label "equal supply increases"]
           (Amount.Checked.assert_equal supply_increase s.supply_increase)
       ; [%with_label "equal source ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
+          (Frozen_ledger_hash.assert_equal s.source.ledger.tree
+             s1.source.ledger.tree)
       ; [%with_label "equal target, source ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
+          (Frozen_ledger_hash.assert_equal s1.target.ledger.tree
+             s2.source.ledger.tree)
       ; [%with_label "equal target ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
+          (Frozen_ledger_hash.assert_equal s2.target.ledger.tree
+             s.target.ledger.tree)
       ; [%with_label "equal source next available tokens"]
-          (Token_id.Checked.Assert.equal s.source.next_available_token
-             s1.source.next_available_token)
+          (Token_id.Checked.Assert.equal s.source.ledger.next_available_token
+             s1.source.ledger.next_available_token)
       ; [%with_label "equal target, source available tokens"]
-          (Token_id.Checked.Assert.equal s1.target.next_available_token
-             s2.source.next_available_token)
+          (Token_id.Checked.Assert.equal s1.target.ledger.next_available_token
+             s2.source.ledger.next_available_token)
       ; [%with_label "equal target available tokens"]
-          (Token_id.Checked.Assert.equal s2.target.next_available_token
-             s.target.next_available_token)
+          (Token_id.Checked.Assert.equal s2.target.ledger.next_available_token
+             s.target.ledger.next_available_token)
       ]
 
   let rule ~proof_level self : _ Pickles.Inductive_rule.t =
@@ -4213,13 +4254,21 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
            `parties` in local state is empty for the first segment*)
         let source_local_ledger =
           if Parties.Call_forest.is_empty source_local.frame.calls then
-            Frozen_ledger_hash.empty_hash
-          else Sparse_ledger.merkle_root source_local.ledger
+            { Ledger_commitment.tree = Frozen_ledger_hash.empty_hash
+            ; next_available_token = empty_next_available_token
+            }
+          else
+            { tree = Sparse_ledger.merkle_root source_local.ledger
+            ; next_available_token =
+                Sparse_ledger.next_available_token source_local.ledger
+            }
         in
         { source =
-            { ledger = Sparse_ledger.merkle_root source_global.ledger
-            ; next_available_token =
-                Sparse_ledger.next_available_token source_global.ledger
+            { ledger =
+                { tree = Sparse_ledger.merkle_root source_global.ledger
+                ; next_available_token =
+                    Sparse_ledger.next_available_token source_global.ledger
+                }
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
@@ -4229,9 +4278,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 }
             }
         ; target =
-            { ledger = Sparse_ledger.merkle_root target_global.ledger
-            ; next_available_token =
-                Sparse_ledger.next_available_token target_global.ledger
+            { ledger =
+                { tree = Sparse_ledger.merkle_root target_global.ledger
+                ; next_available_token =
+                    Sparse_ledger.next_available_token target_global.ledger
+                }
             ; pending_coinbase_stack =
                 Pending_coinbase.Stack.push_state state_body_hash
                   pending_coinbase_init_stack
@@ -4239,7 +4290,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 { target_local with
                   frame = Stack_frame.hash target_local.frame
                 ; call_stack = call_stack_hash target_local.call_stack
-                ; ledger = Sparse_ledger.merkle_root target_local.ledger
+                ; ledger =
+                    { tree = Sparse_ledger.merkle_root target_local.ledger
+                    ; next_available_token =
+                        Sparse_ledger.next_available_token target_local.ledger
+                    }
                 }
             }
         ; supply_increase = Amount.zero
