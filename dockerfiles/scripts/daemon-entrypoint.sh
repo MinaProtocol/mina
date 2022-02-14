@@ -10,7 +10,7 @@ INPUT_ARGS="$@"
 # These arrays can be overwritten or extended in scripts to adjust verbosity
 # Example:
 declare -a LOG_FILES=('mina.log' 'mina-errors.log')
-declare -a VERBOSE_LOG_FILES=('.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
+declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
 # Example: mount a mina-env file with variable evironment variables to source and pass to the daemon
@@ -45,7 +45,7 @@ touch "${LOG_FILES[@]}"
 set +e # Allow wait and kill commands to fail in this loop
 while true; do
   rm -f .mina-config/.mina-lock
-  mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-errors.log 1>mina.log &
+  mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-stderr.log 1>mina.log &
   mina_pid=$!
 
   tail -q -f "${LOG_FILES[@]}" &
