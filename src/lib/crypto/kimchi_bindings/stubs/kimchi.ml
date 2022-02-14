@@ -410,40 +410,6 @@ module Protocol = struct
 
   type nonrec curr_or_next = Curr | Next
 
-  type nonrec column =
-    | Witness of int
-    | Z
-    | LookupSorted of int
-    | LookupAggreg
-    | LookupTable
-    | LookupKindIndex of int
-    | Index of gate_type
-    | Coefficient of int
-
-  type nonrec variable = { col : column; row : curr_or_next }
-
-  type nonrec 'F polish_token =
-    | Alpha
-    | Beta
-    | Gamma
-    | JointCombiner
-    | EndoCoefficient
-    | Mds of int * int
-    | Literal of 'F
-    | Cell of variable
-    | Dup
-    | Pow of int
-    | Add
-    | Mul
-    | Sub
-    | VanishesOnLast4Rows
-    | UnnormalizedLagrangeBasis of int
-    | Store
-    | Load of int
-
-  type nonrec 'E linearization =
-    { constant_term : 'E array; index_terms : (column * 'E array) array }
-
   type nonrec 'F oracles =
     { o : 'F random_oracles
     ; p_eval : 'F * 'F
@@ -624,6 +590,16 @@ module Protocol = struct
   end
 
   module VerifierIndex = struct
+    module Lookup = struct
+      type nonrec lookups_used = Single | Joint
+
+      type nonrec 'PolyComm t =
+        { lookup_used : lookups_used
+        ; lookup_tables : 'PolyComm array array
+        ; lookup_selectors : 'PolyComm array
+        }
+    end
+
     type nonrec 'Fr domain = { log_size_of_group : int; group_gen : 'Fr }
 
     type nonrec 'PolyComm verification_evals =
@@ -638,8 +614,6 @@ module Protocol = struct
       ; chacha_comm : 'PolyComm array option
       }
 
-    type nonrec alphas_builder
-
     type nonrec ('Fr, 'SRS, 'PolyComm) verifier_index =
       { domain : 'Fr domain
       ; max_poly_size : int
@@ -647,7 +621,7 @@ module Protocol = struct
       ; srs : 'SRS
       ; evals : 'PolyComm verification_evals
       ; shifts : 'Fr array
-      ; linearization : 'Fr polish_token linearization
+      ; lookup_index : 'PolyComm Lookup.t option
       }
 
     module Fp = struct
