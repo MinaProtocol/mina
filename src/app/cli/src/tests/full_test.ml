@@ -196,7 +196,9 @@ let run_test () : unit Deferred.t =
              ~proposed_protocol_version_opt:None ~super_catchup:true
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
-             ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
+             ~block_production_keypairs:
+               (Keypair.And_compressed_pk.Set.singleton
+                  (keypair, Public_key.compress keypair.public_key))
              ~snark_worker_config:
                Mina_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key =

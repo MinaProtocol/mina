@@ -1,5 +1,5 @@
-ARG deb_codename=stretch
-FROM debian:${deb_codename}-slim
+ARG image=debian:stretch-slim
+FROM ${image}
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_release=unstable
@@ -11,14 +11,19 @@ ENV DEBIAN_FRONTEND noninteractive
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.
 # The packages are noted here just for clarity/documentation.
-# Buster-only Deps:
-#    libffi7 \
-#    libprocps7 \
-#    libjemalloc2 \
 # Stretch-only Deps:
-#    libffi6 \
-#    libprocps6 \
-#    libjemalloc1 \
+#    libffi6
+#    libprocps6
+#    libjemalloc1
+# Buster-only Deps:
+#    libffi7
+#    libprocps7
+#    libjemalloc2
+# Focal-only Deps:
+#    libffi7
+#    libprocps8
+#    libjemalloc2
+
 
 # Dependencies
 RUN apt-get -y update && \
@@ -37,6 +42,7 @@ RUN apt-get -y update && \
     libssl1.1 \
     libpq-dev \
     procps \
+    python3 \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 

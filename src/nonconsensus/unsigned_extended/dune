@@ -1,5 +1,5 @@
 (library
- (name unsigned_extended_nonconsensus)
+ (name unsigned_extended)
  (public_name unsigned_extended_nonconsensus)
  (library_flags -linkall)
  (inline_tests)

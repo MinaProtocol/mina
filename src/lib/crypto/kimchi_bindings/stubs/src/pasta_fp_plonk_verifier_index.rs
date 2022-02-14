@@ -12,7 +12,6 @@ use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
 use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi::circuits::expr::{Linearization, PolishToken};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{
     alphas,
@@ -54,7 +53,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
-            linearization: vi.linearization.into(),
+            lookup_index: vi.lookup_index.map(Into::into),
         }
     }
 }
@@ -86,6 +85,9 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        // TODO chacha, dummy_lookup_value ?
+        let linearization = expr_linearization(domain, false, &None);
+
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
@@ -111,10 +113,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
-            linearization: index.linearization.into(),
+            lookup_index: index.lookup_index.map(Into::into),
+            linearization,
 
             fr_sponge_params: oracle::pasta::fp_3::params(),
             fq_sponge_params: oracle::pasta::fq_3::params(),
@@ -157,10 +157,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_read(
     srs: CamlFpSrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkVerifierIndex, ocaml::Error> {
-    let mut vi = read_raw(offset, srs, path)?;
-    let (linearization, powers_of_alpha) = expr_linearization(vi.domain, false, None);
-    vi.linearization = linearization;
-    vi.powers_of_alpha = powers_of_alpha;
+    let vi = read_raw(offset, srs, path)?;
     Ok(vi.into())
 }
 
@@ -237,7 +234,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
-        linearization: Linearization::<Vec<PolishToken<Fp>>>::default().into(),
+        lookup_index: None,
     }
 }
 

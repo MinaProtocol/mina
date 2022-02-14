@@ -8,7 +8,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
 ) -> (String, Vec<(String, String)>) {
     let d1 = ark_poly::EvaluationDomain::<F>::new(1).unwrap();
     let evaluated_cols = linearization_columns::<F>();
-    let (linearization, _powers_of_alpha) = constraints_expr(d1, false, None);
+    let (linearization, _powers_of_alpha) = constraints_expr(d1, false, &None);
 
     let Linearization {
         constant_term,

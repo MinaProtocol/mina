@@ -57,14 +57,10 @@ pub mod linearization;
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::circuits::{
-        expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
         scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
         wires::caml::CamlWire,
     },
-    kimchi::{
-        alphas,
-        prover::caml::{CamlProverCommitments, CamlProverProof},
-    },
+    kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     oracle::sponge::caml::CamlScalarChallenge,
 };

@@ -569,9 +569,12 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     match%bind Initial_validate_batcher.verify batcher transition with
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
-    | Ok (Error ()) ->
-        let s = "initial_validate: proof failed to verify" in
-        [%log warn] ~metadata:[ ("state_hash", state_hash) ] "%s" s ;
+    | Ok (Error invalid) ->
+        let s = "initial_validate: block failed to verify, invalid proof" in
+        [%log warn]
+          ~metadata:[ ("state_hash", state_hash) ]
+          "%s, %s" s
+          (Verifier.invalid_to_string invalid) ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -822,7 +825,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
         match%bind
           step
             (* TODO: give the batch verifier a way to somehow throw away stuff if
-                this node gets removed from the tree. *)
+               this node gets removed from the tree. *)
             ( Verify_work_batcher.verify verify_work_batcher iv
             |> Deferred.map ~f:Result.return )
         with
@@ -836,10 +839,12 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
               Gauge.set Catchup.verification_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
-            | Error () ->
+            | Error err ->
                 [%log' warn t.logger] "verification failed! redownloading"
                   ~metadata:
-                    [ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
+                    [ ("state_hash", State_hash.to_yojson node.state_hash)
+                    ; ("error", `String (Verifier.invalid_to_string err))
+                    ] ;
                 ( match iv.sender with
                 | Local ->
                     ()
