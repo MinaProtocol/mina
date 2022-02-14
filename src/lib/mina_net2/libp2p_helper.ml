@@ -217,12 +217,15 @@ let handle_incoming_message t msg ~handle_push_message =
 let spawn ~logger ~pids ~conf_dir ~handle_push_message =
   let termination_handler = ref (fun ~killed:_ _result -> Deferred.unit) in
   match%map
-    Child_processes.start_custom ~logger ~name:"libp2p_helper"
-      ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
-      ~conf_dir ~args:[] ~stdout:`Chunks ~stderr:`Lines
-      ~termination:
-        (`Handler
-          (fun ~killed _process result -> !termination_handler ~killed result))
+    O1trace.time_execution "in_libp2p_child_processes" (fun () ->
+        Child_processes.start_custom ~logger ~name:"libp2p_helper"
+          ~git_root_relative_path:
+            "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
+          ~stdout:`Chunks ~stderr:`Lines
+          ~termination:
+            (`Handler
+              (fun ~killed _process result ->
+                !termination_handler ~killed result)))
   with
   | Error e ->
       Or_error.tag (Error e)
