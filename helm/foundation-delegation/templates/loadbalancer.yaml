@@ -13,3 +13,22 @@ spec:
     port: {{ .Values.backend.port }}
     targetPort: backend
     protocol: TCP
+
+---
+apiVersion: v1
+kind: Ingress
+metadata:
+  name: {{ template "foundation-delegation.fullname" . }}-ingress
+spec:
+  tls:
+  - secretName: {{ .Values.backend.tlsSecret }}
+  rules:
+  - http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: delegation-backend
+            port:
+              number: {{ .Values.backend.port }}
