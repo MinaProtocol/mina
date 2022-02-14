@@ -5,7 +5,6 @@ set -euo pipefail
 # If glob doesn't match anything, return empty string rather than literal pattern
 shopt -s nullglob
 
-
 INPUT_ARGS="$@"
 
 # These arrays can be overwritten or extended in scripts to adjust verbosity
@@ -46,7 +45,7 @@ touch "${LOG_FILES[@]}"
 set +e # Allow wait and kill commands to fail in this loop
 while true; do
   rm -f .mina-config/.mina-lock
-  mina $INPUT_ARGS $EXTRA_ARGS 2>mina-errors.log 1>mina.log &
+  mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-errors.log 1>mina.log &
   mina_pid=$!
 
   tail -q -f "${LOG_FILES[@]}" &
