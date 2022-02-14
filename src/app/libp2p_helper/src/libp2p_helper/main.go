@@ -86,7 +86,7 @@ func main() {
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level:  logging.LevelDebug,
+		Level:  logging.LevelWarn,
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
@@ -126,7 +126,7 @@ func main() {
 	_ = logging.SetLogLevel("autonat", "debug")
 	_ = logging.SetLogLevel("discovery", "debug")
 	_ = logging.SetLogLevel("routing/record", "debug")
-	_ = logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
+	_ = logging.SetLogLevel("pubsub", "info") // Spammy about blacklisted peers, maybe should be info?
 	_ = logging.SetLogLevel("badger", "debug")
 	_ = logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
 	_ = logging.SetLogLevel("routedhost", "debug")
