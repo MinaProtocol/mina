@@ -98,6 +98,8 @@ module type Token_id_intf = sig
   val invalid : t
 
   val default : t
+
+  val next : t -> t
 end
 
 module type Protocol_state_predicate_intf = sig
@@ -157,7 +159,9 @@ module Local_state = struct
           , Parties.Digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
-          , Ledger_hash.Stable.V1.t
+          , ( Ledger_hash.Stable.V1.t
+            , Token_id.Stable.V1.t )
+            Ledger_commitment.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
           , Transaction_status.Failure.Stable.V1.t option )
@@ -177,7 +181,7 @@ module Local_state = struct
       , Field.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
-      , Ledger_hash.var
+      , Ledger_commitment.Checked.t
       , Boolean.var
       , Parties.Transaction_commitment.Checked.t
       , unit )
@@ -272,7 +276,7 @@ module type Stack_intf = sig
 
   type elt
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -290,7 +294,7 @@ module type Parties_intf = sig
 
   module Opt : Opt_intf with type bool := bool
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -342,6 +346,10 @@ module type Ledger_intf = sig
 
   val check_account :
     public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
+
+  val next_available_token : t -> token_id
+
+  val set_next_available_token : t -> token_id -> t
 end
 
 module type Account_intf = sig
@@ -351,9 +359,13 @@ module type Account_intf = sig
 
   type timing
 
+  type token_id
+
   val timing : t -> timing
 
-  val set_timing : timing -> t -> t
+  val set_timing : t -> timing -> t
+
+  val set_token_id : t -> token_id -> t
 
   val token_owner : t -> bool
 end
@@ -429,7 +441,10 @@ module type Inputs_intf = sig
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
   module Account :
-    Account_intf with type timing := Timing.t and type bool := Bool.t
+    Account_intf
+      with type timing := Timing.t
+       and type bool := Bool.t
+       and type token_id := Token_id.t
 
   module Party :
     Party_intf
@@ -533,9 +548,9 @@ module Make (Inputs : Inputs_intf) = struct
   let invalid_caller =
     { Caller.id = Account_id.invalid; token_owner = Bool.false_ }
 
-  let stack_frame_default =
+  let stack_frame_default () =
     Stack_frame.make ~caller:invalid_caller ~caller_caller:invalid_caller
-      ~calls:Ps.empty
+      ~calls:(Ps.empty ())
 
   let assert_ = Bool.Assert.is_true
 
@@ -547,14 +562,31 @@ module Make (Inputs : Inputs_intf) = struct
       (Opt.map ~f:fst res, Opt.map ~f:snd res)
     in
     (* Handle the None cases *)
-    ( Opt.or_default ~if_:Stack_frame.if_ ~default:stack_frame_default next_frame
-    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+    ( Opt.or_default ~if_:Stack_frame.if_ ~default:(stack_frame_default ())
+        next_frame
+    , Opt.or_default ~if_:Call_stack.if_ ~default:(Call_stack.empty ())
         next_call_stack )
+
+  type account_token_info =
+    { account_is_token_owner : Bool.t
+    ; creating_new_token : Bool.t
+    ; account_token_id : Token_id.t
+    }
+
+  type get_next_party_result =
+    { party : Party.t
+    ; new_call_stack : Call_stack.t
+    ; new_frame : account_token_info -> Stack_frame.t
+    ; check_token_usage : account_token_info -> unit
+    }
+
+  let creating_new_token (p : Party.t) =
+    Token_id.equal (Party.token_id p) Token_id.invalid
 
   let get_next_party (current_forest : Stack_frame.t)
       (* The stack for the most recent snapp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
-      =
+      : get_next_party_result =
     (* If the current stack is complete, 'return' to the previous
        partially-completed one.
     *)
@@ -588,11 +620,15 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (is_caller, is_caller_caller)
     in
-    let () =
+    let check_token_usage
+        { creating_new_token; account_is_token_owner; account_token_id = _ } =
       (* Check that the token owner was consulted if using a non-default
          token *)
       Bool.Assert.any
-        [ Token_id.equal (Party.token_id party) Token_id.default
+        [ account_is_token_owner
+        ; creating_new_token
+        ; Token_id.equal (Party.token_id party) Token_id.default
+        ; Token_id.equal (Party.token_id party) Token_id.default
         ; Bool.( &&& ) party_caller_is_caller
             (Stack_frame.caller current_forest).token_owner
         ; Bool.( &&& ) party_caller_is_caller_caller
@@ -634,7 +670,8 @@ module Make (Inputs : Inputs_intf) = struct
                (Call_stack.push remainder_of_current_forest_frame
                   ~onto:call_stack))
     in
-    let new_current_forest ~account_is_token_owner =
+    let new_frame
+        { account_is_token_owner; creating_new_token = _; account_token_id } =
       Stack_frame.if_ party_forest_empty
         ~then_:
           (Stack_frame.if_ remainder_of_current_forest_empty
@@ -642,12 +679,16 @@ module Make (Inputs : Inputs_intf) = struct
         ~else_:
           (Stack_frame.make ~calls:party_forest
              ~caller:
-               { id = Party.account_id party
+               { id =
+                   (* Importantly we do not use `Party.account_id party`,
+                      because the token ID of the account may be a new token ID if
+                      the party is creating a new token. *)
+                   Account_id.create (Party.public_key party) account_token_id
                ; token_owner = account_is_token_owner
                }
              ~caller_caller:(Stack_frame.caller current_forest))
     in
-    (party, new_current_forest, new_call_stack)
+    { party; new_frame; new_call_stack; check_token_usage }
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
@@ -693,7 +734,8 @@ module Make (Inputs : Inputs_intf) = struct
     let ( (party, remaining, call_stack)
         , at_party
         , local_state
-        , (a, inclusion_proof) ) =
+        , (a, inclusion_proof)
+        , account_token_info ) =
       let to_pop, call_stack =
         match is_start with
         | `Compute start_data ->
@@ -702,26 +744,50 @@ module Make (Inputs : Inputs_intf) = struct
                   (Stack_frame.make ~calls:start_data.parties
                      ~caller:invalid_caller ~caller_caller:invalid_caller)
                 ~else_:local_state.frame
-            , Call_stack.if_ is_start' ~then_:Call_stack.empty
+            , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
         | `Yes start_data ->
             ( Stack_frame.make ~calls:start_data.parties ~caller:invalid_caller
                 ~caller_caller:invalid_caller
-            , Call_stack.empty )
+            , Call_stack.empty () )
         | `No ->
             (local_state.frame, local_state.call_stack)
       in
-      let party, remaining, call_stack =
+      let { party
+          ; new_frame = remaining
+          ; new_call_stack = call_stack
+          ; check_token_usage
+          } =
         (* TODO: Make the stack frame hashed inside of the local state *)
         get_next_party to_pop call_stack
       in
       let ((a, inclusion_proof) as acct) =
         Inputs.Ledger.get_account party local_state.ledger
       in
-      Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
-      let remaining =
-        remaining ~account_is_token_owner:(Account.token_owner a)
+      let next_available_token =
+        Inputs.Ledger.next_available_token local_state.ledger
       in
+      let account_token_info =
+        let creating_new_token = creating_new_token party in
+        { creating_new_token
+        ; account_is_token_owner = Account.token_owner a
+        ; account_token_id =
+            Token_id.if_ creating_new_token ~then_:next_available_token
+              ~else_:(Party.token_id party)
+        }
+      in
+      let local_state =
+        { local_state with
+          ledger =
+            Inputs.Ledger.set_next_available_token local_state.ledger
+              (Token_id.if_ account_token_info.creating_new_token
+                 ~then_:(Token_id.next next_available_token)
+                 ~else_:next_available_token)
+        }
+      in
+      Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
+      check_token_usage account_token_info ;
+      let remaining = remaining account_token_info in
       let transaction_commitment, full_transaction_commitment =
         match is_start with
         | `No ->
@@ -757,7 +823,11 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.token_id
         }
       in
-      ((party, remaining, call_stack), to_pop, local_state, acct)
+      ( (party, remaining, call_stack)
+      , to_pop
+      , local_state
+      , acct
+      , account_token_info )
     in
     let local_state = { local_state with frame = remaining; call_stack } in
     let predicate_satisfied : Bool.t =
@@ -795,6 +865,11 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
     in
+    (* Check that if the party is creating a new token, they are
+       doing so in a new account. *)
+    Bool.Assert.any
+      [ Bool.not account_token_info.creating_new_token; account_is_new ] ;
+    let a = Account.set_token_id a account_token_info.account_token_id in
     (* Set account timing for new accounts, if specified. *)
     let a, local_state =
       let timing = Party.Update.timing party in
@@ -809,7 +884,7 @@ module Make (Inputs : Inputs_intf) = struct
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
       assert_ Global_slot.(vesting_period > zero) ;
-      let a = Account.set_timing timing a in
+      let a = Account.set_timing a timing in
       (a, local_state)
     in
     let a', update_permitted, failure_status =
