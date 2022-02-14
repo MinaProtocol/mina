@@ -263,41 +263,367 @@ let create_push_message ~validation_id ~validation_result =
                 reader_op validation_id_set_reader validation_id
                 *> op result_set validation_result)))
 
-(* TODO: carefully think about the scheduling implications of this. *)
-(* TODO: maybe IPC delay metrics should go here instead? *)
-let stream_messages pipe =
-  let open Capnp.Codecs in
-  let stream = FramedStream.empty compression in
-  let r, w = Strict_pipe.(create Synchronous) in
-  let rec read_frames () =
-    match FramedStream.get_next_frame stream with
-    | Ok msg ->
-        let%bind () = Strict_pipe.Writer.write w (Ok msg) in
-        read_frames ()
-    | Error FramingError.Unsupported ->
-        let%map () =
-          Strict_pipe.Writer.write w
-            (Or_error.error_string "unsupported capnp frame header")
+(* TODO: a reusable fragment buffer with support for blitting would probably make more sense here (probably not queue-backed) *)
+module Fragment_view = struct
+  type t = { fragments : bytes list; start_offset : int; end_offset : int }
+
+  type ('result, 'state) decode_f =
+       buf:bytes
+    -> start:int
+    -> end_:int
+    -> 'state
+    -> [ `Finished of 'result | `Incomplete of 'state ]
+
+  (* maybe this should just be a monad *)
+  type 'result decoder =
+    | Decoder :
+        { size : int
+        ; initial_state : 'state
+        ; read : ('result, 'state) decode_f
+        }
+        -> 'result decoder
+
+  let decoder_size (Decoder { size; _ }) = size
+
+  let map_decoder (Decoder d) ~f =
+    let read ~buf ~start ~end_ s =
+      match d.read ~buf ~start ~end_ s with
+      | `Incomplete s' ->
+          `Incomplete s'
+      | `Finished x ->
+          `Finished (f x)
+    in
+    Decoder { d with read }
+
+  let unsafe_decode (Decoder d) t =
+    let fail s = failwithf "Fragment_view.unsafe_decode: %s" s () in
+    let decode_from_this_fragment ~start ~end_ ~remaining_bytes ~state fragment
+        =
+      let finish_expected = end_ - start + 1 >= remaining_bytes in
+      match d.read ~buf:fragment ~start ~end_ state with
+      | `Finished result when finish_expected ->
+          Ok result
+      | `Finished result ->
+          fail "unexpected completion"
+      | `Incomplete st when finish_expected ->
+          fail "expected completion"
+      | `Incomplete st ->
+          Error st
+    in
+
+    let rec decode_from_next_fragment ~start ~remaining_bytes ~state
+        remaining_fragments =
+      let fragment = List.hd_exn remaining_fragments in
+      let remaining_fragments' = List.tl_exn remaining_fragments in
+      let is_last_fragment = List.is_empty remaining_fragments' in
+      let len = Bytes.length fragment in
+      let end_ = if is_last_fragment then t.end_offset else len - 1 in
+      match
+        decode_from_this_fragment ~start ~end_ ~remaining_bytes ~state fragment
+      with
+      | Ok result ->
+          result
+      | Error state' ->
+          let remaining_bytes' = remaining_bytes + len - start in
+          decode_from_next_fragment ~start:0 ~remaining_bytes:remaining_bytes'
+            ~state:state' remaining_fragments'
+    in
+    decode_from_next_fragment ~start:t.start_offset ~remaining_bytes:d.size
+      ~state:d.initial_state t.fragments
+end
+
+module Decoders = struct
+  open Fragment_view
+
+  let align (Decoder d) alignment =
+    let size = alignment * ((d.size + alignment - 1) / alignment) in
+    Decoder { d with size }
+
+  let unit : unit decoder =
+    Decoder
+      { size = 0
+      ; initial_state = ()
+      ; read = (fun ~buf:_ ~start:_ ~end_:_ () -> `Finished ())
+      }
+
+  (* unfortunatley requires copying of bytes, which sucks... *)
+  let bytes size : bytes decoder =
+    let open struct
+      type state =
+        { bytes_read : int
+        ; accumulator : (bytes * [ `Full | `Slice of int * int ]) list
+        }
+    end in
+    let initial_state = { bytes_read = 0; accumulator = [] } in
+    let extract_result slices =
+      let result = Bytes.create size in
+      assert (
+        List.fold_right slices ~init:0 ~f:(fun (buf, slice_view) i ->
+            let start, len =
+              match slice_view with
+              | `Full ->
+                  (0, Bytes.length buf)
+              | `Slice (start, end_) ->
+                  (start, end_ - start + 1)
+            in
+            Bytes.unsafe_blit ~src:buf ~src_pos:start ~dst:result ~dst_pos:i
+              ~len ;
+            i + len)
+        = size ) ;
+      result
+    in
+    let rec read ~buf ~start ~end_ s =
+      if s.bytes_read = size then `Finished (extract_result s.accumulator)
+      else
+        let required = size - s.bytes_read in
+        let available = end_ - start + 1 in
+        let slice_size = min required available in
+        let slice_end = start + slice_size - 1 in
+        let slice_view =
+          if start = 0 && slice_end = Bytes.length buf - 1 then `Full
+          else `Slice (start, slice_end)
         in
-        `Stop
-    | Error FramingError.Incomplete ->
-        return `Continue
+        let bytes_read' = s.bytes_read + slice_size in
+        let accumulator' = (buf, slice_view) :: s.accumulator in
+        if bytes_read' = size then `Finished (extract_result accumulator')
+        else
+          `Incomplete { bytes_read = bytes_read'; accumulator = accumulator' }
+    in
+    Decoder { size; initial_state; read }
+
+  let uint32 : Uint32.t decoder =
+    let open struct
+      type state = { bytes_read : int; accumulator : Uint32.t }
+    end in
+    let size = 4 in
+    let initial_state = { bytes_read = 0; accumulator = Uint32.zero } in
+    (* read uint32 byte-by-byte for X-fragment solution *)
+    let rec read_bytes ~buf ~start ~end_ s =
+      if s.bytes_read = size then `Finished s.accumulator
+      else
+        let b = Bytes.unsafe_get buf start |> Char.to_int |> Uint32.of_int in
+        let s' =
+          let accumulator =
+            Uint32.logor s.accumulator (Uint32.shift_left b (8 * s.bytes_read))
+          in
+          let bytes_read = s.bytes_read + 1 in
+          { bytes_read; accumulator }
+        in
+        if start = end_ then `Incomplete s'
+        else read_bytes ~buf ~start:(start + 1) ~end_ s'
+    in
+    let read ~buf ~start ~end_ state =
+      (* select and optimized solution if possible *)
+      if state.bytes_read = 0 && start + size - 1 <= end_ then
+        `Finished (Uint32.of_bytes_little_endian buf start)
+      else read_bytes ~buf ~start ~end_ state
+    in
+    Decoder { size; initial_state; read }
+
+  let monomorphic_list (element : 'elt decoder) (count : int) :
+      'elt list decoder =
+    let (Decoder
+          { size = elt_size
+          ; initial_state = elt_initial_state
+          ; read = read_elt
+          }) =
+      element
+    in
+    let open struct
+      type ('elt, 'elt_state) state =
+        { elements_read : int
+        ; element_state : 'elt_state
+        ; accumulator : 'elt list
+        }
+    end in
+    let size = elt_size * count in
+    let rec read ~buf ~start ~end_ s =
+      match read_elt ~buf ~start ~end_ s.element_state with
+      | `Incomplete element_state ->
+          `Incomplete { s with element_state }
+      | `Finished elt ->
+          let elements_read = s.elements_read + 1 in
+          let accumulator = elt :: s.accumulator in
+          if elements_read = count then `Finished (List.rev accumulator)
+          else
+            let start' = start + elt_size in
+            let state' =
+              { element_state = elt_initial_state; elements_read; accumulator }
+            in
+            if start' <= end_ then
+              read ~buf ~start:(start + elt_size) ~end_ state'
+            else `Incomplete state'
+    in
+    let initial_state =
+      { elements_read = 0; element_state = elt_initial_state; accumulator = [] }
+    in
+    Decoder { size; initial_state; read }
+
+  let polymorphic_list (elements : 'elt decoder list) : 'elt list decoder =
+    let open struct
+      type 'elt state =
+        | State :
+            { current_elt_size : int
+            ; read_current_elt : ('elt, 'elt_state) decode_f
+            ; current_elt_state : 'elt_state
+            ; remaining_elements : 'elt decoder list
+            ; accumulator : 'elt list
+            }
+            -> 'elt state
+    end in
+    let advance remaining_elements accumulator =
+      match remaining_elements with
+      | [] ->
+          None
+      | Decoder
+          { size = current_elt_size
+          ; initial_state = current_elt_state
+          ; read = read_current_elt
+          }
+        :: remaining_elements ->
+          Some
+            (State
+               { current_elt_size
+               ; read_current_elt
+               ; current_elt_state
+               ; remaining_elements
+               ; accumulator
+               })
+    in
+    match advance elements [] with
+    | None ->
+        map_decoder unit ~f:(Fn.const [])
+    | Some initial_state ->
+        let size =
+          List.sum (module Int) elements ~f:(fun (Decoder { size; _ }) -> size)
+        in
+        let rec read ~buf ~start ~end_ (State s) =
+          match s.read_current_elt ~buf ~start ~end_ s.current_elt_state with
+          | `Incomplete current_elt_state ->
+              `Incomplete (State { s with current_elt_state })
+          | `Finished elt -> (
+              let accumulator = elt :: s.accumulator in
+              match advance s.remaining_elements accumulator with
+              | None ->
+                  `Finished (List.rev accumulator)
+              | Some s' ->
+                  let start' = start + s.current_elt_size in
+                  if start' <= end_ then read ~buf ~start:start' ~end_ s'
+                  else `Incomplete s' )
+        in
+        Decoder { size; initial_state; read }
+end
+
+module Fragment_stream = struct
+  type t =
+    { buffered_fragments : bytes Queue.t
+    ; mutable buffered_size : int
+    ; mutable first_fragment_offset : int
+    ; mutable outstanding_read_request : (int * unit Ivar.t) option
+    }
+
+  let create () =
+    { buffered_fragments = Queue.create ()
+    ; buffered_size = 0
+    ; first_fragment_offset = 0
+    ; outstanding_read_request = None
+    }
+
+  let add_fragment t fragment =
+    let len = Bytes.length fragment in
+    Queue.enqueue t.buffered_fragments fragment ;
+    t.buffered_size <- t.buffered_size + len ;
+    Option.iter t.outstanding_read_request ~f:(fun (remaining, signal) ->
+        let remaining' = remaining - len in
+        if remaining' <= 0 then (
+          t.outstanding_read_request <- None ;
+          Ivar.fill signal () )
+        else t.outstanding_read_request <- Some (remaining', signal))
+
+  let read_now_exn t amount_to_read =
+    let rec dequeue_fragments amount_read =
+      let frag = Queue.peek_exn t.buffered_fragments in
+      let len = Bytes.length frag - t.first_fragment_offset in
+      let delta_read = min len (amount_to_read - amount_read) in
+      let amount_read' = amount_read + delta_read in
+      t.buffered_size <- t.buffered_size - delta_read ;
+      t.first_fragment_offset <-
+        ( if delta_read = len then (
+          ignore (Queue.dequeue_exn t.buffered_fragments) ;
+          0 )
+        else t.first_fragment_offset + delta_read ) ;
+      if amount_read' = amount_to_read then [ frag ]
+      else frag :: dequeue_fragments amount_read'
+    in
+    assert (t.buffered_size >= amount_to_read) ;
+    let start_offset = t.first_fragment_offset in
+    let fragments = dequeue_fragments 0 in
+    let end_offset =
+      if t.first_fragment_offset = 0 then
+        (* TODO: could use a ref for O(1) access of last fragment instead, should `List.length fragments` be very large *)
+        Bytes.length (List.last_exn fragments) - 1
+      else t.first_fragment_offset - 1
+    in
+    { Fragment_view.fragments; start_offset; end_offset }
+
+  let read t amount =
+    assert (Option.is_none t.outstanding_read_request) ;
+    if t.buffered_size >= amount then return (read_now_exn t amount)
+    else
+      let amount_required = amount - t.buffered_size in
+      let wait_signal = Ivar.create () in
+      t.outstanding_read_request <- Some (amount_required, wait_signal) ;
+      let%map () = Ivar.read wait_signal in
+      read_now_exn t amount
+
+  (* val read_and_decode : Fragment_stream.t -> 'a decoder -> 'a Deferred.t *)
+  let read_and_decode t decoder =
+    let open Fragment_view in
+    read t (decoder_size decoder) >>| unsafe_decode decoder
+end
+
+(* TODO: consider -- might be able to re-use bin_ios interface here... *)
+let read_and_decode_message t =
+  let open Fragment_stream in
+  let open Decoders in
+  let%bind segment_count = read_and_decode t uint32 >>| Uint32.(( + ) one) in
+  (* TODO
+     if segment_count-1 > (max_int / 4) - 2 then
+       Util.out_of_int_range "Uint32.to_int"
+     let frame_header_size =
+       let word_size = 8 in
+       (Util.ceil_ratio (4 * (segment_count + 1)) word_size) * word_size
+     in
+  *)
+  (* let%bind segment_sizes = read_and_decode t (align (monomorphic_list uint32 (Uint32.to_int segment_count)) 8) in *)
+  (* let%bind segment_sizes = read_and_decode t (align (monomorphic_list uint32 (Uint32.to_int (segment_count-1))) 8 + 4) in *)
+  let%bind segment_sizes =
+    read_and_decode t (monomorphic_list uint32 (Uint32.to_int segment_count))
   in
-  don't_wait_for
-    (Deferred.ignore_m
-       (Strict_pipe.Reader.iter_until pipe ~f:(fun fragment ->
-            FramedStream.add_fragment stream fragment ;
-            read_frames ()))) ;
-  r
+  let%map segments =
+    read_and_decode t
+      (polymorphic_list
+         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))))
+  in
+  Capnp.BytesMessage.Message.of_storage segments
+
+let rec stream_messages frag_stream w =
+  let%bind () =
+    read_and_decode_message frag_stream
+    >>| Reader.DaemonInterface.Message.of_message >>| Or_error.return
+    >>= Strict_pipe.Writer.write w
+  in
+  stream_messages frag_stream w
 
 let read_incoming_messages reader =
-  Strict_pipe.Reader.map
-    (O1trace.time_execution "libp2p_ipc_reading_and_parsing_frames" (fun () ->
-         stream_messages reader))
-    ~f:
-      (Or_error.map ~f:(fun msg ->
-           O1trace.time_execution' "libp2p_ipc_parsing_message_structure"
-             (fun () -> Reader.DaemonInterface.Message.of_message msg)))
+  let r, w = Strict_pipe.create Strict_pipe.Synchronous in
+  let fragment_stream = Fragment_stream.create () in
+  don't_wait_for (stream_messages fragment_stream w) ;
+  don't_wait_for
+    (Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
+         Fragment_stream.add_fragment fragment_stream
+           (Stdlib.Bytes.unsafe_of_string fragment))) ;
+  r
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message
