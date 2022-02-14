@@ -5,7 +5,7 @@ metadata:
   labels:
     app: {{ template "foundation-delegation.fullname" . }}-backend
 spec:
-  replicas: 1
+  replicas: 4
   selector:
     matchLabels:
       app: {{ template "foundation-delegation.fullname" . }}-backend
