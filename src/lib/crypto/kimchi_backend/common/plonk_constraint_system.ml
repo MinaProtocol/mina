@@ -571,19 +571,16 @@ struct
 
   (** Adds zero-knowledgeness to the gates/rows, and convert into Rust type [Gates.t].
       This can only be called once *)
-  let finalize_and_get_gates sys =
-    (* finalize any pending generic constraint *)
-    ( match sys.pending_generic_gate with
-    | None ->
-        ()
-    | Some (l, r, o, coeffs) ->
-        add_row sys [| l; r; o |] Generic coeffs ;
-        sys.pending_generic_gate <- None ) ;
-
-    match sys.gates with
-    | `Finalized ->
+  let rec finalize_and_get_gates sys =
+    match sys with
+    | { gates = `Finalized; _ } ->
         failwith "Already finalized"
-    | `Unfinalized_rev gates_rev ->
+    | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
+        (* finalize any pending generic constraint first *)
+        add_row sys [| l; r; o |] Generic coeffs ;
+        sys.pending_generic_gate <- None ;
+        finalize_and_get_gates sys
+    | { gates = `Unfinalized_rev gates_rev; _ } ->
         let rust_gates = Gates.create () in
 
         (* create rows for public input *)
