@@ -310,7 +310,6 @@ module Fragment_view = struct
       | `Incomplete st ->
           Error st
     in
-
     let rec decode_from_next_fragment ~start ~remaining_bytes ~state
         remaining_fragments =
       let fragment = List.hd_exn remaining_fragments in
@@ -324,7 +323,7 @@ module Fragment_view = struct
       | Ok result ->
           result
       | Error state' ->
-          let remaining_bytes' = remaining_bytes + len - start in
+          let remaining_bytes' = remaining_bytes - (end_ - start + 1) in
           decode_from_next_fragment ~start:0 ~remaining_bytes:remaining_bytes'
             ~state:state' remaining_fragments'
     in
@@ -390,6 +389,67 @@ module Decoders = struct
           `Incomplete { bytes_read = bytes_read'; accumulator = accumulator' }
     in
     Decoder { size; initial_state; read }
+
+  (* TODO: does not test offsets *)
+  let%test_unit "bytes decoding" =
+    let alphabet = "abcdefghijklmnopqrstuvwxyz" in
+    let rec gen_until g f =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind x = g in
+      if f x then return x else gen_until g f
+    in
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let rec slice_list ~num_slices ~slice_chance ~start ~index src =
+        let get () = String.sub src ~pos:start ~len:(index - start + 1) in
+        let new_slice () =
+          slice_list ~num_slices:(num_slices - 1) ~slice_chance
+            ~start:(index + 1) ~index:(index + 1) src
+        in
+        let continue_slice () =
+          slice_list ~num_slices ~slice_chance ~start ~index:(index + 1) src
+        in
+        if index >= String.length src - 1 then return [ get () ]
+        else if num_slices >= String.length src - 1 - index then
+          new_slice () >>| List.cons (get ())
+        else
+          let%bind roll = Float.gen_incl 0.0 1.0 in
+          if Float.(roll <= slice_chance) then
+            new_slice () >>| List.cons (get ())
+          else continue_slice ()
+      in
+      let%bind n = Int.gen_incl 0 1024 in
+      let%bind chars =
+        gen_until
+          (List.gen_permutations @@ String.to_list alphabet)
+          (Fn.compose not List.is_empty)
+      in
+      let src = String.of_char_list chars in
+      let size = String.length src in
+      let%bind num_slices = Int.gen_incl 0 (size - 1) in
+      let slice_chance =
+        Float.of_int (size - 1 - num_slices) /. Float.of_int size
+      in
+      let%map slices =
+        slice_list ~num_slices ~slice_chance ~start:0 ~index:0 src
+      in
+      List.map slices ~f:Stdlib.Bytes.unsafe_of_string
+    in
+    Quickcheck.test gen ~f:(fun fragments ->
+        let view =
+          { Fragment_view.fragments
+          ; start_offset = 0
+          ; end_offset = Bytes.length @@ List.last_exn fragments
+          }
+        in
+        let size = List.sum (module Int) fragments ~f:Bytes.length in
+        let expected =
+          fragments
+          |> List.map ~f:Stdlib.Bytes.unsafe_to_string
+          |> String.concat |> Stdlib.Bytes.unsafe_of_string
+        in
+        let result = unsafe_decode (bytes size) view in
+        [%test_eq: bytes] result expected)
 
   let uint32 : Uint32.t decoder =
     let open struct
@@ -549,7 +609,7 @@ module Fragment_stream = struct
       t.buffered_size <- t.buffered_size - delta_read ;
       t.first_fragment_offset <-
         ( if delta_read = len then (
-          ignore (Queue.dequeue_exn t.buffered_fragments) ;
+          ignore (Queue.dequeue_exn t.buffered_fragments : bytes) ;
           0 )
         else t.first_fragment_offset + delta_read ) ;
       if amount_read' = amount_to_read then [ frag ]
