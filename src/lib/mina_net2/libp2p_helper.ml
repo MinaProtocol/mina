@@ -247,6 +247,9 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
           trace_recurring_task "process libp2p_helper stderr" (fun () ->
               Child_processes.stderr process
               |> Strict_pipe.Reader.iter ~f:(fun line ->
+                     Mina_metrics.(
+                       Counter.inc_one
+                         Mina_metrics.Network.ipc_logs_received_total) ;
                      let record_result =
                        let open Result.Let_syntax in
                        let%bind json =
@@ -269,21 +272,29 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                      Deferred.unit))) ;
       O1trace.time_execution "handling_libp2p_helper_incoming_ipc" (fun () ->
           trace_recurring_task "process libp2p_helper stdout" (fun () ->
-              O1trace.time_execution "read_libp2p_helper_ipc_incoming"
+              let msg_reader =
+                O1trace.time_execution "read_libp2p_helper_ipc_incoming"
+                  (fun () ->
+                    Child_processes.stdout process
+                    |> Libp2p_ipc.read_incoming_messages)
+              in
+              O1trace.time_execution "handle_libp2p_helper_ipc_incoming"
                 (fun () ->
-                  Child_processes.stdout process
-                  |> Libp2p_ipc.read_incoming_messages)
-              |> Strict_pipe.Reader.iter ~f:(function
-                   | Ok msg ->
-                       msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
-                       |> handle_incoming_message t ~handle_push_message
-                   | Error error ->
-                       [%log error]
-                         "failed to parse IPC message over libp2p_helper \
-                          stdout: $error"
-                         ~metadata:
-                           [ ("error", `String (Error.to_string_hum error)) ] ;
-                       Deferred.unit))) ;
+                  Strict_pipe.Reader.iter msg_reader ~f:(function
+                    | Ok msg ->
+                        let msg =
+                          O1trace.time_execution' "unwrapping_messages"
+                            (fun () ->
+                              Libp2p_ipc.Reader.DaemonInterface.Message.get msg)
+                        in
+                        handle_incoming_message t msg ~handle_push_message
+                    | Error error ->
+                        [%log error]
+                          "failed to parse IPC message over libp2p_helper \
+                           stdout: $error"
+                          ~metadata:
+                            [ ("error", `String (Error.to_string_hum error)) ] ;
+                        Deferred.unit)))) ;
       Or_error.return t
 
 let shutdown t =

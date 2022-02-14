@@ -850,6 +850,10 @@ module Network = struct
   let ipc_latency_ns_summary : Ipc_latency_histogram.t =
     let help = "A histogram for all IPC message latencies" in
     Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
+
+  let ipc_logs_received_total : Counter.t =
+    let help = "Total number of logs received from libp2p helper subprocess" in
+    Counter.v "ipc_logs_received_total" ~help ~namespace ~subsystem
 end
 
 module Pipe = struct

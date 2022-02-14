@@ -249,6 +249,8 @@ module Network : sig
   val rpc_latency_ms_summary : Rpc_latency_histogram.t
 
   val ipc_latency_ns_summary : Ipc_latency_histogram.t
+
+  val ipc_logs_received_total : Counter.t
 end
 
 module Pipe : sig

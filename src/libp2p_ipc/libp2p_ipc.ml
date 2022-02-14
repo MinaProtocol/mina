@@ -678,11 +678,12 @@ let rec stream_messages frag_stream w =
 let read_incoming_messages reader =
   let r, w = Strict_pipe.create Strict_pipe.Synchronous in
   let fragment_stream = Fragment_stream.create () in
-  don't_wait_for (stream_messages fragment_stream w) ;
-  don't_wait_for
-    (Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
-         Fragment_stream.add_fragment fragment_stream
-           (Stdlib.Bytes.unsafe_of_string fragment))) ;
+  O1trace.time_execution "ipc_stream_messages" (fun () -> don't_wait_for (stream_messages fragment_stream w)) ;
+  O1trace.time_execution "ipc_adding_fragments" (fun () ->
+    don't_wait_for
+      (Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
+           Fragment_stream.add_fragment fragment_stream
+             (Stdlib.Bytes.unsafe_of_string fragment)))) ;
   r
 
 let write_outgoing_message writer msg =
