@@ -188,7 +188,7 @@ module Transport = struct
 
     let create () = ()
 
-    let transport () = Core.print_endline
+    let transport () = Writer.(writef (Lazy.force stdout) "%s\n")
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
