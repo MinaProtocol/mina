@@ -168,7 +168,10 @@ let reader_to_strict_pipe reader output_type =
     | `Chunks ->
         Reader.pipe reader
     | `Lines ->
-        Reader.lines reader
+        (* Reader.lines reader *)
+        Async_unix.Reader.lines
+          ~trace:({ Reader.trace = O1trace.time_execution' } : Reader.trace_f)
+          reader
   in
   Strict_pipe.Reader.of_linear_pipe { pipe; has_reader = false }
 

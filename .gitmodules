@@ -39,3 +39,6 @@
 [submodule "src/external/capnp-ocaml"]
 	path = src/external/capnp-ocaml
 	url = https://github.com/o1-labs/capnp-ocaml.git
+[submodule "src/external/async_unix"]
+	path = src/external/async_unix
+	url = https://github.com/nholland94/async_unix.git
