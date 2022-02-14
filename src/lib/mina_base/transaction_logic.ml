@@ -1536,6 +1536,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         assert (Public_key.Compressed.equal public_key account.public_key) ;
         assert (Token_id.equal token_id account.token_id) ;
         match loc with `Existing _ -> `Is_new false | `New -> `Is_new true
+
+      let set_next_available_token (t : t) id =
+        L.set_next_available_token t id ;
+        t
+
+      let next_available_token (t : t) = L.next_available_token t
     end
 
     module Transaction_commitment = struct
@@ -1580,12 +1586,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let timing (a : t) : timing =
         Party.Update.Timing_info.of_account_timing a.timing
 
-      let set_timing (timing : timing) (a : t) : t =
+      let set_timing (a : t) (timing : timing) : t =
         { a with
           timing =
             Option.value_map ~default:Account_timing.Untimed
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
+
+      let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
     end
 
     module Amount = struct
@@ -1697,7 +1705,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let if_ = Parties.value_if
 
-      let empty = []
+      let empty () = []
 
       let is_empty = List.is_empty
 
@@ -1719,7 +1727,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Parties = struct
       type t = (Party.t, Parties.Digest.t) Parties.Call_forest.t
 
-      let empty = []
+      let empty () = []
 
       let if_ = Parties.value_if
 
