@@ -4,7 +4,6 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries
-   zexe_backend
    pickles_types
    snarky.backendless
    core_kernel))

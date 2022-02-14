@@ -1,6 +1,6 @@
 (library
  (name fake_network)
  (public_name fake_network)
- (libraries async core gadt_lib gossip_net mina_networking sync_handler)
+ (libraries async core gadt_lib gossip_net mina_networking sync_handler transition_chain_prover)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std)))

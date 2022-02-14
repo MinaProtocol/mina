@@ -2,7 +2,7 @@
  (name uptime_service)
  (public_name uptime_service)
  (inline_tests)
- (libraries core_kernel async block_producer daemon_rpcs mina_transition otp_lib ptime
+ (libraries core_kernel async daemon_rpcs mina_transition otp_lib ptime
             snark_work_lib snark_worker rfc3339_time)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))

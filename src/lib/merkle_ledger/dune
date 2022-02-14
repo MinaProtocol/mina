@@ -19,7 +19,6 @@
    key_value_database
    merkle_address
    non_empty_list
-   signature_lib
    visualization)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))

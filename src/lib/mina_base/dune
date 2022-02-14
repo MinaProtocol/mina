@@ -22,7 +22,6 @@
    fold_lib
    hash_prefix_states
    hash_prefixes
-   linked_tree
    merkle_ledger
    merkle_mask
    one_or_two

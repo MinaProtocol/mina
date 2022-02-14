@@ -5,21 +5,20 @@
  (modules (:standard \ proof_of_stake_fuzzer))
  (library_flags (-linkall))
  (libraries
+   interruptible
    snarky_taylor
    core_kernel
    consensus.vrf
    mina_base
    block_time
    with_hash
-   test_genesis_ledger
    snark_params
    perf_histograms
-   rc_pool
    test_util
    vrf_lib
    unix_timestamp
-   global_signer_private_key
    non_zero_curve_point
+   genesis_ledger
    yojson
    mina_metrics
    graphql_lib)

@@ -7,13 +7,9 @@
  (libraries
    cache_dir
    core
-   hash_prefixes
    group_map
    snarky.backendless
    pickles
-   bignum_bigint
-   bowe_gabizon_hash
-   random_oracle
    tuple_lib)
  (preprocess
   (pps ppx_version ppx_jane h_list.ppx))

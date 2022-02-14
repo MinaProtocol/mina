@@ -6,12 +6,12 @@
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
+    run_in_thread
     zexe_backend_common
     hex
     pickles_types
     marlin_plonk_bindings
     key_cache
-    sgn_type
     snarky.backendless
     sponge
     snarkette

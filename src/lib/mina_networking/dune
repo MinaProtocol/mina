@@ -2,7 +2,7 @@
  (name mina_networking)
  (public_name mina_networking)
  (library_flags -linkall)
- (libraries core o1trace async mina_intf
+ (libraries core o1trace async
             gossip_net mina_base unix_timestamp perf_histograms proof_carrying_data
             consensus network_pool mina_transition transition_frontier staged_ledger
             sync_status)

@@ -3,7 +3,7 @@
  (public_name work_selector)
  (library_flags -linkall)
  (inline_tests)
- (libraries core debug_assert logger mina_intf async
+ (libraries core debug_assert logger async
             unix_timestamp staged_ledger network_pool)
  (preprocess
   (pps ppx_coda ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
