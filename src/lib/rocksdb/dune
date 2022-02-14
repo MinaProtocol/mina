@@ -2,7 +2,7 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
- (libraries core rocks key_value_database file_system logger)
+ (libraries core ahrocksdb key_value_database file_system logger)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))

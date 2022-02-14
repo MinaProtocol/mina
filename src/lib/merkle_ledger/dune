@@ -9,7 +9,7 @@
    core.uuid
    extlib
    integers
-   rocks
+   ahrocksdb
    ;; libraries
    bitstring
    cache_dir

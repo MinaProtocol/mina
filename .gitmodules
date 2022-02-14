@@ -39,3 +39,6 @@
 [submodule "src/external/capnp-ocaml"]
 	path = src/external/capnp-ocaml
 	url = https://github.com/o1-labs/capnp-ocaml.git
+[submodule "src/external/ocaml-ahrocksdb"]
+	path = src/external/ocaml-ahrocksdb
+	url = https://github.com/balsoft/ocaml-ahrocksdb

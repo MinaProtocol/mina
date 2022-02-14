@@ -71,6 +71,9 @@ let
       ocaml-libs =
         builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
     in {
+      ahrocksdb = super.ahrocksdb.overrideAttrs
+        (_: { ROCKSDB = "${pkgs.rocksdb}/include"; });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -101,8 +104,10 @@ let
           ++ ocaml-libs;
 
         # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+        ROCKSDB = "${pkgs.rocksdb}/include/rocksdb";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+
+        NIX_CFLAGS_COMPILE = "-I${pkgs.rocksdb}/include -L${pkgs.rocksdb}/lib";
 
         MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
         configurePhase = ''
