@@ -13,10 +13,7 @@ use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine a
 
 use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
-use kimchi::{
-    alphas,
-    index::{expr_linearization, VerifierIndex},
-};
+use kimchi::index::{expr_linearization, VerifierIndex};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -32,7 +29,6 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
-            powers_of_alpha: vi.powers_of_alpha,
             srs: CamlFpSrs(vi.srs),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -86,13 +82,13 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, &None);
+        let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
-            powers_of_alpha: index.powers_of_alpha,
+            powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -220,7 +216,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        powers_of_alpha: alphas::Builder::default(),
         srs: CamlFpSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),

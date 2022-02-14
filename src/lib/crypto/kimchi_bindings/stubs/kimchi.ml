@@ -644,7 +644,6 @@ module Protocol = struct
       { domain : 'Fr domain
       ; max_poly_size : int
       ; max_quot_size : int
-      ; powers_of_alpha : alphas_builder
       ; srs : 'SRS
       ; evals : 'PolyComm verification_evals
       ; shifts : 'Fr array

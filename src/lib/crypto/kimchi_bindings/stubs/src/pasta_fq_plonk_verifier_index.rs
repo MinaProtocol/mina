@@ -1,5 +1,4 @@
 use crate::{
-    alphas::Builder,
     arkworks::{CamlFq, CamlGPallas},
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
@@ -30,7 +29,6 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
-            powers_of_alpha: vi.powers_of_alpha,
             srs: CamlFqSrs(vi.srs),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -84,13 +82,13 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, &None);
+        let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
-            powers_of_alpha: index.powers_of_alpha,
+            powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -218,7 +216,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        powers_of_alpha: Builder::default(),
         srs: CamlFqSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),

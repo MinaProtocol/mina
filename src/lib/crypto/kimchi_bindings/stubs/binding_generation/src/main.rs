@@ -1,7 +1,6 @@
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use wires_15_stubs::{
-    alphas,
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     field_vector::{fp::*, fq::*},
@@ -22,14 +21,12 @@ use wires_15_stubs::{
     CamlCircuitGate,
     CamlLookupEvaluations,
     CamlOpeningProof,
-    CamlPolishToken,
     CamlPolyComm,
     CamlProofEvaluations,
     CamlProverCommitments,
     CamlProverProof,
     CamlRandomOracles,
     CamlScalarChallenge,
-    CamlVariable,
     CamlWire,
     CurrOrNext,
     GateType,
@@ -347,7 +344,6 @@ fn generate_bindings(mut w: impl std::io::Write) {
             });
             decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
             decl_type!(w, env, CamlPlonkVerificationEvals<T1> => "verification_evals");
-            decl_type!(w, env, alphas::Builder => "alphas_builder");
             decl_type!(w, env, CamlPlonkVerifierIndex<T1, T2, T3> => "verifier_index");
 
             decl_module!(w, env, "Fp", {
