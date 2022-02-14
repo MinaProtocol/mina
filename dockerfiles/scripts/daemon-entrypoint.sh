@@ -22,10 +22,6 @@ for script in /entrypoint.d/*; do
   fi
 done
 
-# If VERBOSE=true then also append other log files
-if [[ ${VERBOSE} ]]; then
-  LOG_FILES+=("${VERBOSE_LOG_FILES[@]}")
-fi
 # Support flags from .mina-env on debian
 if [[ ${PEER_LIST_URL} ]]; then
   EXTRA_FLAGS+=" --peer-list-url ${PEER_LIST_URL}"
@@ -35,6 +31,14 @@ if [[ ${LOG_LEVEL} ]]; then
 fi
 if [[ ${FILE_LOG_LEVEL} ]]; then
   EXTRA_FLAGS+=" --file-log-level ${FILE_LOG_LEVEL}"
+fi
+
+# If VERBOSE=true then also append other log files
+if [[ ${VERBOSE} ]]; then
+  LOG_FILES+=("${VERBOSE_LOG_FILES[@]}")
+  # Print the flags to the daemon for debugging use
+  echo "[Debug] Input Args: ${INPUT_ARGS}"
+  echo "[Debug] Extra Flags: ${EXTRA_FLAGS}"
 fi
 
 # Mina daemon initialization
