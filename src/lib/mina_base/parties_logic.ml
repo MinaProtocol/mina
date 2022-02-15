@@ -859,9 +859,9 @@ module Make (Inputs : Inputs_intf) = struct
           (List.map ~f:Set_or_keep.is_keep
              (Pickles_types.Vector.to_list app_state))
       in
-      let changing_app_state =
+      let changing_entire_app_state =
         Bool.all
-          (List.map ~f:Set_or_keep.is_keep
+          (List.map ~f:Set_or_keep.is_set
              (Pickles_types.Vector.to_list app_state))
       in
       let proved_state =
@@ -869,7 +869,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~else_:
             (Bool.if_ proof_verifies
                ~then_:
-                 (Bool.if_ changing_app_state ~then_:Bool.true_
+                 (Bool.if_ changing_entire_app_state ~then_:Bool.true_
                     ~else_:(Account.proved_state a))
                ~else_:Bool.false_)
       in
