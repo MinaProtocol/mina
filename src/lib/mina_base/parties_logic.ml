@@ -378,7 +378,9 @@ module type Account_intf = sig
   type global_slot
 
   val check_timing :
-    txn_global_slot:global_slot -> t -> [ `Invalid_timing of bool ] * timing
+       txn_global_slot:global_slot
+    -> t
+    -> [ `Invalid_timing of bool | `Insufficient_balance of bool ] * timing
 
   (** Fill the snapp field of the account if it's currently [None] *)
   val make_snapp : t -> t
@@ -829,11 +831,18 @@ module Make (Inputs : Inputs_intf) = struct
     (* Check timing with current balance *)
     let a, local_state =
       let `Invalid_timing invalid_timing, timing =
-        Account.check_timing ~txn_global_slot a
+        match Account.check_timing ~txn_global_slot a with
+        | `Insufficient_balance _, _ ->
+            failwith "Did not propose a balance change at this timing check!"
+        | `Invalid_timing invalid_timing, timing ->
+            (* NB: Have to destructure to remove the possibility of
+               [`Insufficient_balance _] in the type.
+            *)
+            (`Invalid_timing invalid_timing, timing)
       in
       let local_state =
         Local_state.add_check local_state Source_minimum_balance_violation
-          invalid_timing
+          (Bool.not invalid_timing)
       in
       let a = Account.set_timing timing a in
       (a, local_state)
