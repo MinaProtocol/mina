@@ -66,7 +66,7 @@ RUN test "$deb_codename" = "buster" \
           python-flake8 \
           python-sexpdata \
           python3-sexpdata \
-      && rm -rf /var/lib/apt/lists/* \
+      && sudo rm -rf /var/lib/apt/lists/* \
       && sudo pip install readchar \
       || exit 0
 
@@ -98,7 +98,7 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
     && sudo apt-get update --yes \
     && sudo apt-get install --yes --no-install-recommends helm \
-    && rm -rf /var/lib/apt/lists/*
+    && sudo rm -rf /var/lib/apt/lists/*
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
@@ -106,4 +106,4 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt update \
     && sudo apt install --yes --no-install-recommends nodejs yarn \
-    && rm -rf /var/lib/apt/lists/*
+    && sudo rm -rf /var/lib/apt/lists/*
