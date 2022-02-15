@@ -480,26 +480,33 @@ let timing_error_to_user_command_status err =
   | _ ->
       failwith "Unexpected timed account validation error"
 
+(** [validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot]
+    returns a tuple of 3 values:
+    * [[`Insufficient_balance of bool | `Invalid_timing of bool]] encodes
+      possible errors, with the invariant that the return value is always
+      [`Invalid_timing false] if there was no error.
+      - [`Insufficient_balance true] results if [txn_amount] is larger than the
+        balance held in [account].
+      - [`Invalid_timing true] results if [txn_amount] is larger than the
+        balance available in [account] at global slot [txn_global_slot].
+    * [Timing.t], the new timing for [account] calculated at [txn_global_slot].
+    * [[`Min_balance of Balance.t]] returns the computed available balance at
+      [txn_global_slot].
+      - NOTE: We skip this calculation if the error is
+        [`Insufficient_balance true].  In this scenario, this value MUST NOT be
+        used, as it contains an incorrect placeholder value.
+*)
 let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
-  let nsf_error kind =
-    Or_error.errorf
-      !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
-        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
-        is insufficient"
-      kind txn_amount txn_global_slot account.balance
-    |> Or_error.tag ~tag:nsf_tag
-  in
   match account.timing with
   | Untimed -> (
       (* no time restrictions *)
       match Balance.(account.balance - txn_amount) with
       | None ->
-          nsf_error "untimed"
+          (`Insufficient_balance true, Untimed, `Min_balance Balance.zero)
       | _ ->
-          Or_error.return
-            (`Invalid_timing false, Untimed, `Min_balance Balance.zero) )
+          (`Invalid_timing false, Untimed, `Min_balance Balance.zero) )
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -507,16 +514,16 @@ let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
       ; vesting_period
       ; vesting_increment
       } ->
-      let open Or_error.Let_syntax in
-      let%map invalid_timing, curr_min_balance =
+      let invalid_balance, invalid_timing, curr_min_balance =
         let account_balance = account.balance in
         match Balance.(account_balance - txn_amount) with
         | None ->
-            (* checking for sufficient funds may be redundant with a check elsewhere
-               regardless, the transaction would put the account below any calculated minimum balance
-               so don't bother with the remaining computations
+            (* NB: The [initial_minimum_balance] here is the incorrect value,
+               but:
+               * we don't use it anywhere in this error case; and
+               * we don't want to waste time computing it if it will be unused.
             *)
-            nsf_error "timed"
+            (true, false, initial_minimum_balance)
         | Some proposed_new_balance ->
             let curr_min_balance =
               Account.min_balance_at_slot ~global_slot:txn_global_slot
@@ -524,18 +531,28 @@ let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
                 ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
-              Or_error.return (true, curr_min_balance)
-            else Or_error.return (false, curr_min_balance)
+              (false, true, curr_min_balance)
+            else (false, false, curr_min_balance)
       in
       (* once the calculated minimum balance becomes zero, the account becomes untimed *)
+      let possibly_error =
+        if invalid_balance then `Insufficient_balance invalid_balance
+        else `Invalid_timing invalid_timing
+      in
       if Balance.(curr_min_balance > zero) then
-        ( `Invalid_timing invalid_timing
-        , account.timing
-        , `Min_balance curr_min_balance )
-      else (`Invalid_timing invalid_timing, Untimed, `Min_balance Balance.zero)
+        (possibly_error, account.timing, `Min_balance curr_min_balance)
+      else (possibly_error, Untimed, `Min_balance Balance.zero)
 
 let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Or_error.Let_syntax in
+  let nsf_error kind =
+    Or_error.errorf
+      !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
+        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
+        is insufficient"
+      kind txn_amount txn_global_slot account.Account.Poly.balance
+    |> Or_error.tag ~tag:nsf_tag
+  in
   let min_balance_error min_balance =
     Or_error.errorf
       !"For timed account, the requested transaction for amount %{sexp: \
@@ -545,13 +562,18 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       txn_amount txn_global_slot min_balance
     |> Or_error.tag ~tag:min_balance_tag
   in
-  let%bind ( `Invalid_timing invalid_timing
-           , timing
-           , (`Min_balance curr_min_balance as min_balance) ) =
+  let possibly_error, timing, (`Min_balance curr_min_balance as min_balance) =
     validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot
   in
-  if invalid_timing then min_balance_error curr_min_balance
-  else return (timing, min_balance)
+  match possibly_error with
+  | `Insufficient_balance true ->
+      nsf_error "timed"
+  | `Invalid_timing true ->
+      min_balance_error curr_min_balance
+  | `Insufficient_balance false ->
+      failwith "Broken invariant in validate_timing_with_min_balance'"
+  | `Invalid_timing false ->
+      return (timing, min_balance)
 
 let validate_timing ~account ~txn_amount ~txn_global_slot =
   let open Result.Let_syntax in
@@ -1541,8 +1563,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let invalid_timing, timing, _ =
           validate_timing_with_min_balance' ~txn_amount:Amount.zero
             ~txn_global_slot ~account
-          (* Safe because the only error is when txn_amount > 0 *)
-          |> Or_error.ok_exn
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
 
