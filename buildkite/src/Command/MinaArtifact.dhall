@@ -54,7 +54,12 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
-            retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
+            retries = [
+              Command.Retry::{ exit_status = +2, limit = Some 2 } -- libp2p error
+              , Command.Retry::{ exit_status = +100, limit = Some 2 } -- debian error
+              , Command.Retry::{ exit_status = -1, limit = Some 2 } -- agent lost
+              , Command.Retry::{ exit_status = +255, limit = Some 2 } -- agent lost
+              ]
           },
 
         -- daemon devnet image
