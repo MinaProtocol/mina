@@ -113,9 +113,3 @@ For example, if you have a generic custom type that must be converted to differe
 * The priority is to keep small, potentially short-lived data on the heap so we don't fragment the rust heap and so that it gets free'd appropriately quickly.
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * Do not use `unwrap()` and other functions that can panic in the stubs. Instead return a `Result<_, ocaml::Error>` with a string literal (e.g. `Err(ocaml::Error::Message("my error"))`). This will get you much better errors on the OCaml side. If you want to add dynamic information you'll have to print it on the Rust side before returning the error (I haven't found a better way, `ocaml::Error` seems to only expect string literals).
-
-### Tips and tricks
-
-* If you're often updating the Rust code to test changes, there's two things you can do:
-  * either point all the proof-systems to your local copy
-  * or remove the Cargo.lock files present here (and in `binding_generation/`) (if you're building with dune, you'll have to delete them in the `_build` folder as well)
