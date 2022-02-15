@@ -228,8 +228,10 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
       (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
-    (* the poseidon and generic gates are special cases as they use  coefficient commitments from the verifier index *)
-    (* note that for all gates, the powers of alpha start at a^0 = 1 *)
+    (* The poseidon and generic gates are special cases,
+       as they use coefficient commitments from the verifier index.
+       Note that for all gates, powers of alpha start at a^0 = 1.
+    *)
     let poseidon =
       let (pn :: ps) = Vector.rev m.coefficients_comm in
       let res =
@@ -239,7 +241,7 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     in
 
     (*
-    remember, the layout of the generic gate:
+    Remember, the layout of the generic gate:
     | 0  |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 |
     | l1 | r1 | o1 | m1 | c1 | l2 | r2 | o2 | m2 | c2 |
     *)
@@ -249,14 +251,14 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
           :: l1 :: r1 :: o1 :: m1 :: l2 :: r2 :: o2 :: m2 :: _) =
         plonk.generic
       in
-      (* second gate first, to multiply with a power of alpha *)
+      (* Second gate first, to multiply with a power of alpha. *)
       let snd_gate = l2 * coeffs.(5) in
       let snd_gate = snd_gate + (r2 * coeffs.(6)) in
       let snd_gate = snd_gate + (o2 * coeffs.(7)) in
       let snd_gate = snd_gate + (m2 * coeffs.(8)) in
       let snd_gate = snd_gate + coeffs.(9) in
       let snd_gate = endoscale snd_gate alpha in
-      (* and then the first gate *)
+      (* And then the first gate. *)
       let generic_gate = snd_gate + (l1 * coeffs.(0)) in
       let generic_gate = generic_gate + (r1 * coeffs.(1)) in
       let generic_gate = generic_gate + (o1 * coeffs.(2)) in

@@ -172,12 +172,12 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
 
 (* TODO: not true anymore if lookup is used *)
 
-(** the offset of the powers of alpha for the permutation 
+(** The offset of the powers of alpha for the permutation. 
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
-  (** Computes the ft evaluation at zeta 
+  (** Computes the ft evaluation at zeta. 
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
@@ -217,7 +217,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let constant_term = Sc.constant_term env in
     ft_eval0 - constant_term
 
-  (** Computes the list of scalars used in the linearization *)
+  (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
@@ -261,7 +261,14 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; generic
         }
 
-  (** Checks that the scalars were computed correctly (now that we can do operations in this field). These operations were deferred as the verifier circuit was previously operating in a different field. *)
+  (** Check that computed proof scalars match the expected ones,
+    using the native field.
+    Note that the expected scalars are used to check 
+    the linearization in a proof over the other field 
+    (where those checks are more efficient), 
+    but we deferred the arithmetic checks until here 
+    so that we have the efficiency of the native field.
+  *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
       ~shift ~env (plonk : _ In_circuit.t) evals =
