@@ -107,6 +107,16 @@ val empty : t
 val deriver :
      (< contramap :
           ((bool, Auth_required.t) Poly.t -> (bool, Auth_required.t) Poly.t) ref
+      ; graphql_arg :
+          (   unit
+           -> (bool, Auth_required.t) Poly.t
+              Fields_derivers_graphql.Schema.Arg.arg_typ)
+          ref
+      ; graphql_arg_accumulator :
+          (bool, Auth_required.t) Poly.t
+          Fields_derivers_graphql.Graphql_args.Acc.T.t
+          ref
+      ; graphql_creator : ('a -> (bool, Auth_required.t) Poly.t) ref
       ; graphql_fields :
           (bool, Auth_required.t) Poly.t
           Fields_derivers_graphql.Graphql_fields.Input.T.t
@@ -116,7 +126,10 @@ val deriver :
           Fields_derivers_graphql.Graphql_fields.Accumulator.T.t
           list
           ref
-      ; map : ('b -> 'b) ref
+      ; map :
+          ((bool, Auth_required.t) Poly.t -> (bool, Auth_required.t) Poly.t) ref
+      ; nullable_graphql_arg :
+          (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; nullable_graphql_fields :
           (bool, Auth_required.t) Poly.t option
           Fields_derivers_graphql.Graphql_fields.Input.T.t
