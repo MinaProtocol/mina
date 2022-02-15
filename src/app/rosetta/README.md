@@ -4,6 +4,11 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/02/11:
+
+- Replaced "Pending" status with null as demanded by the specification:
+https://www.rosetta-api.org/docs/models/Operation.html
+
 2022/02/09:
 
 - Refactor docker build instructions to use a generic dockerfile that works across debian/ubuntu
