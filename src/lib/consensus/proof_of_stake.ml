@@ -20,11 +20,10 @@ let name = "proof_of_stake"
 
 let genesis_ledger_total_currency ~ledger =
   Mina_base.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
-    ~f:(fun _addr sum account ->
+    ~f:(fun _addr sum (account : Mina_base.Account.t) ->
       (* only default token matters for total currency used to determine stake *)
       if Mina_base.(Token_id.equal account.token_id Token_id.default) then
-        Amount.add sum
-          (Balance.to_amount @@ account.Mina_base.Account.Poly.balance)
+        Amount.add sum (Balance.to_amount @@ account.balance)
         |> Option.value_exn ?here:None ?error:None
              ~message:"failed to calculate total currency in genesis ledger"
       else sum)

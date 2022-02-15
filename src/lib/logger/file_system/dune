@@ -1,9 +1,9 @@
 (library
- (name logger)
- (public_name logger)
+ (name logger_file_system)
+ (public_name logger.file_system)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel yojson interpolator_lib structured_log_events)
+ (libraries core yojson logger)
  (preprocess
   (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
