@@ -865,6 +865,22 @@ module Make (Inputs : Inputs_intf) = struct
              (Pickles_types.Vector.to_list app_state))
       in
       let proved_state =
+        (* The [proved_state] tracks whether the app state has been entirely
+           determined by proofs ([true] if so), to allow snapp authors to be
+           confident that their initialization logic has been run, rather than
+           some malicious deployer instantiating the snapp in an account with
+           some fake non-initial state.
+           The logic here is:
+           * if the state is unchanged, keep the previous value;
+           * if the state has been entriely replaced, and the authentication
+             was a proof, the state has been 'proved' and [proved_state] is set
+             to [true];
+           * if the state has been partially updated by a proof, the
+             [proved_state] is unchanged;
+           * if the state has been changed by some authentication other than a
+             proof, the state is considered to have been tampered with, and
+             [proved_state] is reset to [false].
+        *)
         Bool.if_ keeping_app_state ~then_:(Account.proved_state a)
           ~else_:
             (Bool.if_ proof_verifies
