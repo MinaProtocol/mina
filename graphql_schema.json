@@ -2778,6 +2778,17 @@
               "description": null,
               "args": [
                 {
+                  "name": "originalRpc",
+                  "description":
+                    "Use the original (now deprecated) archive RPC to talk to an archive procesor <= 1.3.0beta4",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "block",
                   "description": "Block encoded in precomputed block format",
                   "type": {
@@ -2808,6 +2819,17 @@
               "name": "archiveExtensionalBlock",
               "description": null,
               "args": [
+                {
+                  "name": "originalRpc",
+                  "description":
+                    "Use the original (now deprecated) archive RPC to talk to an archive procesor <= 1.3.0beta4",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
                 {
                   "name": "block",
                   "description": "Block encoded in extensional block format",

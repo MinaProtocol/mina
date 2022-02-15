@@ -4,7 +4,8 @@ open Pipe_lib
 open O1trace
 
 let dispatch ?(max_tries = 5)
-    (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
+    (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff
+    ~archive_original_rpc =
   let rec go tries_left errs =
     if Int.( <= ) tries_left 0 then
       let e = Error.of_list (List.rev errs) in
@@ -14,15 +15,21 @@ let dispatch ?(max_tries = 5)
               (sprintf
                  "Could not send archive diff data to archive process after %d \
                   tries. The process may not be running, please check the \
-                  daemon-argument"
+                  daemon-argument.\n\n\
+                  If you have recently upgraded your daemon, but have not yet \
+                  updated your archive node use `--archive-original-rpc` to \
+                  communicate to the archive node."
                  max_tries)
               ( ("host_and_port", archive_location.value)
               , ("daemon-argument", archive_location.name) )
               [%sexp_of: (string * Host_and_port.t) * (string * string)]))
     else
+      let rpc =
+        if archive_original_rpc then Archive_lib.Rpc.Legacy.t
+        else Archive_lib.Rpc.t
+      in
       match%bind
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
-          archive_location.value
+        Daemon_rpcs.Client.dispatch rpc diff archive_location.value
       with
       | Ok () ->
           return (Ok ())
@@ -58,20 +65,27 @@ let make_dispatch_block rpc ?(max_tries = 5)
   in
   go max_tries []
 
-let dispatch_precomputed_block =
-  make_dispatch_block Archive_lib.Rpc.precomputed_block
+let dispatch_precomputed_block ~archive_original_rpc =
+  if archive_original_rpc then
+    make_dispatch_block Archive_lib.Rpc.Legacy.precomputed_block
+  else make_dispatch_block Archive_lib.Rpc.precomputed_block
 
-let dispatch_extensional_block =
-  make_dispatch_block Archive_lib.Rpc.extensional_block
+let dispatch_extensional_block ~archive_original_rpc =
+  if archive_original_rpc then
+    make_dispatch_block Archive_lib.Rpc.Legacy.extensional_block
+  else make_dispatch_block Archive_lib.Rpc.extensional_block
 
-let transfer ~logger ~archive_location
+let transfer ~logger ~archive_location ~archive_original_rpc
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
       Broadcast_pipe.Reader.t) =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
           let diff = Archive_lib.Diff.Builder.breadcrumb_added breadcrumb in
-          match%map dispatch archive_location (Transition_frontier diff) with
+          match%map
+            dispatch archive_location (Transition_frontier diff)
+              ~archive_original_rpc
+          with
           | Ok () ->
               ()
           | Error e ->
@@ -85,7 +99,8 @@ let transfer ~logger ~archive_location
 
 let run ~logger
     ~(frontier_broadcast_pipe :
-       Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
+       Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location
+    ~archive_original_rpc =
   trace_task "Daemon sending diffs to archive loop" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
@@ -98,4 +113,5 @@ let run ~logger
                  Transition_frontier.Extensions.get_view_pipe extensions
                    Transition_frontier.Extensions.New_breadcrumbs
                in
-               transfer ~logger ~archive_location breadcrumb_reader)))
+               transfer ~logger ~archive_location breadcrumb_reader
+                 ~archive_original_rpc)))

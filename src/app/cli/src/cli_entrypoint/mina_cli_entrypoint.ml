@@ -130,11 +130,7 @@ let setup_daemon logger =
          localhost (this is INSECURE, make sure your firewall is configured \
          correctly!)"
   and archive_process_location = Flag.Host_and_port.Daemon.archive
-  and archive_original_rpc =
-    flag "--archive-original-rpc" ~aliases:[ "archive-original-rpc" ] no_arg
-      ~doc:
-        "Use the original (now deprecated) archive RPC to talk to an archive \
-         procesor <= 1.3.0beta4"
+  and archive_original_rpc = Flag.Archive.original_rpc
   and metrics_server_port =
     flag "--metrics-port" ~aliases:[ "metrics-port" ]
       ~doc:

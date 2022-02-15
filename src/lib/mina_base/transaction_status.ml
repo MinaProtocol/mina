@@ -685,6 +685,30 @@ module Failure = struct
   [%%endif]
 end
 
+module Auxiliary_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer_account_creation_fee_paid :
+            Currency.Amount.Stable.V1.t option
+        ; receiver_account_creation_fee_paid :
+            Currency.Amount.Stable.V1.t option
+        ; created_token : Token_id.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let empty =
+    { fee_payer_account_creation_fee_paid = None
+    ; receiver_account_creation_fee_paid = None
+    ; created_token = None
+    }
+end
+
 module Legacy = struct
   module Balance_data = struct
     [%%versioned
@@ -745,6 +769,18 @@ module Legacy = struct
       end
     end]
   end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
+        | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
+      [@@deriving sexp, yojson, equal, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
 end
 
 module Balance_and_nonce = struct
@@ -913,30 +949,6 @@ module Internal_command_balance_data = struct
           (Fee_transfer_balance_data.to_legacy f)
 end
 
-module Auxiliary_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { fee_payer_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_account_creation_fee_paid = None
-    ; receiver_account_creation_fee_paid = None
-    ; created_token = None
-    }
-end
-
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -948,6 +960,12 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+let to_legacy = function
+  | Applied (d, bd) ->
+      Legacy.Applied (d, Balance_data.to_legacy bd)
+  | Failed (f, bd) ->
+      Legacy.Failed (f, Balance_data.to_legacy bd)
 
 let balance_data = function
   | Applied (_, balances) | Failed (_, balances) ->

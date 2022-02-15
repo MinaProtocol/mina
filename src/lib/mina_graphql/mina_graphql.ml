@@ -3161,12 +3161,21 @@ module Mutations = struct
         in
         List.map ~f:Network_peer.Peer.to_display peers)
 
+  let original_rpc_arg =
+    Arg.(
+      arg "originalRpc"
+        ~doc:
+          "Use the original (now deprecated) archive RPC to talk to an archive \
+           procesor <= 1.3.0beta4"
+        ~typ:bool)
+
   let archive_precomputed_block =
     io_field "archivePrecomputedBlock"
       ~args:
         Arg.
           [ arg "block" ~doc:"Block encoded in precomputed block format"
               ~typ:(non_null Types.Input.precomputed_block)
+          ; original_rpc_arg
           ]
       ~typ:
         (non_null
@@ -3175,7 +3184,7 @@ module Mutations = struct
                     ~args:Arg.[]
                     ~resolve:(fun _ _ -> true)
                 ])))
-      ~resolve:(fun { ctx = coda; _ } () block ->
+      ~resolve:(fun { ctx = coda; _ } () block original_rpc ->
         let open Deferred.Result.Let_syntax in
         let%bind archive_location =
           match (Mina_lib.config coda).archive_process_location with
@@ -3186,8 +3195,9 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
-            block
+          Mina_lib.Archive_client.dispatch_precomputed_block
+            ~archive_original_rpc:(Option.value ~default:false original_rpc)
+            archive_location block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         ())
@@ -3198,6 +3208,7 @@ module Mutations = struct
         Arg.
           [ arg "block" ~doc:"Block encoded in extensional block format"
               ~typ:(non_null Types.Input.extensional_block)
+          ; original_rpc_arg
           ]
       ~typ:
         (non_null
@@ -3206,7 +3217,7 @@ module Mutations = struct
                     ~args:Arg.[]
                     ~resolve:(fun _ _ -> true)
                 ])))
-      ~resolve:(fun { ctx = coda; _ } () block ->
+      ~resolve:(fun { ctx = coda; _ } () block original_rpc ->
         let open Deferred.Result.Let_syntax in
         let%bind archive_location =
           match (Mina_lib.config coda).archive_process_location with
@@ -3218,6 +3229,7 @@ module Mutations = struct
         in
         let%map () =
           Mina_lib.Archive_client.dispatch_extensional_block archive_location
+            ~archive_original_rpc:(Option.value ~default:false original_rpc)
             block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in

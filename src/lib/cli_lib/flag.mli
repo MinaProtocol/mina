@@ -12,6 +12,10 @@ val privkey_read_path : string Command.Param.t
 
 val conf_dir : string option Command.Param.t
 
+module Archive : sig
+  val original_rpc : bool Command.Param.t
+end
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 
