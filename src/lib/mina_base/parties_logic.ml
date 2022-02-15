@@ -1120,7 +1120,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.increment_nonce a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_delegate
+        Local_state.add_check local_state Update_not_permitted_nonce
           Bool.((not increment_nonce) ||| has_permission)
       in
       let a = Account.set_nonce nonce a in
