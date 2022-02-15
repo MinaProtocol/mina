@@ -1475,8 +1475,9 @@ module Base = struct
             in
             let `Min_balance _, timing =
               run_checked
-              @@ check_timing ~balance_check ~timed_balance_check ~account
-                   ~txn_amount:None ~txn_global_slot
+              @@ [%with_label "Check snapp timing"]
+                   (check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:None ~txn_global_slot)
             in
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
