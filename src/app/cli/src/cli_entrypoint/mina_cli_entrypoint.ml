@@ -130,6 +130,11 @@ let setup_daemon logger =
          localhost (this is INSECURE, make sure your firewall is configured \
          correctly!)"
   and archive_process_location = Flag.Host_and_port.Daemon.archive
+  and archive_original_rpc =
+    flag "--archive-original-rpc" ~aliases:[ "archive-original-rpc" ] no_arg
+      ~doc:
+        "Use the original (now deprecated) archive RPC to talk to an archive \
+         procesor <= 1.3.0beta4"
   and metrics_server_port =
     flag "--metrics-port" ~aliases:[ "metrics-port" ]
       ~doc:
@@ -1207,10 +1212,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
-             ~archive_process_location ~log_block_creation ~precomputed_values
-             ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
-             ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-             ~uptime_submitter_keypair ~stop_time ~node_status_url ())
+             ~archive_process_location ~archive_original_rpc ~log_block_creation
+             ~precomputed_values ~start_time ?precomputed_blocks_path
+             ~log_precomputed_blocks ~upload_blocks_to_gcloud
+             ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+             ~stop_time ~node_status_url ())
       in
       { Coda_initialization.coda
       ; client_trustlist
