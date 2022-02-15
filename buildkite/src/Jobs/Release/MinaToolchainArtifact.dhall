@@ -33,31 +33,57 @@ Pipeline.build
       },
     steps = [
 
-      -- mina-toolchain Debian Buster image
+      -- mina-toolchain Debian 11 "Bullseye" Toolchain
+      let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="bullseye",
+        extra_args="--no-cache",
+        step_key="toolchain-bullseye-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBullseyeSpec,
+
+      -- mina-toolchain Debian 10 "Buster" Toolchain
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="buster",
         extra_args="--no-cache",
-        step_key="mina-toolchain-buster-docker-image"
+        step_key="toolchain-buster-docker-image"
       }
 
       in
 
       DockerImage.generateStep toolchainBusterSpec,
 
-      -- mina-toolchain Debian Stretch image
+      -- mina-toolchain Debian 9 "Stretch" Toolchain
       let toolchainStretchSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
         deb_codename="stretch",
         extra_args="--no-cache",
-        step_key="mina-toolchain-stretch-docker-image"
+        step_key="toolchain-stretch-docker-image"
       }
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep toolchainStretchSpec,
+
+      -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
+      let toolchainFocalSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="focal",
+        extra_args="--no-cache",
+        step_key="toolchain-focal-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainFocalSpec
 
     ]
   }

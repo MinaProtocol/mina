@@ -20,7 +20,8 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-# git will clone into an empty dir, but this also helps us set the workdir in advance
+# --- Shallow Clone the Mina repo
+# Delete any previous clones of the mina repo and then clone into an empty directory
 RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   && git clone \
   -b "${MINA_BRANCH}" \
@@ -28,19 +29,19 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   --shallow-submodules \
   --recurse-submodules \
   ${MINA_REPO} ${HOME}/${MINA_DIR}
-
+# Set the working directory to the cloned mina repo
 WORKDIR $HOME/${MINA_DIR}
-
+# Create a directory for compiled outputs
 RUN mkdir ${HOME}/app
 
-# Build libp2p_helper
+# --- Build libp2p_helper
 RUN make libp2p_helper \
    && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper
 
 # HACK: build without special cpu features to allow more people to run mina-rosetta
 RUN ./scripts/zexe-standardize.sh
 
-# Make rosetta-crucial components and the generate_keypair tool
+# --- Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/cli/src/mina_testnet_signatures.exe \
@@ -69,6 +70,6 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app/rosetta/ocaml-signer/signer.exe $HOME/app/mina-ocaml-signer \
   && rm -rf _build
 
-# Clear go module caches
+# --- Clear go module caches to make the container smaller
 RUN cd src/app/libp2p_helper/src/libp2p_helper \
   && go clean --cache --modcache --testcache -r
