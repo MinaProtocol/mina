@@ -56,7 +56,8 @@ RUN apt-get update \
     rsync \
     sudo \
     unzip \
-    zlib1g-dev
+    zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \

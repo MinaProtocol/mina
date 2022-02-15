@@ -39,6 +39,7 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 # archive-node package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
-  && apt-get install -y "mina-archive=$deb_version"
+  && apt-get install -y "mina-archive=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
