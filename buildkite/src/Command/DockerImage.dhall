@@ -63,11 +63,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
         target = Size.XLarge,
         docker_login = Some DockerLogin::{=},
         depends_on = spec.deps,
-        retries = [
-              Command.Retry::{ exit_status = +100, limit = Some 2 } -- debian error
-              , Command.Retry::{ exit_status = -1, limit = Some 2 } -- agent lost
-              , Command.Retry::{ exit_status = +255, limit = Some 2 } -- agent lost
-        ]
+        retries = [ Command.Retry::{ exit_status = +100, limit = Some 2 } ] -- debian install error
       }
 
 in
