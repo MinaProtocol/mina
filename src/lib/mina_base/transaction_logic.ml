@@ -1275,7 +1275,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
     let open Result.Let_syntax in
-    (* Check timing. *)
     let update perm u curr ~is_keep ~update ~error =
       match check_auth perm with
       | false ->
