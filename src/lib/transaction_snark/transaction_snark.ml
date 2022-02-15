@@ -1203,10 +1203,9 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t) ?tag
-        ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth ~is_start ~is_new
+    let apply_body ?tag ~txn_global_slot
+        ~(add_check : ?label:string -> Boolean.var -> unit) ~check_auth
+        ~is_start ~is_new
         ({ body =
              { public_key
              ; token_id = _
@@ -1254,33 +1253,6 @@ module Base = struct
       let is_receiver =
         Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
       in
-      (* Check send/receive permissions *)
-      let balance =
-        with_label __LOC__ (fun () ->
-            update_authorized
-              (Permissions.Auth_required.Checked.if_ is_receiver
-                 ~then_:a.permissions.receive ~else_:a.permissions.send)
-              ~is_keep:
-                !Amount.Signed.(Checked.(equal (constant zero) balance_change))
-              ~updated:
-                (let balance, `Overflow failed1 =
-                   !(Balance.Checked.add_signed_amount_flagged a.balance
-                       balance_change)
-                 in
-                 let fee =
-                   Amount.Checked.of_fee
-                     (Fee.var_of_t constraint_constants.account_creation_fee)
-                 in
-                 let balance_when_new, `Underflow failed2 =
-                   !(Balance.Checked.sub_amount_flagged balance fee)
-                 in
-                 let res =
-                   !(Balance.Checked.if_ is_new ~then_:balance_when_new
-                       ~else_:balance)
-                 in
-                 let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
-                 `Flagged (res, failed)))
-      in
       let `Min_balance _, timing =
         !([%with_label "Check snapp timing"]
             (let open Tick in
@@ -1301,8 +1273,7 @@ module Base = struct
                The balance and txn_amount are used only to find the resulting
                balance, so using the result directly is equivalent.
             *)
-            check_timing ~balance_check ~timed_balance_check
-              ~account:{ a with balance }
+            check_timing ~balance_check ~timed_balance_check ~account:a
               ~txn_amount:Amount.(var_of_t zero)
               ~txn_global_slot))
       in
@@ -1476,8 +1447,7 @@ module Base = struct
             ]) ;
       let a : Account.Checked.Unhashed.t =
         { a with
-          balance
-        ; snapp
+          snapp
         ; delegate
         ; permissions
         ; timing
@@ -1551,6 +1521,22 @@ module Base = struct
           let assert_ = Assert.is_true
         end
 
+        module Controller = struct
+          type t = Permissions.Auth_required.Checked.t
+
+          let if_ = Permissions.Auth_required.Checked.if_
+
+          let check =
+            match auth_type with
+            | Proof ->
+                fun ~proof_verifies:_ ~signature_verifies:_ perm ->
+                  Permissions.Auth_required.Checked.eval_proof perm
+            | Signature | None_given ->
+                fun ~proof_verifies:_ ~signature_verifies perm ->
+                  Permissions.Auth_required.Checked.eval_no_proof
+                    ~signature_verifies perm
+        end
+
         module Global_slot = struct
           include Global_slot.Checked
 
@@ -1566,8 +1552,50 @@ module Base = struct
           let vesting_period (t : t) = t.vesting_period
         end
 
+        module Balance = struct
+          include Balance.Checked
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
+
+          let sub_amount_flagged x y = run_checked (sub_amount_flagged x y)
+
+          let add_signed_amount_flagged x y =
+            run_checked (add_signed_amount_flagged x y)
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+
+          module Permissions = struct
+            let edit_state : t -> Controller.t =
+             fun a -> a.data.permissions.edit_state
+
+            let send : t -> Controller.t = fun a -> a.data.permissions.send
+
+            let receive : t -> Controller.t =
+             fun a -> a.data.permissions.receive
+
+            let set_delegate : t -> Controller.t =
+             fun a -> a.data.permissions.set_delegate
+
+            let set_permissions : t -> Controller.t =
+             fun a -> a.data.permissions.set_permissions
+
+            let set_verification_key : t -> Controller.t =
+             fun a -> a.data.permissions.set_verification_key
+
+            let set_snapp_uri : t -> Controller.t =
+             fun a -> a.data.permissions.set_snapp_uri
+
+            let edit_sequence_state : t -> Controller.t =
+             fun a -> a.data.permissions.edit_sequence_state
+
+            let set_token_symbol : t -> Controller.t =
+             fun a -> a.data.permissions.set_token_symbol
+
+            let increment_nonce : t -> Controller.t =
+             fun a -> a.data.permissions.increment_nonce
+          end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) =
             With_hash.of_data account ~hash_data:(fun a ->
@@ -1586,6 +1614,11 @@ module Base = struct
 
           let set_timing (timing : timing) (account : t) : t =
             { account with data = { account.data with timing } }
+
+          let balance (a : t) : Balance.t = a.data.balance
+
+          let set_balance (balance : Balance.t) ({ data = a; hash } : t) : t =
+            { data = { a with balance }; hash }
         end
 
         module Ledger = struct
@@ -2034,6 +2067,8 @@ module Base = struct
 
           let add_signed_flagged (x : t) (y : Signed.t) =
             run_checked (Amount.Checked.add_signed_flagged x y)
+
+          let of_constant_fee fee = Amount.var_of_t (Amount.of_fee fee)
         end
 
         module Token_id = struct
@@ -2155,7 +2190,7 @@ module Base = struct
               let tag =
                 Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
               in
-              apply_body ~constraint_constants ?tag
+              apply_body ?tag
                 ~txn_global_slot:
                   global_state.protocol_state.global_slot_since_hard_fork
                 ~add_check

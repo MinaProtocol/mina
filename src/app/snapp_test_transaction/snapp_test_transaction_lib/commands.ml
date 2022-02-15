@@ -7,6 +7,8 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
+let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
+
 (* transform JSON into a string for a Javascript object,
    some special handling of cases where the GraphQL schema
    differs from OCaml code
@@ -15,33 +17,52 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
   let indent n = String.make n ' ' in
   let rec go json level =
     match json with
-    | `Tuple _ | `Variant _ | `Intlit _ ->
-        failwith "JSON not generated from OCaml"
+    | `Tuple _ | `Variant _ ->
+        failwith
+          (sprintf "JSON not generated from OCaml: %s"
+             (Yojson.Safe.to_string json))
+    | `Intlit i ->
+        i
     | `Bool b ->
         if b then "true" else "false"
     | `Null ->
         "null"
-    (* special handling of sign in Currency.Amount.Signed.t *)
-    | `Assoc [ ("magnitude", m); ("sgn", `List [ `String sgn ]) ] ->
-        let sgn' =
-          match sgn with
-          | "Pos" ->
-              "PLUS"
-          | "Neg" ->
-              "MINUS"
-          | _ ->
-              failwithf "Unexpected sign \"%s\" for currency amount" sgn ()
-        in
-        go (`Assoc [ ("magnitude", m); ("sign", `String sgn') ]) level
     | `Assoc pairs ->
         sprintf "{%s}"
-          ( List.map pairs ~f:(fun (s, json) ->
-                let cameled =
-                  (* special handling for balance_change in Party.Fee_payer.t *)
-                  if fee_payer && String.equal s "balance_change" then "fee"
-                  else Mina_graphql.Reflection.underToCamel s
-                in
-                sprintf "%s:%s" cameled (go json (level + 2)))
+          ( List.filter_map pairs ~f:(fun (s, json) ->
+                (* Special handling of fee payer party and verification key field names*)
+                match (s, fee_payer) with
+                | "use_full_commitment", true
+                | "increment_nonce", true
+                | "token_id", true ->
+                    None
+                | "sgn", _ ->
+                    Some (sprintf "%s:%s" "sign" (go json level))
+                | "verification_key", _ -> (
+                    let vk_camel = underToCamel s in
+                    match json with
+                    | `List [ `String "Keep" ] ->
+                        Some (sprintf "%s:%s" vk_camel "null")
+                    | `List
+                        [ `String "Set"
+                        ; `Assoc [ ("data", vk); ("hash", vk_hash) ]
+                        ] ->
+                        let vk_with_hash =
+                          sprintf "{%s:%s, %s:%s}" vk_camel
+                            (go vk (level + 2))
+                            "hash"
+                            (go vk_hash (level + 2))
+                        in
+                        Some (sprintf "%s:%s" vk_camel vk_with_hash)
+                    | _ ->
+                        failwith "invalid verification key" )
+                | _, _ ->
+                    let cameled =
+                      (* special handling for balance_change in Party.Fee_payer.t *)
+                      if fee_payer && String.equal s "balance_change" then "fee"
+                      else underToCamel s
+                    in
+                    Some (sprintf "%s:%s" cameled (go json (level + 2))))
           |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
     (* Set_or_keep *)
     | `List [ `String "Set"; v ] ->
@@ -53,6 +74,24 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
         go v level
     | `List [ `String "Ignore" ] ->
         "null"
+        (* special handling of sign in Currency.Amount.Signed.t as Enums*)
+    | `List [ `String "Neg" ] ->
+        "MINUS"
+    | `List [ `String "Pos" ] ->
+        "PLUS"
+    (*Special handling of permissions as Enums*)
+    | `List [ `String "Proof" ] ->
+        "Proof"
+    | `List [ `String "Signature" ] ->
+        "Signature"
+    | `List [ `String "None" ] ->
+        "None"
+    | `List [ `String "Either" ] ->
+        "Either"
+    | `List [ `String "Both" ] ->
+        "Both"
+    | `List [ `String "Impossible" ] ->
+        "Impossible"
     (* Predicate special handling *)
     | `List [ `String "Accept" ] ->
         go (`Assoc [ ("account", `Null); ("nonce", `Null) ]) level
@@ -62,7 +101,7 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
         go (`Assoc [ ("account", account) ]) level
     (* other constructors *)
     | `List [ `String name; value ] ->
-        go (`Assoc [ (Mina_graphql.Reflection.underToCamel name, value) ]) level
+        go (`Assoc [ (underToCamel name, value) ]) level
     | `List jsons ->
         sprintf "[%s]"
           ( List.map jsons ~f:(fun json -> sprintf "%s" (go json (level + 2)))
@@ -322,7 +361,7 @@ module Util = struct
     | "impossible" ->
         Impossible
     | _ ->
-        failwith "Invalid authorization"
+        failwith (sprintf "Invalid authorization: %s" s)
 end
 
 let test_snapp_with_genesis_ledger_main keyfile config_file () =
