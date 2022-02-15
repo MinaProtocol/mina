@@ -2232,6 +2232,8 @@ type AccountPredicate =
 
     let balance x = Currency.Balance.Checked.Unsafe.of_field @@ uint64 x
 
+    let nonce x = Mina_numbers.Account_nonce.Checked.Unsafe.of_field @@ uint32 x
+
     let global_slot x =
       Mina_numbers.Global_slot.Checked.Unsafe.of_field @@ uint32 x
 
@@ -2345,38 +2347,31 @@ type AccountPredicate =
       ; depth = As_prover.Ref.create (fun () -> b##.depth)
       }
 
-    (*
-       let fee_payer_party (party : fee_payer_party) :
-           Party.Predicated.Fee_payer.Checked.t =
-         let b = body party##.body in
-         { body =
-             { b with
-               token_id = ()
-             ; delta = Currency.Amount.to_fee b.delta.magnitude
-             }
-         ; predicate =
-             uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
-         }
-         *)
+    let fee_payer_party (party : fee_payer_party) :
+        Party.Predicated.Fee_payer.Checked.t =
+      { (* TODO: is it OK that body is the same for fee_payer as for party?
+           what about fee vs. delta and other differences in the unchecked version?
+        *)
+        body = body party##.body
+      ; predicate = nonce party##.predicate
+      }
 
     let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-      let module Account_nonce = Mina_numbers.Account_nonce.Checked in
       match Js.to_string t##.type_ with
       | "accept" ->
-          Nonce_or_accept { nonce = Account_nonce.zero; accept = Boolean.true_ }
+          Nonce_or_accept
+            { nonce = Mina_numbers.Account_nonce.Checked.zero
+            ; accept = Boolean.true_
+            }
       | "nonce" ->
           let nonce_js : js_uint32 = Obj.magic t##.value in
-          let nonce = Account_nonce.Unsafe.of_field (uint32 nonce_js) in
-          Nonce_or_accept { nonce; accept = Boolean.false_ }
+          Nonce_or_accept { nonce = nonce nonce_js; accept = Boolean.false_ }
       | "full" ->
           let ( ^ ) = Fn.compose in
           let predicate : full_account_predicate = Obj.magic t##.value in
           Full
             { balance = numeric balance predicate##.balance
-            ; nonce =
-                numeric
-                  (Account_nonce.Unsafe.of_field ^ uint32)
-                  predicate##.nonce
+            ; nonce = numeric nonce predicate##.nonce
             ; receipt_chain_hash =
                 or_ignore
                   (* TODO: assumes constant *)
@@ -2396,22 +2391,6 @@ type AccountPredicate =
 
     let party (party : party) : Party.Predicated.Checked.t =
       { body = body party##.body; predicate = predicate party##.predicate }
-
-    (*
-       let parties (parties : parties) : Parties.t =
-         { fee_payer =
-             { data = fee_payer_party parties##.feePayer
-             ; authorization = Mina_base_kernel.Signature.dummy
-             }
-         ; other_parties =
-             Js.to_array parties##.otherParties
-             |> Array.map ~f:(fun p : Party.t ->
-                    { data = party p; authorization = None_given })
-             |> Array.to_list
-         ; protocol_state = protocol_state parties##.protocolState
-         ; memo = Mina_base_kernel.Signed_command_memo.empty
-         }
-    *)
   end
 
   (* TODO create checked versions!!! *)
@@ -2420,17 +2399,17 @@ type AccountPredicate =
   let hash_party (p : party) =
     p |> party |> Party.Predicated.digest |> Field.constant |> to_js_field
 
-  (* let hash_party_checked p =
-     p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field *)
+  let hash_party_checked p =
+    p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
     p |> protocol_state |> Snapp_predicate.Protocol_state.digest
     |> Field.constant |> to_js_field
 
-  (* let hash_protocol_state_checked (p : protocol_state_predicate) =
-       p |> protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
-       |> Field.constant |> to_js_field
-     in *)
+  let hash_protocol_state_checked (p : protocol_state_predicate) =
+    p |> Checked.protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
+    |> to_js_field
+
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
     let other_parties_hash =
@@ -2442,6 +2421,16 @@ type AccountPredicate =
     Parties.Transaction_commitment.create ~other_parties_hash
       ~protocol_state_predicate_hash ~memo_hash:Field.Constant.zero
     |> Field.constant |> to_js_field
+
+  let hash_transaction_checked other_parties_hash protocol_state_predicate_hash
+      =
+    let other_parties_hash = other_parties_hash |> of_js_field in
+    let protocol_state_predicate_hash =
+      protocol_state_predicate_hash |> of_js_field
+    in
+    Parties.Transaction_commitment.Checked.create ~other_parties_hash
+      ~protocol_state_predicate_hash ~memo_hash:Field.zero
+    |> to_js_field
 
   let () =
     let static_method name f =
@@ -2483,6 +2472,10 @@ type AccountPredicate =
     static_method "hashParty" hash_party ;
     static_method "hashProtocolState" hash_protocol_state ;
     static_method "hashTransaction" hash_transaction ;
+
+    static_method "hashPartyChecked" hash_party_checked ;
+    static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
+    static_method "hashTransactionChecked" hash_transaction_checked ;
 
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
