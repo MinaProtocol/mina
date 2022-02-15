@@ -57,11 +57,12 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
+      (** returned string is the transaction id *)
       val send_snapp :
            logger:Logger.t
         -> t
         -> parties:Mina_base.Parties.t
-        -> unit Deferred.Or_error.t
+        -> string Deferred.Or_error.t
 
       val get_balance :
            logger:Logger.t
@@ -263,6 +264,9 @@ module Dsl = struct
     val pub_key_of_node :
          Engine.Network.Node.t
       -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+
+    val priv_key_of_node :
+      Engine.Network.Node.t -> Signature_lib.Private_key.t Malleable_error.t
 
     val check_common_prefixes :
          tolerance:int

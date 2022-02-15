@@ -207,7 +207,7 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           if not (equal zero res) then (
-            Core.eprintf
+            eprintf
               !"%{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
@@ -255,7 +255,7 @@ module V = struct
   include Hashable.Make (T)
 end
 
-type ('a, 'f) t =
+type 'f t =
   { (* map of cells that share the same value (enforced by to the permutation) *)
     equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other variables) *)
@@ -288,7 +288,7 @@ type ('a, 'f) t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
-module Hash = Core.Md5
+module Hash = Core_kernel.Md5
 
 (* the hash of the circuit *)
 let digest (t : _ t) = Hash_state.digest t.hash
@@ -308,10 +308,10 @@ module Make
       val params : Fp.t Params.t
     end) =
 struct
-  open Core
+  open Core_kernel
   open Pickles_types
 
-  type nonrec t = (Gates.t, Fp.t) t
+  type nonrec t = Fp.t t
 
   module H = Digestif.SHA256
 
