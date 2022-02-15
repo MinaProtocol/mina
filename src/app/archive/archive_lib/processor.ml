@@ -706,11 +706,12 @@ module Balance = struct
            ; block_height: int64
            ; block_sequence_no: int
            ; block_secondary_sequence_no: int
+           ; nonce : int64 option
            } [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int64; int; int64;int;int] in
+    let spec = Caqti_type.[int; int; int64; int; int64;int;int; option int64] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -720,10 +721,10 @@ module Balance = struct
     |> Unsigned.UInt64.to_int64
 
   let find (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
     Conn.find_opt
       (Caqti_request.find_opt
-         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
+         Caqti_type.(tup3 (tup2 int int64) (tup4 int int64 int int) int64)
          Caqti_type.int
          {sql| SELECT id FROM balances
                WHERE public_key_id = $1
@@ -732,9 +733,11 @@ module Balance = struct
                AND block_height = $4
                AND block_sequence_no = $5
                AND block_secondary_sequence_no = $6
+               AND nonce = $7
          |sql})
          ((public_key_id, balance_to_int64 balance),
-          (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
+          (block_id, block_height, block_sequence_no, block_secondary_sequence_no),
+          nonce)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -742,33 +745,36 @@ module Balance = struct
          typ
          {sql| SELECT id, public_key_id, balance,
                       block_id, block_height,
-                      block_sequence_no, block_secondary_sequence_no
+                      block_sequence_no, block_secondary_sequence_no,
+                      nonce
                FROM balances
                WHERE id = $1
          |sql})
       id
 
   let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
+         Caqti_type.(tup3 (tup2 int int64) (tup4 int int64 int int)
+                       int64)
          Caqti_type.int
          {sql| INSERT INTO balances (public_key_id, balance,
                                      block_id, block_height, block_sequence_no, block_secondary_sequence_no)
-               VALUES (?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                RETURNING id |sql})
       ((public_key_id, balance_to_int64 balance),
-       (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
+       (block_id, block_height, block_sequence_no, block_secondary_sequence_no),
+       nonce)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
     let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~public_key_id ~balance  ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no with
+    match%bind find (module Conn) ~public_key_id ~balance  ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce with
     | Some balance_id ->
         return balance_id
     | None ->
-        add (module Conn) ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no
+        add (module Conn) ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce
 end
 
 module Block_and_internal_command = struct
@@ -947,7 +953,7 @@ module Block_and_signed_command = struct
       | Failed (failure, balances) ->
           ("failed", Some failure, None, None, None, balances)
     in
-    let add_optional_balance id balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+    let add_optional_balance id balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
       match balance with
       | None ->
           Deferred.Result.return None
@@ -956,7 +962,7 @@ module Block_and_signed_command = struct
             Balance.add_if_doesn't_exist
               (module Conn)
               ~public_key_id:id ~balance
-              ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no
+              ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce
           in
           Some balance_id
     in
@@ -967,15 +973,15 @@ module Block_and_signed_command = struct
       Balance.add_if_doesn't_exist
         (module Conn)
         ~public_key_id:fee_payer_id ~balance:fee_payer_balance
-        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
+        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce:0L
     in
     let%bind source_balance_id =
       add_optional_balance source_id source_balance
-                ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
+                ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce:0L
     in
     let%bind receiver_balance_id =
       add_optional_balance receiver_id receiver_balance
-        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
+        ~block_id ~block_height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce:0L
     in
     add
       (module Conn)
@@ -1312,6 +1318,7 @@ module Block = struct
                           ~public_key_id:receiver_id ~balance
                           ~block_id ~block_height:height
                           ~block_sequence_no:sequence_no ~block_secondary_sequence_no:secondary_sequence_no
+                          ~nonce:0L
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -1358,6 +1365,7 @@ module Block = struct
                           ~public_key_id:fee_transfer_receiver_id
                           ~balance
                           ~block_id ~block_height:height ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0
+                          ~nonce:0L
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -1387,6 +1395,7 @@ module Block = struct
                     ~block_id ~block_height:height
                     ~block_sequence_no:sequence_no
                     ~block_secondary_sequence_no:0
+                    ~nonce:0L
                 in
                 let receiver_account_creation_fee_paid =
                   account_creation_fee_of_fees_and_balance ?additional_fee
@@ -1503,19 +1512,19 @@ module Block = struct
       in
       List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
-    let balance_id_of_info pk balance ~block_sequence_no ~block_secondary_sequence_no =
+    let balance_id_of_info pk balance ~block_sequence_no ~block_secondary_sequence_no ~nonce =
       let%bind public_key_id =
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
       Balance.add_if_doesn't_exist (module Conn) ~public_key_id ~balance
         ~block_id ~block_height:(block.height |> Unsigned.UInt32.to_int64) ~block_sequence_no
-        ~block_secondary_sequence_no
+        ~block_secondary_sequence_no ~nonce
     in
     let balance_id_of_info_balance_opt pk balance_opt ~block_sequence_no ~block_secondary_sequence_no =
       Option.value_map balance_opt ~default:(Deferred.Result.return None)
         ~f:(fun balance ->
             let%map id = balance_id_of_info pk balance
-                ~block_sequence_no ~block_secondary_sequence_no
+                ~block_sequence_no ~block_secondary_sequence_no ~nonce:0L
             in
             Some id )
     in
@@ -1526,7 +1535,7 @@ module Block = struct
           let%bind fee_payer_balance_id =
             balance_id_of_info user_command.fee_payer
               user_command.fee_payer_balance
-              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:0L
           in
           let%bind source_balance_id =
             balance_id_of_info_balance_opt user_command.source
@@ -1578,7 +1587,7 @@ module Block = struct
           let%bind receiver_balance_id =
             balance_id_of_info internal_command.receiver
               internal_command.receiver_balance
-              ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no
+              ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no ~nonce:0L
           in
           let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
                                                    |> Option.map ~f:(fun amount ->

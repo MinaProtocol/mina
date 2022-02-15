@@ -358,12 +358,12 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
   let%map balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
   let account_id = Account_id.create pk token in
-  let actual_balance =
+  let account =
     match Ledger.location_of_account ledger account_id with
     | Some loc -> (
         match Ledger.get ledger loc with
         | Some account ->
-            account.balance
+            account
         | None ->
             failwithf
               "Could not find account in ledger for public key %s and token id \
@@ -376,6 +376,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
           (Token_id.to_string token) ()
   in
+  let actual_balance = account.balance in
   let claimed_balance =
     balance_info.balance |> Unsigned.UInt64.of_int64
     |> Currency.Balance.of_uint64
@@ -428,6 +429,25 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         ; ("block_secondary_sequence_no_command", `Int secondary_sequence_no)
         ; ( "block_secondary_sequence_no_balances"
           , `Int balance_info.block_secondary_sequence_no )
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  let ledger_nonce = account.nonce in
+  let db_nonce =
+    match balance_info.nonce with
+    | None ->
+        (* TODO: temp until all nonces populated *)
+        failwith "No nonce!"
+    | Some nonce ->
+        nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+  in
+  Format.eprintf "LEDGER NONCE: %s@." (Unsigned.UInt32.to_string ledger_nonce) ;
+  Format.eprintf "DB NONCE: %s@." (Unsigned.UInt32.to_string db_nonce) ;
+  if not (Account.Nonce.equal ledger_nonce db_nonce) then (
+    [%log error] "Ledger nonce does not match nonce in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
+        ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
         ] ;
     if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
@@ -569,6 +589,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       in
       match undo_or_error with
       | Ok _undo ->
+          Format.eprintf "VERIFYING BALANCE FOR FEE TRANSFER@." ;
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data
             ~continue_on_error
@@ -596,6 +617,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       in
       match undo_or_error with
       | Ok _undo ->
+          Format.eprintf "VERIFYING BALANCE FOR COINBASE@." ;
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data
             ~continue_on_error
@@ -641,11 +663,13 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
   | Ok _ ->
       let balance_block_data = internal_command_to_balance_block_data cmd1 in
       let%bind () =
+        Format.eprintf "VERIFYING BALANCE FOR COMBINED FEE TRANSFER 1@." ;
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
           ~token_int64:cmd1.token ~balance_block_data ~continue_on_error
       in
       let balance_block_data = internal_command_to_balance_block_data cmd2 in
+      Format.eprintf "VERIFYING BALANCE FOR COMBINED FEE TRANSFER 2@." ;
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
         ~token_int64:cmd2.token ~balance_block_data ~continue_on_error
@@ -775,6 +799,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
       let%bind () =
         match cmd.source_balance with
         | Some balance_id ->
+            Format.eprintf "VERIFYING BALANCE FOR USER CMD SOURCE@." ;
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
               ~pk_id:cmd.source_id ~token_int64 ~balance_block_data
               ~continue_on_error
@@ -784,12 +809,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
       let%bind () =
         match cmd.receiver_balance with
         | Some balance_id ->
+            Format.eprintf "VERIFYING BALANCE FOR USER CMD RECEIVER@." ;
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
               ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
               ~continue_on_error
         | None ->
             return ()
       in
+      Format.eprintf "VERIFYING BALANCE FOR USER CMD FEE PAYER@." ;
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
         ~token_int64:cmd.fee_token ~balance_block_data ~continue_on_error
