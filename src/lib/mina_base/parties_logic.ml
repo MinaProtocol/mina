@@ -970,7 +970,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_app_state
-          Bool.((not keeping_app_state) ||| has_permission)
+          Bool.(keeping_app_state ||| has_permission)
       in
       let app_state =
         Pickles_types.Vector.map2 app_state (Account.app_state a)
