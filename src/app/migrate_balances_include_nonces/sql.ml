@@ -6,6 +6,12 @@ let add_nonce_column (module Conn : Caqti_async.CONNECTION) =
        {sql| ALTER TABLE balances ADD COLUMN IF NOT EXISTS nonce bigint
        |sql})
 
+let index_nonce_column (module Conn : Caqti_async.CONNECTION) =
+  Conn.exec
+    (Caqti_request.exec Caqti_type.unit
+       {sql| CREATE INDEX idx_balances_nonce ON balances(nonce)
+       |sql})
+
 let fee_payers_and_nonces (module Conn : Caqti_async.CONNECTION) =
   Conn.collect_list
     (Caqti_request.collect Caqti_type.unit
@@ -14,6 +20,9 @@ let fee_payers_and_nonces (module Conn : Caqti_async.CONNECTION) =
              FROM user_commands uc
              INNER JOIN blocks_user_commands buc
              ON uc.id = buc.user_command_id
+             INNER JOIN blocks b
+             ON b.id = buc.block_id
+             WHERE b.chain_status = 'canonical'
        |sql})
 
 let update_balance_nonce (module Conn : Caqti_async.CONNECTION) ~id ~nonce =

@@ -22,10 +22,16 @@ let main ~archive_uri () =
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti pool for Postgresql" ;
+      [%log info] "Adding nonce column to balances table" ;
       let%bind () =
         query_db pool
           ~f:(fun db -> Sql.add_nonce_column db ())
           ~item:"ADD nonce COLUMN"
+      in
+      let%bind () =
+        query_db pool
+          ~f:(fun db -> Sql.index_nonce_column db ())
+          ~item:"INDEX nonce COLUMN"
       in
       let%bind fee_payers_and_nonces =
         query_db pool
@@ -76,7 +82,7 @@ let main ~archive_uri () =
       let%bind () =
         Deferred.List.iteri balances_with_nonces_to_update
           ~f:(fun i (id, nonce_opt) ->
-            if i > 0 && (i + 1) % 1000 = 0 then
+            if i > 0 && (i + 1) % 100 = 0 then
               [%log info] "Updating balance with NULL nonce no. %d" (i + 1) ;
             let nonce = Option.value_map nonce_opt ~default:0L ~f:Fn.id in
             query_db pool
