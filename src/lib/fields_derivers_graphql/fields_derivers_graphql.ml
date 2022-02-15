@@ -316,6 +316,30 @@ module Graphql_fields_raw = struct
   end
 end
 
+let rec arg_to_yojson_unsafe (arg : Graphql_parser.const_value) : Yojson.Safe.t
+    =
+  match arg with
+  | `Null ->
+      `Null
+  | `Int x ->
+      `Int x
+  | `Float x ->
+      `Float x
+  | `String x ->
+      `String x
+  | `Bool x ->
+      `Bool x
+  | `Enum _ ->
+      failwith "Enum cannot be converted to Yojson"
+  | `List x ->
+      `List (List.map x ~f:arg_to_yojson_unsafe)
+  | `Assoc x ->
+      `Assoc
+        (List.map x ~f:(fun (key, value) -> (key, arg_to_yojson_unsafe value)))
+
+let arg_to_yojson arg : (Yojson.Safe.t, string) result =
+  try Ok (arg_to_yojson_unsafe arg) with Failure s -> Error s
+
 module IO = struct
   include Async_kernel.Deferred
 

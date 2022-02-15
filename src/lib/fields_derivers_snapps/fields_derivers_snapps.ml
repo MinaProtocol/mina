@@ -1,163 +1,54 @@
 open Core_kernel
 
-(*
-
-module Graphql_args_raw = struct
-  module Make (IO : Graphql_intf.IO) (Schema : Graphql_intf.Schema) = struct
-    type ('f, 'ty, 'input, 'acc, 'hlist) add_field_hlist =
-      | [] : ('f, 'ty, < .. >, < .. >, unit) add_field_hlist
-      | ( :: ) :
-          (   'input
-           -> ([< `Read | `Set_and_create ], 'ty, 'f) Field.t_with_perm
-           -> 'acc
-           -> ('acc -> 'f) * 'acc)
-          * ('f, 'ty, 'input, 'acc, 'hlist) add_field_hlist
-          -> ('f, 'ty, 'input, 'acc, unit -> 'hlist) add_field_hlist
-
-    type ('acc, 'ty, 'hlist) finish_hlist =
-      | [] : (< .. >, 'ty, unit) finish_hlist
-      | ( :: ) :
-          (('acc -> 'ty) * 'acc -> 'acc) * ('acc, 'ty, 'hlist) finish_hlist
-          -> ('acc, 'ty, unit -> 'hlist) finish_hlist
-
-    module Many : sig
-      type many_data
-
-      val add_field_many :
-           ('f, 'ty, 'input, 'acc, 'hlist) add_field_hlist
-        -> 'input
-        -> ([< `Read | `Set_and_create ], 'ty, 'f) Field.t_with_perm
-        -> 'acc
-        -> ('acc -> 'f)
-           * (< add_field_many_count : many_data
-              ; creator_many_id : many_data
-              ; .. >
-              as
-              'acc)
-
-      val finish_many :
-           ('acc, 'ty, 'hlist) finish_hlist
-        -> ('acc -> 'ty) * 'acc
-        -> (< finish_many_count : many_data ; creator_many_id : many_data ; .. >
-            as
-            'acc)
-    end = struct
-      type many_data = int ref ref
-
-      let rec add_field_many :
-          type input hlist.
-             ('f, 'ty, input, 'acc, hlist) add_field_hlist
-          -> input
-          -> ([< `Read | `Set_and_create ], 'ty, 'f) Field.t_with_perm
-          -> 'acc
-          -> ('acc -> 'f)
-             * (< add_field_many_count : int ref ref
-                ; creator_many_id : int ref ref
-                ; .. >
-                as
-                'acc) =
-       fun hlist input field acc ->
-        match hlist with
-        | [] ->
-            ((fun _ -> failwith "unimplemented"), acc)
-        | add_field :: rest ->
-            (* TODO: Figure out why we're magical here. *)
-            let creator, acc = add_field input (Obj.magic field) acc in
-            let current = !(!(acc#add_field_many_count)) in
-            incr !(acc#add_field_many_count) ;
-            let creator_rest, acc_final = add_field_many rest input field acc in
-            let creator_all acc =
-              if !(!(acc#creator_many_id)) = current then creator acc
-              else creator_rest acc
-            in
-            (creator_all, acc_final)
-
-      let add_field_many hlist input field acc =
-        (* Re-init the double refs to allow nested calls. *)
-        let old_add_field_many_count = !(acc#add_field_many_count) in
-        let old_creator_many_id = !(acc#creator_many_id) in
-        acc#add_field_many_count := ref 0 ;
-        acc#creator_many_id := ref 0 ;
-        let res = add_field_many hlist input field acc in
-        acc#add_field_many_count := old_add_field_many_count ;
-        acc#creator_many_id := old_creator_many_id ;
-        res
-
-      let rec finish_many :
-          type hlist.
-             ('acc, 'ty, hlist) finish_hlist
-          -> ('acc -> 'ty) * 'acc
-          -> (< finish_many_count : int ref ref
-              ; creator_many_id : int ref ref
-              ; .. >
-              as
-              'acc) =
-       fun hlist (ctor, acc) ->
-        match hlist with
-        | [] ->
-            acc
-        | finish :: rest ->
-            !(acc#creator_many_id) := !(!(acc#finish_many_count)) ;
-            incr !(acc#finish_many_count) ;
-            let acc = finish (ctor, acc) in
-            finish_many rest (ctor, acc)
-
-      let finish_many hlist (ctor, acc) =
-        (* Re-init the double ref to allow nested calls. *)
-        let old_finish_many_count = !(acc#finish_many_count) in
-        acc#finish_many_count := ref 0 ;
-        let res = finish_many hlist (ctor, acc) in
-        acc#finish_many_count := old_finish_many_count ;
-        res
-    end
-
-    module A = Graphql_args0.Make (IO) (Schema)
-
-    let add_field input field acc =
-      Many.add_field_many [ A.add_field; A.add_field ] input field acc
-
-    let finish ~name arg =
-      Many.finish_many [ A.finish ~name; A.finish ~name ] arg
-  end
-end
-
-*)
-
 module Derivers = struct
   let derivers () =
     let open Fields_derivers_graphql in
     let graphql_fields =
       ref Graphql_fields.Input.T.{ run = (fun () -> failwith "unimplemented") }
     in
-    let contramap = ref (fun _ -> failwith "unimplemented") in
     let nullable_graphql_fields =
       ref Graphql_fields.Input.T.{ run = (fun () -> failwith "unimplemented") }
     in
     let graphql_fields_accumulator = ref [] in
+    let graphql_arg = ref (fun () -> failwith "unimplemented") in
+    let nullable_graphql_arg = ref (fun () -> failwith "unimplemented") in
+    let graphql_arg_accumulator = ref Graphql_args.Acc.T.Init in
+    let graphql_creator = ref (fun _ -> failwith "unimplemented") in
+
     let to_json = ref (fun _ -> failwith "unimplemented") in
     let of_json = ref (fun _ -> failwith "unimplemented") in
     let to_json_accumulator = ref [] in
     let of_json_creator = ref String.Map.empty in
+
+    let contramap = ref (fun _ -> failwith "unimplemented") in
     let map = ref (fun _ -> failwith "unimplemented") in
 
     object
       method graphql_fields = graphql_fields
 
-      method contramap = contramap
-
       method nullable_graphql_fields = nullable_graphql_fields
 
       method graphql_fields_accumulator = graphql_fields_accumulator
 
-      method to_json = to_json
+      method graphql_arg = graphql_arg
 
-      method map = map
+      method nullable_graphql_arg = nullable_graphql_arg
+
+      method graphql_arg_accumulator = graphql_arg_accumulator
+
+      method graphql_creator = graphql_creator
+
+      method to_json = to_json
 
       method of_json = of_json
 
       method to_json_accumulator = to_json_accumulator
 
       method of_json_creator = of_json_creator
+
+      method contramap = contramap
+
+      method map = map
     end
 
   let o () = derivers ()
@@ -167,9 +58,10 @@ module Derivers = struct
       constraint 'a = _ Fields_derivers_json.To_yojson.Input.t
       constraint 'a = _ Fields_derivers_json.Of_yojson.Input.t
       constraint 'a = _ Fields_derivers_graphql.Graphql_fields.Input.t
+      constraint 'a = _ Fields_derivers_graphql.Graphql_args.Input.t
   end
 
-  let yojson obj ?doc ~name ~map ~contramap : 'a Unified_input.t =
+  let yojson obj ?doc ~name ~map ~contramap : _ Unified_input.t =
     let open Fields_derivers_graphql in
     (obj#graphql_fields :=
        let open Schema in
@@ -179,25 +71,34 @@ module Derivers = struct
                scalar name ?doc ~coerce:Yojson.Safe.to_basic |> non_null)
          }) ;
 
-    obj#contramap := contramap ;
-
     (obj#nullable_graphql_fields :=
        let open Schema in
        Graphql_fields.Input.T.
          { run = (fun () -> scalar name ?doc ~coerce:Yojson.Safe.to_basic) }) ;
 
+    (obj#graphql_arg :=
+       fun () ->
+         Schema.Arg.scalar name ?doc ~coerce:arg_to_yojson
+         |> Schema.Arg.non_null) ;
+
+    (obj#nullable_graphql_arg :=
+       fun () -> Schema.Arg.scalar name ?doc ~coerce:arg_to_yojson) ;
+
     obj#to_json := Fn.id ;
+
+    obj#of_json := Fn.id ;
+
+    obj#contramap := contramap ;
 
     obj#map := map ;
 
-    obj#of_json := Fn.id ;
     obj
 
   let iso_string ?doc obj ~(to_string : 'a -> string)
       ~(of_string : string -> 'a) ~name =
     yojson obj ?doc ~name
       ~map:(function `String x -> of_string x | _ -> failwith "unsupported")
-      ~contramap:(fun uint64 -> `String (to_string uint64))
+      ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
     iso_string obj
@@ -224,23 +125,26 @@ module Derivers = struct
 
   let int obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.int obj in
-    let _b = Fields_derivers_json.To_yojson.int obj in
+    let _b = Fields_derivers_graphql.Graphql_args.int obj in
+    let _c = Fields_derivers_json.To_yojson.int obj in
     Fields_derivers_json.Of_yojson.int obj
 
   let string obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.string obj in
-    let _b = Fields_derivers_json.To_yojson.string obj in
+    let _b = Fields_derivers_graphql.Graphql_args.string obj in
+    let _c = Fields_derivers_json.To_yojson.string obj in
     Fields_derivers_json.Of_yojson.string obj
 
   let bool obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.bool obj in
-    let _b = Fields_derivers_json.To_yojson.bool obj in
+    let _b = Fields_derivers_graphql.Graphql_args.bool obj in
+    let _c = Fields_derivers_json.To_yojson.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
   let unit obj : _ Unified_input.t =
-    let _a = Fields_derivers_graphql.Graphql_fields.unit obj in
-    let _b = Fields_derivers_json.To_yojson.unit obj in
-    Fields_derivers_json.Of_yojson.unit obj
+    yojson obj ?doc:None ~name:"Unit"
+      ~map:(function `Null -> () | _ -> failwith "unsupported")
+      ~contramap:(fun () -> `Null)
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
@@ -267,19 +171,22 @@ module Derivers = struct
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.option x obj in
-    let _b = Fields_derivers_json.To_yojson.option x obj in
+    let _b = Fields_derivers_graphql.Graphql_args.option x obj in
+    let _c = Fields_derivers_json.To_yojson.option x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
   let list (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.list x obj in
-    let _b = Fields_derivers_json.To_yojson.list x obj in
+    let _b = Fields_derivers_graphql.Graphql_args.list x obj in
+    let _c = Fields_derivers_json.To_yojson.list x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
   let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a =
       Fields_derivers_graphql.Graphql_fields.contramap ~f:contramap x obj
     in
-    let _b = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
+    let _b = Fields_derivers_graphql.Graphql_args.map ~f:map x obj in
+    let _c = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
 
   let iso_record ~of_record ~to_record record_deriver obj =
@@ -292,14 +199,16 @@ module Derivers = struct
 
   let add_field (x : _ Unified_input.t) fd acc =
     let _, acc' = Fields_derivers_graphql.Graphql_fields.add_field x fd acc in
-    let _, acc'' = Fields_derivers_json.To_yojson.add_field x fd acc' in
-    Fields_derivers_json.Of_yojson.add_field x fd acc''
+    let _, acc'' = Fields_derivers_graphql.Graphql_args.add_field x fd acc' in
+    let _, acc''' = Fields_derivers_json.To_yojson.add_field x fd acc'' in
+    Fields_derivers_json.Of_yojson.add_field x fd acc'''
 
   let ( !. ) x fd acc = add_field (x @@ o ()) fd acc
 
   let finish ~name ?doc res =
     let _a = Fields_derivers_graphql.Graphql_fields.finish ~name ?doc res in
-    let _b = Fields_derivers_json.To_yojson.finish res in
+    let _b = Fields_derivers_graphql.Graphql_args.finish ~name ?doc res in
+    let _c = Fields_derivers_json.To_yojson.finish res in
     Fields_derivers_json.Of_yojson.finish res
 
   let verification_key_with_hash obj =
