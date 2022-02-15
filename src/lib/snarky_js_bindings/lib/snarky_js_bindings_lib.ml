@@ -2312,7 +2312,10 @@ type AccountPredicate =
       }
 
     let events (js_events : js_field Js.js_array Js.t Js.js_array Js.t) =
-      let events = Impl.exists Mina_base_kernel.Snapp_account.Events.typ in
+      let events =
+        Impl.exists Mina_base_kernel.Snapp_account.Events.typ
+          ~compute:(fun () -> [])
+      in
       let push_event js_event =
         let event = Array.map (Js.to_array js_event) ~f:field in
         let _ =
