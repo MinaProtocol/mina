@@ -31,7 +31,8 @@ RUN apt-get update --yes \
     postgresql-contrib \
     tzdata \
     jq \
-    sudo
+    sudo \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
