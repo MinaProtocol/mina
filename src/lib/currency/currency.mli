@@ -128,6 +128,10 @@ module Amount : sig
     val of_fee : Fee.var -> var
 
     val to_fee : var -> Fee.var
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> t
+    end
   end
 
   [%%endif]

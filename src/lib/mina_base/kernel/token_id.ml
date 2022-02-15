@@ -112,6 +112,8 @@ module Checked = struct
     let equal x y = T.Checked.Assert.equal x y
   end
 
+  module Unsafe = T.Checked.Unsafe
+
   let ( = ) = T.Checked.( = )
 
   let ( >= ) = T.Checked.( >= )

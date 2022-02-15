@@ -22,7 +22,7 @@ open Snark_params.Tick
     ...
 }]
 *)
-type 'value t
+type 'value t = Field.Var.t * 'value As_prover.Ref.t
 
 val hash : _ t -> Field.Var.t
 
