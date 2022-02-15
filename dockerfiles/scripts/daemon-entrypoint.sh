@@ -9,7 +9,7 @@ INPUT_ARGS="$@"
 
 # These arrays can be overwritten or extended in scripts to adjust verbosity
 # Example:
-declare -a LOG_FILES=('mina.log' 'mina-errors.log')
+declare -a LOG_FILES=('mina.log')
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
