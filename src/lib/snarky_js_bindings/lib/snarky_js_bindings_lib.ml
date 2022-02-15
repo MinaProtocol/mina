@@ -1483,8 +1483,8 @@ module Circuit = struct
         in
         res *)) ;
     circuit##.runAndCheckSync :=
-      Js.wrap_callback (fun (f : unit -> unit) ->
-          Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> ignore) ;
+      Js.wrap_callback (fun (f : unit -> 'a) ->
+          Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> snd) ;
 
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
