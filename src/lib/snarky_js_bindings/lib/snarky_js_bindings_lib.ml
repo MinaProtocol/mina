@@ -2394,10 +2394,10 @@ type AccountPredicate =
       | s ->
           failwithf "bad predicate type: %s" s ()
 
-    
-       let party (party : party) : Party.Predicated.Checked.t =
-         { body = body party##.body; predicate = predicate party##.predicate }
-      (*
+    let party (party : party) : Party.Predicated.Checked.t =
+      { body = body party##.body; predicate = predicate party##.predicate }
+
+    (*
        let parties (parties : parties) : Parties.t =
          { fee_payer =
              { data = fee_payer_party parties##.feePayer
