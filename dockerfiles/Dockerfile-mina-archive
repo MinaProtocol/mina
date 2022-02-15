@@ -15,7 +15,7 @@ RUN chmod +x /entrypoint.sh
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
-    && apt-get -y install \
+    && apt-get -y --no-install-recommends install \
         procps \
         curl \
         jq \

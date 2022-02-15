@@ -23,8 +23,8 @@ ENV OPAMREUSEBUILDDIR=false
 ENV DEBIAN_FRONTEND=noninteractive
 
 # OS package dependencies
-RUN sudo apt-get update -y \
-  && sudo apt-get install -y \
+RUN sudo apt-get update --yes \
+  && sudo apt-get install --yes --no-install-recommends \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -58,7 +58,7 @@ RUN sudo apt-get update -y \
 # Buster images are used in our migrated integration tests which reqiure python2 jinja2
 # Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
 RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
+      && sudo apt-get install --yes --no-install-recommends \
           python \
           python-pip \
           python-jinja2 \
@@ -87,18 +87,18 @@ RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terra
 # --- Google Cloud tools
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y google-cloud-sdk kubectl
+    && sudo apt-get update --yes \
+    && sudo apt-get install --yes --no-install-recommends google-cloud-sdk kubectl
 
 # --- Helm tools
 RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y helm
+    && sudo apt-get update --yes \
+    && sudo apt-get install --yes --no-install-recommends helm
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt update \
-    && sudo apt install -y nodejs yarn
+    && sudo apt install --yes --no-install-recommends nodejs yarn
