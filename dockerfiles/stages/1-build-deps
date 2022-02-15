@@ -45,6 +45,7 @@ RUN apt-get update \
     libsodium-dev \
     libssl-dev \
     build-essential \
+    ca-certificates \
     capnproto \
     cmake \
     curl \
