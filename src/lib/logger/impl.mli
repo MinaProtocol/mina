@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Stable : sig
   module V1 : sig
@@ -24,6 +24,10 @@ module Time : sig
   val to_yojson : t -> Yojson.Safe.t
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  val pretty_to_string : t -> string
+
+  val set_pretty_to_string : (t -> string) -> unit
 end
 
 module Source : sig
@@ -68,32 +72,25 @@ module Processor : sig
 
   val raw : ?log_level:Level.t -> unit -> t
 
-  val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
+  val pretty :
+    log_level:Level.t -> config:Interpolator_lib.Interpolator.config -> t
 end
 
 (** A Transport is a module which represent a destination
  *  for a log strings. This is used as part of defining a
  *  Consumer. *)
 module Transport : sig
+  module type S = sig
+    type t
+
+    val transport : t -> string -> unit
+  end
+
   type t
 
-  val stdout : unit -> t
+  val create : (module S with type t = 'transport_data) -> 'transport_data -> t
 
-  module File_system : sig
-    (** Dumb_logrotate is a Transport which persists logs
-     *  to the file system by using `num_rotate` log files. This
-     *  Transport will rotate these logs, ensuring that
-     *  each log file is less than some maximum size
-     *  before writing to it. When the logs reach max
-     *  size, the old log is deleted and a new log is
-     *  started. *)
-    val dumb_logrotate :
-         directory:string
-      -> log_filename:string
-      -> max_size:int
-      -> num_rotate:int
-      -> t
-  end
+  val stdout : unit -> t
 end
 
 (** The Consumer_registry is a global registry where consumers

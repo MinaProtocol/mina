@@ -264,7 +264,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
               ~processor:(Logger.Processor.raw ())
               ~transport:
-                (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+                (Logger_file_system.dumb_logrotate ~directory:conf_dir
                    ~log_filename:"mina-snark-worker.log"
                    ~max_size:logrotate_max_size
                    ~num_rotate:logrotate_num_rotate)) ;
