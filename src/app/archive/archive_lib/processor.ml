@@ -747,7 +747,8 @@ module Balance = struct
          typ
          {sql| SELECT id, public_key_id, balance,
                       block_id, block_height,
-                      block_sequence_no, block_secondary_sequence_no, nonce
+                      block_sequence_no, block_secondary_sequence_no,
+                      nonce
                FROM balances
                WHERE id = $1
          |sql})

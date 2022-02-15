@@ -99,6 +99,7 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
     blocks_user_commands and blocks_internal_commands tables
    they are included here to allow Rosetta account queries to consume
     fewer Postgresql resources
+   TODO: nonce column is NULLable until we can establish valid nonces for all rows
 */
 
 CREATE TABLE balances

@@ -353,17 +353,17 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
    we compare those against the same-named values in the balances row
 *)
 let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
-    ~balance_block_data ~continue_on_error =
+    ~balance_block_data ~set_nonces ~continue_on_error : unit Deferred.t =
   let%bind pk = pk_of_pk_id pool pk_id in
-  let%map balance_info = balance_info_of_id pool ~id:balance_id in
+  let%bind balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
   let account_id = Account_id.create pk token in
-  let actual_balance =
+  let account =
     match Ledger.location_of_account ledger account_id with
     | Some loc -> (
         match Ledger.get ledger loc with
         | Some account ->
-            account.balance
+            account
         | None ->
             failwithf
               "Could not find account in ledger for public key %s and token id \
@@ -376,6 +376,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
           (Token_id.to_string token) ()
   in
+  let actual_balance = account.balance in
   let claimed_balance =
     balance_info.balance |> Unsigned.UInt64.of_int64
     |> Currency.Balance.of_uint64
@@ -429,7 +430,44 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         ; ( "block_secondary_sequence_no_balances"
           , `Int balance_info.block_secondary_sequence_no )
         ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 )
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  let ledger_nonce = account.nonce in
+  match balance_info.nonce with
+  | None ->
+      if set_nonces then (
+        [%log info] "Inserting missing nonce into archive db"
+          ~metadata:
+            [ ("balance_id", `Int balance_id)
+            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
+            ] ;
+        let nonce =
+          Account.Nonce.to_uint32 ledger_nonce |> Unsigned.UInt32.to_int64
+        in
+        query_db pool
+          ~f:(fun db -> Sql.Balances.insert_nonce db ~id:balance_id ~nonce)
+          ~item:"chain from state hash" )
+      else (
+        [%log error] "Missing nonce in archive db"
+          ~metadata:
+            [ ("balance_id", `Int balance_id)
+            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
+            ] ;
+        return
+        @@ if continue_on_error then incr error_count else Core_kernel.exit 1 )
+  | Some nonce ->
+      let db_nonce =
+        nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+      in
+      return
+      @@
+      if not (Account.Nonce.equal ledger_nonce db_nonce) then (
+        [%log error] "Ledger nonce does not match nonce in balances table"
+          ~metadata:
+            [ ("who", `String who)
+            ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
+            ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
+            ] ;
+        if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
 let account_creation_fee_uint64 =
   Currency.Fee.to_uint64 constraint_constants.account_creation_fee
@@ -528,7 +566,7 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
         if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~continue_on_error =
+    ~set_nonces ~continue_on_error =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
@@ -570,7 +608,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
-            ~balance_id ~pk_id ~token_int64 ~balance_block_data
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
             ~continue_on_error
       | Error err ->
           fail_on_error err )
@@ -597,7 +635,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
-            ~balance_id ~pk_id ~token_int64 ~balance_block_data
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
             ~continue_on_error
       | Error err ->
           fail_on_error err )
@@ -607,8 +645,9 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
-let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
-    (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
+let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
+    ~continue_on_error (cmd1 : Sql.Internal_command.t)
+    (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
   let fee_transfer_of_cmd (cmd : Sql.Internal_command.t) =
@@ -643,12 +682,14 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
       let%bind () =
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
-          ~token_int64:cmd1.token ~balance_block_data ~continue_on_error
+          ~token_int64:cmd1.token ~balance_block_data ~set_nonces
+          ~continue_on_error
       in
       let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
-        ~token_int64:cmd2.token ~balance_block_data ~continue_on_error
+        ~token_int64:cmd2.token ~balance_block_data ~set_nonces
+        ~continue_on_error
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -714,7 +755,7 @@ let body_of_sql_user_cmd pool
       failwithf "Invalid user command type: %s" type_ ()
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~continue_on_error =
+    ~set_nonces ~continue_on_error =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
@@ -776,7 +817,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         match cmd.source_balance with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
-              ~pk_id:cmd.source_id ~token_int64 ~balance_block_data
+              ~pk_id:cmd.source_id ~token_int64 ~balance_block_data ~set_nonces
               ~continue_on_error
         | None ->
             return ()
@@ -786,13 +827,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
               ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
-              ~continue_on_error
+              ~set_nonces ~continue_on_error
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
-        ~token_int64:cmd.fee_token ~balance_block_data ~continue_on_error
+        ~token_int64:cmd.fee_token ~balance_block_data ~set_nonces
+        ~continue_on_error
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -850,7 +892,8 @@ let unquoted_string_of_yojson json =
   let s = Yojson.Safe.to_string json in
   String.sub s ~pos:1 ~len:(String.length s - 2)
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
+let main ~input_file ~output_file_opt ~archive_uri ~set_nonces
+    ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1024,7 +1067,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
       [%log info] "Loading user commands" ;
-      let%bind unsorted_user_cmds_list =
+      let%bind (unsorted_user_cmds_list : Sql.User_command.t list list) =
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
@@ -1127,7 +1170,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               *)
               log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                apply_combined_fee_transfer ~logger ~pool ~ledger
+                apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~continue_on_error ic ic2
               in
               apply_commands ics2 user_cmds
@@ -1137,7 +1180,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           | _ ->
               log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                run_internal_command ~logger ~pool ~ledger ~continue_on_error ic
+                run_internal_command ~logger ~pool ~ledger ~set_nonces
+                  ~continue_on_error ic
               in
               apply_commands ics user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1158,7 +1202,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
-              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+              run_user_command ~logger ~pool ~ledger ~set_nonces
+                ~continue_on_error uc
             in
             apply_commands [] ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1167,7 +1212,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
             log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
-              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+              run_user_command ~logger ~pool ~ledger ~set_nonces
+                ~continue_on_error uc
             in
             apply_commands internal_cmds ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1256,8 +1302,12 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
+         and set_nonces =
+           Param.flag "--set-nonces"
+             ~doc:"Set missing nonces in archive database" Param.no_arg
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
          in
-         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error)))
+         main ~input_file ~output_file_opt ~archive_uri ~set_nonces
+           ~continue_on_error)))
