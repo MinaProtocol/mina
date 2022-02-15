@@ -514,7 +514,7 @@ module Eff = struct
              ; protocol_state_predicate : 'protocol_state_pred
              ; .. > )
            t
-    | Check_auth_and_update_account :
+    | Check_auth :
         { is_start : 'bool; party : 'party; account : 'account }
         -> ( 'account * 'bool * 'failure
            , < bool : 'bool
@@ -1194,7 +1194,7 @@ module Make (Inputs : Inputs_intf) = struct
     *)
     let a', update_permitted, failure_status =
       h.perform
-        (Check_auth_and_update_account
+        (Check_auth
            { is_start = is_start'; party; account = a })
     in
     let party_succeeded =

@@ -2153,7 +2153,7 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Check_auth_and_update_account
+        | Check_auth
             { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =

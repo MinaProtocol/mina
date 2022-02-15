@@ -1859,7 +1859,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_auth_and_update_account { is_start; party = p; account = a } -> (
+      | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match apply_body ~is_start p.data a with
