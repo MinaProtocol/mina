@@ -22,9 +22,11 @@ ENV OPAMREUSEBUILDDIR=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+USER root
+
 # OS package dependencies
-RUN sudo apt-get update --yes \
-  && sudo apt-get install --yes --no-install-recommends \
+RUN apt-get update --yes \
+  && apt-get install --yes --no-install-recommends \
     apt-transport-https \
     apt-utils \
     awscli \
@@ -54,57 +56,59 @@ RUN sudo apt-get update --yes \
     pkg-config \
     rubygems \
     zlib1g-dev \
-  && sudo rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
 # -- Debian Buster python dependencies (largely installed above from apt)
 # Buster images are used in our migrated integration tests which reqiure python2 jinja2
 # Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
 RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install --yes --no-install-recommends \
+      && apt-get install --yes --no-install-recommends \
           python \
           python-pip \
           python-jinja2 \
           python-flake8 \
           python-sexpdata \
           python3-sexpdata \
-      && sudo rm -rf /var/lib/apt/lists/* \
-      && sudo pip install readchar \
+      && rm -rf /var/lib/apt/lists/* \
+      && pip install readchar \
       || exit 0
 
 # --- deb-s3 tool
 RUN curl -sLO https://github.com/deb-s3/deb-s3/releases/download/0.11.3/deb-s3-0.11.3.gem \
-    && sudo gem install deb-s3-0.11.3.gem \
+    && gem install deb-s3-0.11.3.gem \
     && rm -f deb-s3-0.11.3.gem
 
 # --- Docker Daemon
 RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
     && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
-    && sudo mv /tmp/docker/* /usr/bin
+    && mv /tmp/docker/* /usr/bin
 
 # --- Terraform tools
 RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
     && unzip terraform.zip \
-    && sudo mv terraform /usr/bin \
-    && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+    && mv terraform /usr/bin \
+    && ln -s /usr/bin/terraform /usr/local/bin/terraform
 
 # --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
-    && sudo apt-get update --yes \
-    && sudo apt-get install --yes --no-install-recommends google-cloud-sdk kubectl \
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update --yes \
+    && apt-get install --yes --no-install-recommends google-cloud-sdk kubectl \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && sudo apt-get update --yes \
-    && sudo apt-get install --yes --no-install-recommends helm \
-    && sudo rm -rf /var/lib/apt/lists/*
+RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && apt-get update --yes \
+    && apt-get install --yes --no-install-recommends helm \
+    && rm -rf /var/lib/apt/lists/*
 
 # Get yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && sudo apt update \
-    && sudo apt install --yes --no-install-recommends nodejs yarn \
-    && sudo rm -rf /var/lib/apt/lists/*
+RUN curl -sL https://deb.nodesource.com/setup_14.x | -E bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && apt update \
+    && apt install --yes --no-install-recommends nodejs yarn \
+    && rm -rf /var/lib/apt/lists/*
+
+USER opam
