@@ -10,6 +10,9 @@ INPUT_ARGS="$@"
 # These arrays can be overwritten or extended in scripts to adjust verbosity
 # Example:
 declare -a LOG_FILES=('mina.log')
+# stderr is mostly used to print "reading password from environment varible ..."
+# prover and verifier logs are also sparse, mostly memory stats and debug info
+# mina-best-tip.log is useful for organizing a hard fork and is one way to monitor new blocks as they are added, but not critical
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
