@@ -1,5 +1,6 @@
 (* child_processes.ml -- management of starting, tracking, and killing child processes. *)
 
+open Inline_test_quiet_logs
 open Core
 open Async
 open Pipe_lib

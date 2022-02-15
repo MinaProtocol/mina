@@ -254,8 +254,7 @@ module V = struct
   include Hashable.Make (T)
 end
 
-(* TODO: what is this type parameter 'a ? can we delete it? *)
-type ('a, 'f) t =
+type 'f t =
   { (* map of cells that share the same value (enforced by to the permutation) *)
     equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other variables) *)
@@ -314,7 +313,7 @@ struct
   open Core
   open Pickles_types
 
-  type nonrec t = (Gates.t, Fp.t) t
+  type nonrec t = Fp.t t
 
   module H = Digestif.SHA256
 
