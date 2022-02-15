@@ -416,7 +416,9 @@ module type Account_intf = sig
   type global_slot
 
   val check_timing :
-    txn_global_slot:global_slot -> t -> [ `Invalid_timing of bool ] * timing
+       txn_global_slot:global_slot
+    -> t
+    -> [ `Invalid_timing of bool | `Insufficient_balance of bool ] * timing
 
   (** Fill the snapp field of the account if it's currently [None] *)
   val make_snapp : t -> t
@@ -944,11 +946,18 @@ module Make (Inputs : Inputs_intf) = struct
     (* Check timing with current balance *)
     let a, local_state =
       let `Invalid_timing invalid_timing, timing =
-        Account.check_timing ~txn_global_slot a
+        match Account.check_timing ~txn_global_slot a with
+        | `Insufficient_balance _, _ ->
+            failwith "Did not propose a balance change at this timing check!"
+        | `Invalid_timing invalid_timing, timing ->
+            (* NB: Have to destructure to remove the possibility of
+               [`Insufficient_balance _] in the type.
+            *)
+            (`Invalid_timing invalid_timing, timing)
       in
       let local_state =
         Local_state.add_check local_state Source_minimum_balance_violation
-          invalid_timing
+          (Bool.not invalid_timing)
       in
       let a = Account.set_timing timing a in
       (a, local_state)
@@ -965,17 +974,33 @@ module Make (Inputs : Inputs_intf) = struct
           (List.map ~f:Set_or_keep.is_keep
              (Pickles_types.Vector.to_list app_state))
       in
-      let changing_app_state =
+      let changing_entire_app_state =
         Bool.all
-          (List.map ~f:Set_or_keep.is_keep
+          (List.map ~f:Set_or_keep.is_set
              (Pickles_types.Vector.to_list app_state))
       in
       let proved_state =
+        (* The [proved_state] tracks whether the app state has been entirely
+           determined by proofs ([true] if so), to allow snapp authors to be
+           confident that their initialization logic has been run, rather than
+           some malicious deployer instantiating the snapp in an account with
+           some fake non-initial state.
+           The logic here is:
+           * if the state is unchanged, keep the previous value;
+           * if the state has been entriely replaced, and the authentication
+             was a proof, the state has been 'proved' and [proved_state] is set
+             to [true];
+           * if the state has been partially updated by a proof, the
+             [proved_state] is unchanged;
+           * if the state has been changed by some authentication other than a
+             proof, the state is considered to have been tampered with, and
+             [proved_state] is reset to [false].
+        *)
         Bool.if_ keeping_app_state ~then_:(Account.proved_state a)
           ~else_:
             (Bool.if_ proof_verifies
                ~then_:
-                 (Bool.if_ changing_app_state ~then_:Bool.true_
+                 (Bool.if_ changing_entire_app_state ~then_:Bool.true_
                     ~else_:(Account.proved_state a))
                ~else_:Bool.false_)
       in
@@ -1136,7 +1161,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.increment_nonce a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_delegate
+        Local_state.add_check local_state Update_not_permitted_nonce
           Bool.((not increment_nonce) ||| has_permission)
       in
       let a = Account.set_nonce nonce a in
