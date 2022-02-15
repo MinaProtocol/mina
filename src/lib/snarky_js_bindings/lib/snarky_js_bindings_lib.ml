@@ -527,7 +527,9 @@ let () =
             return
               (Field.constant
                  ( if
-                   Char.equal s.[0] '0' && Char.equal (Char.lowercase s.[1]) 'x'
+                   String.length s > 1
+                   && Char.equal s.[0] '0'
+                   && Char.equal (Char.lowercase s.[1]) 'x'
                  then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
                  else Field.Constant.of_string s ))
           with Failure _ -> Js.Opt.empty )
