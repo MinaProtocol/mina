@@ -15,6 +15,8 @@ declare -a LOG_FILES=('mina.log')
 # mina-best-tip.log is useful for organizing a hard fork and is one way to monitor new blocks as they are added, but not critical
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
+EXTRA_FLAGS=""
+
 # Attempt to execute or source custom entrypoint scripts accordingly
 # Example: mount a mina-env file with variable evironment variables to source and pass to the daemon
 for script in /entrypoint.d/*; do
@@ -25,6 +27,7 @@ for script in /entrypoint.d/*; do
   fi
 done
 
+set +u # allow these variables to be unset
 # Support flags from .mina-env on debian
 if [[ ${PEER_LIST_URL} ]]; then
   EXTRA_FLAGS+=" --peer-list-url ${PEER_LIST_URL}"
@@ -43,6 +46,8 @@ if [[ ${VERBOSE} ]]; then
   echo "[Debug] Input Args: ${INPUT_ARGS}"
   echo "[Debug] Extra Flags: ${EXTRA_FLAGS}"
 fi
+
+set -u
 
 # Mina daemon initialization
 mkdir -p .mina-config

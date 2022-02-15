@@ -7,10 +7,8 @@ FROM debian:stretch-slim AS production
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-# stretch-slim configures apt to not store any cache, so no need to rm it
-# TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
-  && apt -y install \
+  && apt -y install --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     dnsutils \
@@ -21,7 +19,8 @@ RUN apt-get -y update \
     libprocps6 \
     libjemalloc-dev \
     libssl1.1 \
-    tzdata
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
 
 # mina keypair package
 RUN echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list \
