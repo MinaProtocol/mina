@@ -405,6 +405,9 @@ let setup_daemon logger =
       ~doc:
         "contact info used in node error report service (it could be either \
          email address or discord username)"
+    |> Command.Param.map ~f:(fun opt ->
+           Option.value_map opt ~default:None ~f:(fun s ->
+               if String.length s <= 200 then Some s else None))
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
