@@ -26,7 +26,13 @@ It would be easier, especially as a newcomer to understand the structure of the 
 	
 # Design
 
-I made a first attempt at defining some groups, but my knowledge of the project is still limited so I would like some feedback on this.
+## Try to disable implicit transitive dependencies in dune
+See https://github.com/MinaProtocol/mina/issues/2451.
+
+This will help having more precise information about dependencies and 
+detect unneeded ones.
+
+## Moving the libraries
 
 In order to minimize merge conflict, moving the libraries to various subfolders can be done iteratively. And we could start by the things we are most confident about.
 
@@ -34,8 +40,7 @@ At the moment, I would start with:
 
 - The `utils` folder: these libraries are quite easy to identify and moving them to a `utils` folder would unclutter the `src/lib` directory quite a bit.
 
-- The `crypto` folder (at least the libraries which were part of [this PR](https://github.com/MinaProtocol/mina/pull/9540)), and I see that this was already started in the
-`feature/group-lookups-mina` branch.
+- The `crypto` folder (already started in the `develop` branch)
 
 ## First attempt at grouping
 
@@ -70,25 +75,23 @@ For instance the `mina_base` library that contains a lot a files and will maybe 
   The other folders could also contain a `testing` subfolder for specific test related libraries (for instance the `mina_net2_tests` would be in the `Network` group).
     
 
-- `Processes`: Libraries related to parallelism and inter process communication,
+- `Concurrency`: Libraries related to to system concurrency,
    such as `child_processes` and `pipe_lib`.
 
 - `Network`: Libraries related to network communication between the various component.
 
-- `Config`: Libraries such as `mina_numbers` defining primitive types used by most other groups.
+- `Types`: Libraries such as `mina_numbers` defining primitive types used by most other groups.
 
-- `Crypto`:
-  Creating the `crypto` folder was already attempted in [this PR](https://github.com/MinaProtocol/mina/pull/9540) that I used as a reference.
-  Would it make sense to split it between the libraries that depend on the `Config` group,
-  and those that do not ?
+- `Config`: Configuration libraries.
 
-- `Snarky`: The libraries from the snarky git submodule.
+- `Proof_system`: The current crypto folder and crypto related libraries.
+(These do not depend on the `Config` group at the moment)
 
 - `Transition`: Modules related to the handling of transitions
 (many of which have the `transition_` prefix).
 
 - The other name should be self descriptive. I am not very confident about those but I tried to respect clusters in the dependency graph :
-  `Consensus`, `Staged_ledger`, `Genesis_ledger`, `Rosetta` and `Caching`.
+  `Consensus`, `Staged_ledger`, `Rosetta` and `Caching`.
 
 
 ## Inter folder dependencies
@@ -97,12 +100,6 @@ If some dependencies seem strange in the above graph of [dependencies between gr
 
 - maybe a library should be moved to another group.
 - or there may be some refactoring to do in order to remove these dependencies.
-
-### Potential unnecessary dependencies 
-Using this graph I may have found some unnecessary dependencies (which are already "fixed" in the above graphs).
-
-- The `rc_pool` library depends on `snark_params`: can it just be removed from the dune file ?
-- The `snark_worker` library depends on `cli_lib` which seem necessary to access the  `Transaction_snark_work` module. Could it depend directly on the `transaction_snark_work` library instead?
 
 ### Automatic checks
 
