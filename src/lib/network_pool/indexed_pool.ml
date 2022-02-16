@@ -1442,7 +1442,7 @@ let%test_module _ =
           in
           add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
             ~verify:don't_verify
-            (Currency.Amount.of_int 3_000_000_000_000)
+            (Currency.Amount.of_int 3000_000_000_000_000)
           |> function
           | Ok (_, pool', dropped) ->
               assert (Sequence.is_empty dropped) ;
