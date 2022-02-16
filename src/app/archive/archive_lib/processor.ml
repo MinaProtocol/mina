@@ -770,10 +770,10 @@ WITH RECURSIVE pending_chain_nonce AS (
 
   let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
     let public_keys_sql_list =
-      Format.sprintf
+      sprintf
       "( %s )"
       (public_keys
-        |> List.map ~f:(fun pk -> Signature_lib.Public_key.Compressed.to_base58_check pk)
+        |> List.map ~f:(fun pk -> sprintf "'%s'" (Signature_lib.Public_key.Compressed.to_base58_check pk))
         |> String.concat ~sep:",")
     in
     Conn.collect_list
