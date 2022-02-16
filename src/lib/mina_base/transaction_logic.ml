@@ -1297,10 +1297,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
     let open Result.Let_syntax in
-    (* Check timing. *)
-    let init =
-      match a.snapp with None -> Snapp_account.default | Some a -> a
-    in
     let update perm u curr ~is_keep ~update ~error =
       match check_auth perm with
       | false ->
@@ -1316,14 +1312,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
           ~error:Update_not_permitted_delegate
       else return a.delegate
-    in
-    let snapp =
-      let snapp_version =
-        (* Current snapp version. Upgrade mechanism should live here. *)
-        Mina_numbers.Snapp_version.zero
-      in
-      let t : Snapp_account.t = { init with snapp_version } in
-      if Snapp_account.(equal default t) then None else Some t
     in
     let%bind snapp_uri =
       update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
@@ -1369,15 +1357,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with
-      snapp
-    ; delegate
-    ; permissions
-    ; nonce
-    ; snapp_uri
-    ; token_symbol
-    ; voting_for
-    }
+    { a with delegate; permissions; nonce; snapp_uri; token_symbol; voting_for }
 
   module Global_state = struct
     type t =
@@ -1593,6 +1573,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Some Snapp_account.default
           | Some _ as snapp ->
               snapp
+        in
+        { a with snapp }
+
+      let unmake_snapp (a : t) : t =
+        let snapp =
+          match a.snapp with
+          | None ->
+              None
+          | Some snapp ->
+              if Snapp_account.(equal default snapp) then None else Some snapp
         in
         { a with snapp }
 
