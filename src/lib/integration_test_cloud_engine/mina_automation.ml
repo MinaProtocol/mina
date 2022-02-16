@@ -89,6 +89,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
+        ; transaction_capacity
         } =
       test_config
     in
@@ -181,7 +182,7 @@ module Network_config = struct
       ; ledger_depth = None
       ; work_delay = None
       ; block_window_duration_ms = None
-      ; transaction_capacity = None
+      ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None

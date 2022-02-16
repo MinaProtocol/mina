@@ -33,6 +33,8 @@ type t =
   ; log_precomputed_blocks : bool
   ; snark_worker_fee : string
   ; snark_worker_public_key : string
+  ; transaction_capacity :
+      Runtime_config.Proof_keys.Transaction_capacity.t option
   }
 
 let default =
@@ -51,4 +53,5 @@ let default =
   ; snark_worker_public_key =
       (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
+  ; transaction_capacity = None
   }
