@@ -699,10 +699,91 @@ module Coinbase = struct
 end
 
 module Find_nonce = struct
-  let initialize_nonce_map = failwith "TODO"
+  let sql_template =
+    {sql|
+SELECT t.pk_id, MAX(pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
+(
+WITH RECURSIVE pending_chain_nonce AS (
 
-  let find (module Conn : CONNECTION) ~(public_key_id : int) ~parent_block_id
-      ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no = failwith "TODO"
+               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                FROM blocks b
+                WHERE id = $1
+                LIMIT 1)
+
+                UNION ALL
+
+                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+
+                FROM blocks b
+                INNER JOIN pending_chain_nonce
+                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
+                AND pending_chain_nonce.chain_status <> 'canonical'
+
+               )
+
+              /* Slot and balance are NULL here */
+              SELECT pks.id AS pk_id,pks.value AS pk,full_chain.height,cmds.nonce
+
+              FROM (SELECT
+                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+                    FROM pending_chain_nonce
+
+                    UNION ALL
+
+                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                    FROM blocks b
+                    WHERE chain_status = 'canonical') AS full_chain
+
+              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+              INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+              INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
+
+              WHERE pks.value IN $2
+              AND busc.user_command_id = cmds.id
+
+              ORDER BY (full_chain.height, busc.sequence_no) DESC
+            ) t
+            GROUP BY t.pk_id LIMIT $3
+    |sql}
+
+
+  type t = { public_key_id: int
+           ; public_key: string
+           ; height: int
+           ; nonce: int64
+           } [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec = Caqti_type.[int; string; int; int64] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
+    let public_keys_sql_list =
+      Format.sprintf
+      "( %s )"
+      (public_keys
+        |> List.map ~f:(fun pk -> Public_key.Compressed.to_base58_check pk)
+        |> String.concat ~sep:",")
+    in
+    Conn.collect_list
+      (Caqti_request.find_opt
+         Caqti_type.(tup3 int string int)
+         typ sql_template)
+         (parent_id, public_keys_sql_list, List.length public_keys)
+
+  let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
+    let%map ts = collect (module Conn) ~public_keys ~parent_id in
+    let alist =
+      List.map ts ~f:(fun t ->
+        (Public_key.Compressed.of_base58_check_exn t.public_key),
+        Account.Nonce.of_uint32 (UInt32.of_int64 t.nonce))
+    in
+    Public_key.Compressed.Map.of_alist_exn alist
 end
 
 module Balance = struct
