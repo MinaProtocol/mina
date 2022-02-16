@@ -746,7 +746,7 @@ WITH RECURSIVE pending_chain_nonce AS (
               INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
               INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
 
-              WHERE pks.value IN $2
+              WHERE pks.value IN ($2)
               AND busc.user_command_id = cmds.id
 
               ORDER BY (full_chain.height, busc.sequence_no) DESC
@@ -770,8 +770,6 @@ WITH RECURSIVE pending_chain_nonce AS (
 
   let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
     let public_keys_sql_list =
-      sprintf
-      "( %s )"
       (public_keys
         |> List.map ~f:(fun pk -> sprintf "'%s'" (Signature_lib.Public_key.Compressed.to_base58_check pk))
         |> String.concat ~sep:",")
