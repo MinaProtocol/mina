@@ -527,7 +527,9 @@ let () =
             return
               (Field.constant
                  ( if
-                   Char.equal s.[0] '0' && Char.equal (Char.lowercase s.[1]) 'x'
+                   String.length s > 1
+                   && Char.equal s.[0] '0'
+                   && Char.equal (Char.lowercase s.[1]) 'x'
                  then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
                  else Field.Constant.of_string s ))
           with Failure _ -> Js.Opt.empty )
@@ -1482,6 +1484,10 @@ module Circuit = struct
           |> Or_error.ok_exn
         in
         res *)) ;
+    circuit##.runAndCheckSync :=
+      Js.wrap_callback (fun (f : unit -> 'a) ->
+          Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> snd) ;
+
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||])) ;
@@ -1777,6 +1783,14 @@ module Ledger = struct
 
   type js_int64 = < uint64Value : js_field Js.meth > Js.t
 
+  type timing_info =
+    < initialMinimumBalance : js_uint64 Js.prop
+    ; cliffTime : js_uint32 Js.prop
+    ; cliffAmount : js_uint64 Js.prop
+    ; vestingPeriod : js_uint32 Js.prop
+    ; vestingIncrement : js_uint64 Js.prop >
+    Js.t
+
   type party_body =
     < publicKey : public_key Js.prop
     ; update : party_update Js.prop
@@ -1947,6 +1961,7 @@ type AccountPredicate =
   module Parties = Mina_base_kernel.Parties
   module Snapp_state = Mina_base_kernel.Snapp_state
   module Token_id = Mina_base_kernel.Token_id
+  module Snapp_basic = Mina_base_kernel.Snapp_basic
 
   let field (x : js_field) : Impl.field =
     match x##.value with Constant x -> x | x -> As_prover.read_var x
@@ -1977,7 +1992,7 @@ type AccountPredicate =
 
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
-      Mina_base_kernel.Snapp_basic.Or_ignore.Check (elt x##.value)
+      Snapp_basic.Or_ignore.Check (elt x##.value)
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
@@ -2054,7 +2069,7 @@ type AccountPredicate =
 
   let set_or_keep (type a) elt (x : a set_or_keep) =
     if Js.to_bool x##.set##toBoolean then
-      Mina_base_kernel.Snapp_basic.Set_or_keep.Set (elt x##.value)
+      Snapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
   let body (b : party_body) : Party.Body.t =
@@ -2159,236 +2174,233 @@ type AccountPredicate =
 
   let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
 
-  (* TODO: I'm stuck on this... don't understand how to create many of the checked types from more basic checked type like Field.t *)
-  (* example: how to create an Or_ignore.Checked.t *)
-  (* it may be the case that there is some shortcut by going to the checked hash input directly! *)
-  (* module Checked = struct
-       let field (x : js_field) = x##.value
+  (*
+     TODO: to de-scope initial version, the following types are converted
+     by just assuming them to be constant and introducing witnesses out of thin air
 
-       let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
-         { x = field pk##.g##.x
-         ; is_odd = Bigint.(test_bit (of_field (field pk##.g##.y)) 0)
-         }
+     * public_key
+     various hashes:
+     * receipt_chain_hash in predicate
+     * seed, start_checkpoint, lock_checkpoint in epoch_data
+     * ledger_hash
 
-       let uint32 (x : js_uint32) : Field.t = field x##.value
+     TODO: some set_or_keep types are not fully implemented yet, and we use keep with a dummy value
+     see: party update
+  *)
+  module Checked = struct
+    let field_value = field
 
-       let uint64 (x : js_uint64) : Field.t = field x##.value
+    let field (x : js_field) = x##.value
 
-       let int64 (x : js_int64) =
-         let x =
-           x##uint64Value |> field |> Field.Constant.to_string
-           |> Unsigned.UInt64.of_string
-           |> (fun x -> x)
-           |> Unsigned.UInt64.to_int64
-         in
-         { Currency.Signed_poly.sgn =
-             (if Int64.is_negative x then Sgn.Neg else Sgn.Pos)
-         ; magnitude =
-             Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 (Int64.abs x))
-         }
+    let bool (x : bool_class Js.t) = x##.value
 
-       let or_ignore (type a) elt (x : a or_ignore) =
-         if Js.to_bool x##.check##toBoolean then
-           Mina_base_kernel.Snapp_basic.Or_ignore.Check (elt x##.value)
-         else Ignore
+    let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.var =
+      { x = field pk##.g##.x
+      ; is_odd =
+          Impl.Boolean.var_of_value
+            Bigint.(test_bit (of_field (field_value pk##.g##.y)) 0)
+          (* TODO not checked ^^^ *)
+      }
 
-       let closed_interval f (c : 'a closed_interval) :
-           _ Snapp_predicate.Closed_interval.t =
-         { lower = f c##.lower; upper = f c##.upper }
+    let uint32 (x : js_uint32) : Field.t = field x##.value
 
-       let epoch_data (e : epoch_data_predicate) :
-           Snapp_predicate.Protocol_state.Epoch_data.t =
-         let ( ^ ) = Fn.compose in
-         { ledger =
-             { hash = or_ignore field e##.ledger##.hash
-             ; total_currency =
-                 Check
-                   (closed_interval
-                      (Currency.Amount.of_uint64 ^ uint64)
-                      e##.ledger##.totalCurrency)
-             }
-         ; seed = or_ignore field e##.seed
-         ; start_checkpoint = or_ignore field e##.startCheckpoint
-         ; lock_checkpoint = or_ignore field e##.lockCheckpoint
-         ; epoch_length =
-             Check
-               (closed_interval
-                  (Mina_numbers.Length.of_uint32 ^ uint32)
-                  e##.epochLength)
-         }
+    let uint64 (x : js_uint64) : Field.t = field x##.value
 
-       let protocol_state (p : protocol_state_predicate) :
-           Snapp_predicate.Protocol_state.t =
-         let ( ^ ) = Fn.compose in
-         { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
-         ; snarked_next_available_token =
-             Check
-               (closed_interval
-                  (Token_id.of_uint64 ^ uint64)
-                  p##.snarkedNextAvailableToken)
-         ; timestamp =
-             Check
-               (closed_interval
-                  (fun x ->
-                    field x##.value
-                    |> Field.Constant.to_string |> Unsigned.UInt64.of_string
-                    |> Block_time.of_uint64)
-                  p##.timestamp)
-         ; blockchain_length =
-             Check
-               (closed_interval
-                  (Mina_numbers.Length.of_uint32 ^ uint32)
-                  p##.blockchainLength)
-         ; min_window_density =
-             Check
-               (closed_interval
-                  (Mina_numbers.Length.of_uint32 ^ uint32)
-                  p##.minWindowDensity)
-         ; last_vrf_output = ()
-         ; total_currency =
-             Check
-               (closed_interval
-                  (Currency.Amount.of_uint64 ^ uint64)
-                  p##.totalCurrency)
-         ; global_slot_since_hard_fork =
-             Check
-               (closed_interval
-                  (Mina_numbers.Global_slot.of_uint32 ^ uint32)
-                  p##.globalSlotSinceHardFork)
-         ; global_slot_since_genesis =
-             Check
-               (closed_interval
-                  (Mina_numbers.Global_slot.of_uint32 ^ uint32)
-                  p##.globalSlotSinceGenesis)
-         ; staking_epoch_data = epoch_data p##.stakingEpochData
-         ; next_epoch_data = epoch_data p##.nextEpochData
-         }
+    let int64 (x : js_int64) =
+      (* TODO replace with proper int64 impl which has a sign; rename these functions to signed_amount *)
+      Currency.Amount.Signed.create_var
+        ~magnitude:
+          (Currency.Amount.Checked.Unsafe.of_field @@ field x##uint64Value)
+        ~sgn:Sgn.Checked.pos
 
-       let set_or_keep (type a) elt (x : a set_or_keep) =
-         if Js.to_bool x##.set##toBoolean then
-           Mina_base_kernel.Snapp_basic.Set_or_keep.Set (elt x##.value)
-         else Keep
+    let or_ignore (type a b) (transform : a -> b) (x : a or_ignore) =
+      Snapp_basic.Or_ignore.Checked.Explicit
+        { Snapp_basic.Flagged_option.is_some = x##.check##.value
+        ; data = transform x##.value
+        }
 
-       let body (b : party_body) : Party.Body.Checked.t =
-         let update : Party.Update.t =
-           let u = b##.update in
+    let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
+      Snapp_basic.Or_ignore.Checked.Implicit
+        { Snapp_predicate.Closed_interval.lower = transform x##.lower
+        ; upper = transform x##.upper
+        }
 
-           { Party.Update.Poly.app_state =
-               Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
-                   set_or_keep field (array_get_exn u##.appState i))
-           ; delegate = set_or_keep public_key u##.delegate
-           ; verification_key = (* TODO *)
-                                Keep
-           ; permissions = Keep
-           ; snapp_uri = Keep
-           ; token_symbol = Keep
-           ; timing = Keep
-           }
-         in
+    let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
+        b Snapp_basic.Set_or_keep.Checked.t =
+      { Snapp_basic.Flagged_option.is_some = x##.set##.value
+      ; data = transform x##.value
+      }
 
-         { pk = public_key b##.publicKey
-         ; update
-         ; token_id = Token_id.of_uint64 (uint64 b##.tokenId)
-         ; delta = int64 b##.delta
-         ; events =
-             Array.map
-               (Js.to_array b##.events)
-               ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
-             |> Array.to_list
-         ; sequence_events =
-             Array.map
-               (Js.to_array b##.sequenceEvents)
-               ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
-             |> Array.to_list
-         ; call_data = field b##.callData
-         ; depth = b##.depth
-         }
+    let keep dummy : 'a Snapp_basic.Set_or_keep.Checked.t =
+      { Snapp_basic.Flagged_option.is_some = Boolean.false_; data = dummy }
 
-       let fee_payer_party (party : fee_payer_party) :
-           Party.Predicated.Fee_payer.Checked.t =
-         let b = body party##.body in
-         { body =
-             { b with
-               token_id = ()
-             ; delta = Currency.Amount.to_fee b.delta.magnitude
-             }
-         ; predicate =
-             uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
-         }
+    let amount x = Currency.Amount.Checked.Unsafe.of_field @@ uint64 x
 
-       let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-         let module Account_nonce = Mina_numbers.Account_nonce.Checked in
-         match Js.to_string t##.type_ with
-         | "accept" ->
-             Nonce_or_accept { nonce = Account_nonce.zero; accept = Boolean.true_ }
-         | "nonce" ->
-             let nonce_js : js_uint32 = Obj.magic t##.value in
-             let nonce = Account_nonce.Unsafe.of_field (uint32 nonce_js) in
-             Nonce_or_accept { nonce; accept = Boolean.false_ }
-         | "full" ->
-             (* type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
-             { balance : 'balance
-             ; nonce : 'nonce
-             ; receipt_chain_hash : 'receipt_chain_hash
-             ; public_key : 'pk
-             ; delegate : 'pk
-             ; state : 'field Snapp_state.V.Stable.V1.t
-             ; sequence_state : 'field
-             ; proved_state : 'bool
-             } *)
-             (* type t =
-             ( Balance.var Numeric.Checked.t
-             , Account_nonce.Checked.t Numeric.Checked.t
-             , Receipt.Chain_hash.var Hash.Checked.t
-             , Public_key.Compressed.var Eq_data.Checked.t
-             , Field.Var.t Eq_data.Checked.t
-             , Boolean.var Eq_data.Checked.t )
-             Poly.Stable.Latest.t *)
-             let ( ^ ) = Fn.compose in
-             let predicate : full_account_predicate = Obj.magic t##.value in
-             let balance_js = predicate##.balance in
-             let module Or_ignore = Mina_base_kernel.Snapp_basic.Or_ignore in
-             let to_upper = Currency.Balance.Checked.Unsafe.of_field ^ uint64 in
-             let balance = Or_ignore.Checked.Implicit (closed_interval to_upper predicate##.balance) in
-             Full
-               { balance
-               ; nonce =
-                   Check
-                     (closed_interval
-                        (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
-                        p##.nonce)
-               ; receipt_chain_hash = or_ignore field predicate##.receiptChainHash
-               ; public_key = or_ignore public_key predicate##.publicKey
-               ; delegate = or_ignore public_key predicate##.delegate
-               ; state =
-                   Pickles_types.Vector.init Snapp_state.Max_state_size.n
-                     ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
-               ; sequence_state = or_ignore field predicate##.sequenceState
-               ; proved_state =
-                   or_ignore
-                     (fun x -> Js.to_bool x##toBoolean)
-                     predicate##.provedState
-               }
-         | s ->
-             failwithf "bad predicate type: %s" s ()
+    let balance x = Currency.Balance.Checked.Unsafe.of_field @@ uint64 x
 
-       let party (party : party) : Party.Predicated.Checked.t =
-         { body = body party##.body; predicate = predicate party##.predicate }
+    let nonce x = Mina_numbers.Account_nonce.Checked.Unsafe.of_field @@ uint32 x
 
-       let parties (parties : parties) : Parties.t =
-         { fee_payer =
-             { data = fee_payer_party parties##.feePayer
-             ; authorization = Mina_base_kernel.Signature.dummy
-             }
-         ; other_parties =
-             Js.to_array parties##.otherParties
-             |> Array.map ~f:(fun p : Party.t ->
-                    { data = party p; authorization = None_given })
-             |> Array.to_list
-         ; protocol_state = protocol_state parties##.protocolState
-         ; memo = Mina_base_kernel.Signed_command_memo.empty
-         }
-     end *)
+    let global_slot x =
+      Mina_numbers.Global_slot.Checked.Unsafe.of_field @@ uint32 x
+
+    let token_id x =
+      Mina_base_kernel.Token_id.Checked.Unsafe.of_field @@ uint64 x
+
+    let ledger_hash x =
+      (* TODO: assumes constant *)
+      Mina_base_kernel.Frozen_ledger_hash.var_of_t @@ field_value x
+
+    let epoch_data (e : epoch_data_predicate) :
+        Snapp_predicate.Protocol_state.Epoch_data.Checked.t =
+      let ( ^ ) = Fn.compose in
+      { ledger =
+          { hash = or_ignore ledger_hash e##.ledger##.hash
+          ; total_currency = numeric amount e##.ledger##.totalCurrency
+          }
+      ; (* TODO: next three all assume constant *)
+        seed =
+          or_ignore
+            (Mina_base_kernel.Epoch_seed.var_of_t ^ field_value)
+            e##.seed
+      ; start_checkpoint =
+          or_ignore
+            (Mina_base_kernel.State_hash.var_of_t ^ field_value)
+            e##.startCheckpoint
+      ; lock_checkpoint =
+          or_ignore
+            (Mina_base_kernel.State_hash.var_of_t ^ field_value)
+            e##.lockCheckpoint
+      ; epoch_length =
+          numeric
+            (Mina_numbers.Length.Checked.Unsafe.of_field ^ uint32)
+            e##.epochLength
+      }
+
+    let protocol_state (p : protocol_state_predicate) :
+        Snapp_predicate.Protocol_state.Checked.t =
+      let ( ^ ) = Fn.compose in
+
+      { snarked_ledger_hash = or_ignore ledger_hash p##.snarkedLedgerHash
+      ; snarked_next_available_token =
+          numeric token_id p##.snarkedNextAvailableToken
+      ; timestamp =
+          numeric (Block_time.Checked.Unsafe.of_field ^ uint64) p##.timestamp
+      ; blockchain_length =
+          numeric
+            (Mina_numbers.Length.Checked.Unsafe.of_field ^ uint32)
+            p##.blockchainLength
+      ; min_window_density =
+          numeric
+            (Mina_numbers.Length.Checked.Unsafe.of_field ^ uint32)
+            p##.minWindowDensity
+      ; last_vrf_output = ()
+      ; total_currency = numeric amount p##.totalCurrency
+      ; global_slot_since_hard_fork =
+          numeric global_slot p##.globalSlotSinceHardFork
+      ; global_slot_since_genesis =
+          numeric global_slot p##.globalSlotSinceGenesis
+      ; staking_epoch_data = epoch_data p##.stakingEpochData
+      ; next_epoch_data = epoch_data p##.nextEpochData
+      }
+
+    let timing_info_dummy () : Party.Update.Timing_info.Checked.t =
+      { initial_minimum_balance =
+          Currency.Balance.Checked.Unsafe.of_field Field.zero
+      ; cliff_time = Mina_numbers.Global_slot.Checked.Unsafe.of_field Field.zero
+      ; cliff_amount = Currency.Amount.Checked.Unsafe.of_field Field.zero
+      ; vesting_period =
+          Mina_numbers.Global_slot.Checked.Unsafe.of_field Field.zero
+      ; vesting_increment = Currency.Amount.Checked.Unsafe.of_field Field.zero
+      }
+
+    let events (js_events : js_field Js.js_array Js.t Js.js_array Js.t) =
+      let events =
+        Impl.exists Mina_base_kernel.Snapp_account.Events.typ
+          ~compute:(fun () -> [])
+      in
+      let push_event js_event =
+        let event = Array.map (Js.to_array js_event) ~f:field in
+        let _ =
+          Mina_base_kernel.Snapp_account.Events.push_checked events event
+        in
+        ()
+      in
+      Array.iter (Js.to_array js_events) ~f:push_event ;
+      events
+
+    let body (b : party_body) : Party.Body.Checked.t =
+      let update : Party.Update.Checked.t =
+        let u = b##.update in
+        { Party.Update.Poly.app_state =
+            Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+                set_or_keep field (array_get_exn u##.appState i))
+        ; delegate = set_or_keep public_key u##.delegate
+        ; (* TODO *) verification_key = keep Field.zero
+        ; permissions =
+            keep Mina_base_kernel.Permissions.(Checked.constant empty)
+        ; snapp_uri =
+            keep
+              ( (Field.zero, As_prover.Ref.create (fun () -> ""))
+                : string Mina_base_kernel.Data_as_hash.t )
+        ; token_symbol = keep Field.zero
+        ; timing = keep (timing_info_dummy ())
+        }
+      in
+      { pk = public_key b##.publicKey
+      ; update
+      ; token_id = token_id b##.tokenId
+      ; delta = int64 b##.delta
+      ; events = events b##.events
+      ; sequence_events = events b##.sequenceEvents
+      ; call_data = field b##.callData
+      ; depth = As_prover.Ref.create (fun () -> b##.depth)
+      }
+
+    let fee_payer_party (party : fee_payer_party) :
+        Party.Predicated.Fee_payer.Checked.t =
+      { (* TODO: is it OK that body is the same for fee_payer as for party?
+           what about fee vs. delta and other differences in the unchecked version?
+        *)
+        body = body party##.body
+      ; predicate = nonce party##.predicate
+      }
+
+    let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
+      match Js.to_string t##.type_ with
+      | "accept" ->
+          Nonce_or_accept
+            { nonce = Mina_numbers.Account_nonce.Checked.zero
+            ; accept = Boolean.true_
+            }
+      | "nonce" ->
+          let nonce_js : js_uint32 = Obj.magic t##.value in
+          Nonce_or_accept { nonce = nonce nonce_js; accept = Boolean.false_ }
+      | "full" ->
+          let ( ^ ) = Fn.compose in
+          let predicate : full_account_predicate = Obj.magic t##.value in
+          Full
+            { balance = numeric balance predicate##.balance
+            ; nonce = numeric nonce predicate##.nonce
+            ; receipt_chain_hash =
+                or_ignore
+                  (* TODO: assumes constant *)
+                  (Mina_base_kernel.Receipt.Chain_hash.var_of_t ^ field_value)
+                  predicate##.receiptChainHash
+            ; public_key = or_ignore public_key predicate##.publicKey
+            ; delegate = or_ignore public_key predicate##.delegate
+            ; state =
+                Pickles_types.Vector.init Snapp_state.Max_state_size.n
+                  ~f:(fun i ->
+                    or_ignore field (array_get_exn predicate##.state i))
+            ; sequence_state = or_ignore field predicate##.sequenceState
+            ; proved_state = or_ignore bool predicate##.provedState
+            }
+      | s ->
+          failwithf "bad predicate type: %s" s ()
+
+    let party (party : party) : Party.Predicated.Checked.t =
+      { body = body party##.body; predicate = predicate party##.predicate }
+  end
 
   (* TODO create checked versions!!! *)
   (* TODO hash two parties together in the correct way *)
@@ -2396,17 +2408,17 @@ type AccountPredicate =
   let hash_party (p : party) =
     p |> party |> Party.Predicated.digest |> Field.constant |> to_js_field
 
-  (* let hash_party_checked p =
-     p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field *)
+  let hash_party_checked p =
+    p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
     p |> protocol_state |> Snapp_predicate.Protocol_state.digest
     |> Field.constant |> to_js_field
 
-  (* let hash_protocol_state_checked (p : protocol_state_predicate) =
-       p |> protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
-       |> Field.constant |> to_js_field
-     in *)
+  let hash_protocol_state_checked (p : protocol_state_predicate) =
+    p |> Checked.protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
+    |> to_js_field
+
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
     let other_parties_hash =
@@ -2418,6 +2430,16 @@ type AccountPredicate =
     Parties.Transaction_commitment.create ~other_parties_hash
       ~protocol_state_predicate_hash ~memo_hash:Field.Constant.zero
     |> Field.constant |> to_js_field
+
+  let hash_transaction_checked other_parties_hash protocol_state_predicate_hash
+      =
+    let other_parties_hash = other_parties_hash |> of_js_field in
+    let protocol_state_predicate_hash =
+      protocol_state_predicate_hash |> of_js_field
+    in
+    Parties.Transaction_commitment.Checked.create ~other_parties_hash
+      ~protocol_state_predicate_hash ~memo_hash:Field.zero
+    |> to_js_field
 
   let () =
     let static_method name f =
@@ -2459,6 +2481,10 @@ type AccountPredicate =
     static_method "hashParty" hash_party ;
     static_method "hashProtocolState" hash_protocol_state ;
     static_method "hashTransaction" hash_transaction ;
+
+    static_method "hashPartyChecked" hash_party_checked ;
+    static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
+    static_method "hashTransactionChecked" hash_transaction_checked ;
 
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =

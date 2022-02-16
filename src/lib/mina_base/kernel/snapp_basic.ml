@@ -119,7 +119,7 @@ module Set_or_keep = struct
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
-    type 'a t
+    type 'a t = (Boolean.var, 'a) Flagged_option.t
 
     val is_keep : _ t -> Boolean.var
 
@@ -197,7 +197,9 @@ module Or_ignore = struct
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
-    type 'a t
+    type 'a t =
+      | Implicit of 'a
+      | Explicit of (Boolean.var, 'a) Flagged_option.t
 
     val typ_implicit :
          equal:('a -> 'a -> bool)

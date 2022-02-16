@@ -93,6 +93,10 @@ module Checked : sig
 
   type t = var
 
+  module Unsafe : sig
+    val of_field : Field.Var.t -> t
+  end
+
   val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
   val ( < ) : t -> t -> (Boolean.var, _) Checked.t
