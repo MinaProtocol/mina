@@ -16,6 +16,8 @@ let loose_permissions : Mina_base_kernel.Permissions.t =
   ; set_snapp_uri = None
   ; edit_sequence_state = None
   ; set_token_symbol = None
+  ; increment_nonce = None
+  ; set_voting_for = None
   }
 
 module Impl = Pickles.Impls.Step
@@ -1799,7 +1801,8 @@ module Ledger = struct
     ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
     ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
     ; callData : js_field Js.prop
-    ; depth : int Js.prop >
+    ; depth : int Js.prop
+    ; protocolState : protocol_state_predicate Js.prop >
     Js.t
 
   type full_account_predicate =
@@ -1836,8 +1839,7 @@ type AccountPredicate =
 
   type parties =
     < feePayer : fee_payer_party Js.prop
-    ; otherParties : party Js.js_array Js.t Js.prop
-    ; protocolState : protocol_state_predicate Js.prop >
+    ; otherParties : party Js.js_array Js.t Js.prop >
     Js.t
 
   type snapp_account =
@@ -2086,13 +2088,14 @@ type AccountPredicate =
       ; snapp_uri = Keep
       ; token_symbol = Keep
       ; timing = Keep
+      ; voting_for = Keep
       }
     in
 
-    { pk = public_key b##.publicKey
+    { public_key = public_key b##.publicKey
     ; update
     ; token_id = Token_id.of_uint64 (uint64 b##.tokenId)
-    ; delta = int64 b##.delta
+    ; balance_change = int64 b##.delta
     ; events =
         Array.map
           (Js.to_array b##.events)
@@ -2104,7 +2107,10 @@ type AccountPredicate =
           ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
         |> Array.to_list
     ; call_data = field b##.callData
-    ; depth = b##.depth
+    ; call_depth = b##.depth
+    ; protocol_state = protocol_state b##.protocolState (* TODO *)
+    ; increment_nonce = false
+    ; use_full_commitment = false
     }
 
   let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
@@ -2112,7 +2118,9 @@ type AccountPredicate =
     { body =
         { b with
           token_id = ()
-        ; delta = Currency.Amount.to_fee b.delta.magnitude
+        ; increment_nonce = ()
+        ; use_full_commitment = ()
+        ; balance_change = Currency.Amount.to_fee b.balance_change.magnitude
         }
     ; predicate =
         uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
@@ -2165,7 +2173,6 @@ type AccountPredicate =
         |> Array.map ~f:(fun p : Party.t ->
                { data = party p; authorization = None_given })
         |> Array.to_list
-    ; protocol_state = protocol_state parties##.protocolState
     ; memo = Mina_base_kernel.Signed_command_memo.empty
     }
 
