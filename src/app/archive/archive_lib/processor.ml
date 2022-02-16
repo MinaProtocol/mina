@@ -782,15 +782,21 @@ WITH RECURSIVE pending_chain_nonce AS (
          typ sql_template)
          (parent_id, public_keys_sql_list, List.length public_keys)
 
+  (* INVARIANT: The map is populated with all the public_keys present *)
   let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
     let open Deferred.Result.Let_syntax in
     let%map ts = collect (module Conn) ~public_keys ~parent_id in
     let alist =
       List.map ts ~f:(fun t ->
         (Signature_lib.Public_key.Compressed.of_base58_check_exn t.public_key),
-        Account.Nonce.of_uint32 (Unsigned.UInt32.of_int64 t.nonce))
+        Account.Nonce.of_uint32 Unsigned.UInt32.(of_int64 t.nonce |> succ))
     in
-    Signature_lib.Public_key.Compressed.Map.of_alist_exn alist
+    let map = Signature_lib.Public_key.Compressed.Map.of_alist_exn alist in
+    List.fold public_keys ~init:map ~f:(fun map key ->
+      match Signature_lib.Public_key.Compressed.Map.add map ~key ~data:Account.Nonce.zero with
+      | `Ok map' -> map'
+      | `Duplicate -> map
+    )
 end
 
 module Balance = struct
@@ -1047,7 +1053,9 @@ module Block_and_signed_command = struct
     let pk_of_id id =
       let%map pk_str = Public_key.find_by_id (module Conn) id in
       Signature_lib.Public_key.Compressed.of_base58_check pk_str |>
-      Or_error.ok_exn (* DANGER! *)
+      Or_error.ok_exn
+      (* Note: This is safe because the database will already have the
+       * correctly formatted public key by this point.  *)
     in
     let nonce_int64_of_pk pk =
       Signature_lib.Public_key.Compressed.Map.find nonce_map pk |>
@@ -1357,6 +1365,10 @@ module Block = struct
           else
             None
         in
+        let nonce_int64_of_pk nonce_map pk =
+          Signature_lib.Public_key.Compressed.Map.find nonce_map pk |>
+          Option.map ~f:(fun nonce -> Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
+        in
         let%bind (_ : int * Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t) =
           deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
@@ -1370,8 +1382,8 @@ module Block = struct
                 let nonce_map =
                   Signature_lib.Public_key.Compressed.Map.change
                     initial_nonce_map
-                    (Mina_base.User_command.fee_payer command)
-                    ~f:(fun _ -> Some (Mina_base.User_command.nonce_exn command |> Unsigned.UInt32.(add one)))
+                    (Mina_base.User_command.fee_payer command |> Account_id.public_key)
+                    ~f:(fun _ -> Some (Mina_base.User_command.nonce_exn command |> Unsigned.UInt32.succ))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
@@ -1389,7 +1401,7 @@ module Block = struct
                     (module Conn)
                       ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
-                    ~receiver_id
+                    ~receiver_id ~nonce_map
                 in
                 (sequence_no + 1, nonce_map)
             | {data= Fee_transfer fee_transfer_bundled; status} ->
