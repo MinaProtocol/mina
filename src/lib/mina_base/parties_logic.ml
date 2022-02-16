@@ -1218,9 +1218,7 @@ module Make (Inputs : Inputs_intf) = struct
        See comment above.
     *)
     let a', update_permitted, failure_status =
-      h.perform
-        (Check_auth
-           { is_start = is_start'; party; account = a })
+      h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
     let party_succeeded =
       Bool.(
