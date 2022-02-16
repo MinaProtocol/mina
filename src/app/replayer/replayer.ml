@@ -476,34 +476,57 @@ let account_creation_fee_int64 =
   Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
 
 let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-    ~balance_id ~fee ~continue_on_error =
+    ~balance_id ~fee ?additional_fee ~continue_on_error () =
   let%map balance_info = balance_info_of_id pool ~id:balance_id in
   let claimed_balance =
     balance_info.balance |> Unsigned.UInt64.of_int64
     |> Currency.Balance.of_uint64
   in
   let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
+  (* for coinbases, an additional fee may be deducted from the amount
+     given to the receiver beyond the account creation fee *)
+  let total_creation_deduction_uint64 =
+    match additional_fee with
+    | None ->
+        account_creation_fee_uint64
+    | Some fee' ->
+        Unsigned.UInt64.add account_creation_fee_uint64
+          (Currency.Fee.to_uint64 fee')
+  in
   let fee_uint64 = Currency.Fee.to_uint64 fee in
-  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then (
+  let add_additional_fee_to_metadata metadata =
+    match additional_fee with
+    | None ->
+        metadata
+    | Some fee ->
+        metadata @ [ ("fee_transfer_fee", Currency.Fee.to_yojson fee) ]
+  in
+  if Unsigned_extended.UInt64.( >= ) fee_uint64 total_creation_deduction_uint64
+  then (
     (* account may have been created *)
-    let fee_less_account_creation_fee_uint64 =
-      Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64
+    let fee_less_total_creation_deduction_uint64 =
+      Unsigned.UInt64.sub fee_uint64 total_creation_deduction_uint64
     in
-    if Unsigned.UInt64.equal balance_uint64 fee_less_account_creation_fee_uint64
+    if
+      Unsigned.UInt64.equal balance_uint64
+        fee_less_total_creation_deduction_uint64
     then
       match receiver_account_creation_fee with
       | None ->
           [%log error]
             "In the archive database, the account balance equals the internal \
-             command fee minus the account creation fee, but the receiver \
-             account creation fee is NULL"
+             command fee minus the account creation fee (and for coinbases, \
+             also less any fee transfer fee), but the receiver account \
+             creation fee is NULL"
             ~metadata:
-              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-              ; ("fee", Currency.Fee.to_yojson fee)
-              ; ( "constraint_constants.account_creation_fee"
-                , Currency.Fee.to_yojson
-                    constraint_constants.account_creation_fee )
-              ] ;
+              (add_additional_fee_to_metadata
+                 [ ( "account_balance"
+                   , Currency.Balance.to_yojson claimed_balance )
+                 ; ("fee", Currency.Fee.to_yojson fee)
+                 ; ( "constraint_constants.account_creation_fee"
+                   , Currency.Fee.to_yojson
+                       constraint_constants.account_creation_fee )
+                 ]) ;
           if continue_on_error then incr error_count else Core_kernel.exit 1
       | Some amount_int64 ->
           if Int64.equal amount_int64 account_creation_fee_int64 then
@@ -512,18 +535,20 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
           else (
             [%log error]
               "In the archive database, the account balance equals the \
-               internal command fee minus the account creation fee, but the \
-               receiver account creation fee differs from the account creation \
-               fee"
+               internal command fee minus the account creation fee (and for \
+               coinbases, also less any fee transfer fee), but the receiver \
+               account creation fee differs from the account creation fee"
               ~metadata:
-                [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-                ; ("fee", Currency.Fee.to_yojson fee)
-                ; ( "constraint_constants.account_creation_fee"
-                  , Currency.Fee.to_yojson
-                      constraint_constants.account_creation_fee )
-                ; ( "receiver_account_creation_fee"
-                  , `String (Int64.to_string amount_int64) )
-                ] ;
+                (add_additional_fee_to_metadata
+                   [ ( "account_balance"
+                     , Currency.Balance.to_yojson claimed_balance )
+                   ; ("fee", Currency.Fee.to_yojson fee)
+                   ; ( "constraint_constants.account_creation_fee"
+                     , Currency.Fee.to_yojson
+                         constraint_constants.account_creation_fee )
+                   ; ( "receiver_account_creation_fee"
+                     , `String (Int64.to_string amount_int64) )
+                   ]) ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
     else
       match receiver_account_creation_fee with
@@ -532,17 +557,20 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
       | Some amount_int64 ->
           [%log error]
             "In the archive database, the account balance is different than \
-             the internal command fee minus the account creation fee, but the \
-             receiver account creation fee is not NULL"
+             the internal command fee minus the account creation fee (and for \
+             coinbases, also less any fee transfer fee), but the receiver \
+             account creation fee is not NULL"
             ~metadata:
-              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-              ; ("fee", Currency.Fee.to_yojson fee)
-              ; ( "constraint_constants.account_creation_fee"
-                , Currency.Fee.to_yojson
-                    constraint_constants.account_creation_fee )
-              ; ( "receiver_account_creation_fee"
-                , `String (Int64.to_string amount_int64) )
-              ] ;
+              (add_additional_fee_to_metadata
+                 [ ( "account_balance"
+                   , Currency.Balance.to_yojson claimed_balance )
+                 ; ("fee", Currency.Fee.to_yojson fee)
+                 ; ( "constraint_constants.account_creation_fee"
+                   , Currency.Fee.to_yojson
+                       constraint_constants.account_creation_fee )
+                 ; ( "receiver_account_creation_fee"
+                   , `String (Int64.to_string amount_int64) )
+                 ]) ;
           if continue_on_error then incr error_count else Core_kernel.exit 1 )
   else
     (* fee less than account creation fee *)
@@ -551,18 +579,20 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
         ()
     | Some amount_int64 ->
         [%log error]
-          "The internal command fee is less than the account creation fee, so \
-           no account should have been created, but in the archive database, \
-           the receiver account creation fee is not NULL"
+          "The internal command fee is less than the account creation fee (for \
+           coinbases the creation fee plus any fee transfer fee), so no \
+           account should have been created, but in the archive database, the \
+           receiver account creation fee is not NULL"
           ~metadata:
-            [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-            ; ("fee", Currency.Fee.to_yojson fee)
-            ; ( "constraint_constants.account_creation_fee"
-              , Currency.Fee.to_yojson constraint_constants.account_creation_fee
-              )
-            ; ( "receiver_account_creation_fee"
-              , `String (Int64.to_string amount_int64) )
-            ] ;
+            (add_additional_fee_to_metadata
+               [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+               ; ("fee", Currency.Fee.to_yojson fee)
+               ; ( "constraint_constants.account_creation_fee"
+                 , Currency.Fee.to_yojson
+                     constraint_constants.account_creation_fee )
+               ; ( "receiver_account_creation_fee"
+                 , `String (Int64.to_string amount_int64) )
+               ]) ;
         if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
@@ -591,13 +621,13 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   let token_int64 = cmd.token in
   let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
   let balance_block_data = internal_command_to_balance_block_data cmd in
-  let%bind () =
-    verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-      ~balance_id ~fee ~continue_on_error
-  in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ~continue_on_error ()
+      in
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
@@ -629,6 +659,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
+      let additional_fee = Option.map fee_transfer ~f:(fun { fee; _ } -> fee) in
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ?additional_fee ~continue_on_error ()
+      in
       let undo_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
@@ -640,6 +675,10 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ~continue_on_error ()
+      in
       (* these are combined in the "coinbase" case *)
       Deferred.unit
   | _ ->
