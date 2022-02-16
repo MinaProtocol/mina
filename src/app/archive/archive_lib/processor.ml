@@ -767,7 +767,7 @@ WITH RECURSIVE pending_chain_nonce AS (
       Format.sprintf
       "( %s )"
       (public_keys
-        |> List.map ~f:(fun pk -> Public_key.Compressed.to_base58_check pk)
+        |> List.map ~f:(fun pk -> Signature_lib.Public_key.Compressed.to_base58_check pk)
         |> String.concat ~sep:",")
     in
     Conn.collect_list
@@ -777,13 +777,14 @@ WITH RECURSIVE pending_chain_nonce AS (
          (parent_id, public_keys_sql_list, List.length public_keys)
 
   let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
+    let open Deferred.Result.Let_syntax in
     let%map ts = collect (module Conn) ~public_keys ~parent_id in
     let alist =
       List.map ts ~f:(fun t ->
-        (Public_key.Compressed.of_base58_check_exn t.public_key),
-        Account.Nonce.of_uint32 (UInt32.of_int64 t.nonce))
+        (Signature_lib.Public_key.Compressed.of_base58_check_exn t.public_key),
+        Account.Nonce.of_uint32 (Unsigned.UInt32.of_int64 t.nonce))
     in
-    Public_key.Compressed.Map.of_alist_exn alist
+    Signature_lib.Public_key.Compressed.Map.of_alist_exn alist
 end
 
 module Balance = struct
@@ -1251,13 +1252,16 @@ module Block = struct
         in
         (* grab all the nonces associated with every public key in all of these
          * transactions for blocks earlier than this one. *)
-        let%bind initial_nonce_map : Account.Nonce.t Public_key.Compressed.Map.t =
+        let%bind initial_nonce_map : (Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t, _) Deferred.Result.t =
           let public_keys =
             transactions
-            |> List.map ~f:Transaction.public_keys
+            |> List.map ~f:(fun x -> Transaction.public_keys x.data)
             |> List.concat
           in
-          Find_nonce.initialize_nonce_map ~public_keys ~parent_id
+          (* if this block is disconnected and doesn't have a parent, the nonce map will need to start empty *)
+          match parent_id with
+          | None -> Deferred.Result.return Signature_lib.Public_key.Compressed.Map.empty
+          | Some parent_id -> Find_nonce.initialize_nonce_map (module Conn) ~public_keys ~parent_id
         in
         let%bind block_id =
           Conn.find
@@ -1329,7 +1333,7 @@ module Block = struct
           else
             None
         in
-        let%bind (_ : int * Account.Nonce.t Public_key.Compressed.Map.t) =
+        let%bind (_ : int * Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t) =
           deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
             | { Mina_base.With_status.status
@@ -1340,9 +1344,9 @@ module Block = struct
                 (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
                  Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
                 let nonce_map =
-                  Public_key.Map.change
-                    (User_command.fee_payer command)
-                    ~f:(fun _ -> Some (User_command.nonce_exn command |> incr))
+                  Signature_lib.Public_key.Map.change
+                    (Mina_base.User_command.fee_payer command)
+                    ~f:(fun _ -> Some (Mina_base.User_command.nonce_exn command |> Unsigned.UInt32.(add one)))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
