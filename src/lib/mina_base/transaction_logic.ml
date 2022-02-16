@@ -1267,9 +1267,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (Signed_command.forget_check user_command)
 
-  let check e b = if b then Ok () else Error (failure e)
-
-  let apply_body ~check_auth ~is_start
+  let apply_body ~is_start
       ({ body =
            { public_key = _
            ; token_id = _
@@ -1277,7 +1275,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                { app_state = _
                ; delegate = _
                ; verification_key = _
-               ; permissions
+               ; permissions = _
                ; snapp_uri = _
                ; token_symbol = _
                ; timing = _
@@ -1295,21 +1293,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        ; predicate
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
-    let open Snapp_basic in
     let open Result.Let_syntax in
-    let update perm u curr ~is_keep ~update ~error =
-      match check_auth perm with
-      | false ->
-          let%map () = check error (is_keep u) in
-          curr
-      | true ->
-          Ok (update u curr)
-    in
-    let%bind permissions =
-      update a.permissions.set_permissions permissions a.permissions
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_permissions
-    in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
@@ -1325,7 +1309,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with permissions }
+    a
 
   module Global_state = struct
     type t =
@@ -1540,6 +1524,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let set_voting_for : t -> Controller.t =
          fun a -> a.permissions.set_voting_for
+
+        type t = Permissions.t
+
+        let if_ = Parties.value_if
       end
 
       type timing = Party.Update.Timing_info.t option
@@ -1645,6 +1633,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let voting_for (a : t) = a.voting_for
 
       let set_voting_for voting_for (a : t) = { a with voting_for }
+
+      let permissions (a : t) = a.permissions
+
+      let set_permissions permissions (a : t) = { a with permissions }
     end
 
     module Amount = struct
@@ -1742,6 +1734,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let delegate (party : t) = party.data.body.update.delegate
 
         let voting_for (party : t) = party.data.body.update.voting_for
+
+        let permissions (party : t) = party.data.body.update.permissions
       end
     end
 
@@ -1884,17 +1878,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_auth_and_update_account
-          { is_start; party = p; account = a; signature_verifies = _ } -> (
+      | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
-          match
-            apply_body
-              ~check_auth:
-                (Fn.flip Permissions.Auth_required.check
-                   (Control.tag p.authorization))
-              ~is_start p.data a
-          with
+          match apply_body ~is_start p.data a with
           | Error failure ->
               (a, false, Some failure)
           | Ok a ->

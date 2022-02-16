@@ -281,6 +281,10 @@ module type Party_intf = sig
     type state_hash
 
     val voting_for : t -> state_hash set_or_keep
+
+    type permissions
+
+    val permissions : t -> permissions set_or_keep
   end
 end
 
@@ -373,6 +377,8 @@ module type Account_intf = sig
 
   type public_key
 
+  type bool
+
   module Permissions : sig
     type controller
 
@@ -397,6 +403,8 @@ module type Account_intf = sig
     val increment_nonce : t -> controller
 
     val set_voting_for : t -> controller
+
+    include Iffable with type bool := bool
   end
 
   type timing
@@ -410,8 +418,6 @@ module type Account_intf = sig
   val balance : t -> balance
 
   val set_balance : balance -> t -> t
-
-  type bool
 
   type global_slot
 
@@ -485,6 +491,10 @@ module type Account_intf = sig
   val voting_for : t -> state_hash
 
   val set_voting_for : state_hash -> t -> t
+
+  val permissions : t -> Permissions.t
+
+  val set_permissions : Permissions.t -> t -> t
 end
 
 module Eff = struct
@@ -506,12 +516,8 @@ module Eff = struct
              ; protocol_state_predicate : 'protocol_state_pred
              ; .. > )
            t
-    | Check_auth_and_update_account :
-        { is_start : 'bool
-        ; party : 'party
-        ; account : 'account
-        ; signature_verifies : 'bool
-        }
+    | Check_auth :
+        { is_start : 'bool; party : 'party; account : 'account }
         -> ( 'account * 'bool * 'failure
            , < bool : 'bool
              ; party : 'party
@@ -599,6 +605,7 @@ module type Inputs_intf = sig
        and type Update.snapp_uri := Snapp_uri.t
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
+       and type Update.permissions := Account.Permissions.t
 
   module Ledger :
     Ledger_intf
@@ -1185,10 +1192,35 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_voting_for voting_for a in
       (a, local_state)
     in
+    (* Finally, update permissions.
+       This should be the last update applied, to ensure that any earlier
+       updates use the account's existing permissions, and not permissions that
+       are specified by the party!
+    *)
+    let a, local_state =
+      let permissions = Party.Update.permissions party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_permissions a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_permissions
+          Bool.(Set_or_keep.is_keep permissions ||| has_permission)
+      in
+      let permissions =
+        Set_or_keep.set_or_keep ~if_:Account.Permissions.if_ permissions
+          (Account.permissions a)
+      in
+      let a = Account.set_permissions permissions a in
+      (a, local_state)
+    in
+    (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
+       See comment above.
+    *)
     let a', update_permitted, failure_status =
       h.perform
-        (Check_auth_and_update_account
-           { is_start = is_start'; signature_verifies; party; account = a })
+        (Check_auth
+           { is_start = is_start'; party; account = a })
     in
     let party_succeeded =
       Bool.(
