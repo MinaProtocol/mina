@@ -1210,9 +1210,8 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body ~txn_global_slot
-        ~(add_check : ?label:string -> Boolean.var -> unit) ~check_auth
-        ~is_start ~is_new
+    let apply_body ~(add_check : ?label:string -> Boolean.var -> unit)
+        ~check_auth ~is_start ~is_new
         ({ body =
              { public_key
              ; token_id = _
@@ -1231,7 +1230,7 @@ module Base = struct
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
-             ; sequence_events
+             ; sequence_events = _
              ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
              ; protocol_state = _
              ; use_full_commitment
@@ -1259,44 +1258,11 @@ module Base = struct
       let ( ! ) = run_checked in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
-        let sequence_state, last_sequence_slot =
-          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.sequence_state in
-          let last_sequence_slot = a.snapp.last_sequence_slot in
-          let is_this_slot =
-            !(Mina_numbers.Global_slot.Checked.equal txn_global_slot
-                last_sequence_slot)
-          in
-          (* Push events to s1 *)
-          let is_empty = !(Party.Events.is_empty_var sequence_events) in
-          let s1 =
-            Field.if_ is_empty ~then_:s1'
-              ~else_:
-                (Party.Sequence_events.push_events_checked s1' sequence_events)
-          in
-          (* Shift along if last update wasn't this slot *)
-          let is_full_and_different_slot =
-            Boolean.((not is_empty) && is_this_slot)
-          in
-          let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
-          let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
-          let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
-          let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
-          let new_global_slot =
-            !(Mina_numbers.Global_slot.Checked.if_ is_empty
-                ~then_:last_sequence_slot ~else_:txn_global_slot)
-          in
-          let new_sequence_state =
-            ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-            , new_global_slot )
-          in
-          update_authorized a.permissions.edit_sequence_state ~is_keep:is_empty
-            ~updated:(`Ok new_sequence_state)
-        in
         let snapp_version =
           (* Current snapp version. Upgrade mechanism should live here. *)
           Mina_numbers.Snapp_version.(Checked.constant zero)
         in
-        { a.snapp with snapp_version; sequence_state; last_sequence_slot }
+        { a.snapp with snapp_version }
       in
       let snapp_uri =
         update_authorized a.permissions.set_snapp_uri
@@ -1470,6 +1436,10 @@ module Base = struct
           include Global_slot.Checked
 
           let ( > ) x y = run_checked (x > y)
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
+
+          let equal x y = run_checked (equal x y)
         end
 
         module Timing = struct
@@ -1496,6 +1466,14 @@ module Base = struct
           type t = Field.t
 
           let if_ = Field.if_
+        end
+
+        module Events = struct
+          type t = Snapp_account.Events.var
+
+          let is_empty x = run_checked (Party.Events.is_empty_var x)
+
+          let push_events = Party.Sequence_events.push_events_checked
         end
 
         module Account = struct
@@ -1607,6 +1585,19 @@ module Base = struct
                 }
             ; hash
             }
+
+          let last_sequence_slot (a : t) = a.data.snapp.last_sequence_slot
+
+          let set_last_sequence_slot last_sequence_slot ({ data = a; hash } : t)
+              : t =
+            { data = { a with snapp = { a.snapp with last_sequence_slot } }
+            ; hash
+            }
+
+          let sequence_state (a : t) = a.data.snapp.sequence_state
+
+          let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with sequence_state } }; hash }
         end
 
         module Ledger = struct
@@ -2017,6 +2008,9 @@ module Base = struct
 
             let verification_key ({ party; _ } : t) =
               party.data.body.update.verification_key
+
+            let sequence_events ({ party; _ } : t) =
+              party.data.body.sequence_events
           end
         end
 
@@ -2176,7 +2170,6 @@ module Base = struct
               account.data
         | Check_auth_and_update_account
             { is_start
-            ; global_state
             ; signature_verifies
             ; party = { party; _ }
             ; account
@@ -2185,10 +2178,7 @@ module Base = struct
             let add_check, checks_succeeded = create_checker () in
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
-              apply_body
-                ~txn_global_slot:
-                  global_state.protocol_state.global_slot_since_hard_fork
-                ~add_check
+              apply_body ~add_check
                 ~check_auth:(fun t ->
                   Permissions.Auth_required.Checked.spec_eval
                     ~signature_verifies t)

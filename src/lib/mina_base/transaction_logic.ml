@@ -1269,7 +1269,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let check e b = if b then Ok () else Error (failure e)
 
-  let apply_body ~check_auth ~global_slot_since_genesis ~is_start
+  let apply_body ~check_auth ~is_start
       ({ body =
            { public_key = _
            ; token_id = _
@@ -1287,7 +1287,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-           ; sequence_events
+           ; sequence_events = _
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
            ; protocol_state = _
            ; use_full_commitment
@@ -1317,45 +1317,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~error:Update_not_permitted_delegate
       else return a.delegate
     in
-    let%bind snapp =
-      let%map sequence_state, last_sequence_slot =
-        let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
-        let last_sequence_slot = init.last_sequence_slot in
-        let is_this_slot =
-          Mina_numbers.Global_slot.equal global_slot_since_genesis
-            last_sequence_slot
-        in
-        (* Shift along if last update wasn't this slot *)
-        let s5 = if is_this_slot then s5 else s4 in
-        let s4 = if is_this_slot then s4 else s3 in
-        let s3 = if is_this_slot then s3 else s2 in
-        let s2 = if is_this_slot then s2 else s1 in
-        (* Push events to s1 *)
-        let is_empty = List.is_empty sequence_events in
-        let s1 =
-          if is_empty then s1
-          else Party.Sequence_events.push_events s1 sequence_events
-        in
-        let new_sequence_state =
-          if is_empty then Set_or_keep.Keep
-          else
-            Set_or_keep.Set
-              ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-              , global_slot_since_genesis )
-        in
-        update a.permissions.edit_sequence_state new_sequence_state
-          (init.sequence_state, init.last_sequence_slot)
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set x -> x)
-          ~error:Update_not_permitted_sequence_state
-      in
+    let snapp =
       let snapp_version =
         (* Current snapp version. Upgrade mechanism should live here. *)
         Mina_numbers.Snapp_version.zero
       in
-      let t : Snapp_account.t =
-        { init with snapp_version; sequence_state; last_sequence_slot }
-      in
+      let t : Snapp_account.t = { init with snapp_version } in
       if Snapp_account.(equal default t) then None else Some t
     in
     let%bind snapp_uri =
@@ -1525,7 +1492,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Permissions.Auth_required.check perm tag
     end
 
-    module Global_slot = Mina_numbers.Global_slot
+    module Global_slot = struct
+      include Mina_numbers.Global_slot
+
+      let if_ = Parties.value_if
+    end
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
@@ -1550,6 +1521,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
       let if_ = Parties.value_if
+    end
+
+    module Events = struct
+      type t = Field.t array list
+
+      let is_empty = List.is_empty
+
+      let push_events = Party.Sequence_events.push_events
     end
 
     module Account = struct
@@ -1637,6 +1616,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let set_verification_key verification_key (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with verification_key })
+
+      let last_sequence_slot (a : t) = (get_snapp a).last_sequence_slot
+
+      let set_last_sequence_slot last_sequence_slot (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with last_sequence_slot })
+
+      let sequence_state (a : t) = (get_snapp a).sequence_state
+
+      let set_sequence_state sequence_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
     end
 
     module Amount = struct
@@ -1724,6 +1713,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let verification_key (party : t) =
           Snapp_basic.Set_or_keep.map ~f:Option.some
             party.data.body.update.verification_key
+
+        let sequence_events (party : t) = party.data.body.sequence_events
       end
     end
 
@@ -1868,7 +1859,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Check_auth_and_update_account
           { is_start
-          ; global_state
           ; party = p
           ; account = a
           ; account_is_new = _
@@ -1881,9 +1871,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag p.authorization))
-              ~global_slot_since_genesis:
-                global_state.protocol_state.global_slot_since_genesis ~is_start
-              p.data a
+              ~is_start p.data a
           with
           | Error failure ->
               (a, false, Some failure)
