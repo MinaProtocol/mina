@@ -275,6 +275,8 @@ module type Party_intf = sig
     type token_symbol
 
     val token_symbol : t -> token_symbol set_or_keep
+
+    val delegate : t -> public_key set_or_keep
   end
 end
 
@@ -364,6 +366,8 @@ end
 
 module type Account_intf = sig
   type t
+
+  type public_key
 
   module Permissions : sig
     type controller
@@ -455,6 +459,14 @@ module type Account_intf = sig
   val token_symbol : t -> token_symbol
 
   val set_token_symbol : token_symbol -> t -> t
+
+  val public_key : t -> public_key
+
+  val set_public_key : public_key -> t -> t
+
+  val delegate : t -> public_key
+
+  val set_delegate : public_key -> t -> t
 end
 
 module Eff = struct
@@ -480,7 +492,6 @@ module Eff = struct
         { is_start : 'bool
         ; party : 'party
         ; account : 'account
-        ; account_is_new : 'bool
         ; signature_verifies : 'bool
         }
         -> ( 'account * 'bool * 'failure
@@ -508,9 +519,7 @@ module type Inputs_intf = sig
        and type amount := Amount.t
        and type signed_amount := Amount.Signed.t
 
-  module Public_key : sig
-    type t
-  end
+  module Public_key : Iffable with type bool := Bool.t
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
@@ -542,6 +551,7 @@ module type Inputs_intf = sig
        and type verification_key := Verification_key.t
        and type snapp_uri := Snapp_uri.t
        and type token_symbol := Token_symbol.t
+       and type public_key := Public_key.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -843,6 +853,8 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
     in
+    let party_token = Party.token_id party in
+    let party_token_is_default = Token_id.(equal default) party_token in
     (* Set account timing for new accounts, if specified. *)
     let a, local_state =
       let timing = Party.Update.timing party in
@@ -1077,15 +1089,41 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_token_symbol token_symbol a in
       (a, local_state)
     in
+    (* Update delegate. *)
+    let a, local_state =
+      let delegate = Party.Update.delegate party in
+      let base_delegate =
+        let should_set_new_account_delegate =
+          (* Only accounts for the default token may delegate. *)
+          Bool.(account_is_new &&& party_token_is_default)
+        in
+        (* New accounts should have the delegate equal to the public key of the
+           account.
+        *)
+        Public_key.if_ should_set_new_account_delegate
+          ~then_:(Party.public_key party) ~else_:(Account.delegate a)
+      in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_delegate a)
+      in
+      let local_state =
+        (* Note: only accounts for the default token can delegate. *)
+        Local_state.add_check local_state Update_not_permitted_delegate
+          Bool.(
+            Set_or_keep.is_keep delegate
+            ||| has_permission &&& party_token_is_default)
+      in
+      let delegate =
+        Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
+      in
+      let a = Account.set_delegate delegate a in
+      (a, local_state)
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account
-           { is_start = is_start'
-           ; signature_verifies
-           ; party
-           ; account = a
-           ; account_is_new
-           })
+           { is_start = is_start'; signature_verifies; party; account = a })
     in
     let party_succeeded =
       Bool.(
@@ -1110,18 +1148,16 @@ module Make (Inputs : Inputs_intf) = struct
       *)
       Amount.Signed.negate (Party.balance_change party)
     in
-    let party_token = Party.token_id party in
     Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
-      let party_is_default = Token_id.(equal default) party_token in
       Bool.(
         assert_
           ( (not is_start')
-          ||| (party_is_default &&& Amount.Signed.is_pos local_delta) )) ;
+          ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
       (* FIXME: Allow non-default tokens again. *)
-      Bool.(assert_ (party_is_default &&& curr_is_default)) ;
+      Bool.(assert_ (party_token_is_default &&& curr_is_default)) ;
       Amount.add_signed_flagged local_state.excess local_delta
     in
     (* The first party must succeed. *)

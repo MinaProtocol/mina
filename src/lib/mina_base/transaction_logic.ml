@@ -1275,7 +1275,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; token_id = _
            ; update =
                { app_state = _
-               ; delegate
+               ; delegate = _
                ; verification_key = _
                ; permissions
                ; snapp_uri = _
@@ -1304,14 +1304,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           curr
       | true ->
           Ok (update u curr)
-    in
-    let%bind delegate =
-      if Token_id.(equal default) a.token_id then
-        update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
-          ~error:Update_not_permitted_delegate
-      else return a.delegate
     in
     let%bind permissions =
       update a.permissions.set_permissions permissions a.permissions
@@ -1347,7 +1339,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with delegate; permissions; nonce; voting_for }
+    { a with permissions; nonce; voting_for }
 
   module Global_state = struct
     type t =
@@ -1444,6 +1436,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Public_key = struct
       type t = Public_key.Compressed.t
+
+      let if_ = Parties.value_if
     end
 
     module Controller = struct
@@ -1626,6 +1620,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let token_symbol (a : t) = a.token_symbol
 
       let set_token_symbol token_symbol (a : t) = { a with token_symbol }
+
+      let public_key (a : t) = a.public_key
+
+      let set_public_key public_key (a : t) = { a with public_key }
+
+      let delegate (a : t) = Account.delegate_opt a.delegate
+
+      let set_delegate delegate (a : t) =
+        let delegate =
+          if Signature_lib.Public_key.Compressed.(equal empty) delegate then
+            None
+          else Some delegate
+        in
+        { a with delegate }
     end
 
     module Amount = struct
@@ -1719,6 +1727,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let snapp_uri (party : t) = party.data.body.update.snapp_uri
 
         let token_symbol (party : t) = party.data.body.update.token_symbol
+
+        let delegate (party : t) = party.data.body.update.delegate
       end
     end
 
@@ -1862,12 +1872,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Check_auth_and_update_account
-          { is_start
-          ; party = p
-          ; account = a
-          ; account_is_new = _
-          ; signature_verifies = _
-          } -> (
+          { is_start; party = p; account = a; signature_verifies = _ } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match

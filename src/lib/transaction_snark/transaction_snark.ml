@@ -1211,13 +1211,13 @@ module Base = struct
           acc')
 
     let apply_body ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth ~is_start ~is_new
+        ~check_auth ~is_start
         ({ body =
              { public_key
              ; token_id = _
              ; update =
                  { app_state = _
-                 ; delegate
+                 ; delegate = _
                  ; verification_key = _
                  ; permissions
                  ; snapp_uri = _
@@ -1257,21 +1257,6 @@ module Base = struct
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
       let open Snapp_basic in
-      let delegate =
-        let base_delegate =
-          (* New accounts should have the delegate equal to the public key of the account. *)
-          !(Public_key.Compressed.Checked.if_ is_new ~then_:public_key
-              ~else_:a.delegate)
-        in
-        update_authorized a.permissions.set_delegate
-          ~is_keep:(Set_or_keep.Checked.is_keep delegate)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep
-                 ~if_:(fun b ~then_ ~else_ ->
-                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_))
-                 delegate base_delegate))
-      in
       let permissions =
         update_authorized a.permissions.set_permissions
           ~is_keep:(Set_or_keep.Checked.is_keep permissions)
@@ -1319,7 +1304,7 @@ module Base = struct
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
       let a : Account.Checked.Unhashed.t =
-        { a with delegate; permissions; nonce; public_key; voting_for }
+        { a with permissions; nonce; public_key; voting_for }
       in
       (a, `proof_must_verify proof_must_verify)
 
@@ -1590,6 +1575,16 @@ module Base = struct
 
           let set_token_symbol token_symbol ({ data = a; hash } : t) : t =
             { data = { a with token_symbol }; hash }
+
+          let public_key (a : t) = a.data.public_key
+
+          let set_public_key public_key ({ data = a; hash } : t) : t =
+            { data = { a with public_key }; hash }
+
+          let delegate (a : t) = a.data.delegate
+
+          let set_delegate delegate ({ data = a; hash } : t) : t =
+            { data = { a with delegate }; hash }
         end
 
         module Ledger = struct
@@ -2008,6 +2003,8 @@ module Base = struct
 
             let token_symbol ({ party; _ } : t) =
               party.data.body.update.token_symbol
+
+            let delegate ({ party; _ } : t) = party.data.body.update.delegate
           end
         end
 
@@ -2070,6 +2067,9 @@ module Base = struct
 
         module Public_key = struct
           type t = Public_key.Compressed.var
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
         end
 
         module Protocol_state_predicate = struct
@@ -2166,12 +2166,7 @@ module Base = struct
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
         | Check_auth_and_update_account
-            { is_start
-            ; signature_verifies
-            ; party = { party; _ }
-            ; account
-            ; account_is_new
-            } ->
+            { is_start; signature_verifies; party = { party; _ }; account } ->
             let add_check, checks_succeeded = create_checker () in
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
@@ -2179,7 +2174,7 @@ module Base = struct
                 ~check_auth:(fun t ->
                   Permissions.Auth_required.Checked.spec_eval
                     ~signature_verifies t)
-                ~is_start ~is_new:account_is_new party.data account.data
+                ~is_start party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
             let checks_succeeded = checks_succeeded () in
