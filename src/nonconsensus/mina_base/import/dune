@@ -4,4 +4,5 @@
  (libraries signature_lib_nonconsensus)
  (preprocess (pps
     ppx_version
-    ppx_optcomp)))
+    ppx_optcomp))
+ (instrumentation (backend bisect_ppx)))
