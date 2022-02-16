@@ -70,7 +70,7 @@ func multiaddrListForeach(l ipc.Multiaddr_List, f func(string) error) error {
 	return nil
 }
 
-func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
+func peerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i).Id()
 		if err != nil {
@@ -84,7 +84,7 @@ func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	return nil
 }
 
-func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
+func textListForeach(l capnp.TextList, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i)
 		if err != nil {
@@ -114,7 +114,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(bannedIps, func(ip string) error {
+	err = textListForeach(bannedIps, func(ip string) error {
 		return filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 	})
 	if err != nil {
@@ -128,7 +128,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(trustedIps, func(ip string) error {
+	err = textListForeach(trustedIps, func(ip string) error {
 		return filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
 	})
 	if err != nil {
@@ -140,7 +140,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	bannedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
+	err = peerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
 			bannedPeers.Add(id)
@@ -156,7 +156,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	trustedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
+	err = peerIdListForeach(trustedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
 			trustedPeers.Add(id)

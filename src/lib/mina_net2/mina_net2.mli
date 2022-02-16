@@ -160,6 +160,7 @@ val configure :
   -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
+  -> known_private_ip_nets:Core.Unix.Cidr.t list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
