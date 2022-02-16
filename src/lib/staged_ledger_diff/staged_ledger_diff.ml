@@ -98,6 +98,13 @@ module Pre_diff_two = struct
         Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    ; internal_command_balances = t.internal_command_balances
+    }
 end
 
 module Pre_diff_one = struct
@@ -125,6 +132,13 @@ module Pre_diff_one = struct
         Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    ; internal_command_balances = t.internal_command_balances
+    }
 end
 
 module Pre_diff_with_at_most_two_coinbase = struct
@@ -401,7 +415,7 @@ let net_return
       (commands t)
       ~f:(fun sum cmd ->
         let%bind sum = sum in
-        Fee.( + ) sum (User_command.fee_exn (With_status.data cmd)))
+        Fee.( + ) sum (User_command.fee (With_status.data cmd)))
   in
   let%bind completed_works_fees =
     List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->

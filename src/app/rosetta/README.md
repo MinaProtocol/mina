@@ -4,6 +4,23 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/02/11:
+
+- Replaced "Pending" status with null as demanded by the specification:
+https://www.rosetta-api.org/docs/models/Operation.html
+
+2022/02/09:
+
+- Refactor docker build instructions to use a generic dockerfile that works across debian/ubuntu
+
+2022/02/03:
+
+- Removed the current test-agent, in part because it relies
+   on the ability to enable and disable staking via GrapQL.
+   That feature of the daemon had been deprecated, and has been
+   removed. A new test-agent may appear in the future.
+- Update for release/1.3.0 as opposed to purpose-built rosetta branches
+
 2022/01/18:
 
 - /network/list uses `MINA_ROSETTA_NETWORK`
@@ -160,11 +177,13 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## How to build your own docker image
 
-Checkout the "rosetta-v16" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
+Checkout the "release/1.3.0" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
-`cat dockerfiles/stages/1-build-deps-ubuntu dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-prod-ubuntu | docker build -t mina-rosetta:v16 --build-arg "MINA_BRANCH=rosetta-v16" -`
+`cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production | docker build -t mina-rosetta-ubuntu:v1.3.0 --build-arg "MINA_BRANCH=release/1.3.0" -`
 
-This creates an image (mina-rosetta:vX) based on the most up-to-date changes that support rosetta.
+This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu 20.04 and includes the most recent release of the mina daemon along with mina-archive and mina-rosetta.
+
+Alternatively, you could use the official image `minaprotocol/mina-rosetta-ubuntu:1.3.0beta1-087f715-stretch` which is built in exactly this way by buildkite CI/CD.
 
 ## How to Run
 
@@ -178,7 +197,7 @@ The container includes 4 scripts in /rosetta which run a different set of servic
 For example, to run the `docker-devnet-start.sh` and connect to the live devnet:
 
 ```
-docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta:v16
+docker run -it --rm --name rosetta --entrypoint=./docker-devnet-start.sh -p 10101:10101 -p 3085:3085 -p 3086:3086 -p 3087:3087 minaprotocol/mina-rosetta-ubuntu:v1.3.0
 ```
 
 Note: It will take 20min-1hr for your node to sync
@@ -227,7 +246,7 @@ Accounts in Mina are not uniquely identified by an address alone, you must also 
 
 ### Operations for Supported Transactions via Construction
 
-The following supported transactions on devnet and mainnet for the Construction API are the `payment` and `delegation` ones within the ["living" documentation](https://github.com/MinaProtocol/mina/blob/477bbdcdeeeafbcbaff74b9b1a83feacf104e5c9/src/app/rosetta/test-agent/poke.ml#L89) in our integration testing code. The other transaction types are disabled on the live networks.
+The following supported transactions on devnet and mainnet for the Construction API are `payment` and `delegation`. The other transaction types are disabled on the live networks.
 
 ## Future Work and Known Issues
 
@@ -270,13 +289,13 @@ The signer library used by the test agent can be used as a reference for further
 
 ### Rosetta CLI Validation
 
-The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction (running the test-agent suite while `check:data` is run). There are no reconcilliation errors. We are in the middle of verifying reconcilliation errors against devnet.
+The Data API is fully validated using the official `rosetta-cli` against private networks that issue every different type of transaction. There are no reconcilliation errors. We are in the middle of verifying reconcilliation errors against devnet.
 
-The Construction API is _not_ validated using `rosetta-cli` as this would require an implementation of the signer in the rosetta-go-sdk. The test-agent does a thorough job of testing the construction API, however, see the integration-test-agent section above.
+The Construction API is _not_ validated using `rosetta-cli` as this would require an implementation of the signer in the rosetta-go-sdk.
 
 ### Reproduce agent and rosetta-cli validation
 
-`minaprotocol/mina-rosetta:v16` and `rosetta-cli @ v0.5.12`
+`minaprotocol/mina-rosetta-ubuntu:v1.3.0` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
@@ -290,7 +309,7 @@ $ docker logs --follow mina-rosetta-test
 **Run a fast sandbox network forever and test with rosetta-cli**
 
 ```
-$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta:v16
+$ docker run --rm --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-demo --entrypoint ./docker-demo-start.sh -d minaprotocol/mina-rosetta-ubuntu:v1.3.0
 
 $ docker logs --follow mina-rosetta-demo
 
@@ -335,3 +354,4 @@ In the generated files, the type `deriving` clauses will need to have `eq` added
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
 Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
+

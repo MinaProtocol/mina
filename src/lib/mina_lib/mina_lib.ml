@@ -7,7 +7,6 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open O1trace
-open Otp_lib
 open Network_peer
 module Archive_client = Archive_client
 module Config = Config
@@ -68,6 +67,11 @@ type components =
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
+(* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
+type command_inputs =
+  | User_command_inputs of User_command_input.t list
+  | Snapp_command_inputs of Parties.t list
+
 type pipes =
   { validated_transitions_reader :
       External_transition.Validated.t Strict_pipe.Reader.t
@@ -82,7 +86,7 @@ type pipes =
       * Mina_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer :
-      ( User_command_input.t list
+      ( command_inputs
         * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
@@ -123,8 +127,6 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; block_production_keypairs :
-      (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state : Work_selector.State.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
@@ -156,9 +158,8 @@ let client_port t =
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
-  let keypair_and_compressed_pks, _ = Agent.get t.block_production_keypairs in
-  Public_key.Compressed.Set.map keypair_and_compressed_pks
-    ~f:(fun (_keypair, pk_compressed) -> pk_compressed)
+  t.config.block_production_keypairs |> Keypair.And_compressed_pk.Set.to_list
+  |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
 
 let coinbase_receiver t = !(t.coinbase_receiver)
 
@@ -172,9 +173,6 @@ let replace_coinbase_receiver t coinbase_receiver =
       ; ("new_receiver", Consensus.Coinbase_receiver.to_yojson coinbase_receiver)
       ] ;
   t.coinbase_receiver := coinbase_receiver
-
-let replace_block_production_keypairs t kps =
-  Agent.update t.block_production_keypairs kps
 
 let log_snark_worker_warning t =
   if Option.is_some t.config.snark_coordinator_key then
@@ -908,8 +906,9 @@ let get_current_nonce t aid =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
+  let cmd_inputs = User_command_inputs uc_inputs in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -917,6 +916,14 @@ let add_full_transactions t user_command =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_writer
     (user_command, Ivar.fill result_ivar)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
+
+let add_snapp_transactions t (snapp_txns : Parties.t list) =
+  let result_ivar = Ivar.create () in
+  let cmd_inputs = Snapp_command_inputs snapp_txns in
+  Strict_pipe.Writer.write t.pipes.user_command_input_writer
+    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1177,25 +1184,29 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  Block_producer.run ~logger:t.config.logger
-    ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
-    ~set_next_producer_timing ~prover:t.processes.prover
-    ~trust_system:t.config.trust_system
-    ~transaction_resource_pool:
-      (Network_pool.Transaction_pool.resource_pool
-         t.components.transaction_pool)
-    ~get_completed_work:
-      (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-    ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.block_production_keypairs)
-    ~coinbase_receiver:t.coinbase_receiver
-    ~consensus_local_state:t.config.consensus_local_state
-    ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values
-    ~block_reward_threshold:t.config.block_reward_threshold
-    ~block_produced_bvar:t.components.block_produced_bvar ;
+  if
+    not
+      (Keypair.And_compressed_pk.Set.is_empty
+         t.config.block_production_keypairs)
+  then
+    Block_producer.run ~logger:t.config.logger
+      ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+      ~set_next_producer_timing ~prover:t.processes.prover
+      ~trust_system:t.config.trust_system
+      ~transaction_resource_pool:
+        (Network_pool.Transaction_pool.resource_pool
+           t.components.transaction_pool)
+      ~get_completed_work:
+        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+      ~time_controller:t.config.time_controller
+      ~coinbase_receiver:t.coinbase_receiver
+      ~consensus_local_state:t.config.consensus_local_state
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~log_block_creation:t.config.log_block_creation
+      ~precomputed_values:t.config.precomputed_values
+      ~block_reward_threshold:t.config.block_reward_threshold
+      ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1279,15 +1290,7 @@ let create ?wallets (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "mina_lib" (fun () ->
-          let block_production_keypairs =
-            Agent.create
-              ~f:(fun kps ->
-                Keypair.Set.to_list kps
-                |> List.map ~f:(fun kp ->
-                       (kp, Public_key.compress kp.Keypair.public_key))
-                |> Keypair.And_compressed_pk.Set.of_list)
-              config.initial_block_production_keypairs
-          in
+          let start = Time.now () in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1305,6 +1308,11 @@ let create ?wallets (config : Config.t) =
                       ~conf_dir:config.conf_dir))
             >>| Result.ok_exn
           in
+          [%log' debug config.logger] "Took $time ms to create prover process"
+            ~metadata:
+              [ ("time", `Float (Time.(diff (now ()) start) |> Time.Span.to_ms))
+              ] ;
+          let start = Time.now () in
           let%bind verifier =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1324,6 +1332,8 @@ let create ?wallets (config : Config.t) =
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir)))
             >>| Result.ok_exn
           in
+          [%log' info config.logger] "Took %f ms to create verifier process"
+            (Time.(diff (now ()) start) |> Time.Span.to_ms) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1339,7 +1349,7 @@ let create ?wallets (config : Config.t) =
                     Vrf_evaluator.create ~constraint_constants ~pids:config.pids
                       ~logger:config.logger ~conf_dir:config.conf_dir
                       ~consensus_constants
-                      ~keypairs:(Agent.get block_production_keypairs |> fst)))
+                      ~keypairs:config.block_production_keypairs))
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1524,10 +1534,8 @@ let create ?wallets (config : Config.t) =
                               (Mina_incremental.Status.Observer.value status)
                       in
                       let block_producers =
-                        let public_keys, _ =
-                          Agent.get block_production_keypairs
-                        in
-                        Public_key.Compressed.Set.map public_keys ~f:snd
+                        config.block_production_keypairs
+                        |> Public_key.Compressed.Set.map ~f:snd
                         |> Set.to_list
                       in
                       let ban_statuses =
@@ -1680,7 +1688,7 @@ let create ?wallets (config : Config.t) =
           (* tie the first knot *)
           net_ref := Some net ;
           let user_command_input_reader, user_command_input_writer =
-            Strict_pipe.(create ~name:"local transactions" Synchronous)
+            Strict_pipe.(create ~name:"local user transactions" Synchronous)
           in
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
@@ -1706,29 +1714,40 @@ let create ?wallets (config : Config.t) =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, get_current_nonce, get_account) ->
-              match%bind
-                User_command_input.to_user_commands ~get_current_nonce
-                  ~get_account ~constraint_constants ~logger:config.logger
-                  input_list
-              with
-              | Ok user_commands ->
-                  if List.is_empty user_commands then (
-                    result_cb
-                      (Error (Error.of_string "No user commands to send")) ;
-                    Deferred.unit )
-                  else
-                    (*callback for the result from transaction_pool.apply_diff*)
-                    Strict_pipe.Writer.write local_txns_writer
-                      ( List.map user_commands ~f:(fun c ->
-                            User_command.Signed_command c)
-                      , result_cb )
-              | Error e ->
-                  [%log' error config.logger]
-                    "Failed to submit user commands: $error"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                  result_cb (Error e) ;
-                  Deferred.unit)
+            ~f:(fun (inputs, result_cb, get_current_nonce, get_account) ->
+              match inputs with
+              | User_command_inputs uc_inputs -> (
+                  match%bind
+                    User_command_input.to_user_commands ~get_current_nonce
+                      ~get_account ~constraint_constants ~logger:config.logger
+                      uc_inputs
+                  with
+                  | Ok user_commands ->
+                      if List.is_empty user_commands then (
+                        result_cb
+                          (Error (Error.of_string "No user commands to send")) ;
+                        Deferred.unit )
+                      else
+                        (*callback for the result from transaction_pool.apply_diff*)
+                        Strict_pipe.Writer.write local_txns_writer
+                          ( List.map user_commands ~f:(fun cmd ->
+                                User_command.Signed_command cmd)
+                          , result_cb )
+                  | Error e ->
+                      [%log' error config.logger]
+                        "Failed to submit user commands: $error"
+                        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                      result_cb (Error e) ;
+                      Deferred.unit )
+              | Snapp_command_inputs snapp_txns ->
+                  (* TODO: here, submit a Parties.t, which includes a nonce
+                     allow the nonce to be omitted, and infer it, as done
+                     for user command inputs
+                  *)
+                  Strict_pipe.Writer.write local_txns_writer
+                    ( List.map snapp_txns ~f:(fun cmd ->
+                          User_command.Parties cmd)
+                    , result_cb ))
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
             Broadcast_pipe.create
@@ -2058,7 +2077,6 @@ let create ?wallets (config : Config.t) =
                 ; local_snark_work_writer
                 }
             ; wallets
-            ; block_production_keypairs
             ; coinbase_receiver = ref config.coinbase_receiver
             ; snark_job_state = snark_jobs_state
             ; subscriptions

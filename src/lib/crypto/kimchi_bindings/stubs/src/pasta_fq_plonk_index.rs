@@ -1,7 +1,7 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -136,7 +136,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fp_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, None);
+    t.linearization = expr_linearization(t.cs.domain.d1, false, &None);
 
     Ok(CamlPastaFqPlonkIndex(Box::new(t)))
 }

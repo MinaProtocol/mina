@@ -1,5 +1,5 @@
 (library
- (name data_hash_lib_nonconsensus)
+ (name data_hash_lib)
  (public_name data_hash_lib_nonconsensus)
  (inline_tests)
  (library_flags -linkall)

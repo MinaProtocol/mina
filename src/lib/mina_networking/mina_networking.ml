@@ -183,8 +183,8 @@ module Rpcs = struct
         type response =
           ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V2.t
-          * Mina_state.Protocol_state.Value.Stable.V1.t list )
+          * Pending_coinbase.Stable.V1.t
+          * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
         [@@deriving bin_io, version { rpc }]
 

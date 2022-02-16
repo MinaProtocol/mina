@@ -14,24 +14,26 @@ module Breadcrumb = Transition_frontier.Breadcrumb
 module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
-        { block:
+        { block :
             ( External_transition.Stable.Latest.t
             , State_hash.Stable.Latest.t )
-              With_hash.Stable.Latest.t
-        ; sender_receipt_chains_from_parent_ledger:
-            (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t) list
+            With_hash.Stable.Latest.t
+        ; sender_receipt_chains_from_parent_ledger :
+            (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            list
         }
     | Root_transitioned of
         Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
-    | Bootstrap of {lost_blocks: State_hash.Stable.Latest.t list}
+    | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
   [@@deriving bin_io_unversioned]
 end
 
 module Transaction_pool = struct
   type t =
-    { added: User_command.Stable.Latest.t list
-    ; removed: User_command.Stable.Latest.t list }
-    [@@deriving bin_io_unversioned]
+    { added : User_command.Stable.Latest.t list
+    ; removed : User_command.Stable.Latest.t list
+    }
+  [@@deriving bin_io_unversioned]
 end
 
 type t =
@@ -48,8 +50,8 @@ module Builder = struct
     let sender_receipt_chains_from_parent_ledger =
       let senders =
         commands
-        |> List.map ~f:(fun {data; _} ->
-               User_command.(fee_payer (forget_check data)) )
+        |> List.map ~f:(fun { data; _ } ->
+               User_command.(fee_payer (forget_check data)))
         |> Account_id.Set.of_list
       in
       let ledger =
@@ -62,14 +64,14 @@ module Builder = struct
                let%bind ledger_location =
                  Ledger.location_of_account ledger sender
                in
-               let%map {receipt_chain_hash; _} =
+               let%map { receipt_chain_hash; _ } =
                  Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)) )
+               (sender, receipt_chain_hash)))
     in
     Transition_frontier.Breadcrumb_added
-      {block; sender_receipt_chains_from_parent_ledger}
+      { block; sender_receipt_chains_from_parent_ledger }
 
   let user_commands user_commands =
-    Transaction_pool {Transaction_pool.added= user_commands; removed= []}
+    Transaction_pool { Transaction_pool.added = user_commands; removed = [] }
 end

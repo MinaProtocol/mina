@@ -1,5 +1,5 @@
 (library
- (name random_oracle_nonconsensus)
+ (name random_oracle)
  (public_name random_oracle_nonconsensus)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
