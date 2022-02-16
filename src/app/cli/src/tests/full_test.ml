@@ -147,6 +147,7 @@ let run_test () : unit Deferred.t =
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
           }
       in
       let net_config =
