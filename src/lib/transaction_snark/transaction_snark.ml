@@ -1210,28 +1210,26 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body ?tag ~txn_global_slot
-        ~(add_check : ?label:string -> Boolean.var -> unit) ~check_auth
-        ~is_start ~is_new
+    let apply_body ~is_start
         ({ body =
              { public_key
              ; token_id = _
              ; update =
-                 { app_state
-                 ; delegate
-                 ; verification_key
-                 ; permissions
-                 ; snapp_uri
-                 ; token_symbol
+                 { app_state = _
+                 ; delegate = _
+                 ; verification_key = _
+                 ; permissions = _
+                 ; snapp_uri = _
+                 ; token_symbol = _
                  ; timing = _
-                 ; voting_for
+                 ; voting_for = _
                  }
              ; balance_change = _
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
-             ; sequence_events
+             ; sequence_events = _
              ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
              ; protocol_state = _
              ; use_full_commitment
@@ -1242,169 +1240,7 @@ module Base = struct
         Account.Checked.Unhashed.t * _ =
       let open Impl in
       let r = ref [] in
-      let update_authorized (type a) perm ~is_keep
-          ~(updated : [ `Ok of a | `Flagged of a * Boolean.var ]) =
-        let speculative_success, `proof_must_verify x = check_auth perm in
-        r := lazy Boolean.((not is_keep) &&& x) :: !r ;
-        match updated with
-        | `Ok res ->
-            add_check ~label:__LOC__ Boolean.(speculative_success ||| is_keep) ;
-            res
-        | `Flagged (res, failed) ->
-            add_check ~label:__LOC__
-              Boolean.((not failed) &&& speculative_success ||| is_keep) ;
-            res
-      in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
-      let ( ! ) = run_checked in
-      let open Snapp_basic in
-      let snapp : Snapp_account.Checked.t =
-        let keeping_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_keep)
-        in
-        let changing_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_set)
-        in
-        let proved_state =
-          Boolean.if_ keeping_app_state ~then_:a.snapp.proved_state
-            ~else_:
-              ( if Option.is_none tag then (* No proof *)
-                Boolean.false_
-              else
-                (* Has a proof, set proved_state if entire state was set *)
-                Boolean.if_ changing_app_state ~then_:Boolean.true_
-                  ~else_:a.snapp.proved_state )
-        in
-        let app_state =
-          with_label __LOC__ (fun () ->
-              update_authorized a.permissions.edit_state
-                ~is_keep:keeping_app_state
-                ~updated:
-                  (`Ok
-                    (Vector.map2 app_state a.snapp.app_state
-                       ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_))))
-        in
-        Option.iter tag ~f:(fun t ->
-            Pickles.Side_loaded.in_circuit t
-              (Lazy.force a.snapp.verification_key.data)) ;
-        let verification_key =
-          update_authorized a.permissions.set_verification_key
-            ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
-            ~updated:
-              (`Ok
-                (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
-                   (Lazy.force a.snapp.verification_key.hash)))
-        in
-        let sequence_state, last_sequence_slot =
-          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.sequence_state in
-          let last_sequence_slot = a.snapp.last_sequence_slot in
-          let is_this_slot =
-            !(Mina_numbers.Global_slot.Checked.equal txn_global_slot
-                last_sequence_slot)
-          in
-          (* Push events to s1 *)
-          let is_empty = !(Party.Events.is_empty_var sequence_events) in
-          let s1 =
-            Field.if_ is_empty ~then_:s1'
-              ~else_:
-                (Party.Sequence_events.push_events_checked s1' sequence_events)
-          in
-          (* Shift along if last update wasn't this slot *)
-          let is_full_and_different_slot =
-            Boolean.((not is_empty) && is_this_slot)
-          in
-          let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
-          let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
-          let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
-          let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
-          let new_global_slot =
-            !(Mina_numbers.Global_slot.Checked.if_ is_empty
-                ~then_:last_sequence_slot ~else_:txn_global_slot)
-          in
-          let new_sequence_state =
-            ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-            , new_global_slot )
-          in
-          update_authorized a.permissions.edit_sequence_state ~is_keep:is_empty
-            ~updated:(`Ok new_sequence_state)
-        in
-        let snapp_version =
-          (* Current snapp version. Upgrade mechanism should live here. *)
-          Mina_numbers.Snapp_version.(Checked.constant zero)
-        in
-        { Snapp_account.verification_key =
-            (* Big hack. This relies on the fact that the "data" is not
-               used for computing the hash of the snapp account. We can't
-               provide the verification key since it's not available here. *)
-            { With_hash.hash = lazy verification_key
-            ; data = lazy (failwith "unused")
-            }
-        ; app_state
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        ; proved_state
-        }
-      in
-      let snapp_uri =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep snapp_uri)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Data_as_hash.if_ snapp_uri
-                 a.snapp_uri))
-      in
-      let token_symbol =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep token_symbol)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Account.Token_symbol.if_
-                 token_symbol a.token_symbol))
-      in
-      let delegate =
-        let base_delegate =
-          (* New accounts should have the delegate equal to the public key of the account. *)
-          !(Public_key.Compressed.Checked.if_ is_new ~then_:public_key
-              ~else_:a.delegate)
-        in
-        update_authorized a.permissions.set_delegate
-          ~is_keep:(Set_or_keep.Checked.is_keep delegate)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep
-                 ~if_:(fun b ~then_ ~else_ ->
-                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_))
-                 delegate base_delegate))
-      in
-      let permissions =
-        update_authorized a.permissions.set_permissions
-          ~is_keep:(Set_or_keep.Checked.is_keep permissions)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
-                 permissions a.permissions))
-      in
-      let nonce =
-        update_authorized a.permissions.increment_nonce
-          ~is_keep:(Boolean.not increment_nonce)
-          ~updated:
-            (`Ok
-              !(Account.Nonce.Checked.if_ increment_nonce
-                  ~then_:!(Account.Nonce.Checked.succ a.nonce)
-                  ~else_:a.nonce))
-      in
-      let voting_for =
-        update_authorized a.permissions.set_voting_for
-          ~is_keep:(Set_or_keep.Checked.is_keep voting_for)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep
-                 ~if_:(fun b ~then_ ~else_ -> !(State_hash.if_ b ~then_ ~else_))
-                 voting_for a.voting_for))
-      in
 
       (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1425,29 +1261,8 @@ module Base = struct
             ; increment_nonce
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
-      let a : Account.Checked.Unhashed.t =
-        { a with
-          snapp
-        ; delegate
-        ; permissions
-        ; nonce
-        ; public_key
-        ; snapp_uri
-        ; token_symbol
-        ; voting_for
-        }
-      in
+      let a : Account.Checked.Unhashed.t = { a with public_key } in
       (a, `proof_must_verify proof_must_verify)
-
-    let create_checker () =
-      let r = ref [] in
-      let finished = ref false in
-      ( (fun ?label:_ x ->
-          if finished.contents then failwith "finished"
-          else r := x :: r.contents)
-      , fun () ->
-          finished := true ;
-          Impl.Boolean.all r.contents )
 
     module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1520,6 +1335,25 @@ module Base = struct
           include Global_slot.Checked
 
           let ( > ) x y = run_checked (x > y)
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
+
+          let equal x y = run_checked (equal x y)
+        end
+
+        module Nonce = struct
+          type t = Account.Nonce.Checked.t
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Account.Nonce.Checked.if_ b ~then_ ~else_)
+
+          let succ t = run_checked (Account.Nonce.Checked.succ t)
+        end
+
+        module State_hash = struct
+          type t = State_hash.var
+
+          let if_ b ~then_ ~else_ = run_checked (State_hash.if_ b ~then_ ~else_)
         end
 
         module Timing = struct
@@ -1540,6 +1374,32 @@ module Base = struct
 
           let add_signed_amount_flagged x y =
             run_checked (add_signed_amount_flagged x y)
+        end
+
+        module Verification_key = struct
+          type t = Field.t
+
+          let if_ = Field.if_
+        end
+
+        module Events = struct
+          type t = Snapp_account.Events.var
+
+          let is_empty x = run_checked (Party.Events.is_empty_var x)
+
+          let push_events = Party.Sequence_events.push_events_checked
+        end
+
+        module Snapp_uri = struct
+          type t = string Data_as_hash.t
+
+          let if_ = Data_as_hash.if_
+        end
+
+        module Token_symbol = struct
+          type t = Account.Token_symbol.var
+
+          let if_ = Account.Token_symbol.if_
         end
 
         module Account = struct
@@ -1574,6 +1434,13 @@ module Base = struct
 
             let increment_nonce : t -> Controller.t =
              fun a -> a.data.permissions.increment_nonce
+
+            let set_voting_for : t -> Controller.t =
+             fun a -> a.data.permissions.set_voting_for
+
+            type t = Permissions.Checked.t
+
+            let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) =
@@ -1613,6 +1480,94 @@ module Base = struct
                       ~txn_amount:None ~txn_global_slot)
             in
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
+
+          let make_snapp (a : t) = a
+
+          let unmake_snapp (a : t) = a
+
+          let proved_state (a : t) = a.data.snapp.proved_state
+
+          let set_proved_state proved_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with proved_state } }; hash }
+
+          let app_state (a : t) = a.data.snapp.app_state
+
+          let set_app_state app_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with app_state } }; hash }
+
+          let register_verification_key ({ data = a; _ } : t) =
+            Option.iter snapp_statement ~f:(fun (tag, _) ->
+                Pickles.Side_loaded.in_circuit (side_loaded tag)
+                  (Lazy.force a.snapp.verification_key.data))
+
+          let verification_key (a : t) =
+            Lazy.force a.data.snapp.verification_key.hash
+
+          let set_verification_key verification_key ({ data = a; hash } : t) : t
+              =
+            { data =
+                { a with
+                  snapp =
+                    { a.snapp with
+                      verification_key =
+                        (* Big hack. This relies on the fact that the "data" is not
+                           used for computing the hash of the snapp account. We can't
+                           provide the verification key since it's not available here. *)
+                        { With_hash.hash = lazy verification_key
+                        ; data = lazy (failwith "unused")
+                        }
+                    }
+                }
+            ; hash
+            }
+
+          let last_sequence_slot (a : t) = a.data.snapp.last_sequence_slot
+
+          let set_last_sequence_slot last_sequence_slot ({ data = a; hash } : t)
+              : t =
+            { data = { a with snapp = { a.snapp with last_sequence_slot } }
+            ; hash
+            }
+
+          let sequence_state (a : t) = a.data.snapp.sequence_state
+
+          let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with sequence_state } }; hash }
+
+          let snapp_uri (a : t) = a.data.snapp_uri
+
+          let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
+            { data = { a with snapp_uri }; hash }
+
+          let token_symbol (a : t) = a.data.token_symbol
+
+          let set_token_symbol token_symbol ({ data = a; hash } : t) : t =
+            { data = { a with token_symbol }; hash }
+
+          let public_key (a : t) = a.data.public_key
+
+          let set_public_key public_key ({ data = a; hash } : t) : t =
+            { data = { a with public_key }; hash }
+
+          let delegate (a : t) = a.data.delegate
+
+          let set_delegate delegate ({ data = a; hash } : t) : t =
+            { data = { a with delegate }; hash }
+
+          let nonce (a : t) = a.data.nonce
+
+          let set_nonce nonce ({ data = a; hash } : t) : t =
+            { data = { a with nonce }; hash }
+
+          let voting_for (a : t) = a.data.voting_for
+
+          let set_voting_for voting_for ({ data = a; hash } : t) : t =
+            { data = { a with voting_for }; hash }
+
+          let permissions (a : t) = a.data.permissions
+
+          let set_permissions permissions ({ data = a; hash } : t) : t =
+            { data = { a with permissions }; hash }
         end
 
         module Ledger = struct
@@ -2018,6 +1973,27 @@ module Base = struct
               Set_or_keep.Checked.map
                 ~f:Party.Update.Timing_info.Checked.to_account_timing
                 party.data.body.update.timing
+
+            let app_state ({ party; _ } : t) = party.data.body.update.app_state
+
+            let verification_key ({ party; _ } : t) =
+              party.data.body.update.verification_key
+
+            let sequence_events ({ party; _ } : t) =
+              party.data.body.sequence_events
+
+            let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
+
+            let token_symbol ({ party; _ } : t) =
+              party.data.body.update.token_symbol
+
+            let delegate ({ party; _ } : t) = party.data.body.update.delegate
+
+            let voting_for ({ party; _ } : t) =
+              party.data.body.update.voting_for
+
+            let permissions ({ party; _ } : t) =
+              party.data.body.update.permissions
           end
         end
 
@@ -2080,6 +2056,9 @@ module Base = struct
 
         module Public_key = struct
           type t = Public_key.Compressed.var
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
         end
 
         module Protocol_state_predicate = struct
@@ -2088,6 +2067,8 @@ module Base = struct
 
         module Field = struct
           type t = Field.t
+
+          let if_ = Field.if_
         end
 
         module Local_state = struct
@@ -2173,38 +2154,19 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Check_auth_and_update_account
-            { is_start
-            ; global_state
-            ; signature_verifies
-            ; party = { party; _ }
-            ; account
-            ; account_is_new
-            } ->
-            let add_check, checks_succeeded = create_checker () in
+        | Check_auth { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
-              let tag =
-                Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
-              in
-              apply_body ?tag
-                ~txn_global_slot:
-                  global_state.protocol_state.global_slot_since_hard_fork
-                ~add_check
-                ~check_auth:(fun t ->
-                  Permissions.Auth_required.Checked.spec_eval
-                    ~signature_verifies t)
-                ~is_start ~is_new:account_is_new party.data account.data
+              apply_body ~is_start party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
-            let checks_succeeded = checks_succeeded () in
             let success =
               match auth_type with
               | None_given | Signature ->
-                  Boolean.((not proof_must_verify) && checks_succeeded)
+                  Boolean.(not proof_must_verify)
               | Proof ->
                   (* We always assert that the proof verifies. *)
-                  checks_succeeded
+                  Boolean.true_
             in
             (* omit failure status here, unlike `Transaction_logic` *)
             (Inputs.Account.account_with_hash account', success, ())

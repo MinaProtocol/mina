@@ -1267,29 +1267,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (Signed_command.forget_check user_command)
 
-  let check e b = if b then Ok () else Error (failure e)
-
-  open Pickles_types
-
-  let apply_body ~check_auth ~has_proof ~global_slot_since_genesis ~is_start
+  let apply_body ~is_start
       ({ body =
            { public_key = _
            ; token_id = _
            ; update =
-               { app_state
-               ; delegate
-               ; verification_key
-               ; permissions
-               ; snapp_uri
-               ; token_symbol
+               { app_state = _
+               ; delegate = _
+               ; verification_key = _
+               ; permissions = _
+               ; snapp_uri = _
+               ; token_symbol = _
                ; timing = _
-               ; voting_for
+               ; voting_for = _
                }
            ; balance_change = _
            ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-           ; sequence_events
+           ; sequence_events = _
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
            ; protocol_state = _
            ; use_full_commitment
@@ -1297,122 +1293,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        ; predicate
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
-    let open Snapp_basic in
     let open Result.Let_syntax in
-    (* Check timing. *)
-    let init =
-      match a.snapp with None -> Snapp_account.default | Some a -> a
-    in
-    let update perm u curr ~is_keep ~update ~error =
-      match check_auth perm with
-      | false ->
-          let%map () = check error (is_keep u) in
-          curr
-      | true ->
-          Ok (update u curr)
-    in
-    let%bind delegate =
-      if Token_id.(equal default) a.token_id then
-        update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
-          ~error:Update_not_permitted_delegate
-      else return a.delegate
-    in
-    let%bind snapp =
-      let proved_state =
-        let is_keep = Vector.for_all ~f:Set_or_keep.is_keep app_state in
-        if is_keep then init.proved_state
-        else if not has_proof then false
-        else if Vector.for_all ~f:Set_or_keep.is_set app_state then true
-        else init.proved_state
-      in
-      let%map app_state =
-        update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
-          ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
-          ~error:Update_not_permitted_app_state
-      and verification_key =
-        update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x ->
-            match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
-          ~error:Update_not_permitted_verification_key
-      and sequence_state, last_sequence_slot =
-        let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
-        let last_sequence_slot = init.last_sequence_slot in
-        let is_this_slot =
-          Mina_numbers.Global_slot.equal global_slot_since_genesis
-            last_sequence_slot
-        in
-        (* Shift along if last update wasn't this slot *)
-        let s5 = if is_this_slot then s5 else s4 in
-        let s4 = if is_this_slot then s4 else s3 in
-        let s3 = if is_this_slot then s3 else s2 in
-        let s2 = if is_this_slot then s2 else s1 in
-        (* Push events to s1 *)
-        let is_empty = List.is_empty sequence_events in
-        let s1 =
-          if is_empty then s1
-          else Party.Sequence_events.push_events s1 sequence_events
-        in
-        let new_sequence_state =
-          if is_empty then Set_or_keep.Keep
-          else
-            Set_or_keep.Set
-              ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-              , global_slot_since_genesis )
-        in
-        update a.permissions.edit_sequence_state new_sequence_state
-          (init.sequence_state, init.last_sequence_slot)
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set x -> x)
-          ~error:Update_not_permitted_sequence_state
-      in
-      let snapp_version =
-        (* Current snapp version. Upgrade mechanism should live here. *)
-        Mina_numbers.Snapp_version.zero
-      in
-      let t : Snapp_account.t =
-        { app_state
-        ; verification_key
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        ; proved_state
-        }
-      in
-      if Snapp_account.(equal default t) then None else Some t
-    in
-    let%bind snapp_uri =
-      update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_snapp_uri
-    in
-    let%bind token_symbol =
-      update a.permissions.set_token_symbol token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_token_symbol
-    in
-    let%bind permissions =
-      update a.permissions.set_permissions permissions a.permissions
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_permissions
-    in
-    let%bind nonce =
-      let update_nonce =
-        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
-        else Set_or_keep.Keep
-      in
-      update a.permissions.increment_nonce update_nonce a.nonce
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_nonce
-    in
-    let%bind voting_for =
-      update a.permissions.set_voting_for voting_for a.voting_for
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_voting_for
-    in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
@@ -1428,15 +1309,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with
-      snapp
-    ; delegate
-    ; permissions
-    ; nonce
-    ; snapp_uri
-    ; token_symbol
-    ; voting_for
-    }
+    a
 
   module Global_state = struct
     type t =
@@ -1465,6 +1338,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
+
+      let if_ = Parties.value_if
     end
 
     module Bool = struct
@@ -1485,6 +1360,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let ( ||| ) = ( || )
 
       let ( &&& ) = ( && )
+
+      let all = List.for_all ~f:Fn.id
     end
 
     module Ledger = struct
@@ -1529,6 +1406,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Public_key = struct
       type t = Public_key.Compressed.t
+
+      let if_ = Parties.value_if
     end
 
     module Controller = struct
@@ -1547,7 +1426,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Permissions.Auth_required.check perm tag
     end
 
-    module Global_slot = Mina_numbers.Global_slot
+    module Global_slot = struct
+      include Mina_numbers.Global_slot
+
+      let if_ = Parties.value_if
+    end
+
+    module Nonce = struct
+      type t = Account.Nonce.t
+
+      let if_ = Parties.value_if
+
+      let succ = Account.Nonce.succ
+    end
+
+    module State_hash = struct
+      include State_hash
+
+      let if_ = Parties.value_if
+    end
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
@@ -1564,6 +1461,32 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Balance = struct
       include Balance
+
+      let if_ = Parties.value_if
+    end
+
+    module Verification_key = struct
+      type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+
+      let if_ = Parties.value_if
+    end
+
+    module Events = struct
+      type t = Field.t array list
+
+      let is_empty = List.is_empty
+
+      let push_events = Party.Sequence_events.push_events
+    end
+
+    module Snapp_uri = struct
+      type t = string
+
+      let if_ = Parties.value_if
+    end
+
+    module Token_symbol = struct
+      type t = Account.Token_symbol.t
 
       let if_ = Parties.value_if
     end
@@ -1598,6 +1521,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let increment_nonce : t -> Controller.t =
          fun a -> a.permissions.increment_nonce
+
+        let set_voting_for : t -> Controller.t =
+         fun a -> a.permissions.set_voting_for
+
+        type t = Permissions.t
+
+        let if_ = Parties.value_if
       end
 
       type timing = Party.Update.Timing_info.t option
@@ -1622,6 +1552,91 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ~txn_global_slot ~account
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+
+      let make_snapp (a : t) =
+        let snapp =
+          match a.snapp with
+          | None ->
+              Some Snapp_account.default
+          | Some _ as snapp ->
+              snapp
+        in
+        { a with snapp }
+
+      let unmake_snapp (a : t) : t =
+        let snapp =
+          match a.snapp with
+          | None ->
+              None
+          | Some snapp ->
+              if Snapp_account.(equal default snapp) then None else Some snapp
+        in
+        { a with snapp }
+
+      let get_snapp (a : t) = Option.value_exn a.snapp
+
+      let set_snapp (a : t) ~f : t = { a with snapp = Option.map a.snapp ~f }
+
+      let proved_state (a : t) = (get_snapp a).proved_state
+
+      let set_proved_state proved_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with proved_state })
+
+      let app_state (a : t) = (get_snapp a).app_state
+
+      let set_app_state app_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with app_state })
+
+      let register_verification_key (_ : t) = ()
+
+      let verification_key (a : t) = (get_snapp a).verification_key
+
+      let set_verification_key verification_key (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with verification_key })
+
+      let last_sequence_slot (a : t) = (get_snapp a).last_sequence_slot
+
+      let set_last_sequence_slot last_sequence_slot (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with last_sequence_slot })
+
+      let sequence_state (a : t) = (get_snapp a).sequence_state
+
+      let set_sequence_state sequence_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
+
+      let snapp_uri (a : t) = a.snapp_uri
+
+      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+
+      let token_symbol (a : t) = a.token_symbol
+
+      let set_token_symbol token_symbol (a : t) = { a with token_symbol }
+
+      let public_key (a : t) = a.public_key
+
+      let set_public_key public_key (a : t) = { a with public_key }
+
+      let delegate (a : t) = Account.delegate_opt a.delegate
+
+      let set_delegate delegate (a : t) =
+        let delegate =
+          if Signature_lib.Public_key.Compressed.(equal empty) delegate then
+            None
+          else Some delegate
+        in
+        { a with delegate }
+
+      let nonce (a : t) = a.nonce
+
+      let set_nonce nonce (a : t) = { a with nonce }
+
+      let voting_for (a : t) = a.voting_for
+
+      let set_voting_for voting_for (a : t) = { a with voting_for }
+
+      let permissions (a : t) = a.permissions
+
+      let set_permissions permissions (a : t) = { a with permissions }
     end
 
     module Amount = struct
@@ -1703,6 +1718,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
+
+        let app_state (party : t) = party.data.body.update.app_state
+
+        let verification_key (party : t) =
+          Snapp_basic.Set_or_keep.map ~f:Option.some
+            party.data.body.update.verification_key
+
+        let sequence_events (party : t) = party.data.body.sequence_events
+
+        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+
+        let token_symbol (party : t) = party.data.body.update.token_symbol
+
+        let delegate (party : t) = party.data.body.update.delegate
+
+        let voting_for (party : t) = party.data.body.update.voting_for
+
+        let permissions (party : t) = party.data.body.update.permissions
       end
     end
 
@@ -1845,26 +1878,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_auth_and_update_account
-          { is_start
-          ; global_state
-          ; party = p
-          ; account = a
-          ; account_is_new = _
-          ; signature_verifies = _
-          } -> (
+      | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
-          match
-            apply_body
-              ~check_auth:
-                (Fn.flip Permissions.Auth_required.check
-                   (Control.tag p.authorization))
-              ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
-              ~global_slot_since_genesis:
-                global_state.protocol_state.global_slot_since_genesis ~is_start
-              p.data a
-          with
+          match apply_body ~is_start p.data a with
           | Error failure ->
               (a, false, Some failure)
           | Ok a ->
