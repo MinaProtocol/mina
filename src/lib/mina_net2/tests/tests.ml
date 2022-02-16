@@ -52,6 +52,7 @@ let%test_module "coda network tests" =
           ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[]
         >>| Or_error.ok_exn
       in
       let%bind raw_seed_peers = listening_addrs a >>| Or_error.ok_exn in
@@ -72,6 +73,7 @@ let%test_module "coda network tests" =
           ~max_connections:50 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[]
         >>| Or_error.ok_exn
       and () =
         configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
@@ -81,6 +83,7 @@ let%test_module "coda network tests" =
           ~min_connections:20 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[]
         >>| Or_error.ok_exn
       in
       let%bind b_advert = begin_advertising b in

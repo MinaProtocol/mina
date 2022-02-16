@@ -351,7 +351,7 @@ type CodaGatingConfig struct {
 }
 
 // NewCodaGatingState returns a new CodaGatingState
-func NewCodaGatingState(config *CodaGatingConfig) *CodaGatingState {
+func NewCodaGatingState(config *CodaGatingConfig, knownPrivateAddrFilters *ma.Filters) *CodaGatingState {
 	logger := logging.Logger("codanet.CodaGatingState")
 
 	bannedAddrFilters := config.BannedAddrFilters
@@ -373,10 +373,6 @@ func NewCodaGatingState(config *CodaGatingConfig) *CodaGatingState {
 	if trustedPeers == nil {
 		trustedPeers = peer.NewSet()
 	}
-
-	// we initialize the known private addr filters to reject all ip addresses initially
-	knownPrivateAddrFilters := ma.NewFilters()
-	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
 
 	return &CodaGatingState{
 		logger:                  logger,
@@ -738,7 +734,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -777,7 +773,15 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	bandwidthCounter := metrics.NewBandwidthCounter()
-	gs := NewCodaGatingState(gatingConfig)
+
+	// we initialize the known private addr filters to reject all ip addresses initially
+	knownPrivateAddrFilters := ma.NewFilters()
+	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
+	for _, net := range knownPrivateIpNets {
+		knownPrivateAddrFilters.AddFilter(net, ma.ActionAccept)
+	}
+
+	gs := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 		p2p.Identity(pk),
