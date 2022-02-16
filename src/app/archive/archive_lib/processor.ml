@@ -699,9 +699,10 @@ module Coinbase = struct
 end
 
 module Find_nonce = struct
-  let find (module Conn : CONNECTION) ~(public_key_id : int) ~parent_block_id
-      ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+  let initialize_nonce_map = failwith "TODO"
 
+  let find (module Conn : CONNECTION) ~(public_key_id : int) ~parent_block_id
+      ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no = failwith "TODO"
 end
 
 module Balance = struct
@@ -1153,8 +1154,8 @@ module Block = struct
         in
         (* grab all the nonces associated with every public key in all of these
          * transactions for blocks earlier than this one. *)
-        let initial_nonce_map : Account.Nonce.t Public_key.Compressed.Map.t =
-          failwith "TODO"
+        let%bind initial_nonce_map : Account.Nonce.t Public_key.Compressed.Map.t =
+          Find_nonce.initialize_nonce_map ()
         in
         let%bind block_id =
           Conn.find
