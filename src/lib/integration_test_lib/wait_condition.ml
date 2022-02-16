@@ -45,6 +45,20 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
+    let a_long_time =
+      (* Just something long *)
+      Network_time_span.Literal Core.Time.Span.day
+    in
+    let check () (state : Network_state.t) =
+      if f state then Predicate_passed else Predicate_continuation ()
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = a_long_time
+    ; hard_timeout = a_long_time
+    }
+
   (* TODO: does this actually work if it's run twice? I think not *)
   (*
    * options:
@@ -53,23 +67,17 @@ struct
    *)
   let nodes_to_initialize nodes =
     let open Network_state in
-    let check () (state : Network_state.t) =
-      if
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
-    in
-    { description
-    ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
-    }
+            |> Option.value ~default:false))
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
