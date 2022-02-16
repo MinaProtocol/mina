@@ -1207,9 +1207,6 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        (* grab all the nonces associated with every public key in all of these transactions *)
-        let nonce_map = failwith "TODO" in
-
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
           (* TODO: add transaction statuses to internal commands
              the archive lib should not know the details of
@@ -1240,8 +1237,10 @@ module Block = struct
           else
             None
         in
-        let%bind (_ : int) =
-          deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
+        (* grab all the nonces associated with every public key in all of these transactions for blocks earlier than this one. *)
+        let initial_nonce_map : Account.Nonce.t Public_key.Map.t = failwith "TODO" in
+        let%bind (_ : int * Account.Nonce.t Public_key.Map.t) =
+          deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun sequence_no ->
             function
             | { Mina_base.With_status.status
               ; data= Mina_base.Transaction.Command command } ->
