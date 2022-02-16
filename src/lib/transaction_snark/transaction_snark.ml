@@ -1265,15 +1265,6 @@ module Base = struct
               (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
                  permissions a.permissions))
       in
-      let nonce =
-        update_authorized a.permissions.increment_nonce
-          ~is_keep:(Boolean.not increment_nonce)
-          ~updated:
-            (`Ok
-              !(Account.Nonce.Checked.if_ increment_nonce
-                  ~then_:!(Account.Nonce.Checked.succ a.nonce)
-                  ~else_:a.nonce))
-      in
       let voting_for =
         update_authorized a.permissions.set_voting_for
           ~is_keep:(Set_or_keep.Checked.is_keep voting_for)
@@ -1304,7 +1295,7 @@ module Base = struct
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
       let a : Account.Checked.Unhashed.t =
-        { a with permissions; nonce; public_key; voting_for }
+        { a with permissions; public_key; voting_for }
       in
       (a, `proof_must_verify proof_must_verify)
 
@@ -1393,6 +1384,15 @@ module Base = struct
           let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
 
           let equal x y = run_checked (equal x y)
+        end
+
+        module Nonce = struct
+          type t = Account.Nonce.Checked.t
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Account.Nonce.Checked.if_ b ~then_ ~else_)
+
+          let succ t = run_checked (Account.Nonce.Checked.succ t)
         end
 
         module Timing = struct
@@ -1585,6 +1585,11 @@ module Base = struct
 
           let set_delegate delegate ({ data = a; hash } : t) : t =
             { data = { a with delegate }; hash }
+
+          let nonce (a : t) = a.data.nonce
+
+          let set_nonce nonce ({ data = a; hash } : t) : t =
+            { data = { a with nonce }; hash }
         end
 
         module Ledger = struct
