@@ -1210,7 +1210,7 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body ?tag ~txn_global_slot
+    let apply_body ~txn_global_slot
         ~(add_check : ?label:string -> Boolean.var -> unit) ~check_auth
         ~is_start ~is_new
         ({ body =
@@ -1219,7 +1219,7 @@ module Base = struct
              ; update =
                  { app_state = _
                  ; delegate
-                 ; verification_key
+                 ; verification_key = _
                  ; permissions
                  ; snapp_uri
                  ; token_symbol
@@ -1259,17 +1259,6 @@ module Base = struct
       let ( ! ) = run_checked in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
-        Option.iter tag ~f:(fun t ->
-            Pickles.Side_loaded.in_circuit t
-              (Lazy.force a.snapp.verification_key.data)) ;
-        let verification_key =
-          update_authorized a.permissions.set_verification_key
-            ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
-            ~updated:
-              (`Ok
-                (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
-                   (Lazy.force a.snapp.verification_key.hash)))
-        in
         let sequence_state, last_sequence_slot =
           let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.sequence_state in
           let last_sequence_slot = a.snapp.last_sequence_slot in
@@ -1307,18 +1296,7 @@ module Base = struct
           (* Current snapp version. Upgrade mechanism should live here. *)
           Mina_numbers.Snapp_version.(Checked.constant zero)
         in
-        { a.snapp with
-          Snapp_account.verification_key =
-            (* Big hack. This relies on the fact that the "data" is not
-               used for computing the hash of the snapp account. We can't
-               provide the verification key since it's not available here. *)
-            { With_hash.hash = lazy verification_key
-            ; data = lazy (failwith "unused")
-            }
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        }
+        { a.snapp with snapp_version; sequence_state; last_sequence_slot }
       in
       let snapp_uri =
         update_authorized a.permissions.set_snapp_uri
@@ -1514,6 +1492,12 @@ module Base = struct
             run_checked (add_signed_amount_flagged x y)
         end
 
+        module Verification_key = struct
+          type t = Field.t
+
+          let if_ = Field.if_
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
 
@@ -1597,6 +1581,32 @@ module Base = struct
 
           let set_app_state app_state ({ data = a; hash } : t) : t =
             { data = { a with snapp = { a.snapp with app_state } }; hash }
+
+          let register_verification_key ({ data = a; _ } : t) =
+            Option.iter snapp_statement ~f:(fun (tag, _) ->
+                Pickles.Side_loaded.in_circuit (side_loaded tag)
+                  (Lazy.force a.snapp.verification_key.data))
+
+          let verification_key (a : t) =
+            Lazy.force a.data.snapp.verification_key.hash
+
+          let set_verification_key verification_key ({ data = a; hash } : t) : t
+              =
+            { data =
+                { a with
+                  snapp =
+                    { a.snapp with
+                      verification_key =
+                        (* Big hack. This relies on the fact that the "data" is not
+                           used for computing the hash of the snapp account. We can't
+                           provide the verification key since it's not available here. *)
+                        { With_hash.hash = lazy verification_key
+                        ; data = lazy (failwith "unused")
+                        }
+                    }
+                }
+            ; hash
+            }
         end
 
         module Ledger = struct
@@ -2004,6 +2014,9 @@ module Base = struct
                 party.data.body.update.timing
 
             let app_state ({ party; _ } : t) = party.data.body.update.app_state
+
+            let verification_key ({ party; _ } : t) =
+              party.data.body.update.verification_key
           end
         end
 
@@ -2172,10 +2185,7 @@ module Base = struct
             let add_check, checks_succeeded = create_checker () in
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
-              let tag =
-                Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
-              in
-              apply_body ?tag
+              apply_body
                 ~txn_global_slot:
                   global_state.protocol_state.global_slot_since_hard_fork
                 ~add_check
