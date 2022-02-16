@@ -26,13 +26,15 @@ There are two ways of dealing with types:
 1. let OCaml handle your types: use the `ocaml::ToValue` and `ocaml::FromValue` traits to let OCaml convert your types into OCaml types.
 2. Make it opaque to OCaml: use [custom types](https://ocaml.org/manual/intfc.html#s:c-custom) to store opaque blocks within the OCaml heap. There's the [`ocaml::custom!`](https://docs.rs/ocaml/0.22.0/ocaml/macro.custom.html) macro to help you with that.
 
-The first option is the easiest one, unless there are some foreign types in there. (Because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules)) you can't implement the ToValue and FromValue traits on foreign types.)
+Simply put, use custom types unless you need to be able to access a certain type in OCaml. If you need to expose the internal of a struct/enum, use ocaml-gen to generate the matching struct/enum in OCaml. Exposing the internals of a struct/enum requires generating the matching struct/enum in OCaml (using ocaml-gen). If you don't need all of the fields, consider implementing and exposing getters on a custom type instead.
 
-This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
+Note that because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules), you can't implement the `ToValue` and `FromValue` traits on foreign types. This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
+
+We also prefer to store values passed to OCaml on the OCaml heap wherever possible. That is, unless they are long-lived (think SRS, prover index) or would be very inefficient on the OCaml heap (think Vec<_> where we need to use emplace_back).
 
 ### The ToValue and FromValue traits
 
-In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/master/src/value.rs#L55:L73) are used:
+In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/value.rs#L55:L73) are used:
 
 ```rust=
 pub unsafe trait IntoValue {
@@ -43,7 +45,7 @@ pub unsafe trait FromValue<'a> {
 }
 ```
 
-these traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/master/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
+these traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
 
 ```
 $ cargo expand -- some_filename_without_rs > expanded.rs
@@ -51,9 +53,9 @@ $ cargo expand -- some_filename_without_rs > expanded.rs
 
 ### Custom types
 
-The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/master/src/custom.rs) allows you to quickly create custom types.
+The macro [custom!](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/custom.rs) allows you to quickly create custom types.
 
-The particularity of custom types is that OCaml has no idea what they are, they just contain an opaque pointer to some Rust structure that won't be followed when the GC frees that part of the memory. So it is your responsibility to free things using a `finalizer`.
+Values of custom types are opaque to OCaml. They are used to store the data of some Rust value on the OCaml heap. When this data may contain pointers to the Rust heap, or other data that requires a call to 'drop' in rust, you must provide a 'finalizer' for OCaml to call into to correctly drop these values. Best practice is to always provide such a finalizer, even if it's a no-op.
 
 Here is how custom types are transformed into OCaml values:
 
@@ -81,7 +83,7 @@ pub unsafe fn alloc_custom<T: crate::Custom>() -> Value {
 }
 ```
 
-and the data of your type (probably a pointer to some Rust memory) is copied into the OCaml's heap ([source](https://github.com/zshipko/ocaml-rs/blob/master/src/types.rs#L80)):
+and the data of your type (probably a pointer to some Rust memory) is copied into the OCaml's heap ([source](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/types.rs#L80)):
 
 ```rust=
 pub fn set(&mut self, x: T) {
@@ -97,14 +99,7 @@ Note that the generated bindings do not allow you to differentiate the same cust
 If you want to differentiate custom types, differentiate the Rust types first. 
 For example, if you have a generic custom type that must be converted to different OCaml types depending on the concrete parameter used, you will have to instead create non-generic custom types
 
-### Function arguments
-
-Functions that get exported to OCaml have the choice to be passed as pointer, or as value. 
-If passed as value, then a clone happens.
-
-TODO: guidelines on what to do with this information
-
-To avoid large clones, we use shared references. See:
+### Helper macros
 
 * the [impl_shared_ref!](src/caml/shared_reference.rs) macro for a thread-safe shared reference
 * the [impl_shared_rwlock!](src/caml/shared_rwlock.rs) macro for a thread-safe shared mutable object.
@@ -112,8 +107,9 @@ To avoid large clones, we use shared references. See:
 ### Conventions
 
 * To ease eye'ing at FFI code, we use the `Caml` prefix whenever we're dealing with types that will be converted to OCaml. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`. You can then implement the `From` trait to the non-ocaml types for facilitating back-and-forth conversions.
-* You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'd by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
+* You must not include any value from the OCaml heap within a custom type, otherwise you are likely to cause OCaml heap corruption and an eventual segfault.
 * You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry. (TODO: lint on this? or mandate this upstream)
-* If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. (TODO: why is this better?)
+* If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. The OCaml heap is not well-suited to handling large opaque data.
+* The priority is to keep small, potentially short-lived data on the heap so we don't fragment the rust heap and so that it gets free'd appropriately quickly.
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * TODO: We do not have good conventions on returning errors or throwing exceptions.

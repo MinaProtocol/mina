@@ -1,22 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Util
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -38,7 +31,8 @@ module Update = struct
              , 'perms
              , 'snapp_uri
              , 'token_symbol
-             , 'timing )
+             , 'timing
+             , 'voting_for )
              t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
@@ -47,6 +41,7 @@ module Update = struct
           ; snapp_uri : 'snapp_uri
           ; token_symbol : 'token_symbol
           ; timing : 'timing
+          ; voting_for : 'voting_for
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
@@ -93,7 +88,7 @@ module Update = struct
       }
 
     let to_input (t : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Balance.to_input t.initial_minimum_balance
         ; Global_slot.to_input t.cliff_time
         ; Amount.to_input t.cliff_amount
@@ -111,6 +106,28 @@ module Update = struct
       ; vesting_period = slot_unused
       ; vesting_increment = amount_unused
       }
+
+    let to_account_timing (t : t) : Account_timing.t =
+      Timed
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+    let of_account_timing (t : Account_timing.t) : t option =
+      match t with
+      | Untimed ->
+          None
+      | Timed t ->
+          Some
+            { initial_minimum_balance = t.initial_minimum_balance
+            ; cliff_time = t.cliff_time
+            ; cliff_amount = t.cliff_amount
+            ; vesting_period = t.vesting_period
+            ; vesting_increment = t.vesting_increment
+            }
 
     module Checked = struct
       type t =
@@ -138,13 +155,30 @@ module Update = struct
            ; vesting_increment
            } :
             t) =
-        List.reduce_exn ~f:Random_oracle_input.append
+        List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
           ; Global_slot.Checked.to_input cliff_time
           ; Amount.var_to_input cliff_amount
           ; Global_slot.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
+
+      let to_account_timing (t : t) : Account_timing.var =
+        { is_timed = Boolean.true_
+        ; initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
+
+      let of_account_timing (t : Account_timing.var) : t =
+        { initial_minimum_balance = t.initial_minimum_balance
+        ; cliff_time = t.cliff_time
+        ; cliff_amount = t.cliff_amount
+        ; vesting_period = t.vesting_period
+        ; vesting_increment = t.vesting_increment
+        }
     end
 
     let typ : (Checked.t, t) Typ.t =
@@ -172,10 +206,11 @@ module Update = struct
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
+        , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         , string Set_or_keep.Stable.V1.t
         , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        , State_hash.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -183,11 +218,9 @@ module Update = struct
     end
   end]
 
-  let gen ?(new_account = false) ?(snapp_account = false) () :
+  let gen ?(snapp_account = false) ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    if snapp_account && not new_account then
-      failwith "Party.Update.gen: got snapp_account but not new_account" ;
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
@@ -207,8 +240,12 @@ module Update = struct
       else return Set_or_keep.Keep
     in
     let%bind permissions =
-      if snapp_account then Set_or_keep.gen Permissions.gen
-      else return Set_or_keep.Keep
+      match permissions_auth with
+      | None ->
+          return Set_or_keep.Keep
+      | Some auth_tag ->
+          let%map permissions = Permissions.gen ~auth_tag in
+          Set_or_keep.Set permissions
     in
     let%bind snapp_uri =
       let uri_gen =
@@ -228,19 +265,22 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
-    let%map timing =
-      if new_account then Set_or_keep.gen Timing_info.gen
-      else return Set_or_keep.Keep
-    in
-    Poly.
-      { app_state
-      ; delegate
-      ; verification_key
-      ; permissions
-      ; snapp_uri
-      ; token_symbol
-      ; timing
-      }
+    let%bind voting_for = Set_or_keep.gen Field.gen in
+    (* a new account for the Party.t is in the ledger when we use
+       this generated update in tests, so the timing must be Keep
+    *)
+    let timing = Set_or_keep.Keep in
+    return
+      Poly.
+        { app_state
+        ; delegate
+        ; verification_key
+        ; permissions
+        ; snapp_uri
+        ; token_symbol
+        ; timing
+        ; voting_for
+        }
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -252,7 +292,8 @@ module Update = struct
       , Permissions.Checked.t Set_or_keep.Checked.t
       , string Data_as_hash.t Set_or_keep.Checked.t
       , Account.Token_symbol.var Set_or_keep.Checked.t
-      , Timing_info.Checked.t Set_or_keep.Checked.t )
+      , Timing_info.Checked.t Set_or_keep.Checked.t
+      , State_hash.var Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
@@ -263,9 +304,10 @@ module Update = struct
          ; snapp_uri
          ; token_symbol
          ; timing
+         ; voting_for
          } :
           t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
             ~f:(Set_or_keep.Checked.to_input ~f:field)
@@ -278,6 +320,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
+        ; Set_or_keep.Checked.to_input voting_for ~f:State_hash.var_to_input
         ]
   end
 
@@ -290,6 +333,7 @@ module Update = struct
     ; snapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
+    ; voting_for = Keep
     }
 
   let dummy = noop
@@ -302,9 +346,10 @@ module Update = struct
        ; snapp_uri
        ; token_symbol
        ; timing
+       ; voting_for
        } :
         t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
@@ -324,6 +369,8 @@ module Update = struct
           ~f:Account.Token_symbol.to_input
       ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
           ~f:Timing_info.to_input
+      ; Set_or_keep.to_input voting_for ~dummy:State_hash.dummy
+          ~f:State_hash.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -349,6 +396,7 @@ module Update = struct
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
+      ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -362,15 +410,27 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'amount, 'events, 'call_data, 'int) t =
-          { pk : 'pk
+        type ( 'pk
+             , 'update
+             , 'token_id
+             , 'amount
+             , 'events
+             , 'call_data
+             , 'int
+             , 'bool
+             , 'protocol_state )
+             t =
+          { public_key : 'pk
           ; update : 'update
           ; token_id : 'token_id
-          ; delta : 'amount
+          ; balance_change : 'amount
+          ; increment_nonce : 'bool
           ; events : 'events
           ; sequence_events : 'events
           ; call_data : 'call_data
-          ; depth : 'int
+          ; call_depth : 'int
+          ; protocol_state : 'protocol_state
+          ; use_full_commitment : 'bool
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -390,7 +450,9 @@ module Body = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pickles.Backend.Tick.Field.Stable.V1.t array list
         , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-        , int )
+        , int
+        , bool
+        , Snapp_predicate.Protocol_state.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -398,8 +460,12 @@ module Body = struct
     end
   end]
 
-  (* Delta for the fee payer is always going to be Neg, so represent it using an unsigned fee,
-     token id is always going to be the default, so use unit value as a placeholder
+  (* * Balance change for the fee payer is always going to be Neg, so represent it using
+       an unsigned fee,
+     * token id is always going to be the default, so use unit value as a
+       placeholder,
+     * increment nonce must always be true for a fee payer, so use unit as a
+       placeholder.
   *)
   module Fee_payer = struct
     [%%versioned
@@ -412,7 +478,9 @@ module Body = struct
           , Fee.Stable.V1.t
           , Pickles.Backend.Tick.Field.Stable.V1.t array list
           , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-          , int )
+          , int
+          , unit
+          , Snapp_predicate.Protocol_state.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -421,21 +489,29 @@ module Body = struct
     end]
 
     let dummy : t =
-      { pk = Public_key.Compressed.empty
+      { public_key = Public_key.Compressed.empty
       ; update = Update.dummy
       ; token_id = ()
-      ; delta = Fee.zero
+      ; balance_change = Fee.zero
+      ; increment_nonce = ()
       ; events = []
       ; sequence_events = []
       ; call_data = Field.zero
-      ; depth = 0
+      ; call_depth = 0
+      ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; use_full_commitment = ()
       }
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
     { t with
-      delta = { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.delta }
+      balance_change =
+        { Signed_poly.sgn = Sgn.Neg
+        ; magnitude = Amount.of_fee t.balance_change
+        }
     ; token_id = Token_id.default
+    ; increment_nonce = true
+    ; use_full_commitment = true
     }
 
   module Checked = struct
@@ -446,29 +522,39 @@ module Body = struct
       , Amount.Signed.var
       , Events.var
       , Field.Var.t
-      , int As_prover.Ref.t )
+      , int As_prover.Ref.t
+      , Boolean.var
+      , Snapp_predicate.Protocol_state.Checked.t )
       Poly.t
 
     let to_input
-        ({ pk
+        ({ public_key
          ; update
          ; token_id
-         ; delta
+         ; balance_change
+         ; increment_nonce
          ; events
          ; sequence_events
          ; call_data
-         ; depth = _depth (* ignored *)
+         ; call_depth = _depth (* ignored *)
+         ; protocol_state
+         ; use_full_commitment
          } :
           t) =
-      let ( ! ) = Impl.run_checked in
-      List.reduce_exn ~f:Random_oracle_input.append
-        [ Public_key.Compressed.Checked.to_input pk
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
+        [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
-        ; !(Amount.Signed.Checked.to_input delta)
+        ; Snark_params.Tick.Run.run_checked
+            (Amount.Signed.Checked.to_input balance_change)
+        ; Random_oracle_input.Chunked.packed
+            ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
-        ; Random_oracle_input.field call_data
+        ; Random_oracle_input.Chunked.field call_data
+        ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
+        ; Random_oracle_input.Chunked.packed
+            ((use_full_commitment :> Field.Var.t), 1)
         ]
 
     let digest (t : t) =
@@ -483,44 +569,56 @@ module Body = struct
       ; Update.typ ()
       ; Token_id.typ
       ; Amount.Signed.typ
+      ; Boolean.typ
       ; Events.typ
       ; Events.typ
       ; Field.typ
       ; Typ.Internal.ref ()
+      ; Snapp_predicate.Protocol_state.typ
+      ; Impl.Boolean.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   let dummy : t =
-    { pk = Public_key.Compressed.empty
+    { public_key = Public_key.Compressed.empty
     ; update = Update.dummy
     ; token_id = Token_id.default
-    ; delta = Amount.Signed.zero
+    ; balance_change = Amount.Signed.zero
+    ; increment_nonce = false
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
-    ; depth = 0
+    ; call_depth = 0
+    ; protocol_state = Snapp_predicate.Protocol_state.accept
+    ; use_full_commitment = false
     }
 
   let to_input
-      ({ pk
+      ({ public_key
        ; update
        ; token_id
-       ; delta
+       ; balance_change
+       ; increment_nonce
        ; events
        ; sequence_events
        ; call_data
-       ; depth = _ (* ignored *)
+       ; call_depth = _ (* ignored *)
+       ; protocol_state
+       ; use_full_commitment
        } :
         t) =
-    List.reduce_exn ~f:Random_oracle_input.append
-      [ Public_key.Compressed.to_input pk
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
+      [ Public_key.Compressed.to_input public_key
       ; Update.to_input update
       ; Token_id.to_input token_id
-      ; Amount.Signed.to_input delta
+      ; Amount.Signed.to_input balance_change
+      ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
       ; Events.to_input sequence_events
-      ; Random_oracle_input.field call_data
+      ; Random_oracle_input.Chunked.field call_data
+      ; Snapp_predicate.Protocol_state.to_input protocol_state
+      ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ]
 
   let digest (t : t) =
@@ -549,55 +647,48 @@ module Predicate = struct
     end
   end]
 
-  let accept = lazy Random_oracle.(digest (salt "MinaPartyAccept"))
+  let to_full = function
+    | Full s ->
+        s
+    | Nonce n ->
+        { Snapp_predicate.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        }
+    | Accept ->
+        Snapp_predicate.Account.accept
+
+  module Tag = struct
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
+  end
+
+  let tag : t -> Tag.t = function
+    | Full _ ->
+        Full
+    | Nonce _ ->
+        Nonce
+    | Accept ->
+        Accept
 
   let digest (t : t) =
     let digest x =
       Random_oracle.(
         hash ~init:Hash_prefix_states.party_predicate (pack_input x))
     in
-    match t with
-    | Full a ->
-        Snapp_predicate.Account.to_input a |> digest
-    | Nonce n ->
-        Account.Nonce.to_input n |> digest
-    | Accept ->
-        Lazy.force accept
+    to_full t |> Snapp_predicate.Account.to_input |> digest
 
   module Checked = struct
-    type t =
-      | Nonce_or_accept of
-          { nonce : Account.Nonce.Checked.t; accept : Boolean.var }
-      | Full of Snapp_predicate.Account.Checked.t
+    type t = Snapp_predicate.Account.Checked.t
 
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.party_predicate (pack_input x))
       in
-      match t with
-      | Full a ->
-          Snapp_predicate.Account.Checked.to_input a |> digest
-      | Nonce_or_accept { nonce; accept = b } ->
-          let open Impl in
-          Field.(
-            if_ b
-              ~then_:(constant (Lazy.force accept))
-              ~else_:(digest (Account.Nonce.Checked.to_input nonce)))
+      Snapp_predicate.Account.Checked.to_input t |> digest
   end
 
   let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
-    Typ.transport
-      (Snapp_predicate.Account.typ ())
-      ~there:(function
-        | Full s ->
-            s
-        | Nonce n ->
-            { Snapp_predicate.Account.accept with
-              nonce = Check { lower = n; upper = n }
-            }
-        | Accept ->
-            Snapp_predicate.Account.accept)
+    Typ.transport (Snapp_predicate.Account.typ ()) ~there:to_full
       ~back:(fun s -> Full s)
 end
 
@@ -623,9 +714,9 @@ module Predicated = struct
   end]
 
   let to_input ({ body; predicate } : t) =
-    List.reduce_exn ~f:Random_oracle_input.append
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
-      ; Random_oracle_input.field (Predicate.digest predicate)
+      ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
       ]
 
   let digest (t : t) =
@@ -642,9 +733,9 @@ module Predicated = struct
     type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
 
     let to_input ({ body; predicate } : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
-        ; Random_oracle_input.field (Predicate.Checked.digest predicate)
+        ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
         ]
 
     let digest (t : t) =
@@ -782,7 +873,7 @@ module Signed = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk t.data.body.token_id
+    Account_id.create t.data.body.public_key t.data.body.token_id
 end
 
 module Fee_payer = struct
@@ -800,7 +891,7 @@ module Fee_payer = struct
   end]
 
   let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.pk Token_id.default
+    Account_id.create t.data.body.public_key Token_id.default
 
   let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
@@ -833,7 +924,7 @@ module Stable = struct
 end]
 
 let account_id (t : t) : Account_id.t =
-  Account_id.create t.data.body.pk t.data.body.token_id
+  Account_id.create t.data.body.public_key t.data.body.token_id
 
 let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization; data = Predicated.of_signed data }
@@ -849,4 +940,15 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
     When this is positive, the amount will be deposited into the account from
     the funds made available by previous parties in the same transaction.
 *)
-let delta (t : t) : Amount.Signed.t = t.data.body.delta
+let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
+
+let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
+  t.data.body.protocol_state
+
+let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
+
+let token_id (t : t) : Token_id.t = t.data.body.token_id
+
+let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment
+
+let increment_nonce (t : t) : bool = t.data.body.increment_nonce

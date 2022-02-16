@@ -1,19 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Sgn = Sgn_nonconsensus.Sgn
-
-[%%endif]
 
 type uint64 = Unsigned.uint64
 
@@ -37,9 +26,9 @@ module type Basic = sig
 
   include Bits_intf.Convertible_bits with type t := t
 
-  val to_input : t -> Field.t Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
-  val to_input_legacy : t -> (_, bool) Random_oracle.Input.Legacy.t
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val zero : t
 
@@ -72,7 +61,7 @@ module type Basic = sig
   val var_to_bits :
     var -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 
-  val var_to_input : var -> Field.Var.t Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
   val var_to_input_legacy :
        var
@@ -93,6 +82,8 @@ module type Arithmetic_intf = sig
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val sub : t -> t -> t option
+
+  val sub_flagged : t -> t -> t * [ `Underflow of bool ]
 
   val ( + ) : t -> t -> t option
 
@@ -132,9 +123,9 @@ module type Signed_intf = sig
 
   val is_negative : t -> bool
 
-  val to_input : t -> Field.t Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
-  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val add : t -> t -> t option
 
@@ -173,11 +164,11 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_input : var -> (Field.Var.t Random_oracle.Input.t, _) Checked.t
+    val to_input :
+      var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
 
     val to_input_legacy :
-         var
-      -> ((Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t, _) Checked.t
+      var -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -191,10 +182,6 @@ module type Signed_intf = sig
     val ( + ) : var -> var -> (var, _) Checked.t
 
     val to_field_var : var -> (Field.Var.t, _) Checked.t
-
-    (*
-    val scale : Field.Var.t -> var -> (var, _) Checked.t
-       *)
 
     val to_fee : var -> signed_fee_var
 
@@ -280,4 +267,6 @@ module type S = sig
   module Signed : Signed_intf with type magnitude := t
 
   [%%endif]
+
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end

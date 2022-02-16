@@ -68,6 +68,9 @@ type t =
 let config t = t.config
 
 module Command_error = struct
+  (* IMPORTANT! Do not change the names of these errors as to adjust the
+   * to_yojson output without updating Rosetta's construction API to handle the
+   * changes *)
   type t =
     | Invalid_nonce of
         [ `Expected of Account.Nonce.t
@@ -1227,6 +1230,9 @@ let add_from_backtrack :
 
 let global_slot_since_genesis t = global_slot_since_genesis t.config
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
+
 let%test_module _ =
   ( module struct
     open For_tests
@@ -1439,7 +1445,7 @@ let%test_module _ =
                 Quickcheck.Generator.tuple2 (return sender)
                   (Quickcheck_lib.of_array test_keys)
               in
-              User_command.Gen.payment ~sign_type:`Fake ~key_gen
+              User_command_generators.payment ~sign_type:`Fake ~key_gen
                 ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
@@ -1477,7 +1483,7 @@ let%test_module _ =
             Quickcheck.Generator.tuple2 (return sender)
               (Quickcheck_lib.of_array test_keys)
           in
-          User_command.Gen.payment ~sign_type:`Fake ~key_gen
+          User_command_generators.payment ~sign_type:`Fake ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~fee_range:0 ()

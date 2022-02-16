@@ -127,9 +127,9 @@ val set_timestamp :
   -> 'time
   -> ('staged_ledger_hash, 'lh, 'tok, 'ls, 'time) Poly.t
 
-val to_input : Value.t -> Field.t Random_oracle.Input.t
+val to_input : Value.t -> Field.t Random_oracle.Input.Chunked.t
 
-val var_to_input : var -> Field.Var.t Random_oracle.Input.t
+val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
 type display = (string, string, string, Local_state.display, string) Poly.t
 [@@deriving yojson]

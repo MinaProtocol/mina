@@ -36,9 +36,6 @@ val optional_typ :
   -> dummy_value:'value
   -> ('value t, 'value option) Typ.t
 
-val to_input_legacy :
-  _ t -> (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
-
-val to_input : _ t -> Field.Var.t Random_oracle_input.t
+val to_input : _ t -> Field.Var.t Random_oracle_input.Chunked.t
 
 val if_ : Boolean.var -> then_:'value t -> else_:'value t -> 'value t

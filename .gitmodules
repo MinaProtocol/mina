@@ -19,6 +19,9 @@
 [submodule "src/external/graphql_ppx"]
 	path = src/external/graphql_ppx
 	url = https://github.com/o1-labs/graphql_ppx.git
+[submodule "src/lib/crypto/proof-systems"]
+	path = src/lib/crypto/proof-systems
+	url = https://github.com/o1-labs/proof-systems.git
 [submodule "src/external/ppx_version"]
 	path = src/external/ppx_version
 	url = https://github.com/o1-labs/ppx_version.git
@@ -26,6 +29,10 @@
 	path = src/external/ppx_deriving_yojson
 	url = https://github.com/MinaProtocol/ppx_deriving_yojson.git
 	branch = master
+[submodule "src/external/prometheus"]
+	path = src/external/prometheus
+	url = https://github.com/MinaProtocol/prometheus.git
+    branch = master
 [submodule "src/external/c-reference-signer"]
 	path = src/external/c-reference-signer
 	url = https://github.com/MinaProtocol/c-reference-signer.git

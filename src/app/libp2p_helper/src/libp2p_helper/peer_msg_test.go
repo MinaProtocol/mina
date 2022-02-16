@@ -15,8 +15,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 )
 
-func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool) {
-	addr := fmt.Sprintf("%s/p2p/%s", info.Addrs[0], info.ID)
+func testAddPeerImplDo(t *testing.T, node *app, peerAddr peer.AddrInfo, isSeed bool) {
+	addr := fmt.Sprintf("%s/p2p/%s", peerAddr.Addrs[0], peerAddr.ID)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	require.NoError(t, err)
@@ -28,8 +28,8 @@ func testAddPeerImplDo(t *testing.T, appB *app, info peer.AddrInfo, isSeed bool)
 	m.SetIsSeed(isSeed)
 
 	var mRpcSeqno uint64 = 2000
-	resMsg := AddPeerReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	resMsg := AddPeerReq(m).handle(node, mRpcSeqno)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "addPeer")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasAddPeer())
 	_, err = respSuccess.AddPeer()
@@ -64,7 +64,7 @@ func TestGetPeerNodeStatus(t *testing.T) {
 	// only allow peer count of 1 for node A
 	maxCount := 1
 	port := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, port)
+	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, port)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 	appA.P2p.NodeStatus = []byte("testdata")
@@ -89,7 +89,7 @@ func TestGetPeerNodeStatus(t *testing.T) {
 
 	var mRpcSeqno uint64 = 18900
 	resMsg := GetPeerNodeStatusReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "getPeerNodeStatus")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasGetPeerNodeStatus())
 	resp, err := respSuccess.GetPeerNodeStatus()
@@ -109,16 +109,21 @@ func TestListPeers(t *testing.T) {
 
 	var mRpcSeqno uint64 = 2002
 	resMsg := ListPeersReq(m).handle(appB, mRpcSeqno)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "listPeers")
 	require.Equal(t, seqno, mRpcSeqno)
 	require.True(t, respSuccess.HasListPeers())
 	resp, err := respSuccess.ListPeers()
 	require.NoError(t, err)
 	res, err := resp.Result()
 	require.NoError(t, err)
-	require.Equal(t, 1, res.Len())
-	actual, err := readPeerInfo(res.At(0))
-	require.NoError(t, err)
-
-	checkPeerInfo(t, actual, appA.P2p.Host, appAPort)
+	require.Greater(t, res.Len(), 0)
+	for i := 0; i < res.Len(); i++ {
+		pi, err := readPeerInfo(res.At(i))
+		if err == nil {
+			require.Equal(t, pi.Libp2pPort, appAPort)
+			require.Equal(t, pi.PeerID, appA.P2p.Host.ID().String())
+		} else {
+			t.Errorf("failed to read peer info %d: %v", i, err)
+		}
+	}
 }

@@ -60,12 +60,12 @@ let%test_module "vrf-test" =
 
       type 'a or_infinity = 'a Kimchi.Foundations.or_infinity =
         | Infinity
-        | Finite of 'a
+        | Finite of ('a * 'a)
       [@@deriving equal]
 
       let equal x y =
         Snark_params.Tick.Inner_curve.(
-          equal_or_infinity Affine.equal (to_affine_or_infinity x)
+          equal_or_infinity Field.equal (to_affine_or_infinity x)
             (to_affine_or_infinity y))
 
       module Checked = struct

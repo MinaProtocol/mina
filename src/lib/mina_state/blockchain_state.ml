@@ -112,23 +112,25 @@ let create_value ~staged_ledger_hash ~genesis_ledger_hash ~registers ~timestamp
     =
   { Poly.staged_ledger_hash; timestamp; genesis_ledger_hash; registers }
 
+let data_spec =
+  let open Data_spec in
+  [ Staged_ledger_hash.typ
+  ; Frozen_ledger_hash.typ
+  ; Registers.typ
+      [ Frozen_ledger_hash.typ; Typ.unit; Token_id.typ; Local_state.typ ]
+  ; Block_time.Checked.typ
+  ]
+
 let typ : (var, Value.t) Typ.t =
-  Typ.of_hlistable
-    [ Staged_ledger_hash.typ
-    ; Frozen_ledger_hash.typ
-    ; Registers.typ
-        [ Frozen_ledger_hash.typ; Typ.unit; Token_id.typ; Local_state.typ ]
-    ; Block_time.Checked.typ
-    ]
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-    ~value_of_hlist:of_hlist
+  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 module Impl = Pickles.Impls.Step
 
 let var_to_input
     ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } : var) :
-    Field.Var.t Random_oracle.Input.t =
-  let open Random_oracle.Input in
+    Field.Var.t Random_oracle.Input.Chunked.t =
+  let open Random_oracle.Input.Chunked in
   let registers =
     (* TODO: If this were the actual Registers itself (without the unit arg)
        then we could more efficiently deal with the transaction SNARK input
@@ -141,7 +143,7 @@ let var_to_input
         } =
       registers
     in
-    Array.reduce_exn ~f:Random_oracle.Input.append
+    Array.reduce_exn ~f:append
       [| Frozen_ledger_hash.var_to_input ledger
        ; Token_id.Checked.to_input next_available_token
        ; Local_state.Checked.to_input local_state
@@ -157,7 +159,7 @@ let var_to_input
 let to_input
     ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } :
       Value.t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let registers =
     (* TODO: If this were the actual Registers itself (without the unit arg)
        then we could more efficiently deal with the transaction SNARK input

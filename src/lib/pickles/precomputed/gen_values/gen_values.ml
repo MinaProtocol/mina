@@ -82,7 +82,7 @@ let structure =
 
       let max_public_input_size = 150
 
-      open Zexe_backend.Pasta
+      open Kimchi_backend.Pasta.Basic
 
       let vesta =
         let f s = Fq.of_bigint (Bigint256.of_hex_string s) in

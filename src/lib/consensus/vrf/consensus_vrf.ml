@@ -93,15 +93,12 @@ module Message = struct
   let to_input
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ({ global_slot; seed; delegator } : value) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
       [| field (seed :> Tick.field)
        ; Global_slot.to_input global_slot
-       ; List.reduce_exn ~f:append
-           (List.map
-              (Mina_base.Account.Index.to_bits
-                 ~ledger_depth:constraint_constants.ledger_depth delegator)
-              ~f:(fun b -> packed (Mina_base.Util.field_of_bool b, 1)))
+       ; Mina_base.Account.Index.to_input
+           ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
 
   let data_spec
@@ -125,16 +122,12 @@ module Message = struct
     |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
   module Checked = struct
-    open Tick
-
     let to_input ({ global_slot; seed; delegator } : var) =
-      let global_slot = Global_slot.Checked.to_input global_slot in
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       Array.reduce_exn ~f:append
         [| field (Mina_base.Epoch_seed.var_to_hash_packed seed)
-         ; global_slot
-         ; List.reduce_exn ~f:append
-             (List.map delegator ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
+         ; Global_slot.Checked.to_input global_slot
+         ; Mina_base.Account.Index.Unpacked.to_input delegator
         |]
 
     let hash_to_group msg =
@@ -229,6 +222,14 @@ module Output = struct
       in
       Bignum.(
         of_bigint n / of_bigint Bignum_bigint.(shift_left one length_in_bits))
+
+    let to_input (t : t) =
+      List.map (to_bits t) ~f:(fun b -> (Mina_base.Util.field_of_bool b, 1))
+      |> List.to_array |> Random_oracle.Input.Chunked.packeds
+
+    let var_to_input (t : var) =
+      Array.map t ~f:(fun b -> ((b :> Tick.Field.Var.t), 1))
+      |> Random_oracle.Input.Chunked.packeds
   end
 
   open Tick
@@ -244,7 +245,7 @@ module Output = struct
   let hash ~constraint_constants msg g =
     let x, y = Non_zero_curve_point.of_inner_curve_exn g in
     let input =
-      Random_oracle.Input.(
+      Random_oracle.Input.Chunked.(
         append
           (Message.to_input ~constraint_constants msg)
           (field_elements [| x; y |]))
@@ -262,7 +263,7 @@ module Output = struct
     let hash msg (x, y) =
       let msg = Message.Checked.to_input msg in
       let input =
-        Random_oracle.Input.(append msg (field_elements [| x; y |]))
+        Random_oracle.Input.Chunked.(append msg (field_elements [| x; y |]))
       in
       make_checked (fun () ->
           let open Random_oracle.Checked in
@@ -374,15 +375,11 @@ end
 module Evaluation_hash = struct
   let hash_for_proof ~constraint_constants message public_key g1 g2 =
     let input =
-      let open Random_oracle_input in
       let g_to_input g =
-        { field_elements =
-            (let f1, f2 = Group.to_affine_exn g in
-             [| f1; f2 |])
-        ; packeds = [||]
-        }
+        let f1, f2 = Group.to_affine_exn g in
+        Random_oracle_input.Chunked.field_elements [| f1; f2 |]
       in
-      Array.reduce_exn ~f:Random_oracle_input.append
+      Array.reduce_exn ~f:Random_oracle_input.Chunked.append
         [| Message.to_input ~constraint_constants message
          ; g_to_input public_key
          ; g_to_input g1
@@ -400,13 +397,11 @@ module Evaluation_hash = struct
     let hash_for_proof message public_key g1 g2 =
       let open Tick.Checked.Let_syntax in
       let input =
-        let open Random_oracle_input in
         let g_to_input (f1, f2) =
-          { field_elements = [| f1; f2 |]; packeds = [||] }
+          Random_oracle_input.Chunked.field_elements [| f1; f2 |]
         in
-        let message_input = Message.Checked.to_input message in
-        Array.reduce_exn ~f:Random_oracle_input.append
-          [| message_input
+        Array.reduce_exn ~f:Random_oracle_input.Chunked.append
+          [| Message.Checked.to_input message
            ; g_to_input public_key
            ; g_to_input g1
            ; g_to_input g2
@@ -424,9 +419,23 @@ module Evaluation_hash = struct
 end
 
 module Output_hash = struct
-  type value = Snark_params.Tick.Field.t [@@deriving sexp, compare]
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
 
-  type t = value
+    module V1 = struct
+      module T = struct
+        type t = Snark_params.Tick.Field.t
+        [@@deriving sexp, compare, hash, version { asserted }]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare]
 
   type var = Random_oracle.Checked.Digest.t
 
@@ -465,14 +474,14 @@ struct
 end
 
 type evaluation =
-  ( Kimchi_pasta.Pasta.Pallas.t
-  , Kimchi_pasta.Pasta.Fq.t
+  ( Kimchi.Pallas.t
+  , Kimchi.Foundations.Fq.t
     Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Kimchi_pasta.Pasta.Fp.t, int) Message.t
-  , Kimchi_pasta.Pasta.Pallas.t )
+  ( (Unsigned.uint32, Kimchi.Foundations.Fp.t, int) Message.t
+  , Kimchi.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct
@@ -634,4 +643,4 @@ let%test_unit "Standalone and integrates vrfs are consistent" =
       let standalone_vrf =
         Standalone.Evaluation.verified_output standalone_eval context
       in
-      [%test_eq: Output_hash.value option] (Some integrated_vrf) standalone_vrf)
+      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf)

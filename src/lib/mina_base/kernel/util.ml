@@ -1,3 +1,5 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
 
 let field_of_bool =

@@ -76,10 +76,11 @@ module Block = struct
     ; creator : Public_key.Compressed.Stable.Latest.t
     ; block_winner : Public_key.Compressed.Stable.Latest.t
     ; snarked_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; staking_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; staking_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; next_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; next_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
+    ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; min_window_density : Mina_numbers.Length.Stable.Latest.t
+    ; total_currency : Currency.Amount.Stable.Latest.t
+    ; next_available_token : Token_id.Stable.Latest.t
     ; ledger_hash : Ledger_hash.Stable.Latest.t
     ; height : Unsigned_extended.UInt32.Stable.Latest.t
     ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.Latest.t
@@ -87,6 +88,7 @@ module Block = struct
     ; timestamp : Block_time.Stable.Latest.t
     ; user_cmds : User_command.t list
     ; internal_cmds : Internal_command.t list
+    ; chain_status : Chain_status.t
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end

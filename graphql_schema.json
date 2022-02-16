@@ -615,152 +615,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "INPUT_OBJECT",
-          "name": "SetStakingInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKeys",
-              "description":
-                "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "publicKeys",
-              "description":
-                "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SetStakingPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "lastStaking",
-              "description":
-                "Returns the public keys that were staking funds previously",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lockedPublicKeys",
-              "description":
-                "List of public keys that could not be used to stake because they were locked",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "currentStakingKeys",
-              "description":
-                "Returns the public keys that are now staking their funds",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "TarFile",
           "description": null,
@@ -816,1502 +670,10 @@
         },
         {
           "kind": "SCALAR",
-          "name": "StateHash",
-          "description": null,
+          "name": "SendTestSnappInput",
+          "description": "Parties for a test snapp",
           "fields": null,
           "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappStateHashOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "stateHash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "StateHash",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "stateHash",
-              "description": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "StateHash",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "EpochSeedOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "epochSeed",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "EpochSeed",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "epochSeed",
-              "description": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "EpochSeed",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "EpochLedger",
-          "description": null,
-          "fields": [
-            {
-              "name": "totalCurrency",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "CurrencyAmountNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnarkedLedgerHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "totalCurrency",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "CurrencyAmountNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnarkedLedgerHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "EpochData",
-          "description": null,
-          "fields": [
-            {
-              "name": "epochLength",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lockCheckpoint",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappStateHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "startCheckpoint",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappStateHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "seed",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochSeedOrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "ledger",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochLedger",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "epochLength",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lockCheckpoint",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappStateHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "startCheckpoint",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappStateHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "seed",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochSeedOrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "ledger",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochLedger",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "GlobalSlot",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "globalSlot",
-          "description": null,
-          "fields": [
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "GlobalSlot",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "GlobalSlot",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "GlobalSlot",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "GlobalSlot",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "GlobalSlotNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "globalSlot",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "globalSlot",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "globalSlot",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "globalSlot",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "currencyAmount",
-          "description": null,
-          "fields": [
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "CurrencyAmount",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "CurrencyAmountNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "currencyAmount",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "currencyAmount",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "currencyAmount",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "currencyAmount",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "VrfOutput",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Length",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "length",
-          "description": null,
-          "fields": [
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Length",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Length",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Length",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Length",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "LengthNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "length",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "length",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "length",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "length",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "BlockTime",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "blockTime",
-          "description": null,
-          "fields": [
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "BlockTime",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "BlockTimeNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "blockTime",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "blockTime",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "blockTime",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "blockTime",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "tokenId",
-          "description": null,
-          "fields": [
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappNumericTokenId",
-          "description": null,
-          "fields": [
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "tokenId",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "tokenId",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "tokenId",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "SnarkedLedgerHash",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnarkedLedgerHashOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "snarkedLedgerHash",
-              "description":
-                "Snarked ledger hash in Base58Check format, or null if Ignore",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "SnarkedLedgerHash",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "snarkedLedgerHash",
-              "description":
-                "Snarked ledger hash in Base58Check format, or null if Ignore",
-              "type": {
-                "kind": "SCALAR",
-                "name": "SnarkedLedgerHash",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappProtocolState",
-          "description": "Protocol state for a Snapp transaction",
-          "fields": [
-            {
-              "name": "nextEpochData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochData",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "stakingEpochData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochData",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "globalSlotSinceGenesis",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "GlobalSlotNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "GlobalSlotNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "totalCurrency",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "CurrencyAmountNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lastVrfOutput",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "VrfOutput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "minWindowDensity",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "blockchainLength",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "timestamp",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BlockTimeNumeric",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "snarkedNextAvailableToken",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappNumericTokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "snarkedLedgerHash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnarkedLedgerHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "nextEpochData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochData",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "stakingEpochData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "EpochData",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "globalSlotSinceGenesis",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "GlobalSlotNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "globalSlotSinceHardFork",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "GlobalSlotNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "totalCurrency",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "CurrencyAmountNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "lastVrfOutput",
-              "description": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "VrfOutput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "minWindowDensity",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "blockchainLength",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "LengthNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "timestamp",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BlockTimeNumeric",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "snarkedNextAvailableToken",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappNumericTokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "snarkedLedgerHash",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnarkedLedgerHashOrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -2324,35 +686,6 @@
           "inputFields": null,
           "interfaces": null,
           "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "ENUM",
-          "name": "ProofOrSignature",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "Proof",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Signature",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "NoneGiven",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
           "possibleTypes": null
         },
         {
@@ -2383,22 +716,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "proofOrSignature",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "ProofOrSignature",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2421,132 +738,6 @@
                 "ofType": null
               },
               "defaultValue": null
-            },
-            {
-              "name": "proofOrSignature",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "ProofOrSignature",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "BoolOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "bool",
-              "description": "A boolean, or null if Ignore",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "bool",
-              "description": "A boolean, or null if Ignore",
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappFieldOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "field",
-              "description": "Field in string format, or null if Ignore",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "field",
-              "description": "Field in string format, or null if Ignore",
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
             }
           ],
           "interfaces": null,
@@ -2556,7 +747,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappState",
-          "description": "Snapp state, a list of 8 field elements",
+          "description": "snapp state, a list of 8 field elements",
           "fields": [
             {
               "name": "elements",
@@ -2569,13 +760,9 @@
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SnappFieldOrIgnore",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
                   }
                 }
               },
@@ -2594,80 +781,10 @@
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SnappFieldOrIgnore",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
                   }
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "PublicKeyOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKey",
-              "description":
-                "Public key in Base58Check format, or null if Ignore",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "publicKey",
-              "description":
-                "Public key in Base58Check format, or null if Ignore",
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
                 }
               },
               "defaultValue": null
@@ -2689,71 +806,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappReceiptChainHashOrIgnore",
-          "description": null,
-          "fields": [
-            {
-              "name": "receiptChainHash",
-              "description": "receipt chain hash, or null if Ignore",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "ReceiptChainHash",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "receiptChainHash",
-              "description": "receipt chain hash, or null if Ignore",
-              "type": {
-                "kind": "SCALAR",
-                "name": "ReceiptChainHash",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "nonce",
+          "name": "NonceInterval",
           "description": null,
           "fields": [
             {
@@ -2813,70 +866,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Nonce",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "NonceNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "nonce",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "nonce",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "nonce",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "nonce",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
                   "ofType": null
                 }
               },
@@ -2899,7 +888,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "BalanceClosedInterval",
+          "name": "BalanceInterval",
           "description": null,
           "fields": [
             {
@@ -2959,93 +948,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Balance",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "ENUM",
-          "name": "OrIgnore",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "Ignore",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Check",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "BalanceNumeric",
-          "description": null,
-          "fields": [
-            {
-              "name": "balanceInterval",
-              "description": "Balance interval, or null if Ignore",
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BalanceClosedInterval",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "balanceInterval",
-              "description": "Balance interval, or null if Ignore",
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BalanceClosedInterval",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "checkOrIgnore",
-              "description": "Check or ignore",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "OrIgnore",
                   "ofType": null
                 }
               },
@@ -3065,15 +967,7 @@
               "name": "provedState",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BoolOrIgnore",
-                  "ofType": null
-                }
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3081,15 +975,7 @@
               "name": "sequenceState",
               "description": null,
               "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappFieldOrIgnore",
-                  "ofType": null
-                }
-              },
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3114,13 +1000,9 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeyOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3130,29 +1012,21 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeyOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "receiptChainHash",
-              "description": null,
+              "description": "receipt chain hash, or null if Ignore",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappReceiptChainHashOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "ReceiptChainHash",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3162,13 +1036,9 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "NonceNumeric",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "NonceInterval",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3178,13 +1048,9 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BalanceNumeric",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "BalanceInterval",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3194,29 +1060,13 @@
             {
               "name": "provedState",
               "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BoolOrIgnore",
-                  "ofType": null
-                }
-              },
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "sequenceState",
               "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappFieldOrIgnore",
-                  "ofType": null
-                }
-              },
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
             },
             {
@@ -3237,13 +1087,9 @@
               "name": "delegate",
               "description": null,
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeyOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "defaultValue": null
             },
@@ -3251,27 +1097,19 @@
               "name": "publicKey",
               "description": null,
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeyOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "receiptChainHash",
-              "description": null,
+              "description": "receipt chain hash, or null if Ignore",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappReceiptChainHashOrIgnore",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "ReceiptChainHash",
+                "ofType": null
               },
               "defaultValue": null
             },
@@ -3279,13 +1117,9 @@
               "name": "nonce",
               "description": null,
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "NonceNumeric",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "NonceInterval",
+                "ofType": null
               },
               "defaultValue": null
             },
@@ -3293,13 +1127,9 @@
               "name": "balance",
               "description": null,
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BalanceNumeric",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "BalanceInterval",
+                "ofType": null
               },
               "defaultValue": null
             }
@@ -3309,42 +1139,14 @@
           "possibleTypes": null
         },
         {
-          "kind": "ENUM",
-          "name": "SnappPredicateConstructors",
-          "description": "Constructors for Snapp predicates",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "Full",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Nonce",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Accept",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "SnappPredicate",
           "description": null,
           "fields": [
             {
               "name": "nonce",
-              "description": "A nonce for Nonce, null otherwise",
+              "description":
+                "The constraints that the nonce must satisfy in order for this update to succeed.",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Nonce", "ofType": null },
               "isDeprecated": false,
@@ -3352,28 +1154,13 @@
             },
             {
               "name": "account",
-              "description": "An account for Full, null otherwise",
+              "description":
+                "The constraints that the account must satisfy in order for this update to succeed. Snapps can use this field to assert properties about the account.",
               "args": [],
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "SnappPredicateAccount",
                 "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fullOrNonceOrAccept",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SnappPredicateConstructors",
-                  "ofType": null
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3382,31 +1169,19 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "A nonce for Nonce, null otherwise",
+              "description":
+                "The constraints that the nonce must satisfy in order for this update to succeed.",
               "type": { "kind": "SCALAR", "name": "Nonce", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "account",
-              "description": "An account for Full, null otherwise",
+              "description":
+                "The constraints that the account must satisfy in order for this update to succeed. Snapps can use this field to assert properties about the account.",
               "type": {
                 "kind": "INPUT_OBJECT",
                 "name": "SnappPredicateAccount",
                 "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "fullOrNonceOrAccept",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SnappPredicateConstructors",
-                  "ofType": null
-                }
               },
               "defaultValue": null
             }
@@ -3439,22 +1214,12 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "CurrencyAmount",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
-          "name": "Delta",
+          "name": "BalanceChange",
           "description": "A signed amount",
           "fields": [
             {
-              "name": "sgn",
+              "name": "sign",
               "description": "The sign of the amount",
               "args": [],
               "type": {
@@ -3484,7 +1249,7 @@
           ],
           "inputFields": [
             {
-              "name": "sgn",
+              "name": "sign",
               "description": "The sign of the amount",
               "type": {
                 "kind": "NON_NULL",
@@ -3515,18 +1280,19 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a Snapp Party",
+          "description": "Body component of a snapp Party",
           "fields": [
             {
-              "name": "depth",
-              "description": "An integer in string format",
+              "name": "useFullCommitment",
+              "description":
+                "Use the full or partial commitment when checking the party predicate.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },
@@ -3534,8 +1300,38 @@
               "deprecationReason": null
             },
             {
+              "name": "protocolState",
+              "description": "The protocol state in a snapp transaction",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "SnappProtocolState",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callDepth",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching this party.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "callData",
-              "description": "A field in Base58Check",
+              "description":
+                "A commitment to the arguments passed to the snapp and the returned value, for internal use by the calling snapp. This commitment is opaque to ensure that private data can be passed between snapps without revealing it on chain.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3551,7 +1347,8 @@
             },
             {
               "name": "sequenceEvents",
-              "description": "A list of list of fields in Base58Check",
+              "description":
+                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the snapp account for later use",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3583,7 +1380,8 @@
             },
             {
               "name": "events",
-              "description": "A list of list of fields in Base58Check",
+              "description":
+                "A list of events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3614,15 +1412,32 @@
               "deprecationReason": null
             },
             {
-              "name": "delta",
-              "description": "Signed amount",
+              "name": "incrementNonce",
+              "description": "Whether to increment the nonce",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "balanceChange",
+              "description":
+                "Signed amount representing the amount to change for this particular relevant party.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Delta",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -3662,7 +1477,7 @@
               "deprecationReason": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "args": [],
               "type": {
@@ -3680,22 +1495,49 @@
           ],
           "inputFields": [
             {
-              "name": "depth",
-              "description": "An integer in string format",
+              "name": "useFullCommitment",
+              "description":
+                "Use the full or partial commitment when checking the party predicate.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },
               "defaultValue": null
             },
             {
+              "name": "protocolState",
+              "description": "The protocol state in a snapp transaction",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "SnappProtocolState",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callDepth",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching this party.",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "defaultValue": null
+            },
+            {
               "name": "callData",
-              "description": "A field in Base58Check",
+              "description":
+                "A commitment to the arguments passed to the snapp and the returned value, for internal use by the calling snapp. This commitment is opaque to ensure that private data can be passed between snapps without revealing it on chain.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3709,7 +1551,8 @@
             },
             {
               "name": "sequenceEvents",
-              "description": "A list of list of fields in Base58Check",
+              "description":
+                "A list of sequence events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic. A commitment to these events is added to the sequenceState of the snapp account for later use",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3739,7 +1582,8 @@
             },
             {
               "name": "events",
-              "description": "A list of list of fields in Base58Check",
+              "description":
+                "A list of events emitted by the snapp. Each event is a list of field elements, the particular meaning of each event is determined by the snapp's internal logic.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3768,14 +1612,29 @@
               "defaultValue": null
             },
             {
-              "name": "delta",
-              "description": "Signed amount",
+              "name": "incrementNonce",
+              "description": "Whether to increment the nonce",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "balanceChange",
+              "description":
+                "Signed amount representing the amount to change for this particular relevant party.",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Delta",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -3810,7 +1669,7 @@
               "defaultValue": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "type": {
                 "kind": "NON_NULL",
@@ -3903,7 +1762,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "SnappParty",
-          "description": "A party to a Snapp transaction",
+          "description": "A party to a snapp transaction",
           "fields": [
             {
               "name": "authorization",
@@ -3988,6 +1847,902 @@
           "description": null,
           "fields": null,
           "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "StateHash",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "EpochLedger",
+          "description": null,
+          "fields": [
+            {
+              "name": "totalCurrency",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "hash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "SnarkedLedgerHash",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "totalCurrency",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "hash",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "SnarkedLedgerHash",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "EpochData",
+          "description": null,
+          "fields": [
+            {
+              "name": "epochLength",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lockCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "StateHash",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "startCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "StateHash",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "seed",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "EpochSeed",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ledger",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochLedger",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "epochLength",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lockCheckpoint",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "StateHash",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "startCheckpoint",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "StateHash",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "seed",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "EpochSeed",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "ledger",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochLedger",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "GlobalSlot",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "GlobalSlotInterval",
+          "description": null,
+          "fields": [
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "GlobalSlot",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "GlobalSlot",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "GlobalSlot",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "GlobalSlot",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "CurrencyAmount",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "CurrencyAmountInterval",
+          "description": null,
+          "fields": [
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "CurrencyAmount",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "VrfOutput",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Length",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "LengthInterval",
+          "description": null,
+          "fields": [
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Length",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Length",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Length",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Length",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "BlockTime",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "BlockTimeInterval",
+          "description": null,
+          "fields": [
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "BlockTime",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "BlockTime",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "BlockTime",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "BlockTime",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "TokenIdInterval",
+          "description": null,
+          "fields": [
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "SnarkedLedgerHash",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "SnappProtocolState",
+          "description": "Protocol state for a snapp transaction",
+          "fields": [
+            {
+              "name": "nextEpochData",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochData",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stakingEpochData",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochData",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceHardFork",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lastVrfOutput",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "VrfOutput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "minWindowDensity",
+              "description":
+                "Minimum window density Checked if present. Ignored if null.",
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockchainLength",
+              "description":
+                "Length of the blockchain. Checked if present. Ignored if null.",
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timestamp",
+              "description":
+                "Timestamp of the start of the slot where this protocol state was created Checked if present. Ignored if null.",
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BlockTimeInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkedNextAvailableToken",
+              "description":
+                "Next available tokenId according to the snarked ledger. Checked if present. Ignored if null.",
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "TokenIdInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkedLedgerHash",
+              "description":
+                "Snarked ledger hash in Base58Check format. Checked if present. Ignored if null.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "SnarkedLedgerHash",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "nextEpochData",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochData",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "stakingEpochData",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "EpochData",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "globalSlotSinceHardFork",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "lastVrfOutput",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "VrfOutput",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "minWindowDensity",
+              "description":
+                "Minimum window density Checked if present. Ignored if null.",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "blockchainLength",
+              "description":
+                "Length of the blockchain. Checked if present. Ignored if null.",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "LengthInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "timestamp",
+              "description":
+                "Timestamp of the start of the slot where this protocol state was created Checked if present. Ignored if null.",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BlockTimeInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "snarkedNextAvailableToken",
+              "description":
+                "Next available tokenId according to the snarked ledger. Checked if present. Ignored if null.",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "TokenIdInterval",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "snarkedLedgerHash",
+              "description":
+                "Snarked ledger hash in Base58Check format. Checked if present. Ignored if null.",
+              "type": {
+                "kind": "SCALAR",
+                "name": "SnarkedLedgerHash",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -4165,195 +2920,11 @@
           "possibleTypes": null
         },
         {
-          "kind": "INPUT_OBJECT",
-          "name": "TimingSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "timing",
-              "description": "Timing info, or null if Keep",
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Timing",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "timing",
-              "description": "Timing info, or null if Keep",
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Timing",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
           "name": "AccountToken",
           "description": null,
           "fields": null,
           "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "AccountTokenSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "tokenSymbol",
-              "description": "Token symbol",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "AccountToken",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "tokenSymbol",
-              "description": "Token symbol",
-              "type": {
-                "kind": "SCALAR",
-                "name": "AccountToken",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappUriSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "uri",
-              "description": "A URI string, or null if Keep",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "uri",
-              "description": "A URI string, or null if Keep",
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -4411,6 +2982,38 @@
           "description": null,
           "fields": [
             {
+              "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setTokenSymbol",
               "description": null,
               "args": [],
@@ -4573,6 +3176,34 @@
           ],
           "inputFields": [
             {
+              "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
               "name": "setTokenSymbol",
               "description": null,
               "type": {
@@ -4707,70 +3338,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "PermissionsSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "permissions",
-              "description": "Permissions, or null if Keep",
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Permissions",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "permissions",
-              "description": "Permissions, or null if Keep",
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "Permissions",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
                   "ofType": null
                 }
               },
@@ -4854,136 +3421,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "INPUT_OBJECT",
-          "name": "VerificationKeyWithHashSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "verificationKeyWithHash",
-              "description": "A verification key and hash, or null if Keep",
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "VerificationKeyWithHash",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "verificationKeyWithHash",
-              "description": "A verification key and hash, or null if Keep",
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "VerificationKeyWithHash",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "PublicKeySetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKey",
-              "description":
-                "A public key in Base58Check format, or null if Keep",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "publicKey",
-              "description":
-                "A public key in Base58Check format, or null if Keep",
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
           "name": "Field",
           "description": null,
@@ -4994,188 +3431,90 @@
           "possibleTypes": null
         },
         {
-          "kind": "ENUM",
-          "name": "SetOrKeep",
-          "description": "Keep or set a value",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "Keep",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Set",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "FieldSetOrKeep",
-          "description": null,
-          "fields": [
-            {
-              "name": "field",
-              "description": "A field in string format, or null if Keep",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "field",
-              "description": "A field in string format, or null if Keep",
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "setOrKeep",
-              "description": "Flag to keep or set",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "SetOrKeep",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "PartyUpdate",
-          "description": "Update component of a Snapp Party",
+          "description": "Update component of a snapp Party",
           "fields": [
             {
+              "name": "votingFor",
+              "description": "State hash to vote for, or null if Keep",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "timing",
-              "description": null,
+              "description": "Timing info, or null if Keep",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "TimingSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "Timing",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "tokenSymbol",
-              "description": null,
+              "description": "Token symbol",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountTokenSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "AccountToken",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "snappUri",
-              "description": null,
+              "description": "A URI string, or null if Keep",
               "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappUriSetOrKeep",
-                  "ofType": null
-                }
-              },
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "permissions",
-              "description": null,
+              "description": "Permissions, or null if Keep",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PermissionsSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "Permissions",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "verificationKey",
-              "description": null,
+              "description": "A verification key and hash, or null if Keep",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "VerificationKeyWithHashSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "VerificationKeyWithHash",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "delegate",
-              "description": null,
+              "description": "TODO: What is this?",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeySetOrKeep",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "appState",
-              "description": "List of 8 field elements",
+              "description":
+                "List of _exactly_ 8 field elements (null if keep)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5184,13 +3523,9 @@
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "FieldSetOrKeep",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
                   }
                 }
               },
@@ -5200,92 +3535,71 @@
           ],
           "inputFields": [
             {
+              "name": "votingFor",
+              "description": "State hash to vote for, or null if Keep",
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "defaultValue": null
+            },
+            {
               "name": "timing",
-              "description": null,
+              "description": "Timing info, or null if Keep",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "TimingSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "Timing",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "tokenSymbol",
-              "description": null,
+              "description": "Token symbol",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountTokenSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "AccountToken",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "snappUri",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappUriSetOrKeep",
-                  "ofType": null
-                }
-              },
+              "description": "A URI string, or null if Keep",
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
             },
             {
               "name": "permissions",
-              "description": null,
+              "description": "Permissions, or null if Keep",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PermissionsSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "Permissions",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "verificationKey",
-              "description": null,
+              "description": "A verification key and hash, or null if Keep",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "VerificationKeyWithHashSetOrKeep",
-                  "ofType": null
-                }
+                "kind": "INPUT_OBJECT",
+                "name": "VerificationKeyWithHash",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "delegate",
-              "description": null,
+              "description": "TODO: What is this?",
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PublicKeySetOrKeep",
-                  "ofType": null
-                }
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
               },
               "defaultValue": null
             },
             {
               "name": "appState",
-              "description": "List of 8 field elements",
+              "description":
+                "List of _exactly_ 8 field elements (null if keep)",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5293,13 +3607,9 @@
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "FieldSetOrKeep",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
                   }
                 }
               },
@@ -5313,20 +3623,33 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a Snapp Fee Payer Party",
+          "description": "Body component of a snapp Fee Payer Party",
           "fields": [
             {
-              "name": "depth",
-              "description": "An integer in string format",
+              "name": "protocolState",
+              "description": "The protocol state in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
+                  "kind": "INPUT_OBJECT",
+                  "name": "SnappProtocolState",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callDepth",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5440,7 +3763,7 @@
               "deprecationReason": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "args": [],
               "type": {
@@ -5458,16 +3781,27 @@
           ],
           "inputFields": [
             {
-              "name": "depth",
-              "description": "An integer in string format",
+              "name": "protocolState",
+              "description": "The protocol state in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
+                  "kind": "INPUT_OBJECT",
+                  "name": "SnappProtocolState",
                   "ofType": null
                 }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callDepth",
+              "description":
+                "The number of nested snapp calls in the transaction before reaching the fee payer.",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "defaultValue": null
             },
@@ -5570,7 +3904,7 @@
               "defaultValue": null
             },
             {
-              "name": "pk",
+              "name": "publicKey",
               "description": "Public key as a Base58Check string",
               "type": {
                 "kind": "NON_NULL",
@@ -5592,7 +3926,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyPredicatedFeePayer",
           "description":
-            "A party to a Snapp transaction with a nonce predicate",
+            "A party to a snapp transaction with a nonce predicate",
           "fields": [
             {
               "name": "predicate",
@@ -5665,7 +3999,7 @@
           "kind": "INPUT_OBJECT",
           "name": "SnappPartyFeePayer",
           "description":
-            "A party to a Snapp transaction with a signature authorization",
+            "A party to a snapp transaction with a signature authorization",
           "fields": [
             {
               "name": "authorization",
@@ -5748,25 +4082,9 @@
               "deprecationReason": null
             },
             {
-              "name": "snappProtocolState",
-              "description": "The protocol state in a Snapp transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappProtocolState",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "snappOtherParties",
+              "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5789,8 +4107,8 @@
               "deprecationReason": null
             },
             {
-              "name": "snappFeePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "name": "feePayer",
+              "description": "The fee payer party to a snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5813,23 +4131,9 @@
               "defaultValue": null
             },
             {
-              "name": "snappProtocolState",
-              "description": "The protocol state in a Snapp transaction",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "SnappProtocolState",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "snappOtherParties",
+              "name": "otherParties",
               "description":
-                "The parties other than the fee payer in a Snapp transaction",
+                "The parties other than the fee payer in a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5850,8 +4154,8 @@
               "defaultValue": null
             },
             {
-              "name": "snappFeePayer",
-              "description": "The fee payer party to a Snapp transaction",
+              "name": "feePayer",
+              "description": "The fee payer party to a snapp transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5875,7 +4179,7 @@
           "fields": [
             {
               "name": "snapp",
-              "description": "Snapp transaction that was sent",
+              "description": "snapp transaction that was sent",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7791,7 +6095,7 @@
             },
             {
               "name": "sendSnapp",
-              "description": "Send a Snapp transaction",
+              "description": "Send a snapp transaction",
               "args": [
                 {
                   "name": "input",
@@ -7802,6 +6106,69 @@
                     "ofType": {
                       "kind": "INPUT_OBJECT",
                       "name": "SendSnappInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SendSnappPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mockSnapp",
+              "description":
+                "Mock a snapp transaction, no effect on blockchain",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SendSnappInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SendSnappPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sendTestSnapp",
+              "description": "Send a test snapp",
+              "args": [
+                {
+                  "name": "parties",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "SendTestSnappInput",
                       "ofType": null
                     }
                   },
@@ -7841,37 +6208,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ExportLogsPayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "setStaking",
-              "description": "Set keys you wish to stake with",
-              "args": [
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SetStakingInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SetStakingPayload",
                   "ofType": null
                 }
               },
@@ -9634,7 +7970,7 @@
             },
             {
               "name": "hash",
-              "description": "A cryptographic hash of the Snapp command",
+              "description": "A cryptographic hash of the snapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9651,7 +7987,7 @@
             {
               "name": "nonce",
               "description":
-                "Sequence number of the Snapp transaction for the fee-payer's account",
+                "Sequence number of the snapp transaction for the fee-payer's account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9664,7 +8000,7 @@
             {
               "name": "feePayer",
               "description":
-                "Account that pays the fees for the Snapp transaction",
+                "Account that pays the fees for the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9681,7 +8017,7 @@
             {
               "name": "accountsAccessed",
               "description":
-                "List of accounts accessed to complete the Snapp transaction",
+                "List of accounts accessed to complete the snapp transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9706,9 +8042,17 @@
             {
               "name": "fee",
               "description":
-                "Transaction fee paid by the fee-payer for the Snapp transaction",
+                "Transaction fee paid by the fee-payer for the snapp transaction",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9731,7 +8075,7 @@
             {
               "name": "failureReason",
               "description":
-                "The reason for the Snapp transaction failure; null means success or the status is unknown",
+                "The reason for the snapp transaction failure; null means success or the status is unknown",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -11806,7 +10150,7 @@
             },
             {
               "name": "snappCommands",
-              "description": "List of Snapp commands included in this block",
+              "description": "List of snapp commands included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12949,7 +11293,7 @@
           "description": null,
           "fields": [
             {
-              "name": "initialMininumBalance",
+              "name": "initialMinimumBalance",
               "description":
                 "The initial minimum balance for a time-locked account",
               "args": [],
@@ -13265,9 +11609,30 @@
             {
               "name": "snappUri",
               "description":
-                "The URI associated with this account, usually pointing to the Snapp source code",
+                "The URI associated with this account, usually pointing to the snapp source code",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snappState",
+              "description":
+                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -14955,11 +13320,11 @@
             {
               "name": "pooledSnappCommands",
               "description":
-                "Retrieve all the scheduled Snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+                "Retrieve all the scheduled snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of Snapp commands",
+                  "description": "Ids of snapp commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -14978,7 +13343,7 @@
                 {
                   "name": "hashes",
                   "description":
-                    "Hashes of the Snapp commands to find in the pool",
+                    "Hashes of the snapp commands to find in the pool",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -14997,7 +13362,7 @@
                 {
                   "name": "publicKey",
                   "description":
-                    "Public key of sender of pooled Snapp commands",
+                    "Public key of sender of pooled snapp commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",

@@ -39,8 +39,6 @@ module Transaction_with_witness = struct
         { transaction_with_info :
             Transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-              (* TODO: It's inefficient to store this here. Optimize it someday. *)
-        ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
@@ -175,15 +173,15 @@ end]
 (**********Helpers*************)
 
 let create_expected_statement ~constraint_constants
+    ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     { Transaction_with_witness.transaction_with_info
     ; state_hash
-    ; state_view
     ; ledger_witness
     ; init_stack
     ; statement
     } =
   let open Or_error.Let_syntax in
-  let source =
+  let source_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root ledger_witness
   in
@@ -193,15 +191,19 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
-  let%bind after =
+  let%bind protocol_state = get_state (fst state_hash) in
+  let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
+  let empty_local_state = Mina_state.Local_state.empty in
+  let%bind after, _ =
     Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
+        Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)
-  in
-  let target =
-    Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+    |> Or_error.join
   in
   let next_available_token_after = Sparse_ledger.next_available_token after in
+  let target_merkle_root =
+    Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
+  in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -223,23 +225,18 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  (*TODO: source local state should `local_state_init` from the witness and
-    target local state should be whatever `apply_parties_unchecked` returns. Do
-    they have to be in the statement in the scan state? transaction snark*)
-  let local_state = Mina_state.Local_state.empty in
-  let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source =
-      { ledger = source
+      { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; next_available_token = next_available_token_before
-      ; local_state
+      ; local_state = empty_local_state
       }
   ; target =
-      { ledger = target
+      { ledger = target_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; next_available_token = next_available_token_after
-      ; local_state
+      ; local_state = empty_local_state
       }
   ; fee_excess
   ; supply_increase
@@ -376,7 +373,7 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants tree ~verifier :
+  let scan_statement ~constraint_constants tree ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
@@ -475,11 +472,20 @@ struct
       | Full { job = transaction; _ } ->
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
-                Timer.time timer
-                  (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
-                    Deferred.return
-                      (create_expected_statement ~constraint_constants
-                         transaction))
+                match statement_check with
+                | `Full get_state ->
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               ~get_state transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
+                | `Partial ->
+                    return transaction.statement
               in
               let%bind () = yield_always () in
               if
@@ -537,7 +543,8 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~verifier ~error_prefix
+  let check_invariants t ~constraint_constants ~statement_check ~verifier
+      ~error_prefix
       ~(registers_begin :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
@@ -580,7 +587,7 @@ struct
     in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~verifier t)
+          scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
         Error e
@@ -785,32 +792,30 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let `Needs_update_for_multiple_slots_per_txn =
-          Mina_base.Util.todo_multiple_slots_per_transaction
+        let%map witness =
+          let { With_status.data = transaction; status } =
+            Transaction_logic.Transaction_applied.transaction_with_status
+              transaction_with_info
+          in
+          let%bind protocol_state_body =
+            let%map state = get_state (fst state_hash) in
+            Mina_state.Protocol_state.body state
+          in
+          let%map init_stack =
+            match init_stack with
+            | Base x ->
+                Ok x
+            | Merge ->
+                Or_error.error_string "init_stack was Merge"
+          in
+          { Transaction_witness.ledger = ledger_witness
+          ; transaction
+          ; protocol_state_body
+          ; init_stack
+          ; status
+          }
         in
-        let { With_status.data = transaction; status } =
-          Ledger.Transaction_applied.transaction transaction_with_info
-        in
-        let%bind protocol_state_body =
-          let%map state = get_state (fst state_hash) in
-          Mina_state.Protocol_state.body state
-        in
-        let%map init_stack =
-          match init_stack with
-          | Base x ->
-              Ok x
-          | Merge ->
-              Or_error.error_string "init_stack was Merge"
-        in
-        Snark_work_lib.Work.Single.Spec.Transition
-          ( statement
-          , Transaction_witness.Non_parties
-              { ledger = ledger_witness
-              ; transaction
-              ; protocol_state_body
-              ; init_stack
-              ; status
-              } )
+        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

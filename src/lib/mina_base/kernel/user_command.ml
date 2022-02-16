@@ -27,30 +27,31 @@ type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
   | Signed_command of 'u
   | Parties of 's
 
-(* TODO: For now, we don't generate snapp transactions. *)
 module Gen_make (C : Signed_command_intf.Gen_intf) = struct
-  let f g = Quickcheck.Generator.map g ~f:(fun c -> Signed_command c)
+  let to_signed_command f =
+    Quickcheck.Generator.map f ~f:(fun c -> Signed_command c)
 
   open C.Gen
 
   let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
       ~fee_range () =
-    f
+    to_signed_command
       (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
          ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
       ?fee_token ?payment_token ~fee_range () =
-    f
+    to_signed_command
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
          ?fee_token ?payment_token ~fee_range ())
 
   let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
-    f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
+    to_signed_command
+      (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
 
   let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
       ~fee_range () =
-    f
+    to_signed_command
       (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
          ~fee_range ())
 
@@ -74,16 +75,6 @@ module Valid = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V1.t
-        , Snapp_command.Valid.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Poly.Stable.V1.to_latest
-    end
   end]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
@@ -96,14 +87,6 @@ module Stable = struct
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, compare, equal, hash, yojson]
-
-    let to_latest : t -> V2.t = Poly.Stable.V1.to_latest
   end
 end]
 
@@ -173,14 +156,13 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
   match t with
   | Signed_command c ->
       Signed_command c
-  | Parties { fee_payer; other_parties; protocol_state; memo } ->
+  | Parties { fee_payer; other_parties; memo } ->
       Parties
         { fee_payer
-        ; protocol_state
         ; other_parties =
             other_parties
             |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Party_or_stack.With_hashes.of_parties_list
+            |> Parties.Call_forest.With_hashes.of_parties_list
         ; memo
         }
 

@@ -1,12 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifndef consensus_mechanism]
-
-open Import
-
-[%%endif]
+open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
@@ -30,7 +25,7 @@ let to_input t =
     | Not_owned { account_disabled } ->
         [ false; account_disabled ]
   in
-  Random_oracle.Input.packed (Snark_params.Tick.Field.project bs, List.length bs)
+  Random_oracle.Input.Chunked.packed (Field.project bs, List.length bs)
 
 [%%ifdef consensus_mechanism]
 
@@ -83,7 +78,7 @@ let typ : (var, t) Typ.t =
 
 let var_to_input { token_owner; token_locked } =
   let bs = [ token_owner; token_locked ] in
-  Random_oracle.Input.packed (Field.Var.project bs, List.length bs)
+  Random_oracle.Input.Chunked.packed (Field.Var.project bs, List.length bs)
 
 [%%endif]
 

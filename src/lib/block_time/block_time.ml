@@ -79,9 +79,11 @@ module Time = struct
               | Some tm ->
                   Int.of_string tm
               | None ->
+                  let default = 0 in
                   eprintf
-                    "Environment variable %s not found, using default of 0" env ;
-                  0
+                    "Environment variable %s not found, using default of %d\n%!"
+                    env default ;
+                  default
             in
             Core_kernel.Time.Span.of_int_sec env_offset
           in
@@ -115,7 +117,7 @@ module Time = struct
   module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
 
   let to_input (t : t) =
-    Random_oracle_input.packed (Tick.Field.project (Bits.to_bits t), 64)
+    Random_oracle_input.Chunked.packed (Tick.Field.project (Bits.to_bits t), 64)
 
   module Checked = struct
     type t = N.var

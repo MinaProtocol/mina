@@ -16,53 +16,32 @@ let add_fast (type f)
   let eq a b = As_prover.(equal (read_var a) (read_var b)) in
   let same_x_bool = lazy (eq x1 x2) in
   let ( ! ) = Lazy.force in
-  let same_x =
-    exists Field.typ ~compute:As_prover.(fun () -> bool !same_x_bool)
-  in
+  let ( !! ) = As_prover.read_var in
+  let mk f = exists Field.typ ~compute:f in
+  let same_x = mk (fun () -> bool !same_x_bool) in
   let inf =
     if check_finite then Field.zero
-    else
-      exists Field.typ
-        ~compute:As_prover.(fun () -> bool (!same_x_bool && not (eq y1 y2)))
+    else mk (fun () -> bool (!same_x_bool && not (eq y1 y2)))
   in
   let inf_z =
-    exists Field.typ
-      ~compute:
-        As_prover.(
-          fun () ->
-            if eq y1 y2 then zero
-            else if !same_x_bool then inv (read_var y2 - read_var y1)
-            else zero)
+    mk (fun () ->
+        if eq y1 y2 then zero
+        else if !same_x_bool then inv (!!y2 - !!y1)
+        else zero)
   in
   let x21_inv =
-    exists Field.typ
-      ~compute:
-        As_prover.(
-          fun () ->
-            if !same_x_bool then zero else inv (read_var x2 - read_var x1))
+    mk (fun () -> if !same_x_bool then zero else inv (!!x2 - !!x1))
   in
   let s =
-    exists Field.typ
-      ~compute:
-        As_prover.(
-          fun () ->
-            if !same_x_bool then
-              let x1_squared = square (read_var x1) in
-              let y1 = read_var y1 in
-              (x1_squared + x1_squared + x1_squared) / (y1 + y1)
-            else (read_var y2 - read_var y1) / (read_var x2 - read_var x1))
+    mk (fun () ->
+        if !same_x_bool then
+          let x1_squared = square !!x1 in
+          let y1 = !!y1 in
+          (x1_squared + x1_squared + x1_squared) / (y1 + y1)
+        else (!!y2 - !!y1) / (!!x2 - !!x1))
   in
-  let x3 =
-    exists Field.typ
-      ~compute:
-        As_prover.(fun () -> square (read_var s) - (read_var x1 + read_var x2))
-  in
-  let y3 =
-    exists Field.typ
-      ~compute:
-        As_prover.(
-          fun () -> (read_var s * (read_var x1 - read_var x3)) - read_var y1)
-  in
+  let x3 = mk (fun () -> square !!s - (!!x1 + !!x2)) in
+  let y3 = mk (fun () -> (!!s * (!!x1 - !!x3)) - !!y1) in
   let p3 = (x3, y3) in
   with_label "add_fast" (fun () ->
       assert_

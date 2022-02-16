@@ -25,7 +25,8 @@ module Transition = struct
     end
   end]
 
-  let to_input { prev; next } ~f = Random_oracle_input.append (f prev) (f next)
+  let to_input { prev; next } ~f =
+    Random_oracle_input.Chunked.append (f prev) (f next)
 
   [%%ifdef consensus_mechanism]
 
@@ -48,14 +49,15 @@ module Flagged_data = struct
   [%%endif]
 
   let to_input' { flag; data } ~flag:f ~data:d =
-    Random_oracle_input.(append (f flag) (d data))
+    Random_oracle_input.Chunked.(append (f flag) (d data))
 end
 
 module Flagged_option = struct
   type ('bool, 'a) t = { is_some : 'bool; data : 'a } [@@deriving hlist, fields]
 
   let to_input' ~field_of_bool { is_some; data } ~f =
-    Random_oracle_input.(append (packed (field_of_bool is_some, 1)) (f data))
+    Random_oracle_input.Chunked.(
+      append (packed (field_of_bool is_some, 1)) (f data))
 
   let to_input { is_some; data } ~default ~f =
     let data = if is_some then data else default in
@@ -135,8 +137,8 @@ module Set_or_keep = struct
 
     val to_input :
          'a t
-      -> f:('a -> Field.Var.t Random_oracle_input.t)
-      -> Field.Var.t Random_oracle_input.t
+      -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
+      -> Field.Var.t Random_oracle_input.Chunked.t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
 
@@ -208,8 +210,8 @@ module Or_ignore = struct
 
     val to_input :
          'a t
-      -> f:('a -> Field.Var.t Random_oracle_input.t)
-      -> Field.Var.t Random_oracle_input.t
+      -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
+      -> Field.Var.t Random_oracle_input.Chunked.t
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
   end = struct
@@ -271,7 +273,7 @@ module Account_state = struct
     type 'b t = { any : 'b; empty : 'b } [@@deriving hlist]
 
     let to_input ~field_of_bool { any; empty } =
-      Random_oracle_input.packeds
+      Random_oracle_input.Chunked.packeds
         [| (field_of_bool any, 1); (field_of_bool empty, 1) |]
   end
 
@@ -291,7 +293,7 @@ module Account_state = struct
     | { any = true; empty = false } | { any = true; empty = true } ->
         Any
 
-  let to_input (x : t) = Encoding.to_input (encode x) ~field_of_bool
+  let to_input (x : t) = Encoding.to_input ~field_of_bool (encode x)
 
   let check (t : t) (x : [ `Empty | `Non_empty ]) =
     match (t, x) with
@@ -344,6 +346,6 @@ let invalid_public_key : Public_key.Compressed.t Lazy.t =
 
 [%%else]
 
-module F = Snark_params_nonconsensus.Field
+module F = Snark_params.Tick.Field
 
 [%%endif]

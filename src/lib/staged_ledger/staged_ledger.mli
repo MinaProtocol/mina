@@ -94,6 +94,7 @@ val of_scan_state_and_ledger :
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
   -> t Deferred.Or_error.t
 
 val of_scan_state_and_ledger_unchecked :
@@ -176,11 +177,6 @@ val can_apply_supercharged_coinbase_exn :
   -> epoch_ledger:Mina_base.Sparse_ledger.t
   -> global_slot:Mina_numbers.Global_slot.t
   -> bool
-
-val statement_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t

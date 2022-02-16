@@ -55,9 +55,9 @@ module Pending_coinbase_stack_state : sig
 
   val typ : (var, t) Typ.t
 
-  val to_input : t -> Field.t Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
-  val var_to_input : var -> Field.Var.t Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 end
 
 (*
@@ -293,14 +293,15 @@ module Statement : sig
 
     val typ : (var, t) Typ.t
 
-    val to_input : t -> Field.t Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_field_elements : t -> Field.t array
 
     module Checked : sig
       type t = var
 
-      val to_input : var -> (Field.Var.t Random_oracle.Input.t, _) Checked.t
+      val to_input :
+        var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
 
       (* This is actually a checked function. *)
       val to_field_elements : var -> Field.Var.t array
@@ -407,6 +408,15 @@ val generate_transaction_witness :
   -> unit
 
 module Parties_segment : sig
+  module Spec : sig
+    type single =
+      { auth_type : Control.Tag.t
+      ; is_start : [ `Yes | `No | `Compute_in_circuit ]
+      }
+
+    type t = single list
+  end
+
   module Witness = Transaction_witness.Parties_segment_witness
 
   module Basic : sig
@@ -419,14 +429,18 @@ module Parties_segment : sig
           | Opt_signed_opt_signed
           | Opt_signed
           | Proved
-        [@@deriving sexp]
+        [@@deriving sexp, yojson]
       end
     end]
+
+    val to_single_list : t -> Spec.single list
   end
 end
 
 module type S = sig
   include Verification.S
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val cache_handle : Pickles.Cache_handle.t
 
@@ -453,7 +467,9 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
+    -> snapp_statement:(int * Snapp_statement.t) option
     -> witness:Parties_segment.Witness.t
+    -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
 
   val merge :
@@ -486,7 +502,7 @@ val group_by_parties_rev :
   -> 'a list list
   -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
 
-(** [parties_witnesses ledger partiess] generates the parties segment witnesses
+(** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
     and corresponding statements needed to prove the application of each
     parties transaction in [partiess] on top of ledger. If multiple parties are
     given, they are applied in order and grouped together to minimise the
@@ -507,17 +523,17 @@ val group_by_parties_rev :
     should only be used on parties that are already known to pass transaction
     logic without an exception.
 *)
-val parties_witnesses :
+val parties_witnesses_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
   -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
-  -> Ledger.t
+  -> [ `Ledger of Ledger.t | `Sparse_ledger of Sparse_ledger.t ]
   -> Parties.t list
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) list )
+     * (int * Snapp_statement.t) option )
      list
 
 module Make (Inputs : sig
@@ -531,3 +547,60 @@ val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> (string * Md5.t) list
+
+(* Every circuit must have at least 1 of each type of constraint.
+   This function can be used to add the missing constraints *)
+val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
+
+module Base : sig
+  module Parties_snark : sig
+    val main :
+         ?witness:Parties_segment.Witness.t
+      -> Parties_segment.Spec.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> (int * Snapp_statement.Checked.t) list
+      -> Statement.With_sok.var
+      -> unit
+  end
+end
+
+module For_tests : sig
+  module Spec : sig
+    type t =
+      { fee : Currency.Fee.t
+      ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; receivers :
+          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; amount : Currency.Amount.t
+      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; memo : Signed_command_memo.t
+      ; new_snapp_account : bool
+      ; snapp_update : Party.Update.t
+      ; current_auth : Permissions.Auth_required.t
+      ; sequence_events : Tick.Field.t array list
+      ; events : Tick.Field.t array list
+      ; call_data : Tick.Field.t
+      }
+    [@@deriving sexp]
+  end
+
+  val deploy_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Spec.t
+    -> Parties.t
+
+  val update_state :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Spec.t
+    -> (Parties.t * (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t)
+       Async.Deferred.t
+
+  val create_trivial_predicate_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
+    -> Transaction_logic.For_tests.Transaction_spec.t
+    -> Ledger.t
+    -> Parties.t Async.Deferred.t
+
+  val multiple_transfers : Spec.t -> Parties.t
+end

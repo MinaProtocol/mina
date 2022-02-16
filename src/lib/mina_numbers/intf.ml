@@ -4,18 +4,8 @@ open Core_kernel
 open Fold_lib
 open Tuple_lib
 open Unsigned
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
+open Snark_params.Tick
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -62,9 +52,9 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
-  val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
-  val to_input_legacy : t -> (_, bool) Random_oracle.Input.Legacy.t
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -106,7 +96,7 @@ module type S_checked = sig
 
   val min : t -> t -> (t, _) Checked.t
 
-  val to_input : t -> Field.Var.t Random_oracle.Input.t
+  val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy :
     t -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t

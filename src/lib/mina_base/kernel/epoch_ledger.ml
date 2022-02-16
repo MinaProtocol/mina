@@ -27,7 +27,7 @@ module Value = struct
 end
 
 let to_input ({ hash; total_currency } : Value.t) =
-  Random_oracle_input.(
+  Random_oracle_input.Chunked.(
     append (field (hash :> Field.t)) (Amount.to_input total_currency))
 
 type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
@@ -41,7 +41,7 @@ let typ : (var, Value.t) Typ.t =
 
 let var_to_input ({ Poly.hash; total_currency } : var) =
   let total_currency = Amount.var_to_input total_currency in
-  Random_oracle_input.(
+  Random_oracle_input.Chunked.(
     append (field (Frozen_ledger_hash0.var_to_hash_packed hash)) total_currency)
 
 let if_ cond ~(then_ : (Frozen_ledger_hash0.var, Amount.var) Poly.t)

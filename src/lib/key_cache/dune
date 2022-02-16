@@ -2,6 +2,7 @@
  (name key_cache)
  (public_name key_cache)
  (libraries
+   logger
    core_kernel
    async_kernel
    error_json)

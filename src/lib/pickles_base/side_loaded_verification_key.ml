@@ -191,15 +191,15 @@ let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
   |> Array.concat
 
 let wrap_index_to_input (type gs f) (g : gs -> f array) t =
-  Random_oracle_input.field_elements (index_to_field_elements t ~g)
+  Random_oracle_input.Chunked.field_elements (index_to_field_elements t ~g)
 
 let width_size = Nat.to_int Width.Length.n
 
 let to_input (type a) ~(field_of_int : int -> a) :
-    (a * a, _) Poly.t -> a Random_oracle_input.t =
-  let open Random_oracle_input in
+    (a * a, _) Poly.t -> a Random_oracle_input.Chunked.t =
+  let open Random_oracle_input.Chunked in
   let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.t ->
+  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.Chunked.t ->
     let num_branches =
       packed
         (field_of_int (At_most.length step_data), Nat.to_int Max_branches.Log2.n)

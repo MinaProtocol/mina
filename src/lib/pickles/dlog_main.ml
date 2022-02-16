@@ -72,34 +72,6 @@ struct
       let absorb_shifted sponge (x : t Shifted_value.Type1.t) =
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
-
-    module Unpacked = struct
-      type t = Boolean.var list
-
-      type constant = bool list
-
-      let typ : (t, constant) Typ.t =
-        let typ = Typ.list ~length:Field.size_in_bits Boolean.typ in
-        let p_msb =
-          let test_bit x i = B.(shift_right x i land one = one) in
-          List.init Other_field.size_in_bits ~f:(test_bit Other_field.size)
-          |> List.rev
-        in
-        let check xs_lsb =
-          let open Bitstring_lib.Bitstring in
-          Snarky_backendless.Checked.all_unit
-            [ typ.check xs_lsb
-            ; make_checked (fun () ->
-                  Bitstring_checked.lt_value
-                    (Msb_first.of_list (List.rev xs_lsb))
-                    (Msb_first.of_list p_msb)
-                  |> Boolean.Assert.is_true)
-            ]
-        in
-        { typ with check }
-
-      let assert_equal t1 t2 = Field.(Assert.equal (project t1) (project t2))
-    end
   end
 
   let print_g lab (x, y) =
@@ -173,17 +145,8 @@ struct
 
   let squeeze_scalar sponge : Field.t SC.SC.t =
     (* No need to boolean constrain scalar challenges. *)
-    let pre =
-      lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge)
-    in
-    if debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"prechallenge %{sexp:Backend.Tock.Field.t}\n%!"
-              (read_var pre)) ;
-    SC.SC.create pre
+    SC.SC.create
+      (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
@@ -193,12 +156,8 @@ struct
           squeeze_scalar sponge)
     in
     let term_and_challenge (l, r) pre =
-      let left_term =
-        with_label "left_term" (fun () -> Scalar_challenge.endo_inv l pre)
-      in
-      let right_term =
-        with_label "right_term" (fun () -> Scalar_challenge.endo r pre)
-      in
+      let left_term = Scalar_challenge.endo_inv l pre in
+      let right_term = Scalar_challenge.endo r pre in
       ( Ops.add_fast left_term right_term
       , { Bulletproof_challenge.prechallenge = pre } )
     in
@@ -504,25 +463,19 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
-    with_label __LOC__ (fun () -> chal beta_0 beta_1) ;
-    with_label __LOC__ (fun () -> chal gamma_0 gamma_1) ;
-    with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
-    with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
+    chal beta_0 beta_1 ;
+    chal gamma_0 gamma_1 ;
+    scalar_chal alpha_0 alpha_1 ;
+    scalar_chal zeta_0 zeta_1
 
   let assert_eq_marlin
-      (m1 : (_, Field.t Pickles_types.Scalar_challenge.t) Plonk.Minimal.t)
+      (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:
-        (fun ({ inner = t1 } : _ Pickles_types.Scalar_challenge.t)
+        (fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
              ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
-
-  (*
-  type public_input =
-    | Boolean of Boolean.var
-    | Field of { value: Other_field.Packed.t; bit_length: int }
-     *)
 
   let incrementally_verify_proof (type b)
       (module Max_branching : Nat.Add.Intf with type n = b) ~step_widths
@@ -642,55 +595,18 @@ struct
 
            Then, in the other proof, we can witness the evaluations and check their correctness
            against "combined_inner_product" *)
-        let ( + ) = Ops.add_fast in
-        let sigma_comm_init, [ sigma_comm_last ] =
+        let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm (snd (Permuts_minus_1.add Nat.N1.n))
         in
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
-        let f_comm =
-          let poseidon =
-            let (pn :: ps) = Vector.rev m.coefficients_comm in
-            scale_fast
-              (Vector.fold ~init:pn ps ~f:(fun acc c ->
-                   c + Scalar_challenge.endo acc alpha))
-              plonk.poseidon_selector
-            |> Inner_curve.negate
-          in
-          print_g "poseidon" poseidon ;
-          let ( * ) s x = scale_fast x s in
-          let generic =
-            let coeffs = Vector.to_array m.coefficients_comm in
-            let (c0 :: cs) = plonk.generic in
-            Vector.foldi cs
-              ~init:(c0 * coeffs.(0))
-              ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
-          in
-          List.reduce_exn ~f:( + )
-            [ plonk.perm * sigma_comm_last
-            ; generic
-            ; poseidon
-            ; plonk.vbmul * m.mul_comm
-            ; plonk.complete_add * m.complete_add_comm
-            ; plonk.endomul * m.emul_comm
-            ; plonk.endomul_scalar * m.endomul_scalar_comm
-            ]
-        in
-        let chunked_t_comm =
-          let n = Array.length t_comm in
-          let res = ref t_comm.(n - 1) in
-          for i = n - 2 downto 0 do
-            res := t_comm.(i) + scale_fast !res plonk.zeta_to_srs_length
-          done ;
-          !res
-        in
         let ft_comm =
-          f_comm + chunked_t_comm
-          + Inner_curve.negate
-              (scale_fast chunked_t_comm plonk.zeta_to_domain_size)
+          with_label __LOC__ (fun () ->
+              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
+                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+                ~verification_key:m ~plonk ~alpha ~t_comm)
         in
-        print_g "chunked_t_comm" chunked_t_comm ;
         print_g "ft_comm" ft_comm ;
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

@@ -114,7 +114,7 @@ module type S = sig
 
     val gen : t Quickcheck.Generator.t
 
-    val to_input : t -> Field.t Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_bits : t -> bool list
 
@@ -122,7 +122,7 @@ module type S = sig
 
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
 
-    val var_to_input : var -> Field.Var.t Random_oracle.Input.t
+    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
     val empty : t
 

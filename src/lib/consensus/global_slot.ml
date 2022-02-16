@@ -37,7 +37,7 @@ let typ =
     ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : value) =
-  Array.reduce_exn ~f:Random_oracle.Input.append
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| T.to_input t.slot_number; Length.to_input t.slots_per_epoch |]
 
 let gen ~(constants : Constants.t) =
@@ -106,7 +106,7 @@ let diff ~(constants : Constants.t) (t : t) (other_epoch, other_slot) =
     - UInt32.(of_int @@ if compare other_slot slot > 0 then 1 else 0)
   in
   let old_slot =
-    (slot - other_slot) mod Length.to_uint32 constants.epoch_size
+    (slot - other_slot) mod Length.to_uint32 constants.slots_per_epoch
   in
   of_epoch_and_slot (old_epoch, old_slot) ~constants
 
@@ -119,7 +119,7 @@ module Checked = struct
     { slot_number; slots_per_epoch = constants.slots_per_epoch }
 
   let to_input (var : t) =
-    Array.reduce_exn ~f:Random_oracle.Input.append
+    Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
       [| T.Checked.to_input var.slot_number
        ; Length.Checked.to_input var.slots_per_epoch
       |]

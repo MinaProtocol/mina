@@ -16,7 +16,6 @@ module Transaction_with_witness : sig
   type t =
     { transaction_with_info : Ledger.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
-    ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness : Sparse_ledger.t
@@ -51,6 +50,9 @@ end) : sig
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -59,6 +61,9 @@ end) : sig
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
     -> registers_begin:Mina_state.Registers.Value.t option

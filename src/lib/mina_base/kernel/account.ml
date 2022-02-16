@@ -3,23 +3,9 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
+open Util
 open Snark_params
 open Tick
-
-[%%else]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Currency
 open Mina_numbers
 open Fold_lib
@@ -29,17 +15,23 @@ module Index = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving to_yojson, sexp]
+      module T = struct
+        type t = int [@@deriving to_yojson, sexp, hash, compare]
+      end
+
+      include T
 
       let to_latest = Fn.id
+
+      include Hashable.Make_binable (T)
     end
   end]
+
+  include Hashable.Make_binable (Stable.Latest)
 
   let to_int = Int.to_int
 
   let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
-
-  module Table = Int.Table
 
   module Vector = struct
     include Int
@@ -54,6 +46,10 @@ module Index = struct
   let to_bits ~ledger_depth t = List.init ledger_depth ~f:(Vector.get t)
 
   let of_bits = List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
+
+  let to_input ~ledger_depth x =
+    List.map (to_bits ~ledger_depth x) ~f:(fun b -> (field_of_bool b, 1))
+    |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
   let fold_bits ~ledger_depth t =
     { Fold.fold =
@@ -73,6 +69,10 @@ module Index = struct
     type var = Tick.Boolean.var list
 
     type value = Vector.t
+
+    let to_input x =
+      List.map x ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
+      |> List.to_array |> Random_oracle.Input.Chunked.packeds
 
     let typ ~ledger_depth : (var, value) Tick.Typ.t =
       Typ.transport
@@ -96,7 +96,7 @@ module Token_symbol = struct
 
         let max_length = 6
 
-        let check (x : t) = assert (String.length x < max_length)
+        let check (x : t) = assert (String.length x <= max_length)
 
         let t_of_sexp sexp =
           let res = t_of_sexp sexp in
@@ -177,7 +177,8 @@ module Token_symbol = struct
   let to_field (x : t) : Field.t =
     Field.project (Pickles_types.Vector.to_list (to_bits x))
 
-  let to_input (x : t) = Random_oracle_input.packed (to_field x, num_bits)
+  let to_input (x : t) =
+    Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
   [%%ifdef consensus_mechanism]
 
@@ -188,7 +189,7 @@ module Token_symbol = struct
       make_checked (fun () ->
           let _, _, actual_packed =
             Pickles.Scalar_challenge.to_field_checked' ~num_bits m
-              (Pickles_types.Scalar_challenge.create t)
+              (Kimchi_backend_common.Scalar_challenge.create t)
           in
           actual_packed)
     in
@@ -208,7 +209,7 @@ module Token_symbol = struct
       { Field.typ with check = range_check }
       ~there:to_field ~back:of_field
 
-  let var_to_input (x : var) = Random_oracle_input.packed (x, num_bits)
+  let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
 
@@ -315,7 +316,7 @@ module Binable_arg = struct
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
+        , Permissions.Stable.V2.t
         , Snapp_account.Stable.V2.t option
         , string )
         (* TODO: Cache the digest of this? *)
@@ -325,52 +326,6 @@ module Binable_arg = struct
       let to_latest = Fn.id
 
       let public_key (t : t) : key = t.public_key
-    end
-
-    module V1 = struct
-      type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t option
-        , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, hash, compare, yojson]
-
-      let to_latest
-          ({ public_key
-           ; token_id
-           ; token_permissions
-           ; balance
-           ; nonce
-           ; receipt_chain_hash
-           ; delegate
-           ; voting_for
-           ; timing
-           ; permissions
-           ; snapp
-           } :
-            t) : V2.t =
-        { public_key
-        ; token_id
-        ; token_permissions
-        ; token_symbol = ""
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing
-        ; permissions
-        ; snapp = Option.map ~f:Snapp_account.Stable.V1.to_latest snapp
-        ; snapp_uri = ""
-        }
     end
   end]
 end
@@ -417,46 +372,6 @@ module Stable = struct
     let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
-  end
-
-  module V1 = struct
-    type t = Binable_arg.Stable.V1.t
-    [@@deriving sexp, equal, hash, compare, yojson]
-
-    let check = Fn.id
-
-    [%%if not feature_snapps]
-
-    let check (t : t) =
-      let t = check t in
-      match t.snapp with
-      | None ->
-          t
-      | Some _ ->
-          failwith "Snapp accounts not supported"
-
-    [%%endif]
-
-    [%%if not feature_tokens]
-
-    let check (t : t) =
-      let t = check t in
-      if Token_id.equal Token_id.default t.token_id then t
-      else failwith "Token accounts not supported"
-
-    [%%endif]
-
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
-
-                let to_binable = check
-
-                let of_binable = check
-              end)
-
-    let to_latest = Binable_arg.Stable.V1.to_latest
   end
 end]
 
@@ -518,7 +433,7 @@ let hash_snapp_account_opt = function
    added below.
 *)
 let snapp_uri_non_preimage =
-  lazy (Random_oracle_input.field_elements [| Field.zero; Field.zero |])
+  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
 
 let hash_snapp_uri_opt (snapp_uri_opt : string option) =
   let input =
@@ -536,10 +451,8 @@ let hash_snapp_uri_opt (snapp_uri_opt : string option) =
               (* [Int.test_bit c j] *)
               bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
             done) ;
-        Array.reduce_exn ~f:Random_oracle_input.append
-          (Array.map bits ~f:(fun b ->
-               Random_oracle_input.packed
-                 ((if b then Field.one else Field.zero), 1)))
+        Random_oracle_input.Chunked.packeds
+          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
     | None ->
         Lazy.force snapp_uri_non_preimage
   in
@@ -551,9 +464,8 @@ let hash_snapp_uri (snapp_uri : string) = hash_snapp_uri_opt (Some snapp_uri)
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  (*   let bits conv = f (Fn.compose bitstring conv) in *)
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
@@ -703,32 +615,29 @@ module Checked = struct
 
   let to_input (t : var) =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let open Random_oracle.Input in
-    make_checked (fun () ->
-        List.reduce_exn ~f:append
-          (Poly.Fields.fold ~init:[]
-             ~snapp:(f (fun (x, _) -> field x))
-             ~permissions:(f Permissions.Checked.to_input)
-             ~public_key:(f Public_key.Compressed.Checked.to_input)
-             ~token_id:
-               (* We use [run_checked] here to avoid routing the [Checked.t]
-                  monad throughout this calculation.
-               *)
-               (f Token_id.Checked.to_input)
-             ~token_symbol:(f Token_symbol.var_to_input)
-             ~token_permissions:(f Token_permissions.var_to_input)
-             ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
-             ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-             ~delegate:(f Public_key.Compressed.Checked.to_input)
-             ~voting_for:(f State_hash.var_to_input)
-             ~timing:(f Timing.var_to_input)
-             ~snapp_uri:(f Data_as_hash.to_input)))
+    let open Random_oracle.Input.Chunked in
+    List.reduce_exn ~f:append
+      (Poly.Fields.fold ~init:[]
+         ~snapp:(f (fun (x, _) -> field x))
+         ~permissions:(f Permissions.Checked.to_input)
+         ~public_key:(f Public_key.Compressed.Checked.to_input)
+         ~token_id:
+           (* We use [run_checked] here to avoid routing the [Checked.t]
+              monad throughout this calculation.
+           *)
+           (f Token_id.Checked.to_input)
+         ~token_symbol:(f Token_symbol.var_to_input)
+         ~token_permissions:(f Token_permissions.var_to_input)
+         ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
+         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+         ~delegate:(f Public_key.Compressed.Checked.to_input)
+         ~voting_for:(f State_hash.var_to_input)
+         ~timing:(f Timing.var_to_input) ~snapp_uri:(f Data_as_hash.to_input))
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix
-            (pack_input (Run.run_checked (to_input t)))))
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))))
 
   let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
 
@@ -897,8 +806,17 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
             |> to_int64 |> UInt64.of_int64)
         in
         let vesting_decrement =
-          UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
-          |> Amount.of_uint64
+          let vesting_increment = Amount.to_uint64 vesting_increment in
+          if
+            try
+              UInt64.(compare Infix.(max_int / num_periods) vesting_increment)
+              < 0
+            with Division_by_zero -> false
+          then
+            (* The vesting decrement will overflow, use [max_int] instead. *)
+            UInt64.max_int |> Amount.of_uint64
+          else
+            UInt64.Infix.(num_periods * vesting_increment) |> Amount.of_uint64
         in
         match Balance.(min_balance_past_cliff - vesting_decrement) with
         | None ->
@@ -950,11 +868,7 @@ let gen_with_constrained_balance ~low ~high =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
-  let%map balance =
-    Currency.Balance.gen_incl
-      (Currency.Balance.of_int low)
-      (Currency.Balance.of_int high)
-  in
+  let%map balance = Currency.Balance.gen_incl low high in
   create (Account_id.create public_key token_id) balance
 
 let gen_timed =

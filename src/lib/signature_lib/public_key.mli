@@ -1,18 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -20,8 +10,7 @@ include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, compare, equal, hash, yojson, version]
+    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
   end
 
   module Latest = V1
@@ -66,6 +55,8 @@ module Compressed : sig
       type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
+
+      include Hashable.S_binable with type t := t
     end
 
     module Latest = V1
@@ -81,7 +72,7 @@ module Compressed : sig
 
   val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
-  val to_input : t -> Field.t Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_string : t -> string
 
@@ -105,7 +96,7 @@ module Compressed : sig
     val to_input_legacy :
       var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    val to_input : var -> Field.Var.t Random_oracle.Input.t
+    val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 

@@ -40,16 +40,21 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; protocol_state; memo } ->
+  | Parties { fee_payer; other_parties; memo } ->
       with_return (fun { return } ->
-          let commitment =
-            let other_parties_hash =
-              Parties.Party_or_stack.With_hashes.stack_hash other_parties
-            in
+          let other_parties_hash = Parties.Call_forest.hash other_parties in
+          let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest protocol_state)
+                (Snapp_predicate.Protocol_state.digest
+                   fee_payer.data.body.protocol_state)
               ~memo_hash:(Signed_command_memo.hash memo)
+          in
+          let full_tx_commitment =
+            Parties.Transaction_commitment.with_fee_payer tx_commitment
+              ~fee_payer_hash:
+                (Party.Predicated.digest
+                   (Party.Predicated.of_fee_payer fee_payer.data))
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -58,30 +63,31 @@ let check :
             | Some pk ->
                 if
                   not
-                    (Signature_lib.Schnorr.Current.verify s
+                    (Signature_lib.Schnorr.Chunked.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
-                       (Random_oracle_input.field msg))
+                       (Random_oracle_input.Chunked.field msg))
                 then
                   return
                     (`Invalid_signature
                       [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization fee_payer.data.body.pk
-            (Parties.Transaction_commitment.with_fee_payer commitment
-               ~fee_payer_hash:
-                 (Party.Predicated.digest
-                    (Party.Predicated.of_fee_payer fee_payer.data))) ;
+          check_signature fee_payer.authorization fee_payer.data.body.public_key
+            full_tx_commitment ;
           let parties_with_hashes_list =
-            Parties.Party_or_stack.With_hashes.to_parties_with_hashes_list
+            Parties.Call_forest.With_hashes.to_parties_with_hashes_list
               other_parties
           in
           let valid_assuming =
             List.filter_map parties_with_hashes_list
               ~f:(fun ((p, vk_opt), at_party) ->
+                let commitment =
+                  if p.data.body.use_full_commitment then full_tx_commitment
+                  else tx_commitment
+                in
                 match p.authorization with
                 | Signature s ->
-                    check_signature s p.data.body.pk commitment ;
+                    check_signature s p.data.body.public_key commitment ;
                     None
                 | None_given ->
                     None
@@ -92,19 +98,18 @@ let check :
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
-                        Some
-                          ( vk
-                          , { Snapp_statement.Poly.transaction = commitment
-                            ; at_party
-                            }
-                          , pi ) ))
+                        let stmt =
+                          { Snapp_statement.Poly.transaction = commitment
+                          ; at_party
+                          }
+                        in
+                        Some (vk, stmt, pi) ))
           in
           let v =
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =
                   List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
-              ; protocol_state
               ; memo
               }
           in

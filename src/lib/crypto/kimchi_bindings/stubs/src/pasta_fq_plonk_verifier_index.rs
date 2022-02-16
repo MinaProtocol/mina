@@ -11,23 +11,14 @@ use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
+use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::index::{expr_linearization, VerifierIndex};
-use kimchi_circuits::expr::{Linearization, PolishToken};
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
-//
-// CamlPastaFqPlonkVerifierIndex
-//
-
 pub type CamlPastaFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFq, CamlFqSrs, CamlPolyComm<CamlGPallas>>;
-
-//
-// Handy conversion functions
-//
 
 impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
     fn from(vi: VerifierIndex<GAffine>) -> Self {
@@ -58,11 +49,12 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
-            linearization: vi.linearization.into(),
+            lookup_index: vi.lookup_index.map(Into::into),
         }
     }
 }
 
+// TODO: This should really be a TryFrom or TryInto
 impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
     fn from(index: CamlPastaFqPlonkVerifierIndex) -> Self {
         let evals = index.evals;
@@ -89,6 +81,9 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        // TODO chacha, dummy_lookup_value ?
+        let linearization = expr_linearization(domain, false, &None);
+
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
@@ -113,20 +108,14 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
-            linearization: index.linearization.into(),
+            lookup_index: index.lookup_index.map(Into::into),
+            linearization,
 
             fr_sponge_params: oracle::pasta::fq_3::params(),
             fq_sponge_params: oracle::pasta::fp_3::params(),
         }
     }
 }
-
-//
-// Serialization helpers
-//
 
 pub fn read_raw(
     offset: Option<ocaml::Int>,
@@ -145,9 +134,7 @@ pub fn read_raw(
         fq_sponge_params,
         fr_sponge_params,
     )
-    .map_err(|e| {
-        println!("{}", e);
-
+    .map_err(|_| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -155,7 +142,7 @@ pub fn read_raw(
 }
 
 //
-// Methods
+// OCaml methods
 //
 
 #[ocaml_gen::func]
@@ -166,7 +153,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_read(
     path: String,
 ) -> Result<CamlPastaFqPlonkVerifierIndex, ocaml::Error> {
     let mut vi = read_raw(offset, srs, path)?;
-    vi.linearization = expr_linearization(vi.domain, false, false, None);
+    vi.linearization = expr_linearization(vi.domain, false, &None);
     Ok(vi.into())
 }
 
@@ -179,8 +166,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 ) -> Result<(), ocaml::Error> {
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
-    index.to_file(path, append).map_err(|e| {
-        println!("{}", e);
+    index.to_file(path, append).map_err(|_| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -206,7 +192,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
 pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<CamlFq> {
     let domain = Domain::<Fq>::new(1 << log2_size).unwrap();
     let shifts = Shifts::new(&domain);
-
     shifts.shifts().iter().map(Into::into).collect()
 }
 
@@ -244,7 +229,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
-        linearization: Linearization::<Vec<PolishToken<Fq>>>::default().into(),
+        lookup_index: None,
     }
 }
 

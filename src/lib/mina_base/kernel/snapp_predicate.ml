@@ -5,18 +5,10 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module A = Account
 open Mina_numbers
 open Currency
@@ -41,7 +33,7 @@ module Closed_interval = struct
     else { lower = a2; upper = a1 }
 
   let to_input { lower; upper } ~f =
-    Random_oracle_input.append (f lower) (f upper)
+    Random_oracle_input.Chunked.append (f lower) (f upper)
 
   let typ x =
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -62,8 +54,8 @@ module Numeric = struct
       ; to_string : 'a -> string
       ; equal : 'a -> 'a -> bool
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> F.t Random_oracle_input.t
-      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
       }
 
@@ -230,14 +222,14 @@ module Eq_data = struct
       ; equal_checked : 'var -> 'var -> Boolean.var
       ; default : 'a
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> F.t Random_oracle_input.t
-      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       }
 
     let run f x y = Impl.run_checked (f x y)
 
     let field =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Field.
         { typ
         ; equal
@@ -248,7 +240,7 @@ module Eq_data = struct
         }
 
     let sequence_state =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       lazy
         Field.
           { typ
@@ -260,13 +252,13 @@ module Eq_data = struct
           }
 
     let boolean =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Boolean.
         { typ
         ; equal = Bool.equal
         ; equal_checked = run equal
         ; default = false
-        ; to_input = (fun b -> packed ((if b then F.one else F.zero), 1))
+        ; to_input = (fun b -> packed (field_of_bool b, 1))
         ; to_input_checked =
             (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1))
         }
@@ -573,6 +565,8 @@ module Account = struct
     ; proved_state = Ignore
     }
 
+  let is_accept : t -> bool = equal accept
+
   let to_input
       ({ balance
        ; nonce
@@ -584,7 +578,7 @@ module Account = struct
        ; proved_state
        } :
         t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
@@ -623,7 +617,7 @@ module Account = struct
          ; proved_state
          } :
           t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Numeric.(Checked.to_input Tc.balance balance)
         ; Numeric.(Checked.to_input Tc.nonce nonce)
@@ -776,7 +770,7 @@ end
 
 module Protocol_state = struct
   (* On each numeric field, you may assert a range
-      On each hash field, you may assert an equality
+     On each hash field, you may assert an equality
   *)
 
   module Epoch_data = struct
@@ -830,7 +824,7 @@ module Protocol_state = struct
          ; epoch_length
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
@@ -859,7 +853,7 @@ module Protocol_state = struct
            ; epoch_length
            } :
             t) =
-        let open Random_oracle.Input in
+        let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
           ; Numeric.(Checked.to_input Tc.amount total_currency)
@@ -934,10 +928,9 @@ module Protocol_state = struct
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let%bind snarked_ledger_hash = Hash.gen Frozen_ledger_hash.gen in
-    let%bind snarked_next_available_token =
-      Numeric.gen Token_id.gen Token_id.compare
-    in
+    (* TODO: pass in ledger hash, next available token *)
+    let snarked_ledger_hash = Snapp_basic.Or_ignore.Ignore in
+    let snarked_next_available_token = Snapp_basic.Or_ignore.Ignore in
     let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
@@ -991,7 +984,7 @@ module Protocol_state = struct
        ; next_epoch_data
        } :
         t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
@@ -1084,7 +1077,7 @@ module Protocol_state = struct
          ; next_epoch_data
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
@@ -1362,7 +1355,7 @@ module Account_type = struct
         assert false
 
   let to_input x =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     Array.reduce_exn ~f:append
       (Array.of_list_map (to_bits x) ~f:(fun b -> packed (field_of_bool b, 1)))
 
@@ -1370,7 +1363,7 @@ module Account_type = struct
     type t = { user : Boolean.var; snapp : Boolean.var } [@@deriving hlist]
 
     let to_input { user; snapp } =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Array.reduce_exn ~f:append
         (Array.map [| user; snapp |] ~f:(fun b ->
              packed ((b :> Field.Var.t), 1)))
@@ -1471,7 +1464,7 @@ module Other = struct
       Poly.Stable.Latest.t
 
     let to_input ({ predicate; account_transition; account_vk } : t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Account.Checked.to_input predicate
         ; Transition.to_input ~f:Account_state.Checked.to_input
@@ -1481,7 +1474,7 @@ module Other = struct
   end
 
   let to_input ({ predicate; account_transition; account_vk } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.to_input predicate
       ; Transition.to_input ~f:Account_state.to_input account_transition
@@ -1562,7 +1555,7 @@ module Digested = F
 
 let to_input
     ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-  let open Random_oracle_input in
+  let open Random_oracle_input.Chunked in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
     ; Other.to_input other
@@ -1628,7 +1621,7 @@ module Checked = struct
 
   let to_input
       ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.Checked.to_input self_predicate
       ; Other.Checked.to_input other

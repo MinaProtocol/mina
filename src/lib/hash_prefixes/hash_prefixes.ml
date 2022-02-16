@@ -87,6 +87,8 @@ let party = create "MinaParty"
 
 let party_cons = create "MinaPartyCons"
 
+let party_node = create "MinaPartyNode"
+
 let party_with_protocol_state_predicate = create "MinaPartyStatePred"
 
 let snapp_uri = create "MinaSnappUri"
@@ -98,3 +100,5 @@ let snapp_events = create "MinaSnappEvents"
 let snapp_sequence_events = create "MinaSnappSeqEvents"
 
 let snapp_memo = create "MinaSnappMemo"
+
+let snapp_test = create "MinaSnappTest"

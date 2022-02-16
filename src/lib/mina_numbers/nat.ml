@@ -4,10 +4,9 @@ open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
+open Snark_bits
 
 [%%ifdef consensus_mechanism]
-
-open Snark_bits
 
 module Make_checked
     (N : Unsigned_extended.S)
@@ -19,7 +18,8 @@ struct
 
   let () = assert (Int.(N.length_in_bits < Field.size_in_bits))
 
-  let to_input (t : var) = Random_oracle.Input.packed (t, N.length_in_bits)
+  let to_input (t : var) =
+    Random_oracle.Input.Chunked.packed (t, N.length_in_bits)
 
   let to_input_legacy (t : var) =
     let to_bits (t : var) =
@@ -39,7 +39,7 @@ struct
   let range_check' (t : var) =
     let _, _, actual_packed =
       Pickles.Scalar_challenge.to_field_checked' ~num_bits:N.length_in_bits m
-        (Pickles_types.Scalar_challenge.create t)
+        (Kimchi_backend_common.Scalar_challenge.create t)
     in
     actual_packed
 
@@ -181,11 +181,9 @@ struct
   let zero = Field.Var.constant Field.zero
 end
 
-[%%else]
-
-open Snark_bits_nonconsensus
-
 [%%endif]
+
+open Snark_params.Tick
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]
@@ -225,8 +223,8 @@ struct
   let of_bits = Bits.of_bits
 
   let to_input (t : t) =
-    Random_oracle.Input.packed
-      (Snark_params.Tick.Field.project (to_bits t), N.length_in_bits)
+    Random_oracle.Input.Chunked.packed
+      (Field.project (to_bits t), N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 

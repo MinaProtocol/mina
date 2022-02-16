@@ -109,7 +109,7 @@ module Checked = struct
   let if_ = T.Checked.if_
 
   module Assert = struct
-    let equal x y = T.Checked.Assert.equal x y
+    let equal = T.Checked.Assert.equal
   end
 
   let ( = ) = T.Checked.( = )

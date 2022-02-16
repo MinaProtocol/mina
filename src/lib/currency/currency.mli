@@ -46,7 +46,7 @@ module Fee : sig
       with type magnitude := t
        and type magnitude_var := var
        and type signed_fee := (t, Sgn.t) Signed_poly.t
-       and type Checked.signed_fee_var := var Signed_var.t
+       and type Checked.signed_fee_var := Field.Var.t Signed_var.t
 
   [%%else]
 
@@ -151,7 +151,14 @@ module Balance : sig
 
   val add_amount : t -> Amount.t -> t option
 
+  val add_amount_flagged : t -> Amount.t -> t * [ `Overflow of bool ]
+
   val sub_amount : t -> Amount.t -> t option
+
+  val sub_amount_flagged : t -> Amount.t -> t * [ `Underflow of bool ]
+
+  val add_signed_amount_flagged :
+    t -> Amount.Signed.t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> Amount.t -> t option
 

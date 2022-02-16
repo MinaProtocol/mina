@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-module SC = Pickles_types.Scalar_challenge
+module SC = Scalar_challenge
 
 (* Implementation of the algorithm described on page 29 of the Halo paper
    https://eprint.iacr.org/2019/1021.pdf
@@ -232,12 +232,6 @@ struct
           ref G.(p + p))
     in
     let n_acc = ref Field.zero in
-    (*
-    let check_zero () =
-      as_prover (fun () -> 
-          if not (Field.Constant.(equal zero) (As_prover.read_var (Lazy.force zero)))
-          s_prover.read_var
-    *)
     let mk f = exists Field.typ ~compute:f in
     let rounds_rev = ref [] in
     for i = 0 to rows - 1 do

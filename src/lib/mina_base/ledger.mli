@@ -223,12 +223,14 @@ val apply_parties_unchecked :
   -> t
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
-     * ( ( (Party.t, unit) Parties.Party_or_stack.t list
+     * ( ( (Party.t, unit) Parties.Call_forest.t
+         , (Party.t, unit) Parties.Call_forest.t list
          , Token_id.t
          , Currency.Amount.t
          , t
          , bool
-         , unit )
+         , unit
+         , Transaction_status.Failure.t option )
          Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t

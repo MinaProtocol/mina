@@ -17,13 +17,13 @@ module type Bindings = sig
 
   val to_string : t -> string
 
-  val of_numeral : bytes -> int -> int -> t
+  val of_numeral : string -> int -> int -> t
 
-  val of_decimal_string : bytes -> t
+  val of_decimal_string : string -> t
 
-  val to_bytes : t -> bytes
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : bytes -> t
+  val of_bytes : Bytes.t -> t
 end
 
 module type Intf = sig
@@ -41,8 +41,6 @@ module type Intf = sig
 
   val of_hex_string : ?reverse:bool -> string -> t
 
-  val of_decimal_string : string -> t
-
   val of_numeral : string -> base:int -> t
 end
 
@@ -57,8 +55,6 @@ module Make
   let bytes_per_limb = bytes_per_limb ()
 
   let length_in_bytes = num_limbs * bytes_per_limb
-
-  let of_decimal_string x = Bytes.of_string x |> of_decimal_string
 
   let to_hex_string t =
     let data = to_bytes t in
@@ -78,7 +74,7 @@ module Make
       String.init length_in_bytes ~f:(fun _ -> Char.of_int_exn (Random.int 255))
     in
     let h = "0x" ^ Hex.encode bytes in
-    [%test_eq: string] h (to_hex_string (of_hex_string h))
+    [%test_eq: string] h (String.lowercase (to_hex_string (of_hex_string h)))
 
   let t_of_sexp s = of_hex_string (String.t_of_sexp s)
 
@@ -114,7 +110,5 @@ module Make
       of_bytes bytes
   end)
 
-  let of_numeral s ~base =
-    let s = Bytes.of_string s in
-    of_numeral s (Bytes.length s) base
+  let of_numeral s ~base = of_numeral s (String.length s) base
 end

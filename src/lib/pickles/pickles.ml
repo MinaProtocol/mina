@@ -32,7 +32,7 @@ module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Pairing_main = Pairing_main
 
-let profile_constraints = true
+let profile_constraints = false
 
 let verify = Verify.verify
 
@@ -982,11 +982,7 @@ let%test_module "test no side-loaded" =
   ( module struct
     let () = Tock.Keypair.set_urs_info []
 
-    (*         [ On_disk { directory = "/tmp/"; should_write = true } ] *)
-
     let () = Tick.Keypair.set_urs_info []
-
-    (*         [ On_disk { directory = "/tmp/"; should_write = true } ] *)
 
     open Impls.Step
 

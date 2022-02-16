@@ -1,22 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
-
 open Currency
 open Mina_numbers
 
@@ -107,24 +93,6 @@ let to_record t =
         ; vesting_increment
         }
 
-let to_bits t =
-  let As_record.
-        { is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; cliff_amount
-        ; vesting_period
-        ; vesting_increment
-        } =
-    to_record t
-  in
-  is_timed
-  :: ( Balance.to_bits initial_minimum_balance
-     @ Global_slot.to_bits cliff_time
-     @ Amount.to_bits cliff_amount
-     @ Global_slot.to_bits vesting_period
-     @ Amount.to_bits vesting_increment )
-
 let to_input t =
   let As_record.
         { is_timed
@@ -136,7 +104,7 @@ let to_input t =
         } =
     to_record t
   in
-  let open Random_oracle_input in
+  let open Random_oracle_input.Chunked in
   Array.reduce_exn ~f:append
     [| packed ((if is_timed then Field.one else Field.zero), 1)
      ; Balance.to_input initial_minimum_balance
@@ -160,7 +128,7 @@ let var_to_input
       ; vesting_period
       ; vesting_increment
       } =
-  let open Random_oracle_input in
+  let open Random_oracle_input.Chunked in
   Array.reduce_exn ~f:append
     [| packed ((is_timed :> Field.Var.t), 1)
      ; Balance.var_to_input initial_minimum_balance
@@ -169,30 +137,6 @@ let var_to_input
      ; Global_slot.Checked.to_input vesting_period
      ; Amount.var_to_input vesting_increment
     |]
-
-(* TODO
-let var_to_bits
-    As_record.
-      { is_timed
-      ; initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment
-      } =
-  let open Bitstring_lib.Bitstring.Lsb_first in
-  let ( @| ) f x = Checked.map x ~f in
-  let%map initial_minimum_balance =
-    to_list @| Balance.var_to_bits initial_minimum_balance
-  and cliff_amount = to_list @| Amount.var_to_bits cliff_amount
-  and vesting_increment = to_list @| Amount.var_to_bits vesting_increment in
-  let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
-  let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
-  of_list
-    ( is_timed
-    :: ( initial_minimum_balance @ cliff_time @ cliff_amount @ vesting_period
-       @ vesting_increment ) )
-*)
 
 let var_of_t (t : t) : var =
   let As_record.

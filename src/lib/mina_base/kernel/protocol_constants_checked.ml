@@ -1,18 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 module T = Mina_numbers.Length
 
 (*constants actually required for blockchain snark*)
@@ -78,7 +67,7 @@ let t_of_value (v : value) : Genesis_constants.Protocol.t =
   }
 
 let to_input (t : value) =
-  Array.reduce_exn ~f:Random_oracle.Input.append
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| T.to_input t.k
      ; T.to_input t.delta
      ; T.to_input t.slots_per_epoch
@@ -112,7 +101,7 @@ let var_to_input (var : var) =
   let genesis_state_timestamp =
     Block_time.Checked.to_input var.genesis_state_timestamp
   in
-  Array.reduce_exn ~f:Random_oracle.Input.append
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| k
      ; delta
      ; slots_per_epoch

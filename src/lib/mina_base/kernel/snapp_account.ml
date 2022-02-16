@@ -1,23 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Snapp_basic
 
 module Events = struct
@@ -48,7 +32,7 @@ module Events = struct
 
   let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
-  let to_input (x : t) = Random_oracle_input.field (hash x)
+  let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 
   [%%ifdef consensus_mechanism]
 
@@ -168,28 +152,6 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
-
-  module V1 = struct
-    type t =
-      ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V2.t
-        , F.Stable.V1.t )
-        With_hash.Stable.V1.t
-        option )
-      Poly.Stable.V1.t
-    [@@deriving sexp, equal, compare, hash, yojson]
-
-    let to_latest ({ app_state; verification_key } : t) : V2.t =
-      { app_state
-      ; verification_key
-      ; snapp_version = Mina_numbers.Snapp_version.zero
-      ; sequence_state =
-          (let empty = Lazy.force Sequence_events.empty_hash in
-           [ empty; empty; empty; empty; empty ])
-      ; last_sequence_slot = Mina_numbers.Global_slot.zero
-      ; proved_state = false
-      }
-  end
 end]
 
 open Pickles_types
@@ -214,9 +176,11 @@ module Checked = struct
     Poly.t
 
   let to_input' (t : _ Poly.t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
       ~snapp_version:
@@ -225,7 +189,8 @@ module Checked = struct
       ~last_sequence_slot:
         (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
       ~proved_state:
-        (f (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1)))
+        (f (fun (b : Boolean.var) ->
+             Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -276,9 +241,11 @@ let dummy_vk_hash =
   Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+  let app_state v =
+    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+  in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
       (f
@@ -288,7 +255,7 @@ let to_input (t : t) =
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
     ~proved_state:
-      (f (fun b -> packed ((if b then Field.one else Field.zero), 1)))
+      (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

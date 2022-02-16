@@ -19,7 +19,7 @@ module Time : sig
 
     val create : t -> t
 
-    val basic : logger:Logger_type.t -> t
+    val basic : logger:Logger.t -> t
 
     (** Override the time offset set by the [MINA_TIME_OFFSET] environment
         variable for all block time controllers.
@@ -32,7 +32,7 @@ module Time : sig
     (** Get the current time offset, either from the [MINA_TIME_OFFSET]
         environment variable, or as last set by [set_time_offset].
     *)
-    val get_time_offset : logger:Logger_type.t -> Time.Span.t
+    val get_time_offset : logger:Logger.t -> Time.Span.t
 
     (** Disallow setting the time offset. This should be run at every
         entrypoint which does not explicitly need to update the time offset.
@@ -65,7 +65,7 @@ module Time : sig
        and type Packed.value = t
        and type Packed.var = private Tick.Field.Var.t
 
-  val to_input : t -> Tick.Field.t Random_oracle_input.t
+  val to_input : t -> Tick.Field.t Random_oracle_input.Chunked.t
 
   module Checked : sig
     open Snark_params.Tick
@@ -74,7 +74,7 @@ module Time : sig
 
     val typ : (t, Stable.Latest.t) Typ.t
 
-    val to_input : t -> Field.Var.t Random_oracle_input.t
+    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
     val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
@@ -142,16 +142,16 @@ module Time : sig
 
     val zero : t
 
-    val to_input : t -> Tick.Field.t Random_oracle_input.t
+    val to_input : t -> Tick.Field.t Random_oracle_input.Chunked.t
 
-    module rec Checked : sig
+    module Checked : sig
       type t
 
-      val typ : (Checked.t, Stable.V1.t) Snark_params.Tick.Typ.t
+      val typ : (t, Stable.V1.t) Snark_params.Tick.Typ.t
 
       open Snark_params.Tick
 
-      val to_input : t -> Tick.Field.Var.t Random_oracle_input.t
+      val to_input : t -> Tick.Field.Var.t Random_oracle_input.Chunked.t
 
       val to_field : t -> Field.Var.t
 

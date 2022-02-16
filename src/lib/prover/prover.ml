@@ -277,7 +277,7 @@ module Worker = struct
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create
@@ -294,6 +294,7 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
+  [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;

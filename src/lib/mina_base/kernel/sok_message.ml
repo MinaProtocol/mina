@@ -1,4 +1,5 @@
 open Core_kernel
+open Util
 open Import
 
 [%%versioned
@@ -41,10 +42,10 @@ module Digest = struct
       open Snark_params.Tick
 
       let to_input t =
-        Random_oracle.Input.packeds
+        Random_oracle.Input.Chunked.packeds
           (Array.of_list_map
              Fold_lib.Fold.(to_list (string_bits t))
-             ~f:(fun b -> ((if b then Field.one else Field.zero), 1)))
+             ~f:(fun b -> (field_of_bool b, 1)))
 
       let typ =
         Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ
@@ -59,7 +60,7 @@ module Digest = struct
     type t = Boolean.var array
 
     let to_input (t : t) =
-      Random_oracle.Input.packeds
+      Random_oracle.Input.Chunked.packeds
         (Array.map t ~f:(fun b -> ((b :> Field.Var.t), 1)))
   end
 

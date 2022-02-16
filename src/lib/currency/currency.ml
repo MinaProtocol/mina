@@ -1,19 +1,14 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_bits
+open Snark_params
+open Tick
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Bitstring_lib
-open Snark_params
-open Tick
 open Let_syntax
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
@@ -22,6 +17,8 @@ module Signed_poly = Signed_poly
 
 type uint64 = Unsigned.uint64
 
+[%%ifdef consensus_mechanism]
+
 module Signed_var = struct
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
@@ -29,6 +26,8 @@ module Signed_var = struct
   type nonrec 'mag t =
     { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
 end
+
+[%%endif]
 
 module Make (Unsigned : sig
   include Unsigned_extended.S
@@ -44,10 +43,10 @@ end) : sig
   include
     S
       with type t = Unsigned.t
-       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
        and type var = Field.Var.t
        and type Signed.var = Field.Var.t Signed_var.t
-       and type Signed.Checked.signed_fee_var := Field.Var.t Signed_var.t
+       and type Signed.signed_fee = (Unsigned.t, Sgn.t) Signed_poly.t
+       and type Signed.Checked.signed_fee_var = Field.Var.t Signed_var.t
 
   val pack_var : var -> Field.Var.t
 
@@ -167,7 +166,8 @@ end = struct
 
   let var_to_bits t = var_to_bits_ t >>| Bitstring.Lsb_first.of_list
 
-  let var_to_input (t : var) = Random_oracle.Input.packed (t, length_in_bits)
+  let var_to_input (t : var) =
+    Random_oracle.Input.Chunked.packed (t, length_in_bits)
 
   let var_to_input_legacy (t : var) =
     var_to_bits_ t >>| Random_oracle.Input.Legacy.bitstring
@@ -183,7 +183,7 @@ end = struct
     make_checked (fun () ->
         let _, _, actual_packed =
           Pickles.Scalar_challenge.to_field_checked' ~num_bits:length_in_bits m
-            (Pickles_types.Scalar_challenge.create t)
+            (Kimchi_backend_common.Scalar_challenge.create t)
         in
         actual_packed)
 
@@ -215,6 +215,10 @@ end = struct
 
   let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
+  let sub_flagged x y =
+    let z = Unsigned.sub x y in
+    (z, `Underflow (x < y))
+
   let add x y =
     let z = Unsigned.add x y in
     if z < x then None else Some z
@@ -222,6 +226,15 @@ end = struct
   let add_flagged x y =
     let z = Unsigned.add x y in
     (z, `Overflow (z < x))
+
+  let add_signed_flagged x y =
+    match y.Signed_poly.sgn with
+    | Sgn.Pos ->
+        let z, `Overflow b = add_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
+    | Sgn.Neg ->
+        let z, `Underflow b = sub_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
 
   let scale u64 i =
     let i = Unsigned.of_int i in
@@ -235,7 +248,8 @@ end = struct
   type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
   let to_input (t : t) =
-    Random_oracle.Input.packed (Field.project (to_bits t), length_in_bits)
+    Random_oracle.Input.Chunked.packed
+      (Field.project (to_bits t), length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring @@ to_bits t
 
@@ -295,7 +309,7 @@ end = struct
     let to_bits ({ sgn; magnitude } : t) = sgn_to_bool sgn :: to_bits magnitude
 
     let to_input { sgn; magnitude } =
-      Random_oracle.Input.(
+      Random_oracle.Input.Chunked.(
         append (to_input magnitude)
           (packed (Field.project [ sgn_to_bool sgn ], 1)))
 
@@ -347,6 +361,8 @@ end = struct
     let of_fee = Fn.id
 
     [%%ifdef consensus_mechanism]
+
+    type signed_fee = t
 
     let magnitude_to_field = to_field
 
@@ -403,6 +419,8 @@ end = struct
     module Checked = struct
       type t = var
 
+      type signed_fee_var = t
+
       let repr_value ({ magnitude; sgn } : repr) =
         Field.Checked.mul magnitude (sgn :> Field.Var.t)
 
@@ -439,7 +457,7 @@ end = struct
       let to_input t =
         let%map { magnitude; sgn } = repr t in
         let mag = var_to_input magnitude in
-        Random_oracle.Input.(
+        Random_oracle.Input.Chunked.(
           append mag (packed ((Sgn.Checked.is_pos sgn :> Field.Var.t), 1)))
 
       let to_input_legacy t =
@@ -568,11 +586,6 @@ end = struct
       res
 
     let sub_flagged x y =
-      let%bind z = seal (Field.Var.sub x y) in
-      let%map no_underflow = range_check_flag z in
-      (z, `Underflow (Boolean.not no_underflow))
-
-    let sub_or_zero x y =
       make_checked (fun () ->
           let open Tick.Run in
           let res = Pickles.Util.seal Tick.m Field.(x - y) in
@@ -591,7 +604,13 @@ end = struct
           let underflow =
             Boolean.( &&& ) y_gte_x (Boolean.not (Field.equal x y))
           in
-          Field.if_ underflow ~then_:Field.zero ~else_:res)
+          (res, `Underflow underflow))
+
+    let sub_or_zero x y =
+      let%bind res, `Underflow underflow = sub_flagged x y in
+      Tick.Field.Checked.if_ underflow
+        ~then_:Tick.Field.(Var.constant zero)
+        ~else_:res
 
     let assert_equal x y = Field.Checked.Assert.equal x y
 
@@ -879,7 +898,13 @@ module Balance = struct
 
   let add_amount = Amount.add
 
+  let add_amount_flagged = Amount.add_flagged
+
   let sub_amount = Amount.sub
+
+  let sub_amount_flagged = Amount.sub_flagged
+
+  let add_signed_amount_flagged = Amount.add_signed_flagged
 
   let ( + ) = add_amount
 
@@ -957,6 +982,10 @@ module Fee_rate = struct
     (z, `Overflow (check_q z))
 
   let sub x y = of_q @@ Q.sub x y
+
+  let sub_flagged x y =
+    let z = Q.sub x y in
+    (z, `Underflow (check_q z))
 
   let mul x y = of_q @@ Q.mul x y
 

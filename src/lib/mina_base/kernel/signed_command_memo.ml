@@ -3,17 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-module Tick = Snark_params.Tick
-
-[%%else]
-
-module Tick = Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
+open Snark_params
 
 [%%versioned
 module Stable = struct
@@ -166,7 +156,7 @@ let gen =
     ~f:create_by_digesting_string_exn
 
 let hash memo =
-  Random_oracle.Legacy.hash ~init:Hash_prefix.snapp_memo
+  Random_oracle.hash ~init:Hash_prefix.snapp_memo
     (Random_oracle.Legacy.pack_input
        (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 

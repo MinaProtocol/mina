@@ -5,64 +5,41 @@ module Breadcrumb = Transition_frontier.Breadcrumb
 
 (* TODO: We should be able to fully deserialize and serialize via json *)
 
-module Transition_frontier = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        | Breadcrumb_added of
-            { block :
-                ( External_transition.Stable.V2.t
-                , State_hash.Stable.V1.t )
-                With_hash.Stable.V1.t
-            ; sender_receipt_chains_from_parent_ledger :
-                (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
-            }
-        | Root_transitioned of
-            Transition_frontier.Diff.Root_transition.Lite.Stable.V2.t
-        | Bootstrap of { lost_blocks : State_hash.Stable.V1.t list }
+(* these types are serialized for communication between the daemon and archive node,
+   which should be compiled with the same sources
 
-      let to_latest = Fn.id
-    end
-  end]
+   the RPC is itself not versioned, so these types do not need to be versioned
+*)
+
+module Transition_frontier = struct
+  type t =
+    | Breadcrumb_added of
+        { block :
+            ( External_transition.Stable.Latest.t
+            , State_hash.Stable.Latest.t )
+            With_hash.Stable.Latest.t
+        ; sender_receipt_chains_from_parent_ledger :
+            (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            list
+        }
+    | Root_transitioned of
+        Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
+    | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
+  [@@deriving bin_io_unversioned]
 end
 
 module Transaction_pool = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        { added : User_command.Stable.V2.t list
-        ; removed : User_command.Stable.V2.t list
-        }
-
-      let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { added : User_command.Stable.V1.t list
-        ; removed : User_command.Stable.V1.t list
-        }
-
-      let to_latest (t : t) : V2.t =
-        { added = List.map t.added ~f:User_command.Stable.V1.to_latest
-        ; removed = List.map t.removed ~f:User_command.Stable.V1.to_latest
-        }
-    end
-  end]
+  type t =
+    { added : User_command.Stable.Latest.t list
+    ; removed : User_command.Stable.Latest.t list
+    }
+  [@@deriving bin_io_unversioned]
 end
 
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type t =
-      | Transition_frontier of Transition_frontier.Stable.V2.t
-      | Transaction_pool of Transaction_pool.Stable.V2.t
-
-    let to_latest = Fn.id
-  end
-end]
+type t =
+  | Transition_frontier of Transition_frontier.t
+  | Transaction_pool of Transaction_pool.t
+[@@deriving bin_io_unversioned]
 
 module Builder = struct
   let breadcrumb_added breadcrumb =

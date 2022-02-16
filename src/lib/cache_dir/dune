@@ -5,7 +5,7 @@
    ; opam deps
    async_kernel
    ; libs
-   logger_type
+   logger
    key_cache)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))

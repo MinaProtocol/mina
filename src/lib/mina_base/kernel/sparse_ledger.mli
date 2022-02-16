@@ -14,18 +14,6 @@ module Stable : sig
 
     val to_latest : t -> t
   end
-
-  module V1 : sig
-    type t =
-      ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
-      , Account.Stable.V1.t
-      , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving sexp, to_yojson]
-
-    val to_latest : t -> V2.t
-  end
 end]
 
 type sparse_ledger = t
@@ -62,19 +50,27 @@ val of_root : depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 *)
 val empty : depth:int -> unit -> t
 
-val apply_user_command_exn :
+val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
-  -> Signed_command.t
-  -> t
+  -> Signed_command.With_valid_signature.t
+  -> (t * Transaction_logic.Transaction_applied.Signed_command_applied.t)
+     Or_error.t
 
-val apply_transaction_exn :
+val apply_transaction' :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> t ref
+  -> Transaction.t
+  -> Transaction_logic.Transaction_applied.t Or_error.t
+
+val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
-  -> t
+  -> (t * Transaction_logic.Transaction_applied.t) Or_error.t
 
 (** Apply all parties within a parties transaction, accumulating the
     intermediate (global, local) state pairs, in order from first to last
@@ -88,12 +84,14 @@ val apply_parties_unchecked_with_states :
   -> Parties.t
   -> ( Transaction_logic.Transaction_applied.Parties_applied.t
      * ( Global_state.t
-       * ( (Party.t, unit) Parties.Party_or_stack.t list
+       * ( (Party.t, unit) Parties.Call_forest.t
+         , (Party.t, unit) Parties.Call_forest.t list
          , Token_id.t
          , Currency.Amount.t
          , t
          , bool
-         , unit )
+         , unit
+         , Transaction_status.Failure.t option )
          Parties_logic.Local_state.t )
        list )
      Or_error.t

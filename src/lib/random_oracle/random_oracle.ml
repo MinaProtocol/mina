@@ -8,7 +8,7 @@ open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
-open Snark_params_nonconsensus
+open Snark_params.Tick
 
 [%%endif]
 
@@ -78,9 +78,6 @@ module Ocaml_permutation = Sponge.Poseidon (Inputs)
 
 [%%ifdef consensus_mechanism]
 
-module Permutation = Ocaml_permutation
-
-(* TODO
 module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
   module Field = Field
 
@@ -88,14 +85,14 @@ module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
 
   let copy = Ocaml_permutation.copy
 
-  let params = Marlin_plonk_bindings_pasta_fp_poseidon.create ()
+  let params = Kimchi_pasta_fp_poseidon.create ()
 
   let block_cipher _params (s : Field.t array) =
-    let v = Marlin_plonk_bindings_pasta_fp_vector.create () in
-    Array.iter s ~f:(Marlin_plonk_bindings_pasta_fp_vector.emplace_back v) ;
-    Marlin_plonk_bindings_pasta_fp_poseidon.block_cipher params v ;
-    Array.init (Array.length s) ~f:(Marlin_plonk_bindings_pasta_fp_vector.get v)
-end *)
+    let v = Kimchi.FieldVectors.Fp.create () in
+    Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
+    Kimchi_pasta_fp_poseidon.block_cipher params v ;
+    Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
+end
 
 [%%else]
 
@@ -110,9 +107,7 @@ let update ~state = update ~state params
 let hash ?init = hash ?init params
 
 let pow2 =
-  let rec pow2 acc n =
-    if n = 0 then acc else pow2 (Field.add acc acc) (n - 1)
-  in
+  let rec pow2 acc n = if n = 0 then acc else pow2 Field.(acc + acc) (n - 1) in
   Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
 
 [%%ifdef consensus_mechanism]
@@ -142,16 +137,26 @@ module Checked = struct
         hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
 
   let pack_input =
-    Input.pack_to_fields
+    Input.Chunked.pack_to_fields
       ~pow2:(Fn.compose Field.Var.constant pow2)
       (module Pickles.Impls.Step.Field)
 
   let digest xs = xs.(0)
 end
 
+let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
+  let open Pickles.Impls.Step in
+  let open As_prover in
+  { Input.Chunked.field_elements = Array.map ~f:(read Field.typ) field_elements
+  ; packeds = Array.map packeds ~f:(fun (x, i) -> (read Field.typ x, i))
+  }
+
+let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
+ fun _ x -> (x, read_typ input)
+
 [%%endif]
 
-let pack_input = Input.pack_to_fields ~pow2 (module Field)
+let pack_input = Input.Chunked.pack_to_fields ~pow2 (module Field)
 
 let prefix_to_field (s : string) =
   let bits_per_character = 8 in

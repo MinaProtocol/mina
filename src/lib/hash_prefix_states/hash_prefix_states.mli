@@ -1,17 +1,5 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 open Random_oracle
 
 val signature : Field.t State.t
@@ -65,6 +53,8 @@ val party : Field.t State.t
 
 val party_cons : Field.t State.t
 
+val party_node : Field.t State.t
+
 val party_with_protocol_state_predicate : Field.t State.t
 
 val receipt_chain_user_command : Field.t State.t
@@ -96,3 +86,5 @@ val snapp_events : Field.t State.t
 val snapp_sequence_events : Field.t State.t
 
 val snapp_memo : Field.t State.t
+
+val snapp_test : Field.t State.t

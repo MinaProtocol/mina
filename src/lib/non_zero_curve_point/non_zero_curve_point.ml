@@ -1,20 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_params.Tick
 
 [%%ifdef consensus_mechanism]
-
-open Snark_params.Tick
 
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 [%%else]
 
-open Snark_params_nonconsensus
-
 let parity y = Field.parity y
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -53,23 +48,28 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t
-      [@@deriving compare, equal, hash]
+      module T = struct
+        type t = (Field.t, bool) Poly.Stable.V1.t
+        [@@deriving equal, compare, hash]
 
-      (* dummy type for inserting constraint
-         adding constraint to t produces "unused rec" error
-      *)
-      type unused = unit constraint t = Arg.Stable.V1.t
+        (* dummy type for inserting constraint
+           adding constraint to t produces "unused rec" error
+        *)
+        type unused = unit constraint t = Arg.Stable.V1.t
 
-      let to_latest = Fn.id
+        let to_latest = Fn.id
 
-      module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
-      include Base58
+        module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
+        include Base58
 
-      (* sexp representation is a Base58Check string, like the yojson representation *)
-      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+        (* sexp representation is a Base58Check string, like the yojson representation *)
+        let sexp_of_t t = to_base58_check t |> Sexp.of_string
 
-      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+        let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+      end
+
+      include T
+      include Hashable.Make_binable (T)
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -117,7 +117,7 @@ module Compressed = struct
   let empty = Poly.{ x = Field.zero; is_odd = false }
 
   let to_input { Poly.x; is_odd } =
-    { Random_oracle.Input.field_elements = [| x |]
+    { Random_oracle.Input.Chunked.field_elements = [| x |]
     ; packeds = [| (Field.project [ is_odd ], 1) |]
     }
 
@@ -152,7 +152,7 @@ module Compressed = struct
       Boolean.(x_eq && odd_eq)
 
     let to_input ({ x; is_odd } : var) =
-      { Random_oracle.Input.field_elements = [| x |]
+      { Random_oracle.Input.Chunked.field_elements = [| x |]
       ; packeds = [| ((is_odd :> Field.Var.t), 1) |]
       }
 

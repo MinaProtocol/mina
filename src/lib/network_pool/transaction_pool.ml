@@ -48,12 +48,6 @@ module Diff_versioned = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
-
-      let to_latest : t -> V2.t = List.map ~f:User_command.Stable.V1.to_latest
-    end
   end]
 
   (* We defer do any checking on signed-commands until the call to
@@ -91,6 +85,9 @@ module Diff_versioned = struct
       end
     end]
 
+    (* IMPORTANT! Do not change the names of these errors as to adjust the
+     * to_yojson output without updating Rosetta's construction API to handle
+     * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
       | Invalid_signature
@@ -174,15 +171,6 @@ module Diff_versioned = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, yojson]
-
-        let to_latest (t : t) : V2.t =
-          List.map t ~f:(fun (cmd, err) ->
-              (User_command.Stable.V1.to_latest cmd, err))
       end
     end]
 
@@ -505,14 +493,6 @@ struct
                   ~cliff_amount ~vesting_period ~vesting_increment
                   ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
-
-    let check_command (t : User_command.t) : User_command.Valid.t option =
-      match t with
-      | Parties _ ->
-          failwith "TODO"
-      | Signed_command t ->
-          Option.map (Signed_command.check t) ~f:(fun x ->
-              User_command.Signed_command x)
 
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
@@ -1224,7 +1204,15 @@ struct
                                         Batcher.verify t.batcher
                                           { diffs with data = [ c ] }
                                       with
-                                      | Error _ ->
+                                      | Error e ->
+                                          [%log' error t.logger]
+                                            "Transaction verification error: \
+                                             $error"
+                                            ~metadata:
+                                              [ ( "error"
+                                                , `String
+                                                    (Error.to_string_hum e) )
+                                              ] ;
                                           None
                                       | Ok (Error invalid) ->
                                           [%log' error t.logger]
@@ -1787,10 +1775,9 @@ let%test_module _ =
         if n < Array.length test_keys then
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
-            let%bind protocol_state = Snapp_predicate.Protocol_state.gen in
             let%map (parties : Parties.t) =
               Mina_base.Snapp_generators.gen_parties_from ~succeed:true ~keymap
-                ~fee_payer_keypair ~ledger ~protocol_state
+                ~fee_payer_keypair ~ledger ()
             in
             User_command.Parties parties
           in

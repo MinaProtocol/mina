@@ -84,12 +84,6 @@ module Ledger_inner = struct
           | Not_owned _ ->
               false
       end
-
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
-
-        let to_latest = Account.Stable.V1.to_latest
-      end
     end]
 
     let empty = Stable.Latest.empty
@@ -426,7 +420,13 @@ let%test_unit "parties payment test" =
   let module L = Ledger_inner in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
-      let ts2 : Parties.t list = List.map specs ~f:party_send in
+      let ts2 : Parties.t list =
+        List.map specs ~f:(fun s ->
+            let use_full_commitment =
+              Quickcheck.random_value Bool.quickcheck_generator
+            in
+            party_send ~use_full_commitment s)
+      in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
               Init_ledger.init (module L) init_ledger l1 ;

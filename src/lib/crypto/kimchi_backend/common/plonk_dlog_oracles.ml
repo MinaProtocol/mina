@@ -37,7 +37,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   open Backend
 
-  let scalar_challenge t = Pickles_types.Scalar_challenge.create t
+  let scalar_challenge t = Scalar_challenge.create t
 
   let alpha (t : t) = t.o.alpha_chal
 

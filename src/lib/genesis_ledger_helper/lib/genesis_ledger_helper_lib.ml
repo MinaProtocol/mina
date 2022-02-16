@@ -60,6 +60,8 @@ module Accounts = struct
             ; set_snapp_uri
             ; edit_sequence_state
             ; set_token_symbol
+            ; increment_nonce
+            ; set_voting_for
             } ->
             let auth_required a =
               match a with
@@ -86,6 +88,8 @@ module Accounts = struct
             ; set_snapp_uri = auth_required set_snapp_uri
             ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
+            ; increment_nonce = auth_required increment_nonce
+            ; set_voting_for = auth_required set_voting_for
             }
       in
       let token_permissions =
@@ -242,6 +246,8 @@ module Accounts = struct
             ; set_snapp_uri
             ; edit_sequence_state
             ; set_token_symbol
+            ; increment_nonce
+            ; set_voting_for
             } =
           account.permissions
         in
@@ -256,6 +262,8 @@ module Accounts = struct
           ; set_snapp_uri = auth_required set_snapp_uri
           ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
+          ; increment_nonce = auth_required increment_nonce
+          ; set_voting_for = auth_required set_voting_for
           }
       in
       let snapp =

@@ -247,12 +247,12 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
         ; poseidon_selector = e0.poseidon_selector
-        ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index Vbmul))
+        ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index VarBaseMul))
         ; complete_add =
             Lazy.force (Hashtbl.find_exn index_terms (Index CompleteAdd))
-        ; endomul = Lazy.force (Hashtbl.find_exn index_terms (Index Endomul))
+        ; endomul = Lazy.force (Hashtbl.find_exn index_terms (Index EndoMul))
         ; endomul_scalar =
-            Lazy.force (Hashtbl.find_exn index_terms (Index EndomulScalar))
+            Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
         ; generic
         }

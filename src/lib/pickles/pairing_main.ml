@@ -1,9 +1,9 @@
 (* q > p *)
 open Core_kernel
+module SC = Scalar_challenge
 open Import
 open Util
 open Types.Pairing_based
-module SC = Scalar_challenge
 open Pickles_types
 open Common
 open Import
@@ -83,15 +83,6 @@ struct
         Sponge.absorb sponge (`Field x))
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(fun (x, (b : Boolean.var)) ->
-        if debug then
-          as_prover
-            As_prover.(
-              fun () ->
-                printf "absorb %s\n%!"
-                  Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x))) ;
-                printf "absorb %s\n%!"
-                  Backend.Tick.Bigint.R.(
-                    to_hex_string (of_field (read_var (b :> Field.t))))) ;
         Sponge.absorb sponge (`Field x) ;
         Sponge.absorb sponge (`Bits [ b ]))
       ~mask_g1_opt:(fun ((b : Boolean.var), (x, y)) ->
@@ -169,17 +160,8 @@ struct
 
   let squeeze_scalar sponge : Field.t SC.SC.t =
     (* No need to boolean constrain scalar challenges. *)
-    let pre =
-      lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge)
-    in
-    if debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            printf
-              !"prechallenge %{sexp:Backend.Tick.Field.t}\n%!"
-              (read_var pre)) ;
-    SC.SC.create pre
+    SC.SC.create
+      (lowest_128_bits ~constrain_low_bits:false (Sponge.squeeze sponge))
 
   let bullet_reduce sponge gammas =
     with_label __LOC__ (fun () ->
@@ -340,16 +322,16 @@ struct
   let assert_eq_deferred_values
       (m1 :
         ( 'a
-        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t)
       (m2 :
         ( Inputs.Impl.Field.t
-        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
-    let scalar_chal ({ SC.SC.inner = t1 } : _ Pickles_types.Scalar_challenge.t)
-        ({ SC.SC.inner = t2 } : _ Pickles_types.Scalar_challenge.t) =
+    let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
+        ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
     with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
@@ -421,56 +403,16 @@ struct
 
            Then, in the other proof, we can witness the evaluations and check their correctness
            against "combined_inner_product" *)
-        let sigma_comm_init, [ sigma_comm_last ] =
+        let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm
             (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
-        let ( + ) = Inner_curve.( + ) in
-        let f_comm =
-          let poseidon =
-            with_label __LOC__ (fun () ->
-                let (pn :: ps) = Vector.rev m.coefficients_comm in
-                scale_fast2
-                  (Vector.fold ~init:pn ps ~f:(fun acc c ->
-                       c + Scalar_challenge.endo acc alpha))
-                  plonk.poseidon_selector
-                |> Inner_curve.negate)
-          in
-          print_g "poseidon" poseidon ;
-          let ( * ) s x = scale_fast2 x s in
-          let generic =
-            let coeffs = Vector.to_array m.coefficients_comm in
-            let (c0 :: cs) = plonk.generic in
-            Vector.foldi cs
-              ~init:(c0 * coeffs.(0))
-              ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
-          in
-          List.reduce_exn ~f:( + )
-            [ plonk.perm * sigma_comm_last
-            ; generic
-            ; poseidon
-            ; plonk.vbmul * m.mul_comm
-            ; plonk.complete_add * m.complete_add_comm
-            ; plonk.endomul * m.emul_comm
-            ; plonk.endomul_scalar * m.endomul_scalar_comm
-            ]
-        in
-        let chunked_t_comm =
-          let n = Array.length t_comm in
-          let res = ref t_comm.(n - 1) in
-          for i = n - 2 downto 0 do
-            with_label __LOC__ (fun () ->
-                res := t_comm.(i) + scale_fast2 !res plonk.zeta_to_srs_length)
-          done ;
-          !res
-        in
         let ft_comm =
           with_label __LOC__ (fun () ->
-              f_comm + chunked_t_comm
-              + Inner_curve.negate
-                  (scale_fast2 chunked_t_comm plonk.zeta_to_domain_size))
+              Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast2
+                ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
+                ~verification_key:m ~plonk ~alpha ~t_comm)
         in
-        print_g "chunked_t_comm" chunked_t_comm ;
         print_g "ft_comm" ft_comm ;
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -1171,7 +1113,7 @@ struct
           (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
           ~f:(fun i c1 ->
             let c2 = bulletproof_challenges_actual.(i) in
-            let { Pickles_types.Scalar_challenge.inner = c1 } =
+            let { Import.Scalar_challenge.inner = c1 } =
               c1.Bulletproof_challenge.prechallenge
             in
             let c2 =

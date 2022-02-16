@@ -253,11 +253,21 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      in
+      and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+            let logrotate_max_size = 1024 * 10 in
+            let logrotate_num_rotate = 1 in
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+              ~processor:(Logger.Processor.raw ())
+              ~transport:
+                (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                   ~log_filename:"mina-snark-worker.log"
+                   ~max_size:logrotate_max_size
+                   ~num_rotate:logrotate_num_rotate)) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;

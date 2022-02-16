@@ -1,3 +1,28 @@
+(** A verification key for a pickles proof, whose contents are not fixed within
+    the verifier circuit.
+    This is used to verify a proof where the verification key is determined by
+    some other constraint, for example to use a verification key provided as
+    input to the circuit, or loaded from an account that was chosen based upon
+    the circuit inputs.
+
+    Here and elsewhere, we use the terms
+    * **width**:
+      - the number of proofs that a proof has verified itself;
+      - (equivalently) the maximum number of proofs that a proof depends upon
+        directly.
+      - NB: This does not include recursively-verified proofs, this only refers
+        to proofs that were provided directly to pickles when the proof was
+        being generated.
+    * **branch**:
+      - a single 'rule' or 'circuit' for which a proof can be generated, where
+        a verification key verifies a proof for any of these branches.
+      - It is common to have a 'base' branch and a 'recursion' branch. For
+        example, the transaction snark has a 'transaction' proof that evaluates
+        a single transaction and a 'merge' proof that combines two transaction
+        snark proofs that prove sequential updates, each of which may be either
+        a 'transaction' or a 'merge'.
+*)
+
 open Core_kernel
 open Pickles_types
 open Common
@@ -163,81 +188,75 @@ end
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
-    type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
-    [@@deriving sexp, equal, compare, hash, yojson]
+    module T = struct
+      type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
+      [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest = Fn.id
+      let to_latest = Fn.id
 
-    let description = "Verification key"
+      let description = "Verification key"
 
-    let version_byte = Base58_check.Version_bytes.verification_key
+      let version_byte = Base58_check.Version_bytes.verification_key
 
-    include Binable.Of_binable
-              (R.Stable.V2)
-              (struct
-                type nonrec t = t
+      let to_repr { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
+        { Repr.Stable.V2.step_data; max_width; wrap_index }
 
-                module Repr_conv = struct
-                  include Vk
+      let of_repr
+          ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
+            R.Stable.V2.t) : t =
+        let d = Common.wrap_domains.h in
+        let log2_size = Import.Domain.log2_size d in
+        let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
+        let wrap_vk : Impls.Wrap.Verification_key.t =
+          { domain =
+              { log_size_of_group = log2_size
+              ; group_gen = Backend.Tock.Field.domain_generator log2_size
+              }
+          ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+          ; max_quot_size
+          ; srs = Backend.Tock.Keypair.load_urs ()
+          ; evals =
+              (let g (x, y) =
+                 { Kimchi.Protocol.unshifted =
+                     [| Kimchi.Foundations.Finite (x, y) |]
+                 ; shifted = None
+                 }
+               in
+               { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+               ; coefficients_comm =
+                   Array.map ~f:g (Vector.to_array c.coefficients_comm)
+               ; generic_comm = g c.generic_comm
+               ; mul_comm = g c.mul_comm
+               ; psm_comm = g c.psm_comm
+               ; emul_comm = g c.emul_comm
+               ; complete_add_comm = g c.complete_add_comm
+               ; endomul_scalar_comm = g c.endomul_scalar_comm
+               ; chacha_comm = None
+               })
+          ; shifts = Common.tock_shifts ~log2_size
+          ; lookup_index = None
+          }
+        in
+        { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }
 
-                  let of_repr
-                      ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
-                        R.Stable.V2.t) : Impls.Wrap.Verification_key.t =
-                    let d = Common.wrap_domains.h in
-                    let log2_size = Import.Domain.log2_size d in
-                    let max_quot_size =
-                      Common.max_quot_size_int (Import.Domain.size d)
-                    in
-                    { domain =
-                        { log_size_of_group = log2_size
-                        ; group_gen =
-                            Backend.Tock.Field.domain_generator log2_size
-                        }
-                    ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-                    ; max_quot_size
-                    ; srs = Backend.Tock.Keypair.load_urs ()
-                    ; linearization = failwith "TODO"
-                    ; evals =
-                        (let g (x, y) =
-                           { Kimchi.Protocol.unshifted =
-                               [| Kimchi.Foundations.Finite (x, y) |]
-                           ; shifted = None
-                           }
-                         in
-                         { sigma_comm =
-                             Array.map ~f:g (Vector.to_array c.sigma_comm)
-                         ; coefficients_comm =
-                             Array.map ~f:g
-                               (Vector.to_array c.coefficients_comm)
-                         ; generic_comm = g c.generic_comm
-                         ; mul_comm = g c.mul_comm
-                         ; psm_comm = g c.psm_comm
-                         ; emul_comm = g c.emul_comm
-                         ; complete_add_comm = g c.complete_add_comm
-                         ; endomul_scalar_comm = g c.endomul_scalar_comm
-                         ; chacha_comm = None
-                         })
-                    ; shifts = Common.tock_shifts ~log2_size
-                    }
-                end
+      include Binable.Of_binable
+                (R.Stable.V2)
+                (struct
+                  type nonrec t = t
 
-                let to_binable
-                    { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
-                  { Repr.Stable.V2.step_data; max_width; wrap_index }
+                  let to_binable r = to_repr r
 
-                let of_binable
-                    ( { Repr.Stable.V2.step_data; max_width; wrap_index = c } as
-                    t ) =
-                  { Poly.step_data
-                  ; max_width
-                  ; wrap_index = c
-                  ; wrap_vk = Some (Repr_conv.of_repr t)
-                  }
-              end)
+                  let of_binable r = of_repr r
+                end)
+    end
+
+    include T
+    include Codable.Make_base58_check (T)
   end
 end]
 
-include Codable.Make_base58_check (Stable.Latest)
+[%%define_locally
+Stable.Latest.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
 let dummy : t =
   { step_data = At_most.[]
@@ -263,20 +282,28 @@ module Checked = struct
 
   type t =
     { step_domains : (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
+          (** The domain size for proofs of each branch. *)
     ; step_widths : (Width.Checked.t, Max_branches.n) Vector.t
+          (** The width for for proofs of each branch. *)
     ; max_width : Width.Checked.t
+          (** The maximum of all of the [step_widths]. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
+          (** The plonk verification key for the 'wrapping' proof that this key
+              is used to verify.
+          *)
     ; num_branches : (Boolean.var, Max_branches.Log2.n) Vector.t
+          (** The number of branches, encoded as a bitstring. *)
     }
   [@@deriving hlist, fields]
 
+  (** [log_2] of the width. *)
   let width_size = Nat.to_int Width.Length.n
 
   let to_input =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun { step_domains; step_widths; max_width; wrap_index; num_branches } :
-        _ Random_oracle_input.t ->
+        _ Random_oracle_input.Chunked.t ->
       let width w = (Width.Checked.to_field w, width_size) in
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
