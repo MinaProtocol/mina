@@ -30,12 +30,33 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
     | `Assoc pairs ->
         sprintf "{%s}"
           ( List.filter_map pairs ~f:(fun (s, json) ->
+                let cameled_names () =
+                  let cameled, value =
+                    (* special handling for balance_change in Party.Fee_payer.t *)
+                    if fee_payer && String.equal s "balance_change" then
+                      (*yojson prints decimal formatted but graphql accepts unsigned int*)
+                      ( "fee"
+                      , go
+                          (`String
+                            ( Currency.Fee.of_yojson json
+                            |> Result.ok_or_failwith |> Currency.Fee.to_string
+                            ))
+                          (level + 2) )
+                    else (underToCamel s, go json (level + 2))
+                  in
+                  Some (sprintf "%s:%s" cameled value)
+                in
                 (* Special handling of fee payer party and verification key field names*)
                 match (s, fee_payer) with
-                | "use_full_commitment", true
-                | "increment_nonce", true
-                | "token_id", true ->
+                | "use_full_commitment", true | "token_id", true ->
                     None
+                | "increment_nonce", true -> (
+                    (*Increment_nonce permission should be in fee payer*)
+                    match Permissions.Auth_required.of_yojson json with
+                    | Ok _auth ->
+                        cameled_names ()
+                    | _ ->
+                        None )
                 | "sgn", _ ->
                     Some (sprintf "%s:%s" "sign" (go json level))
                 | "verification_key", _ -> (
@@ -56,13 +77,21 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
                         Some (sprintf "%s:%s" vk_camel vk_with_hash)
                     | _ ->
                         failwith "invalid verification key" )
+                | "state", _ ->
+                    (*states in account predicate is a `Assoc with "elements" field name*)
+                    Some
+                      (sprintf "%s:{elements: %s}" "state"
+                         (go json (level + 2)))
+                | "authorization", false -> (
+                    match json with
+                    | `List [ `String "None_given" ] ->
+                        Some "authorization:{signature:null, proof:null}"
+                    | _ ->
+                        Some
+                          (sprintf "%s:%s" "authorization"
+                             (go json (level + 2))) )
                 | _, _ ->
-                    let cameled =
-                      (* special handling for balance_change in Party.Fee_payer.t *)
-                      if fee_payer && String.equal s "balance_change" then "fee"
-                      else underToCamel s
-                    in
-                    Some (sprintf "%s:%s" cameled (go json (level + 2))))
+                    cameled_names ())
           |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
     (* Set_or_keep *)
     | `List [ `String "Set"; v ] ->
@@ -100,7 +129,8 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
     | `List [ `String "Full"; account ] ->
         go (`Assoc [ ("account", account) ]) level
     (* other constructors *)
-    | `List [ `String name; value ] ->
+    | `List [ `String name; value ]
+      when not (String.equal (String.prefix name 2) "0x") ->
         go (`Assoc [ (underToCamel name, value) ]) level
     | `List jsons ->
         sprintf "[%s]"
@@ -653,149 +683,9 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   parties
 
-let mina () =
-  let addrs_and_ports =
-    let base = 23000 in
-    let libp2p_port = base in
-    let client_port = base + 1 in
-    let ip = Unix.Inet_addr.of_string "127.0.0.1" in
-    { Node_addrs_and_ports.external_ip = ip
-    ; bind_ip = ip
-    ; peer = None
-    ; libp2p_port
-    ; client_port
-    }
-  in
-  let block_production_key = None in
-  let chain_id = "snapps-tool-test" in
-  let peers = [] in
-  let is_archive_rocksdb = false in
-  let archive_process_location = None in
-  let logger =
-    Logger.create
-      ~metadata:
-        [ ( "host"
-          , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip) )
-        ; ("port", `Int addrs_and_ports.libp2p_port)
-        ]
-      ()
-  in
-  let precomputed_values =
-    Option.value_exn Precomputed_values.compiled |> Lazy.force
-  in
-  let constraint_constants = precomputed_values.constraint_constants in
-  let (module Genesis_ledger) = precomputed_values.genesis_ledger in
-  let pids = Child_processes.Termination.create_pid_table () in
-  let%bind conf_dir = Unix.mkdtemp "tmp/snapp-test-config" in
-  let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-  let trace_database_initialization typ location =
-    (* can't use %log because location is passed-in *)
-    Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location typ
-  in
-  let trust_system = Trust_system.create trust_dir in
-  trace_database_initialization "trust_system" __LOC__ trust_dir ;
-  let time_controller =
-    Block_time.Controller.create (Block_time.Controller.basic ~logger)
-  in
-  let block_production_keypair =
-    Option.map block_production_key ~f:(fun i ->
-        List.nth_exn (Lazy.force Genesis_ledger.accounts) i
-        |> Genesis_ledger.keypair_of_account_record_exn)
-  in
-  let block_production_keypairs =
-    block_production_keypair
-    |> Option.map ~f:(fun kp -> (kp, Public_key.compress kp.Keypair.public_key))
-    |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
-  in
-  let block_production_pubkeys =
-    block_production_keypairs |> Keypair.And_compressed_pk.Set.to_list
-    |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
-  in
-  let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
-  let consensus_local_state =
-    Consensus.Data.Local_state.create block_production_pubkeys
-      ~genesis_ledger:Genesis_ledger.t
-      ~genesis_epoch_data:precomputed_values.genesis_epoch_data
-      ~epoch_ledger_location ~ledger_depth:constraint_constants.ledger_depth
-      ~genesis_state_hash:
-        (With_hash.hash precomputed_values.protocol_state_with_hash)
-  in
-  let gossip_net_params =
-    Gossip_net.Libp2p.Config.
-      { timeout = Time.Span.of_sec 3.
-      ; initial_peers = peers
-      ; addrs_and_ports
-      ; metrics_port = None
-      ; conf_dir
-      ; chain_id
-      ; logger
-      ; seed_peer_list_url = None
-      ; unsafe_no_trust_ip = true
-      ; isolate = false
-      ; trust_system
-      ; flooding = false
-      ; direct_peers = peers
-      ; min_connections = 20
-      ; max_connections = 50
-      ; validation_queue_size = 150
-      ; peer_exchange = true
-      ; mina_peer_exchange = true
-      ; keypair = None
-      ; all_peers_seen_metric = false
-      }
-  in
-  let is_seed = List.is_empty peers in
-  let net_config =
-    { Mina_networking.Config.logger
-    ; trust_system
-    ; time_controller
-    ; consensus_local_state
-    ; is_seed
-    ; genesis_ledger_hash = Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-    ; constraint_constants
-    ; log_gossip_heard =
-        { snark_pool_diff = true
-        ; transaction_pool_diff = true
-        ; new_state = true
-        }
-    ; creatable_gossip_net =
-        Mina_networking.Gossip_net.(
-          Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params ~pids))
-    }
-  in
-  let monitor = Async.Monitor.create ~name:"coda" () in
-  let start_time = Time.now () in
-  Mina_lib.create
-    (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
-       ~is_seed ~disable_node_status:true ~super_catchup:true
-       ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
-       ~initial_protocol_version:Protocol_version.zero
-       ~proposed_protocol_version_opt:None
-       ~work_selection_method:(module Work_selector.Selection_methods.Sequence)
-       ~snark_worker_config:
-         Mina_lib.Config.Snark_worker_config.
-           { initial_snark_worker_key = None
-           ; shutdown_on_disconnect = true
-           ; num_threads = None
-           }
-       ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-       ~persistent_root_location:(conf_dir ^/ "root")
-       ~persistent_frontier_location:(conf_dir ^/ "frontier")
-       ~epoch_ledger_location ~wallets_disk_location:(conf_dir ^/ "wallets")
-       ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
-       ~block_production_keypairs ~monitor ~consensus_local_state
-       ~is_archive_rocksdb ~work_reassignment_wait:420000 ~precomputed_values
-       ~start_time ~upload_blocks_to_gcloud:false
-       ~archive_process_location:
-         (Option.map archive_process_location ~f:(fun host_and_port ->
-              Cli_lib.Flag.Types.{ name = "dummy"; value = host_and_port }))
-       ~log_precomputed_blocks:false ~stop_time:48 ())
-
 let%test_module "Snapps test transaction" =
   ( module struct
-    let schema = Mina_graphql.schema
-
-    let execute mina query =
+    let execute mina schema query =
       match Graphql_parser.parse query with
       | Ok doc ->
           let%map res = Graphql_async.Schema.execute schema mina doc in
@@ -803,27 +693,91 @@ let%test_module "Snapps test transaction" =
       | Error e ->
           Deferred.return (Error e)
 
-    let hit_server query =
-      let%bind mina = mina () in
-      match%map execute mina query with
+    let hit_server (parties : Parties.t) query =
+      let typ = Mina_graphql.Types.Input.send_snapp in
+      let query_top_level =
+        Graphql_async.Schema.(
+          io_field "sendSnapp" ~typ:(non_null string)
+            ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
+            ~doc:"sample query"
+            ~resolve:
+              (fun _ () (fee_payer_result, other_parties_results, memo) ->
+              let parties_result =
+                let open Result.Let_syntax in
+                let other_parties_result = Result.all other_parties_results in
+                let%bind fee_payer = fee_payer_result in
+                let%bind other_parties = other_parties_result in
+                let result_of_exn f v ~error =
+                  try Ok (f v) with _ -> Error error
+                in
+                let%map memo =
+                  Option.value_map memo ~default:(Ok Signed_command_memo.empty)
+                    ~f:(fun memo ->
+                      result_of_exn Signed_command_memo.create_from_string_exn
+                        memo ~error:"Invalid `memo` provided.")
+                in
+                { Parties.fee_payer; other_parties; memo }
+              in
+              let parties_result = Result.ok_or_failwith parties_result in
+              let failed = ref false in
+              let printf_diff ~label expected got =
+                if String.equal expected got then ()
+                else (
+                  failed := true ;
+                  Core.printf
+                    !"Expected %s: %s \nGot: %s\n%!"
+                    label expected got )
+              in
+              printf_diff ~label:"fee payer"
+                ( Party.Fee_payer.to_yojson parties.fee_payer
+                |> Yojson.Safe.to_string )
+                ( Party.Fee_payer.to_yojson parties_result.fee_payer
+                |> Yojson.Safe.to_string ) ;
+              List.iter2_exn parties.other_parties parties_result.other_parties
+                ~f:(fun expected got ->
+                  printf_diff ~label:"party"
+                    (Party.to_yojson expected |> Yojson.Safe.to_string)
+                    (Party.to_yojson got |> Yojson.Safe.to_string)) ;
+              if !failed then
+                return (Error "invalid snapp transaction generated")
+              else return (Ok "Passed")))
+      in
+      let schema =
+        Graphql_async.Schema.(
+          schema [] ~mutations:[ query_top_level ] ~subscriptions:[])
+      in
+      let%map res = execute () schema query in
+      match res with
       | Ok res -> (
           match res with
           | Ok (`Response data) ->
               Ok (data |> Yojson.Basic.to_string)
-          | _ ->
-              Error "Unexpected response" )
+          | Ok (`Stream _reader) ->
+              Error "Unexpected response"
+          | Error e ->
+              Error (Yojson.Basic.to_string e) )
       | Error e ->
           Error e
 
-    let%test_unit "snapps transaction" =
-      Quickcheck.test ~trials:10
+    let%test_unit "snapps transaction graphql round trip" =
+      Quickcheck.test ~trials:20
         (User_command_generators.parties_with_ledger ())
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Parties p ->
               let q = graphql_snapp_command p in
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  Deferred.ignore_m (hit_server q))
+                  match%map hit_server p q with
+                  | Ok _res ->
+                      ()
+                  | Error e ->
+                      Core.printf
+                        !"Invalid graphql query %s for parties transaction %s. \
+                          Error %s"
+                        q
+                        (Parties.to_yojson p |> Yojson.Safe.to_string)
+                        e ;
+                      failwith "Invalid graphql query")
           | Signed_command _ ->
               failwith "Expected a Parties command")
   end )
