@@ -1,4 +1,4 @@
-SELECT t.pk_id, MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
+SELECT t.pk_id, MAX(t.pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
 (
 WITH RECURSIVE pending_chain_nonce AS (
 
@@ -21,7 +21,7 @@ WITH RECURSIVE pending_chain_nonce AS (
                )
 
               /* Slot and balance are NULL here */
-              SELECT pks.id AS pk_id,full_chain.height,cmds.nonce
+              SELECT pks.id AS pk_id,pks.value as pk,full_chain.height,cmds.nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
