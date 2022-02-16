@@ -1151,6 +1151,11 @@ module Block = struct
           |> Consensus.Data.Consensus_state.blockchain_length
           |> Unsigned.UInt32.to_int64
         in
+        (* grab all the nonces associated with every public key in all of these
+         * transactions for blocks earlier than this one. *)
+        let initial_nonce_map : Account.Nonce.t Public_key.Map.t =
+          failwith "TODO"
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1237,15 +1242,20 @@ module Block = struct
           else
             None
         in
-        (* grab all the nonces associated with every public key in all of these transactions for blocks earlier than this one. *)
-        let initial_nonce_map : Account.Nonce.t Public_key.Map.t = failwith "TODO" in
         let%bind (_ : int * Account.Nonce.t Public_key.Map.t) =
-          deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun sequence_no ->
+          deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
             | { Mina_base.With_status.status
               ; data= Mina_base.Transaction.Command command } ->
                 let user_command =
                   {Mina_base.With_status.status; data= command}
+                in
+                (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
+                 Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
+                let nonce_map =
+                  Public_key.Map.change
+                    (User_command.fee_payer command)
+                    ~f:(fun _ -> Some (User_command.nonce_exn command |> incr))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
@@ -1263,10 +1273,9 @@ module Block = struct
                     (module Conn)
                       ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
-                    ~receiver_id
-                  >>| ignore
+                    ~receiver_id ~nonce_map
                 in
-                sequence_no + 1
+                (sequence_no + 1, nonce_map)
             | {data= Fee_transfer fee_transfer_bundled; status} ->
                 let balances =
                   Transaction_status.Fee_transfer_balance_data
@@ -1334,7 +1343,7 @@ module Block = struct
                         ~receiver_balance_id
                       >>| ignore )
                 in
-                sequence_no + 1
+                (sequence_no + 1, nonce_map)
             | {data= Coinbase coinbase; status} ->
                 let balances =
                   Transaction_status.Coinbase_balance_data.of_balance_data_exn
@@ -1411,7 +1420,7 @@ module Block = struct
                     ~receiver_balance_id
                   >>| ignore
                 in
-                sequence_no + 1 )
+                (sequence_no + 1, nonce_map) )
         in
         return block_id
 
