@@ -1233,10 +1233,31 @@ module Block = struct
           |> Consensus.Data.Consensus_state.blockchain_length
           |> Unsigned.UInt32.to_int64
         in
+        let transactions =
+          let coinbase_receiver =
+            Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+          in
+          let supercharge_coinbase =
+            Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
+          in
+          match
+            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
+              ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
+          with
+          | Ok transactions ->
+              transactions
+          | Error e ->
+              Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
+        in
         (* grab all the nonces associated with every public key in all of these
          * transactions for blocks earlier than this one. *)
         let%bind initial_nonce_map : Account.Nonce.t Public_key.Compressed.Map.t =
-          Find_nonce.initialize_nonce_map ()
+          let public_keys =
+            transactions
+            |> List.map ~f:Transaction.public_keys
+            |> List.concat
+          in
+          Find_nonce.initialize_nonce_map ~public_keys ~parent_id
         in
         let%bind block_id =
           Conn.find
@@ -1277,22 +1298,6 @@ module Block = struct
             (* we don't yet know the chain status for a block we're adding *)
             ; chain_status=Chain_status.(to_string Pending)
             }
-        in
-        let transactions =
-          let coinbase_receiver =
-            Consensus.Data.Consensus_state.coinbase_receiver consensus_state
-          in
-          let supercharge_coinbase =
-            Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
-          in
-          match
-            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-              ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
-          with
-          | Ok transactions ->
-              transactions
-          | Error e ->
-              Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
           (* TODO: add transaction statuses to internal commands
