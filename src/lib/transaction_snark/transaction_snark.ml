@@ -1114,11 +1114,18 @@ module Base = struct
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind proposed_balance, `Underflow underflow =
-      Balance.Checked.sub_amount_flagged account.balance txn_amount
+    let%bind proposed_balance =
+      match txn_amount with
+      | Some txn_amount ->
+          let%bind proposed_balance, `Underflow underflow =
+            Balance.Checked.sub_amount_flagged account.balance txn_amount
+          in
+          (* underflow indicates insufficient balance *)
+          let%map () = balance_check (Boolean.not underflow) in
+          proposed_balance
+      | None ->
+          return account.balance
     in
-    (* underflow indicates insufficient balance *)
-    let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
       Balance.Checked.( >= ) proposed_balance curr_min_balance
     in
@@ -1219,7 +1226,7 @@ module Base = struct
                  ; timing = _
                  ; voting_for
                  }
-             ; balance_change
+             ; balance_change = _
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
@@ -1250,33 +1257,6 @@ module Base = struct
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
-      let is_receiver =
-        Sgn.Checked.is_pos !(Currency.Amount.Signed.Checked.sgn balance_change)
-      in
-      let `Min_balance _, timing =
-        !([%with_label "Check snapp timing"]
-            (let open Tick in
-            let balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            let timed_balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            (* NB: We perform the check here with the final balance and a zero
-               amount. This allows this to serve dual purposes:
-               * if the balance has decreased, this checks that it isn't below
-                 the minimum;
-               * if the account is new and this party has set its timing info,
-                 this checks that the timing is valid.
-               The balance and txn_amount are used only to find the resulting
-               balance, so using the result directly is equivalent.
-            *)
-            check_timing ~balance_check ~timed_balance_check ~account:a
-              ~txn_amount:Amount.(var_of_t zero)
-              ~txn_global_slot))
-      in
       let open Snapp_basic in
       let snapp : Snapp_account.Checked.t =
         let keeping_app_state =
@@ -1450,7 +1430,6 @@ module Base = struct
           snapp
         ; delegate
         ; permissions
-        ; timing
         ; nonce
         ; public_key
         ; snapp_uri
@@ -1619,6 +1598,21 @@ module Base = struct
 
           let set_balance (balance : Balance.t) ({ data = a; hash } : t) : t =
             { data = { a with balance }; hash }
+
+          let check_timing ~txn_global_slot ({ data = account; _ } : t) =
+            let invalid_timing = ref None in
+            let balance_check _ = failwith "Should not be called" in
+            let timed_balance_check b =
+              invalid_timing := Some (Boolean.not b) ;
+              return ()
+            in
+            let `Min_balance _, timing =
+              run_checked
+              @@ [%with_label "Check snapp timing"]
+                   (check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:None ~txn_global_slot)
+            in
+            (`Invalid_timing (Option.value_exn !invalid_timing), timing)
         end
 
         module Ledger = struct
@@ -2131,6 +2125,9 @@ module Base = struct
             { t with
               ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
             }
+
+          let global_slot_since_genesis { protocol_state; _ } =
+            protocol_state.global_slot_since_genesis
         end
       end
 
@@ -2871,7 +2868,7 @@ module Base = struct
                       (Boolean.Assert.is_true ok)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot)
+                    ~txn_amount:(Some txn_amount) ~txn_global_slot)
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -3175,7 +3172,7 @@ module Base = struct
                          user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:amount ~txn_global_slot)
+                    ~txn_amount:(Some amount) ~txn_global_slot)
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -7814,8 +7811,8 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
       let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
-          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
-          ~txn_global_slot
+          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
+          ~txn_amount:(Some txn_amount) ~txn_global_slot
       in
       (min_balance, timing)
 

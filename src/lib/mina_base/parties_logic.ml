@@ -364,6 +364,15 @@ module type Account_intf = sig
   val balance : t -> balance
 
   val set_balance : balance -> t -> t
+
+  type bool
+
+  type global_slot
+
+  val check_timing :
+       txn_global_slot:global_slot
+    -> t
+    -> [ `Invalid_timing of bool | `Insufficient_balance of bool ] * timing
 end
 
 module Eff = struct
@@ -443,6 +452,8 @@ module type Inputs_intf = sig
       with type Permissions.controller := Controller.t
        and type timing := Timing.t
        and type balance := Balance.t
+       and type bool := Bool.t
+       and type global_slot := Global_slot.t
 
   module Party :
     Party_intf
@@ -517,6 +528,8 @@ module type Inputs_intf = sig
     val fee_excess : t -> Amount.Signed.t
 
     val set_fee_excess : t -> Amount.Signed.t -> t
+
+    val global_slot_since_genesis : t -> Global_slot.t
   end
 end
 
@@ -791,6 +804,26 @@ module Make (Inputs : Inputs_intf) = struct
             ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
       in
       let a = Account.set_balance balance a in
+      (a, local_state)
+    in
+    let txn_global_slot = Global_state.global_slot_since_genesis global_state in
+    (* Check timing with current balance *)
+    let a, local_state =
+      let `Invalid_timing invalid_timing, timing =
+        match Account.check_timing ~txn_global_slot a with
+        | `Insufficient_balance _, _ ->
+            failwith "Did not propose a balance change at this timing check!"
+        | `Invalid_timing invalid_timing, timing ->
+            (* NB: Have to destructure to remove the possibility of
+               [`Insufficient_balance _] in the type.
+            *)
+            (`Invalid_timing invalid_timing, timing)
+      in
+      let local_state =
+        Local_state.add_check local_state Source_minimum_balance_violation
+          (Bool.not invalid_timing)
+      in
+      let a = Account.set_timing timing a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =
