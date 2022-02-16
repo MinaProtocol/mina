@@ -308,10 +308,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     else [%log spam] "No logs were pulled" ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
-          log_entry
-          |> parse_event_from_log_entry ~logger ~network
-          |> Or_error.ok_exn
-          |> Pipe.write_without_pushback_if_open event_writer ;
+          ( match log_entry |> parse_event_from_log_entry ~logger ~network with
+          | Ok a ->
+              Pipe.write_without_pushback_if_open event_writer a
+          | Error e ->
+              [%log warn] "Error parsing log $error"
+                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
           Deferred.unit)
     in
     let%bind () = after (Time.Span.of_ms 10000.0) in
