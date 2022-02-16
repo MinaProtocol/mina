@@ -1043,10 +1043,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let compute_balance account_id =
         match get_user_account_with_location ledger account_id with
         | Ok (`Existing _, account) ->
-            Some
-              { Transaction_status.Balance_and_nonce.balance = account.balance
-              ; nonce = account.nonce
-              }
+            Some account.balance
         | _ ->
             None
       in
@@ -1596,10 +1593,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let compute_balance account_id =
       match get_user_account_with_location t account_id with
       | Ok (`Existing _, account) ->
-          Some
-            { Transaction_status.Balance_and_nonce.balance = account.balance
-            ; nonce = account.nonce
-            }
+          Some account.balance
       | _ ->
           None
     in
@@ -1726,14 +1720,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; receiver_timing = receiver_timing_for_applied
       ; balances =
           { Transaction_status.Coinbase_balance_data.coinbase_receiver_balance =
-              { Transaction_status.Balance_and_nonce.balance = receiver_balance
-              ; nonce = receiver_account.nonce
-              }
+              receiver_balance
           ; fee_transfer_receiver_balance =
-              Option.map transferee_update ~f:(fun (_, a) ->
-                  { Transaction_status.Balance_and_nonce.balance = a.balance
-                  ; nonce = a.nonce
-                  })
+              Option.map transferee_update ~f:(fun (_, a) -> a.balance)
           }
       }
 

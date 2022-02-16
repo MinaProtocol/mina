@@ -685,144 +685,20 @@ module Failure = struct
   [%%endif]
 end
 
-module Auxiliary_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { fee_payer_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_account_creation_fee_paid = None
-    ; receiver_account_creation_fee_paid = None
-    ; created_token = None
-    }
-end
-
-module Legacy = struct
-  module Balance_data = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { fee_payer_balance : Currency.Balance.Stable.V1.t option
-          ; source_balance : Currency.Balance.Stable.V1.t option
-          ; receiver_balance : Currency.Balance.Stable.V1.t option
-          }
-        [@@deriving sexp, yojson, equal, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  module Coinbase_balance_data = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { coinbase_receiver_balance : Currency.Balance.Stable.V1.t
-          ; fee_transfer_receiver_balance : Currency.Balance.Stable.V1.t option
-          }
-        [@@deriving sexp, yojson, equal, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  module Fee_transfer_balance_data = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { receiver1_balance : Currency.Balance.Stable.V1.t
-          ; receiver2_balance : Currency.Balance.Stable.V1.t option
-          }
-        [@@deriving sexp, yojson, equal, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  module Internal_command_balance_data = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          | Coinbase of Coinbase_balance_data.Stable.V1.t
-          | Fee_transfer of Fee_transfer_balance_data.Stable.V1.t
-        [@@deriving sexp, yojson, equal, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
-        | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
-module Balance_and_nonce = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { balance : Currency.Balance.Stable.V1.t
-        ; nonce : Account.Nonce.Stable.V1.t
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let to_legacy t = t.balance
-end
-
 module Balance_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer_balance : Balance_and_nonce.Stable.V1.t option
-        ; source_balance : Balance_and_nonce.Stable.V1.t option
-        ; receiver_balance : Balance_and_nonce.Stable.V1.t option
+        { fee_payer_balance : Currency.Balance.Stable.V1.t option
+        ; source_balance : Currency.Balance.Stable.V1.t option
+        ; receiver_balance : Currency.Balance.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
-
-  let to_legacy t =
-    { Legacy.Balance_data.fee_payer_balance =
-        Option.map ~f:Balance_and_nonce.to_legacy t.fee_payer_balance
-    ; source_balance =
-        Option.map ~f:Balance_and_nonce.to_legacy t.source_balance
-    ; receiver_balance =
-        Option.map ~f:Balance_and_nonce.to_legacy t.receiver_balance
-    }
 
   let empty =
     { fee_payer_balance = None; source_balance = None; receiver_balance = None }
@@ -833,22 +709,14 @@ module Coinbase_balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { coinbase_receiver_balance : Balance_and_nonce.Stable.V1.t
-        ; fee_transfer_receiver_balance : Balance_and_nonce.Stable.V1.t option
+        { coinbase_receiver_balance : Currency.Balance.Stable.V1.t
+        ; fee_transfer_receiver_balance : Currency.Balance.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
-
-  let to_legacy t =
-    { Legacy.Coinbase_balance_data.coinbase_receiver_balance =
-        Balance_and_nonce.to_legacy t.coinbase_receiver_balance
-    ; fee_transfer_receiver_balance =
-        Option.map ~f:Balance_and_nonce.to_legacy
-          t.fee_transfer_receiver_balance
-    }
 
   let of_balance_data_exn
       { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
@@ -884,21 +752,14 @@ module Fee_transfer_balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { receiver1_balance : Balance_and_nonce.Stable.V1.t
-        ; receiver2_balance : Balance_and_nonce.Stable.V1.t option
+        { receiver1_balance : Currency.Balance.Stable.V1.t
+        ; receiver2_balance : Currency.Balance.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
-
-  let to_legacy t =
-    { Legacy.Fee_transfer_balance_data.receiver1_balance =
-        Balance_and_nonce.to_legacy t.receiver1_balance
-    ; receiver2_balance =
-        Option.map ~f:Balance_and_nonce.to_legacy t.receiver2_balance
-    }
 
   let of_balance_data_exn
       { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
@@ -939,14 +800,30 @@ module Internal_command_balance_data = struct
       let to_latest = Fn.id
     end
   end]
+end
 
-  let to_legacy = function
-    | Coinbase c ->
-        Legacy.Internal_command_balance_data.Coinbase
-          (Coinbase_balance_data.to_legacy c)
-    | Fee_transfer f ->
-        Legacy.Internal_command_balance_data.Fee_transfer
-          (Fee_transfer_balance_data.to_legacy f)
+module Auxiliary_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer_account_creation_fee_paid :
+            Currency.Amount.Stable.V1.t option
+        ; receiver_account_creation_fee_paid :
+            Currency.Amount.Stable.V1.t option
+        ; created_token : Token_id.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let empty =
+    { fee_payer_account_creation_fee_paid = None
+    ; receiver_account_creation_fee_paid = None
+    ; created_token = None
+    }
 end
 
 [%%versioned
@@ -960,12 +837,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-let to_legacy = function
-  | Applied (d, bd) ->
-      Legacy.Applied (d, Balance_data.to_legacy bd)
-  | Failed (f, bd) ->
-      Legacy.Failed (f, Balance_data.to_legacy bd)
 
 let balance_data = function
   | Applied (_, balances) | Failed (_, balances) ->
