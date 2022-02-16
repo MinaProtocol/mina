@@ -267,6 +267,10 @@ module type Party_intf = sig
     type events
 
     val sequence_events : t -> events
+
+    type snapp_uri
+
+    val snapp_uri : t -> snapp_uri set_or_keep
   end
 end
 
@@ -435,6 +439,12 @@ module type Account_intf = sig
   val sequence_state : t -> field Pickles_types.Vector.Vector_5.t
 
   val set_sequence_state : field Pickles_types.Vector.Vector_5.t -> t -> t
+
+  type snapp_uri
+
+  val snapp_uri : t -> snapp_uri
+
+  val set_snapp_uri : snapp_uri -> t -> t
 end
 
 module Eff = struct
@@ -507,6 +517,8 @@ module type Inputs_intf = sig
 
   module Verification_key : Iffable with type bool := Bool.t
 
+  module Snapp_uri : Iffable with type bool := Bool.t
+
   module Account :
     Account_intf
       with type Permissions.controller := Controller.t
@@ -516,6 +528,7 @@ module type Inputs_intf = sig
        and type global_slot := Global_slot.t
        and type field := Field.t
        and type verification_key := Verification_key.t
+       and type snapp_uri := Snapp_uri.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -532,6 +545,7 @@ module type Inputs_intf = sig
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
        and type Update.events := Events.t
+       and type Update.snapp_uri := Snapp_uri.t
 
   module Ledger :
     Ledger_intf
@@ -1013,6 +1027,24 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* Reset snapp state to [None] if it is unmodified. *)
     let a = Account.unmake_snapp a in
+    (* Update snapp URI. *)
+    let a, local_state =
+      let snapp_uri = Party.Update.snapp_uri party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_snapp_uri a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_snapp_uri
+          Bool.(Set_or_keep.is_keep snapp_uri ||| has_permission)
+      in
+      let snapp_uri =
+        Set_or_keep.set_or_keep ~if_:Snapp_uri.if_ snapp_uri
+          (Account.snapp_uri a)
+      in
+      let a = Account.set_snapp_uri snapp_uri a in
+      (a, local_state)
+    in
     let a', update_permitted, failure_status =
       h.perform
         (Check_auth_and_update_account

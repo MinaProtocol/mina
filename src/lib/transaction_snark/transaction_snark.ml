@@ -1220,7 +1220,7 @@ module Base = struct
                  ; delegate
                  ; verification_key = _
                  ; permissions
-                 ; snapp_uri
+                 ; snapp_uri = _
                  ; token_symbol
                  ; timing = _
                  ; voting_for
@@ -1257,14 +1257,6 @@ module Base = struct
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
       let ( ! ) = run_checked in
       let open Snapp_basic in
-      let snapp_uri =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep snapp_uri)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Data_as_hash.if_ snapp_uri
-                 a.snapp_uri))
-      in
       let token_symbol =
         update_authorized a.permissions.set_snapp_uri
           ~is_keep:(Set_or_keep.Checked.is_keep token_symbol)
@@ -1340,7 +1332,6 @@ module Base = struct
         ; permissions
         ; nonce
         ; public_key
-        ; snapp_uri
         ; token_symbol
         ; voting_for
         }
@@ -1468,6 +1459,12 @@ module Base = struct
           let push_events = Party.Sequence_events.push_events_checked
         end
 
+        module Snapp_uri = struct
+          type t = string Data_as_hash.t
+
+          let if_ = Data_as_hash.if_
+        end
+
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
 
@@ -1592,6 +1589,11 @@ module Base = struct
 
           let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
             { data = { a with snapp = { a.snapp with sequence_state } }; hash }
+
+          let snapp_uri (a : t) = a.data.snapp_uri
+
+          let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
+            { data = { a with snapp_uri }; hash }
         end
 
         module Ledger = struct
@@ -2005,6 +2007,8 @@ module Base = struct
 
             let sequence_events ({ party; _ } : t) =
               party.data.body.sequence_events
+
+            let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
           end
         end
 
