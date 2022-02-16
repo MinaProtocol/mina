@@ -1344,7 +1344,8 @@ module Block = struct
                 (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
                  Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
                 let nonce_map =
-                  Signature_lib.Public_key.Map.change
+                  Signature_lib.Public_key.Compressed.Map.change
+                    initial_nonce_map
                     (Mina_base.User_command.fee_payer command)
                     ~f:(fun _ -> Some (Mina_base.User_command.nonce_exn command |> Unsigned.UInt32.(add one)))
                 in
@@ -1364,7 +1365,7 @@ module Block = struct
                     (module Conn)
                       ~block_id ~block_height:height ~user_command_id:id ~sequence_no
                     ~status:user_command.status ~fee_payer_id ~source_id
-                    ~receiver_id ~nonce_map
+                    ~receiver_id
                 in
                 (sequence_no + 1, nonce_map)
             | {data= Fee_transfer fee_transfer_bundled; status} ->
