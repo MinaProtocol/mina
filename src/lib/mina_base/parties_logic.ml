@@ -271,6 +271,10 @@ module type Party_intf = sig
     type snapp_uri
 
     val snapp_uri : t -> snapp_uri set_or_keep
+
+    type token_symbol
+
+    val token_symbol : t -> token_symbol set_or_keep
   end
 end
 
@@ -445,6 +449,12 @@ module type Account_intf = sig
   val snapp_uri : t -> snapp_uri
 
   val set_snapp_uri : snapp_uri -> t -> t
+
+  type token_symbol
+
+  val token_symbol : t -> token_symbol
+
+  val set_token_symbol : token_symbol -> t -> t
 end
 
 module Eff = struct
@@ -519,6 +529,8 @@ module type Inputs_intf = sig
 
   module Snapp_uri : Iffable with type bool := Bool.t
 
+  module Token_symbol : Iffable with type bool := Bool.t
+
   module Account :
     Account_intf
       with type Permissions.controller := Controller.t
@@ -529,6 +541,7 @@ module type Inputs_intf = sig
        and type field := Field.t
        and type verification_key := Verification_key.t
        and type snapp_uri := Snapp_uri.t
+       and type token_symbol := Token_symbol.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -546,6 +559,7 @@ module type Inputs_intf = sig
        and type Update.verification_key := Verification_key.t
        and type Update.events := Events.t
        and type Update.snapp_uri := Snapp_uri.t
+       and type Update.token_symbol := Token_symbol.t
 
   module Ledger :
     Ledger_intf
@@ -1043,6 +1057,24 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.snapp_uri a)
       in
       let a = Account.set_snapp_uri snapp_uri a in
+      (a, local_state)
+    in
+    (* Update token symbol. *)
+    let a, local_state =
+      let token_symbol = Party.Update.token_symbol party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_token_symbol a)
+      in
+      let local_state =
+        Local_state.add_check local_state Update_not_permitted_token_symbol
+          Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
+      in
+      let token_symbol =
+        Set_or_keep.set_or_keep ~if_:Token_symbol.if_ token_symbol
+          (Account.token_symbol a)
+      in
+      let a = Account.set_token_symbol token_symbol a in
       (a, local_state)
     in
     let a', update_permitted, failure_status =
