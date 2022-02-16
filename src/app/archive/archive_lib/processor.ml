@@ -1153,7 +1153,7 @@ module Block = struct
         in
         (* grab all the nonces associated with every public key in all of these
          * transactions for blocks earlier than this one. *)
-        let initial_nonce_map : Account.Nonce.t Public_key.Map.t =
+        let initial_nonce_map : Account.Nonce.t Public_key.Compressed.Map.t =
           failwith "TODO"
         in
         let%bind block_id =
@@ -1242,7 +1242,7 @@ module Block = struct
           else
             None
         in
-        let%bind (_ : int * Account.Nonce.t Public_key.Map.t) =
+        let%bind (_ : int * Account.Nonce.t Public_key.Compressed.Map.t) =
           deferred_result_list_fold transactions ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
             | { Mina_base.With_status.status
