@@ -28,6 +28,18 @@ module type Bool_intf = sig
   val assert_ : t -> unit
 end
 
+module type Balance_intf = sig
+  include Iffable
+
+  type amount
+
+  type signed_amount
+
+  val sub_amount_flagged : t -> amount -> t * [ `Underflow of bool ]
+
+  val add_signed_amount_flagged : t -> signed_amount -> t * [ `Overflow of bool ]
+end
+
 module type Amount_intf = sig
   include Iffable
 
@@ -54,6 +66,8 @@ module type Amount_intf = sig
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
+
+  val of_constant_fee : Currency.Fee.t -> t
 end
 
 module type Global_slot_intf = sig
@@ -306,14 +320,59 @@ module type Ledger_intf = sig
     public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
 end
 
+module type Controller_intf = sig
+  include Iffable
+
+  val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
+end
+
 module type Account_intf = sig
   type t
+
+  module Permissions : sig
+    type controller
+
+    val edit_state : t -> controller
+
+    val send : t -> controller
+
+    val receive : t -> controller
+
+    val set_delegate : t -> controller
+
+    val set_permissions : t -> controller
+
+    val set_verification_key : t -> controller
+
+    val set_snapp_uri : t -> controller
+
+    val edit_sequence_state : t -> controller
+
+    val set_token_symbol : t -> controller
+
+    val increment_nonce : t -> controller
+  end
 
   type timing
 
   val timing : t -> timing
 
   val set_timing : timing -> t -> t
+
+  type balance
+
+  val balance : t -> balance
+
+  val set_balance : balance -> t -> t
+
+  type bool
+
+  type global_slot
+
+  val check_timing :
+       txn_global_slot:global_slot
+    -> t
+    -> [ `Invalid_timing of bool | `Insufficient_balance of bool ] * timing
 end
 
 module Eff = struct
@@ -365,6 +424,12 @@ module type Inputs_intf = sig
 
   module Amount : Amount_intf with type bool := Bool.t
 
+  module Balance :
+    Balance_intf
+      with type bool := Bool.t
+       and type amount := Amount.t
+       and type signed_amount := Amount.Signed.t
+
   module Public_key : sig
     type t
   end
@@ -375,12 +440,20 @@ module type Inputs_intf = sig
 
   module Protocol_state_predicate : Protocol_state_predicate_intf
 
+  module Controller : Controller_intf with type bool := Bool.t
+
   module Global_slot : Global_slot_intf with type bool := Bool.t
 
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
-  module Account : Account_intf with type timing := Timing.t
+  module Account :
+    Account_intf
+      with type Permissions.controller := Controller.t
+       and type timing := Timing.t
+       and type balance := Balance.t
+       and type bool := Bool.t
+       and type global_slot := Global_slot.t
 
   module Party :
     Party_intf
@@ -455,6 +528,8 @@ module type Inputs_intf = sig
     val fee_excess : t -> Amount.Signed.t
 
     val set_fee_excess : t -> Amount.Signed.t -> t
+
+    val global_slot_since_genesis : t -> Global_slot.t
   end
 end
 
@@ -648,7 +723,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
     in
-    let `Proof_verifies _, `Signature_verifies signature_verifies =
+    let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_
           (Inputs.Party.use_full_commitment party)
@@ -687,6 +762,67 @@ module Make (Inputs : Inputs_intf) = struct
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
       Bool.assert_ Global_slot.(vesting_period > zero) ;
+      let a = Account.set_timing timing a in
+      (a, local_state)
+    in
+    (* Apply balance change. *)
+    let a, local_state =
+      let balance_change = Party.balance_change party in
+      let balance, `Overflow failed1 =
+        Balance.add_signed_amount_flagged (Account.balance a) balance_change
+      in
+      (* TODO: Should this report 'insufficient balance'? *)
+      let local_state =
+        Local_state.add_check local_state Overflow (Bool.not failed1)
+      in
+      let fee =
+        Amount.of_constant_fee constraint_constants.account_creation_fee
+      in
+      let balance_when_new, `Underflow failed2 =
+        Balance.sub_amount_flagged balance fee
+      in
+      let local_state =
+        Local_state.add_check local_state Amount_insufficient_to_create_account
+          Bool.(not (account_is_new &&& failed2))
+      in
+      let balance =
+        Balance.if_ account_is_new ~then_:balance_when_new ~else_:balance
+      in
+      let is_receiver = Amount.Signed.is_pos balance_change in
+      let local_state =
+        let controller =
+          Controller.if_ is_receiver
+            ~then_:(Account.Permissions.receive a)
+            ~else_:(Account.Permissions.send a)
+        in
+        let has_permission =
+          Controller.check ~proof_verifies ~signature_verifies controller
+        in
+        Local_state.add_check local_state Update_not_permitted_balance
+          Bool.(
+            has_permission
+            ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
+      in
+      let a = Account.set_balance balance a in
+      (a, local_state)
+    in
+    let txn_global_slot = Global_state.global_slot_since_genesis global_state in
+    (* Check timing with current balance *)
+    let a, local_state =
+      let `Invalid_timing invalid_timing, timing =
+        match Account.check_timing ~txn_global_slot a with
+        | `Insufficient_balance _, _ ->
+            failwith "Did not propose a balance change at this timing check!"
+        | `Invalid_timing invalid_timing, timing ->
+            (* NB: Have to destructure to remove the possibility of
+               [`Insufficient_balance _] in the type.
+            *)
+            (`Invalid_timing invalid_timing, timing)
+      in
+      let local_state =
+        Local_state.add_check local_state Source_minimum_balance_violation
+          (Bool.not invalid_timing)
+      in
       let a = Account.set_timing timing a in
       (a, local_state)
     in

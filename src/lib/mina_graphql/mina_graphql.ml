@@ -3730,7 +3730,9 @@ module Mutations = struct
               ; status = Enqueued
               }
         | Error e ->
-            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+            Error
+              (sprintf "Couldn't send user command: %s" (Error.to_string_hum e))
+        )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
@@ -3752,7 +3754,9 @@ module Mutations = struct
             in
             Ok cmd_with_hash
         | Error e ->
-            Error ("Couldn't send snapp command: " ^ Error.to_string_hum e) )
+            Error
+              (sprintf "Couldn't send snapp command: %s"
+                 (Error.to_string_hum e)) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 

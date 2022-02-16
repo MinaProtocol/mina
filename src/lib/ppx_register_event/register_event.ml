@@ -15,7 +15,7 @@ let checked_interpolations_statically ~loc msg label_names =
       (* check that every interpolation point $foo in msg has a matching label;
          OK to have extra labels not mentioned in message
       *)
-      match Logproc_lib.Interpolator.parse s with
+      match Interpolator_lib.Interpolator.parse s with
       | Error err ->
           Location.raise_errorf ~loc
             "Encountered an error while parsing the msg: %s" err
