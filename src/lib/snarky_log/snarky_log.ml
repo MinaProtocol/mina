@@ -10,7 +10,9 @@ let to_channel ?buf ?len ?std out_channel events =
   to_channel ?buf ?len ?std out_channel @@ json_of_events events
 
 let to_file ?buf ?len ?std filename events =
-  to_channel ?buf ?len ?std (open_out filename) events
+  let oc = open_out filename in
+  to_channel ?buf ?len ?std oc events ;
+  close_out oc
 
 module Constraints (Snarky_backendless : Snark_intf.Basic) = struct
   (** Create flamechart events for Snarky_backendless constraints.

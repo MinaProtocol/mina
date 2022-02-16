@@ -139,8 +139,6 @@ module type S = sig
 
   val merkle_path : t -> Location.t -> Path.t
 
-  val merkle_path_batch : t -> Location.t list -> (Location.t * Path.t) list
-
   val merkle_path_at_index_exn : t -> int -> Path.t
 
   val remove_accounts_exn : t -> account_id list -> unit

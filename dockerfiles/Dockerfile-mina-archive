@@ -1,5 +1,5 @@
-ARG deb_codename=stretch
-FROM debian:${deb_codename}-slim
+ARG image=debian:stretch-slim
+FROM ${image}
 
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
@@ -30,7 +30,6 @@ RUN apt-get -y update \
         postgresql \
         postgresql-contrib \
         apt-utils \
-        procps \
         man \
     && rm -rf /var/lib/apt/lists/*
 

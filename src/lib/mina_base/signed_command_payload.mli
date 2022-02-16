@@ -2,19 +2,7 @@
 
 open Core_kernel
 open Mina_base_import
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module Body : sig
   type t =
@@ -184,3 +172,10 @@ val next_available_token : t -> Token_id.t -> Token_id.t
 val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t
+
+(** This module defines a weight for each payload component *)
+module Weight : sig
+  val of_body : Body.t -> int
+end
+
+val weight : t -> int
