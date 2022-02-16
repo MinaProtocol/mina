@@ -24,8 +24,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         *)
     ; block_producers =
         List.init 5 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
-    ; num_snark_workers = 0
+    ; num_snark_workers =
+        0
+        (* We use a small scan state to make sure we can get some ledger proofs emitted quickly *)
+    ; transaction_capacity = Some (Log_2 2)
     }
+
+  (* An event which fires when [n] ledger proofs have been emitted *)
+  let ledger_proofs_emitted ~num_proofs =
+    Wait_condition.network_state ~description:"snarked ledger emitted"
+      ~f:(fun network_state ->
+        network_state.snarked_ledgers_generated > num_proofs)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
+         ~hard_timeout:(Slots 10)
+
+  (* Call [f] [n] times in sequence *)
+  let repeat ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go i =
+      if i = 0 then return ()
+      else
+        let%bind () = f () in
+        go (i - 1)
+    in
+    go n
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -233,6 +255,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~receiver_pub_key ~amount
          in
          [%log info] "Payment included in transition frontier")
+    in
+    let%bind () =
+      section "Send payments and wait for proof to be emitted"
+        (let%bind () =
+           repeat ~n:20 ~f:(fun () ->
+               Network.Node.must_send_payment ~logger node ~sender_pub_key
+                 ~receiver_pub_key ~amount:Currency.Amount.one
+                 ~fee:Currency.Fee.one)
+         in
+         wait_for t (ledger_proofs_emitted ~num_proofs:2))
     in
     let%bind () =
       section "send a snapp with bad fee payer signature"
