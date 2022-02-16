@@ -33,15 +33,6 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
-module Archive = struct
-  let original_rpc =
-    let open Command.Param in
-    flag "--archive-original-rpc" ~aliases:[ "archive-original-rpc" ] no_arg
-      ~doc:
-        "Use the original (now deprecated) archive RPC to talk to an archive \
-         procesor <= 1.3.0beta4"
-end
-
 module Doc_builder = struct
   type 'value t =
     { type_name : string

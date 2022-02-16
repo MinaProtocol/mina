@@ -2056,7 +2056,6 @@ let archive_blocks =
            successfully"
         (Command.Flag.optional_with_default true Command.Param.bool)
     and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
-    and archive_original_rpc = Cli_lib.Flag.Archive.original_rpc
     and precomputed_flag =
       Command.Param.flag "--precomputed" ~aliases:[ "precomputed" ] no_arg
         ~doc:"Blocks are in precomputed JSON format"
@@ -2069,7 +2068,6 @@ let archive_blocks =
     , failure_file
     , log_successes
     , archive_process_location
-    , archive_original_rpc
     , precomputed_flag
     , extensional_flag )
   in
@@ -2087,7 +2085,6 @@ let archive_blocks =
             , failure_file
             , log_successes
             , archive_process_location
-            , archive_original_rpc
             , precomputed_flag
             , extensional_flag )
           ->
@@ -2143,8 +2140,7 @@ let archive_blocks =
            make_send_block
              ~graphql_make:Graphql_queries.Archive_precomputed_block.make
              ~archive_dispatch:
-               (Mina_lib.Archive_client.dispatch_precomputed_block
-                  ~archive_original_rpc)
+               Mina_lib.Archive_client.dispatch_precomputed_block
              ~block_to_yojson:
                Mina_transition.External_transition.Precomputed_block.to_yojson
          in
@@ -2152,8 +2148,7 @@ let archive_blocks =
            make_send_block
              ~graphql_make:Graphql_queries.Archive_extensional_block.make
              ~archive_dispatch:
-               (Mina_lib.Archive_client.dispatch_extensional_block
-                  ~archive_original_rpc)
+               Mina_lib.Archive_client.dispatch_extensional_block
              ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
          in
          Deferred.List.iter files ~f:(fun path ->

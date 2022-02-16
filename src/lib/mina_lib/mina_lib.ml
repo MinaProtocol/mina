@@ -1965,7 +1965,6 @@ let create ?wallets (config : Config.t) =
                   ] ;
               Archive_client.run ~logger:config.logger
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-                ~archive_original_rpc:config.archive_original_rpc
                 archive_process_port) ;
           let precomputed_block_writer =
             ref
