@@ -47,7 +47,6 @@ type t =
   ; archive_process_location :
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
-  ; archive_original_rpc : bool [@default false]
   ; demo_mode : bool [@default false]
   ; log_block_creation : bool [@default false]
   ; precomputed_values : Precomputed_values.t

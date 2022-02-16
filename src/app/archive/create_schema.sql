@@ -110,7 +110,6 @@ CREATE TABLE balances
 , block_height                 int    NOT NULL
 , block_sequence_no            int    NOT NULL
 , block_secondary_sequence_no  int    NOT NULL
-, nonce                        bigint
 , UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
 );
 
