@@ -698,6 +698,12 @@ module Coinbase = struct
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
+module Find_nonce = struct
+  let find (module Conn : CONNECTION) ~(public_key_id : int) ~parent_block_id
+      ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+
+end
+
 module Balance = struct
   type t = { id: int
            ; public_key_id: int
@@ -706,11 +712,12 @@ module Balance = struct
            ; block_height: int64
            ; block_sequence_no: int
            ; block_secondary_sequence_no: int
+           ; nonce : int64 option
            } [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int64; int; int64;int;int] in
+    let spec = Caqti_type.[int; int; int64; int; int64;int;int; option int64] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -721,6 +728,7 @@ module Balance = struct
 
   let find (module Conn : CONNECTION) ~(public_key_id : int)
       ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+        (* TODO: Do we need to query with the nonce here? *)
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
@@ -742,33 +750,33 @@ module Balance = struct
          typ
          {sql| SELECT id, public_key_id, balance,
                       block_id, block_height,
-                      block_sequence_no, block_secondary_sequence_no,
+                      block_sequence_no, block_secondary_sequence_no, nonce
                FROM balances
                WHERE id = $1
          |sql})
       id
 
   let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
+         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 (tup2 int int) (option int64)))
          Caqti_type.int
          {sql| INSERT INTO balances (public_key_id, balance,
-                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no)
-               VALUES (?, ?, ?, ?, ?, ?)
+                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no, nonce)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                RETURNING id |sql})
       ((public_key_id, balance_to_int64 balance),
-       (block_id, block_height, block_sequence_no, block_secondary_sequence_no))
+       (block_id, block_height, (block_sequence_no, block_secondary_sequence_no), nonce))
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce =
     let open Deferred.Result.Let_syntax in
     match%bind find (module Conn) ~public_key_id ~balance  ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no with
     | Some balance_id ->
         return balance_id
     | None ->
-        add (module Conn) ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no
+        add (module Conn) ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no ~block_secondary_sequence_no ~nonce
 end
 
 module Block_and_internal_command = struct
@@ -1199,6 +1207,9 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
+        (* grab all the nonces associated with every public key in all of these transactions *)
+        let nonce_map = failwith "TODO" in
+
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance =
           (* TODO: add transaction statuses to internal commands
              the archive lib should not know the details of
