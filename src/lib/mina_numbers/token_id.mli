@@ -4,12 +4,6 @@ open Core_kernel
 open Snark_params
 open Tick
 
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 [%%versioned:
 module Stable : sig
   module V1 : sig

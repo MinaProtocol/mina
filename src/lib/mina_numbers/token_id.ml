@@ -2,12 +2,6 @@
 
 open Core_kernel
 
-[%%ifndef consensus_mechanism]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 module T = Nat.Make64 ()
 
 let default = T.of_uint64 Unsigned.UInt64.one
