@@ -1,7 +1,6 @@
 open Core
 open Async
 open Mina_base
-open Signature_lib
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
@@ -724,9 +723,7 @@ let%test_module "Snapps test transaction" =
                 if String.equal expected got then ()
                 else (
                   failed := true ;
-                  Core.printf
-                    !"Expected %s: %s \nGot: %s\n%!"
-                    label expected got )
+                  printf "Expected %s: %s \nGot: %s\n%!" label expected got )
               in
               printf_diff ~label:"fee payer"
                 ( Party.Fee_payer.to_yojson parties.fee_payer
@@ -771,9 +768,9 @@ let%test_module "Snapps test transaction" =
                   | Ok _res ->
                       ()
                   | Error e ->
-                      Core.printf
-                        !"Invalid graphql query %s for parties transaction %s. \
-                          Error %s"
+                      printf
+                        "Invalid graphql query %s for parties transaction %s. \
+                         Error %s"
                         q
                         (Parties.to_yojson p |> Yojson.Safe.to_string)
                         e ;
