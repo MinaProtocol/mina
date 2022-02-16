@@ -52,6 +52,15 @@ archive:
     tag: 1.2.1alpha1-1f98b8b-devnet
   pg_conn: 'postgres://postgresql:5432'
 
+rosetta:
+  enabled: false
+  image:
+    repository: minaprotocol/mina-rosetta-ubuntu
+    pullPolicy: IfNotPresent
+    tag: 1.3.0alpha2-compatible-513333d-stretch
+  pg_conn: 'postgres://postgresql:5432'
+  graphql_host: 'http://127.0.0.1'
+
 libp2p:
   seed:
     enabled: true
@@ -72,6 +81,7 @@ ports:
   nodePort: "30004"
   postgres: "5432"
   archive: "3086"
+  rosetta: "3087"
 
 resources:
   limits:
