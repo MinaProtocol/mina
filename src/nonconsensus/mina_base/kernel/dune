@@ -8,7 +8,7 @@
    allocation_functor
    base58_check
    bignum_bigint
-   block_time
+   block_time_nonconsensus
    mina_compile_config_nonconsensus
    genesis_constants
    digestif
