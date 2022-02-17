@@ -1656,14 +1656,14 @@ let dummy_constraints =
       ( Pickles.Scalar_challenge.to_field_checked'
           (module Impl)
           ~num_bits:16
-          (Pickles_types.Scalar_challenge.create x)
+          (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t * Field.t ) ;
     ignore
       ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
         : Step_main_inputs.Inner_curve.t ) ;
     ignore
       ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
-          (Pickles_types.Scalar_challenge.create x)
+          (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
 type ('a_var, 'a_value, 'a_weird) pickles_rule =
