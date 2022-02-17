@@ -705,8 +705,12 @@ module Coinbase = struct
 end
 
 module Find_nonce = struct
-  let sql_template =
-    {sql|
+  let sql_template public_keys_sql_list =
+    (* using a string containing the comma-delimited public keys list as an SQL parameter results
+       in syntax errors, so we inline that list into the query
+    *)
+    (sprintf
+       {sql|
 SELECT t.pk_id, MAX(pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
 (
 WITH RECURSIVE pending_chain_nonce AS (
@@ -746,14 +750,13 @@ WITH RECURSIVE pending_chain_nonce AS (
               INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
               INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
 
-              WHERE pks.value IN ($2)
+              WHERE pks.value IN (%s)
               AND busc.user_command_id = cmds.id
 
               ORDER BY (full_chain.height, busc.sequence_no) DESC
             ) t
-            GROUP BY t.pk_id LIMIT $3
-    |sql}
-
+            GROUP BY t.pk_id LIMIT $2
+    |sql} public_keys_sql_list)
 
   type t = { public_key_id: int
            ; public_key: string
@@ -776,9 +779,9 @@ WITH RECURSIVE pending_chain_nonce AS (
     in
     Conn.collect_list
       (Caqti_request.find_opt
-         Caqti_type.(tup3 int string int)
-         typ sql_template)
-         (parent_id, public_keys_sql_list, List.length public_keys)
+         Caqti_type.(tup2 int int)
+         typ (sql_template public_keys_sql_list))
+         (parent_id, List.length public_keys)
 
   (* INVARIANT: The map is populated with all the public_keys present *)
   let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
