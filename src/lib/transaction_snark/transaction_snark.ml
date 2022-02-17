@@ -3701,6 +3701,31 @@ let constraint_system_digests ~constraint_constants () =
             (main ~constraint_constants)) )
   ]
 
+type local_state =
+  ( (Party.t, unit) Parties.Call_forest.t
+  , (Party.t, unit) Parties.Call_forest.t list
+  , Token_id.t
+  , Currency.Amount.t
+  , Sparse_ledger.t
+  , bool
+  , unit
+  , Transaction_status.Failure.t option )
+  Parties_logic.Local_state.t
+
+type global_state = Sparse_ledger.Global_state.t
+
+module Parties_intermediate_state = struct
+  type state = { global : global_state; local : local_state }
+
+  type t =
+    { kind : [ `Same | `New | `Two_new ]
+    ; spec : Parties_segment.Basic.t
+    ; state_before : state
+    ; state_after : state
+    ; use_full_commitment : [ `Others | `Proved_use_full_commitment of bool ]
+    }
+end
+
 (** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
     statements, corresponding to parties in [partiess] which minimize the
     number of snark proofs needed to prove all of the parties.
@@ -3722,13 +3747,21 @@ let constraint_system_digests ~constraint_constants () =
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-let group_by_parties_rev partiess stmtss =
+let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
   let use_full_commitment (p : Party.t) =
     match p.authorization with
     | Proof _ ->
         `Proved_use_full_commitment p.data.body.use_full_commitment
     | _ ->
         `Others
+  in
+  let intermediate_state p ~kind ~spec ~before ~after =
+    { Parties_intermediate_state.kind
+    ; spec
+    ; state_before = { global = fst before; local = snd before }
+    ; state_after = { global = fst after; local = snd after }
+    ; use_full_commitment = use_full_commitment p
+    }
   in
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
@@ -3739,33 +3772,27 @@ let group_by_parties_rev partiess stmtss =
         (* There are no later parties to pair this one with. Prove it on its
            own.
         *)
-        ( `Same
-        , Parties_segment.Basic.of_controls [ a1 ]
-        , before
-        , after
-        , use_full_commitment p )
+        intermediate_state p ~kind:`Same
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
         :: acc
     | ( [ []; [ ({ Party.authorization = a1; _ } as p) ] ]
       , [ [ _ ]; [ before; after ] ] ) ->
         (* This party is part of a new transaction, and there are no later
            parties to pair it with. Prove it on its own.
         *)
-        ( `New
-        , Parties_segment.Basic.of_controls [ a1 ]
-        , before
-        , after
-        , use_full_commitment p )
+        intermediate_state p ~kind:`New
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
         :: acc
     | ( (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party contains a proof, don't pair it with other parties. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Same
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( []
         :: (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
@@ -3775,11 +3802,9 @@ let group_by_parties_rev partiess stmtss =
            pair it with other parties.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `New
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( (({ Party.authorization = a1; _ } as p)
         :: ({ Party.authorization = Proof _; _ } :: _ as parties))
@@ -3787,11 +3812,9 @@ let group_by_parties_rev partiess stmtss =
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Same
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( (({ Party.authorization = a1; _ } as p) :: ([] as parties))
         :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
@@ -3800,11 +3823,9 @@ let group_by_parties_rev partiess stmtss =
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Same
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( (({ Party.authorization = a1; _ } as p)
         :: { Party.authorization = a2; _ } :: parties)
@@ -3816,11 +3837,9 @@ let group_by_parties_rev partiess stmtss =
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Same
-            , Parties_segment.Basic.of_controls [ a1; a2 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( []
         :: (({ Party.authorization = a1; _ } as p)
@@ -3831,11 +3850,9 @@ let group_by_parties_rev partiess stmtss =
            proof, don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `New
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( []
         :: (({ Party.authorization = a1; _ } as p)
@@ -3848,11 +3865,9 @@ let group_by_parties_rev partiess stmtss =
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `New
-            , Parties_segment.Basic.of_controls [ a1; a2 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( [ ({ Party.authorization = a1; _ } as p) ]
         :: ({ Party.authorization = a2; _ } :: parties) :: partiess
@@ -3864,11 +3879,9 @@ let group_by_parties_rev partiess stmtss =
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `New
-            , Parties_segment.Basic.of_controls [ a1; a2 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( []
         :: (({ Party.authorization = a1; _ } as p) :: parties)
@@ -3878,11 +3891,9 @@ let group_by_parties_rev partiess stmtss =
            transaction, don't pair it with the next party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `New
-            , Parties_segment.Basic.of_controls [ a1 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( []
         :: [ ({ Party.authorization = a1; _ } as p) ]
@@ -3897,31 +3908,25 @@ let group_by_parties_rev partiess stmtss =
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Two_new
-            , Parties_segment.Basic.of_controls [ a1; a2 ]
-            , before
-            , after
-            , use_full_commitment p )
+          ( intermediate_state p ~kind:`Two_new
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( [ [ ({ Party.authorization = a1; _ } as p) ] ]
       , (before :: after :: _) :: _ ) ->
         (* This party is the final party given. Prove it on its own. *)
-        ( `Same
-        , Parties_segment.Basic.of_controls [ a1 ]
-        , before
-        , after
-        , use_full_commitment p )
+        intermediate_state p ~kind:`Same
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
         :: acc
     | ( [] :: [ ({ Party.authorization = a1; _ } as p) ] :: [] :: _
       , [ _ ] :: (before :: after :: _) :: _ ) ->
         (* This party is the final party given, in a new transaction. Prove it
            on its own.
         *)
-        ( `New
-        , Parties_segment.Basic.of_controls [ a1 ]
-        , before
-        , after
-        , use_full_commitment p )
+        intermediate_state p ~kind:`New
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
         :: acc
     | _, [] ->
         failwith "group_by_parties_rev: No statements remaining"
@@ -4035,11 +4040,12 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   in
   List.fold_right states_rev ~init:[]
     ~f:(fun
-         ( kind
-         , spec
-         , (source_global, source_local)
-         , (target_global, target_local)
-         , use_full_commitment )
+         { Parties_intermediate_state.kind
+         ; spec
+         ; state_before = { global = source_global; local = source_local }
+         ; state_after = { global = target_global; local = target_local }
+         ; use_full_commitment
+         }
          witnesses
        ->
       let current_commitment = !commitment in

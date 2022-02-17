@@ -60,63 +60,6 @@ module Pending_coinbase_stack_state : sig
   val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 end
 
-(*
-module Local_state : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t =
-        ( Parties.Digest.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Currency.Amount.Stable.V1.t
-        , Ledger_hash.Stable.V1.t
-        , bool
-        , Parties.Transaction_commitment.Stable.V1.t )
-        Parties_logic.Local_state.Stable.V1.t
-      [@@deriving compare, equal, hash, sexp, yojson]
-    end
-  end]
-
-  module Checked : sig
-    open Pickles.Impls.Step
-
-    type t =
-      ( Field.t
-      , Token_id.Checked.t
-      , Currency.Amount.Checked.t
-      , Ledger_hash.var
-      , Boolean.var
-      , Parties.Transaction_commitment.Checked.t )
-      Parties_logic.Local_state.t
-  end
-end
-
-module Registers : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type ('ledger, 'pending_coinbase_stack, 'token_id, 'local_state) t =
-        { ledger : 'ledger
-        ; pending_coinbase_stack : 'pending_coinbase_stack
-        ; next_available_token : 'token_id
-        ; local_state : 'local_state
-        }
-      [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
-    end
-  end]
-
-  module Checked : sig
-    open Pickles.Impls.Step
-    type nonrec t =
-(Ledger_hash.var, Pending_coinbase.Stack.var, Token_id.var,
- Local_state.Checked.t)
-t
-
-    val equal : t -> t -> Boolean.var
-  end
-end
-*)
-
 module Statement : sig
   module Poly : sig
     [%%versioned:
@@ -476,6 +419,33 @@ module type S = sig
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
+type local_state =
+  ( (Party.t, unit) Parties.Call_forest.t
+  , (Party.t, unit) Parties.Call_forest.t list
+  , Token_id.t
+  , Currency.Amount.t
+  , Sparse_ledger.t
+  , bool
+  , unit
+  , Transaction_status.Failure.t option )
+  Parties_logic.Local_state.t
+
+type global_state = Sparse_ledger.Global_state.t
+
+(** Represents before/after pairs of states, corresponding to parties in a list of parties transactions.
+ *)
+module Parties_intermediate_state : sig
+  type state = { global : global_state; local : local_state }
+
+  type t =
+    { kind : [ `Same | `New | `Two_new ]
+    ; spec : Parties_segment.Basic.t
+    ; state_before : state
+    ; state_after : state
+    ; use_full_commitment : [ `Others | `Proved_use_full_commitment of bool ]
+    }
+end
+
 (** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
     statements, corresponding to parties in [partiess] which minimize the
     number of snark proofs needed to prove all of the parties.
@@ -499,13 +469,8 @@ end
 *)
 val group_by_parties_rev :
      Party.t list list
-  -> 'a list list
-  -> ( [ `Same | `New | `Two_new ]
-     * Parties_segment.Basic.t
-     * 'a
-     * 'a
-     * [> `Others | `Proved_use_full_commitment of bool ] )
-     list
+  -> (global_state * local_state) list list
+  -> Parties_intermediate_state.t list
 
 (** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
     and corresponding statements needed to prove the application of each
