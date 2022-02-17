@@ -778,7 +778,7 @@ WITH RECURSIVE pending_chain_nonce AS (
         |> String.concat ~sep:",")
     in
     Conn.collect_list
-      (Caqti_request.find_opt
+      (Caqti_request.collect
          Caqti_type.(tup2 int int)
          typ (sql_template public_keys_sql_list))
          (parent_id, List.length public_keys)
