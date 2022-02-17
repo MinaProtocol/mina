@@ -1970,14 +1970,10 @@ type AccountPredicate =
   module Token_id = Mina_base_kernel.Token_id
   module Snapp_basic = Mina_base_kernel.Snapp_basic
 
-  let max_uint32 =
-    Field.constant
-      Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string "0xffffffff"))
+  let max_uint32 = Field.constant @@ Field.Constant.of_string "4294967295"
 
   let max_uint64 =
-    Field.constant
-      Kimchi_pasta.Pasta.Fp.(
-        of_bigint (Bigint.of_hex_string "0xffffffffffffffff"))
+    Field.constant @@ Field.Constant.of_string "18446744073709551615"
 
   let js_uint_zero =
     object%js
