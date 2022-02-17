@@ -1,7 +1,7 @@
 [%%import "../../config.mlh"]
 
 open Core
-open Util
+open Mina_base_util
 open Fold_lib
 open Snark_params.Tick
 

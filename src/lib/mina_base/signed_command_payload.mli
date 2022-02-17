@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Import
+open Mina_base_import
 open Snark_params.Tick
 
 module Body : sig
