@@ -1,7 +1,7 @@
 open Core
 open Snark_params
 open Tick
-open Import
+open Mina_base_import
 
 [@@@warning "-32"]
 

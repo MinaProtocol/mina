@@ -23,6 +23,8 @@
    hash_prefix_states
    hash_prefixes
    linked_tree
+   mina_base.import
+   mina_base.util
    merkle_ledger
    merkle_mask
    one_or_two

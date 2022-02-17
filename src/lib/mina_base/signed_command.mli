@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Mina_base_import
 module Payload = Signed_command_payload
 
 module Poly : sig

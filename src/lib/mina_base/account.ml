@@ -3,13 +3,13 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
+open Mina_base_util
 open Snark_params
 open Tick
 open Currency
 open Mina_numbers
 open Fold_lib
-open Import
+open Mina_base_import
 
 module Index = struct
   [%%versioned
