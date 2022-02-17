@@ -1656,14 +1656,14 @@ let dummy_constraints =
       ( Pickles.Scalar_challenge.to_field_checked'
           (module Impl)
           ~num_bits:16
-          (Pickles_types.Scalar_challenge.create x)
+          (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t * Field.t ) ;
     ignore
       ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
         : Step_main_inputs.Inner_curve.t ) ;
     ignore
       ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
-          (Pickles_types.Scalar_challenge.create x)
+          (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
 type ('a_var, 'a_value, 'a_weird) pickles_rule =
@@ -1736,6 +1736,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
 module Ledger = struct
   type js_field = field_class Js.t
 
+  type js_bool = bool_class Js.t
+
   type js_uint32 = < value : js_field Js.readonly_prop > Js.t
 
   type js_uint64 = < value : js_field Js.readonly_prop > Js.t
@@ -1780,7 +1782,8 @@ module Ledger = struct
   type party_update =
     < appState : js_field set_or_keep Js.js_array Js.t Js.prop
     ; delegate : public_key set_or_keep Js.prop
-    ; verificationKey : verification_key_class Js.t Js.prop >
+    ; verificationKey : verification_key_class Js.t Js.prop
+    ; votingFor : js_field set_or_keep Js.prop >
     Js.t
 
   type js_int64 = < uint64Value : js_field Js.meth > Js.t
@@ -1802,7 +1805,9 @@ module Ledger = struct
     ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
     ; callData : js_field Js.prop
     ; depth : int Js.prop
-    ; protocolState : protocol_state_predicate Js.prop >
+    ; protocolState : protocol_state_predicate Js.prop
+    ; useFullCommitment : js_bool Js.prop
+    ; incrementNonce : js_bool Js.prop >
     Js.t
 
   type full_account_predicate =
@@ -1992,6 +1997,8 @@ type AccountPredicate =
         Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 (Int64.abs x))
     }
 
+  let bool (x : js_bool) = Js.to_bool x##toBoolean
+
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
       Snapp_basic.Or_ignore.Check (elt x##.value)
@@ -2108,9 +2115,9 @@ type AccountPredicate =
         |> Array.to_list
     ; call_data = field b##.callData
     ; call_depth = b##.depth
-    ; protocol_state = protocol_state b##.protocolState (* TODO *)
-    ; increment_nonce = false
-    ; use_full_commitment = false
+    ; increment_nonce = bool b##.incrementNonce
+    ; use_full_commitment = bool b##.useFullCommitment
+    ; protocol_state = protocol_state b##.protocolState
     }
 
   let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
@@ -2338,7 +2345,7 @@ type AccountPredicate =
     let body (b : party_body) : Party.Body.Checked.t =
       let update : Party.Update.Checked.t =
         let u = b##.update in
-        { Party.Update.Poly.app_state =
+        { app_state =
             Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
@@ -2351,16 +2358,23 @@ type AccountPredicate =
                 : string Mina_base_kernel.Data_as_hash.t )
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
+        ; voting_for =
+            Snapp_basic.Set_or_keep.Checked.map
+              (set_or_keep field u##.votingFor)
+              ~f:Mina_base_kernel.State_hash.var_of_hash_packed
         }
       in
-      { pk = public_key b##.publicKey
+      { public_key = public_key b##.publicKey
       ; update
       ; token_id = token_id b##.tokenId
-      ; delta = int64 b##.delta
+      ; balance_change = int64 b##.delta
       ; events = events b##.events
       ; sequence_events = events b##.sequenceEvents
       ; call_data = field b##.callData
-      ; depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; increment_nonce = bool b##.incrementNonce
+      ; use_full_commitment = bool b##.useFullCommitment
+      ; protocol_state = protocol_state b##.protocolState
       }
 
     let fee_payer_party (party : fee_payer_party) :
