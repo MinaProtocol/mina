@@ -1,0 +1,1 @@
+../../../lib/mina_base/kernel/minting_payload.ml

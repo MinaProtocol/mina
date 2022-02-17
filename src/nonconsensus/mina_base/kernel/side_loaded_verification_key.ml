@@ -1,0 +1,1 @@
+../../../lib/mina_base/kernel/side_loaded_verification_key.ml
