@@ -261,8 +261,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () =
            repeat ~n:20 ~f:(fun () ->
                Network.Node.must_send_payment ~logger node ~sender_pub_key
-                 ~receiver_pub_key ~amount:Currency.Amount.one
-                 ~fee:Currency.Fee.one)
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee)
          in
          wait_for t (ledger_proofs_emitted ~num_proofs:2))
     in
