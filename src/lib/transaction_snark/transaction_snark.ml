@@ -3723,65 +3723,107 @@ let constraint_system_digests ~constraint_constants () =
     pair.
 *)
 let group_by_parties_rev partiess stmtss =
+  let use_full_commitment (p : Party.t) =
+    match p.authorization with
+    | Proof _ ->
+        `Proved_use_full_commitment p.data.body.use_full_commitment
+    | _ ->
+        `Others
+  in
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
         (* We've associated statements with all given parties. *)
         acc
-    | [ [ { Party.authorization = a1; _ } ] ], [ [ before; after ] ] ->
+    | [ [ ({ Party.authorization = a1; _ } as p) ] ], [ [ before; after ] ] ->
         (* There are no later parties to pair this one with. Prove it on its
            own.
         *)
-        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | [ []; [ { Party.authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ]
-      ->
+        ( `Same
+        , Parties_segment.Basic.of_controls [ a1 ]
+        , before
+        , after
+        , use_full_commitment p )
+        :: acc
+    | ( [ []; [ ({ Party.authorization = a1; _ } as p) ] ]
+      , [ [ _ ]; [ before; after ] ] ) ->
         (* This party is part of a new transaction, and there are no later
            parties to pair it with. Prove it on its own.
         *)
-        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | ( ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
+        ( `New
+        , Parties_segment.Basic.of_controls [ a1 ]
+        , before
+        , after
+        , use_full_commitment p )
+        :: acc
+    | ( (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
+        :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party contains a proof, don't pair it with other parties. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `Same
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
-    | ( [] :: ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
+    | ( []
+        :: (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
+           :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is part of a new transaction, and contains a proof, don't
            pair it with other parties.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `New
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
-    | ( ({ Party.authorization = a1; _ }
+    | ( (({ Party.authorization = a1; _ } as p)
         :: ({ Party.authorization = Proof _; _ } :: _ as parties))
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `Same
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
-    | ( ({ Party.authorization = a1; _ } :: ([] as parties))
+    | ( (({ Party.authorization = a1; _ } as p) :: ([] as parties))
         :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party is in the next transaction and contains a proof,
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `Same
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
-    | ( ({ Party.authorization = a1; _ }
+    | ( (({ Party.authorization = a1; _ } as p)
         :: { Party.authorization = a2; _ } :: parties)
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( ( `Same
+            , Parties_segment.Basic.of_controls [ a1; a2 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ }
+        :: (({ Party.authorization = a1; _ } as p)
            :: ({ Party.authorization = Proof _; _ } :: _ as parties))
            :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -3789,41 +3831,61 @@ let group_by_parties_rev partiess stmtss =
            proof, don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `New
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ }
+        :: (({ Party.authorization = a1; _ } as p)
            :: { Party.authorization = a2; _ } :: parties)
            :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            new transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( ( `New
+            , Parties_segment.Basic.of_controls [ a1; a2 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
-    | ( [ { Party.authorization = a1; _ } ]
+    | ( [ ({ Party.authorization = a1; _ } as p) ]
         :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
            a new transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( ( `New
+            , Parties_segment.Basic.of_controls [ a1; a2 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ } :: parties)
+        :: (({ Party.authorization = a1; _ } as p) :: parties)
            :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
       , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
         (* The next transaction contains a proof, and this party is in a new
            transaction, don't pair it with the next party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( ( `New
+            , Parties_segment.Basic.of_controls [ a1 ]
+            , before
+            , after
+            , use_full_commitment p )
           :: acc )
     | ( []
-        :: [ { Party.authorization = a1; _ } ]
+        :: [ ({ Party.authorization = a1; _ } as p) ]
            :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
@@ -3831,22 +3893,36 @@ let group_by_parties_rev partiess stmtss =
         (* The next two parties do not contain proofs, the first is within a
            new transaction, and the second is within another new transaction.
            Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
           ( ( `Two_new
             , Parties_segment.Basic.of_controls [ a1; a2 ]
             , before
-            , after )
+            , after
+            , use_full_commitment p )
           :: acc )
-    | [ [ { Party.authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
+    | ( [ [ ({ Party.authorization = a1; _ } as p) ] ]
+      , (before :: after :: _) :: _ ) ->
         (* This party is the final party given. Prove it on its own. *)
-        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | ( [] :: [ { Party.authorization = a1; _ } ] :: [] :: _
+        ( `Same
+        , Parties_segment.Basic.of_controls [ a1 ]
+        , before
+        , after
+        , use_full_commitment p )
+        :: acc
+    | ( [] :: [ ({ Party.authorization = a1; _ } as p) ] :: [] :: _
       , [ _ ] :: (before :: after :: _) :: _ ) ->
         (* This party is the final party given, in a new transaction. Prove it
            on its own.
         *)
-        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
+        ( `New
+        , Parties_segment.Basic.of_controls [ a1 ]
+        , before
+        , after
+        , use_full_commitment p )
+        :: acc
     | _, [] ->
         failwith "group_by_parties_rev: No statements remaining"
     | ([] | [ [] ]), _ ->
@@ -3933,11 +4009,18 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       ([] :: List.map ~f:Parties.parties partiess)
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
-  let tx_statement transaction
+  let tx_statement commitment full_commitment use_full_commitment
       (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
       Snapp_statement.t =
     let at_party =
       Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
+    in
+    let transaction =
+      match use_full_commitment with
+      | `Proved_use_full_commitment b ->
+          if b then full_commitment else commitment
+      | _ ->
+          failwith "Expected `Proof for party that has a proof"
     in
     { transaction; at_party }
   in
@@ -3955,7 +4038,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
          ( kind
          , spec
          , (source_global, source_local)
-         , (target_global, target_local) )
+         , (target_global, target_local)
+         , use_full_commitment )
          witnesses
        ->
       let current_commitment = !commitment in
@@ -3966,7 +4050,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             (* NB: This is only correct if we assume that a proved party will
                never appear first in a transaction.
             *)
-            Some (0, tx_statement current_commitment source_local.parties)
+            Some
+              ( 0
+              , tx_statement current_commitment current_full_commitment
+                  use_full_commitment source_local.parties )
         | _ ->
             None
       in
@@ -4632,6 +4719,10 @@ module For_tests = struct
             Parties.Call_forest.hash ps
           in
           let tx_statement : Snapp_statement.t =
+            let commitment =
+              if snapp_party.data.body.use_full_commitment then full_commitment
+              else commitment
+            in
             { transaction = commitment; at_party = proof_party }
           in
           let handler (Snarky_backendless.Request.With { request; respond }) =

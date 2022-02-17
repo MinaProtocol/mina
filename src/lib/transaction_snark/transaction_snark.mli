@@ -500,7 +500,12 @@ end
 val group_by_parties_rev :
      Party.t list list
   -> 'a list list
-  -> ([ `Same | `New | `Two_new ] * Parties_segment.Basic.t * 'a * 'a) list
+  -> ( [ `Same | `New | `Two_new ]
+     * Parties_segment.Basic.t
+     * 'a
+     * 'a
+     * [> `Others | `Proved_use_full_commitment of bool ] )
+     list
 
 (** [parties_witnesses_exn ledger partiess] generates the parties segment witnesses
     and corresponding statements needed to prove the application of each
