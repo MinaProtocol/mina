@@ -58,13 +58,15 @@ let
   filtered-src = with inputs.nix-filter.lib;
     filter {
       root = ../.;
-      include = [ "src" "dune" "dune-project" "./graphql_schema.json" ];
+      include =
+        [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
     };
 
-  dockerfiles-scripts = path {
-    path = filterSource (name: type:
-    hasPrefix (toString (../. + "/dockerfiles")) name) ../.;
-  };
+  dockerfiles-scripts = with inputs.nix-filter.lib;
+    filter {
+      root = ../.;
+      include = [ (inDirectory "dockerfiles") ];
+    };
 
   overlay = self: super:
     let

@@ -30,7 +30,7 @@
   inputs.gitignore-nix.url = "github:hercules-ci/gitignore.nix";
   inputs.gitignore-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-  inputs.nix-filter.url = "github:balsoft/nix-filter/tomatcher-matchparents";
+  inputs.nix-filter.url = "github:numtide/nix-filter";
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
@@ -171,7 +171,7 @@
               ocamlPackages.mina_daemon_scripts
             ];
             config = {
-              env = ["MINA_TIME_OFFSET=0"];
+              env = [ "MINA_TIME_OFFSET=0" ];
               cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
             };
           };
@@ -182,7 +182,8 @@
           packages.libp2p_helper = pkgs.libp2p_helper;
           packages.marlin_plonk_bindings_stubs_static =
             pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
-          packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
+          packages.mina_integration_tests =
+            ocamlPackages.mina_integration_tests;
 
           legacyPackages.musl = pkgs.pkgsMusl;
           legacyPackages.regular = pkgs;

@@ -99,16 +99,15 @@
     },
     "nix-filter": {
       "locked": {
-        "lastModified": 1644355753,
-        "narHash": "sha256-YMSxv4eDZuidKxvescWBwXg81mQFsTcVGlhGmJ/VuX0=",
-        "owner": "balsoft",
+        "lastModified": 1645371475,
+        "narHash": "sha256-z2n0y5ME7yQTqzzGWnQTVd1MG5Bp1E+of7ZgA861/9E=",
+        "owner": "numtide",
         "repo": "nix-filter",
-        "rev": "c5fecf01af1b0526d6ad3c09afc323360d46e406",
+        "rev": "38bc843f1ce76958a9f6f0a1e4e3455221c8ecf6",
         "type": "github"
       },
       "original": {
-        "owner": "balsoft",
-        "ref": "tomatcher-matchparents",
+        "owner": "numtide",
         "repo": "nix-filter",
         "type": "github"
       }

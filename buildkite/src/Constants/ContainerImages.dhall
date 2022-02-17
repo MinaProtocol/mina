@@ -9,5 +9,6 @@
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
-  ubuntu1804 = "ubuntu:18.04"
+  ubuntu1804 = "ubuntu:18.04",
+  nix = "nixos/nix:2.6.0"
 }
