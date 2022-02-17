@@ -35,7 +35,7 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup3 int64 int64 (option int64))
         {sql| WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -82,7 +82,7 @@ module Sql = struct
     let query_pending_fallback =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup4 int64 int64 int64 (option int64))
         {sql|
 /* In this query, we are recursively traversing the chain (up to the point of canonicity) to a specific height and then, subject to this height at most, (a) finding the balance of some account and (b) finding the nonce in the most recent user command that this account has sent. Then these two subqueries are combined into one row. */
 
@@ -202,7 +202,7 @@ AS combo GROUP BY combo.pk_id
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup3 int64 int64 (option int64))
         {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,bal.nonce
 
               FROM blocks b
@@ -220,7 +220,7 @@ AS combo GROUP BY combo.pk_id
     let query_canonical_fallback =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 int64)
+        Caqti_type.(tup3 int64 int64 (option int64))
         {sql| /* See comments on the above query to help understand this one.
                * Since this query acts on only canonical blocks, we can skip the
                * recursive traversal part. */
@@ -265,12 +265,14 @@ AS combo GROUP BY combo.pk_id
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
       if has_canonical_height then (
         match%bind Conn.find_opt query_canonical (address, requested_block_height) with
-        | Some result -> return @@ Some result
+        | Some ((_,_,Some _) as result) -> return @@ Some result
+        | Some (_,_,None)
         | None ->
           Conn.find_opt query_canonical_fallback (address, requested_block_height))
       else (
         match%bind Conn.find_opt query_pending (address, requested_block_height) with
-        | Some result -> return @@ Some result
+        | Some ((_,_,Some _) as result) -> return @@ Some result
+        | Some (_,_,None)
         | None ->
           let%map result = Conn.find_opt query_pending_fallback (address, requested_block_height) in
           Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,nonce)))
@@ -356,12 +358,15 @@ AS combo GROUP BY combo.pk_id
            * this is ambiguous in the spec but Coinbase confirmed we can return 0.
            * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return (0L, UInt64.zero)
-        | Some (_, last_relevant_command_balance, nonce), None ->
+        | Some (_, last_relevant_command_balance, Some nonce), None ->
           (* This account has no special vesting, so just use its last known
            * balance from the command. The nonce is returned from this
            * user-command, so we need to add one from here to get the current
 -          * nonce in the account. *)
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+        | Some (_, _last_relevant_command_balance, None), None ->
+          (* Could not get a nonce *)
+          Deferred.Result.fail (Errors.create `Missing_nonce)
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
           let balance_at_genesis : int64 =
@@ -379,7 +384,7 @@ AS combo GROUP BY combo.pk_id
               |> UInt64.to_int64, UInt64.zero)
         | ( Some
               ( last_relevant_command_global_slot_since_genesis
-              , last_relevant_command_balance, nonce )
+              , last_relevant_command_balance, Some nonce )
           , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
            * to compute the change in its balance between the most recent command and the start block (if it has vesting
@@ -396,6 +401,11 @@ AS combo GROUP BY combo.pk_id
                   UInt64.of_int64 last_relevant_command_balance
                   + incremental_balance_between_slots)
               |> UInt64.to_int64, UInt64.of_int64 nonce )
+        | ( Some
+              ( _last_relevant_command_global_slot_since_genesis
+              , _last_relevant_command_balance, None )
+          , Some _timing_info ) ->
+          Deferred.Result.fail (Errors.create `Missing_nonce)
       in
       let%bind total_balance =
         match (last_relevant_command_info_opt, timing_info_opt) with

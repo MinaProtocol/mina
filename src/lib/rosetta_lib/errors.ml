@@ -38,14 +38,15 @@ module Variant = struct
     | `Signature_invalid
     | `Memo_invalid
     | `Graphql_uri_not_set
-    | (* We want each of these to be an explicitly different error *)
+    | (* We want each of these Transaction_submit... to be distinct errors *)
       `Transaction_submit_no_sender
     | `Transaction_submit_duplicate
     | `Transaction_submit_bad_nonce
     | `Transaction_submit_fee_small
     | `Transaction_submit_invalid_signature
     | `Transaction_submit_insufficient_balance
-    | `Transaction_submit_expired ]
+    | `Transaction_submit_expired
+    | `Missing_nonce ]
   [@@deriving yojson, show, equal, to_enum, to_representatives]
 end
 
@@ -80,7 +81,7 @@ end = struct
 
   let kind { extra_context = _; kind } = kind
 
-  let message = function
+  let message : Variant.t -> string = function
     | `Sql _ ->
         "SQL failure"
     | `Json_parse _ ->
@@ -133,8 +134,10 @@ end = struct
         "Can't send transaction: Insufficient balance"
     | `Transaction_submit_expired ->
         "Can't send transaction: Expired"
+    | `Missing_nonce ->
+        "Could not find a nonce for the account"
 
-  let context = function
+  let context : Variant.t -> string option = function
     | `Sql msg ->
         Some msg
     | `Json_parse optional_msg ->
@@ -213,8 +216,10 @@ end = struct
         None
     | `Transaction_submit_expired ->
         None
+    | `Missing_nonce ->
+        None
 
-  let retriable = function
+  let retriable : Variant.t -> bool = function
     | `Sql _ ->
         false
     | `Json_parse _ ->
@@ -267,9 +272,11 @@ end = struct
         false
     | `Transaction_submit_expired ->
         false
+    | `Missing_nonce ->
+        false
 
   (* Unlike message above, description can be updated whenever we see fit *)
-  let description = function
+  let description : Variant.t -> string = function
     | `Sql _ ->
         "We encountered a SQL failure."
     | `Json_parse _ ->
@@ -339,6 +346,8 @@ end = struct
     | `Transaction_submit_expired ->
         "This transaction is expired. Please try again with a larger \
          valid_until."
+    | `Missing_nonce ->
+        "Could not find a nonce for the account"
 
   let create ?context kind = { extra_context = context; kind }
 
