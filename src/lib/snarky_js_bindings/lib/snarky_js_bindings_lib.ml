@@ -1965,6 +1965,44 @@ type AccountPredicate =
   module Token_id = Mina_base_kernel.Token_id
   module Snapp_basic = Mina_base_kernel.Snapp_basic
 
+  let max_uint32 =
+    Field.constant
+      Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string "0xffffffff"))
+
+  let max_uint64 =
+    Field.constant
+      Kimchi_pasta.Pasta.Fp.(
+        of_bigint (Bigint.of_hex_string "0xffffffffffffffff"))
+
+  let js_uint_zero =
+    object%js
+      val value = to_js_field Field.zero
+    end
+
+  let js_max_uint32 : js_uint32 =
+    object%js
+      val value = to_js_field max_uint32
+    end
+
+  let js_max_uint64 : js_uint64 =
+    object%js
+      val value = to_js_field max_uint64
+    end
+
+  let max_interval_uint32 : js_uint32 closed_interval =
+    object%js
+      val mutable lower = js_uint_zero
+
+      val mutable upper = js_max_uint32
+    end
+
+  let max_interval_uint64 : js_uint64 closed_interval =
+    object%js
+      val mutable lower = js_uint_zero
+
+      val mutable upper = js_max_uint64
+    end
+
   let field (x : js_field) : Impl.field =
     match x##.value with Constant x -> x | x -> As_prover.read_var x
 
@@ -2202,12 +2240,18 @@ type AccountPredicate =
     let bool (x : bool_class Js.t) = x##.value
 
     let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.var =
+      (* TODO this should work but seems inefficient.. should the checked public key really be compressed? *)
+      (* Signature_lib.Public_key.Uncompressed.compress_var
+         (field pk##.g##.x, field pk##.g##.y) *)
       { x = field pk##.g##.x
       ; is_odd =
           Impl.Boolean.var_of_value
             Bigint.(test_bit (of_field (field_value pk##.g##.y)) 0)
           (* TODO not checked ^^^ *)
       }
+
+    let public_key_dummy () : Signature_lib.Public_key.Compressed.var =
+      { x = Field.zero; is_odd = Boolean.false_ }
 
     let uint32 (x : js_uint32) : Field.t = field x##.value
 
@@ -2226,11 +2270,20 @@ type AccountPredicate =
         ; data = transform x##.value
         }
 
+    let ignore (dummy : 'a) =
+      Snapp_basic.Or_ignore.Checked.Explicit
+        { Snapp_basic.Flagged_option.is_some = Boolean.false_; data = dummy }
+
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
       Snapp_basic.Or_ignore.Checked.Implicit
         { Snapp_predicate.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
+
+    let numeric_equal (type a b) (transform : a -> b) (x : a) =
+      let x' = transform x in
+      Snapp_basic.Or_ignore.Checked.Implicit
+        { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
         b Snapp_basic.Set_or_keep.Checked.t =
@@ -2351,16 +2404,21 @@ type AccountPredicate =
                 : string Mina_base_kernel.Data_as_hash.t )
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
+        ; voting_for =
+            keep (Mina_base_kernel.State_hash.var_of_hash_packed Field.zero)
         }
       in
-      { pk = public_key b##.publicKey
+      { public_key = public_key b##.publicKey
       ; update
       ; token_id = token_id b##.tokenId
-      ; delta = int64 b##.delta
+      ; balance_change = int64 b##.delta
       ; events = events b##.events
       ; sequence_events = events b##.sequenceEvents
       ; call_data = field b##.callData
-      ; depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; protocol_state = protocol_state b##.protocolState (* TODO *)
+      ; increment_nonce = Boolean.false_
+      ; use_full_commitment = Boolean.false_
       }
 
     let fee_payer_party (party : fee_payer_party) :
@@ -2372,36 +2430,48 @@ type AccountPredicate =
       ; predicate = nonce party##.predicate
       }
 
+    let predicate_accept () : Party.Predicate.Checked.t =
+      let pk_dummy = public_key_dummy () in
+      { balance = numeric balance max_interval_uint64
+      ; nonce = numeric nonce max_interval_uint32
+      ; receipt_chain_hash =
+          ignore
+            (Mina_base_kernel.Receipt.Chain_hash.var_of_hash_packed Field.zero)
+      ; public_key = ignore pk_dummy
+      ; delegate = ignore pk_dummy
+      ; state =
+          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
+              ignore Field.zero)
+      ; sequence_state = ignore Field.zero
+      ; proved_state = ignore Boolean.false_
+      }
+
     let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
       match Js.to_string t##.type_ with
       | "accept" ->
-          Nonce_or_accept
-            { nonce = Mina_numbers.Account_nonce.Checked.zero
-            ; accept = Boolean.true_
-            }
+          predicate_accept ()
       | "nonce" ->
           let nonce_js : js_uint32 = Obj.magic t##.value in
-          Nonce_or_accept { nonce = nonce nonce_js; accept = Boolean.false_ }
+          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
       | "full" ->
           let ( ^ ) = Fn.compose in
           let predicate : full_account_predicate = Obj.magic t##.value in
-          Full
-            { balance = numeric balance predicate##.balance
-            ; nonce = numeric nonce predicate##.nonce
-            ; receipt_chain_hash =
-                or_ignore
-                  (* TODO: assumes constant *)
-                  (Mina_base_kernel.Receipt.Chain_hash.var_of_t ^ field_value)
-                  predicate##.receiptChainHash
-            ; public_key = or_ignore public_key predicate##.publicKey
-            ; delegate = or_ignore public_key predicate##.delegate
-            ; state =
-                Pickles_types.Vector.init Snapp_state.Max_state_size.n
-                  ~f:(fun i ->
-                    or_ignore field (array_get_exn predicate##.state i))
-            ; sequence_state = or_ignore field predicate##.sequenceState
-            ; proved_state = or_ignore bool predicate##.provedState
-            }
+          { balance = numeric balance predicate##.balance
+          ; nonce = numeric nonce predicate##.nonce
+          ; receipt_chain_hash =
+              or_ignore
+                (* TODO: assumes constant *)
+                (Mina_base_kernel.Receipt.Chain_hash.var_of_t ^ field_value)
+                predicate##.receiptChainHash
+          ; public_key = or_ignore public_key predicate##.publicKey
+          ; delegate = or_ignore public_key predicate##.delegate
+          ; state =
+              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+                ~f:(fun i ->
+                  or_ignore field (array_get_exn predicate##.state i))
+          ; sequence_state = or_ignore field predicate##.sequenceState
+          ; proved_state = or_ignore bool predicate##.provedState
+          }
       | s ->
           failwithf "bad predicate type: %s" s ()
 
