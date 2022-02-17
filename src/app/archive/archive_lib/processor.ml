@@ -772,16 +772,20 @@ WITH RECURSIVE pending_chain_nonce AS (
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
-    let public_keys_sql_list =
-      (public_keys
-        |> List.map ~f:(fun pk -> sprintf "'%s'" (Signature_lib.Public_key.Compressed.to_base58_check pk))
-        |> String.concat ~sep:",")
-    in
-    Conn.collect_list
-      (Caqti_request.collect
-         Caqti_type.(tup2 int int)
-         typ (sql_template public_keys_sql_list))
-         (parent_id, List.length public_keys)
+    if List.is_empty public_keys then
+      (* SQL query would fail, because `IN ()` is invalid syntax *)
+      return @@ Ok []
+    else
+      let public_keys_sql_list =
+        (public_keys
+         |> List.map ~f:(fun pk -> sprintf "'%s'" (Signature_lib.Public_key.Compressed.to_base58_check pk))
+         |> String.concat ~sep:",")
+      in
+      Conn.collect_list
+        (Caqti_request.collect
+           Caqti_type.(tup2 int int)
+           typ (sql_template public_keys_sql_list))
+        (parent_id, List.length public_keys)
 
   (* INVARIANT: The map is populated with all the public_keys present *)
   let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
