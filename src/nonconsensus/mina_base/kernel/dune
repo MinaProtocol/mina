@@ -10,7 +10,7 @@
    bignum_bigint
    block_time_nonconsensus
    mina_compile_config_nonconsensus
-   genesis_constants
+   genesis_constants_nonconsensus
    digestif
    mina_numbers_nonconsensus
    codable
