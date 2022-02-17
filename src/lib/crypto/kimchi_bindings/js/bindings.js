@@ -2245,3 +2245,15 @@ var caml_pasta_fq_plonk_oracles_deep_copy = function(x) {
       plonk_wasm.caml_pasta_fq_plonk_oracles_deep_copy(
         caml_oracles_to_rust(x, plonk_wasm.WasmFqOracles, plonk_wasm.WasmFqRandomOracles)));
 };
+
+
+// TODO
+// Provides: caml_pasta_fp_poseidon_params_create
+function caml_pasta_fp_poseidon_params_create() {
+    return [0];
+}
+
+// Provides: caml_pasta_fp_poseidon_block_cipher
+function caml_pasta_fp_poseidon_block_cipher(_params, field_vector) {
+    
+}
