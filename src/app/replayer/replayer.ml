@@ -90,7 +90,7 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_epoch_data
   }
 
-let create_replay_checkpoint ~ledger ~start_slot_since_genesis : input =
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
   let accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
     { base = Accounts accounts
@@ -1333,14 +1333,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
+          let start_slot_since_genesis =
+            Int64.succ last_global_slot_since_genesis
+          in
           let replayer_checkpoint =
-            create_replay_checkpoint ~ledger
-              ~start_slot_since_genesis:last_global_slot_since_genesis
+            create_replayer_checkpoint ~ledger ~start_slot_since_genesis
             |> input_to_yojson |> Yojson.Safe.pretty_to_string
           in
           let checkpoint_file =
-            sprintf "replayer-checkpoint-%Ld.json"
-              last_global_slot_since_genesis
+            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
           in
           [%log info] "Writing checkpoint file"
             ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
