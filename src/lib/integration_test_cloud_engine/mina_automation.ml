@@ -209,9 +209,7 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof =
-          None
-          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
+      ; proof = Some proof_config
       ; ledger =
           Some
             { base = Accounts runtime_accounts
