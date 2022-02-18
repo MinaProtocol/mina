@@ -685,6 +685,12 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
           , cmd.sequence_no
           , cmd.secondary_sequence_no )
       in
+      if Option.is_some fee_transfer then
+        [%log info]
+          "Coinbase transaction at global slot since genesis %Ld, sequence \
+           number %d, and secondary sequence number %d contains a fee transfer"
+          cmd.global_slot_since_genesis cmd.sequence_no
+          cmd.secondary_sequence_no ;
       let coinbase =
         match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
         | Ok cb ->
@@ -713,7 +719,13 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
         verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
           ~balance_id ~fee ~continue_on_error ()
       in
-      (* these are combined in the "coinbase" case *)
+      let%bind () =
+        verify_balance ~logger ~pool ~ledger
+          ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id
+          ~token_int64 ~balance_block_data ~set_nonces ~repair_nonces
+          ~continue_on_error
+      in
+      (* the actual application is in the "coinbase" case *)
       Deferred.unit
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
