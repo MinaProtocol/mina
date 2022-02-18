@@ -10,9 +10,9 @@ Setup for deploying the qa-net
 
 3. In main.tf update `mina_image` and `mina_archive_image` to be a recent image created by our CI from the relevant branch (in this case `feature/snapps-protocol`).  If you prefer to use an image you baked, then use the baked image for `mina_image`
 
-4. The snapps qa net is configured to have 2 whale producers, 2 fish producers, 1 seed, 1 snark coordinator with 5 workers connected to it, and 3 archive processes writing to two postgres database (main.tf has these specifications). They keys in `automation/keys` are added accordingly.
+4. The test-snapps testnet is currently configured to have 16 whales online (plus another 4 that we could bring online), 2 online fish, 3 seed, 1 snark coordinator with 5 workers connected to it, and 3 archive processes writing to two postgres database (main.tf has these specifications). As long as the keys for these nodes are in `automation/keys`, then the keys will be added and uploaded automatically by terraform.
 
-5. If the qa-net is already running then destroy it by running `terraform destroy --auto-approve` from `automation/terraform/testnets/test-snapps/`. If running for the first time, then run `terraform init`
+5. If the `test-snapps` is already running then destroy it by running `terraform destroy --auto-approve` from the directory `automation/terraform/testnets/test-snapps/`. If running for the first time, then run `terraform init`
 Note: You may have to set the env variable `KUBE_CONFIG=~/.kube/config `
 
 6. Deploy the network by running `terraform apply --auto-approve` from `automation/terraform/testnets/test-snapps/`

@@ -50,7 +50,7 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 1
+  default     = 3
 }
 
 variable "plain_node_count" {
@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "test-snapps"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-feature-snapps-protocol-733f61a-buster-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-feature-snapps-protocol-733f61a-buster-devnet"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-develop-7ed3dce-buster-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:mina-daemon:1.3.0beta1-develop-7ed3dce-buster-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -126,6 +126,8 @@ module "test-snapps" {
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
+
+  use_embedded_runtime_config = false
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
