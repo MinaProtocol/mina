@@ -25,7 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         List.init 5 ~f:(fun _ -> { balance = "2000000000"; timing = Untimed })
     ; num_snark_workers =
-        0
+        2
         (* We use a small scan state to make sure we can get some ledger proofs emitted quickly *)
     ; transaction_capacity = Some (Log_2 2)
     }
@@ -70,6 +70,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         go (i - 1)
     in
     go n
+
+  (* Call [f] [n] times in parallel *)
+  let repeat_par ~n ~f =
+    Malleable_error.all_unit (List.init n ~f:(fun _ -> f ()))
+
+  let send_padding_transactions ~fee ~logger ~n nodes =
+    let num_per_node =
+      let num_nodes = List.length nodes in
+      (n + num_nodes - 1) / num_nodes
+    in
+    [%log error] "num_per_node = %d" num_per_node ;
+    [%log error] "num_nodes = %d" (List.length nodes) ;
+    let open Malleable_error.Let_syntax in
+    List.map2_exn nodes
+      (List.tl_exn nodes @ [ List.hd_exn nodes ])
+      ~f:(fun sender receiver ->
+        let%bind sender_pub_key = Util.pub_key_of_node sender in
+        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+        repeat_par ~n:num_per_node ~f:(fun () ->
+            Network.Node.must_send_payment ~logger sender ~sender_pub_key
+              ~receiver_pub_key ~amount:Currency.Amount.one ~fee))
+    |> Malleable_error.all_unit
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -282,9 +304,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send payments and wait for proof to be emitted"
         (let%bind () =
+           send_padding_transactions block_producer_nodes ~fee ~logger
+             ~n:padding_payments
+           (*
            repeat ~n:padding_payments ~f:(fun () ->
                Network.Node.must_send_payment ~logger node ~sender_pub_key
-                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee)
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee) *)
          in
          wait_for t (ledger_proofs_emitted ~logger ~num_proofs:2))
     in
