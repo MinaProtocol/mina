@@ -61,7 +61,7 @@ variable "plain_node_count" {
 locals {
   testnet_name = "test-snapps"
   mina_image = "minaprotocol/mina-daemon:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -158,6 +158,8 @@ module "test-snapps" {
       duplicates = 1
     }
   ]
+
+  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
   
   seed_count            = var.seed_count
 
