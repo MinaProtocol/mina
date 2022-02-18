@@ -1143,7 +1143,19 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               , ic.sequence_no
               , ic.secondary_sequence_no )
             in
-            [%compare: int64 * int * int] (tuple ic1) (tuple ic2))
+            let cmp = [%compare: int64 * int * int] (tuple ic1) (tuple ic2) in
+            if cmp = 0 then
+              match (ic1.type_, ic2.type_) with
+              | "coinbase", "fee_transfer_via_coinbase" ->
+                  -1
+              | "fee_transfer_via_coinbase", "coinbase" ->
+                  1
+              | _ ->
+                  failwith
+                    "Two internal commands have the same global slot since \
+                     genesis %Ld, sequence no %d, and secondary sequence no \
+                     %d, but are not a coinbase and fee transfer via coinbase"
+            else cmp)
       in
       (* populate cache of fee transfer via coinbase items *)
       [%log info] "Populating fee transfer via coinbase cache" ;
