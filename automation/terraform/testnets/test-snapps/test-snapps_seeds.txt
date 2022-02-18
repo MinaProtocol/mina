@@ -1,0 +1,4 @@
+/dns4/seed-1.test-snapps.o1test.net/tcp/10000/p2p/12D3KooWSsgu6Z3Zo7CgcLogbBFmi5tN8G4r1iqR9f1c797oMqcL
+/dns4/seed-2.test-snapps.o1test.net/tcp/10001/p2p/12D3KooWSD9XpYQUAqGEVS9c7qcWmACG88dwvmdJrZggATPUrnpk
+/dns4/seed-3.test-snapps.o1test.net/tcp/10002/p2p/12D3KooWBrQ8LQWFJbc4HQGRoe3A9AtBxhL4aPFR4YfeK2pFYnVq
+
