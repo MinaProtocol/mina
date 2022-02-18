@@ -2204,6 +2204,8 @@ type AccountPredicate =
   let party (party : party) : Party.Predicated.t =
     { body = body party##.body; predicate = predicate party##.predicate }
 
+  (* TODO: use proper authorization *)
+  (* the fact that we don't leads to mock tx with state update being rejected *)
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { data = fee_payer_party parties##.feePayer
@@ -2484,7 +2486,6 @@ type AccountPredicate =
       { body = body party##.body; predicate = predicate party##.predicate }
   end
 
-  (* TODO create checked versions!!! *)
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
@@ -2633,6 +2634,11 @@ type AccountPredicate =
     method_ "addAccount" (fun l (pk : public_key) (balance : int) ->
         add_account_exn l##.value pk balance) ;
     method_ "applyPartiesTransaction" (fun l (p : parties) : unit ->
+        (* TODO: this is not yet working!
+           * lacking API to create a proper tx on the JS side
+           * broken uint64 comparison leads to fail of Check_protocol_state_predicate in
+             ./src/mina_base/kernel/transaction_logic.ml
+        *)
         T.apply_transaction l##.value
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           ~txn_state_view:
