@@ -1850,11 +1850,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let perform ~constraint_constants ~state_view (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
-      | Check_protocol_state_predicate (_pred, _global_state) ->
-          Bool.of_bool "check_protocol_state_predicate" true
-          (* TODO FIXME: This is turned off because uint64 compare is broken in javascript *)
-          (* Snapp_predicate.Protocol_state.check pred global_state.protocol_state
-             |> Bool.of_or_error "Check_protocol_state_predicate" *)
+      | Check_protocol_state_predicate (pred, global_state) ->
+          Snapp_predicate.Protocol_state.check pred global_state.protocol_state
+          |> Bool.of_or_error "Check_protocol_state_predicate"
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
           | Accept ->
