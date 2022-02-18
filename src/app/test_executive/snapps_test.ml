@@ -31,9 +31,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     }
 
   (* An event which fires when [n] ledger proofs have been emitted *)
-  let ledger_proofs_emitted ~num_proofs =
+  let ledger_proofs_emitted ~logger ~num_proofs =
     Wait_condition.network_state ~description:"snarked ledger emitted"
       ~f:(fun network_state ->
+        [%log error] "snarked_ledgers_generated = %d"
+          network_state.snarked_ledgers_generated ;
+        let module T = struct
+          type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
+        end in
+        [%log error] "best_tips_by_node = %s"
+          (Yojson.Safe.to_string
+             (T.to_yojson (Map.to_alist network_state.best_tips_by_node))) ;
+        let module T = struct
+          type t =
+            ( string
+            * Event_type.Gossip.Snark_work.r Gossip_state.Set.t
+              Gossip_state.By_direction.t )
+            list
+          [@@deriving to_yojson]
+        end in
+        [%log error] "snark_work = %s"
+          (Yojson.Safe.to_string
+             (T.to_yojson
+                (Map.to_alist
+                   (Map.map network_state.gossip_received ~f:(fun s ->
+                        s.snark_work))))) ;
         network_state.snarked_ledgers_generated > num_proofs)
     |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
          ~hard_timeout:(Slots 10)
@@ -256,14 +278,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          [%log info] "Payment included in transition frontier")
     in
+    let padding_payments = 20 in
     let%bind () =
       section "Send payments and wait for proof to be emitted"
         (let%bind () =
-           repeat ~n:20 ~f:(fun () ->
+           repeat ~n:padding_payments ~f:(fun () ->
                Network.Node.must_send_payment ~logger node ~sender_pub_key
                  ~receiver_pub_key ~amount:Currency.Amount.one ~fee)
          in
-         wait_for t (ledger_proofs_emitted ~num_proofs:2))
+         wait_for t (ledger_proofs_emitted ~logger ~num_proofs:2))
     in
     let%bind () =
       section "send a snapp with bad fee payer signature"
@@ -276,7 +299,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         *)
         (let%bind parties_next_nonce =
            mk_parties_with_signatures
-             ~fee_payer_nonce:(Mina_base.Account.Nonce.of_int 2)
+             ~fee_payer_nonce:
+               (Mina_base.Account.Nonce.of_int (2 + padding_payments))
              parties_valid_pks
          in
          let parties_bad_signature =
