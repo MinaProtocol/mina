@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "test-snapps"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-develop-7ed3dce-buster-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:mina-daemon:1.3.0beta1-develop-7ed3dce-buster-devnet"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -127,7 +127,7 @@ module "test-snapps" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  use_embedded_runtime_config = false
+  use_embedded_runtime_config = true
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
