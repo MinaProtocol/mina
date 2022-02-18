@@ -364,9 +364,9 @@ AS combo GROUP BY combo.pk_id
            * user-command, so we need to add one from here to get the current
 -          * nonce in the account. *)
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-        | Some (_, _last_relevant_command_balance, None), None ->
-          (* Could not get a nonce *)
-          Deferred.Result.fail (Errors.create `Missing_nonce)
+        | Some (_, last_relevant_command_balance, None), None ->
+          (* Could not get a nonce, return 0 *)
+          Deferred.Result.return (last_relevant_command_balance, UInt64.zero)
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
           let balance_at_genesis : int64 =
@@ -402,10 +402,22 @@ AS combo GROUP BY combo.pk_id
                   + incremental_balance_between_slots)
               |> UInt64.to_int64, UInt64.of_int64 nonce )
         | ( Some
-              ( _last_relevant_command_global_slot_since_genesis
-              , _last_relevant_command_balance, None )
-          , Some _timing_info ) ->
-          Deferred.Result.fail (Errors.create `Missing_nonce)
+              ( last_relevant_command_global_slot_since_genesis
+              , last_relevant_command_balance, None )
+          , Some timing_info ) ->
+          let incremental_balance_between_slots =
+            compute_incremental_balance timing_info
+              ~start_slot:
+                (UInt32.of_int
+                   (Int.of_int64_exn
+                      last_relevant_command_global_slot_since_genesis))
+          in
+          (* Could not get a nonce, return 0 *)
+          Deferred.Result.return
+            ( UInt64.Infix.(
+                  UInt64.of_int64 last_relevant_command_balance
+                  + incremental_balance_between_slots)
+              |> UInt64.to_int64, UInt64.zero )
       in
       let%bind total_balance =
         match (last_relevant_command_info_opt, timing_info_opt) with

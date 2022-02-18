@@ -45,8 +45,7 @@ module Variant = struct
     | `Transaction_submit_fee_small
     | `Transaction_submit_invalid_signature
     | `Transaction_submit_insufficient_balance
-    | `Transaction_submit_expired
-    | `Missing_nonce ]
+    | `Transaction_submit_expired ]
   [@@deriving yojson, show, equal, to_enum, to_representatives]
 end
 
@@ -134,8 +133,6 @@ end = struct
         "Can't send transaction: Insufficient balance"
     | `Transaction_submit_expired ->
         "Can't send transaction: Expired"
-    | `Missing_nonce ->
-        "Could not find a nonce for the account"
 
   let context : Variant.t -> string option = function
     | `Sql msg ->
@@ -216,8 +213,6 @@ end = struct
         None
     | `Transaction_submit_expired ->
         None
-    | `Missing_nonce ->
-        None
 
   let retriable : Variant.t -> bool = function
     | `Sql _ ->
@@ -271,8 +266,6 @@ end = struct
     | `Transaction_submit_insufficient_balance ->
         false
     | `Transaction_submit_expired ->
-        false
-    | `Missing_nonce ->
         false
 
   (* Unlike message above, description can be updated whenever we see fit *)
@@ -346,8 +339,6 @@ end = struct
     | `Transaction_submit_expired ->
         "This transaction is expired. Please try again with a larger \
          valid_until."
-    | `Missing_nonce ->
-        "Could not find a nonce for the account"
 
   let create ?context kind = { extra_context = context; kind }
 
