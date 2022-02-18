@@ -1,8 +1,6 @@
 (executable
  (name gen)
- (libraries 
-   run_in_thread.native
-   pickles async core crs digestif fold_lib snarky.backendless tuple_lib ppxlib group_map)
+ (libraries pickles async core crs digestif fold_lib snarky.backendless tuple_lib ppxlib group_map)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))

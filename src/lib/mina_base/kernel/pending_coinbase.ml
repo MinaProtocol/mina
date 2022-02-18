@@ -179,12 +179,13 @@ module Coinbase_stack = struct
     type t = var
 
     let push (h : t) (cb : Coinbase_data.var) =
-      let cb = Coinbase_data.Checked.to_input cb in
       let open Random_oracle.Checked in
       make_checked (fun () ->
           hash ~init:Hash_prefix.coinbase_stack
             (pack_input
-               (Random_oracle.Input.Chunked.append cb (var_to_input h)))
+               (Random_oracle.Input.Chunked.append
+                  (Coinbase_data.Checked.to_input cb)
+                  (var_to_input h)))
           |> var_of_hash_packed)
 
     let check_merge (_, t1) (s2, _) = equal_var t1 s2

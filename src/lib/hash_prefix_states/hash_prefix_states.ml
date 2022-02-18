@@ -1,7 +1,7 @@
 open Core_kernel
 open Hash_prefixes
 
-let salt (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
+let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
 let receipt_chain_user_command = salt receipt_chain_user_command
 
