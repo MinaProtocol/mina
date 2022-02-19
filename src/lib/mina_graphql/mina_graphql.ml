@@ -2886,13 +2886,7 @@ module Types = struct
       scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
         ~coerce:(fun json ->
           let json = to_yojson json in
-          let result = Mina_base.Parties.of_yojson json in
-          ( match result with
-          | Ok _ ->
-              Format.eprintf "DECODED SNAPP@."
-          | Error err ->
-              Format.eprintf "FAILED TO DECODE SNAPP: %s@." err ) ;
-          result)
+          Mina_base.Parties.of_yojson json)
 
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
