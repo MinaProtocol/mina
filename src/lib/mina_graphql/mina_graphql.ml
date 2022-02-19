@@ -1412,7 +1412,7 @@ module Types = struct
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
-            |> Signed_command_memo.to_string)
+            |> Signed_command_memo.to_base58_check)
       ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
@@ -2886,7 +2886,13 @@ module Types = struct
       scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
         ~coerce:(fun json ->
           let json = to_yojson json in
-          Mina_base.Parties.of_yojson json)
+          let result = Mina_base.Parties.of_yojson json in
+          ( match result with
+          | Ok _ ->
+              Format.eprintf "DECODED SNAPP@."
+          | Error err ->
+              Format.eprintf "FAILED TO DECODE SNAPP: %s@." err ) ;
+          result)
 
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"

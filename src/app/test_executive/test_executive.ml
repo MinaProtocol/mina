@@ -47,7 +47,8 @@ let tests : test list =
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("snapps", (module Snapps_test.Make : Intf.Test.Functor_intf))
+  ; ("snapps-genera", (module Snapps_generated.Make : Intf.Test.Functor_intf))
+  ; ("snapps-constr", (module Snapps_constructed.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =

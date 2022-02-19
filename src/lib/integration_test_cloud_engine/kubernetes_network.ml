@@ -425,22 +425,23 @@ module Node = struct
       ~metadata:
         [ ("namespace", `String t.namespace); ("pod_id", `String t.pod_id) ] ;
     let open Deferred.Or_error.Let_syntax in
-    let fee_payer_pk = parties.fee_payer.data.body.public_key in
-    let fee_payer_pk_str =
-      fee_payer_pk |> Signature_lib.Public_key.Compressed.to_base58_check
-    in
-    [%log info] "send_snapp: unlocking fee payer account"
-      ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
-    let unlock_sender_account_graphql () =
-      let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:node_password
-          ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
-          ()
-      in
-      exec_graphql_request ~logger ~node:t
-        ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
-    in
-    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
+    (* let fee_payer_pk = parties.fee_payer.data.body.public_key in
+       let fee_payer_pk_str =
+         fee_payer_pk |> Signature_lib.Public_key.Compressed.to_base58_check
+       in
+       [%log info] "send_snapp: unlocking fee payer account"
+         ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
+       let unlock_sender_account_graphql () =
+         let unlock_account_obj =
+           Graphql.Unlock_account.make ~password:node_password
+             ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
+             ()
+         in
+         exec_graphql_request ~logger ~node:t
+           ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
+       in
+       let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
+    *)
     let parties_json =
       Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
     in
