@@ -14,7 +14,7 @@
    digestif
    mina_numbers_nonconsensus
    codable
-   crypto_params
+   crypto_params_nonconsensus
    currency_nonconsensus
    debug_assert
    dummy_values
