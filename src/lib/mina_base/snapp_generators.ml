@@ -713,7 +713,17 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   let authorization = Signature.dummy in
   Party.Fee_payer.{ data; authorization }
 
-let max_other_parties = 5
+(* keep max_other_parties small, so snapp integration tests don't need lots
+   of block producers
+
+   because the other parties are split into a permissions-setter
+   and another party, the actual number of other parties is
+   twice this value, plus one, for the "balancing" party
+
+   when we have separate transaction accounts in integration tests
+   this number can be increased
+*)
+let max_other_parties = 2
 
 let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)

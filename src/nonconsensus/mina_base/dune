@@ -17,6 +17,8 @@
    snark_params_nonconsensus
    quickcheck_lib_nonconsensus
    random_oracle_nonconsensus
+   mina_base_nonconsensus.util
+   mina_base_nonconsensus.import
    pickles_types
    pickles_base
    with_hash

@@ -770,11 +770,11 @@ struct
       Deferred.unit
 
     let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        ~expiry_ns ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~expiry_ns
         ; sender_mutex = Account_id.Table.create ()
         ; locally_generated_uncommitted =
             Hashtbl.create
@@ -1598,6 +1598,11 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int
+           precomputed_values.genesis_constants.transaction_expiry_hr)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -1693,7 +1698,7 @@ let%test_module _ =
       in
       let pool =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~incoming_diffs:incoming_diff_r
+          ~time_controller ~expiry_ns ~incoming_diffs:incoming_diff_r
           ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
         |> Test.resource_pool
       in
@@ -2284,7 +2289,7 @@ let%test_module _ =
           in
           let pool =
             Test.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller
+              ~consensus_constants ~time_controller ~expiry_ns
               ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
               ~frontier_broadcast_pipe:frontier_pipe_r
             |> Test.resource_pool

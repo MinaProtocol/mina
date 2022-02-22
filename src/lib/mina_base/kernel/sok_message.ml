@@ -1,6 +1,6 @@
 open Core_kernel
-open Util
-open Import
+open Mina_base_util
+open Mina_base_import
 
 [%%versioned
 module Stable = struct

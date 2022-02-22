@@ -395,6 +395,7 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
+      ; transaction_expiry_hr : int option [@default None]
       }
     [@@deriving yojson, dhall_type]
 
@@ -843,7 +844,10 @@ end
 
 module Daemon = struct
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option; peer_list_url : string option }
+    { txpool_max_size : int option
+    ; peer_list_url : string option
+    ; transaction_expiry_hr : int option
+    }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -860,6 +864,9 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+    ; transaction_expiry_hr =
+        opt_fallthrough ~default:t1.transaction_expiry_hr
+          t2.transaction_expiry_hr
     }
 end
 

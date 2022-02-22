@@ -1,7 +1,6 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snarky_backendless
-module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
 open Let_syntax

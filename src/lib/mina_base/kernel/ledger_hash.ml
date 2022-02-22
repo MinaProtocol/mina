@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snark_params
 open Snarky_backendless
 open Tick
