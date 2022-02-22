@@ -38,6 +38,8 @@ module Pre_diff_two : sig
     }
   [@@deriving compare, sexp, yojson]
 
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+
   module Stable : sig
     module V1 : sig
       type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
@@ -55,6 +57,8 @@ module Pre_diff_one : sig
         Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 
   module Stable : sig
     module V1 : sig
