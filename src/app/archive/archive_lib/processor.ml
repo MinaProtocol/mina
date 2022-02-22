@@ -1578,6 +1578,71 @@ module Block = struct
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
+
+    (* modelled on query in Rosetta.Lib.Account.query_pending
+       except that all we need is the nonce, not the balance
+
+       see the comment explaining the design there
+    *)
+    let nonce_query =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        Caqti_type.int64
+        {sql| SELECT nonce
+              FROM (WITH RECURSIVE chain AS (
+
+                     (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                      FROM blocks b
+                      WHERE height = (select MAX(height) from blocks)
+                      ORDER BY timestamp ASC, state_hash ASC
+                      LIMIT 1)
+
+                      UNION ALL
+
+                      SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+                      FROM blocks b
+                      INNER JOIN chain
+
+                      ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
+
+                     )
+
+                    SELECT nonce
+
+                    FROM (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                          FROM chain
+
+                          UNION ALL
+
+                          SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                          FROM blocks b
+
+                          WHERE chain_status = 'canonical') AS full_chain
+
+                    INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+                    INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+                    INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
+
+                    WHERE pks.value = $1
+                    AND full_chain.height <= $2
+
+                    ORDER BY (full_chain.height,busc.sequence_no) DESC
+                    LIMIT 1
+                )
+                AS result
+        |sql}
+    in
+    let run_nonce_query pk =
+      let pk_str = Signature_lib.Public_key.Compressed.to_base58_check pk in
+      let%map last_nonce = Conn.find_opt nonce_query (pk_str,block.height |> Unsigned.UInt32.to_int64) in
+      (* last nonce was in the last user_command for the public key, add 1 to get current nonce
+         if no nonce found, leave as None (it could be 0, but could also be missing data)
+      *)
+      Result.map last_nonce ~f:(Option.map ~f:Int64.succ)
+    in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -1681,20 +1746,22 @@ module Block = struct
     let%bind () =
       deferred_result_list_fold user_cmds_with_ids ~init:()
         ~f:(fun () (user_command, user_command_id) ->
-          let%bind fee_payer_balance_id =
+            let fee_payer_nonce = user_command.nonce |> Unsigned.UInt32.to_int64 in
+            let%bind fee_payer_balance_id =
             balance_id_of_info user_command.fee_payer
               user_command.fee_payer_balance
-              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:None (* TODO: temporary!!! *)
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
           in
           let%bind source_balance_id =
             balance_id_of_info_balance_opt user_command.source
               user_command.source_balance
-              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:None (* TODO: temporary!!! *)
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
           in
           let%bind receiver_balance_id =
+            let%bind nonce = run_nonce_query user_command.receiver in
             balance_id_of_info_balance_opt user_command.receiver
               user_command.receiver_balance
-              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce:None (* TODO: temporary!!! *)
+              ~block_sequence_no:user_command.sequence_no ~block_secondary_sequence_no:0 ~nonce
           in
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
@@ -1734,9 +1801,10 @@ module Block = struct
            , (sequence_no, secondary_sequence_no) )
            ->
           let%bind receiver_balance_id =
+            let%bind nonce = run_nonce_query internal_command.receiver in
             balance_id_of_info internal_command.receiver
               internal_command.receiver_balance
-              ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no ~nonce:None (* TODO: temporary!!! *)
+              ~block_sequence_no:internal_command.sequence_no ~block_secondary_sequence_no:internal_command.secondary_sequence_no ~nonce
           in
           let receiver_account_creation_fee_paid = internal_command.receiver_account_creation_fee_paid
                                                    |> Option.map ~f:(fun amount ->

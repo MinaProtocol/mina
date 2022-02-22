@@ -190,7 +190,6 @@ WITH RECURSIVE pending_chain_nonce AS (
 
               WHERE pks.value = $1
               AND full_chain_nonce.height <= $2
-              AND busc.user_command_id = cmds.id
 
               ORDER BY (full_chain_nonce.height, busc.sequence_no) DESC
               LIMIT 1
