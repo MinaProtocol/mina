@@ -13,18 +13,15 @@ module Allocation_statistics = struct
   type t = { count : int; lifetimes : quartiles } [@@deriving yojson]
 
   let write_metrics { count; lifetimes } object_id =
-    ignore count ; ignore lifetimes ; ignore object_id ; ()
-
-  (* TODO
-     let open Mina_metrics in
-     let open Mina_metrics.Object_lifetime_statistics in
-     let { q1; q2; q3; q4 } = lifetimes in
-     let q x = lifetime_quartile_ms ~name:object_id ~quartile:x in
-     Gauge.set (live_count ~name:object_id) (Int.to_float count) ;
-     Gauge.set (q `Q1) q1 ;
-     Gauge.set (q `Q2) q2 ;
-     Gauge.set (q `Q3) q3 ;
-     Gauge.set (q `Q4) q4 *)
+    let open Mina_metrics in
+    let open Mina_metrics.Object_lifetime_statistics in
+    let { q1; q2; q3; q4 } = lifetimes in
+    let q x = lifetime_quartile_ms ~name:object_id ~quartile:x in
+    Gauge.set (live_count ~name:object_id) (Int.to_float count) ;
+    Gauge.set (q `Q1) q1 ;
+    Gauge.set (q `Q2) q2 ;
+    Gauge.set (q `Q3) q3 ;
+    Gauge.set (q `Q4) q4
 end
 
 (** mutable data for an object we track allocations of (one exists per object type) *)
@@ -180,9 +177,8 @@ let capture object_id =
   let statistics = Allocation_data.compute_statistics data in
   String.Table.set table ~key:object_id ~data:{ data; statistics } ;
   Allocation_statistics.write_metrics statistics object_id ;
-  (* TODO
-     Mina_metrics.(
-       Counter.inc_one (Object_lifetime_statistics.allocated_count ~name:object_id)) ; *)
+  Mina_metrics.(
+    Counter.inc_one (Object_lifetime_statistics.allocated_count ~name:object_id)) ;
   allocation_id
 
 (* release is currently O(n), where n = number of active allocations for this object type; this can be improved by implementing indexed queues (with decent random delete computational complexity) in ocaml *)
@@ -193,11 +189,8 @@ let release ~object_id ~allocation_id =
   let statistics = Allocation_data.compute_statistics info.data in
   String.Table.set table ~key:object_id ~data:{ info with statistics } ;
   Allocation_statistics.write_metrics statistics object_id ;
-  ()
-
-(*
   Mina_metrics.(
-    Counter.inc_one (Object_lifetime_statistics.collected_count ~name:object_id)) *)
+    Counter.inc_one (Object_lifetime_statistics.collected_count ~name:object_id))
 
 let attach_finalizer object_id obj =
   let allocation_id = capture object_id in
