@@ -53,9 +53,10 @@ end]
 
 module Builder = struct
   let breadcrumb_added breadcrumb =
-    let ((block, _) as validated_block) =
+    let validated_block =
       Breadcrumb.validated_transition breadcrumb
     in
+    let block, _ = External_transition.Validated.Stable.V1.of_v2 validated_block in
     let commands = External_transition.Validated.commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
