@@ -586,6 +586,11 @@ end = struct
       res
 
     let sub_flagged x y =
+      let%bind z = seal (Field.Var.sub x y) in
+      let%map no_underflow = range_check_flag z in
+      (z, `Underflow (Boolean.not no_underflow))
+
+    let sub_or_zero x y =
       make_checked (fun () ->
           let open Tick.Run in
           let res = Pickles.Util.seal Tick.m Field.(x - y) in
@@ -604,13 +609,7 @@ end = struct
           let underflow =
             Boolean.( &&& ) y_gte_x (Boolean.not (Field.equal x y))
           in
-          (res, `Underflow underflow))
-
-    let sub_or_zero x y =
-      let%bind res, `Underflow underflow = sub_flagged x y in
-      Tick.Field.Checked.if_ underflow
-        ~then_:Tick.Field.(Var.constant zero)
-        ~else_:res
+          Field.if_ underflow ~then_:Field.zero ~else_:res)
 
     let assert_equal x y = Field.Checked.Assert.equal x y
 
