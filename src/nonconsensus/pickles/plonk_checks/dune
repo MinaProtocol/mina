@@ -1,0 +1,21 @@
+(library
+ (name plonk_checks)
+ (public_name pickles_nonconsensus.plonk_checks)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (libraries
+   composition_types
+   pickles_base
+
+   kimchi_backend
+   pickles_types
+   snarky.backendless
+   core_kernel))
+
+(rule
+ (targets scalars.ml)
+ (mode promote)
+ (action
+  (progn
+   (run gen_scalars/gen_scalars.exe scalars.ml)
+   (run ocamlformat -i scalars.ml))))

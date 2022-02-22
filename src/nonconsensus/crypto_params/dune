@@ -10,7 +10,7 @@
    hash_prefix_states_nonconsensus
    group_map
    snarky.backendless
-   pickles
+   pickles_nonconsensus
    bignum_bigint
    bowe_gabizon_hash
    random_oracle_nonconsensus
