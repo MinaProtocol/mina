@@ -56,6 +56,7 @@ module Builder = struct
     let ((block, _) as validated_block) =
       Breadcrumb.validated_transition breadcrumb
     in
+    let block = With_hash.map_hash block ~f:(fun {State_hash.With_state_hashes.state_hash;_} -> state_hash) in
     let commands = External_transition.Validated.commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =

@@ -20,9 +20,8 @@ module Make (Inputs : Inputs_intf) :
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem external_transition =
-      external_transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+    let to_proof_elem (transition, _) =
+      State_hash.With_state_hashes.state_body_hash transition
 
     let get_previous ~context transition =
       let parent_hash =
@@ -126,10 +125,10 @@ module Make (Inputs : Inputs_intf) :
            (Int.equal max_length merkle_list_length || root_is_genesis))
     in
     let best_tip_with_hash =
-      With_hash.of_data best_tip ~hash_data:External_transition.state_hash
+      With_hash.of_data best_tip ~hash_data:External_transition.state_hashes
     in
     let root_transition_with_hash =
-      With_hash.of_data root ~hash_data:External_transition.state_hash
+      With_hash.of_data root ~hash_data:External_transition.state_hashes
     in
     let%bind (_ : State_hash.t Non_empty_list.t) =
       Deferred.return

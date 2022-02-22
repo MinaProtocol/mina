@@ -24,7 +24,7 @@ module type External_transition_common_intf = sig
 
   val staged_ledger_diff : t -> Staged_ledger_diff.t
 
-  val state_hash : t -> State_hash.t
+  val state_hashes : t -> State_hash.State_hashes.t
 
   val parent_hash : t -> State_hash.t
 
@@ -206,7 +206,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          with_transition =
-      (external_transition, State_hash.t) With_hash.t
+      external_transition State_hash.With_state_hashes.t
       * ( 'time_received
         , 'genesis_state
         , 'proof
@@ -219,8 +219,8 @@ module type S = sig
     val fully_invalid : fully_invalid
 
     val wrap :
-         (external_transition, State_hash.t) With_hash.t
-      -> (external_transition, State_hash.t) With_hash.t * fully_invalid
+         external_transition State_hash.With_state_hashes.t
+      -> external_transition State_hash.With_state_hashes.t * fully_invalid
 
     val extract_delta_transition_chain_witness :
          ( 'time_received
@@ -290,12 +290,12 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          with_transition
-      -> (external_transition, State_hash.t) With_hash.t
+      -> external_transition State_hash.With_state_hashes.t
   end
 
   module Initial_validated : sig
     type t =
-      (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
+      external_transition State_hash.With_state_hashes.t * Validation.initial_valid
     [@@deriving compare]
 
     val handle_dropped_transition :
@@ -306,7 +306,7 @@ module type S = sig
 
   module Almost_validated : sig
     type t =
-      (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+      external_transition State_hash.With_state_hashes.t * Validation.almost_valid
     [@@deriving compare]
 
     include External_transition_common_intf with type t := t
@@ -314,12 +314,12 @@ module type S = sig
 
   module Validated : sig
     type t =
-      (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
+      external_transition State_hash.With_state_hashes.t * Validation.fully_valid
     [@@deriving compare]
 
     val erase :
          t
-      -> (Stable.Latest.t, State_hash.Stable.Latest.t) With_hash.Stable.Latest.t
+      -> Stable.Latest.t State_hash.With_state_hashes.t
          * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
 
     val create_unsafe :
