@@ -39,9 +39,11 @@ val dummy : t
 
 val empty : t
 
-val to_string : t -> string
+val to_base58_check : t -> string
 
-val of_string : string -> t
+val of_base58_check : string -> t Or_error.t
+
+val of_base58_check_exn : string -> t
 
 (** is the memo a digest *)
 val is_digest : t -> bool
