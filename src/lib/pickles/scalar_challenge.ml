@@ -151,11 +151,6 @@ let to_field_constant (type f) ~endo
   done ;
   F.((!a * endo) + !b)
 
-let bitstring bs =
-  List.map bs ~f:(fun b -> if b then '1' else '0')
-  |> String.of_char_list |> String.rev
-  |> fun s -> "0b" ^ s
-
 let test (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type prover_state = unit
@@ -184,7 +179,7 @@ let test (type f)
               (SC.create (Challenge.Constant.of_bits s)))
           xs
       with e ->
-        Core_kernel.eprintf !"Input %s\n%!" (bitstring xs) ;
+        eprintf !"Input %{sexp: bool list}\n%!" xs ;
         raise e)
 
 module Make
@@ -337,7 +332,7 @@ struct
               G.Constant.scale g x)
             (random_point, xs)
         with e ->
-          Core_kernel.eprintf !"Endo input %s\n%!" (bitstring xs) ;
+          eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e)
 
   let endo_inv ((gx, gy) as g) chal =

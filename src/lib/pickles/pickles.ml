@@ -1,5 +1,5 @@
-module P = Proof
 module Endo = Endo
+module P = Proof
 
 module type Statement_intf = Intf.Statement
 

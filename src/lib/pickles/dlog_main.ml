@@ -42,10 +42,6 @@ struct
   open Inputs
   open Impl
 
-  let two = lazy (Util.constant_var (module Impl) (Field.Constant.of_int 2))
-
-  let zero = lazy (Util.constant_var (module Impl) Field.Constant.zero)
-
   module Other_field = struct
     module Packed = struct
       module Constant = Other_field
@@ -117,14 +113,7 @@ struct
   let absorb sponge ty t =
     absorb
       ~mask_g1_opt:(fun () -> assert false)
-      ~absorb_field:(fun x ->
-        if debug then
-          as_prover
-            As_prover.(
-              fun () ->
-                printf "absorb %s\n%!"
-                  Backend.Tock.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
-        Sponge.absorb sponge x)
+      ~absorb_field:(Sponge.absorb sponge)
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(Sponge.absorb sponge) ty t
 
@@ -330,10 +319,7 @@ struct
                 if_ keep
                   ~then_:
                     (if_ acc.non_zero
-                       ~then_:
-                         (Point.add p
-                            (with_label __LOC__ (fun () ->
-                                 Scalar_challenge.endo acc.point xi)))
+                       ~then_:(Point.add p (Scalar_challenge.endo acc.point xi))
                        ~else_:
                          ((* In this branch, the accumulator was zero, so there is no harm in
                              putting the potentially junk underlying point here. *)
@@ -420,17 +406,7 @@ struct
 
   (* TODO: This doesn't need to be an opt sponge *)
   let absorb sponge ty t =
-    Util.absorb
-      ~absorb_field:(fun (b, x) ->
-        if debug then
-          as_prover
-            As_prover.(
-              fun () ->
-                if read Boolean.typ b then
-                  printf "absorb %s\n%!"
-                    Backend.Tock.Bigint.R.(
-                      to_hex_string (of_field (read_var x)))) ;
-        Opt.absorb sponge (b, x))
+    Util.absorb ~absorb_field:(Opt.absorb sponge)
       ~g1_to_field_elements:(fun (b, (x, y)) -> [ (b, x); (b, y) ])
       ~absorb_scalar:(fun x -> Opt.absorb sponge (Boolean.true_, x))
       ~mask_g1_opt:(fun ((finite : Boolean.var), (x, y)) ->
@@ -607,7 +583,6 @@ struct
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
                 ~verification_key:m ~plonk ~alpha ~t_comm)
         in
-        print_g "ft_comm" ft_comm ;
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
              1. The polynomial commitments
@@ -896,7 +871,6 @@ struct
             b_actual)
     in
     let plonk_checks_passed =
-      (*         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base) *)
       with_label __LOC__ (fun () ->
           Plonk_checks.checked
             (module Impl)

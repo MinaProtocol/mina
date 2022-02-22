@@ -73,14 +73,7 @@ struct
 
   let absorb sponge ty t =
     absorb
-      ~absorb_field:(fun x ->
-        if debug then
-          as_prover
-            As_prover.(
-              fun () ->
-                printf "absorb %s\n%!"
-                  Backend.Tick.Bigint.R.(to_hex_string (of_field (read_var x)))) ;
-        Sponge.absorb sponge (`Field x))
+      ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(fun (x, (b : Boolean.var)) ->
         Sponge.absorb sponge (`Field x) ;
@@ -286,37 +279,28 @@ struct
           |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
-        print_g "lr_prod" lr_prod ;
-        print_g "combined_polynomial" combined_polynomial ;
-        print_g "u" u ;
         let p_prime =
           let uc = scale_fast2 u combined_inner_product in
-          print_g "uc" uc ; combined_polynomial + uc
+          combined_polynomial + uc
         in
-        print_g "p_prime" p_prime ;
         let q = p_prime + lr_prod in
-        print_g "q" q ;
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
         print_fp "c" c.inner ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
-          print_g "cq" cq ; cq + delta
+          cq + delta
         in
-        print_g "lhs" lhs ;
         let rhs =
           with_label __LOC__ (fun () ->
               let b_u = scale_fast2 u advice.b in
-              print_g "b_u" b_u ;
               let z_1_g_plus_b_u = scale_fast2 (sg + b_u) z_1 in
-              print_g "z_1_g_plus_b_u" z_1_g_plus_b_u ;
               let z2_h =
                 scale_fast2 (Inner_curve.constant (Lazy.force Generators.h)) z_2
               in
-              print_g "z2_h" z2_h ; z_1_g_plus_b_u + z2_h)
+              z_1_g_plus_b_u + z2_h)
         in
-        print_g "rhs" rhs ;
         (`Success (equal_g lhs rhs), challenges))
 
   let assert_eq_deferred_values
@@ -413,7 +397,6 @@ struct
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
                 ~verification_key:m ~plonk ~alpha ~t_comm)
         in
-        print_g "ft_comm" ft_comm ;
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
              1. The polynomial commitments

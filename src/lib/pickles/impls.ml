@@ -181,11 +181,10 @@ module Wrap = struct
       let check t =
         let open Internal_Basic in
         let open Let_syntax in
-        with_label __LOC__
-          (let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
-           let%bind () = t0.check t in
-           Checked.List.map forbidden_shifted_values ~f:(equal t)
-           >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true)
+        let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
+        let%bind () = t0.check t in
+        Checked.List.map forbidden_shifted_values ~f:(equal t)
+        >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
       (t0, check)
 
