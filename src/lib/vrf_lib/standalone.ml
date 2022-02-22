@@ -40,6 +40,20 @@ module Make
       val add : t -> t -> t
 
       val mul : t -> t -> t
+
+      type var
+
+      val typ : (var, t) Impl.Typ.t
+
+      module Checked : sig
+        open Impl
+
+        val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
+        module Assert : sig
+          val equal : var -> var -> (unit, _) Checked.t
+        end
+      end
     end) (Group : sig
       type t [@@deriving sexp]
 
@@ -50,34 +64,77 @@ module Make
       val scale : t -> Scalar.t -> t
 
       val generator : t
+
+      type var
+
+      val typ : (var, t) Impl.Typ.t
+
+      module Checked :
+        Snarky_curves.Weierstrass_checked_intf
+          with module Impl := Impl
+           and type unchecked := t
+           and type t = var
     end) (Message : sig
+      open Impl
+
       type value [@@deriving sexp]
+
+      type var
+
+      val typ : (var, value) Typ.t
 
       (* This hash function can be merely collision-resistant *)
 
       val hash_to_group : value -> Group.t
+
+      module Checked : sig
+        val hash_to_group : var -> (Group.var, _) Checked.t
+      end
     end) (Output_hash : sig
       type t
+
+      type var
 
       (* I believe this has to be a random oracle *)
 
       val hash : Message.value -> Group.t -> t
+
+      module Checked : sig
+        val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
+      end
     end) (Hash : sig
       (* I believe this has to be a random oracle *)
 
       val hash_for_proof :
         Message.value -> Group.t -> Group.t -> Group.t -> Scalar.t
+
+      module Checked : sig
+        val hash_for_proof :
+             Message.var
+          -> Group.var
+          -> Group.var
+          -> Group.var
+          -> (Scalar.var, _) Impl.Checked.t
+      end
     end) : sig
   module Public_key : sig
     type t = Group.t
+
+    type var = Group.var
   end
 
   module Private_key : sig
     type t = Scalar.t
+
+    type var = Scalar.var
   end
 
   module Context : sig
     type t = (Message.value, Public_key.t) Context.t [@@deriving sexp]
+
+    type var = (Message.var, Public_key.var) Context.t
+
+    val typ : (var, t) Impl.Typ.t
   end
 
   module Evaluation : sig
@@ -87,15 +144,35 @@ module Make
       Evaluation.Poly.t
     [@@deriving sexp]
 
+    type var
+
+    val typ : (var, t) Impl.Typ.t
+
     val create : Private_key.t -> Message.value -> t
 
     val verified_output : t -> Context.t -> Output_hash.t option
+
+    module Checked : sig
+      val verified_output :
+           (module Group.Checked.Shifted.S with type t = 'shifted)
+        -> var
+        -> Context.var
+        -> (Output_hash.var, _) Impl.Checked.t
+    end
   end
 end = struct
   module Public_key = Group
 
   module Context = struct
     type t = (Message.value, Public_key.t) Context.t [@@deriving sexp]
+
+    type var = (Message.var, Public_key.var) Context.t
+
+    let typ =
+      Impl.Typ.of_hlistable
+        [ Message.typ; Public_key.typ ]
+        ~var_to_hlist:Context.to_hlist ~var_of_hlist:Context.of_hlist
+        ~value_to_hlist:Context.to_hlist ~value_of_hlist:Context.of_hlist
   end
 
   module Private_key = Scalar
@@ -107,6 +184,15 @@ end = struct
       [@@deriving sexp, hlist]
 
       type t = Scalar.t t_ [@@deriving sexp]
+
+      type var = Scalar.var t_
+
+      open Impl
+
+      let typ : (var, t) Typ.t =
+        Typ.of_hlistable [ Scalar.typ; Scalar.typ ] ~var_to_hlist:t__to_hlist
+          ~var_of_hlist:t__of_hlist ~value_to_hlist:t__to_hlist
+          ~value_of_hlist:t__of_hlist
     end
 
     type ('group, 'dleq) t_ = ('group, 'dleq) Evaluation.Poly.t =
@@ -114,6 +200,21 @@ end = struct
     [@@deriving sexp]
 
     type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp]
+
+    type var = (Group.var, Discrete_log_equality.var) t_
+
+    let typ : (var, t) Impl.Typ.t =
+      let open Snarky_backendless.H_list in
+      Impl.Typ.of_hlistable
+        [ Discrete_log_equality.typ; Group.typ ]
+        ~var_to_hlist:(fun { discrete_log_equality; scaled_message_hash } ->
+          [ discrete_log_equality; scaled_message_hash ])
+        ~value_to_hlist:(fun { discrete_log_equality; scaled_message_hash } ->
+          [ discrete_log_equality; scaled_message_hash ])
+        ~value_of_hlist:(fun [ discrete_log_equality; scaled_message_hash ] ->
+          { discrete_log_equality; scaled_message_hash })
+        ~var_of_hlist:(fun [ discrete_log_equality; scaled_message_hash ] ->
+          { discrete_log_equality; scaled_message_hash })
 
     let create (k : Private_key.t) message : t =
       let public_key = Group.scale Group.generator k in
@@ -145,6 +246,45 @@ end = struct
              ((s * message_hash) + (c * Group.negate scaled_message_hash)))
       in
       if dleq then Some (Output_hash.hash message scaled_message_hash) else None
+
+    module Checked = struct
+      let verified_output (type shifted)
+          ((module Shifted) as shifted :
+            (module Group.Checked.Shifted.S with type t = shifted))
+          ({ scaled_message_hash; discrete_log_equality = { c; s } } : var)
+          ({ message; public_key } : Context.var) =
+        let open Impl.Checked in
+        let%bind () =
+          let%bind a =
+            (* s * g - c * public_key *)
+            let%bind sg =
+              Group.Checked.scale_known shifted Group.generator
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
+            in
+            Group.Checked.(
+              scale shifted (negate public_key) (Scalar.Checked.to_bits c)
+                ~init:sg)
+            >>= Shifted.unshift_nonzero
+          and b =
+            (* s * H(m) - c * scaled_message_hash *)
+            let%bind sx =
+              let%bind message_hash = Message.Checked.hash_to_group message in
+              Group.Checked.scale shifted message_hash
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
+            in
+            Group.Checked.(
+              scale shifted
+                (negate scaled_message_hash)
+                (Scalar.Checked.to_bits c) ~init:sx)
+            >>= Shifted.unshift_nonzero
+          in
+          Hash.Checked.hash_for_proof message public_key a b
+          >>= Scalar.Checked.Assert.equal c
+        in
+        (* TODO: This could just hash (message_hash, message_hash^k) instead
+           if it were cheaper *)
+        Output_hash.Checked.hash message scaled_message_hash
+    end
   end
 end
 

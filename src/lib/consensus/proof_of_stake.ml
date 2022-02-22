@@ -20,11 +20,10 @@ let name = "proof_of_stake"
 
 let genesis_ledger_total_currency ~ledger =
   Mina_base.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
-    ~f:(fun _addr sum account ->
+    ~f:(fun _addr sum (account : Mina_base.Account.t) ->
       (* only default token matters for total currency used to determine stake *)
       if Mina_base.(Token_id.equal account.token_id Token_id.default) then
-        Amount.add sum
-          (Balance.to_amount @@ account.Mina_base.Account.Poly.balance)
+        Amount.add sum (Balance.to_amount @@ account.balance)
         |> Option.value_exn ?here:None ?error:None
              ~message:"failed to calculate total currency in genesis ledger"
       else sum)
@@ -680,7 +679,7 @@ module Data = struct
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~block_stake_winner ~block_creator ~ledger ~message =
+        shifted ~block_stake_winner ~block_creator ~ledger ~message =
       let open Mina_base in
       let open Snark_params.Tick in
       let%bind private_key =
@@ -712,16 +711,16 @@ module Data = struct
       in
       let%map evaluation =
         with_label __LOC__
-          (T.Checked.eval_and_check_public_key ~private_key ~public_key:delegate
-             message)
+          (T.Checked.eval_and_check_public_key shifted ~private_key
+             ~public_key:delegate message)
       in
       (evaluation, account)
 
     module Checked = struct
       let%snarkydef check
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-          ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner ~block_creator
-          ~global_slot ~seed =
+          shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
+          ~block_creator ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
           request_witness
@@ -730,8 +729,8 @@ module Data = struct
             (As_prover.return Winner_address)
         in
         let%bind result, winner_account =
-          get_vrf_evaluation ~constraint_constants ~ledger:epoch_ledger.hash
-            ~block_stake_winner ~block_creator
+          get_vrf_evaluation ~constraint_constants shifted
+            ~ledger:epoch_ledger.hash ~block_stake_winner ~block_creator
             ~message:{ Message.global_slot; seed; delegator = winner_addr }
         in
         let my_stake = winner_account.balance in
@@ -2160,7 +2159,9 @@ module Data = struct
                , vrf_result
                , truncated_vrf_result
                , winner_account ) =
+        let%bind (module M) = Inner_curve.Checked.Shifted.create () in
         Vrf.Checked.check ~constraint_constants
+          (module M)
           ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_slot_number
           ~block_stake_winner ~block_creator ~seed:staking_epoch_data.seed
       in

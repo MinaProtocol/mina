@@ -7,7 +7,7 @@ module Scalar = struct
 
   type value = t
 
-  type var = Tick.Inner_curve.Scalar.Checked.t
+  type var = Tick.Inner_curve.Scalar.var
 
   let to_string = Tick.Inner_curve.Scalar.to_string
 
@@ -69,7 +69,8 @@ module Group = struct
   module Checked = struct
     include Inner_curve.Checked
 
-    let scale_generator s = scale_known Inner_curve.one s
+    let scale_generator shifted s ~init =
+      scale_known shifted Inner_curve.one s ~init
   end
 end
 
@@ -458,6 +459,8 @@ struct
   include Vrf_lib.Standalone.Make (Tick) (Tick.Inner_curve.Scalar) (Group)
             (struct
               include Message
+
+              let typ = typ ~constraint_constants
 
               let hash_to_group = hash_to_group ~constraint_constants
             end)
