@@ -262,40 +262,13 @@ module Versioned_v1 = struct
 end
 
 module Versioned_v2 = struct
-  module Basic_intf (M : Intf.Input.Versioned_v2.Basic_intf) : sig
-    include
-      Intf.Output.Versioned_v2.Basic_intf
-        with type Stable.V2.t = M.Stable.V2.t
-         and type 'a Stable.V2.creator = 'a M.Stable.V2.creator
-  end = struct
-    module Stable = struct
-      module V2 = struct
-        include Bin_io (struct
-          let id = M.id
-
-          include M.Stable.V2
-        end)
-
-        let __versioned__ = ()
-
-        type 'a creator = 'a M.Stable.V2.creator
-      end
-
-      module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
-    end
-
-    type t = Stable.V2.t
-  end
-
   module Sexp (M : Intf.Input.Versioned_v2.Sexp_intf) : sig
     include
       Intf.Output.Versioned_v2.Sexp_intf
         with type Stable.V2.t = M.Stable.V2.t
          and type 'a Stable.V2.creator = 'a M.Stable.V2.creator
+         and type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V2 = struct
@@ -310,108 +283,18 @@ module Versioned_v2 = struct
         type 'a creator = 'a M.Stable.V2.creator
       end
 
-      module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
-    end
-
-    type t = Stable.V2.t
-  end
-
-  module Yojson (M : Intf.Input.Versioned_v2.Yojson_intf) : sig
-    include
-      Intf.Output.Versioned_v2.Yojson_intf
-        with type Stable.V2.t = M.Stable.V2.t
-         and type 'a Stable.V2.creator = 'a M.Stable.V2.creator
-  end = struct
-    module Stable = struct
-      module V2 = struct
-        include Bin_io_and_yojson (struct
+      module V1 = struct
+        include Bin_io_and_sexp (struct
           let id = M.id
 
-          include M.Stable.V2
+          include M.Stable.V1
         end)
 
         let __versioned__ = ()
 
-        type 'a creator = 'a M.Stable.V2.creator
-      end
+        type 'a creator = 'a M.Stable.V1.creator
 
-      module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
-    end
-
-    type t = Stable.V2.t
-  end
-
-  module Full_compare_eq_hash
-      (M : Intf.Input.Versioned_v2.Full_compare_eq_hash_intf) : sig
-    include
-      Intf.Output.Versioned_v2.Full_compare_eq_hash_intf
-        with type Stable.V2.t = M.Stable.V2.t
-         and type 'a Stable.V2.creator = 'a M.Stable.V2.creator
-  end = struct
-    module Stable = struct
-      module V2 = struct
-        include Full (struct
-          let id = M.id
-
-          include M.Stable.V2
-        end)
-
-        let compare = M.Stable.V2.compare
-
-        let equal = M.Stable.V2.equal
-
-        let hash = M.Stable.V2.hash
-
-        let hash_fold_t = M.Stable.V2.hash_fold_t
-
-        let __versioned__ = ()
-
-        type 'a creator = 'a M.Stable.V2.creator
-      end
-
-      module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
-    end
-
-    type t = Stable.V2.t
-
-    let equal = M.equal
-
-    let compare = M.compare
-
-    let hash = M.hash
-
-    let hash_fold_t = M.hash_fold_t
-  end
-
-  module Full (M : Intf.Input.Versioned_v2.Full_intf) : sig
-    include
-      Intf.Output.Versioned_v2.Full_intf
-        with type Stable.V2.t = M.Stable.V2.t
-         and type 'a Stable.V2.creator = 'a M.Stable.V2.creator
-  end = struct
-    module Stable = struct
-      module V2 = struct
-        include Full (struct
-          let id = M.id
-
-          include M.Stable.V2
-        end)
-
-        let __versioned__ = ()
-
-        type 'a creator = 'a M.Stable.V2.creator
+        let to_latest = M.Stable.V1.to_latest
       end
 
       module Latest = V2
