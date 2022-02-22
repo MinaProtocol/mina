@@ -70,8 +70,9 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       |> Strict_pipe.Writer.write primary_transition_writer) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun envelope ->
-        Network_peer.Envelope.Incoming.data envelope
-        |> Mina_transition.External_transition.Initial_validated.state_hash)
+        ( Network_peer.Envelope.Incoming.data envelope
+        |> Mina_transition.External_transition.Initial_validated.state_hashes )
+          .state_hash)
     |> Mina_base.State_hash.Set.of_list
   in
   let extensions = Transition_frontier.extensions frontier in

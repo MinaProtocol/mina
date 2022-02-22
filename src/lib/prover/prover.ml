@@ -163,8 +163,7 @@ module Worker_state = struct
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
                           ~constraint_constants ~pending_coinbase)
-                     t
-                     (Protocol_state.hash next_state)
+                     t (Protocol_state.hashes next_state).state_hash
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
                             ~proof:Mina_base.Proof.blockchain_dummy)
@@ -465,7 +464,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   let%map chain =
     extend_blockchain t
       (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
-      genesis_inputs.protocol_state_with_hash.data snark_transition None
+      genesis_inputs.protocol_state_with_hashes.data snark_transition None
       prover_state pending_coinbase
   in
   Mina_metrics.(
