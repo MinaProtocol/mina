@@ -2,7 +2,7 @@
 
 open Js_of_ocaml
 open Snark_params.Tick
-open Mina_base
+open Mina_base_kernel
 module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
 

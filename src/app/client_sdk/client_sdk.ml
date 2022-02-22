@@ -2,15 +2,9 @@
 
 [%%import "/src/config.mlh"]
 
-[%%ifdef consensus_mechanism]
-
-[%%error "Client SDK cannot be built if \"consensus_mechanism\" is defined"]
-
-[%%endif]
-
 open Js_of_ocaml
 open Signature_lib
-open Mina_base
+open Mina_base_kernel
 open Rosetta_lib
 open Rosetta_coding
 open Js_util

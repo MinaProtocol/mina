@@ -5,20 +5,21 @@
   (flags +toplevel.js +dynlink.js))
  (libraries
   core_kernel
-  snark_params_nonconsensus
-  rosetta_lib_nonconsensus
-  mina_base_nonconsensus
-  data_hash_lib_nonconsensus
-  random_oracle_nonconsensus
-  signature_lib_nonconsensus
-  string_sign_nonconsensus
+  snark_params
+  rosetta_lib
+  mina_base_kernel
+  mina_numbers
+  data_hash_lib
+  random_oracle
+  signature_lib
+  string_sign
   zarith_stubs_js
   integers
   integers_stubs_js
   js_of_ocaml
   digestif.ocaml
   sponge
-  hex_nonconsensus)
+  hex)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
