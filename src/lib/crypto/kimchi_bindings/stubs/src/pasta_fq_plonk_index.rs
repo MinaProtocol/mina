@@ -43,13 +43,6 @@ pub fn caml_pasta_fq_plonk_index_create(
         })
         .collect();
 
-    /*
-    for (i, g) in gates.iter().enumerate() {
-        let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
-        let s = x.join(", ");
-        println!("c[{}][{:?}]: {}", i, g.typ, s);
-    } */
-
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(
         gates,

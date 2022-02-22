@@ -28,8 +28,8 @@ use wires_15_stubs::{
     CamlRandomOracles,
     CamlScalarChallenge,
     CamlWire,
-    GateType,
     CurrOrNext,
+    GateType,
 };
 
 fn main() {

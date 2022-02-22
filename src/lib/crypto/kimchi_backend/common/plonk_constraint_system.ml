@@ -2,8 +2,6 @@
 open Sponge
 open Unsigned.Size_t
 
-let debug = false
-
 (* TODO: open Core here instead of opening it multiple times below *)
 
 (** A gate interface, parameterized by a field *)
@@ -209,7 +207,7 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           if not (equal zero res) then (
-            Core_kernel.eprintf
+            eprintf
               !"%{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
@@ -257,7 +255,7 @@ module V = struct
   include Hashable.Make (T)
 end
 
-type ('a, 'f) t =
+type 'f t =
   { (* map of cells that share the same value (enforced by to the permutation) *)
     equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other variables) *)
@@ -313,7 +311,7 @@ struct
   open Core_kernel
   open Pickles_types
 
-  type nonrec t = (Gates.t, Fp.t) t
+  type nonrec t = Fp.t t
 
   module H = Digestif.SHA256
 
@@ -482,27 +480,6 @@ struct
                 res.(col_idx).(row_idx) <- value ;
                 Hashtbl.set internal_values ~key:var ~data:value)) ;
     (* return the witness *)
-    ((* construct permutation hashmap *)
-     let pos_map = equivalence_classes_to_hashtbl sys in
-     let permutation (pos : Row.t Position.t) : Row.t Position.t =
-       Option.value (Hashtbl.find pos_map pos) ~default:pos
-     in
-     for row = 0 to num_rows - 1 do
-       for col = 0 to 6 do
-         let permuted =
-           permutation
-             { col
-             ; row =
-                 ( if row < public_input_size then Public_input row
-                 else After_public_input (row - public_input_size) )
-             }
-         in
-         assert (permuted.col < 7) ;
-         [%test_eq: Fp.t]
-           res.(col).(row)
-           res.(permuted.col).(Row.to_absolute ~public_input_size permuted.row)
-       done
-     done) ;
     res
 
   let union_find sys v =
@@ -593,6 +570,7 @@ struct
         let permutation (pos : Row.t Position.t) : Row.t Position.t =
           Option.value (Hashtbl.find pos_map pos) ~default:pos
         in
+
         let update_gate_with_permutation_info (row : Row.t)
             (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
           { gate with
@@ -684,14 +662,6 @@ struct
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
     | `Unfinalized_rev gates ->
-        ( match kind with
-        | Kimchi.Protocol.Generic ->
-            if debug then
-              printf "gnrc %d: %s\n%!" sys.next_row
-                (String.concat_array ~sep:", "
-                   (Array.map coeffs ~f:Fp.to_string))
-        | _ ->
-            () ) ;
         (* as we're adding a row, we're adding new cells.
            If these cells (the first 7) contain variables, make sure that they are wired *)
         let num_vars = min Constants.permutation_cols (Array.length vars) in
@@ -808,13 +778,11 @@ struct
             (Fp.one, `Var res) )
 
   (** Adds a constraint to the constraint system. *)
-  let add_constraint ?label sys
+  let add_constraint ?label:_ sys
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    if debug then
-      Option.iter label ~f:(printf "constraint %d: %s\n%!" sys.next_row) ;
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
@@ -1026,16 +994,6 @@ struct
           Array.map ~f:(Array.map ~f:reduce_to_v) s
         in
         let state = reduce_state sys state in
-        (*
-        let state, remaining_state =
-          let n = Array.length state in
-          let full_rows = n / 5 in
-          let excess = n mod 5 in
-          assert (excess = 1) ;
-          ( Array.init full_rows ~f:(fun i ->
-                Array.concat (List.init 5 ~f:(fun j -> state.((5 * i) + j))))
-          , state.(n - 1) )
-        in *)
         (* add_round_state adds a row that contains 5 rounds of permutation *)
         let add_round_state ~round (s1, s2, s3, s4, s5) =
           let vars =
