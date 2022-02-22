@@ -3,7 +3,8 @@ open Async
 include Intf
 
 module Thread = struct
-  type t = { name : string; mutable elapsed : Time.Span.t } [@@deriving sexp_of]
+  type t = { name : string; mutable elapsed : Time_ns.Span.t }
+  [@@deriving sexp_of]
 
   let threads : t String.Table.t = String.Table.create ()
 
@@ -12,7 +13,7 @@ module Thread = struct
     | Some thread ->
         thread
     | None ->
-        let thread = { name; elapsed = Time.Span.zero } in
+        let thread = { name; elapsed = Time_ns.Span.zero } in
         Hashtbl.set threads ~key:name ~data:thread ;
         thread
 
@@ -31,12 +32,7 @@ module Fiber = struct
 
   let next_id = ref 1
 
-  type t =
-    { id : int
-    ; parent : t option
-    ; thread : Thread.t
-    ; mutable last_start_time : Time.t option
-    }
+  type t = { id : int; parent : t option; thread : Thread.t }
   [@@deriving sexp_of]
 
   let ctx_id : t Type_equal.Id.t = Type_equal.Id.create ~name:"fiber" sexp_of_t
@@ -55,7 +51,7 @@ module Fiber = struct
         fiber
     | None ->
         let thread = Thread.register name in
-        let fiber = { id = !next_id; parent; thread; last_start_time = None } in
+        let fiber = { id = !next_id; parent; thread } in
         incr next_id ;
         Hashtbl.set fibers ~key ~data:fiber ;
         fiber
@@ -65,13 +61,15 @@ module Fiber = struct
     Execution_context.with_local ctx ctx_id (Some t)
 
   let rec record_elapsed_time span t =
-    t.thread.elapsed <- Time.Span.(t.thread.elapsed + span) ;
+    t.thread.elapsed <- Time_ns.Span.(t.thread.elapsed + span) ;
     Option.iter t.parent ~f:(record_elapsed_time span)
 end
 
 module No_trace = struct
   module Hooks = struct
-    let trace_thread_switch _ _ = ()
+    let on_job_enter _ = ()
+
+    let on_job_exit _ _ = ()
   end
 
   let measure _ f = f ()
@@ -126,10 +124,10 @@ let forget_tid f =
 
 let time_execution' (name : string) (f : unit -> 'a) =
   let thread = Thread.register name in
-  let start_time = Time.now () in
+  let start_time = Time_ns.now () in
   let x = f () in
-  let elapsed_time = Time.abs_diff (Time.now ()) start_time in
-  thread.elapsed <- Time.Span.(thread.elapsed + elapsed_time) ;
+  let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
+  thread.elapsed <- Time_ns.Span.(thread.elapsed + elapsed_time) ;
   x
 
 let time_execution (name : string) (f : unit -> 'a) =
@@ -162,22 +160,17 @@ let time_execution (name : string) (f : unit -> 'a) =
 
 (* scheduler hooks *)
 
-let trace_thread_switch (old_ctx : Execution_context.t)
-    (new_ctx : Execution_context.t) =
-  let now = lazy (Time.now ()) in
-  Option.iter (Execution_context.find_local old_ctx Fiber.ctx_id)
-    ~f:(fun fiber ->
-      let last_start_time = Option.value_exn fiber.last_start_time in
-      let elapsed_this_execution =
-        Time.abs_diff (Lazy.force now) last_start_time
-      in
-      fiber.last_start_time <- None ;
-      Fiber.record_elapsed_time elapsed_this_execution fiber) ;
-  Option.iter (Execution_context.find_local new_ctx Fiber.ctx_id)
-    ~f:(fun fiber -> fiber.last_start_time <- Some (Lazy.force now)) ;
+let on_job_enter ctx =
   let (module M) = !implementation in
-  M.Hooks.trace_thread_switch old_ctx new_ctx
+  M.Hooks.on_job_enter ctx
 
-let () = Async_kernel.Tracing.fns := { trace_thread_switch }
+let on_job_exit ctx elapsed_time =
+  Option.iter
+    (Execution_context.find_local ctx Fiber.ctx_id)
+    ~f:(Fiber.record_elapsed_time elapsed_time) ;
+  let (module M) = !implementation in
+  M.Hooks.on_job_exit ctx elapsed_time
+
+let () = Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }
 
 (* FUTURE: migrate to `thread` and `label` based api, with dynamic multidispatch for tracing subsystems *)

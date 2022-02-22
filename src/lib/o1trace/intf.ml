@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 
 module type S = sig
@@ -52,6 +53,8 @@ module type S_with_hooks = sig
   include S
 
   module Hooks : sig
-    val trace_thread_switch : Execution_context.t -> Execution_context.t -> unit
+    val on_job_enter : Execution_context.t -> unit
+
+    val on_job_exit : Execution_context.t -> Time_ns.Span.t -> unit
   end
 end

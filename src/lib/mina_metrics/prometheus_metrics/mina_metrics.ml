@@ -1460,7 +1460,8 @@ module Execution_times = struct
     in
     let collect () =
       let elapsed = Option.value_exn (O1trace.Thread.get_elapsed_time name) in
-      LabelSetMap.singleton [] [ Sample_set.sample (Time.Span.to_ms elapsed) ]
+      LabelSetMap.singleton []
+        [ Sample_set.sample (Time_ns.Span.to_ms elapsed) ]
     in
     CollectorRegistry.register CollectorRegistry.default info collect
 

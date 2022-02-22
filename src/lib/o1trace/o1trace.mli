@@ -5,7 +5,7 @@ include module type of Intf
 module Thread : sig
   val iter_threads : f:(string -> unit) -> unit
 
-  val get_elapsed_time : string -> Time.Span.t option
+  val get_elapsed_time : string -> Time_ns.Span.t option
 end
 
 module No_trace : S_with_hooks
