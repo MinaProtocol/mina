@@ -9,3 +9,4 @@ module Sync_ledger = Sync_ledger
 module Sample_keypairs = Sample_keypairs
 include Mina_base_kernel
 module Sparse_ledger = Sparse_ledger0
+module Util = Mina_base_util

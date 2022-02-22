@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snark_params.Tick
 
 [%%versioned

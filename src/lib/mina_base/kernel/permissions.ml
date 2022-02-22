@@ -1,7 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 

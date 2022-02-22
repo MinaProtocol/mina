@@ -12,6 +12,8 @@
    mina_compile_config
    genesis_constants
    digestif
+   mina_base.import
+   mina_base.util
    mina_numbers
    codable
    crypto_params
