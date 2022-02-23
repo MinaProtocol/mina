@@ -17,6 +17,8 @@ module type Gate_vector_intf = sig
   val add : t -> field Kimchi.Protocol.circuit_gate -> unit
 
   val get : t -> int -> field Kimchi.Protocol.circuit_gate
+
+  val digest : t -> bytes
 end
 
 (** A row indexing in a constraint system. *)
@@ -112,22 +114,6 @@ module Gate_spec = struct
       , wired_to.(6) )
     in
     { typ; wires; coeffs }
-end
-
-(** Represents the state of a hash function. *)
-module Hash_state = struct
-  open Core_kernel
-  module H = Digestif.SHA256
-
-  type t = H.ctx
-
-  (* TODO: why `md5(SHA-256(x))` instead of truncating? *)
-  let digest t = Md5.digest_string H.(to_raw_string (get t))
-
-  (* TODO: it's weird to have a function that you don't know how to call here, this probably should be wrapped with a safer interface (I'm assuming it's the initial state) *)
-
-  (** The initial state. *)
-  let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
 (** The PLONK constraints. *)
@@ -259,7 +245,7 @@ module V = struct
   include Hashable.Make (T)
 end
 
-type 'f t =
+type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
     equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other variables). *)
@@ -268,13 +254,15 @@ type 'f t =
     mutable rows_rev : V.t option array list
   ; (* A circuit is described by a series of gates.
        A gate is finalized once [finalize_and_get_gates] is called.
+       The finalized tag contains the digest of the circuit.
     *)
     mutable gates :
-      [ `Finalized | `Unfinalized_rev of (unit, 'f) Gate_spec.t list ]
+      [ `Finalized of
+        Core.Md5.t * 'rust_gates
+        (* TODO: why is this a polymorphic variant? *)
+      | `Unfinalized_rev of (unit, 'f) Gate_spec.t list ]
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
-  ; (* Hash of the circuit, for distinguishing different circuits. *)
-    mutable hash : Hash_state.t
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
   ; (* Whatever is not public input. *)
@@ -299,11 +287,6 @@ type 'f t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
-module Hash = Core.Md5
-
-(* The hash of the circuit. *)
-let digest (t : _ t) = Hash_state.digest t.hash
-
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -323,93 +306,7 @@ struct
   open Core
   open Pickles_types
 
-  type nonrec t = Fp.t t
-
-  module H = Digestif.SHA256
-
-  (** Used as a helper to unambiguously hash the circuit. *)
-  let feed_constraint t constr =
-    (* Note: the output of `Fp.to_bytes` is fixed-length. *)
-    let absorb_field field acc = H.feed_bytes acc (Fp.to_bytes field) in
-    let lc =
-      let int_buf = Bytes.init 8 ~f:(fun _ -> '\000') in
-      fun x t ->
-        List.fold x ~init:t ~f:(fun acc (x, index) ->
-            let acc = absorb_field x acc in
-            for i = 0 to 7 do
-              Bytes.set int_buf i
-                (Char.of_int_exn ((index lsr (8 * i)) land 255))
-            done ;
-            H.feed_bytes acc int_buf)
-    in
-    let cvars xs =
-      List.concat_map xs ~f:(fun x ->
-          let c, ts =
-            Fp.(
-              Snarky_backendless.Cvar.to_constant_and_terms x ~equal ~add ~mul
-                ~zero ~one)
-          in
-          Option.value_map c ~default:[] ~f:(fun c -> [ (c, 0) ]) @ ts)
-      |> lc
-    in
-    match constr with
-    | Snarky_backendless.Constraint.Equal (v1, v2) ->
-        let t = H.feed_string t "equal" in
-        cvars [ v1; v2 ] t
-    | Snarky_backendless.Constraint.Boolean b ->
-        let t = H.feed_string t "boolean" in
-        cvars [ b ] t
-    | Snarky_backendless.Constraint.Square (x, z) ->
-        let t = H.feed_string t "square" in
-        cvars [ x; z ] t
-    | Snarky_backendless.Constraint.R1CS (a, b, c) ->
-        let t = H.feed_string t "r1cs" in
-        cvars [ a; b; c ] t
-    | Plonk_constraint.T constr -> (
-        match constr with
-        | Basic { l; r; o; m; c } ->
-            let t = H.feed_string t "basic" in
-            let pr (s, x) acc = absorb_field s acc |> cvars [ x ] in
-            t |> pr l |> pr r |> pr o |> absorb_field m |> absorb_field c
-        | Poseidon { state } ->
-            let t = H.feed_string t "poseidon" in
-            let row a = cvars (Array.to_list a) in
-            Array.fold state ~init:t ~f:(fun acc a -> row a acc)
-        | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
-            let t = H.feed_string t "ec_add_complete" in
-            let pr (x, y) = cvars [ x; y ] in
-            t
-            |> cvars [ inf; same_x; slope; inf_z; x21_inv ]
-            |> pr p1 |> pr p2 |> pr p3
-        | EC_scale { state } ->
-            let t = H.feed_string t "ec_scale" in
-            Array.fold state ~init:t ~f:(fun acc a ->
-                Scale_round.fold a ~init:acc ~f:cvars)
-        | EC_endoscale { state; xs; ys; n_acc } ->
-            let t = H.feed_string t "ec_endoscale" in
-            let t =
-              Array.fold state ~init:t
-                ~f:(fun
-                     acc
-                     { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 }
-                   ->
-                  cvars
-                    [ xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 ]
-                    acc)
-            in
-            cvars [ xs; ys; n_acc ] t
-        | EC_endoscalar { state } ->
-            let t = H.feed_string t "ec_endoscale_scalar" in
-            Array.fold state ~init:t
-              ~f:(fun
-                   acc
-                   { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 }
-                 ->
-                cvars
-                  [ n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 ]
-                  acc) )
-    | _ ->
-        failwith "Unsupported constraint"
+  type nonrec t = (Fp.t, Gates.t) t
 
   (** Converts the set of permutations (equivalence_classes) to
       a hash table that maps each position to the next one.
@@ -508,9 +405,6 @@ struct
     Hashtbl.add_exn sys.internal_vars ~key:v ~data:(lc, constant) ;
     V.Internal v
 
-  (* Returns a hash of the circuit. *)
-  let digest (sys : t) = Hash_state.digest sys.hash
-
   (* Initializes a constraint system. *)
   let create () : t =
     { public_input_size = Set_once.create ()
@@ -519,7 +413,6 @@ struct
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
-    ; hash = Hash_state.empty
     ; auxiliary_input_size = 0
     ; pending_generic_gate = None
     ; cached_constants = Hashtbl.create (module Fp)
@@ -558,7 +451,7 @@ struct
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
   let add_row sys (vars : V.t option array) kind coeffs =
     match sys.gates with
-    | `Finalized ->
+    | `Finalized _ ->
         failwith "add_row called on finalized constraint system"
     | `Unfinalized_rev gates ->
         (* As we're adding a row, we're adding new cells.
@@ -584,8 +477,8 @@ struct
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = `Finalized; _ } ->
-        failwith "Already finalized"
+    | { gates = `Finalized (_, gates); _ } ->
+        gates
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
@@ -656,14 +549,26 @@ struct
         add_gates public_gates ;
         add_gates gates ;
 
+        (* compute the circuit's digest *)
+        let digest = Gates.digest rust_gates in
+        let md5_digest = Md5.digest_bytes digest in
+
         (* drop the gates, we don't need them anymore *)
-        sys.gates <- `Finalized ;
+        sys.gates <- `Finalized (md5_digest, rust_gates) ;
 
         (* return the gates *)
         rust_gates
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+
+  (* Returns a hash of the circuit. *)
+  let rec digest (sys : t) =
+    match sys.gates with
+    | `Unfinalized_rev _ ->
+        finalize sys ; digest sys
+    | `Finalized (digest, _) ->
+        digest
 
   (** Regroup terms that share the same variable. 
       For example, (3, i2) ; (2, i2) can be simplified to (5, i2).
@@ -814,7 +719,6 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
