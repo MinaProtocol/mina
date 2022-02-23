@@ -1430,7 +1430,8 @@ let%test_module _ =
                 failwith "should've succeeded")
 
     let%test_unit "age-based expiry" =
-      Quickcheck.test ~trials:1 (User_command_generators.parties_with_ledger ())
+      Quickcheck.test ~trials:1
+        (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (cmd, _, _, _) ->
           let cmd =
             Transaction_hash.User_command_with_valid_signature.create cmd
@@ -1600,8 +1601,8 @@ let%test_module _ =
                 Quickcheck.Generator.tuple2 (return sender)
                   (Quickcheck_lib.of_array test_keys)
               in
-              User_command_generators.payment ~sign_type:`Fake ~key_gen
-                ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
+              Mina_generators.User_command_generators.payment ~sign_type:`Fake
+                ~key_gen ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
@@ -1638,7 +1639,8 @@ let%test_module _ =
             Quickcheck.Generator.tuple2 (return sender)
               (Quickcheck_lib.of_array test_keys)
           in
-          User_command_generators.payment ~sign_type:`Fake ~key_gen
+          Mina_generators.User_command_generators.payment ~sign_type:`Fake
+            ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~fee_range:0 ()

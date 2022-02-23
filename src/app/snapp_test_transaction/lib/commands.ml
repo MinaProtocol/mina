@@ -279,7 +279,8 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
     let protocol_state_predicate_view =
       Mina_state.Protocol_state.Body.view compile_time_genesis.data.body
     in
-    Snapp_generators.gen_protocol_state_predicate protocol_state_predicate_view
+    Mina_generators.Snapp_generators.gen_protocol_state_predicate
+      protocol_state_predicate_view
     |> Base_quickcheck.Generator.generate ~size:1
          ~random:(Splittable_random.State.create Random.State.default)
   in
@@ -758,7 +759,7 @@ let%test_module "Snapps test transaction" =
 
     let%test_unit "snapps transaction graphql round trip" =
       Quickcheck.test ~trials:20
-        (User_command_generators.parties_with_ledger ())
+        (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Parties p ->
