@@ -704,6 +704,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
             | `Fatal_error of exn ] )
           Result.t
           Deferred.t) =
+  (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
     Initial_validate_batcher.create ~verifier ~precomputed_values
   in
@@ -1069,6 +1070,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   (* TODO: Print out the hashes you're adding *)
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader
     ~f:(fun (target_parent_hash, forest) ->
+      (* whenever anything comes through the catchup_job_reader, this anonymous function is called. `target_parent_hash` is actually the parent of all the trees in `forest`, is in other words if one expands `target_parent_hash` and combines it with `forest` them one actually obtains a single tree. *)
       don't_wait_for
         (let prev_ctx = Broadcast_pipe.Reader.peek best_tip_r in
          let ctx = combine prev_ctx (pre_context forest) in
@@ -1079,7 +1081,8 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
          if eq prev_ctx ctx then Deferred.unit
          else Broadcast_pipe.Writer.write best_tip_w ctx) ;
       don't_wait_for
-        ( [%log debug]
+        ( (* primary super_catchup business logic begins here, in this second `don't_wait_for` *)
+          [%log debug]
             ~metadata:
               [ ( "target_parent_hash"
                 , Yojson.Safe.from_string
@@ -1230,6 +1233,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
               [%log debug]
                 ~metadata:[ ("n", `Int (List.length state_hashes)) ]
                 "Adding $n nodes" ;
+              (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
               List.iter forest
                 ~f:
                   (Rose_tree.iter ~f:(fun c ->
