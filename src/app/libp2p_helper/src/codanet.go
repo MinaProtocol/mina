@@ -478,8 +478,8 @@ func bothAccept(a connectionAllowance, b connectionAllowance) connectionAllowanc
 	return a
 }
 
-// eitherAccepts makes sure either allowance allows the connection (or both are undecided)
-func eitherAccepts(a connectionAllowance, b connectionAllowance) connectionAllowance {
+// unlessUndecided(a, b) returns `a` unless it is undecided, in which case it falls back to `b`
+func unlessUndecided(a connectionAllowance, b connectionAllowance) connectionAllowance {
 	if a == Undecided {
 		return b
 	}
@@ -488,7 +488,7 @@ func eitherAccepts(a connectionAllowance, b connectionAllowance) connectionAllow
 
 // checks if a peer id is allowed to dial/accept
 func (gs *CodaGatingState) checkAllowedPeer(p peer.ID) connectionAllowance {
-	return eitherAccepts(gs.checkPeerTrusted(p), gs.checkPeerBanned(p))
+	return unlessUndecided(gs.checkPeerTrusted(p), gs.checkPeerBanned(p))
 }
 
 func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowance {
@@ -518,7 +518,7 @@ func (gs *CodaGatingState) checkAllowedAddr(addr ma.Multiaddr) connectionAllowan
 
 // checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
 func (gs *CodaGatingState) checkAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) connectionAllowance {
-	return eitherAccepts(gs.checkPeerTrusted(p), bothAccept(gs.checkAllowedPeer(p), gs.checkAllowedAddr(addr)))
+	return unlessUndecided(gs.checkPeerTrusted(p), bothAccept(gs.checkAllowedPeer(p), gs.checkAllowedAddr(addr)))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -559,7 +559,7 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) bool
 // Bluetooth), straight after it has accepted a connection from its socket.
 func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) bool {
 	remoteAddr := addrs.RemoteMultiaddr()
-	allowance := eitherAccepts(gs.checkAddrTrusted(remoteAddr), gs.checkAddrBanned(remoteAddr))
+	allowance := unlessUndecided(gs.checkAddrTrusted(remoteAddr), gs.checkAddrBanned(remoteAddr))
 	if allowance.isDeny() {
 		gs.logger.Infof("refusing to accept inbound connection from addr: %v (%s)", remoteAddr, allowance)
 		gs.logGate()
