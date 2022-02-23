@@ -29,12 +29,11 @@ ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
 # proof-systems
-commitment_dlog = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5"  }
-groupmap = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5" }
-mina-curves = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5" }
-oracle = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5"}
-kimchi-circuits = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5", features = [ "wasm_types" ]}
-kimchi = { git = "https://github.com/o1-labs/proof-systems", rev = "aff6a79b81b3afa0c0594a210efd398383753ab5"}
+commitment_dlog = { path = "../../proof-systems/poly-commitment" }
+groupmap = { path = "../../proof-systems/groupmap" }
+mina-curves = { path = "../../proof-systems/curves" }
+oracle = { path = "../../proof-systems/oracle" }
+kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
 rand = { version = "0.8.0" }
 getrandom = { version = "0.2", features = ["js"] }
