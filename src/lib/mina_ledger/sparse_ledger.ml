@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 include Sparse_ledger_base
 
 let of_ledger_root ledger =

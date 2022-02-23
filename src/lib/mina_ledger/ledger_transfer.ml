@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 
 module type Base_ledger_intf =
   Merkle_ledger.Base_ledger_intf.S
