@@ -36,6 +36,7 @@
    kimchi_backend
    cache_dir.fake
    run_in_thread.fake
+   mina_metrics.none
    kimchi
    js_of_ocaml
    bindings_js
