@@ -333,7 +333,28 @@ let _ =
 
        method hashFieldElems = Poseidon_hash.hash_field_elems
 
-       val hashOrder = Poseidon_hash.Field.(Hex.encode @@ Nat.to_bytes order)
+       val hashOrder =
+         let open Core_kernel in
+         let field_order_bytes =
+           let bits_to_bytes bits =
+             let byte_of_bits bs =
+               List.foldi bs ~init:0 ~f:(fun i acc b ->
+                   if b then acc lor (1 lsl i) else acc)
+               |> Char.of_int_exn
+             in
+             List.map
+               (List.groupi bits ~break:(fun i _ _ -> i mod 8 = 0))
+               ~f:byte_of_bits
+             |> String.of_char_list
+           in
+           bits_to_bytes
+             (List.init Snark_params.Tick.Field.size_in_bits ~f:(fun i ->
+                  Bigint.(
+                    equal
+                      (shift_right Snark_params.Tick.Field.size i land one)
+                      one)))
+         in
+         Hex.encode @@ field_order_bytes
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)
