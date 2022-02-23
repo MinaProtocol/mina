@@ -2061,7 +2061,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             (* all done *)
             log_ledger_hash_after_last_slot () ;
             Deferred.return
-              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
+              ( last_global_slot_since_genesis
+              , staking_epoch_ledger
+              , staking_seed
+              , next_epoch_ledger
+              , next_seed )
         | ic :: ics, [], [] ->
             (* only internal commands *)
             combine_or_run_internal_cmds ic ics
@@ -2173,7 +2177,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                , staking_seed
                , next_epoch_ledger
                , next_seed ) =
-        apply_commands sorted_internal_cmds sorted_user_cmds
+        apply_commands sorted_internal_cmds sorted_user_cmds sorted_snapp_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
