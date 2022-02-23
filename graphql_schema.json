@@ -11180,6 +11180,49 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "AccountVerificationKeyWithHash",
+          "description": "Verification key with hash",
+          "fields": [
+            {
+              "name": "verificationKey",
+              "description": "Verification key in Base58Check format",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "hash",
+              "description": "Hash of verification key",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "ENUM",
           "name": "AccountAuthRequired",
           "description": "Kind of authorization required",
@@ -11913,10 +11956,13 @@
             },
             {
               "name": "verificationKey",
-              "description":
-                "Hash of the verification key associated with this account",
+              "description": "Verification key associated with this account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "OBJECT",
+                "name": "AccountVerificationKeyWithHash",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },

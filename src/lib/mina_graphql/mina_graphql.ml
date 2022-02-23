@@ -1043,6 +1043,21 @@ module Types = struct
                 permission.Permissions.Poly.set_voting_for)
           ])
 
+    let account_vk =
+      obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
+        ~fields:(fun _ ->
+          [ field "verificationKey"
+              ~doc:"Verification key in Base58Check format"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+          ; field "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Backend.Tick.Field.to_string vk.hash)
+          ])
+
     let rec account =
       lazy
         (obj "Account" ~doc:"An account record according to the daemon"
@@ -1301,16 +1316,12 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol)
-             ; field "verificationKey" ~typ:string
-                 ~doc:
-                   "Hash of the verification key associated with this account"
+             ; field "verificationKey" ~typ:account_vk
+                 ~doc:"Verification key associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.value_map account.Account.Poly.snapp ~default:None
-                     ~f:(fun snapp_account ->
-                       Option.map snapp_account.verification_key ~f:(fun vk ->
-                           With_hash.hash vk
-                           |> Pickles.Backend.Tick.Field.to_string)))
+                     ~f:(fun snapp_account -> snapp_account.verification_key))
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
                  ~typ:(list (non_null string))
