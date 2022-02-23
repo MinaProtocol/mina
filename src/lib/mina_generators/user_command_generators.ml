@@ -5,7 +5,8 @@
 *)
 
 open Core_kernel
-open Mina_base_kernel
+open Mina_base
+module Ledger = Mina_base.Ledger
 include User_command.Gen
 
 (* using Precomputed_values depth introduces a cyclic dependency *)
