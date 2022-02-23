@@ -89,6 +89,20 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
+        - "-run-snark-coordinator"
+        - "$(CODA_SNARK_KEY)"
+        - "-snark-worker-fee"
+        - "$(CODA_SNARK_FEE)"
+        - "-work-selection"
+        - "$(WORK_SELECTION)"
+        {{-  if .Values.features.enablepeerexchange.enabled}}
+        - "-enable-peer-exchange"
+        - "true"
+        {{- end }}
+        {{-  if .Values.features.logsnarkworkgossip.enabled}}
+        - "-log-snark-work-gossip"
+        - "true"
+        {{- end }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - "--discovery-keypair"
         - "/root/libp2p-keys/key"
@@ -120,6 +134,7 @@ spec:
         - "--config-directory"
         - "{{.Values.features.persistence.mountPath}}/.mina-config"
         {{- end }}
+        "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}'"
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}
@@ -141,6 +156,12 @@ spec:
           value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
+        - name: CODA_SNARK_KEY
+          value: {{ $.Values.publicKey | quote }}
+        - name: CODA_SNARK_FEE
+          value: {{ $.Values.snarkFee | quote }}
+        - name: WORK_SELECTION
+          value: {{$.Values.workSelectionAlgorithm | quote }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - name: CODA_LIBP2P_PASS
           valueFrom:
