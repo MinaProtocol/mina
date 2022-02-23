@@ -965,6 +965,99 @@ module Types = struct
     let account_id { Account.Poly.public_key; token_id; _ } =
       Account_id.create public_key token_id
 
+    let auth_required =
+      let open Permissions.Auth_required in
+      enum "AccountAuthRequired" ~doc:"Kind of authorization required"
+        ~values:
+          [ enum_value "None" ~value:None
+          ; enum_value "Either" ~value:Either
+          ; enum_value "Proof" ~value:Proof
+          ; enum_value "Signature" ~value:Signature
+          ; enum_value "Both" ~value:Both
+          ; enum_value "Impossible" ~value:Impossible
+          ]
+
+    let account_permissions =
+      obj "AccountPermissions" ~fields:(fun _ ->
+          [ field "stake" ~typ:(non_null bool) ~doc:"Permission to stake"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.stake)
+          ; field "editState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit snapp state"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.edit_state)
+          ; field "send" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to send tokens"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.send)
+          ; field "receive" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to receive tokens"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "setDelegate" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the delegate"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_delegate)
+          ; field "setPermissions" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to change permissions"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_permissions)
+          ; field "setVerificationKey" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to set the verification key of the \
+                 snapp associated with the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_verification_key)
+          ; field "setSnappUri" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to change the URI of the snapp \
+                 associated with the account "
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_snapp_uri)
+          ; field "editSequenceState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit the sequence state"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.edit_sequence_state)
+          ; field "setTokenSymbol" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the token symbol"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_token_symbol)
+          ; field "incrementNonce" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to increment the nonce"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.increment_nonce)
+          ; field "setVotingFor" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to set the state hash the account is \
+                 voting for"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_voting_for)
+          ])
+
+    let account_vk =
+      obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
+        ~fields:(fun _ ->
+          [ field "verificationKey"
+              ~doc:"Verification key in Base58Check format"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+          ; field "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Backend.Tick.Field.to_string vk.hash)
+          ])
+
     let rec account =
       lazy
         (obj "Account" ~doc:"An account record according to the daemon"
@@ -1213,11 +1306,32 @@ module Types = struct
                    |> Option.map ~f:(fun snapp_account ->
                           snapp_account.app_state |> Snapp_state.V.to_list
                           |> List.map ~f:Snapp_basic.F.to_string))
+             ; field "permissions" ~typ:account_permissions
+                 ~doc:"Permissions for updating certain fields of this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.permissions)
              ; field "tokenSymbol" ~typ:string
                  ~doc:"The token symbol associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol)
+             ; field "verificationKey" ~typ:account_vk
+                 ~doc:"Verification key associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   Option.value_map account.Account.Poly.snapp ~default:None
+                     ~f:(fun snapp_account -> snapp_account.verification_key))
+             ; field "sequenceEvents"
+                 ~doc:"Sequence events associated with this account"
+                 ~typ:(list (non_null string))
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   Option.map account.Account.Poly.snapp
+                     ~f:(fun snapp_account ->
+                       List.map ~f:Snark_params.Tick.Field.to_string
+                         (Pickles_types.Vector.to_list
+                            snapp_account.sequence_state)))
              ]))
 
     let account = Lazy.force account
