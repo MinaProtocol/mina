@@ -1,9 +1,10 @@
 //! A GateVector: this is used to represent a list of gates.
 
 use kimchi::circuits::{
-    gate::{caml::CamlCircuitGate, CircuitGate},
+    gate::{caml::CamlCircuitGate, Circuit, CircuitGate},
     wires::caml::CamlWire,
 };
+use o1_utils::hasher::CryptoDigest;
 
 // TODO: get rid of this
 
@@ -75,6 +76,12 @@ pub mod fp {
     ) {
         (v.as_mut().0)[t.row as usize].wires[t.col as usize] = h.into();
     }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fp_plonk_gate_vector_digest(v: CamlPastaFpPlonkGateVectorPtr) -> [u8; 32] {
+        Circuit(&v.as_ref().0).digest()
+    }
 }
 
 //
@@ -142,5 +149,11 @@ pub mod fq {
         h: CamlWire,
     ) {
         (v.as_mut().0)[t.row as usize].wires[t.col as usize] = h.into();
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fq_plonk_gate_vector_digest(v: CamlPastaFqPlonkGateVectorPtr) -> [u8; 32] {
+        Circuit(&v.as_ref().0).digest()
     }
 }
