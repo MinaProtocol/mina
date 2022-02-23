@@ -1133,9 +1133,8 @@ var caml_plonk_gate_of_rust = function(gate) {
 var caml_fp_plonk_gate_to_rust = function(gate) {
     return new plonk_wasm.WasmFpGate(
       gate[1],
-      gate[2],
-      caml_plonk_wires_to_rust(gate[3]),
-      caml_u8array_vector_to_rust_flat_vector(gate[4]));
+      caml_plonk_wires_to_rust(gate[2]),
+      caml_u8array_vector_to_rust_flat_vector(gate[3]));
 };
 
 // Provides: caml_fq_plonk_gate_to_rust
@@ -1144,9 +1143,8 @@ var caml_fq_plonk_gate_to_rust = function(gate) {
     // TODO: Hardcoding 32 here is a little brittle
     return new plonk_wasm.WasmFqGate(
       gate[1],
-      gate[2],
-      caml_plonk_wires_to_rust(gate[3]),
-      caml_u8array_vector_to_rust_flat_vector(gate[4]))
+      caml_plonk_wires_to_rust(gate[2]),
+      caml_u8array_vector_to_rust_flat_vector(gate[3]))
 };
 
 
@@ -1513,6 +1511,8 @@ function linearization_of_rust(linearization, affine_class) {
     return [0, constant_term, index_terms];
 }
 
+var None = 0;
+
 // Provides: caml_plonk_verifier_index_of_rust
 // Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
@@ -1525,9 +1525,9 @@ var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     var shifts = caml_plonk_verification_shifts_of_rust(x.shifts);
     // TODO: Handle linearization correctly!
     // var linearization = linearization_of_rust(x.linearization, affine_class);
-    var linearization = free_on_finalize(x.linearization);
+    var lookup_index = None;
     x.free();
-    return [0, domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization];
+    return [0, domain, max_poly_size, max_quot_size, srs, evals, shifts, None];
 };
 // Provides: caml_plonk_verifier_index_to_rust
 // Requires: caml_plonk_domain_to_rust, caml_plonk_verification_evals_to_rust, caml_plonk_verification_shifts_to_rust, free_finalization_registry
@@ -1539,9 +1539,7 @@ var caml_plonk_verifier_index_to_rust = function(x, klass, domain_class, verific
     var srs = x[4];
     var evals = caml_plonk_verification_evals_to_rust(x[5], verification_evals_class, poly_comm_class, mk_affine);
     var shifts = caml_plonk_verification_shifts_to_rust(x[6], verification_shifts_class);
-    // TODO: Handle linearization correctly!
-    var linearization = x[7];
-    return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts, linearization);
+    return new klass(domain, max_poly_size, max_quot_size, srs, evals, shifts);
 };
 
 
