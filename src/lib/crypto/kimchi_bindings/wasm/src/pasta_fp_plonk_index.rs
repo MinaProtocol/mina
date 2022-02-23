@@ -11,7 +11,6 @@ use std::{
 use crate::srs::fp::WasmFpSrs as WasmSrs;
 use crate::gate_vector::fp::WasmGateVector;
 use wasm_bindgen::prelude::*;
-use crate::console_log;
 
 //
 // CamlPastaFpPlonkIndex (custom type)

@@ -26,7 +26,6 @@ use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-use crate::console_log;
 
 #[wasm_bindgen]
 extern "C" {

@@ -2,7 +2,6 @@
 
 use wasm_bindgen::prelude::*;
 use kimchi::circuits::{gate::CircuitGate, wires::Wire, gate::GateType};
-use std::convert::TryInto;
 use crate::wasm_flat_vector::WasmFlatVector;
 
 use paste::paste;

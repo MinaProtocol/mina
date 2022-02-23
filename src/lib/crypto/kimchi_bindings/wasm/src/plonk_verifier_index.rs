@@ -5,7 +5,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
-use kimchi::circuits::expr::{Column, Linearization, PolishToken, Variable};
+use kimchi::circuits::expr::{Column, PolishToken, Variable};
 use kimchi::circuits::gate::{CurrOrNext, GateType};
 use kimchi::circuits::{
     constraints::{zk_polynomial, zk_w3, Shifts},
@@ -754,6 +754,7 @@ macro_rules! impl_verification_key {
                             shifts.s6.into()
                         ],
                         srs: srs.0.clone(),
+                        linearization: expr_linearization(domain, false, &None),
                         // TODO
                         lookup_index: None,
                     };
@@ -799,7 +800,7 @@ macro_rules! impl_verification_key {
                 srs: &$WasmSrs,
                 path: String,
             ) -> Result<WasmPlonkVerifierIndex, JsValue> {
-                let mut vi = read_raw(offset, srs, path)?;
+                let vi = read_raw(offset, srs, path)?;
                 Ok(to_wasm(srs, vi.into()))
             }
 
@@ -850,7 +851,7 @@ macro_rules! impl_verification_key {
                 srs: &$WasmSrs,
                 index: String,
             ) -> WasmPlonkVerifierIndex {
-                let mut vi: DlogVerifierIndex<$G> = serde_json::from_str(&index).unwrap();
+                let vi: DlogVerifierIndex<$G> = serde_json::from_str(&index).unwrap();
                 return to_wasm(srs, vi.into())
             }
 
