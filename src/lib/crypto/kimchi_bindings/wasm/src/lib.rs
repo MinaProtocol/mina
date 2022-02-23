@@ -104,7 +104,7 @@ pub mod plonk_proof;
 pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
-    kimchi_circuits::{
+    kimchi::circuits::{
         expr::caml::{CamlColumn, CamlLinearization, CamlPolishToken, CamlVariable},
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
         nolookup::scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},

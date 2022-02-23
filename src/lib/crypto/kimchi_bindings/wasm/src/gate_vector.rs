@@ -1,7 +1,7 @@
 //! A GateVector: this is used to represent a list of gates.
 
 use wasm_bindgen::prelude::*;
-use kimchi_circuits::{gate::CircuitGate, wires::Wire, gate::GateType};
+use kimchi::circuits::{gate::CircuitGate, wires::Wire, gate::GateType};
 use std::convert::TryInto;
 use crate::wasm_flat_vector::WasmFlatVector;
 

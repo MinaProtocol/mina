@@ -1,7 +1,7 @@
 use ark_poly::EvaluationDomain;
 
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
+use kimchi::circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{

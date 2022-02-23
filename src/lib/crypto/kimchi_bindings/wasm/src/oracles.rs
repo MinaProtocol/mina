@@ -1,7 +1,7 @@
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::prover::ProverProof;
 use kimchi::{index::VerifierIndex as DlogVerifierIndex};
-use kimchi_circuits::nolookup::scalars::RandomOracles;
+use kimchi::circuits::nolookup::scalars::RandomOracles;
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,

@@ -5,9 +5,9 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
-use kimchi_circuits::expr::{Column, Linearization, PolishToken, Variable};
-use kimchi_circuits::gate::{CurrOrNext, GateType};
-use kimchi_circuits::{
+use kimchi::circuits::expr::{Column, Linearization, PolishToken, Variable};
+use kimchi::circuits::gate::{CurrOrNext, GateType};
+use kimchi::circuits::{
     nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };

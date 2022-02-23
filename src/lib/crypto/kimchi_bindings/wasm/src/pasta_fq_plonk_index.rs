@@ -1,7 +1,7 @@
 use ark_poly::EvaluationDomain;
 
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi_circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
+use kimchi::circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, vesta::Affine as GAffineOther, pallas::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -156,4 +156,3 @@ pub fn caml_pasta_fq_plonk_index_write(
         .serialize(&mut rmp_serde::Serializer::new(w))
         .map_err(|e| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {}", e)))
 }
-

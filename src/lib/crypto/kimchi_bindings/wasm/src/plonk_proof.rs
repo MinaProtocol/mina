@@ -1,5 +1,5 @@
-// use kimchi_circuits::expr::{Linearization, PolishToken, Variable, Column};
-// use kimchi_circuits::gate::{GateType, CurrOrNext};
+// use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
+// use kimchi::circuits::gate::{GateType, CurrOrNext};
 use paste::paste;
 use crate::wasm_vector::WasmVector;
 use crate::wasm_flat_vector::WasmFlatVector;
@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use kimchi_circuits::{
+use kimchi::circuits::{
     nolookup::scalars::ProofEvaluations,
     // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS},
