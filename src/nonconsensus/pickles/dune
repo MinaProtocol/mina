@@ -19,15 +19,15 @@
   base58_check
   base64
   codable
-  kimchi_backend
+  kimchi_backend_nonconsensus
   random_oracle_input
   pickles_base
-  pickles.composition_types
-  pickles.limb_vector
-  pickles.plonk_checks
-  pickles.precomputed
-  pickles.one_hot_vector
-  pickles.pseudo
+  pickles_nonconsensus.composition_types
+  pickles_nonconsensus.limb_vector
+  pickles_nonconsensus.plonk_checks
+  pickles_nonconsensus.precomputed
+  pickles_nonconsensus.one_hot_vector
+  pickles_nonconsensus.pseudo
   snarky_log
   sponge
   group_map

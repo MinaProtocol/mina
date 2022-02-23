@@ -1,0 +1,1 @@
+../../../../lib/crypto/kimchi_backend/common/scalar_challenge.ml

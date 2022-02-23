@@ -6,7 +6,7 @@
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries
    limb_vector
-   kimchi_backend
+   kimchi_backend_nonconsensus
    pickles_types
    pickles_base
    snarky.backendless

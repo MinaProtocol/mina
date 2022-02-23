@@ -7,7 +7,7 @@
    composition_types
    pickles_base
 
-   kimchi_backend
+   kimchi_backend_nonconsensus
    pickles_types
    snarky.backendless
    core_kernel))

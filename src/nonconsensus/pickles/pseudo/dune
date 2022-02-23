@@ -5,8 +5,8 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
  (libraries
-   plonk_checks_nonconsensus
-   one_hot_vector_nonconsensus
+   pickles_nonconsensus.plonk_checks
+   pickles_nonconsensus.one_hot_vector
    pickles_types
    snarky.backendless
    core_kernel))

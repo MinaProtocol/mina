@@ -3,7 +3,7 @@
  (public_name pickles_nonconsensus.precomputed)
  (libraries
    core_kernel
-   kimchi_backend)
+   kimchi_backend_nonconsensus)
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
