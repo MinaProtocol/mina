@@ -1,7 +1,7 @@
 use ark_poly::EvaluationDomain;
 
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi::circuits::{gate::CircuitGate, nolookup::constraints::ConstraintSystem};
+use kimchi::circuits::{gate::CircuitGate, constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, vesta::Affine as GAffineOther, pallas::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -36,7 +36,6 @@ pub fn caml_pasta_fq_plonk_index_create(
     let gates: Vec<_> = gates.0
         .iter()
         .map(|gate| CircuitGate::<Fq> {
-            row: gate.row,
             typ: gate.typ,
             wires: gate.wires,
             c: gate.c.clone(),
@@ -132,7 +131,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
     t.srs = srs.0.clone();
     t.fq_sponge_params = oracle::pasta::fp_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, false, None);
+    t.linearization = expr_linearization(t.cs.domain.d1, false, &None);
 
     //
     Ok(WasmPastaFqPlonkIndex(Box::new(t)))

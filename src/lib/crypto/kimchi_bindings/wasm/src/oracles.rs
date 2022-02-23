@@ -1,7 +1,7 @@
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::prover::ProverProof;
 use kimchi::{index::VerifierIndex as DlogVerifierIndex};
-use kimchi::circuits::nolookup::scalars::RandomOracles;
+use kimchi::circuits::scalars::RandomOracles;
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -176,7 +176,7 @@ macro_rules! impl_oracles {
                         .iter()
                         .map(|a| a.clone().into())
                         .map(|s: $F| -s)
-                        .collect(),
+                        .collect::<Vec<_>>(),
                 );
 
                 let proof: ProverProof<$G> = proof.into();

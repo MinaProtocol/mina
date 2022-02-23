@@ -40,7 +40,6 @@ macro_rules! impl_gate_vector {
 
             #[wasm_bindgen]
             pub struct [<Wasm $field_name:camel Gate>] {
-                pub row: u32,
                 pub typ: GateType, // type of the gate
                 pub wires: WasmGateWires,  // gate wires
                 #[wasm_bindgen(skip)] pub c: Vec<$WasmF>,  // constraints vector
@@ -50,12 +49,10 @@ macro_rules! impl_gate_vector {
             impl [<Wasm $field_name:camel Gate>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
-                    row: u32,
                     typ: GateType,
                     wires: WasmGateWires,
                     c: WasmFlatVector<$WasmF>) -> Self {
                     Self {
-                        row,
                         typ,
                         wires,
                         c: c.into(),
@@ -67,7 +64,6 @@ macro_rules! impl_gate_vector {
             {
                 fn from(cg: CircuitGate<$F>) -> Self {
                     Self {
-                        row: cg.row.try_into().expect("usize -> isize"),
                         typ: cg.typ,
                         wires: WasmGateWires(
                             cg.wires[0],
@@ -86,7 +82,6 @@ macro_rules! impl_gate_vector {
             {
                 fn from(cg: &CircuitGate<$F>) -> Self {
                     Self {
-                        row: cg.row.try_into().expect("usize -> isize"),
                         typ: cg.typ,
                         wires: WasmGateWires(
                             cg.wires[0],
@@ -105,7 +100,6 @@ macro_rules! impl_gate_vector {
             {
                 fn from(ccg: [<Wasm $field_name:camel Gate>]) -> Self {
                     Self {
-                        row: ccg.row.try_into().expect("isize -> usize"),
                         typ: ccg.typ,
                         wires: [
                             ccg.wires.0,

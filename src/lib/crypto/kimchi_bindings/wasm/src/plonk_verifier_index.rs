@@ -8,7 +8,7 @@ use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 use kimchi::circuits::expr::{Column, Linearization, PolishToken, Variable};
 use kimchi::circuits::gate::{CurrOrNext, GateType};
 use kimchi::circuits::{
-    nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
+    constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
 use paste::paste;
@@ -574,8 +574,7 @@ macro_rules! impl_verification_key {
                 #[wasm_bindgen(skip)]
                 pub evals: WasmPlonkVerificationEvals,
                 pub shifts: WasmShifts,
-                #[wasm_bindgen(skip)]
-                pub linearization: WasmLinearization,
+                // TODO: add lookup index field
             }
             type WasmPlonkVerifierIndex = [<Wasm $field_name:camel PlonkVerifierIndex>];
 
@@ -589,7 +588,6 @@ macro_rules! impl_verification_key {
                     srs: &$WasmSrs,
                     evals: &WasmPlonkVerificationEvals,
                     shifts: &WasmShifts,
-                    linearization: &WasmLinearization,
                 ) -> Self {
                     WasmPlonkVerifierIndex {
                         domain: domain.clone(),
@@ -598,7 +596,6 @@ macro_rules! impl_verification_key {
                         srs: srs.clone(),
                         evals: evals.clone(),
                         shifts: shifts.clone(),
-                        linearization: linearization.clone(),
                     }
                 }
 
@@ -620,16 +617,6 @@ macro_rules! impl_verification_key {
                 #[wasm_bindgen(setter)]
                 pub fn set_evals(&mut self, x: WasmPlonkVerificationEvals) {
                     self.evals = x
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn linearization(&self) -> WasmLinearization {
-                    self.linearization.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_linearization(&mut self, x: WasmLinearization) {
-                    self.linearization = x
                 }
             }
 
@@ -670,10 +657,6 @@ macro_rules! impl_verification_key {
                             s5: vi.shift[5].into(),
                             s6: vi.shift[6].into(),
                         },
-                    linearization: WasmLinearization {
-                        constant_term: vi.linearization.constant_term.into_iter().map(From::from).collect(),
-                        index_terms: IntoIterator::into_iter(vi.linearization.index_terms).map(From::from).collect(),
-                    },
                 }
             }
 
@@ -725,7 +708,6 @@ macro_rules! impl_verification_key {
                 srs: &$WasmSrs,
                 evals: &WasmPlonkVerificationEvals,
                 shifts: &WasmShifts,
-                linearization: &WasmLinearization,
             ) -> (DlogVerifierIndex<GAffine>, Arc<SRS<GAffine>>) {
                 /*
                 let urs_copy = Rc::clone(&*urs);
@@ -755,8 +737,6 @@ macro_rules! impl_verification_key {
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
                         chacha_comm: None,
-                        lookup_selectors: vec![],
-                        lookup_tables: vec![],
                         w: zk_w3(domain),
                         fr_sponge_params: $FrSpongeParams::params(),
                         fq_sponge_params: $FqSpongeParams::params(),
@@ -773,13 +753,9 @@ macro_rules! impl_verification_key {
                             shifts.s5.into(),
                             shifts.s6.into()
                         ],
-                        linearization: Linearization {
-                            constant_term: linearization.constant_term.clone().into_iter().map(From::from).collect(),
-                            index_terms: linearization.index_terms.clone().into_iter().map(From::from).collect()
-                        },
-                        // TODO
-                        lookup_used: None,
                         srs: srs.0.clone(),
+                        // TODO
+                        lookup_index: None,
                     };
                 (index, srs.0.clone())
             }
@@ -793,7 +769,6 @@ macro_rules! impl_verification_key {
                         &index.srs,
                         &index.evals,
                         &index.shifts,
-                        &index.linearization,
                     )
                     .0
                 }
@@ -825,7 +800,6 @@ macro_rules! impl_verification_key {
                 path: String,
             ) -> Result<WasmPlonkVerifierIndex, JsValue> {
                 let mut vi = read_raw(offset, srs, path)?;
-                vi.linearization = expr_linearization(vi.domain, false, false, None);
                 Ok(to_wasm(srs, vi.into()))
             }
 
@@ -877,7 +851,6 @@ macro_rules! impl_verification_key {
                 index: String,
             ) -> WasmPlonkVerifierIndex {
                 let mut vi: DlogVerifierIndex<$G> = serde_json::from_str(&index).unwrap();
-                vi.linearization = expr_linearization(vi.domain, false, false, None);
                 return to_wasm(srs, vi.into())
             }
 
@@ -952,7 +925,6 @@ macro_rules! impl_verification_key {
                             s5: $F::one().into(),
                             s6: $F::one().into(),
                         },
-                    linearization: WasmLinearization::dummy(),
                 }
             }
 

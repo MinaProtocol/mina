@@ -13,7 +13,7 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use kimchi::circuits::{
-    nolookup::scalars::ProofEvaluations,
+    scalars::ProofEvaluations,
     // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS},
 };
