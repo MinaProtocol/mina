@@ -38,13 +38,6 @@ module Flags = struct
     Param.flag "--nonce" ~doc:"NN Nonce of the fee payer account"
       Param.(required txn_nonce)
 
-  let snapp_state =
-    Param.flag "--snapp-state"
-      ~doc:
-        "FIELDS A list of 8 values that can be Integers, arbitrarty strings,  \
-         hashes, or field elements"
-      Param.(required txn_nonce)
-
   let common_flags =
     Command.(
       let open Let_syntax in
@@ -224,7 +217,7 @@ let update_state =
          Param.flag "--snapp-state"
            ~doc:
              "String(hash)|Integer(field element) a list of 8 elements that \
-              represent the snapp state (null if unspecified)"
+              represent the snapp state (Use empty string for no-op)"
            Param.(listed string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
