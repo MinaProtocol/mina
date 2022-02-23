@@ -29,6 +29,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "payment" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "archive-node" dependsOn,
-    TestExecutive.execute "snapps" dependsOn
+    TestExecutive.execute "snapps-genera" dependsOn,
+    TestExecutive.execute "snapps-constr" dependsOn
   ]
 }
