@@ -38,7 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node = List.hd_exn block_producer_nodes in
     let[@warning "-8"] (Parties parties0 : Mina_base.User_command.t), _, _, _ =
       Quickcheck.random_value
-        (Mina_base.User_command_generators.parties_with_ledger ())
+        (Mina_generators.User_command_generators.parties_with_ledger ())
     in
     let mk_parties_with_signatures ~fee_payer_nonce
         (parties : Mina_base.Parties.t) =

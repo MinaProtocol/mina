@@ -2414,8 +2414,8 @@ let%test_module "staged ledger tests" =
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
-        User_command_generators.sequence_parties_with_ledger ~length:num_snapps
-          ()
+        Mina_generators.User_command_generators.sequence_parties_with_ledger
+          ~length:num_snapps ()
       in
       let snapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
