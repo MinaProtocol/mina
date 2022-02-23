@@ -1342,8 +1342,36 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         | _ ->
             failwith "Expected only the genesis block to have an unparented id"
       in
-      [%log info] "At start slot %Ld, ledger hash"
-        input.start_slot_since_genesis
+      let%bind start_slot_since_genesis =
+        let%map slot_opt =
+          query_db pool
+            ~f:(fun db ->
+              Sql.Block.get_next_slot db input.start_slot_since_genesis)
+            ~item:"Next slot"
+        in
+        match slot_opt with
+        | Some slot ->
+            slot
+        | None ->
+            failwithf
+              "There is no slot in the database greater than equal to the \
+               start slot %Ld given in the input file"
+              input.start_slot_since_genesis ()
+      in
+      if
+        not
+          (Int64.equal start_slot_since_genesis input.start_slot_since_genesis)
+      then
+        [%log info]
+          "Starting with next available global slot in the archive database"
+          ~metadata:
+            [ ( "input_start_slot"
+              , `String (Int64.to_string input.start_slot_since_genesis) )
+            ; ( "available_start_slot"
+              , `String (Int64.to_string start_slot_since_genesis) )
+            ] ;
+      [%log info] "At start global slot %Ld, ledger hash"
+        start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
       let%bind ( last_global_slot_since_genesis
                , staking_epoch_ledger
@@ -1351,12 +1379,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                , next_epoch_ledger
                , next_seed ) =
         apply_commands sorted_internal_cmds sorted_user_cmds
-          ~last_global_slot_since_genesis:input.start_slot_since_genesis
+          ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
+          (* start replaying at the slot after the one we've just finished with *)
           let start_slot_since_genesis =
             Int64.succ last_global_slot_since_genesis
           in
