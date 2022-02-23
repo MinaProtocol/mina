@@ -6,6 +6,7 @@ open Core
 
 open Async_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_transition
 include Frontier_base
 module Full_frontier = Full_frontier
@@ -454,7 +455,10 @@ end
 
 module For_tests = struct
   open Signature_lib
-  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+  module Ledger_transfer =
+    Mina_ledger.Ledger_transfer.Make
+      (Mina_ledger.Ledger)
+      (Mina_ledger.Ledger.Db)
   open Full_frontier.For_tests
 
   let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y

@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Mina_base
 open Signature_lib
+module Ledger = Mina_ledger.Ledger
 
 type t [@@deriving sexp]
 
@@ -174,7 +175,7 @@ val create_diff :
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
-  -> epoch_ledger:Mina_base.Sparse_ledger.t
+  -> epoch_ledger:Mina_ledger.Sparse_ledger.t
   -> global_slot:Mina_numbers.Global_slot.t
   -> bool
 

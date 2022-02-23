@@ -12,7 +12,9 @@ module T = struct
      the second maps ledger hashes to reference counts
   *)
   type t =
-    { ledgers : Ledger.t Ledger_hash.Table.t; counts : int Ledger_hash.Table.t }
+    { ledgers : Mina_ledger.Ledger.t Ledger_hash.Table.t
+    ; counts : int Ledger_hash.Table.t
+    }
 
   type view = unit
 
@@ -39,7 +41,7 @@ module T = struct
     let breadcrumbs = Full_frontier.all_breadcrumbs frontier in
     List.iter breadcrumbs ~f:(fun bc ->
         let ledger = Staged_ledger.ledger @@ Breadcrumb.staged_ledger bc in
-        let ledger_hash = Ledger.merkle_root ledger in
+        let ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
         add_entry t ~ledger_hash ~ledger) ;
     (t, ())
 
@@ -52,7 +54,7 @@ module T = struct
           let ledger =
             Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb
           in
-          let ledger_hash = Ledger.merkle_root ledger in
+          let ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger
       | E (Root_transitioned transition, _) -> (
           match transition.garbage with

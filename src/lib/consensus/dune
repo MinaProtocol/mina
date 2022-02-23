@@ -9,6 +9,7 @@
    core_kernel
    consensus.vrf
    mina_base
+   mina_ledger
    block_time
    with_hash
    test_genesis_ledger

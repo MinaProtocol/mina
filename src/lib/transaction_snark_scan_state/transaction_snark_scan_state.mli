@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
@@ -18,7 +19,7 @@ module Transaction_with_witness : sig
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness : Sparse_ledger.t
+    ; ledger_witness : Mina_ledger.Sparse_ledger.t
     }
   [@@deriving sexp]
 end
