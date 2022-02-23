@@ -967,7 +967,7 @@ module Types = struct
 
     let auth_required =
       let open Permissions.Auth_required in
-      enum "AuthRequired" ~doc:"Kind of authorization required"
+      enum "AccountAuthRequired" ~doc:"Kind of authorization required"
         ~values:
           [ enum_value "None" ~value:None
           ; enum_value "Either" ~value:Either
@@ -978,7 +978,7 @@ module Types = struct
           ]
 
     let account_permissions =
-      obj "Permissions" ~fields:(fun _ ->
+      obj "AccountPermissions" ~fields:(fun _ ->
           [ field "stake" ~typ:(non_null bool) ~doc:"Permission to stake"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.stake)
