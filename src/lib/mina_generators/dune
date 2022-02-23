@@ -2,5 +2,5 @@
  (name mina_generators)
  (public_name mina_generators)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_let))
+ (preprocess (pps ppx_let ppx_version))
  (libraries mina_base core base_quickcheck quickcheck_lib signature_lib random_oracle mina_compile_config with_hash))
