@@ -1502,7 +1502,7 @@ let create (config : Config.t)
                         , External_transition.to_yojson state )
                       ]
                     (Block_received
-                       { state_hash = External_transition.state_hash state
+                       { state_hash = (External_transition.state_hashes state).state_hash
                        ; sender = Envelope.Incoming.sender envelope
                        }) ;
                 Mina_net2.Validation_callback.set_message_type valid_cb `Block ;

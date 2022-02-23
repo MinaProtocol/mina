@@ -28,7 +28,7 @@ let hashes_abstract ~hash_body
       [| (previous_state_hash :> Field.t); (state_body_hash :> Field.t) |]
     |> State_hash.of_hash
   in
-  {State_hash.With_state_hashes.state_hash; state_body_hash}
+  {State_hash.State_hashes.state_hash; state_body_hash}
 
 module Body = struct
   module Poly = struct

@@ -4,6 +4,8 @@ open Mina_base
 open Mina_transition
 open Frontier_base
 
+(* TODO: cache state body hashes in db to avoid re-hashing on load (!!!log and issue!!!) *)
+
 (* TODO: bundle together with other writes by sharing batch requests between
  * function calls in this module (#3738) *)
 
@@ -289,8 +291,9 @@ let check t ~genesis_state_hash =
 
 let initialize t ~root_data =
   let open Root_data.Limited in
-  let {With_hash.hash= root_state_hash; data= root_transition}, _ =
-    External_transition.Validated.erase (transition root_data)
+  let root_state_hash, root_transition =
+    let t, _ = External_transition.Validated.erase (transition root_data) in
+    (State_hash.With_state_hashes.state_hash t, State_hash.With_state_hashes.data t)
   in
   [%log' trace t.logger]
     ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
@@ -306,8 +309,9 @@ let initialize t ~root_data =
 
 let add t ~transition =
   let parent_hash = External_transition.Validated.parent_hash transition in
-  let {With_hash.hash; data= raw_transition}, _ =
-    External_transition.Validated.erase transition
+  let hash, raw_transition =
+    let t, _ = External_transition.Validated.erase transition in
+    (State_hash.With_state_hashes.state_hash t, State_hash.With_state_hashes.data t)
   in
   let%bind () =
     Result.ok_if_true

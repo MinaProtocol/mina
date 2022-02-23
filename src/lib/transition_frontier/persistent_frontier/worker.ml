@@ -84,7 +84,7 @@ module Worker = struct
                   , `String
                       (State_hash.to_base58_check
                          (Mina_transition.External_transition.Validated
-                          .state_hash transition)) )
+                          .state_hashes transition).state_hash) )
                 ; ("parent", `String (State_hash.to_base58_check h)) ] ;
             Ok ()
         | _ ->

@@ -465,7 +465,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   let%map chain =
     extend_blockchain t
       (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
-      genesis_inputs.protocol_state_with_hash.data snark_transition None
+      genesis_inputs.protocol_state_with_hashes.data snark_transition None
       prover_state pending_coinbase
   in
   Mina_metrics.(

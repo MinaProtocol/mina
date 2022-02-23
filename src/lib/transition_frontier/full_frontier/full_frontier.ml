@@ -112,9 +112,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values ~persistent_root_instance ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
-  let root_hash =
-    External_transition.Validated.state_hash root_data.transition
-  in
+  let root_hash = (External_transition.Validated.state_hashes root_data.transition).state_hash in
   let protocol_states_for_root_scan_state =
     State_hash.Map.of_alist_exn root_data.protocol_states
   in
@@ -392,7 +390,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 1 *)
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
-        let hash = External_transition.Validated.state_hash node.transition in
+        let hash = (External_transition.Validated.state_hashes node.transition).state_hash in
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
@@ -522,8 +520,8 @@ let calculate_diffs t breadcrumb =
             (Consensus.Hooks.select
                ~constants:t.precomputed_values.consensus_constants
                ~existing:
-                 (Breadcrumb.consensus_state_with_hash current_best_tip)
-               ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
+                 (Breadcrumb.consensus_state_with_hashes current_best_tip)
+               ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb)
                ~logger:
                  (Logger.extend t.logger
                     [ ( "selection_context"

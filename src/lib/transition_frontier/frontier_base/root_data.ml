@@ -30,13 +30,24 @@ end
 module Historical = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { transition: External_transition.Validated.Stable.V2.t
+        ; common: Common.Stable.V1.t
+        ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; common: Common.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
 
-      let to_latest = Fn.id
+      let to_latest {transition; common; staged_ledger_target_ledger_hash} =
+        let transition = External_transition.Validated.Stable.V1.to_latest transition in
+        {V2.transition; common; staged_ledger_target_ledger_hash}
     end
   end]
 
@@ -65,6 +76,24 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { transition: External_transition.Validated.Stable.V2.t
+        ; protocol_states:
+            ( Mina_base.State_hash.Stable.V1.t
+            * Mina_state.Protocol_state.Value.Stable.V1.t )
+            list
+        ; common: Common.Stable.V1.t }
+
+      let to_yojson {transition; protocol_states= _; common} =
+        `Assoc
+          [ ("transition", External_transition.Validated.Stable.V2.to_yojson transition)
+          ; ("protocol_states", `String "<opaque>")
+          ; ("common", Common.Stable.V1.to_yojson common) ]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
@@ -76,11 +105,13 @@ module Limited = struct
 
       let to_yojson {transition; protocol_states= _; common} =
         `Assoc
-          [ ("transition", External_transition.Validated.to_yojson transition)
+          [ ("transition", External_transition.Validated.Stable.V1.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
           ; ("common", Common.Stable.V1.to_yojson common) ]
 
-      let to_latest = Fn.id
+      let to_latest {transition; protocol_states; common} =
+        let transition = External_transition.Validated.Stable.V1.to_latest transition in
+        {V2.transition; protocol_states; common}
     end
   end]
 
@@ -93,7 +124,7 @@ module Limited = struct
 
   let transition t = t.transition
 
-  let hash t = External_transition.Validated.state_hash t.transition
+  let hashes t = External_transition.Validated.state_hashes t.transition
 
   let protocol_states t = t.protocol_states
 

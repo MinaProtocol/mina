@@ -315,11 +315,29 @@ module type S = sig
   module Validated : sig
     type t =
       external_transition State_hash.With_state_hashes.t * Validation.fully_valid
-    [@@deriving compare]
+    [@@deriving compare, sexp, to_yojson]
+
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V2 : sig
+        type nonrec t = t [@@deriving compare, sexp, to_yojson]
+      end
+
+      module V1 : sig
+        type t = (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
+        [@@deriving compare, sexp, to_yojson] 
+
+        val to_latest : t -> V2.t
+      end
+    end]
+
+    include External_transition_common_intf with type t := t
 
     val erase :
          t
-      -> Stable.Latest.t State_hash.With_state_hashes.t
+      -> external_transition State_hash.With_state_hashes.t
          * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
 
     val create_unsafe :
@@ -327,8 +345,6 @@ module type S = sig
 
     val handle_dropped_transition :
       ?pipe_name:string -> logger:Logger.t -> t -> unit
-
-    include External_transition_base_intf with type t := t
 
     val commands : t -> User_command.Valid.t With_status.t list
 

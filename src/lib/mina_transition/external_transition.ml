@@ -991,7 +991,7 @@ module Validated = struct
 
       let to_latest = Fn.id
 
-      let erase (transition_with_hash, validation) =
+      let erase ((transition_with_hash, validation) : t) =
         ( transition_with_hash
         , Validation.extract_delta_transition_chain_witness validation )
 
@@ -1101,29 +1101,6 @@ module Validated = struct
                   let to_binable = erase
                 end)
 
-      let to_yojson (transition_with_hash, _) =
-        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
-
-      let create_unsafe_pre_hashed t =
-        `I_swear_this_is_safe_see_my_comment
-          ( (t, Validation.fully_invalid)
-          |> skip_time_received_validation
-               `This_transition_was_not_received_via_gossip
-          |> skip_genesis_protocol_state_validation
-               `This_transition_was_generated_internally
-          |> skip_proof_validation `This_transition_was_generated_internally
-          |> skip_delta_transition_chain_validation
-               `This_transition_was_not_received_via_gossip
-          |> skip_frontier_dependencies_validation
-               `This_transition_belongs_to_a_detached_subtree
-          |> skip_staged_ledger_diff_validation
-               `This_transition_has_a_trusted_staged_ledger
-          |> skip_protocol_versions_validation
-               `This_transition_has_valid_protocol_versions )
-
-      let create_unsafe t =
-        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:(fun d -> (state_hashes d).state_hash))
-
       include With_validation
     end
   end]
@@ -1184,7 +1161,7 @@ end
 
 let genesis ~precomputed_values =
   let genesis_protocol_state =
-    Precomputed_values.genesis_state_with_hash precomputed_values
+    Precomputed_values.genesis_state_with_hashes precomputed_values
   in
   let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
