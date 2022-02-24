@@ -245,6 +245,18 @@ module V = struct
   include Hashable.Make (T)
 end
 
+(** Keeps track of a circuit (which is a list of gates)
+    while it is being written.
+  *)
+type ('f, 'rust_gates) circuit =
+  | Unfinalized_rev of (unit, 'f) Gate_spec.t list
+      (** A circuit still being written. *)
+  | Compiled of Core.Md5.t * 'rust_gates
+      (** Once finalized, a circuit is represented as a digest 
+    and a list of gates that corresponds to the circuit. 
+  *)
+
+(** The constraint system. *)
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the permutation). *)
     equivalence_classes : Row.t Position.t list V.Table.t
@@ -256,11 +268,7 @@ type ('f, 'rust_gates) t =
        A gate is finalized once [finalize_and_get_gates] is called.
        The finalized tag contains the digest of the circuit.
     *)
-    mutable gates :
-      [ `Finalized of
-        Core.Md5.t * 'rust_gates
-        (* TODO: why is this a polymorphic variant? *)
-      | `Unfinalized_rev of (unit, 'f) Gate_spec.t list ]
+    mutable gates : ('f, 'rust_gates) circuit
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
@@ -409,7 +417,7 @@ struct
   let create () : t =
     { public_input_size = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
-    ; gates = `Unfinalized_rev [] (* Gates.create () *)
+    ; gates = Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
@@ -451,9 +459,9 @@ struct
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
   let add_row sys (vars : V.t option array) kind coeffs =
     match sys.gates with
-    | `Finalized _ ->
+    | Compiled _ ->
         failwith "add_row called on finalized constraint system"
-    | `Unfinalized_rev gates ->
+    | Unfinalized_rev gates ->
         (* As we're adding a row, we're adding new cells.
            If these cells (the first 7) contain variables,
            make sure that they are wired
@@ -464,8 +472,7 @@ struct
             Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
         (* Add to gates. *)
         let open Position in
-        sys.gates <-
-          `Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
+        sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
         (* Increment row. *)
         sys.next_row <- sys.next_row + 1 ;
         (* Add to row. *)
@@ -477,14 +484,14 @@ struct
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = `Finalized (_, gates); _ } ->
+    | { gates = Compiled (_, gates); _ } ->
         gates
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
         sys.pending_generic_gate <- None ;
         finalize_and_get_gates sys
-    | { gates = `Unfinalized_rev gates_rev; _ } ->
+    | { gates = Unfinalized_rev gates_rev; _ } ->
         let rust_gates = Gates.create () in
 
         (* Create rows for public input. *)
@@ -554,7 +561,7 @@ struct
         let md5_digest = Md5.digest_bytes digest in
 
         (* drop the gates, we don't need them anymore *)
-        sys.gates <- `Finalized (md5_digest, rust_gates) ;
+        sys.gates <- Compiled (md5_digest, rust_gates) ;
 
         (* return the gates *)
         rust_gates
@@ -565,9 +572,9 @@ struct
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
     match sys.gates with
-    | `Unfinalized_rev _ ->
+    | Unfinalized_rev _ ->
         finalize sys ; digest sys
-    | `Finalized (digest, _) ->
+    | Compiled (digest, _) ->
         digest
 
   (** Regroup terms that share the same variable. 
