@@ -58,9 +58,3 @@
  (instrumentation (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))
 
-(rule
- (targets sample_keypairs.ml sample_keypairs.json)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<} %{targets})))

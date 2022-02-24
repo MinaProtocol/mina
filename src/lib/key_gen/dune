@@ -6,3 +6,10 @@
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
  (modes native))
+
+(rule
+ (targets sample_keypairs.ml sample_keypairs.json)
+ (deps
+  (:< gen.exe))
+ (action
+  (run %{<} %{targets})))
