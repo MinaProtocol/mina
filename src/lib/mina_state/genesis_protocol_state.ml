@@ -12,9 +12,10 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
   in
   let negative_one_protocol_state_hash =
     Protocol_state.(
-      hash
+      hashes
         (negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
            ~consensus_constants))
+      .state_hash
   in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis

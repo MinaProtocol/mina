@@ -45,12 +45,12 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.t -> External_transition.t t
-    | Arcs : State_hash.t -> State_hash.t list t
-    | Root : Root_data.Minimal.t t
-    | Best_tip : State_hash.t t
+    | Transition : State_hash.Stable.V1.t -> External_transition.Stable.V1.t t
+    | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
+    | Root : Root_data.Minimal.Stable.V1.t t
+    | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.value list t
+        : Mina_state.Protocol_state.Value.Stable.V1.t list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -305,14 +305,12 @@ let initialize t ~root_data =
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.unzip (protocol_states root_data) |> snd) )
+        ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add t ~transition =
-  let parent_hash = External_transition.Validated.parent_hash transition in
-  let hash, raw_transition =
-    let t, _ = External_transition.Validated.erase transition in
-    (State_hash.With_state_hashes.state_hash t, State_hash.With_state_hashes.data t)
-  in
+let add t ~transition:(transition, _validation) =
+  let hash = State_hash.With_state_hashes.state_hash transition in
+  let raw_transition = With_hash.data transition in
+  let parent_hash = External_transition.parent_hash raw_transition in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
@@ -330,7 +328,7 @@ let move_root t ~new_root ~garbage =
   let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition (hash new_root)))
+      (mem t.db ~key:(Transition (hashes new_root).state_hash))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
@@ -341,7 +339,7 @@ let move_root t ~new_root ~garbage =
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:snd (protocol_states new_root)) ;
+        ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
       List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node

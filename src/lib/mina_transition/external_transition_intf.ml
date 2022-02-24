@@ -295,7 +295,8 @@ module type S = sig
 
   module Initial_validated : sig
     type t =
-      external_transition State_hash.With_state_hashes.t * Validation.initial_valid
+      external_transition State_hash.With_state_hashes.t
+      * Validation.initial_valid
     [@@deriving compare]
 
     val handle_dropped_transition :
@@ -306,7 +307,8 @@ module type S = sig
 
   module Almost_validated : sig
     type t =
-      external_transition State_hash.With_state_hashes.t * Validation.almost_valid
+      external_transition State_hash.With_state_hashes.t
+      * Validation.almost_valid
     [@@deriving compare]
 
     include External_transition_common_intf with type t := t
@@ -314,22 +316,29 @@ module type S = sig
 
   module Validated : sig
     type t =
-      external_transition State_hash.With_state_hashes.t * Validation.fully_valid
-    [@@deriving compare, sexp, to_yojson]
+      external_transition State_hash.With_state_hashes.t
+      * Validation.fully_valid
+    [@@deriving compare, equal, sexp, to_yojson]
 
     [%%versioned:
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
       module V2 : sig
-        type nonrec t = t [@@deriving compare, sexp, to_yojson]
+        type nonrec t = t [@@deriving compare, equal, sexp, to_yojson]
       end
 
       module V1 : sig
-        type t = (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
-        [@@deriving compare, sexp, to_yojson] 
+        type t =
+          (external_transition, State_hash.t) With_hash.t
+          * Validation.fully_valid
+        [@@deriving compare, equal, sexp, to_yojson]
 
         val to_latest : t -> V2.t
+
+        val of_v2 : V2.t -> t
+
+        val state_hash : t -> State_hash.t
       end
     end]
 
@@ -349,6 +358,8 @@ module type S = sig
     val commands : t -> User_command.Valid.t With_status.t list
 
     val to_initial_validated : t -> Initial_validated.t
+
+    val state_body_hash : t -> State_body_hash.t
   end
 
   val create :

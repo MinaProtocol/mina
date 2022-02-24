@@ -120,8 +120,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
   let previous_protocol_state_hash =
-    Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
-      previous_protocol_state
+    (Protocol_state.hashes_with_body
+       ~body_hash:previous_protocol_state_body_hash previous_protocol_state)
+      .state_hash
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
@@ -572,9 +573,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             | Some
                 (protocol_state, internal_transition, pending_coinbase_witness)
               ->
-                let protocol_state_hash = Protocol_state.hash protocol_state in
-                let consensus_state_with_hash =
-                  { With_hash.hash = protocol_state_hash
+                let protocol_state_hashes =
+                  Protocol_state.hashes protocol_state
+                in
+                let consensus_state_with_hashes =
+                  { With_hash.hash = protocol_state_hashes
                   ; data = Protocol_state.consensus_state protocol_state
                   }
                 in
@@ -584,20 +587,20 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                          ~existing:
                            (With_hash.map ~f:External_transition.consensus_state
                               previous_transition)
-                         ~candidate:consensus_state_with_hash ~logger)
+                         ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
                          over their parent" ;
-                    let root_consensus_state_with_hash =
+                    let root_consensus_state_with_hashes =
                       Transition_frontier.root frontier
-                      |> Breadcrumb.consensus_state_with_hash
+                      |> Breadcrumb.consensus_state_with_hashes
                     in
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select
-                         ~existing:root_consensus_state_with_hash
+                         ~existing:root_consensus_state_with_hashes
                          ~constants:consensus_constants
-                         ~candidate:consensus_state_with_hash ~logger)
+                         ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
@@ -626,7 +629,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       Internal_transition.staged_ledger_diff internal_transition
                     in
                     let previous_state_hash =
-                      Protocol_state.hash previous_protocol_state
+                      (Protocol_state.hashes previous_protocol_state).state_hash
                     in
                     let delta_transition_chain_proof =
                       Transition_chain_prover.prove
@@ -638,7 +641,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let%bind transition =
                       let open Result.Let_syntax in
                       External_transition.Validation.wrap
-                        { With_hash.hash = protocol_state_hash
+                        { With_hash.hash = protocol_state_hashes
                         ; data =
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
@@ -701,7 +704,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
                     let metadata =
-                      [ ("state_hash", State_hash.to_yojson protocol_state_hash)
+                      [ ( "state_hash"
+                        , State_hash.to_yojson protocol_state_hashes.state_hash
+                        )
                       ]
                     in
                     [%log debug] ~metadata
@@ -710,7 +715,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Deferred.choose
                       [ Deferred.choice
                           (Transition_registry.register transition_registry
-                             protocol_state_hash)
+                             protocol_state_hashes.state_hash)
                           (Fn.const (Ok `Transition_accepted))
                       ; Deferred.choice
                           ( Time.Timeout.create time_controller
@@ -936,9 +941,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; staged_ledger_diff
       ; delta_transition_chain_proof
       } =
-    let protocol_state_hash = Protocol_state.hash protocol_state in
-    let consensus_state_with_hash =
-      { With_hash.hash = protocol_state_hash
+    let protocol_state_hashes = Protocol_state.hashes protocol_state in
+    let consensus_state_with_hashes =
+      { With_hash.hash = protocol_state_hashes
       ; data = Protocol_state.consensus_state protocol_state
       }
     in
@@ -970,19 +975,19 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  ~existing:
                    (With_hash.map ~f:External_transition.consensus_state
                       previous_transition)
-                 ~candidate:consensus_state_with_hash ~logger)
+                 ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over \
                  their parent" ;
-            let root_consensus_state_with_hash =
+            let root_consensus_state_with_hashes =
               Transition_frontier.root frontier
-              |> Breadcrumb.consensus_state_with_hash
+              |> Breadcrumb.consensus_state_with_hashes
             in
             [%test_result: [ `Take | `Keep ]]
-              (Consensus.Hooks.select ~existing:root_consensus_state_with_hash
+              (Consensus.Hooks.select ~existing:root_consensus_state_with_hashes
                  ~constants:consensus_constants
-                 ~candidate:consensus_state_with_hash ~logger)
+                 ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over the \
@@ -990,12 +995,12 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
-            With_hash.hash previous_transition
+            State_hash.With_state_hashes.state_hash previous_transition
           in
           let%bind transition =
             let open Result.Let_syntax in
             External_transition.Validation.wrap
-              { With_hash.hash = protocol_state_hash
+              { With_hash.hash = protocol_state_hashes
               ; data =
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
@@ -1043,7 +1048,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
             Block_produced ;
           let metadata =
-            [ ("state_hash", State_hash.to_yojson protocol_state_hash) ]
+            [ ( "state_hash"
+              , State_hash.to_yojson protocol_state_hashes.state_hash )
+            ]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async.Deferred () =
@@ -1054,7 +1061,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Deferred.choose
             [ Deferred.choice
                 (Transition_registry.register transition_registry
-                   protocol_state_hash)
+                   protocol_state_hashes.state_hash)
                 (Fn.const (Ok `Transition_accepted))
             ; Deferred.choice
                 ( Time.Timeout.create time_controller (Time.Span.of_ms 20000L)

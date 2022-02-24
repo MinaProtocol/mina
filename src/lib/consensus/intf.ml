@@ -615,8 +615,10 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
-      -> candidate:Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> select_status
 
@@ -660,8 +662,10 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
-      -> candidate:Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> bool
 

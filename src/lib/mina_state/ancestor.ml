@@ -123,7 +123,8 @@ let%test_unit "completeness" =
               Protocol_state.hashes_abstract ~hash_body:Fn.id
                 { previous_state_hash = prev; body }
             in
-            Prover.add prover ~prev_hash:prev ~hash:hs.state_hash ~length ~body_hash:body ;
+            Prover.add prover ~prev_hash:prev ~hash:hs.state_hash ~length
+              ~body_hash:body ;
             ((hs.state_hash, length), hs.state_hash))
       in
       List.iteri hashes ~f:(fun i h ->

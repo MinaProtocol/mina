@@ -9,6 +9,8 @@ open Mina_base
 open Mina_transition
 open Network_peer
 
+(* TODO: remove duplicate hashing *)
+
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
     from its peer. It receives the state_hash to catchup from
@@ -145,7 +147,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
   let state_hash =
     External_transition.Validation.forget_validation_with_hash
       transition_with_hash
-    |> With_hash.hash |> State_hash.to_yojson
+    |> State_hash.With_state_hashes.state_hash |> State_hash.to_yojson
   in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
@@ -379,7 +381,8 @@ module Downloader = struct
               type t = External_transition.t
 
               let key (t : t) =
-                External_transition.(state_hash t, blockchain_length t)
+                External_transition.
+                  ((state_hashes t).state_hash, blockchain_length t)
             end)
             (struct
               type t = (State_hash.t * Length.t) option
@@ -483,8 +486,12 @@ module Initial_validate_batcher = struct
       (fun xs ->
         let input = function `Partially_validated x | `Init x -> x in
         List.map xs ~f:(fun x ->
-            External_transition.Validation.wrap
-              (Envelope.Incoming.data (input x)))
+            input x |> Envelope.Incoming.data
+            |> With_hash.map_hash ~f:(fun state_hash ->
+                   { State_hash.State_hashes.state_hash
+                   ; state_body_hash = None
+                   })
+            |> External_transition.Validation.wrap)
         |> External_transition.validate_proofs ~verifier
         >>| function
         | Ok tvs ->
@@ -642,7 +649,7 @@ let create_node ~downloader t x =
         let t = (Cached.peek b).Envelope.Incoming.data in
         let open External_transition.Initial_validated in
         ( Node.State.To_verify b
-        , state_hash t
+        , (state_hashes t).state_hash
         , blockchain_length t
         , parent_hash t
         , Ivar.create () )
@@ -664,8 +671,8 @@ let create_node ~downloader t x =
 let set_state t node s = set_state t node s ; write_graph t
 
 let pick ~constants
-    (x : (Mina_state.Protocol_state.Value.t, State_hash.t) With_hash.t)
-    (y : _ With_hash.t) =
+    (x : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t)
+    (y : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t) =
   let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
   match
     Consensus.Hooks.select ~constants ~existing:(f x) ~candidate:(f y)
@@ -782,8 +789,13 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
           ~knowledge_context:
             (Broadcast_pipe.map best_tip_r
                ~f:
-                 (Option.map ~f:(fun (x : _ With_hash.t) ->
-                      ( x.hash
+                 (Option.map
+                    ~f:(fun
+                         (x :
+                           Mina_state.Protocol_state.value
+                           State_hash.With_state_hashes.t)
+                       ->
+                      ( State_hash.With_state_hashes.state_hash x
                       , Mina_state.Protocol_state.consensus_state x.data
                         |> Consensus.Data.Consensus_state.blockchain_length ))))
           ~knowledge)
@@ -1070,7 +1082,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             (let prev_ctx = Broadcast_pipe.Reader.peek best_tip_r in
              let ctx = combine prev_ctx (pre_context forest) in
              let eq x y =
-               let f = Option.map ~f:With_hash.hash in
+               let f = Option.map ~f:State_hash.With_state_hashes.state_hash in
                Option.equal State_hash.equal (f x) (f y)
              in
              if eq prev_ctx ctx then Deferred.unit
@@ -1096,8 +1108,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                  List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
                    ~f:(fun c ->
                      let h =
-                       External_transition.Initial_validated.state_hash
-                         (Cached.peek c).data
+                       (External_transition.Initial_validated.state_hashes
+                          (Cached.peek c).data)
+                         .state_hash
                      in
                      ( match (Cached.peek c).sender with
                      | Local ->
@@ -1112,10 +1125,12 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                      let%bind p =
                        Transition_chain_verifier.verify
                          ~target_hash:
-                           (External_transition.Initial_validated.state_hash
+                           (External_transition.Initial_validated.state_hashes
                               data)
+                             .state_hash
                          ~transition_chain_proof:
-                           (External_transition.state_hash root, path)
+                           ( (External_transition.state_hashes root).state_hash
+                           , path )
                      in
                      Result.ok
                        (try_to_connect_hash_chain t p ~frontier
@@ -1160,9 +1175,11 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                        let children_state_hashes =
                          List.map children_transitions
                            ~f:(fun cached_transition ->
-                             Cached.peek cached_transition
+                             ( Cached.peek cached_transition
                              |> Envelope.Incoming.data
-                             |> External_transition.Initial_validated.state_hash)
+                             |> External_transition.Initial_validated
+                                .state_hashes )
+                               .state_hash)
                        in
                        [%log error]
                          ~metadata:
@@ -1172,8 +1189,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                                     ~f:State_hash.to_yojson) )
                            ; ( "state_hash"
                              , State_hash.to_yojson
-                               @@ External_transition.Initial_validated
-                                  .state_hash transition )
+                                 (External_transition.Initial_validated
+                                  .state_hashes transition)
+                                   .state_hash )
                            ; ( "reason"
                              , `String
                                  "no common ancestor with our transition \

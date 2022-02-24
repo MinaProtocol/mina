@@ -851,6 +851,7 @@ let required_state_hashes t =
       Set.add acc (fst t.state_hash))
     (Parallel_scan.pending_data t)
 
+(** TODO: trace this function to see if this hashing is avoidable. *)
 let check_required_protocol_states t ~protocol_states =
   let open Or_error.Let_syntax in
   let required_state_hashes = required_state_hashes t in
@@ -868,7 +869,8 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m ~key:(Mina_state.Protocol_state.hash ps) ~data:ps)
+        State_hash.Map.set m
+          ~key:(Mina_state.Protocol_state.hashes ps).state_hash ~data:ps)
   in
   let protocol_states_assoc =
     List.filter_map (State_hash.Set.to_list required_state_hashes)

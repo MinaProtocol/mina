@@ -59,6 +59,9 @@ val blockchain_state : t -> Mina_state.Blockchain_state.Value.t
 
 val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
+val protocol_state_with_hashes :
+  t -> Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
+
 val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
 val consensus_state_with_hashes :

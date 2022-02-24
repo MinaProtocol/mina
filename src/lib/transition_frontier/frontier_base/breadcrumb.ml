@@ -167,6 +167,11 @@ let parent_hash = lift External_transition.Validated.parent_hash
 
 let protocol_state = lift External_transition.Validated.protocol_state
 
+let protocol_state_with_hashes breadcrumb =
+  breadcrumb |> validated_transition
+  |> External_transition.Validation.forget_validation_with_hash
+  |> With_hash.map ~f:External_transition.protocol_state
+
 let consensus_state = lift External_transition.Validated.consensus_state
 
 let consensus_state_with_hashes breadcrumb =
@@ -336,7 +341,7 @@ module For_tests = struct
           Protocol_state.body prev_state |> Protocol_state.Body.view
         in
         ( current_state_view
-        , (prev_state_hashes.state_hash, prev_state_hashes.state_body_hash) )
+        , (prev_state_hashes.state_hash, Option.value_exn prev_state_hashes.state_body_hash) )
       in
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff =

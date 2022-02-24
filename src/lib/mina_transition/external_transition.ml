@@ -920,7 +920,9 @@ module With_validation = struct
   let handle_dropped_transition ?pipe_name ~logger t =
     [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
       ~metadata:
-        [ ("state_hash", State_hash.to_yojson (state_hashes t).State_hash.State_hashes.state_hash)
+        [ ( "state_hash"
+          , State_hash.to_yojson
+              (state_hashes t).State_hash.State_hashes.state_hash )
         ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
         ] ;
     reject t
@@ -928,7 +930,8 @@ end
 
 module Initial_validated = struct
   type t =
-    external_transition State_hash.With_state_hashes.t * Validation.initial_valid
+    external_transition State_hash.With_state_hashes.t
+    * Validation.initial_valid
 
   type nonrec protocol_version_status = protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -968,7 +971,7 @@ module Validated = struct
           * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
         [@@deriving sexp]
 
-        let to_latest ({With_hash.data; _}, delta_proof) =
+        let to_latest ({ With_hash.data; _ }, delta_proof) =
           (With_hash.of_data data ~hash_data:state_hashes, delta_proof)
       end
     end]
@@ -988,6 +991,8 @@ module Validated = struct
           , [ `Staged_ledger_diff ] * (unit, Truth.True.t) Truth.t
           , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
           Validation.t
+
+      let equal (a, _) (b, _) = State_hash.With_state_hashes.equal equal a b
 
       let to_latest = Fn.id
 
@@ -1064,8 +1069,23 @@ module Validated = struct
           , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
           Validation.t
 
-      let to_latest ({With_hash.data; _}, validation) =
-        (With_hash.of_data data ~hash_data:state_hashes, validation)
+      let equal (a, _) (b, _) = With_hash.equal equal State_hash.equal a b
+
+      let to_latest (transition, validation) =
+        let transition =
+          With_hash.map_hash transition ~f:(fun state_hash ->
+              { State_hash.State_hashes.state_hash; state_body_hash = None })
+        in
+        (transition, validation)
+
+      let of_v2 (transition, validation) =
+        let transition =
+          With_hash.map_hash transition ~f:State_hash.State_hashes.state_hash
+        in
+        (transition, validation)
+
+      let to_yojson (transition_with_hash, _) =
+        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
 
       let erase (transition_with_hash, validation) =
         ( transition_with_hash
@@ -1102,6 +1122,8 @@ module Validated = struct
                 end)
 
       include With_validation
+
+      let state_hash (transition, _) = With_hash.hash transition
     end
   end]
 
@@ -1148,6 +1170,11 @@ module Validated = struct
   let to_initial_validated t =
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
+
+  let state_body_hash ((transition, _) : t) =
+    State_hash.With_state_hashes.state_body_hash transition
+      ~compute_hashes:
+        (Fn.compose Protocol_state.hashes Raw_versioned__.protocol_state)
 
   let commands (t : t) =
     List.map (commands t) ~f:(fun x ->
@@ -1320,7 +1347,8 @@ module Staged_ledger_validation = struct
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)
            in
-           ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash).state_hash
+           ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
+               .state_hash
            , body_hash ))
         ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->

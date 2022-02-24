@@ -27,8 +27,12 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   (List.map subtrees_of_enveloped_transitions ~f:(fun subtree ->
                        Rose_tree.to_yojson
                          (fun enveloped_transitions ->
-                           let transition, _ = enveloped_transitions |> Cached.peek |> Envelope.Incoming.data in
-                           Mina_base.State_hash.(to_yojson (With_state_hashes.state_hash transition)))
+                           let transition, _ =
+                             enveloped_transitions |> Cached.peek
+                             |> Envelope.Incoming.data
+                           in
+                           Mina_base.State_hash.(
+                             to_yojson (With_state_hashes.state_hash transition)))
                          subtree)) )
             ]
           "Transition frontier already garbage-collected the parent of \
