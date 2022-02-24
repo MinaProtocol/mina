@@ -8,6 +8,7 @@
    core
    archive_lib
    mina_base
+   mina_ledger
    mina_caqti
    mina_state
    genesis_constants
