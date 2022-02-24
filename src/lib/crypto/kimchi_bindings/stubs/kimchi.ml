@@ -434,6 +434,8 @@ module Protocol = struct
 
         external wrap : t -> wire -> wire -> unit
           = "caml_pasta_fp_plonk_gate_vector_wrap"
+
+        external digest : t -> bytes = "caml_pasta_fp_plonk_gate_vector_digest"
       end
 
       module Fq = struct
@@ -451,6 +453,8 @@ module Protocol = struct
 
         external wrap : t -> wire -> wire -> unit
           = "caml_pasta_fq_plonk_gate_vector_wrap"
+
+        external digest : t -> bytes = "caml_pasta_fq_plonk_gate_vector_digest"
       end
     end
   end
