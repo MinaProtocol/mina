@@ -7,7 +7,7 @@ The smart contract (which users might write using snarkyJS) used in the tool is 
 
 #### Usage
 
-The tool generates a graphQL `sendSnapp` mutation that can be sent to the graphQL server the daemon starts by default at port 3085. One can use the UI to interact with the local graphQL server mounted at http://localhost:3085/graphql and paste the graphql object that the tool prints
+The tool generates a graphQL `sendSnapp` mutation that can be sent to the graphQL server the daemon starts by default at port 3085. One can use the UI to interact with the local graphQL server mounted at http://localhost:3085/graphql and paste the graphQL object that the tool prints
 
 The commands proivded by this tool are-
 
@@ -77,7 +77,7 @@ For example:
 $mina-snapp-test-transaction create-snapp-account --fee-payer-key my-fee-payer --nonce 0 --receiver-amount 2 --snapp-account-key my-snapp-key
 ```
 
-generates the following graphql object- a snapp transaction as input to the sendSnapp mutation. A snapp transaction is basically a list of parties where each [party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html) is an update performed on an account.
+generates the following graphQL object- a snapp transaction as input to the `sendSnapp` mutation. A snapp transaction is basically a list of parties where each [party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html) is an update performed on an account.
 
 The snapp transaction here has three parties-
 
@@ -87,7 +87,7 @@ The snapp transaction here has three parties-
 
 The authorization used in each of the parties here is a signature of the respective accounts i.e., the updates on these accounts are authorized as per the accounts' permissions.
 
-```json
+```
 mutation MyMutation {
   __typename
   sendSnapp(input: {
@@ -248,7 +248,7 @@ mutation MyMutation {
 
 After the transaction is sent and included in a block, a new snapp account with the verification of the test smart contract gets created. The account information can be queried through the graphQL `account` query.
 
-```json
+```
 query MyQuery {
   account(publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z") {
     nonce
@@ -354,7 +354,7 @@ The snapp transaction here has two parties-
 1. The fee payer party which specifies who pays the transaction fees and how much
 2. A party that updates the `app_state` of the snapp account. The authorization required to update the state is a proof (as updated the by deploy-snapp transaction above `editState: Proof`)
 
-```json
+```
 mutation MyMutation {
   __typename
   sendSnapp(input: {
@@ -457,7 +457,7 @@ mutation MyMutation {
 
 Account state after the above transaction is included in a block
 
-```json
+```
 query MyQuery {
   account(publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z") {
     nonce
@@ -539,7 +539,7 @@ For example: To change the permission required to edit permissions from Signatur
 $mina-snapp-test-transaction update-permissions --fee-payer-key ..my-fee-payer --nonce 4 --snapp-account-key my-snapp-key --current-auth signature --edit-stake Proof --receive None --set-permissions Proof --set-delegate Signature --set-verification-key Signature --set-snapp-uri Signature --set-sequence-state Proof --set-token-symbol Signature --send Signature --increment-nonce Signature --set-voting-for Signature
 ```
 
-```json
+```
 mutation MyMutation {
   __typename
   sendSnapp(input: {
@@ -653,7 +653,7 @@ mutation MyMutation {
 
 Account state after the above transaction is included in a block
 
-```json
+```
 query MyQuery {
   account(publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z") {
     permissions {
