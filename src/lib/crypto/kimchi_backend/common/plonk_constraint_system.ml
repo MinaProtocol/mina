@@ -251,7 +251,7 @@ end
 type ('f, 'rust_gates) circuit =
   | Unfinalized_rev of (unit, 'f) Gate_spec.t list
       (** A circuit still being written. *)
-  | Compiled of Core.Md5.t * 'rust_gates
+  | Compiled of Core_kernel.Md5.t * 'rust_gates
       (** Once finalized, a circuit is represented as a digest 
     and a list of gates that corresponds to the circuit. 
   *)
