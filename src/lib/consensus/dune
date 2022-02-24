@@ -9,6 +9,7 @@
    core_kernel
    consensus.vrf
    mina_base
+   key_gen
    mina_ledger
    network_peer
    block_time

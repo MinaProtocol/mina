@@ -746,7 +746,7 @@ module Data = struct
     let eval = T.eval
 
     module Precomputed = struct
-      let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs
+      let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
 
       let genesis_winner = keypairs.(0)
 
