@@ -10,6 +10,7 @@
    consensus.vrf
    mina_base
    mina_ledger
+   network_peer
    block_time
    with_hash
    test_genesis_ledger

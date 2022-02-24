@@ -617,7 +617,7 @@ module type S = sig
     open Data
 
     module Rpcs : sig
-      include Rpc_intf.Rpc_interface_intf
+      include Network_peer.Rpc_intf.Rpc_interface_intf
 
       val rpc_handlers :
            logger:Logger.t
@@ -628,7 +628,7 @@ module type S = sig
       type query =
         { query :
             'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+            -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
         }
     end
 
