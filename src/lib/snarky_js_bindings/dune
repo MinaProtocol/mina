@@ -3,20 +3,7 @@
  (modules snarky_js_node)
  (modes js)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries
-   digestif.ocaml
-   snarky_curve
-   pickles
-   kimchi_backend
-   cache_dir.fake
-   run_in_thread.fake
-   mina_metrics.none
-   kimchi
-   js_of_ocaml
-   bindings_js
-   node_backend
-   integers_stubs_js
-   snarky_js_bindings_lib)
+ (libraries snarky_js_bindings_lib node_backend)
  (link_deps
  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
@@ -29,20 +16,7 @@
  (modules snarky_js_chrome)
  (modes js)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries
-   digestif.ocaml
-   snarky_curve
-   pickles
-   kimchi_backend
-   cache_dir.fake
-   run_in_thread.fake
-   mina_metrics.none
-   kimchi
-   js_of_ocaml
-   bindings_js
-   chrome_backend
-   integers_stubs_js
-   snarky_js_bindings_lib)
+ (libraries snarky_js_bindings_lib chrome_backend)
  (link_deps
  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.wasm)

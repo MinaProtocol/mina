@@ -5,9 +5,12 @@
    snarky_curve
    pickles
    kimchi_backend
-   run_in_thread.fake
    kimchi
+   cache_dir.fake
+   run_in_thread.fake
+   mina_metrics.none
    js_of_ocaml
+   digestif.ocaml
    bindings_js
    integers_stubs_js
    zarith_stubs_js)
