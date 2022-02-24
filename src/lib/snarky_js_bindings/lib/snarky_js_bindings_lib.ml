@@ -5,7 +5,7 @@ module Other_backend = Kimchi_backend.Pasta.Pallas_based_plonk
 let () = Backend.Keypair.set_urs_info []
    *)
 
-let loose_permissions : Mina_base_kernel.Permissions.t =
+let loose_permissions : Mina_base.Permissions.t =
   { stake = true
   ; edit_state = None
   ; send = None
@@ -1840,12 +1840,12 @@ type AccountPredicate =
   let ledger_class : < .. > Js.t =
     Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
 
-  module L : Mina_base_kernel.Transaction_logic.Ledger_intf = struct
-    module Account = Mina_base_kernel.Account
-    module Account_id = Mina_base_kernel.Account_id
-    module Transaction_logic = Mina_base_kernel.Transaction_logic
-    module Ledger_hash = Mina_base_kernel.Ledger_hash
-    module Token_id = Mina_base_kernel.Token_id
+  module L : Mina_base.Transaction_logic.Ledger_intf = struct
+    module Account = Mina_base.Account
+    module Account_id = Mina_base.Account_id
+    module Transaction_logic = Mina_base.Transaction_logic
+    module Ledger_hash = Mina_base.Ledger_hash
+    module Token_id = Mina_base.Token_id
 
     type t_ =
       { next_location : int
@@ -1934,7 +1934,7 @@ type AccountPredicate =
     let apply_mask (t : t) ~(masked : t) = t := !masked
   end
 
-  module T = Mina_base_kernel.Transaction_logic.Make (L)
+  module T = Mina_base.Transaction_logic.Make (L)
 
   type ledger_class = < value : L.t Js.prop >
 
@@ -1944,12 +1944,12 @@ type AccountPredicate =
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
-  module Snapp_predicate = Mina_base_kernel.Snapp_predicate
-  module Party = Mina_base_kernel.Party
-  module Parties = Mina_base_kernel.Parties
-  module Snapp_state = Mina_base_kernel.Snapp_state
-  module Token_id = Mina_base_kernel.Token_id
-  module Snapp_basic = Mina_base_kernel.Snapp_basic
+  module Snapp_predicate = Mina_base.Snapp_predicate
+  module Party = Mina_base.Party
+  module Parties = Mina_base.Parties
+  module Snapp_state = Mina_base.Snapp_state
+  module Token_id = Mina_base.Token_id
+  module Snapp_basic = Mina_base.Snapp_basic
 
   let max_uint32 = Field.constant @@ Field.Constant.of_string "4294967295"
 
@@ -2190,18 +2190,18 @@ type AccountPredicate =
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { data = fee_payer_party parties##.feePayer
-        ; authorization = Mina_base_kernel.Signature.dummy
+        ; authorization = Mina_base.Signature.dummy
         }
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
                { data = party p; authorization = None_given })
         |> Array.to_list
-    ; memo = Mina_base_kernel.Signed_command_memo.empty
+    ; memo = Mina_base.Signed_command_memo.empty
     }
 
   let account_id pk =
-    Mina_base_kernel.Account_id.create (public_key pk) Token_id.default
+    Mina_base.Account_id.create (public_key pk) Token_id.default
 
   let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
 
@@ -2289,12 +2289,11 @@ type AccountPredicate =
     let global_slot x =
       Mina_numbers.Global_slot.Checked.Unsafe.of_field @@ uint32 x
 
-    let token_id x =
-      Mina_base_kernel.Token_id.Checked.Unsafe.of_field @@ uint64 x
+    let token_id x = Mina_base.Token_id.Checked.Unsafe.of_field @@ uint64 x
 
     let ledger_hash x =
       (* TODO: assumes constant *)
-      Mina_base_kernel.Frozen_ledger_hash.var_of_t @@ field_value x
+      Mina_base.Frozen_ledger_hash.var_of_t @@ field_value x
 
     let epoch_data (e : epoch_data_predicate) :
         Snapp_predicate.Protocol_state.Epoch_data.Checked.t =
@@ -2304,17 +2303,14 @@ type AccountPredicate =
           ; total_currency = numeric amount e##.ledger##.totalCurrency
           }
       ; (* TODO: next three all assume constant *)
-        seed =
-          or_ignore
-            (Mina_base_kernel.Epoch_seed.var_of_t ^ field_value)
-            e##.seed
+        seed = or_ignore (Mina_base.Epoch_seed.var_of_t ^ field_value) e##.seed
       ; start_checkpoint =
           or_ignore
-            (Mina_base_kernel.State_hash.var_of_t ^ field_value)
+            (Mina_base.State_hash.var_of_t ^ field_value)
             e##.startCheckpoint
       ; lock_checkpoint =
           or_ignore
-            (Mina_base_kernel.State_hash.var_of_t ^ field_value)
+            (Mina_base.State_hash.var_of_t ^ field_value)
             e##.lockCheckpoint
       ; epoch_length =
           numeric
@@ -2361,14 +2357,11 @@ type AccountPredicate =
 
     let events (js_events : js_field Js.js_array Js.t Js.js_array Js.t) =
       let events =
-        Impl.exists Mina_base_kernel.Snapp_account.Events.typ
-          ~compute:(fun () -> [])
+        Impl.exists Mina_base.Snapp_account.Events.typ ~compute:(fun () -> [])
       in
       let push_event js_event =
         let event = Array.map (Js.to_array js_event) ~f:field in
-        let _ =
-          Mina_base_kernel.Snapp_account.Events.push_checked events event
-        in
+        let _ = Mina_base.Snapp_account.Events.push_checked events event in
         ()
       in
       Array.iter (Js.to_array js_events) ~f:push_event ;
@@ -2382,18 +2375,17 @@ type AccountPredicate =
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
         ; (* TODO *) verification_key = keep Field.zero
-        ; permissions =
-            keep Mina_base_kernel.Permissions.(Checked.constant empty)
+        ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
         ; snapp_uri =
             keep
               ( (Field.zero, As_prover.Ref.create (fun () -> ""))
-                : string Mina_base_kernel.Data_as_hash.t )
+                : string Mina_base.Data_as_hash.t )
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
         ; voting_for =
             Snapp_basic.Set_or_keep.Checked.map
               (set_or_keep field u##.votingFor)
-              ~f:Mina_base_kernel.State_hash.var_of_hash_packed
+              ~f:Mina_base.State_hash.var_of_hash_packed
         }
       in
       { public_key = public_key b##.publicKey
@@ -2423,8 +2415,7 @@ type AccountPredicate =
       { balance = numeric balance max_interval_uint64
       ; nonce = numeric nonce max_interval_uint32
       ; receipt_chain_hash =
-          ignore
-            (Mina_base_kernel.Receipt.Chain_hash.var_of_hash_packed Field.zero)
+          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
       ; public_key = ignore pk_dummy
       ; delegate = ignore pk_dummy
       ; state =
@@ -2449,7 +2440,7 @@ type AccountPredicate =
           ; receipt_chain_hash =
               or_ignore
                 (* TODO: assumes constant *)
-                (Mina_base_kernel.Receipt.Chain_hash.var_of_t ^ field_value)
+                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
                 predicate##.receiptChainHash
           ; public_key = or_ignore public_key predicate##.publicKey
           ; delegate = or_ignore public_key predicate##.delegate
@@ -2522,8 +2513,8 @@ type AccountPredicate =
 
       let balance = Currency.Balance.of_uint64 bal_u64 in
 
-      let a : Mina_base_kernel.Account.t =
-        { (Mina_base_kernel.Account.create account_id balance) with
+      let a : Mina_base.Account.t =
+        { (Mina_base.Account.create account_id balance) with
           permissions = loose_permissions
         }
       in
@@ -2552,7 +2543,7 @@ type AccountPredicate =
 
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
-          { Mina_base_kernel.Epoch_ledger.Poly.hash = Field.Constant.zero
+          { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
           ; total_currency = Currency.Amount.zero
           }
       ; seed = Field.Constant.zero

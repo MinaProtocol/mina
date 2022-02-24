@@ -1,7 +1,7 @@
 (library
  (name snarky_js_bindings_lib)
  (libraries
-   mina_base.kernel
+   mina_base
    snarky_curve
    pickles
    kimchi_backend

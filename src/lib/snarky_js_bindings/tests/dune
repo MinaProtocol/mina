@@ -2,7 +2,7 @@
  (name snarky_js_bindings_tests)
  (inline_tests)
  (libraries
-   mina_base.kernel
+   mina_base
    snarky_curve
    pickles
    kimchi_backend
