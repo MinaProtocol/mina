@@ -1299,7 +1299,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               ( Precomputed_values.genesis_ledger precomputed_values
-              |> Lazy.force |> Ledger.merkle_root
+              |> Lazy.force |> Mina_ledger.Ledger.merkle_root
               |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof

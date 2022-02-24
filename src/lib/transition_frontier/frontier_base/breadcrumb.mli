@@ -79,7 +79,7 @@ val payments : t -> Signed_command.t With_status.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
-val mask : t -> Ledger.Mask.Attached.t
+val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 
 val display : t -> display
 

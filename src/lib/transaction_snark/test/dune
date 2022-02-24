@@ -5,6 +5,7 @@
     currency
     mina_base
     mina_state
+    mina_ledger
     signature_lib
     snark_params
     snarky.backendless

@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_state
 open Mina_transition
 open Frontier_base

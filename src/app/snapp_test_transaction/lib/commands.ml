@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 

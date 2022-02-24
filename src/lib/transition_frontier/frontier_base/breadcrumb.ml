@@ -243,13 +243,14 @@ module For_tests = struct
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
-            Ledger.get_or_create_account ledger
+            Mina_ledger.Ledger.get_or_create_account ledger
               (Account.identifier sender_account)
               sender_account
             |> Or_error.ok_exn
           in
           assert ([%equal: [ `Existed | `Added ]] status `Existed) ;
-          (Option.value_exn (Ledger.get ledger account_location)).nonce
+          (Option.value_exn (Mina_ledger.Ledger.get ledger account_location))
+            .nonce
         in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =

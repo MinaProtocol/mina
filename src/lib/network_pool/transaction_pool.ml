@@ -1546,12 +1546,12 @@ end
 module Make (Staged_ledger : sig
   type t
 
-  val ledger : t -> Mina_base.Ledger.t
+  val ledger : t -> Mina_ledger.Ledger.t
 end)
 (Transition_frontier : Transition_frontier_intf
                          with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0 (Mina_base.Ledger) (Staged_ledger) (Transition_frontier)
+  Make0 (Mina_ledger.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
@@ -1745,12 +1745,14 @@ let%test_module _ =
            we build the Ledger.t from the map
         *)
         let ledger =
-          Ledger.create
+          Mina_ledger.Ledger.create
             ~depth:precomputed_values.constraint_constants.ledger_depth ()
         in
         Account_id.Table.iteri best_tip_ledger
           ~f:(fun ~key:acct_id ~data:acct ->
-            match Ledger.get_or_create_account ledger acct_id acct with
+            match
+              Mina_ledger.Ledger.get_or_create_account ledger acct_id acct
+            with
             | Error err ->
                 failwithf
                   "mk_parties_cmds: error adding account for account id: %s, \
@@ -1794,7 +1796,7 @@ let%test_module _ =
       in
       (* add new accounts to best tip ledger *)
       let ledger_accounts =
-        Ledger.to_list ledger
+        Mina_ledger.Ledger.to_list ledger
         |> List.filter ~f:(fun acct -> Option.is_some acct.snapp)
       in
       List.iter ledger_accounts ~f:(fun account ->
@@ -2459,7 +2461,9 @@ let%test_module _ =
     let%test_unit "max size is maintained" =
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
-        let%bind init_ledger_state = Ledger.gen_initial_ledger_state in
+        let%bind init_ledger_state =
+          Mina_ledger.Ledger.gen_initial_ledger_state
+        in
         let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
         let%bind cmds =
           User_command.Valid.Gen.sequence ~sign_type:`Real ~length:cmds_count
