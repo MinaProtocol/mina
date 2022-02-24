@@ -51,7 +51,6 @@ module Numeric = struct
       { zero : 'a
       ; max_value : 'a
       ; compare : 'a -> 'a -> int
-      ; to_string : 'a -> string
       ; equal : 'a -> 'a -> bool
       ; typ : ('var, 'a) Typ.t
       ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
@@ -68,7 +67,6 @@ module Numeric = struct
         { zero
         ; max_value
         ; compare
-        ; to_string
         ; lte_checked = run Checked.( <= )
         ; equal
         ; typ
@@ -80,7 +78,6 @@ module Numeric = struct
       Currency.Amount.
         { zero
         ; max_value = max_int
-        ; to_string
         ; compare
         ; lte_checked = run Checked.( <= )
         ; equal
@@ -93,7 +90,6 @@ module Numeric = struct
       Currency.Balance.
         { zero
         ; max_value = max_int
-        ; to_string
         ; compare
         ; lte_checked = run Checked.( <= )
         ; equal
@@ -106,7 +102,6 @@ module Numeric = struct
       Account_nonce.
         { zero
         ; max_value
-        ; to_string
         ; compare
         ; lte_checked = run Checked.( <= )
         ; equal
@@ -118,7 +113,6 @@ module Numeric = struct
     let global_slot =
       Global_slot.
         { zero
-        ; to_string
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
@@ -132,7 +126,6 @@ module Numeric = struct
       Token_id.
         { zero = of_uint64 Unsigned.UInt64.zero
         ; max_value = of_uint64 Unsigned.UInt64.max_int
-        ; to_string
         ; equal
         ; compare
         ; lte_checked = run Checked.( <= )
@@ -145,7 +138,6 @@ module Numeric = struct
       Block_time.
         { equal
         ; compare
-        ; to_string
         ; lte_checked = run Checked.( <= )
         ; zero
         ; max_value
@@ -194,23 +186,13 @@ module Numeric = struct
       ~equal:(Closed_interval.equal eq)
       ~ignore:{ Closed_interval.lower = zero; upper = max_value }
 
-  let check (type a) ~label { to_string; compare = _; _ } (t : a t) (x : a) =
+  let check ~label { compare; _ } (t : 'a t) (x : 'a) =
     match t with
     | Ignore ->
         Ok ()
     | Check { lower; upper } ->
-        (* TODO: uint64 Compare doesn't work in JS *)
-        let compare = Bignum_bigint.compare in
-        let lower_ = to_string lower in
-        let upper_ = to_string upper in
-        let x_ = to_string x in
-        let lower = Bignum_bigint.of_string lower_ in
-        let upper = Bignum_bigint.of_string upper_ in
-        let x = Bignum_bigint.of_string x_ in
         if compare lower x <= 0 && compare x upper <= 0 then Ok ()
-        else
-          Or_error.errorf "Bounds check failed (%s): %s not in [%s, %s]" label
-            x_ lower_ upper_
+        else Or_error.errorf "Bounds check failed: %s" label
 end
 
 module Eq_data = struct
@@ -392,61 +374,6 @@ module Leaf_typs = struct
 
   let token_id = Numeric.typ token_id
 end
-
-(*
-    { 
-      balance= [123, Balance.max]
-    ; ...
-    ; state =
-          [ Check_equal (Field.of_int 2) // corresponds to some_var
-          ; Ignore
-          ; Ignore
-          ; Ignore
-          ; Ignore
-          ; Ignore
-          ; Ignore
-          ; Ignore
-          ]
-  }
--> 
-
-
-  Statement:
-   { precondition: Precondition,
-     effects: Effects
-    }
-   where
-   type Precondition =
-   { protocol_state:
-      { global_slot: Range(UInt32),
-      ...
-      }
-   , account: Array<AccountPrecondition>
-   }
-   type AccountPrecondition =
-      { balance: Range(UInt64),
-        nonce: Range(UInt64),
-        state: [Option<Field>; 8] }
-
-   type Effects = Array<AccountEffects>
-   type AccountEffects =
-     { state: [Option<Field>; 8]
-     ; balance_change: Int64 // signed
-     ; ... }
-
-[ 123, Balance.max
-, ...
-, 1, 2
-, 0, 0
-, 0, 0
-, 0, 0
-, 0, 0
-, 0, 0
-, 0, 0
-, 0, 0
-]
-
-*)
 
 module Account = struct
   module Poly = struct
