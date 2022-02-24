@@ -404,11 +404,13 @@ module Network_manager = struct
       else []
     in
     let snark_worker_workloads =
-      [ cons_workload
-          ("snark-worker-" ^ snark_coordinator_id)
-          (List.init network_config.terraform.snark_worker_replicas
-             ~f:(fun _i -> cons_node_info "worker"))
-      ]
+      if network_config.terraform.snark_worker_replicas > 0 then
+        [ cons_workload
+            ("snark-worker-" ^ snark_coordinator_id)
+            (List.init network_config.terraform.snark_worker_replicas
+               ~f:(fun _i -> cons_node_info "worker"))
+        ]
+      else []
     in
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
