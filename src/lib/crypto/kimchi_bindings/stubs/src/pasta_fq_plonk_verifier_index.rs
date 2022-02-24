@@ -1,9 +1,9 @@
-use crate::arkworks::{CamlFq, CamlGPallas};
-use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
-use crate::plonk_verifier_index::{
-    CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+use crate::{
+    arkworks::{CamlFq, CamlGPallas},
+    pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
+    plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
+    srs::fq::CamlFqSrs,
 };
-use crate::srs::fq::CamlFqSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -82,12 +82,13 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, &None);
+        let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
+            powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -134,7 +135,7 @@ pub fn read_raw(
         fq_sponge_params,
         fr_sponge_params,
     )
-    .map_err(|_| {
+    .map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
@@ -165,7 +166,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 ) -> Result<(), ocaml::Error> {
     let index: VerifierIndex<GAffine> = index.into();
     let path = Path::new(&path);
-    index.to_file(path, append).map_err(|_| {
+    index.to_file(path, append).map_err(|_e| {
         ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
             .err()
             .unwrap()
