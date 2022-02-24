@@ -2,6 +2,7 @@ open Core
 open Mina_base
 open Snark_params
 open Mina_state
+module Transaction_validator = Transaction_validator
 
 (** For debugging. Logs to stderr the inputs to the top hash. *)
 val with_top_hash_logging : (unit -> 'a) -> 'a
@@ -424,13 +425,13 @@ type local_state =
   , (Party.t, unit) Parties.Call_forest.t list
   , Token_id.t
   , Currency.Amount.t
-  , Sparse_ledger.t
+  , Mina_ledger.Sparse_ledger.t
   , bool
   , unit
   , Transaction_status.Failure.t option )
   Parties_logic.Local_state.t
 
-type global_state = Sparse_ledger.Global_state.t
+type global_state = Mina_ledger.Sparse_ledger.Global_state.t
 
 (** Represents before/after pairs of states, corresponding to parties in a list of parties transactions.
  *)
@@ -498,7 +499,8 @@ val parties_witnesses_exn :
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
   -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
-  -> [ `Ledger of Ledger.t | `Sparse_ledger of Sparse_ledger.t ]
+  -> [ `Ledger of Mina_ledger.Ledger.t
+     | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
   -> Parties.t list
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
@@ -569,7 +571,7 @@ module For_tests : sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
     -> Transaction_logic.For_tests.Transaction_spec.t
-    -> Ledger.t
+    -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
 
   val multiple_transfers : Spec.t -> Parties.t

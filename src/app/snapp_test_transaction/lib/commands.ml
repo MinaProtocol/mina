@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
@@ -355,9 +356,11 @@ module Events = struct
 end
 
 module Util = struct
-  let keypair_of_file =
-    Secrets.Keypair.Terminal_stdin.read_exn ~should_prompt_user:false
-      ~which:"payment keypair"
+  let keypair_of_file ?(which = "Fee Payer") f =
+    printf "%s keyfile\n" which ;
+    Secrets.Keypair.Terminal_stdin.read_exn ~which f
+
+  let snapp_keypair_of_file = keypair_of_file ~which:"Snapp Account"
 
   let print_snapp_transaction parties =
     printf !"Parties sexp:\n %{sexp: Parties.t}\n\n%!" parties ;
@@ -371,7 +374,12 @@ module Util = struct
         Signed_command_memo.create_from_string_exn m)
 
   let app_state_of_list lst =
-    List.map ~f:App_state.of_string lst |> Snapp_state.V.of_list_exn
+    let app_state = List.map ~f:App_state.of_string lst in
+    List.append app_state
+      (List.init
+         (8 - List.length app_state)
+         ~f:(fun _ -> Snapp_basic.Set_or_keep.Keep))
+    |> Snapp_state.V.of_list_exn
 
   let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
     List.map ~f:Events.of_string_array array_lst
@@ -423,7 +431,7 @@ let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ~memo =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
@@ -449,7 +457,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~verification_key ~snapp_uri ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let verification_key =
     let data =
       Side_loaded_verification_key.of_base58_check_exn verification_key
@@ -518,7 +526,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
 let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let app_state = Util.app_state_of_list app_state in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -551,7 +559,7 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let snapp_uri = Snapp_basic.Set_or_keep.Set snapp_uri in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -586,7 +594,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~sequence_state =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let sequence_events = Util.sequence_state_of_list sequence_state in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -619,7 +627,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~token_symbol ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let token_symbol = Snapp_basic.Set_or_keep.Set token_symbol in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -654,7 +662,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~permissions ~current_auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_keypair = Util.keypair_of_file snapp_keyfile in
+  let%bind snapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee

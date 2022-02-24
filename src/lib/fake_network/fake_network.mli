@@ -3,6 +3,7 @@ open Core
 open Gadt_lib
 open Network_peer
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1

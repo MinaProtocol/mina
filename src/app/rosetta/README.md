@@ -4,6 +4,10 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/02/18:
+
+- Added nonces to the balance table with all relevant schema migration changes and archive node changes to support it
+
 2022/02/11:
 
 - Replaced "Pending" status with null as demanded by the specification:

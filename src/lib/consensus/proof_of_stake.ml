@@ -19,7 +19,7 @@ let make_checked t =
 let name = "proof_of_stake"
 
 let genesis_ledger_total_currency ~ledger =
-  Mina_base.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
+  Mina_ledger.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
     ~f:(fun _addr sum (account : Mina_base.Account.t) ->
       (* only default token matters for total currency used to determine stake *)
       if Mina_base.(Token_id.equal account.token_id Token_id.default) then
@@ -29,7 +29,7 @@ let genesis_ledger_total_currency ~ledger =
       else sum)
 
 let genesis_ledger_hash ~ledger =
-  Mina_base.Ledger.merkle_root (Lazy.force ledger)
+  Mina_ledger.Ledger.merkle_root (Lazy.force ledger)
   |> Mina_base.Frozen_ledger_hash.of_ledger_hash
 
 let compute_delegatee_table keys ~iter_accounts =
@@ -65,15 +65,15 @@ let compute_delegatee_table keys ~iter_accounts =
 
 let compute_delegatee_table_sparse_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
-      Mina_base.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct))
+      Mina_ledger.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct))
 
 let compute_delegatee_table_ledger_db keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
-      Mina_base.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct))
+      Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct))
 
 let compute_delegatee_table_genesis_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
-      Mina_base.Ledger.iteri ledger ~f:(fun i acct -> f i acct))
+      Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct))
 
 module Segment_id = Mina_numbers.Nat.Make32 ()
 
@@ -245,14 +245,14 @@ module Data = struct
     module Snapshot = struct
       module Ledger_snapshot = struct
         type t =
-          | Genesis_epoch_ledger of Mina_base.Ledger.t
-          | Ledger_db of Mina_base.Ledger.Db.t
+          | Genesis_epoch_ledger of Mina_ledger.Ledger.t
+          | Ledger_db of Mina_ledger.Ledger.Db.t
 
         let merkle_root = function
           | Genesis_epoch_ledger ledger ->
-              Mina_base.Ledger.merkle_root ledger
+              Mina_ledger.Ledger.merkle_root ledger
           | Ledger_db ledger ->
-              Mina_base.Ledger.Db.merkle_root ledger
+              Mina_ledger.Ledger.Db.merkle_root ledger
 
         let compute_delegatee_table keys ledger =
           match ledger with
@@ -265,21 +265,21 @@ module Data = struct
           | Genesis_epoch_ledger _ ->
               ()
           | Ledger_db ledger ->
-              Mina_base.Ledger.Db.close ledger
+              Mina_ledger.Ledger.Db.close ledger
 
         let remove ~location = function
           | Genesis_epoch_ledger _ ->
               ()
           | Ledger_db ledger ->
-              Mina_base.Ledger.Db.close ledger ;
+              Mina_ledger.Ledger.Db.close ledger ;
               File_system.rmrf location
 
         let ledger_subset keys ledger =
           match ledger with
           | Genesis_epoch_ledger ledger ->
-              Mina_base.Sparse_ledger.of_ledger_subset_exn ledger keys
+              Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger keys
           | Ledger_db ledger ->
-              Mina_base.(
+              Mina_ledger.(
                 Sparse_ledger.of_any_ledger
                 @@ Ledger.Any_ledger.cast (module Ledger.Db) ledger)
       end
@@ -408,13 +408,13 @@ module Data = struct
 
     let create_epoch_ledger ~location ~logger ~genesis_epoch_ledger
         ~ledger_depth =
-      let open Mina_base in
       if Sys.file_exists location then (
         [%log info]
           ~metadata:[ ("location", `String location) ]
           "Loading epoch ledger from disk: $location" ;
         Snapshot.Ledger_snapshot.Ledger_db
-          (Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()) )
+          (Mina_ledger.Ledger.Db.create ~directory_name:location
+             ~depth:ledger_depth ()) )
       else Genesis_epoch_ledger (Lazy.force genesis_epoch_ledger)
 
     let create block_producer_pubkeys ~genesis_ledger ~genesis_epoch_data
@@ -571,10 +571,9 @@ module Data = struct
           !t.next_epoch_snapshot <- v
 
     let reset_snapshot (t : t) id ~sparse_ledger ~ledger_depth =
-      let open Mina_base in
       let open Or_error.Let_syntax in
       let module Ledger_transfer =
-        Mina_base.Ledger_transfer.From_sparse_ledger (Ledger.Db) in
+        Mina_ledger.Ledger_transfer.From_sparse_ledger (Mina_ledger.Ledger.Db) in
       let delegatee_table =
         compute_delegatee_table_sparse_ledger
           (current_block_production_keys t)
@@ -586,9 +585,10 @@ module Data = struct
           Snapshot.Ledger_snapshot.remove !t.staking_epoch_snapshot.ledger
             ~location ;
           let ledger =
-            Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
+            Mina_ledger.Ledger.Db.create ~directory_name:location
+              ~depth:ledger_depth ()
           in
-          let%map (_ : Ledger.Db.t) =
+          let%map (_ : Mina_ledger.Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
           in
           !t.staking_epoch_snapshot <-
@@ -600,9 +600,10 @@ module Data = struct
           Snapshot.Ledger_snapshot.remove !t.next_epoch_snapshot.ledger
             ~location ;
           let ledger =
-            Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
+            Mina_ledger.Ledger.Db.create ~directory_name:location
+              ~depth:ledger_depth ()
           in
-          let%map (_ : Ledger.Db.t) =
+          let%map (_ : Mina_ledger.Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
           in
           !t.next_epoch_snapshot <-
@@ -750,11 +751,11 @@ module Data = struct
       let genesis_winner = keypairs.(0)
 
       let genesis_stake_proof :
-          genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> Stake_proof.t =
+          genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =
        fun ~genesis_epoch_ledger ->
         let pk, sk = genesis_winner in
         let dummy_sparse_ledger =
-          Mina_base.Sparse_ledger.of_ledger_subset_exn
+          Mina_ledger.Sparse_ledger.of_ledger_subset_exn
             (Lazy.force genesis_epoch_ledger)
             [ Mina_base.(Account_id.create pk Token_id.default) ]
         in
@@ -768,12 +769,12 @@ module Data = struct
 
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
-          -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
+          -> genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t
           -> Snark_params.Tick.Handler.t =
        fun ~constraint_constants ~genesis_epoch_ledger ->
         let pk, sk = genesis_winner in
         let dummy_sparse_ledger =
-          Mina_base.Sparse_ledger.of_ledger_subset_exn
+          Mina_ledger.Sparse_ledger.of_ledger_subset_exn
             (Lazy.force genesis_epoch_ledger)
             [ Mina_base.(Account_id.create pk Token_id.default) ]
         in
@@ -783,7 +784,7 @@ module Data = struct
           |> Or_error.ok_exn
         in
         let ledger_handler =
-          unstage (Mina_base.Sparse_ledger.handler dummy_sparse_ledger)
+          unstage (Mina_ledger.Sparse_ledger.handler dummy_sparse_ledger)
         in
         let pending_coinbase_handler =
           unstage
@@ -2046,7 +2047,7 @@ module Data = struct
           }
       in
       let snarked_ledger_hash =
-        Lazy.force genesis_ledger |> Mina_base.Ledger.merkle_root
+        Lazy.force genesis_ledger |> Mina_ledger.Ledger.merkle_root
         |> Mina_base.Frozen_ledger_hash.of_ledger_hash
       in
       let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
@@ -2436,7 +2437,7 @@ module Data = struct
         ~pending_coinbase:
           { Mina_base.Pending_coinbase_witness.pending_coinbases; is_new_stack }
         : Snark_params.Tick.Handler.t =
-      let ledger_handler = unstage (Mina_base.Sparse_ledger.handler ledger) in
+      let ledger_handler = unstage (Mina_ledger.Sparse_ledger.handler ledger) in
       let pending_coinbase_handler =
         unstage
           (Mina_base.Pending_coinbase.handler
@@ -2495,7 +2496,7 @@ module Hooks = struct
         module T = struct
           type query = Mina_base.Ledger_hash.t
 
-          type response = (Mina_base.Sparse_ledger.t, string) Result.t
+          type response = (Mina_ledger.Sparse_ledger.t, string) Result.t
         end
 
         module Caller = T
@@ -2528,7 +2529,7 @@ module Hooks = struct
           [@@deriving bin_io, version { rpc }]
 
           type response =
-            ( Mina_base.Sparse_ledger.Stable.V2.t
+            ( Mina_ledger.Sparse_ledger.Stable.V2.t
             , string )
             Core_kernel.Result.Stable.V1.t
           [@@deriving bin_io, version { rpc }]
@@ -2584,7 +2585,7 @@ module Hooks = struct
                       | Genesis_epoch_ledger genesis_epoch_ledger ->
                           if
                             Ledger_hash.equal ledger_hash
-                              (Mina_base.Ledger.merkle_root
+                              (Mina_ledger.Ledger.merkle_root
                                  genesis_epoch_ledger)
                           then
                             Some
@@ -2593,13 +2594,13 @@ module Hooks = struct
                       | Ledger_db ledger ->
                           if
                             Ledger_hash.equal ledger_hash
-                              (Mina_base.Ledger.Db.merkle_root ledger)
+                              (Mina_ledger.Ledger.Db.merkle_root ledger)
                           then
                             Some
                               (Ok
-                                 ( Mina_base.Sparse_ledger.of_any_ledger
-                                 @@ Mina_base.Ledger.Any_ledger.cast
-                                      (module Mina_base.Ledger.Db)
+                                 ( Mina_ledger.Sparse_ledger.of_any_ledger
+                                 @@ Mina_ledger.Ledger.Any_ledger.cast
+                                      (module Mina_ledger.Ledger.Db)
                                       ledger ))
                           else None)
                 in
@@ -2830,7 +2831,7 @@ module Hooks = struct
             Deferred.Or_error.ok_unit
         | Ledger_db next_epoch_ledger ->
             let ledger =
-              Mina_base.Ledger.Db.create_checkpoint next_epoch_ledger
+              Mina_ledger.Ledger.Db.create_checkpoint next_epoch_ledger
                 ~directory_name:(staking_epoch_ledger_location local_state)
                 ()
             in
@@ -3180,7 +3181,9 @@ module Hooks = struct
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~(local_state : Local_state.t)
       ~snarked_ledger ~genesis_ledger_hash =
-    let snarked_ledger_hash = Mina_base.Ledger.Db.merkle_root snarked_ledger in
+    let snarked_ledger_hash =
+      Mina_ledger.Ledger.Db.merkle_root snarked_ledger
+    in
     if
       not
         (Epoch.equal
@@ -3214,7 +3217,7 @@ module Hooks = struct
         !local_state.next_epoch_snapshot <-
           { ledger =
               Local_state.Snapshot.Ledger_snapshot.Ledger_db
-                (Mina_base.Ledger.Db.create_checkpoint snarked_ledger
+                (Mina_ledger.Ledger.Db.create_checkpoint snarked_ledger
                    ~directory_name:
                      ( !local_state.epoch_ledger_location
                      ^ Uuid.to_string epoch_ledger_uuids.next )
@@ -3439,7 +3442,7 @@ module Hooks = struct
         let open Consensus_state in
         let genesis_ledger_hash =
           let (module L) = Genesis_ledger.for_unit_tests in
-          Lazy.force L.t |> Mina_base.Ledger.merkle_root
+          Lazy.force L.t |> Mina_ledger.Ledger.merkle_root
           |> Mina_base.Frozen_ledger_hash.of_ledger_hash
         in
         let open Quickcheck.Let_syntax in
@@ -3521,6 +3524,7 @@ let time_hum ~(constants : Constants.t) (now : Block_time.t) =
 let%test_module "Proof of stake tests" =
   ( module struct
     open Mina_base
+    open Mina_ledger
     open Data
     open Consensus_state
 

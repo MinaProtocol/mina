@@ -710,7 +710,7 @@ struct
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
-include Make (Mina_base.Ledger) (Staged_ledger)
+include Make (Mina_ledger.Ledger) (Staged_ledger)
           (struct
             include Transition_frontier
 
