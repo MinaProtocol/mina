@@ -1971,14 +1971,15 @@ let create ?wallets (config : Config.t) =
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
-            trace "coda_subscriptions" (fun () ->
-                Coda_subscriptions.create ~logger:config.logger
-                  ~constraint_constants ~new_blocks ~wallets
-                  ~transition_frontier:frontier_broadcast_pipe_r
-                  ~is_storing_all:config.is_archive_rocksdb
-                  ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
-                  ~time_controller:config.time_controller
-                  ~precomputed_block_writer)
+            O1trace.time_execution "in_coda_subscriptions" (fun () ->
+                trace "coda_subscriptions" (fun () ->
+                    Coda_subscriptions.create ~logger:config.logger
+                      ~constraint_constants ~new_blocks ~wallets
+                      ~transition_frontier:frontier_broadcast_pipe_r
+                      ~is_storing_all:config.is_archive_rocksdb
+                      ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
+                      ~time_controller:config.time_controller
+                      ~precomputed_block_writer))
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =
@@ -1996,19 +1997,21 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            trace "sync_status_observer" (fun () ->
-                create_sync_status_observer ~logger:config.logger ~net
-                  ~is_seed:config.is_seed ~demo_mode:config.demo_mode
-                  ~transition_frontier_and_catchup_signal_incr
-                  ~online_status_incr:
-                    ( Var.watch @@ of_broadcast_pipe
-                    @@ Mina_networking.online_status net )
-                  ~first_connection_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Mina_networking.on_first_connect net ~f:Fn.id )
-                  ~first_message_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Mina_networking.on_first_received_message net ~f:Fn.id ))
+            O1trace.time_execution "maintaining_sync_status" (fun () ->
+                trace "sync_status_observer" (fun () ->
+                    create_sync_status_observer ~logger:config.logger ~net
+                      ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+                      ~transition_frontier_and_catchup_signal_incr
+                      ~online_status_incr:
+                        ( Var.watch @@ of_broadcast_pipe
+                        @@ Mina_networking.online_status net )
+                      ~first_connection_incr:
+                        ( Var.watch @@ of_deferred
+                        @@ Mina_networking.on_first_connect net ~f:Fn.id )
+                      ~first_message_incr:
+                        ( Var.watch @@ of_deferred
+                        @@ Mina_networking.on_first_received_message net
+                             ~f:Fn.id )))
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
