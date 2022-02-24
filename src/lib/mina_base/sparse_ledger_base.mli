@@ -27,6 +27,9 @@ module Global_state : sig
   [@@deriving sexp, to_yojson]
 end
 
+module L :
+  Transaction_logic.Ledger_intf with type t = t ref and type location = int
+
 val merkle_root : t -> Ledger_hash.t
 
 val depth : t -> int
@@ -109,8 +112,3 @@ val handler : t -> Handler.t Staged.t
 
 val has_locked_tokens_exn :
   global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
-
-module L :
-  Transaction_logic.Ledger_intf
-    with type t = Stable.Latest.t ref
-     and type location = int
