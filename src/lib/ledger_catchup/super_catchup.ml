@@ -1240,9 +1240,10 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                        let node =
                          create_node ~downloader t (`Initial_validated c)
                        in
-                       ignore
-                         ( run_state_machine node
-                           : (unit, [ `Finished ]) Deferred.Result.t ))) ;
+                       don't_wait_for
+                         ( ( run_state_machine node
+                             : (unit, [ `Finished ]) Deferred.Result.t )
+                         >>| ignore ))) ;
               ignore
                 ( List.fold state_hashes
                     ~init:(root.state_hash, root.blockchain_length)
