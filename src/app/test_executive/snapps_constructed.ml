@@ -111,7 +111,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Transaction_snark.For_tests.update_state ~constraint_constants
         parties_spec
     in
-    let timeout = Network_time_span.Slots 2 in
+    let timeout = Network_time_span.Slots 3 in
     let%bind () =
       section "send a snapp to create a snapp account"
         ( [%log info] "Sending valid snapp" ;
