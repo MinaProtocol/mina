@@ -39,25 +39,6 @@ let console_log_string s = Js_of_ocaml.Firebug.console##log (Js.string s)
 
 let console_log s = Js_of_ocaml.Firebug.console##log s
 
-(*
-let () =
-  let two = Unsigned.UInt64.of_int 2 in
-  let a = Unsigned.UInt64.of_string "18446744073709551615" in
-  let cmp =
-    Js.Unsafe.eval_string
-      {js|(function integers_uint64_compare(x, y) {
-    x.hi = x.hi >>> 0;
-    y.hi = y.hi >>> 0;
-    return x.ucompare(y);
-})|js}
-  in
-  Firebug.console##log two ;
-  Firebug.console##log a ;
-  Firebug.console##log (Unsigned.UInt64.to_string a |> Js.string) ;
-  Firebug.console##log (Unsigned.UInt64.compare two a) ;
-  Firebug.console##log Js.Unsafe.(fun_call cmp [| inject two; inject a |])
-   *)
-
 let raise_error s =
   let s = Js.string s in
   Js.raise_js_error (new%js Js.error_constr s)
