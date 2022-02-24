@@ -1,5 +1,6 @@
 module Peer = Peer
 module Envelope = Envelope
+module Rpc_intf = Rpc_intf
 
 type query_peer =
   { query :
