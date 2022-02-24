@@ -299,7 +299,7 @@ val query_peer :
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
-  -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+  -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
 
 val restart_helper : t -> unit
 
