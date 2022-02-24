@@ -47,8 +47,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_signed_gen =
-      User_command_generators.payment_with_random_participants ~keys
-        ~max_amount:1000 ~fee_range:10 ()
+      Mina_generators.User_command_generators.payment_with_random_participants
+        ~keys ~max_amount:1000 ~fee_range:10 ()
 
     let user_command_snapp_gen :
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
@@ -77,7 +77,8 @@ let%test_module "Archive node unit tests" =
       |> Or_error.ok_exn
       |> fun _ ->
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
+        Mina_generators.Snapp_generators.gen_parties_from ~fee_payer_keypair
+          ~keymap ~ledger ()
       in
       User_command.Parties parties
 

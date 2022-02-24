@@ -125,7 +125,7 @@ ls -lh mina*.deb
 
 ##################################### END SNAPP TEST TXN PACKAGE #######################################
 
-###### deb without the proving keys
+##################################### MAINNET PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "Building mainnet deb without keys:"
 
@@ -189,6 +189,7 @@ done
 #copy config.json
 cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
 cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
 # The default configuration:
 cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
@@ -210,7 +211,9 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
-###### deb with testnet signatures
+##################################### END MAINNET PACKAGE #######################################
+
+##################################### DEVNET PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "Building testnet signatures deb without keys:"
 
@@ -258,6 +261,60 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END MAINNET PACKAGE #######################################
+
+##################################### BERKELEY PACKAGE #######################################
+
+echo "------------------------------------------------------------"
+echo "Building Mina Berkeley testnet signatures deb without keys:"
+
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: mina-berkeley
+Version: ${MINA_DEB_VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
+Suggests: postgresql
+Conflicts: mina-mainnet
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: O(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+
+echo "------------------------------------------------------------"
+# Overwrite binaries (sudo to fix permissions error)
+sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+
+# Switch the default configuration to devnet.json:
+sudo cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
+# Overwrite the mina.service with a new default PEERS_URL
+rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/berkeley_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-berkeley_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END BERKELEY PACKAGE #######################################
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on

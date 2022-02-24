@@ -197,7 +197,7 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           if not (equal zero res) then (
-            Core.eprintf
+            eprintf
               !"%{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
@@ -311,7 +311,7 @@ module Make
       val params : Fp.t Params.t
     end) =
 struct
-  open Core
+  open Core_kernel
   open Pickles_types
 
   type nonrec t = (Fp.t, Gates.t) t

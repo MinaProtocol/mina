@@ -26,6 +26,8 @@ module Auth_required : sig
 
     val eval_no_proof : t -> signature_verifies:Boolean.var -> Boolean.var
 
+    val eval_proof : t -> Boolean.var
+
     val spec_eval :
          t
       -> signature_verifies:Boolean.var
