@@ -45,7 +45,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~vesting_increment:500_000_000_000
           }
         ]
-    ; num_snark_workers = 0
+    ; num_snark_workers =
+        3
+        (* this test doesn't need snark workers, however turning it on in this test just to make sure the snark workers function within integration tests *)
     }
 
   let run network t =
