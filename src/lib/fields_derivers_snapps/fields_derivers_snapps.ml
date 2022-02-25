@@ -1,4 +1,17 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
+module Field = Snark_params.Tick
+
+[%%else]
+
+module Field = Snark_params.Tick
+
+[%%endif]
+
 
 module Derivers = struct
   let derivers () =
@@ -113,7 +126,6 @@ module Derivers = struct
       ~of_string:Unsigned.UInt32.of_string
 
   let field obj : _ Unified_input.t =
-    let module Field = Pickles.Backend.Tick.Field in
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
       ~to_string:Field.to_string ~of_string:Field.of_string
 
@@ -158,17 +170,6 @@ module Derivers = struct
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
       ~of_string:Currency.Balance.of_string
 
-  let proof obj : _ Unified_input.t =
-    let of_string s =
-      match Pickles.Side_loaded.Proof.of_base64 s with
-      | Ok proof ->
-          proof
-      | Error _err ->
-          failwith "error"
-    in
-    iso_string obj ~name:"SnappProof"
-      ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
-
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Fields_derivers_graphql.Graphql_fields.option x obj in
     let _b = Fields_derivers_graphql.Graphql_args.option x obj in
@@ -211,6 +212,29 @@ module Derivers = struct
     let _c = Fields_derivers_json.To_yojson.finish res in
     Fields_derivers_json.Of_yojson.finish res
 
+  let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
+
+  let of_json obj x = !(obj#map) @@ !(obj#of_json) x
+
+  let typ obj =
+    !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
+end
+
+include Derivers
+
+[%%ifdef consensus_mechanism]
+
+  let proof obj : _ Unified_input.t =
+    let of_string s =
+      match Pickles.Side_loaded.Proof.of_base64 s with
+      | Ok proof ->
+          proof
+      | Error _err ->
+          failwith "error"
+    in
+    iso_string obj ~name:"SnappProof"
+      ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
+
   let verification_key_with_hash obj =
     let verification_key obj =
       Pickles.Side_loaded.Verification_key.(
@@ -222,19 +246,17 @@ module Derivers = struct
       ~hash:!.field obj
     |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
 
-  let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
-
-  let of_json obj x = !(obj#map) @@ !(obj#of_json) x
-
-  let typ obj =
-    !(obj#graphql_fields).Fields_derivers_graphql.Graphql_fields.Input.T.run ()
-end
-
-include Derivers
+    let%test_unit "verification key with hash, roundtrip json" =
+      let open Pickles.Side_loaded.Verification_key in
+      (* we do this because the dummy doesn't have a wrap_vk on it *)
+      let data = dummy |> to_base58_check |> of_base58_check_exn in
+      let v = { With_hash.data; hash = Field.one } in
+      let o = verification_key_with_hash @@ Derivers.o () in
+      [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
+[%%endif]
 
 let%test_module "Test" =
   ( module struct
-    module Field = Pickles.Impls.Step.Field.Constant
     module Public_key = Signature_lib.Public_key.Compressed
 
     module Or_ignore_test = struct
@@ -338,13 +360,6 @@ let%test_module "Test" =
       let open Derivers in
       [%test_eq: V3.t] (of_json v3 (to_json v3 V3.v)) V3.v
 
-    let%test_unit "verification key with hash, roundtrip json" =
-      let open Pickles.Side_loaded.Verification_key in
-      (* we do this because the dummy doesn't have a wrap_vk on it *)
-      let data = dummy |> to_base58_check |> of_base58_check_exn in
-      let v = { With_hash.data; hash = Field.one } in
-      let o = verification_key_with_hash @@ Derivers.o () in
-      [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
   end )
 
 (* TODO: remove this or move to a %test_module once the deriver code is stable *)
