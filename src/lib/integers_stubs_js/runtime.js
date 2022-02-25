@@ -332,21 +332,21 @@ function integers_uint64_to_string(i) {
     return caml_int64_format(caml_new_string("%u"), i.value);
 }
 
-//Provides: caml_uint64_unmarshal
+//Provides: integers_uint64_unmarshal
 //Requires: caml_int64_unmarshal, UInt64
-function caml_uint64_unmarshal(reader, size){
+function integers_uint64_unmarshal(reader, size){
     return new UInt64(caml_int64_unmarshal(reader, size));
 }
   
-//Provides: caml_uint64_marshal
+//Provides: integers_uint64_marshal
 //Requires: caml_int64_marshal
-function caml_uint64_marshal(writer, v, sizes) {
+function integers_uint64_marshal(writer, v, sizes) {
     caml_int64_marshal(writer, v.value, sizes);
 }
 
-//Provides: caml_uint64_hash
+//Provides: integers_uint64_hash
 //Requires: caml_int64_hash
-function caml_uint64_hash(v) {
+function integers_uint64_hash(v) {
     return caml_int64_hash(v.value);
 }
 
@@ -373,7 +373,7 @@ function integers_ulonglong_size(unit) {
 }
 
 //Provides: integers_unsigned_init
-//Requires: caml_custom_ops, integers_uint8_deserialize, integers_uint16_deserialize, integers_uint32_serialize, integers_uint32_deserialize, integers_uint32_hash, integers_uint32_compare, integers_uint64_compare, caml_uint64_hash, caml_uint64_marshal, caml_uint64_unmarshal
+//Requires: caml_custom_ops, integers_uint8_deserialize, integers_uint16_deserialize, integers_uint32_serialize, integers_uint32_deserialize, integers_uint32_hash, integers_uint32_compare, integers_uint64_compare, integers_uint64_hash, integers_uint64_marshal, integers_uint64_unmarshal
 function integers_unsigned_init(unit) {
     caml_custom_ops["integers:uint8"] =
     { deserialize: integers_uint8_deserialize
@@ -388,9 +388,9 @@ function integers_unsigned_init(unit) {
     , hash: integers_uint32_hash
     , compare: integers_uint32_compare };
     caml_custom_ops["integers:uint64"] =
-    { serialize: caml_uint64_marshal
-    , deserialize: caml_uint64_unmarshal
-    , hash: caml_uint64_hash
+    { serialize: integers_uint64_marshal
+    , deserialize: integers_uint64_unmarshal
+    , hash: integers_uint64_hash
     , compare: integers_uint64_compare };
     return unit;
 }
