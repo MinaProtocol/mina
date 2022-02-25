@@ -3,6 +3,7 @@
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 module Processor = Archive_lib.Processor
 
 (* identify a target block B containing staking and next epoch ledgers
@@ -624,7 +625,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   let token_int64 = cmd.token in
   let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
   let balance_block_data = internal_command_to_balance_block_data cmd in
-  let open Mina_base.Ledger in
+  let open Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
       let%bind () =

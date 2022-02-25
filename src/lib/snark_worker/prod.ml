@@ -253,7 +253,7 @@ module Inputs = struct
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage
-                                   (Mina_base.Sparse_ledger.handler w.ledger))))
+                                   (Mina_ledger.Sparse_ledger.handler w.ledger))))
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->

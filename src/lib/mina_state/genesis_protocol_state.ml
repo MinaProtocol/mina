@@ -1,11 +1,12 @@
 open Core_kernel
-open Mina_base
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants =
-  let genesis_ledger_hash = Ledger.merkle_root (Lazy.force genesis_ledger) in
+  let genesis_ledger_hash =
+    Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
+  in
   let snarked_next_available_token =
-    Ledger.next_available_token (Lazy.force genesis_ledger)
+    Mina_ledger.Ledger.next_available_token (Lazy.force genesis_ledger)
   in
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants

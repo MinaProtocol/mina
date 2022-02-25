@@ -960,7 +960,7 @@ let setup_daemon logger =
       in
       let genesis_ledger_hash =
         Precomputed_values.genesis_ledger precomputed_values
-        |> Lazy.force |> Ledger.merkle_root
+        |> Lazy.force |> Mina_ledger.Ledger.merkle_root
       in
       let block_production_keypairs =
         block_production_keypair

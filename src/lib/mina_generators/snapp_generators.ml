@@ -6,7 +6,7 @@
 
 open Core_kernel
 open Mina_base
-module Ledger = Mina_base.Ledger
+module Ledger = Mina_ledger.Ledger
 
 let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
   (* construct predicate using pk and ledger

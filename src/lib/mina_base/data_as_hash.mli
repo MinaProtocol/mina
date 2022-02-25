@@ -39,3 +39,5 @@ val optional_typ :
 val to_input : _ t -> Field.Var.t Random_oracle_input.Chunked.t
 
 val if_ : Boolean.var -> then_:'value t -> else_:'value t -> 'value t
+
+val make_unsafe : Field.Var.t -> 'value As_prover.Ref.t -> 'value t

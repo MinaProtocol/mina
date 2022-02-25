@@ -2,6 +2,7 @@ open Core
 open Async
 open Graphql_async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency
 
@@ -973,7 +974,6 @@ module Types = struct
           ; enum_value "Either" ~value:Either
           ; enum_value "Proof" ~value:Proof
           ; enum_value "Signature" ~value:Signature
-          ; enum_value "Both" ~value:Both
           ; enum_value "Impossible" ~value:Impossible
           ]
 
@@ -1134,12 +1134,11 @@ module Types = struct
                    | Ledger_db staking_ledger -> (
                        try
                          let index =
-                           Mina_base.Ledger.Db.index_of_account_exn
-                             staking_ledger account_id
+                           Ledger.Db.index_of_account_exn staking_ledger
+                             account_id
                          in
                          let delegate_account =
-                           Mina_base.Ledger.Db.get_at_index_exn staking_ledger
-                             index
+                           Ledger.Db.get_at_index_exn staking_ledger index
                          in
                          let delegate_key = delegate_account.public_key in
                          Some (get_best_ledger_account_pk coda delegate_key)
@@ -2357,7 +2356,6 @@ module Types = struct
             ; enum_value "Either" ~value:Either
             ; enum_value "Proof" ~value:Proof
             ; enum_value "Signature" ~value:Signature
-            ; enum_value "Both" ~value:Both
             ; enum_value "Impossible" ~value:Impossible
             ]
 

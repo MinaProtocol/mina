@@ -5,8 +5,8 @@ open Snark_params.Tick
 module Auth_required : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
-      type t = None | Either | Proof | Signature | Both | Impossible
+    module V2 : sig
+      type t = None | Either | Proof | Signature | Impossible
       [@@deriving sexp, equal, compare, hash, yojson, enum]
     end
   end]
@@ -65,7 +65,7 @@ end
 [%%versioned:
 module Stable : sig
   module V2 : sig
-    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V2.t
+    type t = (bool, Auth_required.Stable.V2.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]

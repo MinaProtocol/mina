@@ -119,7 +119,7 @@ val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
-val best_ledger : t -> Ledger.t Participating_state.t
+val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t
 
 val root_length : t -> int Participating_state.t
 

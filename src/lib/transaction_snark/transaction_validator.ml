@@ -1,4 +1,6 @@
 open Base
+open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 module Hashless_ledger = struct
   type t =

@@ -864,6 +864,10 @@ module Amount = struct
     let of_fee (fee : Fee.var) : var = fee
 
     let to_fee (t : var) : Fee.var = t
+
+    module Unsafe = struct
+      let of_field : Field.Var.t -> var = Fn.id
+    end
   end
 
   [%%endif]

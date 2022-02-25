@@ -51,40 +51,7 @@ pub mod pasta_fp_poseidon;
 pub mod pasta_fq_poseidon;
 
 /// Linearization helpers
-pub mod linearization {
-
-    pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-    ) -> (String, Vec<(String, String)>) {
-        let d1 = ark_poly::EvaluationDomain::<F>::new(1).unwrap();
-        let evaluated_cols = kimchi::index::linearization_columns::<F>(&None);
-        let kimchi::circuits::expr::Linearization {
-            constant_term,
-            mut index_terms,
-        } = kimchi::index::constraints_expr(d1, false, &None)
-            .linearize(evaluated_cols)
-            .unwrap();
-        // HashMap deliberately uses an unstable order; here we sort to ensure that the output is
-        // consistent when printing.
-        index_terms.sort_by(|(x, _), (y, _)| x.cmp(y));
-        (
-            format!("{}", constant_term),
-            index_terms
-                .iter()
-                .map(|(col, expr)| (format!("{:?}", col), format!("{}", expr)))
-                .collect(),
-        )
-    }
-
-    #[ocaml::func]
-    pub fn fp_linearization_strings() -> (String, Vec<(String, String)>) {
-        linearization_strings::<mina_curves::pasta::Fp>()
-    }
-
-    #[ocaml::func]
-    pub fn fq_linearization_strings() -> (String, Vec<(String, String)>) {
-        linearization_strings::<mina_curves::pasta::Fq>()
-    }
-}
+pub mod linearization;
 
 /// Handy re-exports
 pub use {

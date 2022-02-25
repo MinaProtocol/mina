@@ -1455,18 +1455,18 @@ let%test_module _ =
 
     let%test_unit "sequential adds (all valid)" =
       let gen :
-          ( Ledger.init_state
+          ( Mina_ledger.Ledger.init_state
           * Transaction_hash.User_command_with_valid_signature.t list )
           Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init = Ledger.gen_initial_ledger_state in
+        let%bind ledger_init = Mina_ledger.Ledger.gen_initial_ledger_state in
         let%map cmds = User_command.Valid.Gen.sequence ledger_init in
         ( ledger_init
         , List.map ~f:Transaction_hash.User_command_with_valid_signature.create
             cmds )
       in
       let shrinker :
-          ( Ledger.init_state
+          ( Mina_ledger.Ledger.init_state
           * Transaction_hash.User_command_with_valid_signature.t list )
           Quickcheck.Shrinker.t =
         Quickcheck.Shrinker.create (fun (init_state, cmds) ->
@@ -1476,7 +1476,7 @@ let%test_module _ =
       Quickcheck.test gen ~trials:1000
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
+            Mina_ledger.Ledger.init_state
             * Transaction_hash.User_command_with_valid_signature.t list]
         ~shrinker ~shrink_attempts:`Exhaustive ~seed:(`Deterministic "d")
         ~sizes:(Sequence.repeat 10) ~f:(fun (ledger_init, cmds) ->
