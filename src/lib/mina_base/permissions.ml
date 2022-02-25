@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
@@ -10,10 +11,6 @@ open Snark_params.Tick
 
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
-
-let field_of_bool b =
-  let open Snark_params.Tick in
-  if b then Field.one else Field.zero
 
 (* Semantically this type represents a function
      { has_valid_signature: bool; has_valid_proof: bool } -> bool

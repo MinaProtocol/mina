@@ -6,4 +6,3 @@
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
  (modes native))
- 

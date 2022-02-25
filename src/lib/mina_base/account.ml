@@ -138,8 +138,9 @@ module Token_symbol = struct
 
   let to_bits (x : t) =
     Pickles_types.Vector.init Num_bits.n ~f:(fun i ->
-        if i / 8 < String.length x then
-          let c = x.[i / 8] |> Char.to_int in
+        let byte_index = i / 8 in
+        if byte_index < String.length x then
+          let c = x.[byte_index] |> Char.to_int in
           c land (1 lsl (i mod 8)) <> 0
         else false)
 
