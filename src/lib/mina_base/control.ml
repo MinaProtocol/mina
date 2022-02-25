@@ -103,7 +103,7 @@ module As_record = struct
   [@@deriving fields]
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_snapps in
     Fields.make_creator obj
       ~proof:!.(option @@ proof @@ o ())
       ~signature:!.(option @@ signature_deriver @@ o ())

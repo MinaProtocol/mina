@@ -1,5 +1,5 @@
 (library
- (name fields_derivers_snapps_nonconsensus)
+ (name fields_derivers_snapps)
  (public_name fields_derivers_snapps_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
@@ -19,9 +19,11 @@
  (preprocess
   (pps
    ppx_deriving_yojson
-   ppx_jane
+   ppx_optcomp
+   ppx_base
    ppx_fields_conv
    ppx_let
    ppx_inline_test
+   ppx_assert
    ppx_version
    ppx_custom_printf)))

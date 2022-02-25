@@ -1,17 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-module Field = Snark_params.Tick
-
-[%%else]
-
-module Field = Snark_params.Tick
-
-[%%endif]
-
+module Field = Snark_params.Tick.Field
 
 module Derivers = struct
   let derivers () =
@@ -224,35 +214,36 @@ include Derivers
 
 [%%ifdef consensus_mechanism]
 
-  let proof obj : _ Unified_input.t =
-    let of_string s =
-      match Pickles.Side_loaded.Proof.of_base64 s with
-      | Ok proof ->
-          proof
-      | Error _err ->
-          failwith "error"
-    in
-    iso_string obj ~name:"SnappProof"
-      ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
+let proof obj : _ Unified_input.t =
+  let of_string s =
+    match Pickles.Side_loaded.Proof.of_base64 s with
+    | Ok proof ->
+        proof
+    | Error _err ->
+        failwith "error"
+  in
+  iso_string obj ~name:"SnappProof"
+    ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
-  let verification_key_with_hash obj =
-    let verification_key obj =
-      Pickles.Side_loaded.Verification_key.(
-        iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
-          ~of_string:of_base58_check_exn
-          ~doc:"Verification key in Base58Check format")
-    in
-    With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
-      ~hash:!.field obj
-    |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
+let verification_key_with_hash obj =
+  let verification_key obj =
+    Pickles.Side_loaded.Verification_key.(
+      iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
+        ~of_string:of_base58_check_exn
+        ~doc:"Verification key in Base58Check format")
+  in
+  With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
+    ~hash:!.field obj
+  |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
 
-    let%test_unit "verification key with hash, roundtrip json" =
-      let open Pickles.Side_loaded.Verification_key in
-      (* we do this because the dummy doesn't have a wrap_vk on it *)
-      let data = dummy |> to_base58_check |> of_base58_check_exn in
-      let v = { With_hash.data; hash = Field.one } in
-      let o = verification_key_with_hash @@ Derivers.o () in
-      [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
+let%test_unit "verification key with hash, roundtrip json" =
+  let open Pickles.Side_loaded.Verification_key in
+  (* we do this because the dummy doesn't have a wrap_vk on it *)
+  let data = dummy |> to_base58_check |> of_base58_check_exn in
+  let v = { With_hash.data; hash = Field.one } in
+  let o = verification_key_with_hash @@ Derivers.o () in
+  [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
+
 [%%endif]
 
 let%test_module "Test" =
@@ -359,7 +350,6 @@ let%test_module "Test" =
     let%test_unit "roundtrip json'" =
       let open Derivers in
       [%test_eq: V3.t] (of_json v3 (to_json v3 V3.v)) V3.v
-
   end )
 
 (* TODO: remove this or move to a %test_module once the deriver code is stable *)
