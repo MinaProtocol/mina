@@ -3,6 +3,8 @@ open Async
 open Mina_base
 open Currency
 open O1trace
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -43,7 +45,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
@@ -189,8 +191,7 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.next_available_token ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
-    Transaction_logic.Transaction_applied.transaction_with_status
-      transaction_with_info
+    Ledger.Transaction_applied.transaction transaction_with_info
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
@@ -471,7 +472,6 @@ struct
           in
           (acc_statement, acc_pc)
       | Full { job = transaction; _ } ->
-          let open Transaction_with_witness in
           with_error "Bad base statement" ~f:(fun () ->
               let%bind expected_statement =
                 match statement_check with
@@ -489,6 +489,7 @@ struct
                 | `Partial ->
                     return transaction.statement
               in
+              let%bind () = yield_always () in
               if
                 Transaction_snark.Statement.equal transaction.statement
                   expected_statement
@@ -588,7 +589,7 @@ struct
     in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~statement_check ~verifier t)
+          scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
         Error e
@@ -629,7 +630,7 @@ struct
 end
 
 module Staged_undos = struct
-  type applied_txn = Transaction_logic.Transaction_applied.t
+  type applied_txn = Ledger.Transaction_applied.t
 
   type t = applied_txn list
 
@@ -663,7 +664,7 @@ let extract_txns txns_with_witnesses =
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
-        Transaction_logic.Transaction_applied.transaction_with_status
+        Ledger.Transaction_applied.transaction
           txn_with_witness.transaction_with_info
       in
       let state_hash = fst txn_with_witness.state_hash in
@@ -686,8 +687,7 @@ let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info
-      |> Transaction_logic.Transaction_applied.transaction_with_status)
+      t.transaction_with_info |> Ledger.Transaction_applied.transaction)
   @@ Parallel_scan.pending_data t
 
 let staged_transactions_with_protocol_states t
@@ -695,8 +695,7 @@ let staged_transactions_with_protocol_states t
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       let txn =
-        t.transaction_with_info
-        |> Transaction_logic.Transaction_applied.transaction_with_status
+        t.transaction_with_info |> Ledger.Transaction_applied.transaction
       in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state))

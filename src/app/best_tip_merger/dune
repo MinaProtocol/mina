@@ -7,6 +7,7 @@
     async
     core_kernel
     logger
+    logger.file_system
     ppx_deriving_yojson.runtime
     lib
     cli_lib

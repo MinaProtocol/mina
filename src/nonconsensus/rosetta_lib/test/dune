@@ -1,7 +1,5 @@
 (executable
- (package rosetta_lib)
  (name test_encodings)
- (public_name test_encodings)
  (modes native)
  (modules test_encodings)
  (libraries core_kernel signature_lib_nonconsensus rosetta_lib_nonconsensus)

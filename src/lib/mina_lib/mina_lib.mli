@@ -36,9 +36,6 @@ val daemon_start_time : Time_ns.t
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
-val replace_block_production_keypairs :
-  t -> Keypair.And_compressed_pk.Set.t -> unit
-
 val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
 
 val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
@@ -122,7 +119,7 @@ val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
-val best_ledger : t -> Ledger.t Participating_state.t
+val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t
 
 val root_length : t -> int Participating_state.t
 

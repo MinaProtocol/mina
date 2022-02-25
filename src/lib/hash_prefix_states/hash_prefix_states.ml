@@ -1,15 +1,3 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
-
 open Core_kernel
 open Hash_prefixes
 
@@ -104,6 +92,8 @@ let party = salt party
 let party_predicate = salt party_predicate
 
 let party_cons = salt party_cons
+
+let party_node = salt party_node
 
 let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate

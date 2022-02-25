@@ -19,7 +19,7 @@ module Extend_blockchain_input = struct
         ; block : Snark_transition.Value.Stable.V2.t
         ; ledger_proof : Ledger_proof.Stable.V2.t option
         ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
-        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
         }
 
       let to_latest = Fn.id
@@ -277,7 +277,7 @@ module Worker = struct
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create

@@ -269,7 +269,7 @@ module type S = sig
   module Genesis_epoch_data : sig
     module Data : sig
       type t =
-        { ledger : Mina_base.Ledger.t Lazy.t; seed : Mina_base.Epoch_seed.t }
+        { ledger : Mina_ledger.Ledger.t Lazy.t; seed : Mina_base.Epoch_seed.t }
     end
 
     type tt = { staking : Data.t; next : Data.t option }
@@ -286,8 +286,8 @@ module type S = sig
       module Snapshot : sig
         module Ledger_snapshot : sig
           type t =
-            | Genesis_epoch_ledger of Mina_base.Ledger.t
-            | Ledger_db of Mina_base.Ledger.Db.t
+            | Genesis_epoch_ledger of Mina_ledger.Ledger.t
+            | Ledger_db of Mina_ledger.Ledger.Db.t
 
           val close : t -> unit
 
@@ -299,7 +299,7 @@ module type S = sig
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
-        -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> ledger_depth:int
@@ -370,11 +370,11 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
-      val genesis_data : genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> t
+      val genesis_data : genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> t
 
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
+        -> genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t
         -> Snark_params.Tick.Handler.t
 
       val handler :
@@ -462,7 +462,7 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Ledger.t Lazy.t
+           genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -471,7 +471,7 @@ module type S = sig
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
-        -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
@@ -479,7 +479,7 @@ module type S = sig
 
       val create_genesis :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
-        -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
@@ -550,7 +550,7 @@ module type S = sig
     module Block_data : sig
       type t
 
-      val epoch_ledger : t -> Mina_base.Sparse_ledger.t
+      val epoch_ledger : t -> Mina_ledger.Sparse_ledger.t
 
       val global_slot : t -> Mina_numbers.Global_slot.t
 
@@ -680,7 +680,7 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Mina_base.Ledger.Db.t
+      -> snarked_ledger:Mina_ledger.Ledger.Db.t
       -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
       -> unit
 

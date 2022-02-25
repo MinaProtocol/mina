@@ -1,7 +1,8 @@
 open Core
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Frontier_base
-module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in

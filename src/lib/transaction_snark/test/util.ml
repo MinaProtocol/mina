@@ -17,13 +17,13 @@ let consensus_constants =
     ~protocol_constants:genesis_constants.protocol
 
 module Ledger = struct
-  include Mina_base.Ledger
+  include Mina_ledger.Ledger
 
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
 module Sparse_ledger = struct
-  include Mina_base.Sparse_ledger
+  include Mina_ledger.Sparse_ledger
 
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end

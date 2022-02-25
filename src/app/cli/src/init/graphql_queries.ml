@@ -116,18 +116,6 @@ query pendingSnarkWork {
   }
 |}]
 
-module Set_staking =
-[%graphql
-{|
-mutation ($public_key: PublicKey) {
-  setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
-    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
-    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
-    }
-  }
-|}]
-
 module Set_coinbase_receiver =
 [%graphql
 {|
@@ -291,7 +279,7 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_string")
+    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_base58_check_exn")
   }
 }
 |}]

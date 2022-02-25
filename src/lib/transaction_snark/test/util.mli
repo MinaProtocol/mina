@@ -9,9 +9,9 @@ val consensus_constants : Consensus.Constants.t
 (* For tests, monkey patch ledger and sparse ledger to freeze their 
    ledger_hashes.
    The nominal type prevents using this in non-test code. *)
-module Ledger : module type of Mina_base.Ledger
+module Ledger : module type of Mina_ledger.Ledger
 
-module Sparse_ledger : module type of Mina_base.Sparse_ledger
+module Sparse_ledger : module type of Mina_ledger.Sparse_ledger
 
 val ledger_depth : Ledger.index
 

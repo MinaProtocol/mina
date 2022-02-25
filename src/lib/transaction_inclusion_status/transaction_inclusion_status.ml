@@ -1,3 +1,4 @@
+open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
 open Pipe_lib
@@ -120,8 +121,13 @@ let%test_module "transaction_status" =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~time_controller ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+          ~time_controller
+          ~expiry_ns:
+            (Time_ns.Span.of_hr
+               (Float.of_int
+                  precomputed_values.genesis_constants.transaction_expiry_hr))
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)

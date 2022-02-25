@@ -149,21 +149,22 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
+Compressed public keys are accepted of the following form:
+
+Field elements are expected to be backed by a 32-byte array where the highest bits of the field are stored in arr[31].
+
+Presented is a hex encoded 32-byte array where the highest bit of arr[31] is the `is_odd` parity bit.
 
 ```
-|----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
+|----- pk : Fq.t (32 bytes) ------{is_odd}--|
+
 ```
 
 Example:
 
-`(123123, 234234)`
+The encoding `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390`
 
-is encoded as the string:
-
-`000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
-
-(abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
+Decodes to the field represented by the number `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310`. That's the same as the encoding, except that the 9 representing the high nybble of the final byte is replaced by 1, by zeroing the high bit. Because the high bit was set, is_odd is true.
 
 **Name**
 
@@ -274,13 +275,21 @@ The Rosetta spec leaves the encoding of unsigned transactions implementation-def
 
 Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input in two ways as defined below and send that byte-buffer as hex-encoded ascii.
 
+
 ```
 // Serialization schema for Random oracle input (1)
 
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t above)
+yy yy ...    #
+             # Field elements are represented by laying out their bits from high
+             # to low (adding a padding zero at the highest bit in the front)
+             # and then grouping by 8 and converting to bytes:
+             #
+             #     (always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
+             #     |----groups of 8---|--groups of 8---|
+             #
              #
 00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
@@ -374,20 +383,21 @@ This endpoint will also accept a query parameter `?plain_random_oracle`
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
-// Signature encoding
-
-a signature is a field and a scalar
-|----- field 32bytes ----|---- scalar 32bytes ---|
-Use the same hex-encoded little endian represenation as described above for
-the public key for these 64 bytes
-```
-
-```
 {
-  signature: string (* Signature as described above *),
+  signature: string (* Signature hex bytes as described below *),
   payment: payment?,
   stakeDelegation: stakeDelegation?
 }
+```
+
+**Format**
+
+```
+// Signature encoding
+
+a signature is a field and a scalar
+|---- field 32bytes (Fp) ---|----- scalar 32bytes (Fq) ----|
+Use the same hex-encoded representation as described above for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint

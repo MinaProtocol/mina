@@ -8,6 +8,7 @@
    ;; libraries
    blockchain_snark
    mina_base
+   mina_ledger
    coda_genesis_proof
    mina_state
    genesis_ledger_helper
