@@ -86,6 +86,7 @@ let%test_module "coda network tests" =
           ~known_private_ip_nets:[]
         >>| Or_error.ok_exn
       in
+      let%bind () = after (Time.Span.of_sec 10.) in
       let%bind b_advert = begin_advertising b in
       Or_error.ok_exn b_advert ;
       let%bind c_advert = begin_advertising c in
@@ -105,7 +106,7 @@ let%test_module "coda network tests" =
     (* TODO fails occasionally, uncomment after debugging it *)
     let%test_unit "b_stream_c" =
       let () = Core.Backtrace.elide := false in
-      let test_def =
+      let test_def () =
         let open Deferred.Let_syntax in
         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
         let%bind b_peerid = me b >>| Keypair.to_peer_id in
@@ -160,11 +161,11 @@ let%test_module "coda network tests" =
         let%bind _msgs = Pipe.read_all r in
         shutdown ()
       in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+      Async.Thread_safe.block_on_async_exn test_def
 
     let%test_unit "stream" =
       let () = Core.Backtrace.elide := false in
-      let test_def =
+      let test_def () =
         let open Deferred.Let_syntax in
         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
         let%bind b_peerid = me b >>| Keypair.to_peer_id in
@@ -193,8 +194,7 @@ let%test_module "coda network tests" =
         assert (String.equal msg testmsg) ;
         let%bind () = Ivar.read handler_finished in
         let%bind () = close_protocol b ~protocol:"echo" in
-        let%map () = shutdown () in
-        ()
+        shutdown ()
       in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+      Async.Thread_safe.block_on_async_exn test_def
   end )
