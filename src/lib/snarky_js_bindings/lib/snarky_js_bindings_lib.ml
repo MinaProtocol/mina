@@ -2251,34 +2251,32 @@ type AccountPredicate =
         ~sgn:Sgn.Checked.pos
 
     let or_ignore (type a b) (transform : a -> b) (x : a or_ignore) =
-      Snapp_basic.Or_ignore.Checked.Explicit
-        { Snapp_basic.Flagged_option.is_some = x##.check##.value
-        ; data = transform x##.value
-        }
+      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit
+        x##.check##.value
+        (transform x##.value)
 
     let ignore (dummy : 'a) =
-      Snapp_basic.Or_ignore.Checked.Explicit
-        { Snapp_basic.Flagged_option.is_some = Boolean.false_; data = dummy }
+      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.false_ dummy
 
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
-      Snapp_basic.Or_ignore.Checked.Implicit
+      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
 
     let numeric_equal (type a b) (transform : a -> b) (x : a) =
       let x' = transform x in
-      Snapp_basic.Or_ignore.Checked.Implicit
+      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
         b Snapp_basic.Set_or_keep.Checked.t =
-      { Snapp_basic.Flagged_option.is_some = x##.set##.value
-      ; data = transform x##.value
-      }
+      Snapp_basic.Set_or_keep.Checked.make_unsafe
+        x##.set##.value
+        (transform x##.value)
 
     let keep dummy : 'a Snapp_basic.Set_or_keep.Checked.t =
-      { Snapp_basic.Flagged_option.is_some = Boolean.false_; data = dummy }
+      Snapp_basic.Set_or_keep.Checked.make_unsafe Boolean.false_ dummy
 
     let amount x = Currency.Amount.Checked.Unsafe.of_field @@ uint64 x
 
@@ -2378,8 +2376,8 @@ type AccountPredicate =
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
         ; snapp_uri =
             keep
-              ( (Field.zero, As_prover.Ref.create (fun () -> ""))
-                : string Mina_base.Data_as_hash.t )
+              (Mina_base.Data_as_hash.make_unsafe Field.zero
+                 (As_prover.Ref.create (fun () -> "")))
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
         ; voting_for =
