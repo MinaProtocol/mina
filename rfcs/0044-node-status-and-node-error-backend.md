@@ -42,7 +42,9 @@ We would setup an alert that tells us if user's input is over the designated lim
 
 For storage of the logs, we can setup customized buckets that can be configured to have 3650 days of log retentions.
 
-For visualization and plotting, logs can be passed to the elastic cloud on GCP through Pub/Sub message sharing. For the details, please see this tutorial on how to export logs to elastic cloud: https://cloud.google.com/community/tutorials/exporting-stackdriver-elasticcloud
+For visualization and plotting, logs can be passed to the elastic cloud on GCP through Pub/Sub message sharing. We decided to hold the elastic stack by ourselves on our k8s clusters.
+
+Most of the setup would be capture in a terraform modules, except the management of secret and service accounts since it's not safe to expose those in terraform states.
 
 In summary, we need to setup a micro-service for each corresponding system and we also need to setup separate log buckets and log sinks for them.
 
@@ -105,3 +107,6 @@ The reason that we choose Google Cloud Logging fo our backend is that
 2. For LogDNA, it has a 30 days log retention limit which clearly doesn't suit our needs. Plus, LogDNA is much expensive than the other 2.
 
 3. For Grafana Loki, it features a "label"-indexed log compression system. This would shine if the log that it process has a certain amount of static labels. For our system, this is not the case. Plus that, none of us are familiar with Loki. And finally Grafana's cloud system also has a 30 days' limit on log retention. This limitation implies that if we want to use Loki then we have to set up our own Loki service which adds some more additional maintenance complexity.
+
+## The decision to make our Kibana ingress private
+We choose Kibana as our tool to visualize and search through the reports. And we decide to make the Kibana ingress private. The reason is that the reports that users send us contains stack traces that might contains sensitive information that could expose vulnerability to malicious users. So we decided not to make those reports public. But we would create some grafana charts that highlights the stats we collected from those reports.
