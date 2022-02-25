@@ -606,15 +606,6 @@ struct
       let module V = H3.To_vector (E) in
       V.f prev_values_length (M.f prev_with_proofs)
     in
-    assert (
-      Backend.Tick.Proof.verify ~message:prev_polynomials next_proof
-        (Backend.Tick.Keypair.vk pk)
-        (let v = Backend.Tick.Field.Vector.create () in
-         List.iter
-           ~f:(Backend.Tick.Field.Vector.emplace_back v)
-           (tick_public_input_of_statement ~max_branching:Max_branching.n
-              next_statement_hashed) ;
-         v) ) ;
     { P.Base.Pairing_based.proof = next_proof
     ; statement = next_statement
     ; index = branch_data.index
