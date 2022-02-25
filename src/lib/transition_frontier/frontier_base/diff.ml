@@ -9,7 +9,7 @@ type lite = Lite
 module Node = struct
   type _ t =
     | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+    | Lite : External_transition.Validated.Stable.V1.t -> lite t
 end
 
 module Node_list = struct
@@ -29,7 +29,7 @@ module Node_list = struct
 
   let to_lite =
     let f {transition; _} =
-      External_transition.Validated.state_hash transition
+      (External_transition.Validated.state_hashes transition).state_hash
     in
     List.map ~f
 
@@ -69,7 +69,7 @@ end
 
 module Root_transition = struct
   type 'repr t =
-    { new_root: Root_data.Limited.t
+    { new_root: Root_data.Limited.Stable.V2.t
     ; garbage: 'repr Node_list.t
     ; just_emitted_a_proof: bool }
 
@@ -79,13 +79,23 @@ module Root_transition = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
+      module V3 = struct
+        type t =
+          { new_root: Root_data.Limited.Stable.V2.t
+          ; garbage: Node_list.Lite.Stable.V1.t
+          ; just_emitted_a_proof: bool }
+
+        let to_latest = Fn.id
+      end
       module V2 = struct
         type t =
           { new_root: Root_data.Limited.Stable.V1.t
           ; garbage: Node_list.Lite.Stable.V1.t
           ; just_emitted_a_proof: bool }
 
-        let to_latest = Fn.id
+        let to_latest {new_root; garbage; just_emitted_a_proof} =
+          let new_root = Root_data.Limited.Stable.V1.to_latest new_root in
+          {V3.new_root; garbage; just_emitted_a_proof}
       end
     end]
   end
@@ -95,16 +105,43 @@ module Root_transition = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+        module V3 = struct
+          type t = Lite_binable.Stable.V3.t
+
+          let to_latest = Fn.id
+        end
+
         module V2 = struct
           type t = Lite_binable.Stable.V2.t
 
-          let to_latest = Fn.id
+          let to_latest = Lite_binable.Stable.V2.to_latest
         end
       end]
     end
 
     [%%versioned_binable
     module Stable = struct
+      module V3 = struct
+        type t = lite root_transition
+
+        module T_nonbinable = struct
+          type nonrec t = t
+
+          let to_binable ({new_root; garbage; just_emitted_a_proof} : t) :
+              Binable_arg.Stable.V3.t =
+            {new_root; garbage; just_emitted_a_proof}
+
+          let of_binable
+              ({new_root; garbage; just_emitted_a_proof} :
+                Binable_arg.Stable.V3.t) : t =
+            {new_root; garbage; just_emitted_a_proof}
+        end
+
+        include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t = lite root_transition
 
@@ -113,11 +150,13 @@ module Root_transition = struct
 
           let to_binable ({new_root; garbage; just_emitted_a_proof} : t) :
               Binable_arg.Stable.V2.t =
+            let new_root = Root_data.Limited.Stable.V1.of_v2 new_root in
             {new_root; garbage; just_emitted_a_proof}
 
           let of_binable
               ({new_root; garbage; just_emitted_a_proof} :
                 Binable_arg.Stable.V2.t) : t =
+            let new_root = Root_data.Limited.Stable.V1.to_latest new_root in
             {new_root; garbage; just_emitted_a_proof}
         end
 
@@ -150,8 +189,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        State_hash.to_yojson
-          (External_transition.Validated.state_hash transition)
+        let x, _ = transition in
+        State_hash.to_yojson (With_hash.hash x)
     | Root_transitioned {new_root; garbage; just_emitted_a_proof} ->
         let garbage_hashes =
           match garbage with
@@ -161,7 +200,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hash new_root))
+          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hashes new_root).state_hash)
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
     | Best_tip_changed breadcrumb ->
@@ -170,9 +209,10 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
   `Assoc [(name key, json_key)]
 
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
+  let downgrade_transition (t, v) = (With_hash.map_hash t ~f:(fun {State_hash.State_hashes.state_hash; _} -> state_hash), v) in
   match diff with
   | New_node (Full breadcrumb) ->
-      New_node (Lite (Breadcrumb.validated_transition breadcrumb))
+      New_node (Lite (downgrade_transition @@ Breadcrumb.validated_transition breadcrumb))
   | Root_transitioned
       {new_root; garbage= Full garbage_nodes; just_emitted_a_proof} ->
       Root_transitioned

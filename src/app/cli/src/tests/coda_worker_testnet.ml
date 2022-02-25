@@ -221,8 +221,9 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               false
           | [ state_hash ]
             when State_hash.equal state_hash
-                   testnet.Api.precomputed_values.protocol_state_with_hash.hash
-            ->
+                   testnet.Api.precomputed_values.protocol_state_with_hashes
+                     .hash
+                     .state_hash ->
               (* Knowing only the genesis transition doesn't indicate an online
                  chain.
               *)

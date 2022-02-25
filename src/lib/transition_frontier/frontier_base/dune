@@ -1,6 +1,7 @@
 (library
  (name frontier_base)
  (public_name transition_frontier_base)
+ (flags -w -22)
  (libraries core_kernel mina_base mina_state mina_transition staged_ledger base58_check)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))
