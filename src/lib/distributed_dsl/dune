@@ -3,7 +3,7 @@
  (public_name distributed_dsl)
  (library_flags -linkall)
  (inline_tests)
- (libraries logger core pipe_lib async)
+ (libraries logger core pipe_lib async inline_test_quiet_logs)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.enum ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

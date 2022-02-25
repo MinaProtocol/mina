@@ -539,8 +539,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -573,8 +571,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_genesis_state :
            ( 'time_received
@@ -607,8 +603,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_delta_transition_chain :
            ( 'time_received
@@ -646,8 +640,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -680,8 +672,6 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -714,8 +704,6 @@ module Validation = struct
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_protocol_versions :
            ( 'time_received
@@ -748,8 +736,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , (`Protocol_versions, Truth.True ()) )
-      | _ ->
-          failwith "why can't this be refuted?"
   end
 end
 
@@ -799,15 +785,29 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proofs tvs ~verifier =
+let validate_proofs tvs ~verifier ~genesis_state_hash =
   let open Deferred.Let_syntax in
+  let to_verify =
+    List.filter_map tvs ~f:(fun (t, _validation) ->
+        if State_hash.equal (With_hash.hash t) genesis_state_hash then
+          (* Don't require a valid proof for the genesis block, since the
+             peer may not have one.
+          *)
+          None
+        else
+          let transition = With_hash.data t in
+          Some
+            (Blockchain_snark.Blockchain.create
+               ~state:(protocol_state transition)
+               ~proof:(protocol_state_proof transition)))
+  in
   match%map
-    Verifier.verify_blockchain_snarks verifier
-      (List.map tvs ~f:(fun (t, _validation) ->
-           let transition = With_hash.data t in
-           Blockchain_snark.Blockchain.create
-             ~state:(protocol_state transition)
-             ~proof:(protocol_state_proof transition)))
+    match to_verify with
+    | [] ->
+        (* Skip calling the verifier, nothing here to verify. *)
+        return (Ok true)
+    | _ ->
+        Verifier.verify_blockchain_snarks verifier to_verify
   with
   | Ok verified ->
       if verified then

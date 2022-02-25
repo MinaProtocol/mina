@@ -7,7 +7,6 @@ open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open O1trace
-open Otp_lib
 open Network_peer
 module Archive_client = Archive_client
 module Config = Config
@@ -52,6 +51,7 @@ type snark_worker =
 type processes =
   { prover : Prover.t
   ; verifier : Verifier.t
+  ; vrf_evaluator : Vrf_evaluator.t
   ; mutable snark_worker :
       [ `On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t ]
   ; uptime_snark_worker_opt : Uptime_service.Uptime_snark_worker.t option
@@ -122,8 +122,6 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; block_production_keypairs :
-      (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state : Work_selector.State.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
@@ -155,9 +153,8 @@ let client_port t =
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
-  let keypair_and_compressed_pks, _ = Agent.get t.block_production_keypairs in
-  Public_key.Compressed.Set.map keypair_and_compressed_pks
-    ~f:(fun (_keypair, pk_compressed) -> pk_compressed)
+  t.config.block_production_keypairs |> Keypair.And_compressed_pk.Set.to_list
+  |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
 
 let coinbase_receiver t = !(t.coinbase_receiver)
 
@@ -171,9 +168,6 @@ let replace_coinbase_receiver t coinbase_receiver =
       ; ("new_receiver", Consensus.Coinbase_receiver.to_yojson coinbase_receiver)
       ] ;
   t.coinbase_receiver := coinbase_receiver
-
-let replace_block_production_keypairs t kps =
-  Agent.update t.block_production_keypairs kps
 
 let log_snark_worker_warning t =
   if Option.is_some t.config.snark_coordinator_key then
@@ -890,6 +884,8 @@ let get_current_nonce t aid =
     |> Option.join
   with
   | None ->
+      (* IMPORTANT! Do not change the content of this error without
+       * updating Rosetta's construction API to handle the changes *)
       Error
         "Couldn't infer nonce for transaction from specified `sender` since \
          `sender` is not in the ledger or sent a transaction in transaction \
@@ -1066,26 +1062,30 @@ let check_and_stop_daemon t ~wait =
     match t.next_producer_timing with
     | None ->
         `Now
-    | Some timing ->
-        let tm =
-          match timing.timing with
-          | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm ->
-              Block_time.to_time tm
-          | Produce tm | Produce_now tm ->
-              Block_time.to_time tm.time
-        in
-        (*Assuming it takes at most 1hr to bootstrap and catchup*)
-        let next_block =
-          Time.add tm
-            (Block_time.Span.to_time_span
-               t.config.precomputed_values.consensus_constants.slot_duration_ms)
-        in
-        let wait_for = Time.(diff next_block (now ())) in
-        if Time.Span.(wait_for > max_catchup_time) then `Now
-        else `Check_in wait_for
+    | Some timing -> (
+        match timing.timing with
+        | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
+        | Produce { time = tm; _ }
+        | Produce_now { time = tm; _ } ->
+            let tm = Block_time.to_time tm in
+            (*Assuming it takes at most 1hr to bootstrap and catchup*)
+            let next_block =
+              Time.add tm
+                (Block_time.Span.to_time_span
+                   t.config.precomputed_values.consensus_constants
+                     .slot_duration_ms)
+            in
+            let wait_for = Time.(diff next_block (now ())) in
+            if Time.Span.(wait_for > max_catchup_time) then `Now
+            else `Check_in wait_for
+        | Evaluating_vrf _last_checked_slot ->
+            `Check_in
+              (Core.Time.Span.of_ms
+                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float))
+        )
 
-let _stop_long_running_daemon t =
-  let wait_mins = (40 * 60) + (Random.int 10 * 60) in
+let stop_long_running_daemon t =
+  let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
@@ -1134,11 +1134,13 @@ let start t =
       in
       let status, timing =
         match timing with
-        | `Check_again time ->
+        | `Check_again block_time ->
             ( `Free
             , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
-                (time |> Block_time.Span.of_ms |> Block_time.of_span_since_epoch)
-            )
+                block_time )
+        | `Evaluating_vrf last_checked_slot ->
+            (* Vrf evaluation is still going on, so treating it as if a block is being produced*)
+            (`Producing, Evaluating_vrf last_checked_slot)
         | `Produce_now (block_data, _) ->
             let info :
                 Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
@@ -1168,25 +1170,45 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing ~prover:t.processes.prover
-    ~trust_system:t.config.trust_system
-    ~transaction_resource_pool:
-      (Network_pool.Transaction_pool.resource_pool
-         t.components.transaction_pool)
-    ~get_completed_work:
-      (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-    ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.block_production_keypairs)
-    ~coinbase_receiver:t.coinbase_receiver
-    ~consensus_local_state:t.config.consensus_local_state
-    ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values
-    ~block_reward_threshold:t.config.block_reward_threshold
-    ~block_produced_bvar:t.components.block_produced_bvar ;
+  if
+    not
+      (Keypair.And_compressed_pk.Set.is_empty
+         t.config.block_production_keypairs)
+  then
+    Block_producer.run ~logger:t.config.logger
+      ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+      ~set_next_producer_timing ~prover:t.processes.prover
+      ~trust_system:t.config.trust_system
+      ~transaction_resource_pool:
+        (Network_pool.Transaction_pool.resource_pool
+           t.components.transaction_pool)
+      ~get_completed_work:
+        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+      ~time_controller:t.config.time_controller
+      ~coinbase_receiver:t.coinbase_receiver
+      ~consensus_local_state:t.config.consensus_local_state
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~log_block_creation:t.config.log_block_creation
+      ~precomputed_values:t.config.precomputed_values
+      ~block_reward_threshold:t.config.block_reward_threshold
+      ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
+  let () =
+    match t.config.node_status_url with
+    | Some node_status_url ->
+        Node_status_service.start ~logger:t.config.logger ~node_status_url
+          ~network:t.components.net
+          ~transition_frontier:t.components.transition_frontier
+          ~sync_status:t.sync_status
+          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+          ~start_time:t.config.start_time
+          ~slot_duration:
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms)
+    | None ->
+        ()
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
@@ -1196,7 +1218,7 @@ let start t =
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
-  (* stop_long_running_daemon t ; *)
+  stop_long_running_daemon t ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
@@ -1288,6 +1310,24 @@ let create ?wallets (config : Config.t) =
                       ~constraint_constants:
                         config.precomputed_values.constraint_constants
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir)))
+            >>| Result.ok_exn
+          in
+          let%bind vrf_evaluator =
+            Monitor.try_with ~here:[%here]
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
+                    [%log' warn config.logger]
+                      "unhandled exception from daemon-side vrf evaluator \
+                       server: $exn"
+                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ]))
+              (fun () ->
+                trace "vrf_evaluator" (fun () ->
+                    Vrf_evaluator.create ~constraint_constants ~pids:config.pids
+                      ~logger:config.logger ~conf_dir:config.conf_dir
+                      ~consensus_constants
+                      ~keypairs:config.block_production_keypairs))
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1389,15 +1429,6 @@ let create ?wallets (config : Config.t) =
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
-          let block_production_keypairs =
-            Agent.create
-              ~f:(fun kps ->
-                Keypair.Set.to_list kps
-                |> List.map ~f:(fun kp ->
-                       (kp, Public_key.compress kp.Keypair.public_key))
-                |> Keypair.And_compressed_pk.Set.of_list)
-              config.initial_block_production_keypairs
-          in
           let get_node_status _env =
             trace_recurring "get_node_status" (fun () ->
                 let node_ip_addr =
@@ -1481,10 +1512,8 @@ let create ?wallets (config : Config.t) =
                               (Mina_incremental.Status.Observer.value status)
                       in
                       let block_producers =
-                        let public_keys, _ =
-                          Agent.get block_production_keypairs
-                        in
-                        Public_key.Compressed.Set.map public_keys ~f:snd
+                        config.block_production_keypairs
+                        |> Public_key.Compressed.Set.map ~f:snd
                         |> Set.to_list
                       in
                       let ban_statuses =
@@ -1989,7 +2018,12 @@ let create ?wallets (config : Config.t) =
             { config
             ; next_producer_timing = None
             ; processes =
-                { prover; verifier; snark_worker; uptime_snark_worker_opt }
+                { prover
+                ; verifier
+                ; snark_worker
+                ; uptime_snark_worker_opt
+                ; vrf_evaluator
+                }
             ; initialization_finish_signal
             ; components =
                 { net
@@ -2010,7 +2044,6 @@ let create ?wallets (config : Config.t) =
                 ; local_snark_work_writer
                 }
             ; wallets
-            ; block_production_keypairs
             ; coinbase_receiver = ref config.coinbase_receiver
             ; snark_job_state = snark_jobs_state
             ; subscriptions

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,21 +13,35 @@ import (
 
 	"codanet"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strconv"
 
-	logging "github.com/ipfs/go-log"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	logging "github.com/ipfs/go-log/v2"
 
 	net "github.com/libp2p/go-libp2p-core/network"
 
-	"github.com/stretchr/testify/require"
 	ipc "libp2p_ipc"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
-	_ = logging.SetLogLevel("codanet.Helper", "warning")
-	_ = logging.SetLogLevel("codanet.CodaGatingState", "warning")
+	for i := 0; i < 100; i++ {
+		logging.Logger(fmt.Sprintf("node%d", i))
+	}
+  // Uncomment for more logging (ERROR by default)
+	// _ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
+	// _ = logging.SetLogLevel("engine", "DEBUG")
+	// _ = logging.SetLogLevel("codanet.Helper", "WARN")
+	// _ = logging.SetLogLevel("codanet.CodaGatingState", "WARN")
+	// for i := 0; i < 100; i++ {
+	// 	logging.SetLogLevel(fmt.Sprintf("node%d", i), "WARN")
+	// }
+	// _ = logging.SetLogLevel("dht", "debug")
+	// _ = logging.SetLogLevel("connmgr", "debug")
+	// _ = logging.SetLogLevel("*", "debug")
 	codanet.WithPrivate = true
 
 	os.Exit(m.Run())
@@ -100,7 +115,7 @@ func TestPeerExchange(t *testing.T) {
 	// only allow peer count of 2 for node A
 	maxCount := 2
 	appAPort := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, appAPort)
+	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, appAPort)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
@@ -140,6 +155,7 @@ func TestPeerExchange(t *testing.T) {
 
 func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {
 	stream, err := from.P2p.Host.NewStream(context.Background(), to.P2p.Host.ID(), testProtocol)
+	require.NoError(t, err)
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
 	err = stream.Close()

@@ -1241,39 +1241,6 @@ let stop_tracing =
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e))
 
-let set_staking_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let open Graphql_lib in
-  let pk_flag =
-    flag "--public-key" ~aliases:[ "public-key" ]
-      ~doc:"PUBLICKEY Public key of account with which to produce blocks"
-      (required public_key_compressed)
-  in
-  Command.async ~summary:"Start producing blocks"
-    (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun graphql_endpoint public_key ->
-         let print_message msg arr =
-           if not (Array.is_empty arr) then
-             printf "%s: %s\n" msg
-               (String.concat_array ~sep:", "
-                  (Array.map ~f:Public_key.Compressed.to_base58_check arr))
-         in
-         let%map result =
-           Graphql_client.query_exn
-             (Graphql_queries.Set_staking.make
-                ~public_key:(Encoders.public_key public_key)
-                ())
-             graphql_endpoint
-         in
-         print_message "Stopped staking with" result#setStaking#lastStaking ;
-         print_message
-           "❌ Failed to start staking with keys (try `mina accounts unlock` \
-            first)"
-           result#setStaking#lockedPublicKeys ;
-         print_message "Started staking with"
-           result#setStaking#currentStakingKeys))
-
 let set_coinbase_receiver_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -1545,6 +1512,13 @@ let export_key =
                     !"wrong password provided for account \
                       %{Public_key.Compressed.to_base58_check}"
                     pk)
+           | Error (`Key_read_error e) ->
+               Error
+                 (sprintf
+                    !"Error reading the secret key file for account \
+                      %{Public_key.Compressed.to_base58_check}: %s"
+                    pk
+                    (Secrets.Privkey_error.to_string e))
            | Error `Not_found ->
                Error
                  (sprintf
@@ -2404,7 +2378,6 @@ let client =
     ; ("create-token-account", create_new_account_graphql)
     ; ("mint-tokens", mint_tokens_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
     ; ("export-logs", Export_logs.export_via_graphql)

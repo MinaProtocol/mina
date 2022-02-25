@@ -85,6 +85,9 @@ module Diff_versioned = struct
       end
     end]
 
+    (* IMPORTANT! Do not change the names of these errors as to adjust the
+     * to_yojson output without updating Rosetta's construction API to handle
+     * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
       | Invalid_signature
@@ -1436,6 +1439,9 @@ include Make
             let best_tip_diff_pipe t =
               Extensions.(get_view_pipe (extensions t) Best_tip_diff)
           end)
+
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 
 let%test_module _ =
   ( module struct

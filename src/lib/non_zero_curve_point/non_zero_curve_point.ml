@@ -1,20 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_params.Tick
 
 [%%ifdef consensus_mechanism]
-
-open Snark_params.Tick
 
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 [%%else]
 
-open Snark_params_nonconsensus
-
 let parity y = Field.parity y
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -53,23 +48,28 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t
-      [@@deriving compare, equal, hash]
+      module T = struct
+        type t = (Field.t, bool) Poly.Stable.V1.t
+        [@@deriving equal, compare, hash]
 
-      (* dummy type for inserting constraint
-         adding constraint to t produces "unused rec" error
-      *)
-      type unused = unit constraint t = Arg.Stable.V1.t
+        (* dummy type for inserting constraint
+           adding constraint to t produces "unused rec" error
+        *)
+        type unused = unit constraint t = Arg.Stable.V1.t
 
-      let to_latest = Fn.id
+        let to_latest = Fn.id
 
-      module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
-      include Base58
+        module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
+        include Base58
 
-      (* sexp representation is a Base58Check string, like the yojson representation *)
-      let sexp_of_t t = to_base58_check t |> Sexp.of_string
+        (* sexp representation is a Base58Check string, like the yojson representation *)
+        let sexp_of_t t = to_base58_check t |> Sexp.of_string
 
-      let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+        let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+      end
+
+      include T
+      include Hashable.Make_binable (T)
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in

@@ -109,10 +109,6 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
-      | Error
-          (`Staged_ledger_application_failed
-            (Staged_ledger.Staged_ledger_error.Unexpected e)) ->
-          return (Error (`Fatal_error (Error.to_exn e)))
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
           let%map () =
             match sender with
@@ -145,12 +141,9 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                       | Non_zero_fee_excess _
                       | Insufficient_work _
                       | Mismatched_statuses _
-                      | Invalid_public_key _ ->
-                          make_actions Gossiped_invalid_transition
+                      | Invalid_public_key _
                       | Unexpected _ ->
-                          failwith
-                            "build: Unexpected staged ledger error should \
-                             have been caught in another pattern"
+                          make_actions Gossiped_invalid_transition
                     in
                     Trust_system.record trust_system logger peer action )
           in
@@ -478,4 +471,46 @@ module For_tests = struct
             (breadcrumb, breadcrumb :: acc) )
       in
       List.rev ls
-end
+
+  let build_fail ?skip_staged_ledger_verification ~logger ~precomputed_values
+      ~verifier ~trust_system ~parent
+      ~transition:(transition_with_validation :
+                    External_transition.Almost_validated.t) ~sender
+      ~transition_receipt_time () : (t,
+      [> `Fatal_error of exn
+       | `Invalid_staged_ledger_diff of Core_kernel.Error.t
+       | `Invalid_staged_ledger_hash of Core_kernel.Error.t ])
+     result Async_kernel.Deferred.t =
+     O1trace.trace_recurring "Breadcrumb.build" ( 
+       fun () ->
+
+        let _ = logger in
+        let _ = precomputed_values in
+        let _ = skip_staged_ledger_verification in
+        let _ = verifier in
+        let _ = sender in
+        let _ = transition_receipt_time in
+        let _ = trust_system in
+        let _ = parent in
+        let _ = transition_with_validation in
+
+       Deferred.return (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
+
+      
+
+     )
+
+    end
+
+
+(*         match%bind
+          External_transition.Staged_ledger_validation
+          .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+            ~precomputed_values ~verifier
+            ~parent_staged_ledger:(staged_ledger parent)
+            ~parent_protocol_state:
+              (External_transition.Validated.protocol_state
+                 parent.validated_transition)
+            transition_with_validation
+        with
+        | Ok  *)

@@ -250,6 +250,8 @@ module Types = struct
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
                   [ of_time info.time ~consensus_constants ]
               | Produce_now info ->
@@ -262,6 +264,8 @@ module Types = struct
               (fun _ { Daemon_rpcs.Types.Status.Next_producer_timing.timing; _ } ->
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
                   []
               | Produce info ->
                   [ info.for_slot.global_slot_since_genesis ]
@@ -1827,27 +1831,6 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
-    let set_staking =
-      obj "SetStakingPayload" ~fields:(fun _ ->
-          [ field "lastStaking"
-              ~doc:"Returns the public keys that were staking funds previously"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
-          ; field "lockedPublicKeys"
-              ~doc:
-                "List of public keys that could not be used to stake because \
-                 they were locked"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, locked, _) -> locked)
-          ; field "currentStakingKeys"
-              ~doc:"Returns the public keys that are now staking their funds"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking)
-          ])
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
           [ field "lastCoinbaseReceiver"
@@ -2330,16 +2313,6 @@ module Types = struct
               ~typ:(non_null public_key_arg)
           ]
 
-    let set_staking =
-      obj "SetStakingInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKeys"
-              ~typ:(non_null (list (non_null public_key_arg)))
-              ~doc:
-                "Public keys of accounts you wish to stake with - these must \
-                 be accounts that are in trackedAccounts"
-          ]
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
         ~fields:
@@ -2634,6 +2607,10 @@ module Mutations = struct
         Error "Could not find owned account associated with provided key"
     | Error `Bad_password ->
         Error "Wrong password provided"
+    | Error (`Key_read_error e) ->
+        Error
+          (sprintf "Error reading the secret key file: %s"
+             (Secrets.Privkey_error.to_string e))
     | Ok () ->
         Ok pk
 
@@ -2732,6 +2709,10 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = coda; _ } () privkey_path password ->
         let open Deferred.Result.Let_syntax in
+        (* the Keypair.read zeroes the password, so copy for use in import step below *)
+        let saved_password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
         let password =
           Lazy.return (Deferred.return (Bytes.of_string password))
         in
@@ -2746,7 +2727,8 @@ module Mutations = struct
             return (pk, true)
         | None ->
             let%map.Async.Deferred pk =
-              Secrets.Wallets.import_keypair wallets keypair ~password
+              Secrets.Wallets.import_keypair wallets keypair
+                ~password:saved_password
             in
             Ok (pk, false))
 
@@ -2802,6 +2784,8 @@ module Mutations = struct
       Result.ok_if_true
         Currency.Fee.(fee >= Signed_command.minimum_fee)
         ~error:
+          (* IMPORTANT! Do not change the content of this error without
+           * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
@@ -3073,47 +3057,6 @@ module Mutations = struct
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson))
 
-  let set_staking =
-    field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
-      ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun { ctx = coda; _ } () pks ->
-        let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk)
-        in
-        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
-            ]
-          "Block production key replacement; old: $old, new: $new" ;
-        if not (List.is_empty locked) then
-          [%log' warn (Mina_lib.top_level_logger coda)]
-            "Some public keys are locked and unavailable as block production \
-             keys"
-            ~metadata:
-              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
-              ] ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-        , List.map ~f:Tuple.T2.get2 unlocked ))
-
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
       ~args:
@@ -3299,7 +3242,6 @@ module Mutations = struct
     ; create_token_account
     ; mint_tokens
     ; export_logs
-    ; set_staking
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee

@@ -200,6 +200,30 @@ module ListPeers = struct
     build' (module Builder.Libp2pHelperInterface.ListPeers.Request) noop
 end
 
+module BandwidthInfo = struct
+  let name = "BandwidthInfo"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.BandwidthInfo.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.BandwidthInfo req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.BandwidthInfo.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.BandwidthInfo resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request () =
+    build' (module Builder.Libp2pHelperInterface.BandwidthInfo.Request) noop
+end
+
 module GenerateKeypair = struct
   let name = "GenerateKeypair"
 

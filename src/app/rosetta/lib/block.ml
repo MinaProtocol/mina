@@ -45,6 +45,9 @@ module Block_query = struct
       | Some index, Some hash ->
           M.return (Some (`Those (`Height index, `Hash hash)))
 
+    let of_partial_identifier' (identifier : Partial_block_identifier.t option) =
+      of_partial_identifier (Option.value identifier ~default:{Partial_block_identifier.index = None; hash = None })
+
     let is_genesis ~hash = function
       | Some (`This (`Height index)) ->
           Int64.equal index Network.genesis_block_height
@@ -56,6 +59,16 @@ module Block_query = struct
       | None ->
           false
   end
+
+  let to_string : t -> string = function
+    | Some (`This (`Height h)) ->
+      sprintf "height = %Ld" h
+    | Some (`That (`Hash h)) ->
+      sprintf "hash = %s" h
+    | Some (`Those (`Height height, `Hash hash)) ->
+      sprintf "height = %Ld, hash = %s" height hash
+    | None ->
+      sprintf "(no height or hash given)"
 end
 
 module Op = User_command_info.Op
@@ -241,7 +254,29 @@ module Sql = struct
 
     let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
 
-    let query_height =
+    let query_count_canonical_at_height =
+      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+        {sql| SELECT COUNT(*) FROM blocks
+              WHERE height = ?
+              AND chain_status = 'canonical'
+        |sql}
+
+    let query_height_canonical =
+      Caqti_request.find_opt Caqti_type.int64 typ
+        (* The archive database will only reconcile the canonical columns for
+         * blocks older than k + epsilon
+         *)
+        {|
+SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM blocks c
+  INNER JOIN public_keys pk
+  ON pk.id = c.creator_id
+  INNER JOIN public_keys bw
+  ON bw.id = c.block_winner_id
+  WHERE c.height = ? AND c.chain_status = 'canonical'
+      |}
+
+
+    let query_height_pending =
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -249,19 +284,24 @@ module Sql = struct
          * given height, and not an arbitrary one.
          *
          * This query recursively traverses the blockchain from the longest tip
-         * backwards until it reaches a block of the given height. *)
+         * backwards until it reaches a block of the given height.
+         *
+         * This query is best used only for _short_ (around ~k blocks back
+         * + epsilon)
+         * requests since recursive queries stress PostgreSQL.
+         *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC
+  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp, chain_status FROM blocks b WHERE height = (select MAX(height) from blocks)
+  ORDER BY timestamp ASC, state_hash ASC
   LIMIT 1)
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, pk.value as creator, bw.value as winner FROM chain c
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
+) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   INNER JOIN public_keys bw
@@ -271,7 +311,7 @@ WITH RECURSIVE chain AS (
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         INNER JOIN public_keys bw
@@ -282,7 +322,7 @@ WITH RECURSIVE chain AS (
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         INNER JOIN public_keys bw
@@ -291,7 +331,7 @@ WITH RECURSIVE chain AS (
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         INNER JOIN public_keys bw
@@ -300,21 +340,41 @@ WITH RECURSIVE chain AS (
 
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
            INNER JOIN public_keys pk
            ON pk.id = b.creator_id
            INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
            WHERE b.height = (select MAX(b.height) from blocks b)
-           ORDER BY timestamp ASC
+           ORDER BY timestamp ASC, state_hash ASC
            LIMIT 1 |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
+    let run_has_canonical_height (module Conn : Caqti_async.CONNECTION) ~height =
+      let open Deferred.Result.Let_syntax in
+      let%map num_canonical_at_height =
+        Conn.find query_count_canonical_at_height height
+      in
+      Int64.(>) num_canonical_at_height Int64.zero
+
     let run (module Conn : Caqti_async.CONNECTION) = function
       | Some (`This (`Height h)) ->
-        Conn.find_opt query_height h
+        let open Deferred.Result.Let_syntax in
+        let%bind has_canonical_height = run_has_canonical_height (module Conn) ~height:h in
+        if has_canonical_height then
+          Conn.find_opt query_height_canonical h
+        else
+          let%bind max_height = Conn.find
+              (Caqti_request.find Caqti_type.unit Caqti_type.int64
+                 {sql| SELECT MAX(height) FROM blocks |sql}) ()
+          in
+          let max_queryable_height = Int64.(-) max_height Network.Sql.max_height_delta in
+          if Int64.(<=) h max_queryable_height then
+            Conn.find_opt query_height_pending h
+          else
+            return None
       | Some (`That (`Hash h)) ->
         Conn.find_opt query_hash h
       | Some (`Those (`Height height, `Hash hash)) ->
@@ -381,7 +441,7 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
+        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
         pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
         blocks_user_commands.status,
@@ -450,13 +510,13 @@ WITH RECURSIVE chain AS (
         |> Errors.Lift.sql ~context:"Finding block"
       with
       | None ->
-        M.fail (Errors.create `Block_missing)
+        M.fail (Errors.create @@ `Block_missing (Block_query.to_string input))
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
     let%bind parent_id =
       Option.value_map raw_block.parent_id
-        ~default:(M.fail (Errors.create `Block_missing))
+        ~default:(M.fail (Errors.create @@ `Block_missing (sprintf "parent block of: %s" (Block_query.to_string input))))
         ~f:M.return
     in
     let%bind raw_parent_block, _parent_block_extras =
@@ -465,7 +525,7 @@ WITH RECURSIVE chain AS (
         |> Errors.Lift.sql ~context:"Finding parent block"
       with
       | None ->
-          M.fail (Errors.create ~context:"Parent block" `Block_missing)
+        M.fail (Errors.create ~context:"Parent block" @@ `Block_missing (sprintf "parent_id = %d" parent_id))
       | Some (_, raw_parent_block, parent_block_extras) ->
           M.return (raw_parent_block, parent_block_extras)
     in
@@ -760,6 +820,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Block query" ~metadata:[("query",body)];
   match route with
   | [] | [""] ->
       with_db (fun ~db ->

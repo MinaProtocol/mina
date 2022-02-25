@@ -49,7 +49,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
         ),
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version}-${spec.network} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 
@@ -58,7 +58,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     Command.build
       Command.Config::{
         commands  = commands,
-        label = "Release Docker Image: ${spec.step_key}",
+        label = "Docker: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,
         docker_login = Some DockerLogin::{=},

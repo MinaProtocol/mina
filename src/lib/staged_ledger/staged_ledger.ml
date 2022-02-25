@@ -251,15 +251,16 @@ module T = struct
       |> Option.value_map ~default:(None, None) ~f:(fun proof ->
              (Some (get_target proof), Some (next_available_token_begin proof)))
     in
-    Statement_scanner.check_invariants ~constraint_constants scan_state
-      ~verifier:() ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin
-      ~next_available_token_begin ~next_available_token_end:next_available_token
+    Statement_scanner.check_invariants scan_state ~constraint_constants
+      ~statement_check:`Partial ~verifier:() ~error_prefix
+      ~ledger_hash_end:ledger ~ledger_hash_begin ~next_available_token_begin
+      ~next_available_token_end:next_available_token
 
-  let statement_exn ~constraint_constants t =
+  let statement_exn ~constraint_constants ~statement_check t =
     let open Deferred.Let_syntax in
     match%map
-      Statement_scanner.scan_statement ~constraint_constants t.scan_state
-        ~verifier:()
+      Statement_scanner.scan_statement ~constraint_constants ~statement_check
+        t.scan_state ~verifier:()
     with
     | Ok s ->
         `Non_empty s
@@ -272,8 +273,7 @@ module T = struct
       ~constraint_constants ~pending_coinbase_collection =
     { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 
-  let of_scan_state_and_ledger ~logger
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+  let of_scan_state_and_ledger ~logger ~constraint_constants ~statement_check
       ~verifier ~snarked_ledger_hash ~snarked_next_available_token ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
@@ -283,7 +283,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state
+        ~statement_check scan_state
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
@@ -303,8 +303,9 @@ module T = struct
       { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
     let%bind () =
-      Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+      Statement_scanner.check_invariants scan_state ~constraint_constants
+        ~statement_check:`Partial ~verifier:()
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
@@ -359,7 +360,8 @@ module T = struct
                   Got:%{sexp:Ledger_hash.t}"
                 expected_merkle_root staged_ledger_hash)
     in
-    of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
+    of_scan_state_and_ledger ~logger ~constraint_constants
+      ~statement_check:`Full ~verifier
       ~snarked_ledger_hash:snarked_frozen_ledger_hash
       ~snarked_next_available_token ~ledger:snarked_ledger ~scan_state
       ~pending_coinbase_collection:pending_coinbases
@@ -3335,4 +3337,179 @@ let%test_module "test" =
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               supercharge_coinbase_test ~self:locked_self
                 ~delegator:locked_delegator ~block_count f_expected_balance sl))
+
+    let command_insufficient_funds =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map ledger_init_state = Ledger.gen_initial_ledger_state in
+      let kp, balance, nonce, _ = ledger_init_state.(0) in
+      let receiver_pk =
+        Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
+          Public_key.Compressed.gen
+      in
+      let insufficient_account_creation_fee =
+        Currency.Fee.to_int constraint_constants.account_creation_fee / 2
+        |> Currency.Amount.of_int
+      in
+      let source_pk = Public_key.compress kp.public_key in
+      let body =
+        Signed_command_payload.Body.Payment
+          Payment_payload.Poly.
+            { source_pk
+            ; receiver_pk
+            ; token_id = Token_id.default
+            ; amount = insufficient_account_creation_fee
+            }
+      in
+      let fee = Currency.Amount.to_fee balance in
+      let payload =
+        Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
+          ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
+          ~valid_until:None ~body
+      in
+      let signed_command =
+        User_command.Signed_command (Signed_command.sign kp payload)
+      in
+      (ledger_init_state, signed_command)
+
+    let%test_unit "Commands with Insufficient funds are not included" =
+      let logger = Logger.null () in
+      Quickcheck.test command_insufficient_funds ~trials:1
+        ~f:(fun (ledger_init_state, invalid_command) ->
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              let diff =
+                Sl.create_diff ~constraint_constants !sl ~logger
+                  ~current_state_view:(dummy_state_view ())
+                  ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
+                  ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+                  ~coinbase_receiver ~supercharge_coinbase:false
+              in
+              ( match diff with
+              | Ok x ->
+                  assert (
+                    List.is_empty
+                      (Staged_ledger_diff.With_valid_signatures_and_proofs
+                       .commands x) )
+              | Error e ->
+                  Error.raise (Pre_diff_info.Error.to_error e) ) ;
+              Deferred.unit))
+
+    let%test_unit "Blocks having commands with insufficient funds are rejected"
+        =
+      let logger = Logger.create () in
+      let g =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map ledger_init_state = Ledger.gen_initial_ledger_state in
+        let command (kp : Keypair.t) (balance : Currency.Amount.t)
+            (nonce : Account.Nonce.t) (validity : [ `Valid | `Invalid ]) =
+          let receiver_pk =
+            Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
+              Public_key.Compressed.gen
+          in
+          let account_creation_fee, fee =
+            match validity with
+            | `Valid ->
+                let account_creation_fee =
+                  constraint_constants.account_creation_fee
+                  |> Currency.Amount.of_fee
+                in
+                ( account_creation_fee
+                , Currency.Amount.to_fee
+                    ( Currency.Amount.sub balance account_creation_fee
+                    |> Option.value_exn ) )
+            | `Invalid ->
+                (* Not enough account creation fee and using full balance for fee*)
+                ( Currency.Fee.to_int constraint_constants.account_creation_fee
+                  / 2
+                  |> Currency.Amount.of_int
+                , Currency.Amount.to_fee balance )
+          in
+          let source_pk = Public_key.compress kp.public_key in
+          let body =
+            Signed_command_payload.Body.Payment
+              Payment_payload.Poly.
+                { source_pk
+                ; receiver_pk
+                ; token_id = Token_id.default
+                ; amount = account_creation_fee
+                }
+          in
+          let payload =
+            Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
+              ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
+              ~valid_until:None ~body
+          in
+          User_command.Signed_command (Signed_command.sign kp payload)
+        in
+        let signed_command =
+          let kp, balance, nonce, _ = ledger_init_state.(0) in
+          command kp balance nonce `Valid
+        in
+        let invalid_command =
+          let kp, balance, nonce, _ = ledger_init_state.(1) in
+          command kp balance nonce `Invalid
+        in
+        (ledger_init_state, signed_command, invalid_command)
+      in
+      Quickcheck.test g ~trials:1
+        ~f:(fun (ledger_init_state, valid_command, invalid_command) ->
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              let diff =
+                Sl.create_diff ~constraint_constants !sl ~logger
+                  ~current_state_view:(dummy_state_view ())
+                  ~transactions_by_fee:(Sequence.of_list [ valid_command ])
+                  ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+                  ~coinbase_receiver ~supercharge_coinbase:false
+              in
+              match diff with
+              | Error e ->
+                  Error.raise (Pre_diff_info.Error.to_error e)
+              | Ok x -> (
+                  assert (
+                    List.length
+                      (Staged_ledger_diff.With_valid_signatures_and_proofs
+                       .commands x)
+                    = 1 ) ;
+                  let f, s = x.diff in
+                  [%log info] "Diff %s"
+                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .to_yojson x
+                    |> Yojson.Safe.to_string ) ;
+                  let failed_command =
+                    With_status.
+                      { data = invalid_command
+                      ; status =
+                          Transaction_status.Failed
+                            ( Transaction_status.Failure
+                              .Amount_insufficient_to_create_account
+                            , Transaction_status.Balance_data.
+                                { fee_payer_balance = None
+                                ; source_balance = None
+                                ; receiver_balance = None
+                                } )
+                      }
+                  in
+                  (*Replace the valid command with an invalid command)*)
+                  let diff =
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ({ f with commands = [ failed_command ] }, s)
+                    }
+                  in
+                  let%map res =
+                    Sl.apply ~constraint_constants !sl
+                      (Staged_ledger_diff.forget diff)
+                      ~logger ~verifier
+                      ~current_state_view:(dummy_state_view ())
+                      ~state_and_body_hash:
+                        (State_hash.dummy, State_body_hash.dummy)
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  in
+                  match res with
+                  | Ok _x ->
+                      assert false
+                  (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
+                  | Error (Staged_ledger_error.Unexpected _ as e) ->
+                      [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                      assert true
+                  | Error _ ->
+                      assert false )))
   end )

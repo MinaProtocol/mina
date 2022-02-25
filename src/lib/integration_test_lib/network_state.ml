@@ -50,6 +50,7 @@ module Make
       ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
       Deferred.return `Continue
     in
+    (* handle_block_produced *)
     ignore
       ( Event_router.on event_router Event_type.Block_produced
           ~f:(fun node block_produced ->
@@ -72,6 +73,7 @@ module Make
                   }
                 else state))
         : _ Event_router.event_subscription ) ;
+    (* handle_update_best_tips *)
     ignore
       ( Event_router.on event_router
           Event_type.Transition_frontier_diff_application
@@ -124,6 +126,7 @@ module Make
     handle_gossip_received Block_gossip ;
     handle_gossip_received Snark_work_gossip ;
     handle_gossip_received Transactions_gossip ;
+    (* handle_node_init *)
     ignore
       ( Event_router.on event_router Event_type.Node_initialization
           ~f:(fun node () ->
@@ -136,6 +139,25 @@ module Make
                     ~data:true
                 in
                 { state with node_initialization = node_initialization' }))
+        : _ Event_router.event_subscription ) ;
+    (* handle_node_offline *)
+    ignore
+      ( Event_router.on event_router Event_type.Node_offline ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with event of $node going offline"
+                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                let node_initialization' =
+                  String.Map.set state.node_initialization ~key:(Node.id node)
+                    ~data:false
+                in
+                let best_tips_by_node' =
+                  String.Map.remove state.best_tips_by_node (Node.id node)
+                in
+                { state with
+                  node_initialization = node_initialization'
+                ; best_tips_by_node = best_tips_by_node'
+                }))
         : _ Event_router.event_subscription ) ;
     (r, w)
 end

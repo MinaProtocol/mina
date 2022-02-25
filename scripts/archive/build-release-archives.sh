@@ -16,10 +16,10 @@ cd _build
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgomp1, libpq-dev, "
 case "${MINA_DEB_CODENAME}" in
-  buster)
+  buster|focal|bullseye)
     ARCHIVE_DEPS="libjemalloc2"
     ;;
-  stretch)
+  stretch|bionic)
     ARCHIVE_DEPS="libjemalloc1"
     ;;
   *)
@@ -58,7 +58,6 @@ mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
 cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
-cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
 cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"

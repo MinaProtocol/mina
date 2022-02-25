@@ -57,6 +57,9 @@ type t =
 [@@deriving sexp_of, equal, compare]
 
 module Command_error = struct
+  (* IMPORTANT! Do not change the names of these errors as to adjust the
+   * to_yojson output without updating Rosetta's construction API to handle the
+   * changes *)
   type t =
     | Invalid_nonce of
         [ `Expected of Account.Nonce.t
@@ -1051,6 +1054,9 @@ let add_from_backtrack :
       ; consensus_constants
       ; time_controller
       }
+
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 
 let%test_module _ =
   ( module struct

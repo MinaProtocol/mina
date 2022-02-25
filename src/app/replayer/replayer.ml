@@ -38,6 +38,13 @@ type output =
   }
 [@@deriving yojson]
 
+type balance_block_data =
+  { block_id : int
+  ; block_height : int64
+  ; sequence_no : int
+  ; secondary_sequence_no : int
+  }
+
 let error_count = ref 0
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -47,13 +54,13 @@ let proof_level = Genesis_constants.Proof_level.Full
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
+let create_ledger_as_list ledger =
+  List.map (Ledger.to_list ledger) ~f:(fun acc ->
+      Genesis_ledger_helper.Accounts.Single.of_account acc None)
+
 let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
-  let create_ledger_as_list ledger =
-    List.map (Ledger.to_list ledger) ~f:(fun acc ->
-        Genesis_ledger_helper.Accounts.Single.of_account acc None)
-  in
   let genesis_ledger_as_list = create_ledger_as_list ledger in
   let target_genesis_ledger =
     { input_genesis_ledger with base = Accounts genesis_ledger_as_list }
@@ -81,6 +88,22 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_epoch_ledgers_state_hash
   ; target_genesis_ledger
   ; target_epoch_data
+  }
+
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
+  let accounts = create_ledger_as_list ledger in
+  let genesis_ledger : Runtime_config.Ledger.t =
+    { base = Accounts accounts
+    ; num_accounts = None
+    ; balances = []
+    ; hash = None
+    ; name = None
+    ; add_genesis_winner = Some true
+    }
+  in
+  { target_epoch_ledgers_state_hash = None
+  ; start_slot_since_genesis
+  ; genesis_ledger
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash pairs *)
@@ -150,20 +173,25 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
 
-let balance_of_id_and_pk_id pool ~id ~pk_id : Currency.Balance.t Deferred.t =
-  let open Deferred.Let_syntax in
-  match%map
-    Caqti_async.Pool.use (fun db -> Sql.Balance.run db ~id ~pk_id) pool
-  with
-  | Ok (Some balance) ->
-      balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  | Ok None ->
-      failwithf "Could not find balance with id %d and public key %d" id pk_id
-        ()
-  | Error msg ->
-      failwithf
-        "Error retrieving balance with id %d and public key %d, error: %s" id
-        pk_id (Caqti_error.show msg) ()
+let balance_info_of_id pool ~id =
+  query_db pool
+    ~f:(fun db -> Archive_lib.Processor.Balance.load db ~id)
+    ~item:"balance info of id"
+
+let internal_command_to_balance_block_data
+    (internal_cmd : Sql.Internal_command.t) =
+  { block_id = internal_cmd.block_id
+  ; block_height = internal_cmd.block_height
+  ; sequence_no = internal_cmd.sequence_no
+  ; secondary_sequence_no = internal_cmd.secondary_sequence_no
+  }
+
+let user_command_to_balance_block_data (user_cmd : Sql.User_command.t) =
+  { block_id = user_cmd.block_id
+  ; block_height = user_cmd.block_height
+  ; sequence_no = user_cmd.sequence_no
+  ; secondary_sequence_no = 0
+  }
 
 let epoch_staking_id_of_state_hash ~logger pool state_hash =
   match%map
@@ -334,20 +362,25 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
   | _ ->
       Deferred.unit
 
+(* balance_block_data come from a loaded internal or user command, which
+    includes data from the blocks table and
+    - for internal commands, the tables internal_commands and blocks_internals_commands
+    - for user commands, the tables user_commands and blocks_user_commands
+   we compare those against the same-named values in the balances row
+*)
 let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
-    ~continue_on_error =
+    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error :
+    unit Deferred.t =
   let%bind pk = pk_of_pk_id pool pk_id in
-  let%map claimed_balance =
-    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
-  in
+  let%bind balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
   let account_id = Account_id.create pk token in
-  let actual_balance =
+  let account =
     match Ledger.location_of_account ledger account_id with
     | Some loc -> (
         match Ledger.get ledger loc with
         | Some account ->
-            account.balance
+            account
         | None ->
             failwithf
               "Could not find account in ledger for public key %s and token id \
@@ -360,6 +393,11 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
           (Token_id.to_string token) ()
   in
+  let actual_balance = account.balance in
+  let claimed_balance =
+    balance_info.balance |> Unsigned.UInt64.of_int64
+    |> Currency.Balance.of_uint64
+  in
   if not (Currency.Balance.equal actual_balance claimed_balance) then (
     [%log error] "Claimed balance does not match actual balance in ledger"
       ~metadata:
@@ -367,7 +405,103 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
         ; ("actual_balance", Currency.Balance.to_yojson actual_balance)
         ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 )
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  let { block_id; block_height; sequence_no; secondary_sequence_no } =
+    balance_block_data
+  in
+  if not (block_id = balance_info.block_id) then (
+    [%log error]
+      "Block id from command does not match block id in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_id_command", `Int block_id)
+        ; ("block_id_balances", `Int balance_info.block_id)
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (Int64.equal block_height balance_info.block_height) then (
+    [%log error]
+      "Block height from command does not match block height in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_height_command", `String (Int64.to_string block_height))
+        ; ( "block_height_balances"
+          , `String (Int64.to_string balance_info.block_height) )
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (sequence_no = balance_info.block_sequence_no) then (
+    [%log error]
+      "Sequence no from command does not match sequence no in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_sequence_no_command", `Int sequence_no)
+        ; ("block_sequence_no_balances", `Int balance_info.block_sequence_no)
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  if not (secondary_sequence_no = balance_info.block_secondary_sequence_no) then (
+    [%log error]
+      "Secondary sequence no from command does not match secondary sequence no \
+       in balances table"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("block_secondary_sequence_no_command", `Int secondary_sequence_no)
+        ; ( "block_secondary_sequence_no_balances"
+          , `Int balance_info.block_secondary_sequence_no )
+        ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
+  let ledger_nonce = account.nonce in
+  match balance_info.nonce with
+  | None ->
+      if set_nonces then (
+        [%log info] "Inserting missing nonce into archive db"
+          ~metadata:
+            [ ("balance_id", `Int balance_id)
+            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
+            ] ;
+        let nonce =
+          Account.Nonce.to_uint32 ledger_nonce |> Unsigned.UInt32.to_int64
+        in
+        query_db pool
+          ~f:(fun db -> Sql.Balances.insert_nonce db ~id:balance_id ~nonce)
+          ~item:"chain from state hash" )
+      else (
+        [%log error] "Missing nonce in archive db"
+          ~metadata:
+            [ ("balance_id", `Int balance_id)
+            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
+            ] ;
+        return
+        @@ if continue_on_error then incr error_count else Core_kernel.exit 1 )
+  | Some nonce ->
+      let db_nonce =
+        nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+      in
+      if not (Account.Nonce.equal ledger_nonce db_nonce) then
+        if repair_nonces then (
+          [%log info] "Repairing incorrect nonce in balances table"
+            ~metadata:
+              [ ("who", `String who)
+              ; ("balance_id", `Int balance_id)
+              ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
+              ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
+              ] ;
+          let correct_nonce =
+            ledger_nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
+          in
+          query_db pool
+            ~f:(fun db ->
+              Sql.Balances.insert_nonce db ~id:balance_id ~nonce:correct_nonce)
+            ~item:"repairing nonce" )
+        else (
+          [%log error] "Ledger nonce does not match nonce in balances table"
+            ~metadata:
+              [ ("who", `String who)
+              ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
+              ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
+              ] ;
+          return
+          @@ if continue_on_error then incr error_count else Core_kernel.exit 1
+          )
+      else Deferred.unit
 
 let account_creation_fee_uint64 =
   Currency.Fee.to_uint64 constraint_constants.account_creation_fee
@@ -376,32 +510,57 @@ let account_creation_fee_int64 =
   Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
 
 let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-    ~balance_id ~pk_id ~fee ~continue_on_error =
-  let%map claimed_balance =
-    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+    ~balance_id ~fee ?additional_fee ~continue_on_error () =
+  let%map balance_info = balance_info_of_id pool ~id:balance_id in
+  let claimed_balance =
+    balance_info.balance |> Unsigned.UInt64.of_int64
+    |> Currency.Balance.of_uint64
   in
   let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
+  (* for coinbases, an additional fee may be deducted from the amount
+     given to the receiver beyond the account creation fee *)
+  let total_creation_deduction_uint64 =
+    match additional_fee with
+    | None ->
+        account_creation_fee_uint64
+    | Some fee' ->
+        Unsigned.UInt64.add account_creation_fee_uint64
+          (Currency.Fee.to_uint64 fee')
+  in
   let fee_uint64 = Currency.Fee.to_uint64 fee in
-  if Unsigned_extended.UInt64.( >= ) fee_uint64 account_creation_fee_uint64 then (
+  let add_additional_fee_to_metadata metadata =
+    match additional_fee with
+    | None ->
+        metadata
+    | Some fee ->
+        metadata @ [ ("fee_transfer_fee", Currency.Fee.to_yojson fee) ]
+  in
+  if Unsigned_extended.UInt64.( >= ) fee_uint64 total_creation_deduction_uint64
+  then (
     (* account may have been created *)
-    let fee_less_account_creation_fee_uint64 =
-      Unsigned.UInt64.sub fee_uint64 account_creation_fee_uint64
+    let fee_less_total_creation_deduction_uint64 =
+      Unsigned.UInt64.sub fee_uint64 total_creation_deduction_uint64
     in
-    if Unsigned.UInt64.equal balance_uint64 fee_less_account_creation_fee_uint64
+    if
+      Unsigned.UInt64.equal balance_uint64
+        fee_less_total_creation_deduction_uint64
     then
       match receiver_account_creation_fee with
       | None ->
           [%log error]
             "In the archive database, the account balance equals the internal \
-             command fee minus the account creation fee, but the receiver \
-             account creation fee is NULL"
+             command fee minus the account creation fee (and for coinbases, \
+             also less any fee transfer fee), but the receiver account \
+             creation fee is NULL"
             ~metadata:
-              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-              ; ("fee", Currency.Fee.to_yojson fee)
-              ; ( "constraint_constants.account_creation_fee"
-                , Currency.Fee.to_yojson
-                    constraint_constants.account_creation_fee )
-              ] ;
+              (add_additional_fee_to_metadata
+                 [ ( "account_balance"
+                   , Currency.Balance.to_yojson claimed_balance )
+                 ; ("fee", Currency.Fee.to_yojson fee)
+                 ; ( "constraint_constants.account_creation_fee"
+                   , Currency.Fee.to_yojson
+                       constraint_constants.account_creation_fee )
+                 ]) ;
           if continue_on_error then incr error_count else Core_kernel.exit 1
       | Some amount_int64 ->
           if Int64.equal amount_int64 account_creation_fee_int64 then
@@ -410,18 +569,20 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
           else (
             [%log error]
               "In the archive database, the account balance equals the \
-               internal command fee minus the account creation fee, but the \
-               receiver account creation fee differs from the account creation \
-               fee"
+               internal command fee minus the account creation fee (and for \
+               coinbases, also less any fee transfer fee), but the receiver \
+               account creation fee differs from the account creation fee"
               ~metadata:
-                [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-                ; ("fee", Currency.Fee.to_yojson fee)
-                ; ( "constraint_constants.account_creation_fee"
-                  , Currency.Fee.to_yojson
-                      constraint_constants.account_creation_fee )
-                ; ( "receiver_account_creation_fee"
-                  , `String (Int64.to_string amount_int64) )
-                ] ;
+                (add_additional_fee_to_metadata
+                   [ ( "account_balance"
+                     , Currency.Balance.to_yojson claimed_balance )
+                   ; ("fee", Currency.Fee.to_yojson fee)
+                   ; ( "constraint_constants.account_creation_fee"
+                     , Currency.Fee.to_yojson
+                         constraint_constants.account_creation_fee )
+                   ; ( "receiver_account_creation_fee"
+                     , `String (Int64.to_string amount_int64) )
+                   ]) ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
     else
       match receiver_account_creation_fee with
@@ -430,17 +591,20 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
       | Some amount_int64 ->
           [%log error]
             "In the archive database, the account balance is different than \
-             the internal command fee minus the account creation fee, but the \
-             receiver account creation fee is not NULL"
+             the internal command fee minus the account creation fee (and for \
+             coinbases, also less any fee transfer fee), but the receiver \
+             account creation fee is not NULL"
             ~metadata:
-              [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-              ; ("fee", Currency.Fee.to_yojson fee)
-              ; ( "constraint_constants.account_creation_fee"
-                , Currency.Fee.to_yojson
-                    constraint_constants.account_creation_fee )
-              ; ( "receiver_account_creation_fee"
-                , `String (Int64.to_string amount_int64) )
-              ] ;
+              (add_additional_fee_to_metadata
+                 [ ( "account_balance"
+                   , Currency.Balance.to_yojson claimed_balance )
+                 ; ("fee", Currency.Fee.to_yojson fee)
+                 ; ( "constraint_constants.account_creation_fee"
+                   , Currency.Fee.to_yojson
+                       constraint_constants.account_creation_fee )
+                 ; ( "receiver_account_creation_fee"
+                   , `String (Int64.to_string amount_int64) )
+                 ]) ;
           if continue_on_error then incr error_count else Core_kernel.exit 1 )
   else
     (* fee less than account creation fee *)
@@ -449,22 +613,24 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
         ()
     | Some amount_int64 ->
         [%log error]
-          "The internal command fee is less than the account creation fee, so \
-           no account should have been created, but in the archive database, \
-           the receiver account creation fee is not NULL"
+          "The internal command fee is less than the account creation fee (for \
+           coinbases the creation fee plus any fee transfer fee), so no \
+           account should have been created, but in the archive database, the \
+           receiver account creation fee is not NULL"
           ~metadata:
-            [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-            ; ("fee", Currency.Fee.to_yojson fee)
-            ; ( "constraint_constants.account_creation_fee"
-              , Currency.Fee.to_yojson constraint_constants.account_creation_fee
-              )
-            ; ( "receiver_account_creation_fee"
-              , `String (Int64.to_string amount_int64) )
-            ] ;
+            (add_additional_fee_to_metadata
+               [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
+               ; ("fee", Currency.Fee.to_yojson fee)
+               ; ( "constraint_constants.account_creation_fee"
+                 , Currency.Fee.to_yojson
+                     constraint_constants.account_creation_fee )
+               ; ( "receiver_account_creation_fee"
+                 , `String (Int64.to_string amount_int64) )
+               ]) ;
         if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
@@ -488,13 +654,14 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   let balance_id = cmd.receiver_balance in
   let token_int64 = cmd.token in
   let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
-  let%bind () =
-    verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-      ~balance_id ~pk_id ~fee ~continue_on_error
-  in
+  let balance_block_data = internal_command_to_balance_block_data cmd in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ~continue_on_error ()
+      in
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
@@ -505,7 +672,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
-            ~balance_id ~pk_id ~token_int64 ~continue_on_error
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
+            ~repair_nonces ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -517,6 +685,12 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
           , cmd.sequence_no
           , cmd.secondary_sequence_no )
       in
+      if Option.is_some fee_transfer then
+        [%log info]
+          "Coinbase transaction at global slot since genesis %Ld, sequence \
+           number %d, and secondary sequence number %d contains a fee transfer"
+          cmd.global_slot_since_genesis cmd.sequence_no
+          cmd.secondary_sequence_no ;
       let coinbase =
         match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
         | Ok cb ->
@@ -525,23 +699,40 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
+      let additional_fee = Option.map fee_transfer ~f:(fun { fee; _ } -> fee) in
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ?additional_fee ~continue_on_error ()
+      in
       let undo_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
-            ~balance_id ~pk_id ~token_int64 ~continue_on_error
+            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
+            ~repair_nonces ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
-      (* these are combined in the "coinbase" case *)
+      let%bind () =
+        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
+          ~balance_id ~fee ~continue_on_error ()
+      in
+      let%bind () =
+        verify_balance ~logger ~pool ~ledger
+          ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id
+          ~token_int64 ~balance_block_data ~set_nonces ~repair_nonces
+          ~continue_on_error
+      in
+      (* the actual application is in the "coinbase" case *)
       Deferred.unit
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
-let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
-    (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
+let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
+    ~continue_on_error (cmd1 : Sql.Internal_command.t)
+    (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
   let fee_transfer_of_cmd (cmd : Sql.Internal_command.t) =
@@ -572,14 +763,18 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
   in
   match applied_or_error with
   | Ok _ ->
+      let balance_block_data = internal_command_to_balance_block_data cmd1 in
       let%bind () =
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
-          ~token_int64:cmd1.token ~continue_on_error
+          ~token_int64:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
+          ~continue_on_error
       in
+      let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
-        ~token_int64:cmd2.token ~continue_on_error
+        ~token_int64:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
+        ~continue_on_error
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -645,7 +840,7 @@ let body_of_sql_user_cmd pool
       failwithf "Invalid user command type: %s" type_ ()
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
@@ -702,11 +897,13 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         | _, None ->
             cmd.token
       in
+      let balance_block_data = user_command_to_balance_block_data cmd in
       let%bind () =
         match cmd.source_balance with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
-              ~pk_id:cmd.source_id ~token_int64 ~continue_on_error
+              ~pk_id:cmd.source_id ~token_int64 ~balance_block_data ~set_nonces
+              ~repair_nonces ~continue_on_error
         | None ->
             return ()
       in
@@ -714,13 +911,15 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         match cmd.receiver_balance with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
-              ~pk_id:cmd.receiver_id ~token_int64 ~continue_on_error
+              ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
+              ~set_nonces ~repair_nonces ~continue_on_error
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
-        ~token_int64:cmd.fee_token ~continue_on_error
+        ~token_int64:cmd.fee_token ~balance_block_data ~set_nonces
+        ~repair_nonces ~continue_on_error
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -778,7 +977,8 @@ let unquoted_string_of_yojson json =
   let s = Yojson.Safe.to_string json in
   String.sub s ~pos:1 ~len:(String.length s - 2)
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
+let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
+    ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -943,7 +1143,19 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               , ic.sequence_no
               , ic.secondary_sequence_no )
             in
-            [%compare: int64 * int * int] (tuple ic1) (tuple ic2))
+            let cmp = [%compare: int64 * int * int] (tuple ic1) (tuple ic2) in
+            if cmp = 0 then
+              match (ic1.type_, ic2.type_) with
+              | "coinbase", "fee_transfer_via_coinbase" ->
+                  -1
+              | "fee_transfer_via_coinbase", "coinbase" ->
+                  1
+              | _ ->
+                  failwith
+                    "Two internal commands have the same global slot since \
+                     genesis %Ld, sequence no %d, and secondary sequence no \
+                     %d, but are not a coinbase and fee transfer via coinbase"
+            else cmp)
       in
       (* populate cache of fee transfer via coinbase items *)
       [%log info] "Populating fee transfer via coinbase cache" ;
@@ -952,7 +1164,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
       [%log info] "Loading user commands" ;
-      let%bind unsorted_user_cmds_list =
+      let%bind (unsorted_user_cmds_list : Sql.User_command.t list list) =
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
@@ -1055,8 +1267,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               *)
               log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                apply_combined_fee_transfer ~logger ~pool ~ledger
-                  ~continue_on_error ic ic2
+                apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
+                  ~repair_nonces ~continue_on_error ic ic2
               in
               apply_commands ics2 user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1065,7 +1277,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           | _ ->
               log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                run_internal_command ~logger ~pool ~ledger ~continue_on_error ic
+                run_internal_command ~logger ~pool ~ledger ~set_nonces
+                  ~repair_nonces ~continue_on_error ic
               in
               apply_commands ics user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1082,11 +1295,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
             Deferred.return
-              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
+              ( last_global_slot_since_genesis
+              , staking_epoch_ledger
+              , staking_seed
+              , next_epoch_ledger
+              , next_seed )
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
-              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+              run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
+                ~continue_on_error uc
             in
             apply_commands [] ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1095,7 +1313,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
             log_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
-              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+              run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
+                ~continue_on_error uc
             in
             apply_commands internal_cmds ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1123,23 +1342,65 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | _ ->
             failwith "Expected only the genesis block to have an unparented id"
       in
-      [%log info] "At start slot %Ld, ledger hash"
-        input.start_slot_since_genesis
+      let%bind start_slot_since_genesis =
+        let%map slot_opt =
+          query_db pool
+            ~f:(fun db ->
+              Sql.Block.get_next_slot db input.start_slot_since_genesis)
+            ~item:"Next slot"
+        in
+        match slot_opt with
+        | Some slot ->
+            slot
+        | None ->
+            failwithf
+              "There is no slot in the database greater than equal to the \
+               start slot %Ld given in the input file"
+              input.start_slot_since_genesis ()
+      in
+      if
+        not
+          (Int64.equal start_slot_since_genesis input.start_slot_since_genesis)
+      then
+        [%log info]
+          "Starting with next available global slot in the archive database"
+          ~metadata:
+            [ ( "input_start_slot"
+              , `String (Int64.to_string input.start_slot_since_genesis) )
+            ; ( "available_start_slot"
+              , `String (Int64.to_string start_slot_since_genesis) )
+            ] ;
+      [%log info] "At start global slot %Ld, ledger hash"
+        start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
-          =
+      let%bind ( last_global_slot_since_genesis
+               , staking_epoch_ledger
+               , staking_seed
+               , next_epoch_ledger
+               , next_seed ) =
         apply_commands sorted_internal_cmds sorted_user_cmds
-          ~last_global_slot_since_genesis:input.start_slot_since_genesis
+          ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          [%log info]
-            "Not writing output, because target state hash was obtained from \
-             the longest chain, not from a fork point that produced an epoch \
-             ledger hash" ;
-          return ()
+          (* start replaying at the slot after the one we've just finished with *)
+          let start_slot_since_genesis =
+            Int64.succ last_global_slot_since_genesis
+          in
+          let replayer_checkpoint =
+            create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+            |> input_to_yojson |> Yojson.Safe.pretty_to_string
+          in
+          let checkpoint_file =
+            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+          in
+          [%log info] "Writing checkpoint file"
+            ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+          return
+          @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
+                 Out_channel.output_string oc replayer_checkpoint)
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1155,11 +1416,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                       (State_hash.of_base58_check_exn target_state_hash)
                     ~ledger ~staking_epoch_ledger ~staking_seed
                     ~next_epoch_ledger ~next_seed input.genesis_ledger
-                  |> output_to_yojson |> Yojson.Safe.to_string
+                  |> output_to_yojson |> Yojson.Safe.pretty_to_string
                 in
-                let%map writer = Async_unix.Writer.open_file output_file in
-                Async.fprintf writer "%s\n" output ;
-                () )
+                return
+                @@ Out_channel.with_file output_file ~f:(fun oc ->
+                       Out_channel.output_string oc output) )
               else (
                 [%log error] "There were %d errors, not writing output"
                   !error_count ;
@@ -1184,8 +1445,15 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
+         and set_nonces =
+           Param.flag "--set-nonces"
+             ~doc:"Set missing nonces in archive database" Param.no_arg
+         and repair_nonces =
+           Param.flag "--repair-nonces"
+             ~doc:"Repair incorrect nonces in archive database" Param.no_arg
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
          in
-         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error)))
+         main ~input_file ~output_file_opt ~archive_uri ~set_nonces
+           ~repair_nonces ~continue_on_error)))
