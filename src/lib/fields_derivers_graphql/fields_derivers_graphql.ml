@@ -211,7 +211,7 @@ module Graphql_fields_raw = struct
         { Accumulator.T.run =
             (fun () ->
               Schema.field
-                (Fields_derivers_util.name_under_to_camel field)
+                (Fields_derivers.name_under_to_camel field)
                 ~args:Schema.Arg.[]
                 ?doc:None ?deprecated:None
                 ~typ:(!(t_field#graphql_fields).Input.T.run ())
