@@ -15,6 +15,7 @@
   with_hash)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
    ppx_deriving_yojson
