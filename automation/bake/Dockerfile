@@ -6,7 +6,7 @@ ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld
 ARG CONFIG_FILE="/root/daemon.json"
 
-COPY genesis_ledger.json "${CONFIG_FILE}"
+COPY ../../genesis_ledgers/${TESTNET_NAME}.json "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
 
