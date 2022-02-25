@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
 
 [%%versioned:

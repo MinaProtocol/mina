@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Mina_base_util
 open Mina_base_import
 

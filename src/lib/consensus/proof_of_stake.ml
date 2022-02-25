@@ -746,7 +746,7 @@ module Data = struct
     let eval = T.eval
 
     module Precomputed = struct
-      let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs
+      let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
 
       let genesis_winner = keypairs.(0)
 
@@ -2621,7 +2621,7 @@ module Hooks = struct
             Ivar.fill ivar response)
     end
 
-    open Mina_base.Rpc_intf
+    open Network_peer.Rpc_intf
 
     type ('query, 'response) rpc =
       | Get_epoch_ledger
@@ -2639,7 +2639,7 @@ module Hooks = struct
     type query =
       { query :
           'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-          -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+          -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
       }
 
     let implementation_of_rpc :

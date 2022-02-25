@@ -106,7 +106,9 @@ module Network_config = struct
     let block_producer_keypairs, runtime_accounts =
       (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
       let keypairs =
-        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
+        List.drop
+          (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+          1
       in
       if num_block_producers > List.length keypairs then
         failwith
