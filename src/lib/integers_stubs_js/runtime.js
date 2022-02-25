@@ -298,13 +298,13 @@ function integers_uint64_rem(x, y) {
 //Provides: integers_uint64_shift_left
 //Requires: caml_int64_shift_left, UInt64
 function integers_uint64_shift_left(x, y) {
-    return new UInt64(caml_int64_shift_left(x.value, y.value));
+    return new UInt64(caml_int64_shift_left(x.value, y));
 }
 
 //Provides: integers_uint64_shift_right
 //Requires: caml_int64_shift_right_unsigned, UInt64
 function integers_uint64_shift_right(x, y) {
-    return new UInt64(caml_int64_shift_right_unsigned(x.value, y.value));
+    return new UInt64(caml_int64_shift_right_unsigned(x.value, y));
 }
 
 //Provides: integers_uint64_sub
