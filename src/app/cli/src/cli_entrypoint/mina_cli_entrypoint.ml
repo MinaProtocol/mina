@@ -436,21 +436,21 @@ let setup_daemon logger =
     Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
            ~num_rotate:1) ;
     let rejected_blocks_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-rejected-blocks.log"
            ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
     let version_metadata =
@@ -960,7 +960,7 @@ let setup_daemon logger =
       in
       let genesis_ledger_hash =
         Precomputed_values.genesis_ledger precomputed_values
-        |> Lazy.force |> Ledger.merkle_root
+        |> Lazy.force |> Mina_ledger.Ledger.merkle_root
       in
       let block_production_keypairs =
         block_production_keypair

@@ -128,7 +128,7 @@ module Network_config = struct
                   }
           in
           (* an account may be used for snapp transactions, so add
-             permissions and snapp account
+             permissions
           *)
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
@@ -144,6 +144,7 @@ module Network_config = struct
               ; edit_sequence_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
+              ; set_voting_for = None
               }
           in
           let default = Runtime_config.Accounts.Single.default in
@@ -193,7 +194,11 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; transaction_expiry_hr = None
+            }
       ; genesis =
           Some
             { k = Some k

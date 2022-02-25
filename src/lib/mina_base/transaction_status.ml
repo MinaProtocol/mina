@@ -34,6 +34,7 @@ module Failure = struct
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
+        | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Incorrect_nonce
@@ -107,6 +108,8 @@ module Failure = struct
         "Update_not_permitted_permissions"
     | Update_not_permitted_nonce ->
         "Update_not_permitted_nonce"
+    | Update_not_permitted_voting_for ->
+        "Update_not_permitted_voting_for"
     | Parties_replay_check_failed ->
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
@@ -163,6 +166,8 @@ module Failure = struct
         Ok Update_not_permitted_permissions
     | "Update_not_permitted_nonce" ->
         Ok Update_not_permitted_nonce
+    | "Update_not_permitted_voting_for" ->
+        Ok Update_not_permitted_voting_for
     | "Parties_replay_check_failed" ->
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
@@ -240,6 +245,9 @@ module Failure = struct
     | Update_not_permitted_nonce ->
         "The authentication for an account didn't allow the requested update \
          to its nonce"
+    | Update_not_permitted_voting_for ->
+        "The authentication for an account didn't allow the requested update \
+         to its voted-for state hash"
     | Parties_replay_check_failed ->
         "Check to avoid replays failed. The party must increment nonce or use \
          full commitment if the authorization is a signature"

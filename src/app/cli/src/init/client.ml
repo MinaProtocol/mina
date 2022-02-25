@@ -992,7 +992,7 @@ let hash_ledger =
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
-           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+           (Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
        in
        Deferred.return
        @@

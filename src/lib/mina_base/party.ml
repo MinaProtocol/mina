@@ -1,23 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
+open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -39,7 +31,8 @@ module Update = struct
              , 'perms
              , 'snapp_uri
              , 'token_symbol
-             , 'timing )
+             , 'timing
+             , 'voting_for )
              t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
@@ -48,6 +41,7 @@ module Update = struct
           ; snapp_uri : 'snapp_uri
           ; token_symbol : 'token_symbol
           ; timing : 'timing
+          ; voting_for : 'voting_for
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
@@ -215,7 +209,8 @@ module Update = struct
         , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         , string Set_or_keep.Stable.V1.t
         , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        , State_hash.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -270,6 +265,7 @@ module Update = struct
       in
       Set_or_keep.gen token_gen
     in
+    let%bind voting_for = Set_or_keep.gen Field.gen in
     (* a new account for the Party.t is in the ledger when we use
        this generated update in tests, so the timing must be Keep
     *)
@@ -283,6 +279,7 @@ module Update = struct
         ; snapp_uri
         ; token_symbol
         ; timing
+        ; voting_for
         }
 
   module Checked = struct
@@ -295,7 +292,8 @@ module Update = struct
       , Permissions.Checked.t Set_or_keep.Checked.t
       , string Data_as_hash.t Set_or_keep.Checked.t
       , Account.Token_symbol.var Set_or_keep.Checked.t
-      , Timing_info.Checked.t Set_or_keep.Checked.t )
+      , Timing_info.Checked.t Set_or_keep.Checked.t
+      , State_hash.var Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
@@ -306,6 +304,7 @@ module Update = struct
          ; snapp_uri
          ; token_symbol
          ; timing
+         ; voting_for
          } :
           t) =
       let open Random_oracle_input.Chunked in
@@ -321,6 +320,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
+        ; Set_or_keep.Checked.to_input voting_for ~f:State_hash.var_to_input
         ]
   end
 
@@ -333,6 +333,7 @@ module Update = struct
     ; snapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
+    ; voting_for = Keep
     }
 
   let dummy = noop
@@ -345,6 +346,7 @@ module Update = struct
        ; snapp_uri
        ; token_symbol
        ; timing
+       ; voting_for
        } :
         t) =
     let open Random_oracle_input.Chunked in
@@ -367,6 +369,8 @@ module Update = struct
           ~f:Account.Token_symbol.to_input
       ; Set_or_keep.to_input timing ~dummy:Timing_info.dummy
           ~f:Timing_info.to_input
+      ; Set_or_keep.to_input voting_for ~dummy:State_hash.dummy
+          ~f:State_hash.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -392,6 +396,7 @@ module Update = struct
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
+      ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

@@ -45,7 +45,7 @@ module type Inputs_intf = sig
   end
 
   module Constraint_system : sig
-    type t = (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t
+    type t = (Scalar_field.t, Gate_vector.t) Plonk_constraint_system.t
 
     val finalize_and_get_gates : t -> Gate_vector.t
   end
@@ -93,7 +93,7 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { index : Inputs.Index.t
     ; cs :
-        (Inputs.Gate_vector.t, Inputs.Scalar_field.t) Plonk_constraint_system.t
+        (Inputs.Scalar_field.t, Inputs.Gate_vector.t) Plonk_constraint_system.t
     }
 
   let name =

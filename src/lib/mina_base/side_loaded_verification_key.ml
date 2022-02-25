@@ -9,7 +9,7 @@ include Pickles.Side_loaded.Verification_key
 open Core_kernel
 
 module G = struct
-  open Snark_params_nonconsensus
+  open Snark_params.Tick
 
   [%%versioned
   module Stable = struct
@@ -69,7 +69,7 @@ end]
 
 let to_input x =
   Pickles_base.Side_loaded_verification_key.to_input
-    ~field_of_int:Snark_params_nonconsensus.Field.of_int x
+    ~field_of_int:Snark_params.Tick.Field.of_int x
 
 let dummy : t =
   let open Pickles_types in

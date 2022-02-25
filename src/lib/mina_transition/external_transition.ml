@@ -561,8 +561,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -595,8 +593,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_genesis_state :
            ( 'time_received
@@ -629,8 +625,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_delta_transition_chain :
            ( 'time_received
@@ -668,8 +662,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -702,8 +694,6 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -736,8 +726,6 @@ module Validation = struct
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_protocol_versions :
            ( 'time_received
@@ -770,8 +758,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , (`Protocol_versions, Truth.True ()) )
-      | _ ->
-          failwith "why can't this be refuted?"
   end
 end
 
@@ -1313,7 +1299,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               ( Precomputed_values.genesis_ledger precomputed_values
-              |> Lazy.force |> Ledger.merkle_root
+              |> Lazy.force |> Mina_ledger.Ledger.merkle_root
               |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof

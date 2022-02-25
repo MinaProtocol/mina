@@ -1,18 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
+open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -246,6 +239,20 @@ module Auth_required = struct
       signature_sufficient
       &&& (constant ||| ((not constant) &&& signature_verifies))
 
+    let eval_proof ({ constant; signature_necessary; signature_sufficient } : t)
+        =
+      (* ways authorization can succeed if a proof is present:
+         - None
+           {constant= true; signature_necessary= _; signature_sufficient= true}
+         - Either
+           {constant= false; signature_necessary= false; signature_sufficient= true}
+         - Proof
+           {constant= false; signature_necessary= false; signature_sufficient= false}
+      *)
+      let open Pickles.Impls.Step.Boolean in
+      let impossible = constant &&& not signature_sufficient in
+      (not signature_necessary) &&& not impossible
+
     let spec_eval ({ constant; signature_necessary; signature_sufficient } : t)
         ~signature_verifies =
       let open Pickles.Impls.Step.Boolean in
@@ -299,7 +306,7 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('bool, 'controller) t =
         { stake : 'bool
         ; edit_state : 'controller
@@ -312,6 +319,7 @@ module Poly = struct
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
+        ; set_voting_for : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -327,13 +335,14 @@ module Poly = struct
       ~set_verification_key:(f controller) ~receive:(f controller)
       ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
       ~set_token_symbol:(f controller) ~increment_nonce:(f controller)
+      ~set_voting_for:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (bool, Auth_required.Stable.V2.t) Poly.Stable.V1.t
+    type t = (bool, Auth_required.Stable.V2.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
@@ -363,6 +372,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind edit_sequence_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
+  let%bind set_voting_for = auth_required_gen in
   return
     { Poly.stake
     ; edit_state
@@ -375,6 +385,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; edit_sequence_state
     ; set_token_symbol
     ; increment_nonce
+    ; set_voting_for
     }
 
 [%%ifdef consensus_mechanism]
@@ -398,7 +409,7 @@ module Checked = struct
     Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
       ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
-      ~increment_nonce:c
+      ~increment_nonce:c ~set_voting_for:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -407,13 +418,14 @@ module Checked = struct
       ~stake:(fun f -> Boolean.var_of_value (get f t))
       ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
       ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
-      ~set_token_symbol:a ~increment_nonce:a
+      ~set_token_symbol:a ~increment_nonce:a ~set_voting_for:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
     [ Boolean.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -444,6 +456,7 @@ let user_default : t =
   ; edit_sequence_state = Signature
   ; set_token_symbol = Signature
   ; increment_nonce = Signature
+  ; set_voting_for = Signature
   }
 
 let empty : t =
@@ -458,4 +471,5 @@ let empty : t =
   ; edit_sequence_state = None
   ; set_token_symbol = None
   ; increment_nonce = None
+  ; set_voting_for = None
   }

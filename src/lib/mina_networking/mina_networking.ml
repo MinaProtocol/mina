@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Mina_transition
 open Network_peer
@@ -183,7 +184,7 @@ module Rpcs = struct
         type response =
           ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V2.t
+          * Pending_coinbase.Stable.V1.t
           * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
         [@@deriving bin_io, version { rpc }]
@@ -1244,7 +1245,7 @@ let create (config : Config.t)
                       , [ ("hash", Ledger_hash.to_yojson hash)
                         ; ( "query"
                           , Syncable_ledger.Query.to_yojson
-                              Ledger.Addr.to_yojson query )
+                              Mina_ledger.Ledger.Addr.to_yojson query )
                         ; ("error", Error_json.error_to_yojson err)
                         ] ) ))
           else return ()
@@ -1804,8 +1805,8 @@ module Sl_downloader = struct
             end)
             (struct
               type t =
-                (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
-                * Mina_base.Sync_ledger.Answer.t
+                (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
+                * Sync_ledger.Answer.t
               [@@deriving to_yojson]
 
               let key = fst
@@ -1816,11 +1817,11 @@ end
 let glue_sync_ledger :
        t
     -> preferred:Peer.t list
-    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+    -> (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
-       * Mina_base.Sync_ledger.Query.t
-       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       * Sync_ledger.Query.t
+       * Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t ~preferred query_reader response_writer ->

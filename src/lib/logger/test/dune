@@ -1,0 +1,7 @@
+(library
+ (name logger_test)
+ (libraries core async logger logger_file_system)
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation (backend bisect_ppx)))

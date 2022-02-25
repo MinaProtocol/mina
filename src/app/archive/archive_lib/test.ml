@@ -47,8 +47,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_signed_gen =
-      User_command_generators.payment_with_random_participants ~keys
-        ~max_amount:1000 ~fee_range:10 ()
+      Mina_generators.User_command_generators.payment_with_random_participants
+        ~keys ~max_amount:1000 ~fee_range:10 ()
 
     let user_command_snapp_gen :
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
@@ -67,17 +67,19 @@ let%test_module "Archive node unit tests" =
             (Public_key.compress public_key, private_key))
         |> Array.to_list |> Public_key.Compressed.Map.of_alist_exn
       in
-      let ledger = Ledger.create ~depth:10 () in
+      let ledger = Mina_ledger.Ledger.create ~depth:10 () in
       let fee_payer_cpk = Public_key.compress fee_payer_keypair.public_key in
       let fee_payer_account_id =
         Account_id.create fee_payer_cpk Token_id.default
       in
       let account = Account.create fee_payer_account_id initial_balance in
-      Ledger.get_or_create_account ledger fee_payer_account_id account
+      Mina_ledger.Ledger.get_or_create_account ledger fee_payer_account_id
+        account
       |> Or_error.ok_exn
       |> fun _ ->
       let%map (parties : Parties.t) =
-        Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
+        Mina_generators.Snapp_generators.gen_parties_from ~fee_payer_keypair
+          ~keymap ~ledger ()
       in
       User_command.Parties parties
 

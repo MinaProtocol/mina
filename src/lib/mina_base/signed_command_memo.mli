@@ -3,17 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-module Tick = Snark_params.Tick
-open Tick
-
-[%%else]
-
-module Tick = Snark_params_nonconsensus
-
-[%%endif]
+open Snark_params.Tick
 
 exception Too_long_user_memo_input
 
@@ -49,9 +39,11 @@ val dummy : t
 
 val empty : t
 
-val to_string : t -> string
+val to_base58_check : t -> string
 
-val of_string : string -> t
+val of_base58_check : string -> t Or_error.t
+
+val of_base58_check_exn : string -> t
 
 (** is the memo a digest *)
 val is_digest : t -> bool
@@ -103,4 +95,4 @@ val to_bits : t -> bool list
 val gen : t Quickcheck.Generator.t
 
 (** Compute a standalone hash of the current memo. *)
-val hash : t -> Tick.Field.t
+val hash : t -> Field.t

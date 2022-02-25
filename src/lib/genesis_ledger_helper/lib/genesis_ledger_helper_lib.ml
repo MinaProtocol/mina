@@ -61,6 +61,7 @@ module Accounts = struct
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
+            ; set_voting_for
             } ->
             let auth_required a =
               match a with
@@ -86,6 +87,7 @@ module Accounts = struct
             ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
+            ; set_voting_for = auth_required set_voting_for
             }
       in
       let token_permissions =
@@ -241,6 +243,7 @@ module Accounts = struct
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
+            ; set_voting_for
             } =
           account.permissions
         in
@@ -256,6 +259,7 @@ module Accounts = struct
           ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
+          ; set_voting_for = auth_required set_voting_for
           }
       in
       let snapp =
@@ -572,6 +576,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
+  ; transaction_expiry_hr =
+      Option.value ~default:default.transaction_expiry_hr
+        (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -598,6 +605,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
+          ; transaction_expiry_hr =
+              Some precomputed_values.genesis_constants.transaction_expiry_hr
           }
     ; genesis =
         Some

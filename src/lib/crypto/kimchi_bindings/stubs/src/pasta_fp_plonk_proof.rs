@@ -10,11 +10,11 @@ use array_init::array_init;
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
+use kimchi::circuits::polynomial::COLUMNS;
+use kimchi::circuits::scalars::ProofEvaluations;
 use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
-use kimchi_circuits::nolookup::scalars::ProofEvaluations;
-use kimchi_circuits::polynomial::COLUMNS;
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
@@ -26,6 +26,9 @@ use oracle::{
 };
 use std::convert::TryInto;
 
+type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>;
+type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstants15W>;
+
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_create(
@@ -33,7 +36,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     witness: Vec<CamlFpVector>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> CamlProverProof<CamlGVesta, CamlFp> {
+) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
     {
         let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -67,7 +70,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
-        .expect("the witness should be a column of 15 vectors");
+        .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
     let index: &Index<GAffine> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
@@ -78,12 +81,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create::<
-            DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
-            DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
-        >(&group_map, witness, index, prev)
-        .unwrap();
-        proof.into()
+        let proof = ProverProof::create::<EFqSponge, EFrSponge>(&group_map, witness, index, prev)
+            .map_err(|e| ocaml::Error::Error(e.into()))?;
+        Ok(proof.into())
     })
 }
 

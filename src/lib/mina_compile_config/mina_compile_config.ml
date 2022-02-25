@@ -1,11 +1,5 @@
 [%%import "/src/config.mlh"]
 
-[%%ifndef consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
-
 (** This file consists of compile-time constants that are not in
     Genesis_constants.
     This file includes all of the constants defined at compile-time for both
@@ -54,3 +48,5 @@ let rpc_heartbeat_timeout_sec = 60.0
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%inject "generate_genesis_proof", generate_genesis_proof]
+
+let transaction_expiry_hr = 2

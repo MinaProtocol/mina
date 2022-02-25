@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
@@ -14,11 +15,11 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Transaction_logic.Transaction_applied.t
+    { transaction_with_info : Ledger.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness : Sparse_ledger.t
+    ; ledger_witness : Mina_ledger.Sparse_ledger.t
     }
   [@@deriving sexp]
 end

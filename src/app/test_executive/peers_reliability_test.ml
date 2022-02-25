@@ -31,20 +31,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    (* TEMP: until we fix the seed graphql port, we will only check peers for block producers *)
-    (* let all_nodes = Network.all_nodes network in *)
-    let all_nodes = Network.block_producers network in
+    let all_nodes = Network.all_nodes network in
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
+    [%log info] "peers_list"
+      ~metadata:
+        [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
+        ] ;
     (* TODO: let%bind () = wait_for t (Wait_condition.nodes_to_initialize [node_a; node_b; node_c]) in *)
     let%bind () =
-      Malleable_error.List.iter [ node_a; node_b; node_c ]
+      Malleable_error.List.iter all_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
+    in
+    let%bind initial_connectivity_data =
+      Util.fetch_connectivity_data ~logger all_nodes
     in
     let%bind () =
       section "network is fully connected upon initialization"
-        (Util.check_peers ~logger all_nodes)
+        (Util.assert_peers_completely_connected initial_connectivity_data)
+    in
+    let%bind () =
+      section
+        "network can't be paritioned if 2 nodes are hypothetically taken \
+         offline"
+        (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
+           initial_connectivity_data)
     in
     let%bind _ =
       section "blocks are produced"
@@ -77,5 +89,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
-       Util.check_peers ~logger all_nodes)
+       let%bind final_connectivity_data =
+         Util.fetch_connectivity_data ~logger all_nodes
+       in
+       Util.assert_peers_completely_connected final_connectivity_data)
 end

@@ -2,6 +2,7 @@ open Core_kernel
 open Currency
 open Signature_lib
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =

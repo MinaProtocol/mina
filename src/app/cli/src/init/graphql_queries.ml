@@ -279,7 +279,7 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_string")
+    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_base58_check_exn")
   }
 }
 |}]
