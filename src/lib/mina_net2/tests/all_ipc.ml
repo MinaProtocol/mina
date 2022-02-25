@@ -197,15 +197,6 @@ let%test_module "all-ipc test" =
                 raise UnexpectedState)
         |> or_timeout ~msg:"Alice: wait for Carol to connect"
       in
-      (* List peers of Alice *)
-      let%bind peers = peers a in
-      assert (List.length peers = 3) ;
-      assert (
-        List.fold [ ad.y_peerid; ad.b_peerid; ad.c_peerid ] ~init:true
-          ~f:(fun b_acc pid ->
-            b_acc
-            && List.fold peers ~init:false ~f:(fun acc p ->
-                   acc || String.equal p.peer_id pid)) ) ;
       (* Subscribe to topic "c" *)
       let topic_c_received_1 = ref false in
       let topic_c_received_2 = ref false in
@@ -326,6 +317,16 @@ let%test_module "all-ipc test" =
       (* Reset stream 2: signal Carol that she can proceed to the last step
          (waiting for Alice to disconnect) *)
       let%bind () = reset_stream a stream2 >>| Or_error.ok_exn in
+
+      (* List peers of Alice *)
+      let%bind peers = peers a in
+      assert (List.length peers >= 2) ;
+      assert (
+        List.fold [ ad.y_peerid; ad.b_peerid; ad.c_peerid ] ~init:true
+          ~f:(fun b_acc pid ->
+            b_acc
+            && List.fold peers ~init:false ~f:(fun acc p ->
+                   acc || String.equal p.peer_id pid)) ) ;
 
       (* Ban Carol in Alice's gating config *)
       let%bind _ =
@@ -577,7 +578,7 @@ let%test_module "all-ipc test" =
       in
       return (node, peerid, addr, shutdown)
 
-    let test_def =
+    let test_def () =
       let open Deferred.Let_syntax in
       let on_connected (_, w) s = don't_wait_for (Pipe.write w (true, s)) in
       let on_disconnected (_, w) s = don't_wait_for (Pipe.write w (false, s)) in
@@ -640,5 +641,5 @@ let%test_module "all-ipc test" =
     let%test_unit "ipc test" =
       (* ignore test_def *)
       let () = Core.Backtrace.elide := false in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+      Async.Thread_safe.block_on_async_exn test_def
   end )
