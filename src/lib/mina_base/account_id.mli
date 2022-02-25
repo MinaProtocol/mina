@@ -18,6 +18,8 @@ val public_key : t -> Public_key.Compressed.t
 
 val token_id : t -> Token_id.t
 
+val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
+
 val gen : t Quickcheck.Generator.t
 
 include Comparable.S with type t := t
@@ -41,6 +43,9 @@ module Checked : sig
   val public_key : var -> Public_key.Compressed.var
 
   val token_id : var -> Token_id.var
+
+  val to_input :
+    var -> Snark_params.Tick.Field.Var.t Random_oracle.Input.Chunked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

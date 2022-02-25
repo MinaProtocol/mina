@@ -1,8 +1,9 @@
 open Core_kernel
+open Mina_base
 
 module Hashless_ledger : Transaction_logic.Ledger_intf
 
-val create : Ledger.t -> Hashless_ledger.t
+val create : Mina_ledger.Ledger.t -> Hashless_ledger.t
 
 val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t

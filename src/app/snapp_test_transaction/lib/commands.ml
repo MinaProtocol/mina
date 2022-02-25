@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
@@ -116,8 +117,6 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
         "None"
     | `List [ `String "Either" ] ->
         "Either"
-    | `List [ `String "Both" ] ->
-        "Both"
     | `List [ `String "Impossible" ] ->
         "Impossible"
     (* Predicate special handling *)
@@ -391,8 +390,6 @@ module Util = struct
         Proof
     | "signature" ->
         Signature
-    | "both" ->
-        Both
     | "either" ->
         Either
     | "impossible" ->

@@ -313,9 +313,9 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
           Blockchain_state.negative_one ~constraint_constants
             ~consensus_constants
             ~genesis_ledger_hash:
-              (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+              (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:
-              (Mina_base.Ledger.next_available_token
+              (Mina_ledger.Ledger.next_available_token
                  (Lazy.force genesis_ledger))
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =

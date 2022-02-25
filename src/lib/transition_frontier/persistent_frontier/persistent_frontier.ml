@@ -39,7 +39,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     | Some protocol_state ->
         Ok protocol_state
   in
-  let mask = Ledger.of_database root_ledger in
+  let mask = Mina_ledger.Ledger.of_database root_ledger in
   let local_state =
     Blockchain_state.registers blockchain_state |> Registers.local_state
   in
@@ -249,7 +249,10 @@ module Instance = struct
               (*TODO: store the hashes as well?*)
               List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
           }
-        ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
+        ~root_ledger:
+          (Mina_ledger.Ledger.Any_ledger.cast
+             (module Mina_ledger.Ledger.Db)
+             root_ledger)
         ~consensus_local_state ~max_length ~precomputed_values
         ~persistent_root_instance
     in

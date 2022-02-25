@@ -111,7 +111,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Transaction_snark.For_tests.update_state ~constraint_constants
         parties_spec
     in
-    let timeout = Network_time_span.Slots 2 in
+    let timeout = Network_time_span.Slots 3 in
     let%bind () =
       section "send a snapp to create a snapp account"
         ( [%log info] "Sending valid snapp" ;
@@ -134,7 +134,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%map () =
            wait_for t
            @@ Wait_condition.with_timeouts ~soft_timeout:timeout
-                ~hard_timeout:timeout
            @@ Wait_condition.snapp_to_be_included_in_frontier
                 ~parties:parties_create_account
          in
@@ -162,7 +161,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%map () =
            wait_for t
            @@ Wait_condition.with_timeouts ~soft_timeout:timeout
-                ~hard_timeout:timeout
            @@ Wait_condition.snapp_to_be_included_in_frontier
                 ~parties:parties_update_state
          in

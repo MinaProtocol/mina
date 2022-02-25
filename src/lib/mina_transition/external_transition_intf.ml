@@ -118,8 +118,6 @@ module type S = sig
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
           }
-
-        (*         val to_latest : t -> t *)
       end
     end]
 

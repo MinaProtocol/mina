@@ -7,6 +7,9 @@ module Global_slot = Mina_numbers.Global_slot
 open Currency
 open Pickles_types
 module Impl = Pickles.Impls.Step
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
+module Transaction_validator = Transaction_validator
 
 let top_hash_logging_enabled = ref false
 

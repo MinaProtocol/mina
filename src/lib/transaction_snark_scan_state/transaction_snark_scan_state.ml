@@ -3,6 +3,8 @@ open Async
 open Mina_base
 open Currency
 open O1trace
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -43,7 +45,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 

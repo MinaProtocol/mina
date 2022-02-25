@@ -1,6 +1,5 @@
 open Async
 open Core
-open Network_peer
 
 type state = Peer.t
 

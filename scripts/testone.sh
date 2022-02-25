@@ -21,7 +21,7 @@ TEST_FILE=${ABSOLUTE_FILE_PATH#"$(pwd)/"}
 DIRPATH=$(dirname "$TEST_FILE")
 LIBRARY_NAME=$(basename "$DIRPATH")
 
-TEST_RUNNER_PROG="$DIRPATH/.$LIBRARY_NAME.inline-tests/run.exe"
+TEST_RUNNER_PROG="$DIRPATH/.$LIBRARY_NAME.inline-tests/inline_test_runner_$LIBRARY_NAME.exe"
 if [[ "$#" -eq "1" ]]; then 
     TEST_CASE="$TEST_FILE" 
 else 
