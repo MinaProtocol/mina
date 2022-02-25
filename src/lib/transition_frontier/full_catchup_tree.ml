@@ -197,9 +197,9 @@ let to_node_status_report =
       ; to_build_breadcrumb = 0
       }
     in
-    List.fold (Hashtbl.to_alist t.states) ~init ~f:(fun acc (state, hashes) -> 
-      let n = Set.length hashes in
-      match state with 
+    Hashtbl.fold t.states ~init ~f:(fun ~key ~data acc -> 
+      let n = Set.length data in
+      match key with 
       | Finished -> 
         { acc with finished = n }
       | Failed -> 

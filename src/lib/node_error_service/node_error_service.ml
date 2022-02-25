@@ -3,6 +3,17 @@ open Core
 open Pipe_lib
 open Signature_lib
 
+type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
+  { finished : int
+  ; failed : int
+  ; to_download : int
+  ; to_initial_validate : int
+  ; wait_for_parent : int
+  ; to_verify : int
+  ; to_build_breadcrumb : int
+  }
+[@@deriving to_yojson]
+
 type node_error_data =
   { peer_id : string
   ; ip_address : string
@@ -11,10 +22,11 @@ type node_error_data =
   ; commit_hash : string
   ; chain_id : string
   ; contact_info : string option
+  ; hardware_info : string list option
   ; timestamp : string
   ; id : string
-  ; error : string
-  ; catchup_job_states : Transition_frontier.Full_catchup_tree.job_states option
+  ; error : Yojson.Safe.t
+  ; catchup_job_states : catchup_job_states option
   ; sync_status : Sync_status.t
   ; block_height_at_best_tip : int option
   ; max_observed_block_height : int
@@ -60,7 +72,7 @@ let send_node_error_data ~logger ~url node_error_data =
           ; ("url", `String (Uri.to_string url))
           ]
 
-let send_report ~logger ~node_error_url ~mina_ref ~exn ~contact_info =
+let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
   match !mina_ref with
   | None ->
       [%log info] "Crashed before mina instance was created." ;
@@ -87,8 +99,6 @@ let send_report ~logger ~node_error_url ~mina_ref ~exn ~contact_info =
       in
       let timestamp = Rfc3339_time.get_rfc3339_time () in
       let id = Uuid_unix.create () |> Uuid.to_string in
-      let error = Exn.to_string exn in
-
       let catchup_job_states =
         match
           Broadcast_pipe.Reader.peek @@ Mina_lib.transition_frontier mina
@@ -115,6 +125,7 @@ let send_report ~logger ~node_error_url ~mina_ref ~exn ~contact_info =
       let sync_status =
         Mina_lib.sync_status mina |> Mina_incremental.Status.Observer.value_exn
       in
+      let%bind hardware_info = Mina_lib.Conf_dir.get_hw_info () in
       send_node_error_data ~logger
         ~url:(Uri.of_string node_error_url)
         { peer_id
@@ -124,9 +135,10 @@ let send_report ~logger ~node_error_url ~mina_ref ~exn ~contact_info =
         ; commit_hash
         ; chain_id
         ; contact_info
+        ; hardware_info
         ; timestamp
         ; id
-        ; error
+        ; error = Error_json.error_to_yojson error
         ; catchup_job_states
         ; sync_status
         ; block_height_at_best_tip

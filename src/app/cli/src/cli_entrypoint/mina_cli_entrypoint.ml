@@ -404,7 +404,14 @@ let setup_daemon logger =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
         "contact info used in node error report service (it could be either \
-         email address or discord username)"
+         email address or discord username), it should be less than 200 \
+         characters"
+    |> Command.Param.map ~f:(fun opt ->
+           Option.value_map opt ~default:None ~f:(fun s ->
+               if String.length s < 200 then Some s
+               else
+                 Mina_user_error.raisef
+                   "The length of contact info exceeds 200 characters:\n %s" s))
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
