@@ -235,12 +235,12 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let protocol_state = Snapp_predicate.Protocol_state.accept in
           let ps =
-            Parties.Party_or_stack.of_parties_list
+            Parties.Call_forest.of_parties_list
               ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
               [ sender_party_data; snapp_party_data ]
-            |> Parties.Party_or_stack.accumulate_hashes_predicated
+            |> Parties.Call_forest.accumulate_hashes_predicated
           in
-          let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+          let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
             Snapp_predicate.Protocol_state.digest protocol_state
           in
@@ -250,7 +250,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash ~memo_hash
           in
-          let at_party = Parties.Party_or_stack.stack_hash ps in
+          let at_party = Parties.Call_forest.hash ps in
           let tx_statement : Snapp_statement.t = { transaction; at_party } in
           let msg =
             tx_statement |> Snapp_statement.to_field_elements

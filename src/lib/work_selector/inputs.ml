@@ -94,7 +94,7 @@ end
 module Implementation_inputs = struct
   open Mina_base
   module Ledger_hash = Ledger_hash
-  module Sparse_ledger = Sparse_ledger
+  module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction
   module Transaction_witness = Transaction_witness
   module Ledger_proof = Ledger_proof

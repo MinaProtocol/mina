@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Gadt_lib
 open Signature_lib
 open Network_peer
@@ -106,7 +107,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
     ; consensus_local_state
     ; is_seed = Vect.is_empty peers
     ; genesis_ledger_hash =
-        Ledger.merkle_root
+        Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
     ; creatable_gossip_net =

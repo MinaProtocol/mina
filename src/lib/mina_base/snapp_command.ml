@@ -5,18 +5,10 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -63,7 +55,7 @@ module Party = struct
             , F.Stable.V1.t )
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
-          , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
+          , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, sexp, hash, yojson]
 

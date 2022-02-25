@@ -112,4 +112,4 @@ For example, if you have a generic custom type that must be converted to differe
 * If a custom type is large, you can use a `Box` to only store a pointer (pointing to the Rust heap) in the OCaml heap. The OCaml heap is not well-suited to handling large opaque data.
 * The priority is to keep small, potentially short-lived data on the heap so we don't fragment the rust heap and so that it gets free'd appropriately quickly.
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
-* TODO: We do not have good conventions on returning errors or throwing exceptions.
+* Do not use `unwrap()` and other functions that can panic in the stubs. Instead return a `Result<_, ocaml::Error>` with a string literal (e.g. `Err(ocaml::Error::Message("my error"))`). This will get you much better errors on the OCaml side. If you want to add dynamic information you'll have to print it on the Rust side before returning the error (I haven't found a better way, `ocaml::Error` seems to only expect string literals).

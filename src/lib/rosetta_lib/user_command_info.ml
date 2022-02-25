@@ -1,17 +1,4 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Mina_base = Mina_base_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Signature_lib = Signature_lib_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Mina_numbers = Mina_numbers_nonconsensus
-
-[%%endif]
-
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
 open Rosetta_models
@@ -143,7 +130,7 @@ module Partial = struct
     ; valid_until : Unsigned_extended.UInt32.t option
     ; memo : string option
     }
-  [@@deriving to_yojson, sexp, compare]
+  [@@deriving to_yojson, sexp, compare, equal]
 
   module Reason = Errors.Partial_reason
 
@@ -276,9 +263,9 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
      *
      * ops = length exactly 3
      *
-     * payment_source_dec with account 'a, some amount 'x, status="Pending"
-     * fee_payment with account 'a, some amount 'y, status="Pending"
-     * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
+     * payment_source_dec with account 'a, some amount 'x, status=None
+     * fee_payment with account 'a, some amount 'y, status=None
+     * payment_receiver_inc with account 'b, some amount 'x, status=None
   *)
   let payment =
     let%map () =
@@ -326,7 +313,8 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     and () =
       if
         List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
+            let p = Option.equal String.equal op.status in
+            p None || p (Some ""))
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_x =
@@ -365,7 +353,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
      *
      * ops = length exactly 2
      *
-     * fee_payment with account 'a, some amount 'y, status="Pending"
+     * fee_payment with account 'a, some amount 'y, status=None
      * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
   *)
   let delegation =
@@ -403,7 +391,8 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     and () =
       if
         List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
+            let p = Option.equal String.equal op.status in
+            p None || p (Some ""))
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -429,6 +418,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     ; memo
     }
   in
+  (* These are deprecated so we don't need to update the status handling for them *)
   (* For token creation, we demand:
      *
      * ops = length exactly 2
@@ -710,17 +700,17 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         match (op.label, failure_status) with
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
-            (`Pending, None, false)
+            (None, None, false)
         | _, Some (`Applied _) ->
-            (`Success, None, false)
+            (Some `Success, None, false)
         | _, Some (`Failed reason) ->
-            (`Failed, Some (`Assoc [ ("reason", `String reason) ]), true)
+            (Some `Failed, Some (`Assoc [ ("reason", `String reason) ]), true)
       in
       let pending_or_success_only = function
-        | `Pending ->
-            `Pending
-        | `Success | `Failed ->
-            `Success
+        | None ->
+            None
+        | Some (`Success | `Failed) ->
+            Some `Success
       in
       let merge_metadata m1 m2 =
         match (m1, m2) with
@@ -738,7 +728,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status =
-              Some (status |> pending_or_success_only |> Operation_statuses.name)
+              status |> pending_or_success_only
+              |> Option.map ~f:Operation_statuses.name
           ; account = Some (account_id t.fee_payer t.fee_token)
           ; _type = Operation_types.name `Fee_payment
           ; amount = Some Amount_of.(negated @@ token t.fee_token t.fee)
@@ -748,7 +739,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Payment_source_dec amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.source t.token)
           ; _type = Operation_types.name `Payment_source_dec
           ; amount =
@@ -760,7 +751,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Payment_receiver_inc amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.receiver t.token)
           ; _type = Operation_types.name `Payment_receiver_inc
           ; amount =
@@ -771,7 +762,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Account_creation_fee_via_payment account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.receiver t.token)
           ; _type = Operation_types.name `Account_creation_fee_via_payment
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
@@ -781,7 +772,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Account_creation_fee_via_fee_payer account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.fee_payer t.fee_token)
           ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
@@ -791,7 +782,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Create_token ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = None
           ; _type = Operation_types.name `Create_token
           ; amount = None
@@ -801,7 +792,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Delegate_change ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.source Amount_of.Token_id.default)
           ; _type = Operation_types.name `Delegate_change
           ; amount = None
@@ -819,7 +810,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Mint_tokens amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status = Some (Operation_statuses.name status)
+          ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.receiver t.token)
           ; _type = Operation_types.name `Mint_tokens
           ; amount = Some (Amount_of.token t.token amount)

@@ -62,10 +62,10 @@ module Builder = struct
              Option.value_exn
                (let open Option.Let_syntax in
                let%bind ledger_location =
-                 Ledger.location_of_account ledger sender
+                 Mina_ledger.Ledger.location_of_account ledger sender
                in
                let%map { receipt_chain_hash; _ } =
-                 Ledger.get ledger ledger_location
+                 Mina_ledger.Ledger.get ledger ledger_location
                in
                (sender, receipt_chain_hash)))
     in

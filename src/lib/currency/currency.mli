@@ -151,7 +151,14 @@ module Balance : sig
 
   val add_amount : t -> Amount.t -> t option
 
+  val add_amount_flagged : t -> Amount.t -> t * [ `Overflow of bool ]
+
   val sub_amount : t -> Amount.t -> t option
+
+  val sub_amount_flagged : t -> Amount.t -> t * [ `Underflow of bool ]
+
+  val add_signed_amount_flagged :
+    t -> Amount.Signed.t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> Amount.t -> t option
 

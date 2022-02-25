@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_state
 open Mina_transition
 open Frontier_base
@@ -474,7 +475,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
                    ~constraint_constants:
                      t.precomputed_values.constraint_constants ~txn_state_view
                    mt txn.data)
-              : Transaction_logic.Transaction_applied.t )) ;
+              : Ledger.Transaction_applied.t )) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

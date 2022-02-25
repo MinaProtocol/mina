@@ -3,6 +3,8 @@ open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Pipe_lib.Strict_pipe
 open Mina_transition

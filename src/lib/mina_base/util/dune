@@ -1,0 +1,9 @@
+(library
+ (name mina_base_util)
+ (public_name mina_base.util)
+ (libraries snark_params)
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess (pps
+    ppx_version
+    ppx_optcomp))
+ (instrumentation (backend bisect_ppx)))

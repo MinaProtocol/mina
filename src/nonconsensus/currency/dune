@@ -1,5 +1,5 @@
 (library
- (name currency_nonconsensus)
+ (name currency)
  (public_name currency_nonconsensus)
  (library_flags -linkall)
  (inline_tests)

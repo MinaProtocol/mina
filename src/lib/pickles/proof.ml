@@ -277,9 +277,13 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     | Error (`Msg s) ->
         Error s
 
-  let to_yojson x = Repr.to_yojson (to_repr x)
+  let to_yojson x = `String (to_base64 x)
 
-  let of_yojson x = Result.map ~f:of_repr (Repr.of_yojson x)
+  let of_yojson = function
+    | `String x ->
+        of_base64 x
+    | _ ->
+        Error "Invalid json for proof. Expecting base64 encoded string"
 end
 
 module Branching_2 = struct
