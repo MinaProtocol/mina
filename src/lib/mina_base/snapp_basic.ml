@@ -119,7 +119,7 @@ module Set_or_keep = struct
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
-    type 'a t = (Boolean.var, 'a) Flagged_option.t
+    type 'a t
 
     val is_keep : _ t -> Boolean.var
 
@@ -139,6 +139,8 @@ module Set_or_keep = struct
          'a t
       -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
       -> Field.Var.t Random_oracle_input.Chunked.t
+
+    val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
 
@@ -161,6 +163,8 @@ module Set_or_keep = struct
     let to_input (t : _ t) ~f =
       Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
           (b :> Field.Var.t))
+
+    let make_unsafe is_keep data = { Flagged_option.is_some = is_keep; data }
   end
 
   let typ = Checked.typ
@@ -197,9 +201,7 @@ module Or_ignore = struct
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
-    type 'a t =
-      | Implicit of 'a
-      | Explicit of (Boolean.var, 'a) Flagged_option.t
+    type 'a t
 
     val typ_implicit :
          equal:('a -> 'a -> bool)
@@ -216,6 +218,10 @@ module Or_ignore = struct
       -> Field.Var.t Random_oracle_input.Chunked.t
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
+
+    val make_unsafe_implicit : 'a -> 'a t
+
+    val make_unsafe_explicit : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t =
       | Implicit of 'a
@@ -251,6 +257,11 @@ module Or_ignore = struct
         ~there:(function Implicit _ -> assert false | Explicit t -> t)
         ~back:(fun t -> Explicit t)
       |> Typ.transport ~there:to_option ~back:of_option
+
+    let make_unsafe_implicit data = Implicit data
+
+    let make_unsafe_explicit is_ignore data =
+      Explicit { is_some = is_ignore; data }
   end
 
   let typ_implicit = Checked.typ_implicit

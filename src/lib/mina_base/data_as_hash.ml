@@ -33,3 +33,5 @@ let if_ b ~then_ ~else_ =
           As_prover.Ref.get ref)
   in
   (hash, ref)
+
+let make_unsafe hash ref : 'a t = (hash, ref)
