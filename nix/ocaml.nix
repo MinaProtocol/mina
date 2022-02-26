@@ -72,6 +72,16 @@ let
     let
       ocaml-libs =
         builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+
+      runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
+        check:
+        self.mina.overrideAttrs (oa:
+          {
+            pname = "mina-${name}";
+            buildInputs = oa.buildInputs ++ extraInputs;
+            buildPhase = check;
+            installPhase = "touch $out";
+          } // extraArgs);
     in {
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
@@ -137,21 +147,23 @@ let
           OCAMLPARAM = "_,cclib=-lc++";
         });
 
-      mina_tests = self.mina.overrideAttrs (oa: {
-        pname = "mina_tests";
-        src = filtered-src;
-        outputs = [ "out" ];
-        MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
-        TZDIR = "${pkgs.tzdata}/share/zoneinfo";
-        nativeBuildInputs = oa.nativeBuildInputs ++ [ pkgs.ephemeralpg ];
-        buildPhase = ''
-          dune build graphql_schema.json --display=short
-          export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-          psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
-          dune runtest src/app src/lib --display=short
-        '';
-        installPhase = "touch $out";
-      });
+      mina_tests = runMinaCheck {
+        name = "tests";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+        };
+        extraInputs = [ pkgs.ephemeralpg ];
+      } ''
+        dune build graphql_schema.json --display=short
+        export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
+        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        dune runtest src/app src/lib --display=short
+      '';
+
+      mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
+        dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
+      '';
 
       mina_client_sdk = pkgs.stdenv.mkDerivation {
         pname = "mina_client_sdk";

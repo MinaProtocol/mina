@@ -29,7 +29,23 @@ in  Pipeline.build
             , commands = Nix.nixBuild "mina"
             , label = "Build Mina with Nix"
             , key = "build-with-nix"
-            , target = Size.Large
+            , target = Size.Medium
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands = Nix.nixBuild "mina_tests"
+            , label = "Run mina tests with Nix"
+            , key = "tests-with-nix"
+            , target = Size.Medium
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands = Nix.nixBuild "mina_ocaml_format"
+            , label = "Run ocaml formatting check with Nix"
+            , key = "ocamlformat-with-nix"
+            , target = Size.Small
             , docker = None Docker.Type
             }
         ]
