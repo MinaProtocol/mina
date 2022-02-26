@@ -379,105 +379,6 @@ module Test = struct
   module Graphql_fields_pure =
     Fields_derivers_graphql.Graphql_fields_raw.Make (Schema)
 
-  let introspection_query_raw =
-    {graphql|
-  query IntrospectionQuery {
-    __schema {
-      queryType { name }
-      mutationType { name }
-      subscriptionType { name }
-      types {
-        ...FullType
-      }
-      directives {
-        name
-        description
-        locations
-        args {
-          ...InputValue
-        }
-      }
-    }
-  }
-  fragment FullType on __Type {
-    kind
-    name
-    description
-    fields(includeDeprecated: true) {
-      name
-      description
-      args {
-        ...InputValue
-      }
-      type {
-        ...TypeRef
-      }
-      isDeprecated
-      deprecationReason
-    }
-    inputFields {
-      ...InputValue
-    }
-    interfaces {
-      ...TypeRef
-    }
-    enumValues(includeDeprecated: true) {
-      name
-      description
-      isDeprecated
-      deprecationReason
-    }
-    possibleTypes {
-      ...TypeRef
-    }
-  }
-  fragment InputValue on __InputValue {
-    name
-    description
-    type { ...TypeRef }
-    defaultValue
-  }
-  fragment TypeRef on __Type {
-    kind
-    name
-    ofType {
-      kind
-      name
-      ofType {
-        kind
-        name
-        ofType {
-          kind
-          name
-          ofType {
-            kind
-            name
-            ofType {
-              kind
-              name
-              ofType {
-                kind
-                name
-                ofType {
-                  kind
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  |graphql}
-
-  let introspection_query () =
-    match Graphql_parser.parse introspection_query_raw with
-    | Ok res ->
-        res
-    | Error err ->
-        failwith err
-
   let print_schema (typ' : _ Fields_derivers_graphql.Schema.typ) v =
     let typ : _ Schema.typ = Obj.magic typ' in
     let query_top_level =
@@ -490,7 +391,10 @@ module Test = struct
     let schema =
       Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
     in
-    let res = Schema.execute schema () (introspection_query ()) in
+    let res =
+      Schema.execute schema ()
+        (Fields_derivers_graphql.Test.introspection_query ())
+    in
     let str =
       match res with
       | Ok (`Response data) ->

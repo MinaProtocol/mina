@@ -355,33 +355,9 @@ module Graphql_args = Graphql_args_raw.Make (Schema)
 let typ_conv (typ : ('a, 'b) Schema.typ) : ('a, 'b) Graphql_async.Schema.typ =
   Obj.magic typ
 
-let%test_module "Test" =
-  ( module struct
-    (* Pure -- just like Graphql libraries functor application *)
-    module IO = struct
-      type +'a t = 'a
-
-      let bind t f = f t
-
-      let return t = t
-
-      module Stream = struct
-        type 'a t = 'a Seq.t
-
-        let map t f = Seq.map f t
-
-        let iter t f = Seq.iter f t
-
-        let close _t = ()
-      end
-    end
-
-    module Schema = Graphql_schema.Make (IO)
-    module Graphql_fields = Graphql_fields_raw.Make (Schema)
-    module Graphql_args = Graphql_args_raw.Make (Schema)
-
-    let introspection_query_raw =
-      {graphql|
+module Test = struct
+  let introspection_query_raw =
+    {graphql|
 query IntrospectionQuery {
     __schema {
       queryType { name }
@@ -472,12 +448,38 @@ query IntrospectionQuery {
   }
 |graphql}
 
-    let introspection_query () =
-      match Graphql_parser.parse introspection_query_raw with
-      | Ok res ->
-          res
-      | Error err ->
-          failwith err
+  let introspection_query () =
+    match Graphql_parser.parse introspection_query_raw with
+    | Ok res ->
+        res
+    | Error err ->
+        failwith err
+end
+
+let%test_module "Test" =
+  ( module struct
+    (* Pure -- just like Graphql libraries functor application *)
+    module IO = struct
+      type +'a t = 'a
+
+      let bind t f = f t
+
+      let return t = t
+
+      module Stream = struct
+        type 'a t = 'a Seq.t
+
+        let map t f = Seq.map f t
+
+        let iter t f = Seq.iter f t
+
+        let close _t = ()
+      end
+    end
+
+    module Schema = Graphql_schema.Make (IO)
+    module Graphql_fields = Graphql_fields_raw.Make (Schema)
+    module Graphql_args = Graphql_args_raw.Make (Schema)
 
     let deriver (type a b c d) () :
         < contramap : (a -> b) ref
@@ -522,42 +524,30 @@ query IntrospectionQuery {
 
     let o () = deriver ()
 
-    let hit_server (typ : _ Schema.typ) v =
-      let query_top_level =
-        Schema.(
-          field "query" ~typ:(non_null typ)
-            ~args:Arg.[]
-            ~doc:"sample query"
-            ~resolve:(fun _ _ -> v))
-      in
-      let schema =
-        Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
-      in
-      let res = Schema.execute schema () (introspection_query ()) in
+    let hit_server q =
+      let schema = Schema.(schema [ q ] ~mutations:[] ~subscriptions:[]) in
+      let res = Schema.execute schema () (Test.introspection_query ()) in
       match res with
       | Ok (`Response data) ->
           data |> Yojson.Basic.to_string
       | _ ->
           failwith "Unexpected response"
 
+    let hit_server_query (typ : _ Schema.typ) v =
+      hit_server
+        Schema.(
+          field "query" ~typ:(non_null typ)
+            ~args:Arg.[]
+            ~doc:"sample query"
+            ~resolve:(fun _ _ -> v))
+
     let hit_server_args (arg_typ : 'a Schema.Arg.arg_typ) =
-      let query_top_level =
+      hit_server
         Schema.(
           field "args" ~typ:(non_null int)
             ~args:Arg.[ arg "input" ~typ:arg_typ ]
             ~doc:"sample args query"
             ~resolve:(fun _ _ _ -> 0))
-      in
-      let schema =
-        Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
-      in
-      let res = Schema.execute schema () (introspection_query ()) in
-      match res with
-      | Ok (`Response data) ->
-          (*Yojson.Basic.pretty_print Format.std_formatter data ;*)
-          data |> Yojson.Basic.to_string
-      | _ ->
-          failwith "Unexpected response"
 
     module T1 = struct
       type t = { foo_hello : int option; bar : string list } [@@deriving fields]
@@ -673,11 +663,11 @@ query IntrospectionQuery {
         !(typ_input#graphql_fields).run ()
       in
       [%test_eq: string]
-        (hit_server generated_typ T2.v1)
-        (hit_server T2.manual_typ T2.v1) ;
+        (hit_server_query generated_typ T2.v1)
+        (hit_server_query T2.manual_typ T2.v1) ;
       [%test_eq: string]
-        (hit_server generated_typ T2.v2)
-        (hit_server T2.manual_typ T2.v2)
+        (hit_server_query generated_typ T2.v2)
+        (hit_server_query T2.manual_typ T2.v2)
 
     let%test_unit "T2 unfold" =
       let open Graphql_args in
