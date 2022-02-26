@@ -1090,9 +1090,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
           [%log debug]
             ~metadata:
               [ ( "target_parent_hash"
-                , Yojson.Safe.from_string
-                    (Marlin_plonk_bindings_pasta_fp.to_string
-                       target_parent_hash) )
+                , State_body_hash.to_yojson target_parent_hash )
               ]
             "Catchup job started with $target_parent_hash " ;
           let state_hashes =
