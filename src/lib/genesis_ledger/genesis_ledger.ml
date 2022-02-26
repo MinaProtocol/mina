@@ -58,7 +58,7 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Mina_base.Sample_keypairs.keypairs in
+      and keypairs = Key_gen.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
           { balance = b
           ; pk = fst keypairs.(i)

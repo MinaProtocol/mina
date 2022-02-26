@@ -85,6 +85,8 @@ module Numeric = struct
 
     let run f x y = Impl.run_checked (f x y)
 
+    let ( !! ) f = Fn.compose Impl.run_checked f
+
     let length =
       Length.
         { zero

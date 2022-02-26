@@ -146,5 +146,5 @@ module type S = sig
   (** Triggers when the ledger has been detached and should no longer be
       accessed.
   *)
-  val detached_signal : t -> unit Async.Deferred.t
+  val detached_signal : t -> unit Async_kernel.Deferred.t
 end

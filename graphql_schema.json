@@ -2962,12 +2962,6 @@
               "deprecationReason": null
             },
             {
-              "name": "Both",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "Impossible",
               "description": null,
               "isDeprecated": false,
@@ -11250,12 +11244,6 @@
             },
             {
               "name": "Signature",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "Both",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null

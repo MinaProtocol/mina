@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 module Digest = Kimchi_backend.Pasta.Basic.Fp
 
 module Call_forest = struct

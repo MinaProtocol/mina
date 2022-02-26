@@ -3,7 +3,7 @@ open Async
 open Network_peer
 open O1trace
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -58,7 +58,7 @@ let download_seed_peer_list uri =
   let%map contents = Cohttp_async.Body.to_string body in
   Mina_net2.Multiaddr.of_file_contents contents
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 

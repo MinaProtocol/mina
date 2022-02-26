@@ -1,9 +1,9 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
 
-let field_of_bool b = if b then Field.one else Field.zero
+let field_of_bool =
+  Snark_params.Tick.(fun b -> if b then Field.one else Field.zero)
 
 let bit_length_to_triple_length n =
   let r = n mod 3 in
