@@ -354,7 +354,7 @@ let%test_module "Test" =
 
 (* TODO: remove this or move to a %test_module once the deriver code is stable *)
 (* Can be used to print the graphql schema, like this:
-   Fields_derivers_snapps.Test.print_schema (!(full#graphql_fields).run ()) dummy ;
+   Fields_derivers_snapps.Test.print_schema full ;
 *)
 module Test = struct
   module IO = struct
@@ -379,14 +379,17 @@ module Test = struct
   module Graphql_fields_pure =
     Fields_derivers_graphql.Graphql_fields_raw.Make (Schema)
 
-  let print_schema (typ' : _ Fields_derivers_graphql.Schema.typ) v =
+  let print_schema (full : _ Unified_input.t) =
+    let typ' : _ Fields_derivers_graphql.Schema.typ =
+      !(full#graphql_fields).run ()
+    in
     let typ : _ Schema.typ = Obj.magic typ' in
     let query_top_level =
       Schema.(
         field "query" ~typ:(non_null typ)
           ~args:Arg.[]
           ~doc:"sample query"
-          ~resolve:(fun _ _ -> v))
+          ~resolve:(fun _ _ -> ()))
     in
     let schema =
       Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])

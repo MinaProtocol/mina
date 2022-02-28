@@ -39,10 +39,10 @@ module Closed_interval = struct
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let deriver a obj =
+  let deriver ~name inner obj =
     let open Fields_derivers_snapps.Derivers in
-    Fields.make_creator obj ~lower:!.a ~upper:!.a
-    |> finish ~name:"ClosedInterval"
+    Fields.make_creator obj ~lower:!.inner ~upper:!.inner
+    |> finish ~name:(name ^ "Interval")
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -58,7 +58,7 @@ module Closed_interval = struct
       let%test_unit "roundtrip json" =
         let open Fields_derivers_snapps.Derivers in
         let full = o () in
-        let _a : _ Unified_input.t = deriver int full in
+        let _a : _ Unified_input.t = deriver ~name:"Int" int full in
         [%test_eq: IntClosedInterval.t]
           (!(full#of_json) (!(full#to_json) IntClosedInterval.v))
           IntClosedInterval.v
@@ -182,13 +182,35 @@ module Numeric = struct
     end
   end]
 
-  let deriver a obj =
-    let open Fields_derivers_snapps.Derivers in
-    let inner obj =
-      Closed_interval.Fields.make_creator obj ~lower:!.a ~upper:!.a
-      |> finish ~name:"ClosedInterval"
-    in
-    Or_ignore.deriver inner obj
+  let deriver name inner obj =
+    let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
+    Or_ignore.deriver closed_interval obj
+
+  module Derivers = struct
+    open Fields_derivers_snapps.Derivers
+
+    let token_id_inner obj =
+      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
+        ~of_string:Token_id.of_string
+
+    let block_time_inner obj =
+      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
+        ~to_string:Block_time.to_string obj
+
+    let nonce obj = deriver "Nonce" uint32 obj
+
+    let balance obj = deriver "Balance" balance obj
+
+    let amount obj = deriver "CurrencyAmount" amount obj
+
+    let length obj = deriver "Length" uint32 obj
+
+    let global_slot obj = deriver "GlobalSlot" uint32 obj
+
+    let token_id obj = deriver "TokenId" token_id_inner obj
+
+    let block_time obj = deriver "BlockTime" block_time_inner obj
+  end
 
   let%test_module "Numeric" =
     ( module struct
@@ -208,7 +230,7 @@ module Numeric = struct
 
         let deriver obj =
           let open Fields_derivers_snapps.Derivers in
-          Fields.make_creator obj ~foo:!.(deriver int) |> finish ~name:"T"
+          Fields.make_creator obj ~foo:!.(deriver "Int" int) |> finish ~name:"T"
       end
 
       let%test_unit "roundtrip json" =
@@ -556,9 +578,8 @@ module Account = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
-    Poly.Fields.make_creator obj
-      ~balance:!.(Numeric.deriver balance)
-      ~nonce:!.(Numeric.deriver uint32)
+    Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
+      ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~public_key:!.(Or_ignore.deriver public_key)
       ~delegate:!.(Or_ignore.deriver public_key)
@@ -814,14 +835,14 @@ module Protocol_state = struct
       let ledger obj' =
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
-          ~total_currency:!.(Numeric.deriver amount)
+          ~total_currency:!.Numeric.Derivers.amount
         |> finish ~name:"EpochLedgerPredicate"
       in
       Poly.Fields.make_creator obj ~ledger:!.ledger
         ~seed:!.(Or_ignore.deriver field)
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
-        ~epoch_length:!.(Numeric.deriver uint32)
+        ~epoch_length:!.Numeric.Derivers.length
       |> finish ~name:"EpochDataPredicate"
 
     let%test_unit "json roundtrip" =
@@ -978,24 +999,15 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    let token_id obj =
-      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
-        ~of_string:Token_id.of_string
-    in
-    let block_time obj =
-      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
-        ~to_string:Block_time.to_string obj
-    in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
-      ~snarked_next_available_token:!.(Numeric.deriver token_id)
-      ~timestamp:!.(Numeric.deriver block_time)
-      ~blockchain_length:!.(Numeric.deriver uint32)
-      ~min_window_density:!.(Numeric.deriver uint32)
-      ~last_vrf_output:!.unit
-      ~total_currency:!.(Numeric.deriver amount)
-      ~global_slot_since_hard_fork:!.(Numeric.deriver uint32)
-      ~global_slot_since_genesis:!.(Numeric.deriver uint32)
+      ~snarked_next_available_token:!.Numeric.Derivers.token_id
+      ~timestamp:!.Numeric.Derivers.block_time
+      ~blockchain_length:!.Numeric.Derivers.length
+      ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output:!.unit
+      ~total_currency:!.Numeric.Derivers.amount
+      ~global_slot_since_hard_fork:!.Numeric.Derivers.global_slot
+      ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
     |> finish ~name:"ProtocolStatePredicate"
