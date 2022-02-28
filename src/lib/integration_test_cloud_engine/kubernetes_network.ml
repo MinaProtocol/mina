@@ -504,8 +504,12 @@ let snark_workers { snark_workers; _ } = snark_workers
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-(* TODO: snark workers (until then, pretty sure snark work won't be done) *)
-let all_nodes
+(* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
+let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
+  List.concat [ seeds; block_producers; snark_coordinators; archive_nodes ]
+
+(* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
+let all_pods
     { seeds
     ; block_producers
     ; snark_coordinators
@@ -515,6 +519,12 @@ let all_nodes
     } =
   List.concat
     [ seeds; block_producers; snark_coordinators; snark_workers; archive_nodes ]
+
+(* all_non_seed_pods returns everything in the network except seed nodes *)
+let all_non_seed_pods
+    { block_producers; snark_coordinators; snark_workers; archive_nodes; _ } =
+  List.concat
+    [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
 
 let keypairs { keypairs; _ } = keypairs
 
@@ -611,7 +621,6 @@ let initialize ~logger network =
       res
   | Ok _ ->
       [%log info] "Starting the daemons within the pods" ;
-      let seed_nodes = seeds network in
       let start_print (node : Node.t) =
         let open Malleable_error.Let_syntax in
         [%log info] "starting %s ..." node.pod_id ;
@@ -619,20 +628,12 @@ let initialize ~logger network =
         [%log info] "%s started" node.pod_id ;
         Malleable_error.return res
       in
-      let seed_pod_ids =
-        seed_nodes
-        |> List.map ~f:(fun { Node.pod_id; _ } -> pod_id)
-        |> String.Set.of_list
-      in
-      let non_seed_nodes =
-        network |> all_nodes
-        |> List.filter ~f:(fun { Node.pod_id; _ } ->
-               not (String.Set.mem seed_pod_ids pod_id))
-      in
+      let seed_nodes = network |> seeds in
+      let non_seed_pods = network |> all_non_seed_pods in
       (* TODO: parallelize (requires accumlative hard errors) *)
       let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
       (* put a short delay before starting other nodes, to help avoid artifact generation races *)
       let%bind () =
         after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
       in
-      Malleable_error.List.iter non_seed_nodes ~f:start_print
+      Malleable_error.List.iter non_seed_pods ~f:start_print
