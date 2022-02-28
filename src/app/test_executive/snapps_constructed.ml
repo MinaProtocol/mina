@@ -74,14 +74,52 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
            parties_spec
     in
-    let%bind.Deferred parties_update_state, _vk =
-      (* construct a Parties.t, similar to snapp_test_transaction update-state *)
+    let%bind.Deferred parties_update_permissions, _vk =
+      (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let nonce = Account.Nonce.of_int 2 in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Snapp update permissions"
+      in
+      let new_permissions : Permissions.t =
+        { Permissions.user_default with
+          edit_state = Permissions.Auth_required.Proof
+        ; edit_sequence_state = Proof
+        ; set_delegate = Proof
+        ; set_verification_key = Proof
+        ; set_permissions = Proof
+        ; set_snapp_uri = Proof
+        ; set_token_symbol = Proof
+        ; set_voting_for = Proof
+        }
+      in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (keypair, nonce)
+        ; fee
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; snapp_account_keypair = Some snapp_keypair
+        ; memo
+        ; new_snapp_account = false
+        ; snapp_update =
+            { Party.Update.dummy with permissions = Set new_permissions }
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      Transaction_snark.For_tests.update_state ~constraint_constants
+        parties_spec
+    in
+    let%bind.Deferred parties_update_all, _vk =
       let open Mina_base in
       let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 3 in
       let memo =
-        Signed_command_memo.create_from_string_exn "Snapp update state"
+        Signed_command_memo.create_from_string_exn "Snapp update all"
       in
       let app_state =
         let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
@@ -93,6 +131,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         List.map fields ~f:(fun field -> Snapp_basic.Set_or_keep.Set field)
         |> Snapp_state.V.of_list_exn
       in
+      let new_delegate =
+        Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
+      in
+      let new_verification_key =
+        let data = Pickles.Side_loaded.Verification_key.dummy in
+        let hash = Snapp_account.digest_vk data in
+        ({ data; hash } : _ With_hash.t)
+      in
+      let new_permissions =
+        Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
+      in
+      let new_snapp_uri = "https://www.minaprotocol.com" in
+      let new_token_symbol = "SHEKEL" in
+      let new_voting_for = Quickcheck.random_value State_hash.gen in
+      let snapp_update : Party.Update.t =
+        { app_state
+        ; delegate = Set new_delegate
+        ; verification_key = Set new_verification_key
+        ; permissions = Set new_permissions
+        ; snapp_uri = Set new_snapp_uri
+        ; token_symbol = Set new_token_symbol
+        ; timing = (* timing can't be updated for an existing account *)
+                   Keep
+        ; voting_for = Set new_voting_for
+        }
+      in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
@@ -101,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_account_keypair = Some snapp_keypair
         ; memo
         ; new_snapp_account = false
-        ; snapp_update = { Party.Update.dummy with app_state }
+        ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
@@ -111,62 +175,60 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Transaction_snark.For_tests.update_state ~constraint_constants
         parties_spec
     in
-    let timeout = Network_time_span.Slots 2 in
+    let with_timeout =
+      let soft_slots = 3 in
+      let soft_timeout = Network_time_span.Slots soft_slots in
+      let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+      Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+    in
+    let send_snapp parties =
+      [%log info] "Sending snapp" ;
+      match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
+      | Ok _snapp_id ->
+          [%log info] "Snapps transaction sent" ;
+          Malleable_error.return ()
+      | Error err ->
+          let err_str = Error.to_string_mach err in
+          [%log error] "Error sending snapp"
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
+            err_str
+    in
+    let wait_for_snapp parties =
+      let%map () =
+        wait_for t @@ with_timeout
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+      in
+      [%log info] "Snapps transaction included in transition frontier"
+    in
     let%bind () =
       section "send a snapp to create a snapp account"
-        ( [%log info] "Sending valid snapp" ;
-          match%bind.Deferred
-            Network.Node.send_snapp ~logger node ~parties:parties_create_account
-          with
-          | Ok _snapp_id ->
-              [%log info] "Snapps transaction sent" ;
-              Malleable_error.return ()
-          | Error err ->
-              let err_str = Error.to_string_mach err in
-              [%log error] "Error sending snapp"
-                ~metadata:[ ("error", `String err_str) ] ;
-              Malleable_error.soft_error_format ~value:()
-                "Error sending snapp: %s" err_str )
+        (send_snapp parties_create_account)
     in
     let%bind () =
       section
         "wait for snapp to create account to be included in transition frontier"
-        (let%map () =
-           wait_for t
-           @@ Wait_condition.with_timeouts ~soft_timeout:timeout
-                ~hard_timeout:timeout
-           @@ Wait_condition.snapp_to_be_included_in_frontier
-                ~parties:parties_create_account
-         in
-         [%log info] "Snapps transaction included in transition frontier")
+        (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "send a snapp to update the snapp state"
-        ( [%log info] "Sending valid snapp" ;
-          match%bind.Deferred
-            Network.Node.send_snapp ~logger node ~parties:parties_update_state
-          with
-          | Ok _snapp_id ->
-              [%log info] "Snapps transaction sent" ;
-              Malleable_error.return ()
-          | Error err ->
-              let err_str = Error.to_string_mach err in
-              [%log error] "Error sending snapp"
-                ~metadata:[ ("error", `String err_str) ] ;
-              Malleable_error.soft_error_format ~value:()
-                "Error sending snapp: %s" err_str )
+      section "send a snapp to update permissions"
+        (send_snapp parties_update_permissions)
     in
     let%bind () =
       section
-        "wait for snapp to update state to be included in transition frontier"
-        (let%map () =
-           wait_for t
-           @@ Wait_condition.with_timeouts ~soft_timeout:timeout
-                ~hard_timeout:timeout
-           @@ Wait_condition.snapp_to_be_included_in_frontier
-                ~parties:parties_update_state
-         in
-         [%log info] "Snapps transaction included in transition frontier")
+        "wait for snapp to update permissions to be included in transition \
+         frontier"
+        (wait_for_snapp parties_update_permissions)
+    in
+    let%bind () =
+      section "send a snapp to update all fields"
+        (send_snapp parties_update_all)
+    in
+    let%bind () =
+      section
+        "wait for snapp to update all fields to be included in transition \
+         frontier"
+        (wait_for_snapp parties_update_all)
     in
     return ()
 end

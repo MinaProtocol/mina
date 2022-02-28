@@ -34,7 +34,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     witness: Vec<CamlFqVector>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> CamlProverProof<CamlGPallas, CamlFq> {
+) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
         let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -83,8 +83,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
             DefaultFqSponge<PallasParameters, PlonkSpongeConstants15W>,
             DefaultFrSponge<Fq, PlonkSpongeConstants15W>,
         >(&group_map, witness, index, prev)
-        .unwrap();
-        proof.into()
+        .map_err(|e| ocaml::Error::Error(e.into()))?;
+        Ok(proof.into())
     })
 }
 

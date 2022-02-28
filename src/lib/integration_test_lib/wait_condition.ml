@@ -178,7 +178,7 @@ struct
       let open User_command in
       match cmd with
       | Parties p ->
-          Mina_base.Parties.equal p parties
+          Parties.equal p parties
       | Signed_command _ ->
           false
     in

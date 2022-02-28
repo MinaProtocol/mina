@@ -49,13 +49,12 @@ module Ledger_hash = Ledger_hash0
 module Auth_required = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | None
         | Either
         | Proof
         | Signature
-        | Both
         | Impossible (* Both and either can both be subsumed in verification key.
                         It is good to have "Either" as a separate thing to spare the owner from
                         having to make a proof instead of a signature. Both, I'm not sure if there's
@@ -177,11 +176,6 @@ module Auth_required = struct
         ; signature_necessary = false
         ; signature_sufficient = true
         }
-    | Both ->
-        { constant = false
-        ; signature_necessary = true
-        ; signature_sufficient = false
-        }
 
   let decode : bool Encoding.t -> t = function
     | { constant = true; signature_necessary = _; signature_sufficient = false }
@@ -209,10 +203,12 @@ module Auth_required = struct
       ; signature_necessary = true
       ; signature_sufficient = false
       } ->
-        Both
+        failwith
+          "Permissions.decode: Found encoding of Both, but Both is not an \
+           exposed option"
 
   let%test_unit "decode encode" =
-    List.iter [ Impossible; Proof; Signature; Either; Both ] ~f:(fun t ->
+    List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)))
 
   [%%ifdef consensus_mechanism]
@@ -292,8 +288,6 @@ module Auth_required = struct
         false
     | None, _ ->
         true
-    | Both, (Proof | Signature) ->
-        false
     | Proof, Proof ->
         true
     | Signature, Signature ->
@@ -305,7 +299,7 @@ module Auth_required = struct
         false
     | Proof, Signature ->
         false
-    | (Both | Proof | Signature | Either), None_given ->
+    | (Proof | Signature | Either), None_given ->
         false
 end
 
@@ -348,7 +342,7 @@ end
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V2.t
+    type t = (bool, Auth_required.Stable.V2.t) Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id

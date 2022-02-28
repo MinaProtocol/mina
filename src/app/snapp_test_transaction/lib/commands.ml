@@ -117,8 +117,6 @@ let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
         "None"
     | `List [ `String "Either" ] ->
         "Either"
-    | `List [ `String "Both" ] ->
-        "Both"
     | `List [ `String "Impossible" ] ->
         "Impossible"
     (* Predicate special handling *)
@@ -392,8 +390,6 @@ module Util = struct
         Proof
     | "signature" ->
         Signature
-    | "both" ->
-        Both
     | "either" ->
         Either
     | "impossible" ->
