@@ -47,7 +47,7 @@ let char_bits c =
   List.concat_map [ hi; lo ] ~f:nybble_bits
 
 let string_to_input s =
-  Random_oracle.Input.
+  Random_oracle.Input.Legacy.
     { field_elements = [||]
     ; bitstrings = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
     }
@@ -55,11 +55,11 @@ let string_to_input s =
 let verify ?signature_kind signature pk s =
   let m = string_to_input s in
   let inner_curve = Inner_curve.of_affine pk in
-  Schnorr.verify ?signature_kind signature inner_curve m
+  Schnorr.Legacy.verify ?signature_kind signature inner_curve m
 
 let sign ?signature_kind sk s =
   let m = string_to_input s in
-  Schnorr.sign ?signature_kind sk m
+  Schnorr.Legacy.sign ?signature_kind sk m
 
 let%test_module "Sign_string tests" =
   ( module struct

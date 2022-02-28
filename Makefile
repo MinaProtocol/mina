@@ -261,8 +261,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon

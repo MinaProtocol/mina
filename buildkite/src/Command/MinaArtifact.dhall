@@ -70,6 +70,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep daemonDevnetSpec,
 
+        -- daemon berkeley image
+        let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-daemon",
+          network="berkeley",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep daemonBerkeleySpec,
+
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -106,7 +119,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep rosettaSpec
+        DockerImage.generateStep rosettaSpec,
+
+        -- Snapp test transaction image
+        let snappTestTxnSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-snapp-test-transaction",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="snapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep snappTestTxnSpec
 
       ]
     }

@@ -3,12 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 exception Too_long_user_memo_input
 
@@ -44,9 +39,11 @@ val dummy : t
 
 val empty : t
 
-val to_string : t -> string
+val to_base58_check : t -> string
 
-val of_string : string -> t
+val of_base58_check : string -> t Or_error.t
+
+val of_base58_check_exn : string -> t
 
 (** is the memo a digest *)
 val is_digest : t -> bool
@@ -93,3 +90,9 @@ val create_from_string : string -> t Or_error.t
 (** convert a memo to a list of bools
  *)
 val to_bits : t -> bool list
+
+(** Quickcheck generator for memos. *)
+val gen : t Quickcheck.Generator.t
+
+(** Compute a standalone hash of the current memo. *)
+val hash : t -> Field.t

@@ -1,5 +1,5 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_import
 
 module Single = struct
   [%%versioned

@@ -342,9 +342,13 @@ module T = struct
     { protocol : Protocol.Stable.Latest.t
     ; txpool_max_size : int
     ; num_accounts : int option
+    ; transaction_expiry_hr : int
     }
   [@@deriving to_yojson, bin_io_unversioned]
 
+  (*Note: not including transaction_expiry_hr in the chain id to give nodes the
+    flexibility to update it when required but having different expiry times
+    will cause inconsistent pools*)
   let hash (t : t) =
     let str =
       ( List.map
@@ -390,6 +394,7 @@ let compiled : t =
       }
   ; txpool_max_size = pool_max_size
   ; num_accounts = None
+  ; transaction_expiry_hr = Mina_compile_config.transaction_expiry_hr
   }
 
 let for_unit_tests = compiled

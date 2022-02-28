@@ -4,12 +4,12 @@
  (public_name replayer)
  (libraries
    async_kernel
-   core
-   caqti
-   caqti-async
    caqti-driver-postgresql
+   core
    archive_lib
    mina_base
+   mina_ledger
+   mina_caqti
    mina_state
    genesis_constants
    genesis_ledger_helper
