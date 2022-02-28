@@ -720,6 +720,8 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
+                let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
+
                 let index =
                     DlogVerifierIndex {
                         domain,
@@ -754,7 +756,8 @@ macro_rules! impl_verification_key {
                             shifts.s6.into()
                         ],
                         srs: srs.0.clone(),
-                        linearization: expr_linearization(domain, false, &None),
+                        linearization,
+                        powers_of_alpha,
                         // TODO
                         lookup_index: None,
                     };

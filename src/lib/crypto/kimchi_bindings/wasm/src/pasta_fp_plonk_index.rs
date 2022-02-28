@@ -37,7 +37,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         .map(|gate| CircuitGate::<Fp> {
             typ: gate.typ,
             wires: gate.wires,
-            c: gate.c.clone(),
+            coeffs: gate.coeffs.clone(),
         })
         .collect();
 
@@ -128,7 +128,9 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fp_3::params();
     t.srs = srs.0.clone();
     t.fq_sponge_params = oracle::pasta::fq_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, &None);
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    t.linearization = linearization;
+    t.powers_of_alpha = powers_of_alpha;
 
     //
     Ok(WasmPastaFpPlonkIndex(Box::new(t)))
@@ -160,7 +162,7 @@ fn format_field(f: &Fp) -> String {
 
 pub fn format_circuit_gate(i: usize, gate: &CircuitGate<Fp>) -> String {
     let coeffs = gate
-        .c
+        .coeffs
         .iter()
         .map(|coeff: &Fp| format_field(coeff))
         .collect::<Vec<_>>()

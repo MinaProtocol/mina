@@ -1,7 +1,12 @@
 //! A GateVector: this is used to represent a list of gates.
 
 use crate::wasm_flat_vector::WasmFlatVector;
-use kimchi::circuits::{gate::CircuitGate, gate::GateType, wires::Wire};
+use kimchi::circuits::{
+    gate::GateType,
+    gate::{Circuit, CircuitGate},
+    wires::Wire,
+};
+use o1_utils::hasher::CryptoDigest;
 use wasm_bindgen::prelude::*;
 
 use paste::paste;
@@ -41,7 +46,7 @@ macro_rules! impl_gate_vector {
             pub struct [<Wasm $field_name:camel Gate>] {
                 pub typ: GateType, // type of the gate
                 pub wires: WasmGateWires,  // gate wires
-                #[wasm_bindgen(skip)] pub c: Vec<$WasmF>,  // constraints vector
+                #[wasm_bindgen(skip)] pub coeffs: Vec<$WasmF>,  // constraints vector
             }
 
             #[wasm_bindgen]
@@ -50,11 +55,11 @@ macro_rules! impl_gate_vector {
                 pub fn new(
                     typ: GateType,
                     wires: WasmGateWires,
-                    c: WasmFlatVector<$WasmF>) -> Self {
+                    coeffs: WasmFlatVector<$WasmF>) -> Self {
                     Self {
                         typ,
                         wires,
-                        c: c.into(),
+                        coeffs: coeffs.into(),
                     }
                 }
             }
@@ -72,7 +77,7 @@ macro_rules! impl_gate_vector {
                             cg.wires[4],
                             cg.wires[5],
                             cg.wires[6]),
-                        c: cg.c.into_iter().map(Into::into).collect(),
+                        coeffs: cg.coeffs.into_iter().map(Into::into).collect(),
                     }
                 }
             }
@@ -90,7 +95,7 @@ macro_rules! impl_gate_vector {
                             cg.wires[4],
                             cg.wires[5],
                             cg.wires[6]),
-                        c: cg.c.clone().into_iter().map(Into::into).collect(),
+                        coeffs: cg.coeffs.clone().into_iter().map(Into::into).collect(),
                     }
                 }
             }
@@ -109,7 +114,7 @@ macro_rules! impl_gate_vector {
                             ccg.wires.5,
                             ccg.wires.6
                         ],
-                        c: ccg.c.into_iter().map(Into::into).collect(),
+                        coeffs: ccg.coeffs.into_iter().map(Into::into).collect(),
                     }
                 }
             }
@@ -143,6 +148,13 @@ macro_rules! impl_gate_vector {
                 h: Wire,
             ) {
                 (v.0)[t.row as usize].wires[t.col as usize] = h.into();
+            }
+
+            #[wasm_bindgen]
+            pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_digest>](
+                v: &WasmGateVector
+            ) -> Box<[u8]> {
+                Circuit(&(v.0)).digest().to_vec().into_boxed_slice()
             }
         }
     };
