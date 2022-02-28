@@ -1921,14 +1921,12 @@ module Base = struct
 
           let increment_nonce (t : t) = t.party.data.body.increment_nonce
 
-          let check_authorization ~(account : Account.t) ~commitment
+          let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)
               ({ party; control; _ } : t) =
             let proof_verifies =
               match (auth_type, snapp_statement) with
-              | Proof, Some (i, s) ->
-                  Pickles.Side_loaded.in_circuit (side_loaded i)
-                    (Lazy.force account.data.snapp.verification_key.data) ;
+              | Proof, Some (_i, s) ->
                   with_label __LOC__ (fun () ->
                       Snapp_statement.Checked.Assert.equal
                         { transaction = commitment; at_party }
