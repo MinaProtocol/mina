@@ -115,10 +115,10 @@ macro_rules! impl_projective {
 
 pub mod pallas {
     use super::*;
-    use crate::arkworks::pasta_fp::WasmPastaFp;
-    use crate::arkworks::pasta_fq::WasmPastaFq;
     use crate::arkworks::group_affine::WasmGPallas;
     use crate::arkworks::group_projective::WasmPallasGProjective;
+    use crate::arkworks::pasta_fp::WasmPastaFp;
+    use crate::arkworks::pasta_fq::WasmPastaFq;
     use mina_curves::pasta::{
         fp::Fp,
         pallas::{Affine as GAffine, Projective},
@@ -137,10 +137,10 @@ pub mod pallas {
 
 pub mod vesta {
     use super::*;
-    use crate::arkworks::pasta_fp::WasmPastaFp;
-    use crate::arkworks::pasta_fq::WasmPastaFq;
     use crate::arkworks::group_affine::WasmGVesta;
     use crate::arkworks::group_projective::WasmVestaGProjective;
+    use crate::arkworks::pasta_fp::WasmPastaFp;
+    use crate::arkworks::pasta_fq::WasmPastaFq;
     use mina_curves::pasta::{
         fq::Fq,
         vesta::{Affine as GAffine, Projective},

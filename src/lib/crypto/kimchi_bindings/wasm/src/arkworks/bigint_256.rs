@@ -1,10 +1,10 @@
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
-use ark_ff::{FromBytes, ToBytes, BigInteger as ark_BigInteger, BigInteger256};
+use ark_ff::{BigInteger as ark_BigInteger, BigInteger256, FromBytes, ToBytes};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::convert::TryInto;
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi};
+use wasm_bindgen::prelude::*;
 
 //
 // Handy constants
@@ -17,11 +17,12 @@ const BIGINT256_NUM_LIMBS: i32 =
     (BIGINT256_NUM_BITS + BIGINT256_LIMB_BITS - 1) / BIGINT256_LIMB_BITS;
 const BIGINT256_NUM_BYTES: usize = (BIGINT256_NUM_LIMBS as usize) * 8;
 
-
 pub struct WasmBigInteger256(pub BigInteger256);
 
 impl wasm_bindgen::describe::WasmDescribe for WasmBigInteger256 {
-    fn describe() { <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe() }
+    fn describe() {
+        <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe()
+    }
 }
 
 impl FromWasmAbi for WasmBigInteger256 {
@@ -57,11 +58,7 @@ pub fn of_biguint(x: &BigUint) -> BigInteger256 {
 }
 
 #[wasm_bindgen]
-pub fn caml_bigint_256_of_numeral(
-    s: String,
-    _len: u32,
-    base: u32,
-) -> WasmBigInteger256 {
+pub fn caml_bigint_256_of_numeral(s: String, _len: u32, base: u32) -> WasmBigInteger256 {
     match BigUint::parse_bytes(&s.into_bytes(), base) {
         Some(data) => WasmBigInteger256(of_biguint(&data)),
         None => panic!("caml_bigint_256_of_numeral"),
@@ -87,19 +84,13 @@ pub fn caml_bigint_256_bytes_per_limb() -> i32 {
 }
 
 #[wasm_bindgen]
-pub fn caml_bigint_256_div(
-    x: WasmBigInteger256,
-    y: WasmBigInteger256,
-) -> WasmBigInteger256 {
+pub fn caml_bigint_256_div(x: WasmBigInteger256, y: WasmBigInteger256) -> WasmBigInteger256 {
     let res: BigUint = to_biguint(&x.0) / to_biguint(&y.0);
     WasmBigInteger256(of_biguint(&res))
 }
 
 #[wasm_bindgen]
-pub fn caml_bigint_256_compare(
-    x: WasmBigInteger256,
-    y: WasmBigInteger256,
-) -> i8 {
+pub fn caml_bigint_256_compare(x: WasmBigInteger256, y: WasmBigInteger256) -> i8 {
     match x.0.cmp(&y.0) {
         Less => -1,
         Equal => 0,
@@ -118,10 +109,7 @@ pub fn caml_bigint_256_to_string(x: WasmBigInteger256) -> String {
 }
 
 #[wasm_bindgen]
-pub fn caml_bigint_256_test_bit(
-    x: WasmBigInteger256,
-    i: i32,
-) -> bool {
+pub fn caml_bigint_256_test_bit(x: WasmBigInteger256, i: i32) -> bool {
     match i.try_into() {
         Ok(i) => x.0.get_bit(i),
         Err(_) => panic!("caml_bigint_256_test_bit"),
@@ -131,7 +119,8 @@ pub fn caml_bigint_256_test_bit(
 #[wasm_bindgen]
 pub fn caml_bigint_256_to_bytes(x: WasmBigInteger256) -> Vec<u8> {
     let mut serialized_bytes = vec![];
-    x.0.serialize(&mut serialized_bytes).expect("serialize failed");
+    x.0.serialize(&mut serialized_bytes)
+        .expect("serialize failed");
     serialized_bytes
 }
 

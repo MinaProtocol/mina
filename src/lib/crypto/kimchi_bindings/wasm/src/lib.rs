@@ -14,7 +14,7 @@ mod wasm_flat_vector;
 mod wasm_vector;
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     pub fn alert(s: &str);
 }
 
@@ -54,7 +54,9 @@ pub fn set_u32_ptr(ptr: *mut u32, arg: u32) {
     // The rust docs explicitly forbid using this for cross-thread syncronization. Oh well, we
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
     // behavior dragons.
-    unsafe { std::ptr::write_volatile(ptr, arg); }
+    unsafe {
+        std::ptr::write_volatile(ptr, arg);
+    }
 }
 
 #[wasm_bindgen]
@@ -64,7 +66,9 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     // behavior dragons.
     loop {
         let contents = unsafe { std::ptr::read_volatile(ptr) };
-        if contents != 0 { return contents; }
+        if contents != 0 {
+            return contents;
+        }
     }
     unreachable!();
 }
@@ -80,9 +84,9 @@ pub mod urs_utils; // TODO: move this logic to proof-systems
 /// Vectors
 pub mod gate_vector;
 
+pub mod poly_comm;
 /// Curves
 pub mod projective;
-pub mod poly_comm;
 
 /// SRS
 pub mod srs;

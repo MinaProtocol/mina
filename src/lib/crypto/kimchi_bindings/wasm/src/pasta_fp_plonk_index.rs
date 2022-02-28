@@ -1,15 +1,15 @@
 use ark_poly::EvaluationDomain;
 
+use crate::gate_vector::fp::WasmGateVector;
+use crate::srs::fp::WasmFpSrs as WasmSrs;
+use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi::circuits::{gate::CircuitGate, constraints::ConstraintSystem};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
-use crate::srs::fp::WasmFpSrs as WasmSrs;
-use crate::gate_vector::fp::WasmGateVector;
 use wasm_bindgen::prelude::*;
 
 //
@@ -18,9 +18,7 @@ use wasm_bindgen::prelude::*;
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[wasm_bindgen]
-pub struct WasmPastaFpPlonkIndex(
-    #[wasm_bindgen(skip)]
-    pub Box<DlogIndex<GAffine>>);
+pub struct WasmPastaFpPlonkIndex(#[wasm_bindgen(skip)] pub Box<DlogIndex<GAffine>>);
 
 //
 // CamlPastaFpPlonkIndex methods
@@ -33,7 +31,8 @@ pub fn caml_pasta_fp_plonk_index_create(
     srs: &WasmSrs,
 ) -> Result<WasmPastaFpPlonkIndex, JsValue> {
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
-    let gates: Vec<_> = gates.0
+    let gates: Vec<_> = gates
+        .0
         .iter()
         .map(|gate| CircuitGate::<Fp> {
             typ: gate.typ,
@@ -111,16 +110,16 @@ pub fn caml_pasta_fp_plonk_index_read(
 ) -> Result<WasmPastaFpPlonkIndex, JsValue> {
     // read from file
     let file = match File::open(path) {
-        Err(_) => {
-            return Err(JsValue::from_str("caml_pasta_fp_plonk_index_read"))
-        }
+        Err(_) => return Err(JsValue::from_str("caml_pasta_fp_plonk_index_read")),
         Ok(file) => file,
     };
     let mut r = BufReader::new(file);
 
     // optional offset in file
     if let Some(offset) = offset {
-        r.seek(Start(offset as u64)).map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
+        r.seek(Start(offset as u64)).map_err(|err| {
+            JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err))
+        })?;
     }
 
     // deserialize the index
@@ -144,9 +143,7 @@ pub fn caml_pasta_fp_plonk_index_write(
     let file = OpenOptions::new()
         .append(append.unwrap_or(true))
         .open(path)
-        .map_err(|_| {
-            JsValue::from_str("caml_pasta_fp_plonk_index_write")
-        })?;
+        .map_err(|_| JsValue::from_str("caml_pasta_fp_plonk_index_write"))?;
     let w = BufWriter::new(file);
     index
         .0

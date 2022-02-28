@@ -1,14 +1,11 @@
-use wasm_bindgen::prelude::*;
 use crate::arkworks::pasta_fp::WasmPastaFp;
 use crate::arkworks::pasta_fq::WasmPastaFq;
 use mina_curves::pasta::{
-    pallas::Affine as AffinePallas,
-    vesta::Affine as AffineVesta,
-    pallas::G_GENERATOR_X as GeneratorPallasX,
-    pallas::G_GENERATOR_Y as GeneratorPallasY,
-    vesta::G_GENERATOR_X as GeneratorVestaX,
-    vesta::G_GENERATOR_Y as GeneratorVestaY,
+    pallas::Affine as AffinePallas, pallas::G_GENERATOR_X as GeneratorPallasX,
+    pallas::G_GENERATOR_Y as GeneratorPallasY, vesta::Affine as AffineVesta,
+    vesta::G_GENERATOR_X as GeneratorVestaX, vesta::G_GENERATOR_Y as GeneratorVestaY,
 };
+use wasm_bindgen::prelude::*;
 
 //
 // handy types
@@ -37,7 +34,7 @@ impl From<AffineVesta> for WasmGVesta {
         WasmGVesta {
             x: point.x.into(),
             y: point.y.into(),
-            infinity: point.infinity
+            infinity: point.infinity,
         }
     }
 }
@@ -47,26 +44,20 @@ impl From<&AffineVesta> for WasmGVesta {
         WasmGVesta {
             x: point.x.into(),
             y: point.y.into(),
-            infinity: point.infinity
+            infinity: point.infinity,
         }
     }
 }
 
 impl From<WasmGVesta> for AffineVesta {
     fn from(point: WasmGVesta) -> Self {
-        AffineVesta::new(
-            point.x.into(),
-            point.y.into(),
-            point.infinity)
+        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
     }
 }
 
 impl From<&WasmGVesta> for AffineVesta {
     fn from(point: &WasmGVesta) -> Self {
-        AffineVesta::new(
-            point.x.into(),
-            point.y.into(),
-            point.infinity)
+        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
     }
 }
 
@@ -77,7 +68,7 @@ impl From<AffinePallas> for WasmGPallas {
         WasmGPallas {
             x: point.x.into(),
             y: point.y.into(),
-            infinity: point.infinity
+            infinity: point.infinity,
         }
     }
 }
@@ -87,26 +78,20 @@ impl From<&AffinePallas> for WasmGPallas {
         WasmGPallas {
             x: point.x.into(),
             y: point.y.into(),
-            infinity: point.infinity
+            infinity: point.infinity,
         }
     }
 }
 
 impl From<WasmGPallas> for AffinePallas {
     fn from(point: WasmGPallas) -> Self {
-        AffinePallas::new(
-            point.x.into(),
-            point.y.into(),
-            point.infinity)
+        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
     }
 }
 
 impl From<&WasmGPallas> for AffinePallas {
     fn from(point: &WasmGPallas) -> Self {
-        AffinePallas::new(
-            point.x.into(),
-            point.y.into(),
-            point.infinity)
+        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
     }
 }
 
@@ -115,7 +100,7 @@ pub fn caml_pallas_affine_one() -> WasmGPallas {
     WasmGPallas {
         x: WasmPastaFp::from(GeneratorPallasX),
         y: WasmPastaFp::from(GeneratorPallasY),
-        infinity: false
+        infinity: false,
     }
 }
 
@@ -124,7 +109,7 @@ pub fn caml_vesta_affine_one() -> WasmGVesta {
     WasmGVesta {
         x: WasmPastaFq::from(GeneratorVestaX),
         y: WasmPastaFq::from(GeneratorVestaY),
-        infinity: false
+        infinity: false,
     }
 }
 

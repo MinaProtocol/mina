@@ -1,10 +1,10 @@
 // use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
 // use kimchi::circuits::gate::{GateType, CurrOrNext};
-use paste::paste;
-use crate::wasm_vector::WasmVector;
 use crate::wasm_flat_vector::WasmFlatVector;
-use wasm_bindgen::prelude::*;
+use crate::wasm_vector::WasmVector;
+use paste::paste;
 use std::convert::TryInto;
+use wasm_bindgen::prelude::*;
 // use std::sync::Arc;
 // use commitment_dlog::srs::SRS;
 // use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
@@ -15,13 +15,13 @@ use array_init::array_init;
 use kimchi::circuits::{
     scalars::ProofEvaluations,
     // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
-    wires::{COLUMNS},
+    wires::COLUMNS,
 };
 // use std::path::Path;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
-use kimchi::prover::{ProverCommitments, ProverProof};
-use kimchi::index::Index;
 use groupmap::GroupMap;
+use kimchi::index::Index;
+use kimchi::prover::{ProverCommitments, ProverProof};
 use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -781,12 +781,12 @@ macro_rules! impl_proof {
 
 pub mod fp {
     use super::*;
-    use crate::arkworks::{WasmPastaFp, WasmGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine, pallas::Affine as GAffineOther};
-    use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use crate::srs::fp::WasmFpSrs as WasmSrs;
+    use crate::arkworks::{WasmGVesta, WasmPastaFp};
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
+    use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
+    use crate::srs::fp::WasmFpSrs as WasmSrs;
+    use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -802,17 +802,17 @@ pub mod fp {
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
-        );
+    );
 }
 
 pub mod fq {
     use super::*;
-    use crate::arkworks::{WasmPastaFq, WasmGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
-    use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use crate::srs::fq::WasmFqSrs as WasmSrs;
+    use crate::arkworks::{WasmGPallas, WasmPastaFq};
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
+    use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
+    use crate::srs::fq::WasmFqSrs as WasmSrs;
+    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,
@@ -828,5 +828,5 @@ pub mod fq {
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
-        );
+    );
 }

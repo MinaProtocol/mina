@@ -1,8 +1,8 @@
 //! A GateVector: this is used to represent a list of gates.
 
-use wasm_bindgen::prelude::*;
-use kimchi::circuits::{gate::CircuitGate, wires::Wire, gate::GateType};
 use crate::wasm_flat_vector::WasmFlatVector;
+use kimchi::circuits::{gate::CircuitGate, gate::GateType, wires::Wire};
+use wasm_bindgen::prelude::*;
 
 use paste::paste;
 
@@ -15,7 +15,8 @@ pub struct WasmGateWires(
     pub Wire,
     pub Wire,
     pub Wire,
-    pub Wire);
+    pub Wire,
+);
 
 #[wasm_bindgen]
 impl WasmGateWires {
@@ -30,7 +31,6 @@ macro_rules! impl_gate_vector {
      $WasmF: ty,
      $F: ty,
      $field_name: ident) => {
-
         paste! {
             #[wasm_bindgen]
             pub struct [<Wasm $field_name:camel GateVector>](
@@ -145,7 +145,7 @@ macro_rules! impl_gate_vector {
                 (v.0)[t.row as usize].wires[t.col as usize] = h.into();
             }
         }
-    }
+    };
 }
 
 pub mod fp {

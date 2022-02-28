@@ -1,3 +1,5 @@
+use crate::wasm_flat_vector::WasmFlatVector;
+use crate::wasm_vector::WasmVector;
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use commitment_dlog::{
@@ -6,15 +8,13 @@ use commitment_dlog::{
 };
 use paste::paste;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     sync::Arc,
 };
 use wasm_bindgen::prelude::*;
-use std::ops::Deref;
-use crate::wasm_flat_vector::WasmFlatVector;
-use crate::wasm_vector::WasmVector;
 
 macro_rules! impl_srs {
     ($name: ident,
@@ -190,9 +190,9 @@ macro_rules! impl_srs {
 
 pub mod fp {
     use super::*;
-    use crate::arkworks::{WasmPastaFp, WasmGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use crate::arkworks::{WasmGVesta, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
+    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
 
     impl_srs!(
         caml_fp_srs,
@@ -201,14 +201,15 @@ pub mod fp {
         Fp,
         GAffine,
         WasmPolyComm,
-        Fp);
+        Fp
+    );
 }
 
 pub mod fq {
     use super::*;
-    use crate::arkworks::{WasmPastaFq, WasmGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use crate::arkworks::{WasmGPallas, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
+    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
 
     impl_srs!(
         caml_fq_srs,
@@ -217,5 +218,6 @@ pub mod fq {
         Fq,
         GAffine,
         WasmPolyComm,
-        Fq);
+        Fq
+    );
 }

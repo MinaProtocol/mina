@@ -1,16 +1,16 @@
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::convert::{OptionIntoWasmAbi, IntoWasmAbi, FromWasmAbi};
 use crate::arkworks::bigint_256::{self, WasmBigInteger256};
-use ark_ff::{FromBytes, ToBytes, BigInteger256};
-use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
 use ark_ff::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FftField, One, UniformRand, Zero,
 };
+use ark_ff::{BigInteger256, FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi};
+use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct WasmPastaFp(pub Fp);
@@ -46,7 +46,9 @@ impl<'a> From<&'a WasmPastaFp> for &'a Fp {
 }
 
 impl wasm_bindgen::describe::WasmDescribe for WasmPastaFp {
-    fn describe() { <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe() }
+    fn describe() {
+        <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe()
+    }
 }
 
 impl FromWasmAbi for WasmPastaFp {
@@ -110,7 +112,7 @@ pub fn caml_pasta_fp_div(x: WasmPastaFp, y: WasmPastaFp) -> WasmPastaFp {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_inv(x: WasmPastaFp) -> Option<WasmPastaFp> {
-    x.0.inverse().map(|x| { WasmPastaFp(x) })
+    x.0.inverse().map(|x| WasmPastaFp(x))
 }
 
 #[wasm_bindgen]
@@ -126,7 +128,7 @@ pub fn caml_pasta_fp_is_square(x: WasmPastaFp) -> bool {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_sqrt(x: WasmPastaFp) -> Option<WasmPastaFp> {
-    x.0.sqrt().map(|x| { WasmPastaFp(x) })
+    x.0.sqrt().map(|x| WasmPastaFp(x))
 }
 
 #[wasm_bindgen]
@@ -141,12 +143,12 @@ pub fn caml_pasta_fp_to_string(x: WasmPastaFp) -> String {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_of_string(s: String) -> Result<WasmPastaFp, JsValue> {
-    let biguint = BigUint::parse_bytes(s.as_bytes(), 10).ok_or(
-        JsValue::from_str("caml_pasta_fp_of_string"))?;
+    let biguint = BigUint::parse_bytes(s.as_bytes(), 10)
+        .ok_or(JsValue::from_str("caml_pasta_fp_of_string"))?;
 
     match Fp::from_repr(bigint_256::of_biguint(&biguint)) {
         Some(x) => Ok(x.into()),
-        None => Err(JsValue::from_str("caml_pasta_fp_of_string"))
+        None => Err(JsValue::from_str("caml_pasta_fp_of_string")),
     }
 }
 
@@ -191,7 +193,7 @@ pub fn caml_pasta_fp_to_bigint(x: WasmPastaFp) -> WasmBigInteger256 {
 pub fn caml_pasta_fp_of_bigint(x: WasmBigInteger256) -> Result<WasmPastaFp, JsValue> {
     match Fp::from_repr(x.0) {
         Some(x) => Ok(x.into()),
-        None => Err(JsValue::from_str("caml_pasta_fp_of_bigint"))
+        None => Err(JsValue::from_str("caml_pasta_fp_of_bigint")),
     }
 }
 
@@ -213,7 +215,7 @@ pub fn caml_pasta_fp_to_bytes(x: WasmPastaFp) -> Vec<u8> {
     let len = std::mem::size_of::<Fp>();
     let mut str: Vec<u8> = Vec::with_capacity(len);
     str.resize(len, 0);
-    let str_as_fp : *mut Fp = str.as_mut_ptr().cast::<Fp>();
+    let str_as_fp: *mut Fp = str.as_mut_ptr().cast::<Fp>();
     unsafe {
         *str_as_fp = x.0;
     }
@@ -234,4 +236,3 @@ pub fn caml_pasta_fp_of_bytes(x: &[u8]) -> WasmPastaFp {
 pub fn caml_pasta_fp_deep_copy(x: WasmPastaFp) -> WasmPastaFp {
     x
 }
-

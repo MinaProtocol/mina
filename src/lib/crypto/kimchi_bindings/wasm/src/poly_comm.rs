@@ -1,5 +1,5 @@
-use paste::paste;
 use crate::wasm_vector::WasmVector;
+use paste::paste;
 macro_rules! impl_poly_comm {
     (
      $WasmG: ty,
@@ -11,7 +11,6 @@ macro_rules! impl_poly_comm {
      $CamlBaseField: ty,
      $Projective: ty */
      ) => {
-
         paste! {
             use wasm_bindgen::prelude::*;
             use commitment_dlog::commitment::PolyComm;
@@ -86,7 +85,7 @@ macro_rules! impl_poly_comm {
                 }
             }
         }
-    }
+    };
 }
 
 pub mod pallas {
@@ -94,11 +93,7 @@ pub mod pallas {
     use crate::arkworks::group_affine::WasmGPallas;
     use mina_curves::pasta::pallas::Affine as GAffine;
 
-    impl_poly_comm!(
-        WasmGPallas,
-        GAffine,
-        Fq
-    );
+    impl_poly_comm!(WasmGPallas, GAffine, Fq);
 }
 
 pub mod vesta {
@@ -106,9 +101,5 @@ pub mod vesta {
     use crate::arkworks::group_affine::WasmGVesta;
     use mina_curves::pasta::vesta::Affine as GAffine;
 
-    impl_poly_comm!(
-        WasmGVesta,
-        GAffine,
-        Fp
-    );
+    impl_poly_comm!(WasmGVesta, GAffine, Fp);
 }
