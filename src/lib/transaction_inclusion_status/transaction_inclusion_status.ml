@@ -1,3 +1,4 @@
+open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
 open Pipe_lib
