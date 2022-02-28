@@ -1380,9 +1380,16 @@ module Base = struct
         end
 
         module Verification_key = struct
-          type t = Field.t
+          type t =
+            ( Boolean.var
+            , ( Side_loaded_verification_key.t option
+              , Field.Constant.t )
+              With_hash.t
+              Data_as_hash.t )
+            Snapp_basic.Flagged_option.t
 
-          let if_ = Field.if_
+          let if_ b ~(then_ : t) ~(else_ : t) : t =
+            Snapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
         module Events = struct
@@ -1500,27 +1507,26 @@ module Base = struct
 
           let register_verification_key ({ data = a; _ } : t) =
             Option.iter snapp_statement ~f:(fun (tag, _) ->
-                Pickles.Side_loaded.in_circuit (side_loaded tag)
-                  (Lazy.force a.snapp.verification_key.data))
+                let vk =
+                  exists Side_loaded_verification_key.typ ~compute:(fun () ->
+                      Option.value_exn
+                        (As_prover.Ref.get
+                           (Data_as_hash.ref a.snapp.verification_key.data))
+                          .data)
+                in
+                let expected_hash =
+                  Data_as_hash.hash a.snapp.verification_key.data
+                in
+                let actual_hash = Snapp_account.Checked.digest_vk vk in
+                Field.Assert.equal expected_hash actual_hash ;
+                Pickles.Side_loaded.in_circuit (side_loaded tag) vk)
 
-          let verification_key (a : t) =
-            Lazy.force a.data.snapp.verification_key.hash
+          let verification_key (a : t) : Verification_key.t =
+            a.data.snapp.verification_key
 
-          let set_verification_key verification_key ({ data = a; hash } : t) : t
-              =
-            { data =
-                { a with
-                  snapp =
-                    { a.snapp with
-                      verification_key =
-                        (* Big hack. This relies on the fact that the "data" is not
-                           used for computing the hash of the snapp account. We can't
-                           provide the verification key since it's not available here. *)
-                        { With_hash.hash = lazy verification_key
-                        ; data = lazy (failwith "unused")
-                        }
-                    }
-                }
+          let set_verification_key (verification_key : Verification_key.t)
+              ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with verification_key } }
             ; hash
             }
 
@@ -1626,57 +1632,10 @@ module Base = struct
             , V.map ledger
                 ~f:
                   As_prover.(
-                    let account_typ =
-                      let snapp :
-                          ( Snapp_account.Checked.t
-                          , Snapp_account.t option )
-                          Typ.t =
-                        let open Snapp_account.Poly in
-                        let vk :
-                            ( ( Pickles.Side_loaded.Verification_key.Checked.t
-                                Lazy.t
-                              , Pickles.Impls.Step.Field.t Lazy.t )
-                              With_hash.t
-                            , ( Side_loaded_verification_key.t
-                              , Field.Constant.t )
-                              With_hash.t
-                              option )
-                            Typ.t =
-                          { store = (fun _ -> failwith "unused")
-                          ; check = (fun _ -> failwith "unused")
-                          ; alloc = Free (Alloc (fun _ -> failwith "unused"))
-                          ; read =
-                              Snarky_backendless.Typ_monads.Read.(
-                                fun v ->
-                                  let%map h = read (Lazy.force v.hash) in
-                                  Some
-                                    { With_hash.data =
-                                        Pickles.Side_loaded.Verification_key
-                                        .dummy
-                                    ; hash = h
-                                    })
-                          }
-                        in
-                        (* TODO: Refactor. This hacking around the vk is a code smell *)
-                        Typ.of_hlistable
-                          [ Snapp_state.typ Field.typ
-                          ; vk
-                          ; Mina_numbers.Snapp_version.typ
-                          ; Pickles_types.Vector.typ Field.typ
-                              Pickles_types.Nat.N5.n
-                          ; Mina_numbers.Global_slot.typ
-                          ; Boolean.typ
-                          ]
-                          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-                          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-                        |> Typ.transport
-                             ~there:(fun x -> Option.value_exn x)
-                             ~back:(fun x -> Some x)
-                      in
-                      Mina_base.Account.typ' snapp
-                    in
                     fun ledger ->
-                      let a : Mina_base.Account.t = read account_typ a.data in
+                      let a : Mina_base.Account.t =
+                        read Mina_base.Account.Checked.Unhashed.typ a.data
+                      in
                       let idx = idx ledger (Mina_base.Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
 

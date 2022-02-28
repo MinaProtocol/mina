@@ -288,7 +288,11 @@ module Update = struct
     type t =
       ( Field.t Set_or_keep.Checked.t
       , Public_key.Compressed.var Set_or_keep.Checked.t
-      , Field.t Set_or_keep.Checked.t
+      , ( Boolean.var
+        , (Side_loaded_verification_key.t option, Field.Constant.t) With_hash.t
+          Data_as_hash.t )
+        Snapp_basic.Flagged_option.t
+        Set_or_keep.Checked.t
       , Permissions.Checked.t Set_or_keep.Checked.t
       , string Data_as_hash.t Set_or_keep.Checked.t
       , Account.Token_symbol.var Set_or_keep.Checked.t
@@ -313,7 +317,8 @@ module Update = struct
             ~f:(Set_or_keep.Checked.to_input ~f:field)
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
-        ; Set_or_keep.Checked.to_input verification_key ~f:field
+        ; Set_or_keep.Checked.to_input verification_key ~f:(fun x ->
+              field (Data_as_hash.hash x.data))
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
         ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
@@ -380,19 +385,33 @@ module Update = struct
       [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
       ; Set_or_keep.typ ~dummy:Public_key.Compressed.empty
           Public_key.Compressed.typ
-      ; Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ
-        |> Typ.transport
-             ~there:(Set_or_keep.map ~f:With_hash.hash)
-             ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
+      ; Set_or_keep.optional_typ
+          (Data_as_hash.typ ~hash:With_hash.hash)
+          ~to_option:(function
+            | { With_hash.data = Some data; hash } ->
+                Some { With_hash.data; hash }
+            | { With_hash.data = None; _ } ->
+                None)
+          ~of_option:(function
+            | Some { With_hash.data; hash } ->
+                { With_hash.data = Some data; hash }
+            | None ->
+                { With_hash.data = None; hash = Field.Constant.zero })
+        |> Typ.transport_var
+             ~there:
+               (Set_or_keep.Checked.map
+                  ~f:(fun { Snapp_basic.Flagged_option.data; _ } -> data))
+             ~back:(fun x ->
+               Set_or_keep.Checked.map x ~f:(fun data ->
+                   { Snapp_basic.Flagged_option.data
+                   ; is_some = Set_or_keep.Checked.is_set x
+                   }))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
-      ; (* We have to do this unfortunate dance to provide a dummy value. *)
-        Set_or_keep.typ ~dummy:None
+      ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Account.hash_snapp_uri
              ~non_preimage:(Account.hash_snapp_uri_opt None)
              ~dummy_value:"")
-        |> Typ.transport
-             ~there:(Set_or_keep.map ~f:Option.some)
-             ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
+          ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
