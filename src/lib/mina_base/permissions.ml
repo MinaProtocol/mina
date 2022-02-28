@@ -484,8 +484,6 @@ let auth_required_to_string = function
       "Proof"
   | Signature ->
       "Signature"
-  | Both ->
-      "Both"
   | Impossible ->
       "Impossible"
 
@@ -498,8 +496,6 @@ let auth_required_of_string = function
       Proof
   | "Signature" ->
       Signature
-  | "Both" ->
-      Both
   | "Impossible" ->
       Impossible
   | _ ->
