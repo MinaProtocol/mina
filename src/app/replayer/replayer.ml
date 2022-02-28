@@ -1078,7 +1078,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       let%bind user_cmd_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.User_command_ids.run db target_state_hash)
+            (fun db ->
+              Sql.User_command_ids.run db ~state_hash:target_state_hash
+                ~start_slot:input.start_slot_since_genesis)
             pool
         with
         | Ok ids ->
@@ -1092,7 +1094,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       let%bind internal_cmd_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.Internal_command_ids.run db target_state_hash)
+            (fun db ->
+              Sql.Internal_command_ids.run db ~state_hash:target_state_hash
+                ~start_slot:input.start_slot_since_genesis)
             pool
         with
         | Ok ids ->
@@ -1125,14 +1129,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   (Caqti_error.show msg) ())
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
-      (* filter out internal commands in blocks not along chain from target state hash
-         or before start slot
-      *)
+      (* filter out internal commands in blocks not along chain from target state hash *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int64.( >= ) cmd.global_slot_since_genesis
-              input.start_slot_since_genesis
-            && Int.Set.mem block_ids cmd.block_id)
+            Int.Set.mem block_ids cmd.block_id)
       in
       [%log info] "Will replay %d internal commands"
         (List.length filtered_internal_cmds) ;
@@ -1180,14 +1180,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   (Caqti_error.show msg) ())
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
-      (* filter out user commands in blocks not along chain from target state hash
-         or before start slot
-      *)
+      (* filter out user commands in blocks not along chain from target state hash *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int64.( >= ) cmd.global_slot_since_genesis
-              input.start_slot_since_genesis
-            && Int.Set.mem block_ids cmd.block_id)
+            Int.Set.mem block_ids cmd.block_id)
       in
       [%log info] "Will replay %d user commands"
         (List.length filtered_user_cmds) ;
