@@ -9,7 +9,7 @@ edition = "2018"
 
 [lib]
 name = "plonk_wasm"
-crate-type = ["cdylib"]
+crate-type = ["lib"]
 
 ################################# Dependencies ################################
 
@@ -32,6 +32,7 @@ ark-poly = { version = "0.3.0", features = ["parallel"] }
 commitment_dlog = { path = "../../proof-systems/poly-commitment" }
 groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
+o1-utils = { path = "../../proof-systems/utils" }
 oracle = { path = "../../proof-systems/oracle" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
@@ -66,10 +67,4 @@ wasm-opt = false
 rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
 
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
-
-[target.wasm32-wasi]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
-
-[target.wasm32-unknown-emscripten]
 rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
