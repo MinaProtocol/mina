@@ -4884,7 +4884,9 @@ module Queries = struct
             } =
           (Mina_lib.config coda).precomputed_values
         in
-        let { With_hash.data = genesis_state; hash } =
+        let { With_hash.data = genesis_state
+            ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+            } =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants

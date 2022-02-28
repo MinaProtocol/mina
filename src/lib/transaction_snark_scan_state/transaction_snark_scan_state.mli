@@ -152,8 +152,10 @@ val required_state_hashes : t -> State_hash.Set.t
 (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
 val check_required_protocol_states :
      t
-  -> protocol_states:Mina_state.Protocol_state.value list
-  -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
+  -> protocol_states:
+       Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+  -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+     Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs :

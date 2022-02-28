@@ -407,7 +407,7 @@ module T = struct
               ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
-                (With_hash.hash precomputed_values.protocol_state_with_hash)
+                precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -579,7 +579,7 @@ module T = struct
                      External_transition.Validated.parent_hash t
                    in
                    let state_hash =
-                     External_transition.Validated.state_hash t
+                     (External_transition.Validated.state_hashes t).state_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
