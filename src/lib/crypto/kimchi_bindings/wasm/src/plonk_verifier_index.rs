@@ -4,13 +4,13 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
-use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 use kimchi::circuits::expr::{Column, PolishToken, Variable};
 use kimchi::circuits::gate::{CurrOrNext, GateType};
 use kimchi::circuits::{
     constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
+use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 use paste::paste;
 use std::convert::TryInto;
 use std::path::Path;

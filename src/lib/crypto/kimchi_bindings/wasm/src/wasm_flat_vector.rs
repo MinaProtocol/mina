@@ -1,7 +1,7 @@
-use wasm_bindgen::convert::{OptionIntoWasmAbi, IntoWasmAbi, OptionFromWasmAbi, FromWasmAbi};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 
-use std::ops::Deref;
 use std::convert::From;
+use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 pub struct WasmFlatVector<T>(Vec<T>);
@@ -15,7 +15,9 @@ pub trait FlatVectorElem {
 impl<T> Deref for WasmFlatVector<T> {
     type Target = Vec<T>;
 
-    fn deref(&self) -> &Self::Target { &self.0 }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<T> From<Vec<T>> for WasmFlatVector<T> {
@@ -54,7 +56,9 @@ impl<'a, T> std::iter::IntoIterator for &'a WasmFlatVector<T> {
 
 impl<T> std::iter::FromIterator<T> for WasmFlatVector<T> {
     fn from_iter<I>(iter: I) -> WasmFlatVector<T>
-    where I: IntoIterator<Item = T> {
+    where
+        I: IntoIterator<Item = T>,
+    {
         WasmFlatVector(std::iter::FromIterator::from_iter(iter))
     }
 }
@@ -66,13 +70,18 @@ impl<T> std::default::Default for WasmFlatVector<T> {
 }
 
 impl<T> std::iter::Extend<T> for WasmFlatVector<T> {
-    fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item = T> {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>,
+    {
         self.0.extend(iter)
     }
 }
 
 impl<T> wasm_bindgen::describe::WasmDescribe for WasmFlatVector<T> {
-    fn describe() { <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe() }
+    fn describe() {
+        <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe()
+    }
 }
 
 impl<T: FlatVectorElem> FromWasmAbi for WasmFlatVector<T> {
@@ -117,4 +126,3 @@ impl<T: FlatVectorElem> OptionIntoWasmAbi for WasmFlatVector<T> {
         <Vec<u8> as OptionIntoWasmAbi>::none()
     }
 }
-

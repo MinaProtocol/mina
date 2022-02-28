@@ -1,5 +1,5 @@
-use wasm_bindgen::prelude::*;
 use std::ops::{Add, Deref, Neg, Sub};
+use wasm_bindgen::prelude::*;
 
 use mina_curves::pasta::{
     pallas::Projective as ProjectivePallas, vesta::Projective as ProjectiveVesta,

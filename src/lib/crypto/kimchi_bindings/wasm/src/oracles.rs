@@ -1,7 +1,7 @@
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
-use kimchi::prover::ProverProof;
-use kimchi::{index::VerifierIndex as DlogVerifierIndex};
 use kimchi::circuits::scalars::RandomOracles;
+use kimchi::index::VerifierIndex as DlogVerifierIndex;
+use kimchi::prover::ProverProof;
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,
@@ -238,10 +238,10 @@ macro_rules! impl_oracles {
 pub mod fp {
     use super::*;
     use crate::{
-        arkworks::{WasmPastaFp, WasmGVesta},
+        arkworks::{WasmGVesta, WasmPastaFp},
+        plonk_proof::fp::WasmFpProverProof as WasmProverProof,
         plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::vesta::WasmFpPolyComm as WasmPolyComm,
-        plonk_proof::fp::WasmFpProverProof as WasmProverProof,
     };
     use mina_curves::pasta::{
         fp::Fp,
@@ -264,10 +264,10 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::{
-        arkworks::{WasmPastaFq, WasmGPallas},
+        arkworks::{WasmGPallas, WasmPastaFq},
+        plonk_proof::fq::WasmFqProverProof as WasmProverProof,
         plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::pallas::WasmFqPolyComm as WasmPolyComm,
-        plonk_proof::fq::WasmFqProverProof as WasmProverProof,
     };
     use mina_curves::pasta::{
         fq::Fq,
