@@ -57,7 +57,7 @@ module "kubernetes_testnet" {
 
   archive_configs = local.archive_node_configs
 
-  mina_archive_schema = var.mina_archive_schema
+  # mina_archive_schema = var.mina_archive_schema
 
   snark_coordinators = var.snark_coordinators
 

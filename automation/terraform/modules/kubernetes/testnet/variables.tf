@@ -61,10 +61,10 @@ variable "mina_archive_image" {
   default = ""
 }
 
-variable "mina_archive_schema" {
-  type    = string
-  default = ""
-}
+# variable "mina_archive_schema" {
+#   type    = string
+#   default = ""
+# }
 
 variable "archive_node_count" {
   type    = number

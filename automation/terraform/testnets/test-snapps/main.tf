@@ -94,7 +94,9 @@ module "test-snapps" {
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/feature/snapps-protocol/src/app/archive/create_schema.sql" 
+  # mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/feature/snapps-protocol/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql" 
 
   archive_configs       = [
     {
