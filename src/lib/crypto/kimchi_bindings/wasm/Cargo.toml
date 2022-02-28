@@ -9,7 +9,7 @@ edition = "2018"
 
 [lib]
 name = "plonk_wasm"
-crate-type = ["lib"]
+crate-type = ["cdylib"]
 
 ################################# Dependencies ################################
 
