@@ -57,10 +57,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* fee for user commands *)
     let fee = Currency.Fee.of_int 10_000_000 in
     let all_nodes = Network.all_nodes network in
-    let%bind () =
-      Malleable_error.List.iter all_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
-    in
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
       Network.block_producers network
     in
