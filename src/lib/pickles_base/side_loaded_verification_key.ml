@@ -170,7 +170,7 @@ module Poly = struct
             Max_branches_vec.Stable.V1.t
         ; max_width : Width.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
-        ; wrap_vk : 'vk option
+        ; wrap_vk : 'vk option [@compare.ignore] [@equal.ignore]
         }
       [@@deriving sexp, equal, compare, hash, yojson]
     end

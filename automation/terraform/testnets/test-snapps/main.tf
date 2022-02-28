@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-test-labels.tfstate"
+    key     = "terraform-test-snapps.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 2
+  default     = 16
 }
 
 variable "fish_count" {
@@ -50,13 +50,18 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 1
+  default     = 3
+}
+
+variable "plain_node_count" {
+  default     = 0
+  # default     = 10
 }
 
 locals {
-  testnet_name = "test-labels"
-  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.5-compatible-be67bed-test-labels-425db71"
-  mina_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
+  testnet_name = "test-snapps"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -70,7 +75,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "testlabels" {
+module "test-snapps" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -89,7 +94,7 @@ module "testlabels" {
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/06691e343be1ddad036c1fc4a6c94afc12afc4ee/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/feature/snapps-protocol/src/app/archive/create_schema.sql" 
 
   archive_configs       = [
     {
@@ -113,14 +118,16 @@ module "testlabels" {
   ]
 
 
-  coda_faucet_amount = "10000000000"
-  coda_faucet_fee    = "100000000"
+  mina_faucet_amount = "10000000000"
+  mina_faucet_fee    = "100000000"
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
+
+  use_embedded_runtime_config = true
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
@@ -134,7 +141,7 @@ module "testlabels" {
   snark_coordinators = [
     {
       snark_worker_replicas = 5
-      snark_worker_fee      = "1.025"
+      snark_worker_fee      = "0.025"
       snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
       snark_coordinators_host_port = 10401
     }
@@ -151,7 +158,11 @@ module "testlabels" {
       duplicates = 1
     }
   ]
+
+  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
+  
   seed_count            = var.seed_count
+
   plain_node_count = 0
 
   upload_blocks_to_gcloud         = false
@@ -161,6 +172,6 @@ module "testlabels" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/test-labels.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/test-snapps.txt"
 }
 

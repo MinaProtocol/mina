@@ -162,8 +162,6 @@ module Snapp_permissions = struct
           "proof"
       | Permissions.Auth_required.Signature ->
           "signature"
-      | Permissions.Auth_required.Both ->
-          "both"
       | Permissions.Auth_required.Impossible ->
           "impossible"
     in
@@ -176,8 +174,6 @@ module Snapp_permissions = struct
           Result.return Permissions.Auth_required.Proof
       | "signature" ->
           Result.return Permissions.Auth_required.Signature
-      | "both" ->
-          Result.return Permissions.Auth_required.Both
       | "impossible" ->
           Result.return Permissions.Auth_required.Impossible
       | s ->

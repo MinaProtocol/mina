@@ -974,7 +974,6 @@ module Types = struct
           ; enum_value "Either" ~value:Either
           ; enum_value "Proof" ~value:Proof
           ; enum_value "Signature" ~value:Signature
-          ; enum_value "Both" ~value:Both
           ; enum_value "Impossible" ~value:Impossible
           ]
 
@@ -2357,7 +2356,6 @@ module Types = struct
             ; enum_value "Either" ~value:Either
             ; enum_value "Proof" ~value:Proof
             ; enum_value "Signature" ~value:Signature
-            ; enum_value "Both" ~value:Both
             ; enum_value "Impossible" ~value:Impossible
             ]
 
