@@ -9,10 +9,11 @@ let wasmPath = resolve(`${build}/src/lib/crypto/kimchi_bindings/js/node_js`);
 let snarkyPath = resolve(
   `${build}/src/lib/snarky_js_bindings/snarky_js_node.bc.js`
 );
-let nodeModules = resolve("node_modules");
+let nodeModules = "node_modules";
+let nodeModulesExists = fs.existsSync(nodeModules);
 
 // set up node_modules
-if (!fs.existsSync(nodeModules)) {
+if (!nodeModulesExists) {
   fs.mkdirSync(nodeModules);
   fs.mkdirSync(`${nodeModules}/env`);
   fs.writeFileSync(`${nodeModules}/env/index.js`, "module.exports = {};");
@@ -33,4 +34,23 @@ fs.readdirSync(wasmPath)
     fs.cpSync(`${wasmPath}/${file}`, `${nodeModules}/snarkyjs/${file}`);
   });
 
-module.exports = require("snarkyjs");
+let snarkyjs = require("snarkyjs");
+if (!nodeModulesExists) fs.rmSync(nodeModules);
+
+let didShutdown = false;
+
+module.exports = {
+  ...snarkyjs,
+
+  shutdown() {
+    if (global.wasm_rayon_poolbuilder && !didShutdown) {
+      didShutdown = true;
+      global.wasm_rayon_poolbuilder.free();
+      return Promise.all(
+        global.wasm_workers.map(async (worker) => {
+          await worker.terminate();
+        })
+      );
+    }
+  },
+};
