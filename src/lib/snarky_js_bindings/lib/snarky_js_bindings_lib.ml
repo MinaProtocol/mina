@@ -1039,28 +1039,56 @@ let array_map2 t1 t2 ~f =
   array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
   res
 
+let to_unchecked (x : Field.t) =
+  match x with Constant y -> y | y -> Impl.As_prover.read_var y
+
 let poseidon =
   object%js
+    (* TODO make sure this is the correct way to hash
+       has to be the same in-snark and out-of-snark
+    *)
     method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
-      match
-        array_map xs ~f:(fun x ->
-            match x##.value with Constant x -> x | x -> As_prover.read_var x)
-      with
-      | exception _ ->
-          let module Sponge = Pickles.Step_main_inputs.Sponge in
-          let sponge_params = Pickles.Step_main_inputs.sponge_params in
-          let s = Sponge.create sponge_params in
-          for i = 0 to xs##.length - 1 do
-            Sponge.absorb s (`Field (array_get_exn xs i)##.value)
-          done ;
-          new%js field_constr (As_field.of_field (Sponge.squeeze_field s))
-      | xs ->
-          let module Field = Pickles.Tick_field_sponge.Field in
-          let params = Pickles.Tick_field_sponge.params in
-          let s = Field.create params in
-          array_iter xs ~f:(Field.absorb s) ;
-          new%js field_constr
-            (As_field.of_field (Impl.Field.constant (Field.squeeze s)))
+      let input = Array.map (Js.to_array xs) ~f:of_js_field in
+      let digest =
+        try Random_oracle.Checked.hash input
+        with _ ->
+          Random_oracle.hash (Array.map ~f:to_unchecked input) |> Field.constant
+      in
+      (* debug hash value: *)
+      (* let () =
+           try
+             let s = digest |> to_unchecked |> Field.Constant.to_string in
+             console_log_string "got hash" ;
+             console_log (Js.string s) ;
+             ()
+           with _ ->
+             Impl.as_prover (fun () ->
+                 let s = digest |> to_unchecked |> Field.Constant.to_string in
+                 console_log_string "got hash (as_prover)" ;
+                 console_log (Js.string s))
+         in *)
+      to_js_field digest
+    (* old implementation: *)
+    (* method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
+       match
+         array_map xs ~f:(fun x ->
+             match x##.value with Constant x -> x | x -> As_prover.read_var x)
+       with
+       | exception _ ->
+           let module Sponge = Pickles.Step_main_inputs.Sponge in
+           let sponge_params = Pickles.Step_main_inputs.sponge_params in
+           let s = Sponge.create sponge_params in
+           for i = 0 to xs##.length - 1 do
+             Sponge.absorb s (`Field (array_get_exn xs i)##.value)
+           done ;
+           new%js field_constr (As_field.of_field (Sponge.squeeze_field s))
+       | xs ->
+           let module Field = Pickles.Tick_field_sponge.Field in
+           let params = Pickles.Tick_field_sponge.params in
+           let s = Field.create params in
+           array_iter xs ~f:(Field.absorb s) ;
+           new%js field_constr
+             (As_field.of_field (Impl.Field.constant (Field.squeeze s))) *)
   end
 
 class type verification_key_class =
@@ -1570,10 +1598,6 @@ let () =
 
 (* helpers for pickles_compile *)
 
-let field_to_constant (x : Field.t) =
-  (* match x with Constant y -> y | _ -> failwith "can't convert to constant" *)
-  match x with Constant y -> y | y -> Impl.As_prover.read_var y
-
 type 'a snapp_statement = { transaction : 'a; at_party : 'a }
 
 let snapp_statement_to_fields { transaction; at_party } =
@@ -1590,9 +1614,7 @@ module Snapp_statement = struct
   let to_field_elements = snapp_statement_to_fields
 
   let to_constant ({ transaction; at_party } : t) =
-    { transaction = field_to_constant transaction
-    ; at_party = field_to_constant at_party
-    }
+    { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
 
   let to_js ({ transaction; at_party } : t) =
     object%js
@@ -2475,10 +2497,10 @@ type AccountPredicate =
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
     let other_parties_hash =
-      other_parties_hash |> of_js_field |> field_to_constant
+      other_parties_hash |> of_js_field |> to_unchecked
     in
     let protocol_state_predicate_hash =
-      protocol_state_predicate_hash |> of_js_field |> field_to_constant
+      protocol_state_predicate_hash |> of_js_field |> to_unchecked
     in
     Parties.Transaction_commitment.create ~other_parties_hash
       ~protocol_state_predicate_hash ~memo_hash:Field.Constant.zero
