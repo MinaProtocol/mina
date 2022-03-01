@@ -80,6 +80,7 @@ let
             pname = "mina-${name}";
             buildInputs = oa.buildInputs ++ extraInputs;
             buildPhase = check;
+            outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
     in {
