@@ -1175,6 +1175,13 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function(v, x, y) {
     return plonk_wasm.caml_pasta_fp_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
 };
 
+// Provides: caml_pasta_fp_plonk_gate_vector_digest
+// Requires: plonk_wasm, caml_bytes_of_uint8array
+var caml_pasta_fp_plonk_gate_vector_digest = function(gate_vector) {
+    var uint8array = plonk_wasm.caml_pasta_fp_plonk_gate_vector_digest(gate_vector);
+    return caml_bytes_of_uint8array(uint8array);
+}
+
 
 
 
@@ -1203,6 +1210,12 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function(v, x, y) {
     return plonk_wasm.caml_pasta_fq_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
 };
 
+// Provides: caml_pasta_fq_plonk_gate_vector_digest
+// Requires: plonk_wasm, caml_bytes_of_uint8array
+var caml_pasta_fq_plonk_gate_vector_digest = function(gate_vector) {
+    var uint8array = plonk_wasm.caml_pasta_fq_plonk_gate_vector_digest(gate_vector);
+    return caml_bytes_of_uint8array(uint8array);
+}
 
 
 
