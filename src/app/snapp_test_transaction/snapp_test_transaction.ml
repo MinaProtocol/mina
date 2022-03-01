@@ -475,6 +475,10 @@ let test_snapp_with_genesis_ledger =
              "KEYFILE Private key file for the fee payer of the transaction \
               (should be in the genesis ledger)"
            Param.(required string)
+       and snapp_keyfile =
+         Param.flag "--snapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new snapp account"
+           Param.(required string)
        and config_file =
          Param.flag "--config-file" ~aliases:[ "config-file" ]
            ~doc:

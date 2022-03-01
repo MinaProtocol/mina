@@ -74,14 +74,14 @@ module Flagged_option = struct
 
   let map ~f { is_some; data } = { is_some; data = f data }
 
+  [%%ifdef consensus_mechanism]
+
   let if_ ~(if_ : 'b -> then_:'var -> else_:'var -> 'var) b ~then_ ~else_ =
     { is_some =
         Run.run_checked
           (Boolean.if_ b ~then_:then_.is_some ~else_:else_.is_some)
     ; data = if_ b ~then_:then_.data ~else_:else_.data
     }
-
-  [%%ifdef consensus_mechanism]
 
   let typ t =
     Typ.of_hlistable [ Boolean.typ; t ] ~var_to_hlist:to_hlist

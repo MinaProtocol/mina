@@ -570,6 +570,7 @@ module For_tests : sig
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
+    -> snapp_kp:Signature_lib.Keypair.t
     -> Transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t

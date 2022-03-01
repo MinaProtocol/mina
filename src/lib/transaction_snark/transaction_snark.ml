@@ -4740,7 +4740,7 @@ module For_tests = struct
 
   let create_trivial_snapp_account ?(permissions = Permissions.user_default) ~vk
       ~ledger pk =
-    let set_or_create ledger id account =
+    let create ledger id account =
       match Ledger.location_of_account ledger id with
       | Some _loc ->
           failwith "Account already present"
@@ -4757,17 +4757,20 @@ module For_tests = struct
       ; snapp = Some { Snapp_account.default with verification_key = Some vk }
       }
     in
-    set_or_create ledger id account
+    create ledger id account
 
   let create_trivial_predicate_snapp ~constraint_constants
-      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept) spec
-      ledger =
+      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept)
+      ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
     let { Transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
-        ; receiver = trivial_account_pk
+        ; receiver = _
         ; amount
         } =
       spec
+    in
+    let trivial_account_pk =
+      Signature_lib.Public_key.compress snapp_kp.public_key
     in
     let `VK vk, `Prover trivial_prover =
       create_trivial_snapp ~constraint_constants ()
@@ -5603,31 +5606,6 @@ let%test_module "transaction_snark" =
                 |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
         end
 
-        (* test with a trivial predicate *)
-        let%test_unit "trivial snapp predicate" =
-          let open Transaction_logic.For_tests in
-          let gen =
-            let open Quickcheck.Generator.Let_syntax in
-            let%map test_spec = Test_spec.gen in
-            test_spec
-          in
-          Quickcheck.test ~trials:1 gen ~f:(fun { init_ledger; specs } ->
-              Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  let parties =
-                    (fun () ->
-                      create_trivial_predicate_snapp ~constraint_constants
-                        (List.hd_exn specs) ledger)
-                    |> Async.Thread_safe.block_on_async_exn
-                  in
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  (fun () -> apply_parties_with_proof ledger [ parties ])
-                  |> Async.Thread_safe.block_on_async_exn))
-
         let gen_snapp_ledger =
           let open Transaction_logic.For_tests in
           let open Quickcheck.Generator.Let_syntax in
@@ -5644,6 +5622,27 @@ let%test_module "transaction_snark" =
                      (Signature_lib.Public_key.compress kp.public_key)))
           in
           (test_spec, kp)
+
+        (* test with a trivial predicate *)
+        let%test_unit "trivial snapp predicate" =
+          let open Transaction_logic.For_tests in
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let parties =
+                    (fun () ->
+                      create_trivial_predicate_snapp ~constraint_constants
+                        (List.hd_exn specs) ledger ~snapp_kp:new_kp)
+                    |> Async.Thread_safe.block_on_async_exn
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  (fun () -> apply_parties_with_proof ledger [ parties ])
+                  |> Async.Thread_safe.block_on_async_exn))
 
         let%test_unit "create snapp account" =
           let open Transaction_logic.For_tests in
