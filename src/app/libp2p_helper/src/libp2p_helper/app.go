@@ -18,7 +18,7 @@ import (
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -360,11 +360,8 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
-	if err != nil {
-		return err
-	}
-	app.P2p.Mdns = &mdns
+	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local")
+	app.P2p.Mdns = mdns
 	l := &mdnsListener{
 		FoundPeer: foundPeerCh,
 		app:       app,
