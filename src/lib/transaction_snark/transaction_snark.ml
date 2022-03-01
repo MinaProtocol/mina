@@ -4738,6 +4738,27 @@ module For_tests = struct
     in
     { parties with other_parties }
 
+  let create_trivial_snapp_account ?(permissions = Permissions.user_default) ~vk
+      ~ledger pk =
+    let set_or_create ledger id account =
+      match Ledger.location_of_account ledger id with
+      | Some _loc ->
+          failwith "Account already present"
+      | None ->
+          let _loc, _new =
+            Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
+          in
+          ()
+    in
+    let id = Account_id.create pk Token_id.default in
+    let account : Account.t =
+      { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
+        permissions
+      ; snapp = Some { Snapp_account.default with verification_key = Some vk }
+      }
+    in
+    set_or_create ledger id account
+
   let create_trivial_predicate_snapp ~constraint_constants
       ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept) spec
       ledger =
@@ -4751,16 +4772,6 @@ module For_tests = struct
     let `VK vk, `Prover trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
-    let set_or_create ledger id account =
-      match Ledger.location_of_account ledger id with
-      | Some loc ->
-          Ledger.set ledger loc account
-      | None ->
-          let _loc, _new =
-            Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
-          in
-          ()
-    in
     let _v =
       let id =
         Public_key.compress sender.public_key
@@ -4771,15 +4782,8 @@ module For_tests = struct
       |> Or_error.ok_exn
     in
     let () =
-      let id = Account_id.create trivial_account_pk Token_id.default in
-      let account : Account.t =
-        { (Account.create id Balance.(of_int 0)) with
-          permissions =
-            { Permissions.user_default with set_permissions = Proof }
-        ; snapp = Some { Snapp_account.default with verification_key = Some vk }
-        }
-      in
-      set_or_create ledger id account
+      create_trivial_snapp_account trivial_account_pk ~ledger ~vk
+        ~permissions:{ Permissions.user_default with set_permissions = Proof }
     in
     let update_empty_permissions =
       let permissions =
@@ -5370,7 +5374,7 @@ let%test_module "transaction_snark" =
             p
       in
       let _p = Or_error.ok_exn p in
-      ((), ())
+      ()
 
     let apply_parties ledger parties =
       let witnesses =
@@ -5622,8 +5626,227 @@ let%test_module "transaction_snark" =
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
                   (fun () -> apply_parties_with_proof ledger [ parties ])
-                  |> Async.Thread_safe.block_on_async_exn)
-              |> fun ((), ()) -> ())
+                  |> Async.Thread_safe.block_on_async_exn))
+
+        let gen_snapp_ledger =
+          let open Transaction_logic.For_tests in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind test_spec = Test_spec.gen in
+          let pks =
+            Signature_lib.Public_key.Compressed.Set.of_list
+              (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+                   Public_key.compress (fst s).public_key))
+          in
+          let%map kp =
+            Quickcheck.Generator.filter Signature_lib.Keypair.gen ~f:(fun kp ->
+                not
+                  (Signature_lib.Public_key.Compressed.Set.mem pks
+                     (Signature_lib.Public_key.compress kp.public_key)))
+          in
+          (test_spec, kp)
+
+        let%test_unit "create snapp account" =
+          let open Transaction_logic.For_tests in
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                  let spec = List.hd_exn specs in
+                  let fee = Currency.Fee.of_int 1_000_000 in
+                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let memo =
+                    Signed_command_memo.create_from_string_exn
+                      "Snapp create account"
+                  in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; receivers = []
+                    ; amount
+                    ; snapp_account_keypair = Some new_kp
+                    ; memo
+                    ; new_snapp_account = true
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    }
+                  in
+                  let parties = deploy_snapp test_spec ~constraint_constants in
+                  (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    apply_parties_with_proof ledger [ parties ])
+                  |> Async.Thread_safe.block_on_async_exn))
+
+        let vk =
+          lazy
+            (let `VK vk, `Prover _ =
+               create_trivial_snapp ~constraint_constants ()
+             in
+             vk)
+
+        let test_snapp_update ?permissions test_spec ~init_ledger ~snapp_pk =
+          let open Transaction_logic.For_tests in
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  (*create a snapp account*)
+                  create_trivial_snapp_account ?permissions ~vk:(Lazy.force vk)
+                    ~ledger snapp_pk ;
+                  let open Async.Deferred.Let_syntax in
+                  let%bind parties, _ =
+                    update_state ~constraint_constants test_spec
+                  in
+                  apply_parties_with_proof ledger [ parties ]))
+
+        let%test_unit "update a snapp account's app-state with signature and \
+                       fee paid by the snapp account" =
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+              let fee = Currency.Fee.of_int 1_000_000 in
+              let amount = Currency.Amount.of_int 10_000_000_000 in
+              let memo =
+                Signed_command_memo.create_from_string_exn
+                  "Snapp create account"
+              in
+              let test_spec : Spec.t =
+                { sender = (new_kp, Mina_base.Account.Nonce.zero)
+                ; fee
+                ; receivers = []
+                ; amount
+                ; snapp_account_keypair = Some new_kp
+                ; memo
+                ; new_snapp_account = false
+                ; snapp_update =
+                    { Party.Update.dummy with
+                      app_state =
+                        Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+                            Snapp_basic.Set_or_keep.Set
+                              (Snark_params.Tick.Field.of_int i))
+                    }
+                ; current_auth = Permissions.Auth_required.Signature
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; sequence_events = []
+                }
+              in
+              test_snapp_update test_spec ~init_ledger
+                ~snapp_pk:(Signature_lib.Public_key.compress new_kp.public_key))
+
+        let%test_unit "update a snapp account's app-state with signature and \
+                       fee paid by a non-snapp account" =
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              let fee = Currency.Fee.of_int 1_000_000 in
+              let amount = Currency.Amount.zero in
+              let memo =
+                Signed_command_memo.create_from_string_exn
+                  "Snapp create account"
+              in
+              let spec = List.hd_exn specs in
+              let test_spec : Spec.t =
+                { sender = spec.sender
+                ; fee
+                ; receivers = []
+                ; amount
+                ; snapp_account_keypair = Some new_kp
+                ; memo
+                ; new_snapp_account = false
+                ; snapp_update =
+                    { Party.Update.dummy with
+                      app_state =
+                        Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+                            Snapp_basic.Set_or_keep.Set
+                              (Snark_params.Tick.Field.of_int i))
+                    }
+                ; current_auth = Permissions.Auth_required.Signature
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; sequence_events = []
+                }
+              in
+              test_snapp_update test_spec ~init_ledger
+                ~snapp_pk:(Signature_lib.Public_key.compress new_kp.public_key))
+
+        let%test_unit "update a snapp account's app-state with proof and fee \
+                       paid by the snapp account" =
+          let gen = gen_snapp_ledger in
+          Quickcheck.test ~trials:1 gen
+            ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+              let fee = Currency.Fee.of_int 1_000_000 in
+              let amount = Currency.Amount.of_int 10_000_000_000 in
+              let memo =
+                Signed_command_memo.create_from_string_exn
+                  "Snapp create account"
+              in
+              let test_spec : Spec.t =
+                { sender = (new_kp, Mina_base.Account.Nonce.zero)
+                ; fee
+                ; receivers = []
+                ; amount
+                ; snapp_account_keypair = Some new_kp
+                ; memo
+                ; new_snapp_account = false
+                ; snapp_update =
+                    { Party.Update.dummy with
+                      app_state =
+                        Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+                            Snapp_basic.Set_or_keep.Set
+                              (Snark_params.Tick.Field.of_int i))
+                    }
+                ; current_auth = Permissions.Auth_required.Proof
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; sequence_events = []
+                }
+              in
+              test_snapp_update
+                ~permissions:
+                  { Permissions.user_default with edit_state = Proof }
+                test_spec ~init_ledger
+                ~snapp_pk:(Signature_lib.Public_key.compress new_kp.public_key))
+
+        let%test_unit "update a snapp account's app-state with proof and fee \
+                       paid by a non-snapp account" =
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              let fee = Currency.Fee.of_int 1_000_000 in
+              let amount = Currency.Amount.of_int 10_000_000_000 in
+              let memo =
+                Signed_command_memo.create_from_string_exn
+                  "Snapp create account"
+              in
+              let spec = List.hd_exn specs in
+              let test_spec : Spec.t =
+                { sender = spec.sender
+                ; fee
+                ; receivers = []
+                ; amount
+                ; snapp_account_keypair = Some new_kp
+                ; memo
+                ; new_snapp_account = false
+                ; snapp_update =
+                    { Party.Update.dummy with
+                      app_state =
+                        Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+                            Snapp_basic.Set_or_keep.Set
+                              (Snark_params.Tick.Field.of_int i))
+                    }
+                ; current_auth = Permissions.Auth_required.Proof
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; sequence_events = []
+                }
+              in
+              test_snapp_update
+                ~permissions:
+                  { Permissions.user_default with edit_state = Proof }
+                test_spec ~init_ledger
+                ~snapp_pk:(Signature_lib.Public_key.compress new_kp.public_key))
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
