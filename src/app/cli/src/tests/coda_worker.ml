@@ -432,6 +432,7 @@ module T = struct
               ; mina_peer_exchange = true
               ; keypair = Some libp2p_keypair
               ; all_peers_seen_metric = false
+              ; known_private_ip_nets = []
               }
           in
           let net_config =
