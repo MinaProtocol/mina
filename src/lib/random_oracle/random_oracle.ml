@@ -78,7 +78,7 @@ module Ocaml_permutation = Sponge.Poseidon (Inputs)
 
 [%%ifdef consensus_mechanism]
 
-module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
+(* module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
   module Field = Field
 
   let add_assign = Ocaml_permutation.add_assign
@@ -92,7 +92,9 @@ module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
     Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
     Kimchi_pasta_fp_poseidon.block_cipher params v ;
     Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
-end
+end *)
+
+module Permutation = Ocaml_permutation
 
 [%%else]
 
