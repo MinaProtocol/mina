@@ -195,6 +195,8 @@ end = struct
     let%bind actual = range_check' t in
     Field.Checked.equal actual t
 
+  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
+
   let modulus_as_field =
     lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
 
@@ -273,6 +275,7 @@ end = struct
       let open Field.Var in
       add t (scale adjustment_factor (Lazy.force modulus_as_field))
     in
+    let%bind t_adjusted = seal t_adjusted in
     let%bind actual = range_check' t_adjusted in
     let%map () =
       with_label "range_adjust_flagged"
@@ -289,8 +292,6 @@ end = struct
     Typ.transport
       { Field.typ with check = range_check }
       ~there:to_field ~back:of_field
-
-  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
 
   [%%endif]
 
@@ -692,8 +693,7 @@ end = struct
 
     let sub_flagged x y =
       let%bind z = seal (Field.Var.sub x y) in
-      let%bind z, `Overflow underflow = range_adjust_flagged `Sub z in
-      let%map z = seal z in
+      let%map z, `Overflow underflow = range_adjust_flagged `Sub z in
       (z, `Underflow underflow)
 
     let sub_or_zero x y =
@@ -744,8 +744,7 @@ end = struct
 
     let add_flagged x y =
       let%bind z = seal (Field.Var.add x y) in
-      let%bind z, `Overflow overflow = range_adjust_flagged `Add z in
-      let%map z = seal z in
+      let%map z, `Overflow overflow = range_adjust_flagged `Add z in
       (z, `Overflow overflow)
 
     let ( - ) = sub
@@ -761,8 +760,7 @@ end = struct
     let add_signed_flagged (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       let%bind res = seal (Field.Var.add t d) in
-      let%bind res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
-      let%map res = seal res in
+      let%map res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
       (res, `Overflow overflow)
 
     let scale (f : Field.Var.t) (t : var) =
