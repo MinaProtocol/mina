@@ -187,10 +187,25 @@ end = struct
         in
         actual_packed)
 
+  (** [range_check t] asserts that [0 <= t < 2^length_in_bits].
+
+      Any value consumed or returned by functions in this module must satisfy
+      this assertion.
+  *)
   let range_check t =
     let%bind actual = range_check' t in
     Field.Checked.Assert.equal actual t
 
+  (** [range_check_flag t] returns a [Boolean.var] that is true when
+      [0 <= t < 2^length_in_bits], and false otherwise.
+
+      This function MUST NOT be used to constrain return values. Use
+      [range_adjust_flagged] instead.
+
+      This function should only be used for comparison operations, where the
+      result of an addition or subtraction is unused. For example,
+      [let ( <= ) x y = range_check_flag (Field.Var.sub y x)].
+  *)
   let range_check_flag t =
     let%bind actual = range_check' t in
     Field.Checked.equal actual t
@@ -203,6 +218,25 @@ end = struct
   let double_modulus_as_field =
     lazy (Field.(mul (of_int 2)) (Lazy.force modulus_as_field))
 
+  (** [range_adjust_flagged kind t] returns [t'] that fits in [length_in_bits]
+      bits, and satisfies [t' = t + k * 2^length_in_bits] for some [k].
+      The [`Overflow b] return value is false iff [t' = t].
+
+      This function should be used when [t] was computed via addition or
+      subtraction, to calculate the equivalent value that would be returned by
+      overflowing or underflowing an integer with [length_in_bits] bits.
+
+      The [`Add] and [`Sub] values for [kind] are specializations that use
+      fewer constraints and perform fewer calculations. Any inputs that satisfy
+      the invariants for [`Add] or [`Sub] will return the same value if
+      [`Add_or_sub] is used instead.
+
+      Invariants:
+      * if [kind] is [`Add], [0 <= t < 2 * 2^length_in_bits - 1];
+      * if [kind] is [`Sub], [- 2^length_in_bits < t < 2^length_in_bits];
+      * if [kind] is [`Add_or_sub],
+        [- 2^length_in_bits < t < 2 * 2^length_in_bits - 1].
+  *)
   let range_adjust_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
     let%bind adjustment_factor =
       exists Field.typ
