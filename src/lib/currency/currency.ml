@@ -275,7 +275,8 @@ end = struct
     in
     let%bind actual = range_check' t_adjusted in
     let%map () =
-      with_label "range_adjust_flagged" (Field.Checked.Assert.equal actual t_adjusted)
+      with_label "range_adjust_flagged"
+        (Field.Checked.Assert.equal actual t_adjusted)
     in
     (t_adjusted, `Overflow out_of_range)
 
