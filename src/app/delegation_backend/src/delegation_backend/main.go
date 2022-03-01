@@ -27,6 +27,9 @@ func main() {
 
 	app := new(App)
 	app.Log = log
+	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+		_, _ = rw.Write([]byte("delegation backend service"))
+	})
 	http.Handle("/v1/submit", app.NewSubmitH())
 	client, err1 := storage.NewClient(ctx)
 	if err1 != nil {
