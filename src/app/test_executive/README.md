@@ -16,10 +16,9 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 ![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
-4) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
+4) In addition to `GCLOUD_API_KEY` and `GOOGLE_CLOUD_KEYFILE_JSON`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
 - `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
-- any other vars relating to Google cloud access,
-- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
+- the following AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
 - vars relating to ocaml compilation
 
 5) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
