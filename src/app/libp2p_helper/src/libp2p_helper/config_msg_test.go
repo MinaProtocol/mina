@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	crand "crypto/rand"
 	"errors"
 	"io/ioutil"
@@ -102,7 +103,10 @@ func TestMDNSDiscovery(t *testing.T) {
 	beginAdvertisingSendAndCheck(t, appB)
 	beginAdvertisingSendAndCheck(t, appA)
 
-	withTimeout(t, func() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	go func() {
+		defer cancel()
 		for {
 			// check if peerB knows about peerA
 			addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
@@ -111,9 +115,12 @@ func TestMDNSDiscovery(t *testing.T) {
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}, "B did not discover A via mDNS")
-
-	time.Sleep(time.Second * 3)
+	}()
+	<-ctx.Done()
+	switch ctx.Err() {
+	case context.DeadlineExceeded:
+		t.Error("B did not discover A via mDNS")
+	}
 }
 
 func TestConfigure(t *testing.T) {
