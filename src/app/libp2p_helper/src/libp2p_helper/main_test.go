@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	for i := 0; i < 100; i++ {
 		logging.Logger(fmt.Sprintf("node%d", i))
 	}
-  // Uncomment for more logging (ERROR by default)
+	// Uncomment for more logging (ERROR by default)
 	// _ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
 	// _ = logging.SetLogLevel("engine", "DEBUG")
 	// _ = logging.SetLogLevel("codanet.Helper", "WARN")

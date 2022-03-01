@@ -37,6 +37,7 @@ module Config = struct
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
+    ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
   [@@deriving make]
 end
@@ -246,6 +247,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
+                ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
                     { banned_peers =
