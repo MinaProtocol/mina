@@ -1080,6 +1080,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; isolate = Option.value ~default:false isolate
           ; keypair = libp2p_keypair
           ; all_peers_seen_metric
+          ; known_private_ip_nets = Option.value ~default:[] client_trustlist
           }
       in
       let net_config =

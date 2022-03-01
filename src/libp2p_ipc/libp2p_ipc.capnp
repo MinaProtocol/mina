@@ -73,6 +73,7 @@ struct Libp2pConfig {
   validationQueueSize @13 :UInt32;
   minaPeerExchange @14 :Bool;
   minConnections @15 :UInt32;
+  knownPrivateIpNets @16 :List(Text);
 }
 
 # Resource status updated
