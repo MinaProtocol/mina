@@ -2062,7 +2062,7 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
             [%log info] "Committing block data for $state_hash"
               ~metadata:
                 [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
-            Conn.commit () )
+            Conn.commit ())
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
