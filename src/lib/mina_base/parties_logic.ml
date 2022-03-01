@@ -1220,18 +1220,14 @@ module Make (Inputs : Inputs_intf) = struct
     let a', update_permitted, failure_status =
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
-    let party_succeeded =
+    let success =
       Bool.(
-        protocol_state_predicate_satisfied &&& predicate_satisfied
-        &&& update_permitted)
+        local_state.success &&& protocol_state_predicate_satisfied
+        &&& predicate_satisfied &&& update_permitted)
     in
     (* The first party must succeed. *)
-    Bool.(assert_ ((not is_start') ||| party_succeeded)) ;
-    let local_state =
-      { local_state with
-        success = Bool.( &&& ) local_state.success party_succeeded
-      }
-    in
+    Bool.(assert_ ((not is_start') ||| success)) ;
+    let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
