@@ -49,12 +49,20 @@ in  Pipeline.build
             , docker = None Docker.Type
             }
         , Command.build
-          Command.Config::{
-          , commands = Nix.nixBuild "trace-tool"
-          , label = "Build trace-tool with Nix"
-          , key = "trace-tool-with-nix"
-          , target = Size.Small
-          , docker = None Docker.Type
-          }
+            Command.Config::{
+            , commands = Nix.nixBuild "trace-tool"
+            , label = "Build trace-tool with Nix"
+            , key = "trace-tool-with-nix"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands = Nix.nixBuild "mina_client_sdk_binding"
+            , label = "Build Client SDK with Nix"
+            , key = "client-sdk-with-nix"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
         ]
       }
