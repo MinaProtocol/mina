@@ -3245,9 +3245,12 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
-        let%bind res =
+         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
+          [%log info] "Attempting to add block data for $state_hash"
+            ~metadata:
+              [("state_hash", Mina_base.State_hash.to_yojson (hash block))];
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
