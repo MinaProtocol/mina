@@ -48,5 +48,13 @@ in  Pipeline.build
             , target = Size.Small
             , docker = None Docker.Type
             }
+        , Command.build
+          Command.Config::{
+          , commands = Nix.nixBuild "trace-tool"
+          , label = "Build trace-tool with Nix"
+          , key = "trace-tool-with-nix"
+          , target = Size.Small
+          , docker = None Docker.Type
+          }
         ]
       }
