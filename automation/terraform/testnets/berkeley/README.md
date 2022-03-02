@@ -8,7 +8,7 @@ Setup for deploying the testnet
 
 2. Make sure there is a genesis_ledger.json file in `automation/terraform/testnets/berkeley` (terraform apply will upload this genesis_ledger.json and automatically hook it up to the daemons).  Make sure that the timestamp within this file is within the last 14 days, if the timestamp is older than 14 days then manually edit the date to be any time within 14 days.  Make sure the timestamp is in UTC format (hint: it should end with a `Z`).  Note: it is not necessary to create a baked image based on an image from CI, but if you would like to do that then run `./automation/scripts/bake.sh --testnet=test-snapps --cloud=false --docker-tag=1.2.0beta5-feature-snapp-snarkworker-dee827f-stretch-devnet`
 
-3. In main.tf update `mina_image` and `mina_archive_image` to be a recent image created by our CI from the relevant branch (in this case `feature/snapps-protocol`).  If you prefer to use an image you baked, then use the baked image for `mina_image`
+3. In main.tf update `mina_image` and `mina_archive_image` to be a recent image created by our CI from the relevant branch.  If you prefer to use an image you baked, then use the baked image for `mina_image`
 
 4. The test-snapps testnet is currently configured to have 16 whales online (plus another 4 that we could bring online), 2 online fish, 3 seed, 1 snark coordinator with 5 workers connected to it, and 3 archive processes writing to two postgres database (main.tf has these specifications). As long as the keys for these nodes are in `automation/keys`, then the keys will be added and uploaded automatically by terraform.
 

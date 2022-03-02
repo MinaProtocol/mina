@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "berkeley"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-develop-e74c6a3-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-develop-e74c6a3-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
