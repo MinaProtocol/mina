@@ -36,16 +36,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "4000"; timing = Untimed }
-        ; { balance = "3000"; timing = Untimed }
-        ; { balance = "1000"
+        [ { balance = "40000"; timing = Untimed }
+        ; { balance = "30000"; timing = Untimed }
+        ; { balance = "10000"
           ; timing =
-              make_timing ~min_balance:100_000_000_000 ~cliff_time:4
-                ~cliff_amount:0 ~vesting_period:2
-                ~vesting_increment:50_000_000_000
+              make_timing ~min_balance:1_000_000_000_000 ~cliff_time:8
+                ~cliff_amount:0 ~vesting_period:4
+                ~vesting_increment:500_000_000_000
           }
         ]
-    ; num_snark_workers = 0
+    ; num_snark_workers =
+        3
+        (* this test doesn't need snark workers, however turning it on in this test just to make sure the snark workers function within integration tests *)
     }
 
   let run network t =
@@ -55,16 +57,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* fee for user commands *)
     let fee = Currency.Fee.of_int 10_000_000 in
     let all_nodes = Network.all_nodes network in
-    let%bind () =
-      Malleable_error.List.iter all_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
-    in
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
       Network.block_producers network
     in
     let%bind () =
       section "send a single payment between 2 untimed accounts"
-        (let amount = Currency.Amount.of_int 200_000_000 in
+        (let amount = Currency.Amount.of_int 2_000_000_000 in
          let fee = Currency.Fee.of_int 10_000_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
@@ -80,7 +79,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 300_000_000_000 in
+        (let amount = Currency.Amount.of_int 3_000_000_000_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_a in
@@ -94,7 +93,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~receiver_pub_key ~amount))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 600_000_000_000 in
+      (let amount = Currency.Amount.of_int 6_900_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_a in

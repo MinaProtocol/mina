@@ -238,6 +238,8 @@ module Dsl = struct
 
     val node_to_initialize : Engine.Network.Node.t -> t
 
+    val nodes_to_initialize : Engine.Network.Node.t list -> t
+
     val blocks_to_be_produced : int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
