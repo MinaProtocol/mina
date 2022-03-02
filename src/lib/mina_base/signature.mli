@@ -21,7 +21,7 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 
 [%%endif]
 
-include Codable.Base58_check_base_intf with type t := t
+include Codable.Base58_check_intf with type t := t
 
 val dummy : t
 

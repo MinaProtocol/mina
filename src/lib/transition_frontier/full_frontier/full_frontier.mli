@@ -28,7 +28,7 @@ end
 val create :
      logger:Logger.t
   -> root_data:Root_data.t
-  -> root_ledger:Ledger.Any_ledger.witness
+  -> root_ledger:Mina_ledger.Ledger.Any_ledger.witness
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
@@ -50,7 +50,7 @@ val protocol_states_for_root_scan_state :
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> enable_epoch_ledger_sync:[`Enabled of Ledger.Db.t | `Disabled]
+  -> enable_epoch_ledger_sync:[ `Enabled of Mina_ledger.Ledger.Db.t | `Disabled ]
   -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]

@@ -63,6 +63,7 @@ val create_libp2p_config :
   -> flood:bool
   -> direct_peers:multiaddr list
   -> seed_peers:multiaddr list
+  -> known_private_ip_nets:string list
   -> peer_exchange:bool
   -> mina_peer_exchange:bool
   -> min_connections:int

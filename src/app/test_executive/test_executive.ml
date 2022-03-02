@@ -47,6 +47,8 @@ let tests : test list =
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("snapps-genera", (module Snapps_generated.Make : Intf.Test.Functor_intf))
+  ; ("snapps-constr", (module Snapps_constructed.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -289,7 +291,7 @@ let main inputs =
              (sprintf
                 !"log engine fatal error: %s"
                 (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-           ~test_result:(Malleable_error.return ()))
+           ~test_result:(Malleable_error.hard_error_string "fatal error"))
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let init_result =

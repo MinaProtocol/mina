@@ -3,7 +3,7 @@ open Async
 open Network_peer
 open O1trace
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -37,6 +37,7 @@ module Config = struct
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
+    ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
   [@@deriving make]
 end
@@ -58,7 +59,7 @@ let download_seed_peer_list uri =
   let%map contents = Cohttp_async.Body.to_string body in
   Mina_net2.Multiaddr.of_file_contents contents
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -246,6 +247,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
+                ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
                     { banned_peers =

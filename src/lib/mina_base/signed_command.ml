@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Import
+open Mina_base_import
 open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
@@ -109,8 +109,8 @@ let tag_string (t : t) =
 let next_available_token ({ payload; _ } : t) tid =
   Payload.next_available_token payload tid
 
-let to_input (payload : Payload.t) =
-  Transaction_union_payload.(to_input (of_user_command_payload payload))
+let to_input_legacy (payload : Payload.t) =
+  Transaction_union_payload.(to_input_legacy (of_user_command_payload payload))
 
 let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
   (not (Token_id.(equal invalid) fee_token))
@@ -131,7 +131,8 @@ let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
 
 let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
-  Signature_lib.Schnorr.sign ?signature_kind private_key (to_input payload)
+  Signature_lib.Schnorr.Legacy.sign ?signature_kind private_key
+    (to_input_legacy payload)
 
 let sign ?signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
@@ -362,15 +363,18 @@ module Base58_check = Codable.Make_base58_check (Stable.Latest)
 Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
 let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-  Signature_lib.Schnorr.verify ?signature_kind signature
+  Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
-    (to_input payload)
+    (to_input_legacy payload)
 
-let check_valid_keys t =
+let public_keys t =
   let fee_payer = fee_payer_pk t in
   let source = source_pk t in
   let receiver = receiver_pk t in
-  List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
+  [ fee_payer; source; receiver ]
+
+let check_valid_keys t =
+  List.for_all (public_keys t) ~f:(fun pk ->
       Option.is_some (Public_key.decompress pk))
 
 let create_with_signature_checked ?signature_kind signature signer payload =
@@ -394,7 +398,11 @@ let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t))
 
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
 let check t = Option.some_if (check_signature t && check_valid_keys t) t
+
+(* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
+let check_only_for_signature t = Option.some_if (check_signature t) t
 
 let forget_check t = t
 

@@ -74,10 +74,8 @@ spec:
           value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.mina.ports.metrics | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
         - name: GCLOUD_KEYFILE
           value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME

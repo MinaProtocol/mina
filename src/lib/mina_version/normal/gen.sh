@@ -21,7 +21,7 @@ pushd ../../../../../..
     if [ -n "$(git diff --stat)" ]; then id="[DIRTY]$id"; fi
   fi
   commit_date=$(git show HEAD -s --format="%cI")
-  pushd src/lib/marlin
+  pushd src/lib/crypto/proof-systems
     marlin_commit_id=$(git rev-parse --verify HEAD)
     if [ -n "$(git diff --stat)" ]; then marlin_commit_id="[DIRTY]$id"; fi
     marlin_commit_id_short=$(git rev-parse --short=8 --verify HEAD)

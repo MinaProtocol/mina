@@ -11,6 +11,14 @@ module Tree = struct
         | Hash of 'hash
         | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
       [@@deriving equal, sexp, yojson]
+
+      let rec to_latest acct_to_latest = function
+        | Account acct ->
+            Account (acct_to_latest acct)
+        | Hash hash ->
+            Hash hash
+        | Node (hash, l, r) ->
+            Node (hash, to_latest acct_to_latest l, to_latest acct_to_latest r)
     end
   end]
 
@@ -202,7 +210,16 @@ end = struct
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
   let find_index_exn (t : t) aid =
-    List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
+    match List.Assoc.find t.indexes ~equal:Account_id.equal aid with
+    | Some x ->
+        x
+    | None ->
+        failwithf
+          !"Sparse_ledger.find_index_exn: %{sexp:Account_id.t} not in %{sexp: \
+            Account_id.t list}"
+          aid
+          (List.map t.indexes ~f:fst)
+          ()
 
   let get_exn ({ T.tree; depth; _ } as t) idx =
     let rec go i tree =

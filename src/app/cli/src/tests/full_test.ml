@@ -147,6 +147,7 @@ let run_test () : unit Deferred.t =
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
           }
       in
       let net_config =
@@ -157,7 +158,7 @@ let run_test () : unit Deferred.t =
           ; consensus_local_state
           ; is_seed = true
           ; genesis_ledger_hash =
-              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+              Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; constraint_constants
           ; log_gossip_heard =
               { snark_pool_diff = false

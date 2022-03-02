@@ -574,7 +574,7 @@ module Payloads = struct
           partial_user_command
         |> env.lift
       in
-      let random_oracle_input = Signed_command.to_input user_command_payload in
+      let random_oracle_input = Signed_command.to_input_legacy user_command_payload in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
         ; command = partial_user_command
@@ -890,7 +890,7 @@ module Submit = struct
       [@@deriving hlist]
 
       let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
+        let open Mina_caqti.Type_spec in
         let spec =
           Caqti_type.[int64; string; string; int64; int64]
         in

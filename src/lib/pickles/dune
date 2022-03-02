@@ -16,7 +16,10 @@
  (libraries
   digestif
   mina_version
-  zexe_backend
+  base58_check
+  base64
+  codable
+  kimchi_backend
   random_oracle_input
   pickles_base
   pickles.composition_types
