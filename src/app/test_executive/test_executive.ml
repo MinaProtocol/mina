@@ -48,7 +48,7 @@ let tests : test list =
   ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ( "block-prod"
+  ; ( "opt-block-prod"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ]
 
