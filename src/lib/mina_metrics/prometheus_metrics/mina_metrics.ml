@@ -136,14 +136,11 @@ module Runtime = struct
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
 
   let rec gc_stat () =
-    Async.Deferred.(
-      upon
-        (after (Time_ns.Span.of_min !gc_stat_interval_mins))
-        (fun () ->
-          current_gc := Gc.stat () ;
-          current_jemalloc := Jemalloc.get_memory_stats () ;
-          gc_allocated_bytes := Gc.allocated_bytes () ;
-          gc_stat ()))
+    let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
+    current_gc := Gc.stat () ;
+    current_jemalloc := Jemalloc.get_memory_stats () ;
+    gc_allocated_bytes := Gc.allocated_bytes () ;
+    gc_stat ()
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -1527,9 +1524,11 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
 type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
-  Runtime.gc_stat () ;
-  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
-    ()
+  don't_wait_for
+    (O1trace.time_execution "collecting_gc_metrics" Runtime.gc_stat) ;
+  O1trace.time_execution "serving_metrics"
+    (generic_server ?forward_uri ~port ~logger
+       ~registry:CollectorRegistry.default)
 
 module Archive = struct
   type t =

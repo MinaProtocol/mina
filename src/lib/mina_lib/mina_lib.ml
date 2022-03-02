@@ -1961,9 +1961,10 @@ let create ?wallets (config : Config.t) =
                   ; ( "Port"
                     , `Int (Host_and_port.port archive_process_port.value) )
                   ] ;
-              Archive_client.run ~logger:config.logger
-                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-                archive_process_port) ;
+              O1trace.time_execution "in_archive_client" (fun () ->
+                  Archive_client.run ~logger:config.logger
+                    ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                    archive_process_port)) ;
           let precomputed_block_writer =
             ref
               ( Option.map config.precomputed_blocks_path ~f:(fun path ->
