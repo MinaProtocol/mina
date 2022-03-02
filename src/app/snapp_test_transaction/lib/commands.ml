@@ -250,7 +250,8 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   in
   ()
 
-let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
+let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
+    ~snapp_kp =
   let open Deferred.Let_syntax in
   let receiver =
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -285,7 +286,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t) =
   in
   let%bind parties =
     Transaction_snark.For_tests.create_trivial_predicate_snapp
-      ~constraint_constants ~protocol_state_predicate spec ledger
+      ~constraint_constants ~protocol_state_predicate spec ledger ~snapp_kp
   in
   printf "Snapp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
@@ -398,9 +399,10 @@ module Util = struct
         failwith (sprintf "Invalid authorization: %s" s)
 end
 
-let test_snapp_with_genesis_ledger_main keyfile config_file () =
+let test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file () =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind snapp_kp = Util.snapp_keypair_of_file snapp_keyfile in
   let%bind ledger =
     let%map config_json = Genesis_ledger_helper.load_config_json config_file in
     let runtime_config =
@@ -421,7 +423,7 @@ let test_snapp_with_genesis_ledger_main keyfile config_file () =
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in
-  generate_snapp_txn keypair ledger
+  generate_snapp_txn keypair ledger ~snapp_kp
 
 let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ~memo =
