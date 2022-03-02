@@ -57,6 +57,24 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
+      val delegate_currency :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> unit Deferred.Or_error.t
+
+      val must_delegate_currency :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> unit Malleable_error.t
+
       val get_balance :
            logger:Logger.t
         -> t

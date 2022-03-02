@@ -121,6 +121,25 @@ module Node = struct
       }
     |}]
 
+    module Delegate_currency =
+    [%graphql
+    {|
+      mutation ($sender: PublicKey!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $token: UInt64,
+      $fee: UInt64!,
+      $nonce: UInt32,
+      $memo: String) {
+        sendPayment(input:
+          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+            payment {
+              id
+            }
+          }
+      }
+    |}]
+
     module Get_balance =
     [%graphql
     {|
@@ -324,6 +343,49 @@ module Node = struct
   let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+      =
+    [%log info] "Delegating currency" ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
+    [%log info] "delegate_currency: unlocking account"
+      ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
+    let unlock_sender_account_graphql () =
+      let unlock_account_obj =
+        Graphql.Unlock_account.make ~password:"naughty blue worm"
+          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"unlock_sender_account_graphql" unlock_account_obj
+    in
+    let%bind _ = unlock_sender_account_graphql () in
+    let delegate_currency_graphql () =
+      let delegate_currency_obj =
+        Graphql.Delegate_currency.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"delegate_currency_graphql" delegate_currency_obj
+    in
+    let%map sent_payment_obj = delegate_currency_graphql () in
+    let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
+    let user_cmd_id = id_obj#id in
+    [%log info] "Currency Delegated"
+      ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
+    ()
+
+  let must_delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount
+      ~fee =
+    delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
