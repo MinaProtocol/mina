@@ -4,7 +4,7 @@
 
 open Js_of_ocaml
 open Signature_lib
-open Mina_base_kernel
+open Mina_base
 open Rosetta_lib
 open Rosetta_coding
 open Js_util

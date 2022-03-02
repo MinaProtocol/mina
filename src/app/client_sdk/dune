@@ -7,7 +7,7 @@
   core_kernel
   snark_params
   rosetta_lib
-  mina_base_kernel
+  mina_base
   mina_numbers
   data_hash_lib
   random_oracle
