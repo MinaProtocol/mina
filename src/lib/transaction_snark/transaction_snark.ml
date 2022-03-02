@@ -1316,6 +1316,10 @@ module Base = struct
           type t = var
 
           let assert_ = Assert.is_true
+
+          type failure_status = unit
+
+          let assert_with_failure_status b _failure_status = Assert.is_true b
         end
 
         module Controller = struct
@@ -2032,8 +2036,6 @@ module Base = struct
         end
 
         module Local_state = struct
-          type failure_status = unit
-
           type t =
             ( Parties.t
             , Call_stack.t
@@ -2042,7 +2044,7 @@ module Base = struct
             , Ledger.t
             , Bool.t
             , Transaction_commitment.t
-            , failure_status )
+            , Bool.failure_status )
             Parties_logic.Local_state.t
 
           let add_check (t : t) _failure b =
