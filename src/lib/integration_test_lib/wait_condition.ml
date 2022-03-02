@@ -45,12 +45,6 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  (* TODO: does this actually work if it's run twice? I think not *)
-  (*
-   * options:
-   *   - assume nodes have not yet initialized by the time we get here
-   *   - associate additional state to see when initialization was last checked
-   *)
   let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
