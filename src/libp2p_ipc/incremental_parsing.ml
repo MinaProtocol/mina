@@ -49,8 +49,13 @@ module Fragment_view = struct
     in
     let rec decode_from_next_fragment ~start ~remaining_bytes ~state
         remaining_fragments =
-      let fragment = List.hd_exn remaining_fragments in
-      let remaining_fragments' = List.tl_exn remaining_fragments in
+      let fragment, remaining_fragments' =
+        match remaining_fragments with
+        | h :: t ->
+            (h, t)
+        | [] ->
+            failwith "Fragment_view.unsafe_decode: invariant broken"
+      in
       let is_last_fragment = List.is_empty remaining_fragments' in
       let len = Bytes.length fragment in
       let end_ = if is_last_fragment then t.end_offset else len - 1 in
