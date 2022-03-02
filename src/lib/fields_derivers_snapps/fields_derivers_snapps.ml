@@ -365,7 +365,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
                     failwithf "Expected wrapping %s" k ()
               in
               let inner = json |> unwrap "data" |> unwrap "out" in
-              of_json deriver (json_to_safe inner)
+              of_json deriver (json_to_safe inner) |> return
           | Error e ->
               failwithf "Unexpected response out: %s"
                 (e |> Yojson.Basic.to_string)
