@@ -195,6 +195,10 @@ let typ : (Checked.t, t) Typ.t =
 
 [%%endif]
 
+let deriver obj =
+  Fields_derivers_snapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
+    ~of_string:of_base58_check_exn
+
 let%test_module "user_command_memo" =
   ( module struct
     let data memo = String.sub memo ~pos:(length_index + 1) ~len:(length memo)
