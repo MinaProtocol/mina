@@ -8472,7 +8472,7 @@ let%test_module "transaction_undos" =
         List.map (List.zip_exn source_accounts new_keys)
           ~f:(fun ((s, _, nonce, _), r) ->
             let sender_pk = Public_key.compress s.public_key in
-            let reciever_pk = Public_key.compress r.public_key in
+            let receiver_pk = Public_key.compress r.public_key in
             let fee = Currency.Fee.of_int 10 in
             let payload : Signed_command.Payload.t =
               Signed_command.Payload.create ~fee ~fee_token:Token_id.default
@@ -8481,7 +8481,7 @@ let%test_module "transaction_undos" =
                 ~body:
                   (Payment
                      { source_pk = sender_pk
-                     ; receiver_pk = reciever_pk
+                     ; receiver_pk
                      ; token_id = Token_id.default
                      ; amount
                      })
