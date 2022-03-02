@@ -248,12 +248,15 @@ module Make (Schema : Graphql_intf.Schema) = struct
     module Loop = struct
       let rec json_to_string_gql : Yojson.Safe.t -> string = function
         | `Assoc kv ->
-            sprintf "{ %s }"
+            sprintf "{\n%s\n}"
               ( List.map kv ~f:(fun (k, v) ->
                     sprintf "%s: %s"
                       (Fields_derivers.under_to_camel k)
                       (json_to_string_gql v))
               |> String.concat ~sep:",\n" )
+        | `List xs ->
+            sprintf "[\n%s\n]"
+              (List.map xs ~f:json_to_string_gql |> String.concat ~sep:",\n")
         | x ->
             Yojson.Safe.to_string x
 
