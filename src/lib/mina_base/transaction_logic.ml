@@ -1362,6 +1362,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let ( &&& ) = ( && )
 
       let all = List.for_all ~f:Fn.id
+
+      type failure_status = Transaction_status.Failure.t option
+
+      let assert_with_failure_status b failure_status =
+        match (b, failure_status) with
+        | false, Some failure ->
+            (* Raise a more useful error message if we have a failure
+               description.
+            *)
+            Error.raise
+              (Error.of_string @@ Transaction_status.Failure.to_string failure)
+        | _ ->
+            assert b
     end
 
     module Ledger = struct
@@ -1809,8 +1822,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Call_stack = Stack (Parties)
 
     module Local_state = struct
-      type failure_status = Transaction_status.Failure.t option
-
       type t =
         ( Parties.t
         , Call_stack.t
@@ -1819,7 +1830,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
-        , failure_status )
+        , Bool.failure_status )
         Parties_logic.Local_state.t
 
       let add_check (t : t) failure b =
