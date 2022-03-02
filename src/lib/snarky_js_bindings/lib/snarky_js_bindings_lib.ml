@@ -2076,13 +2076,7 @@ type AccountPredicate =
              (Token_id.of_uint64 ^ uint64)
              p##.snarkedNextAvailableToken)
     ; timestamp =
-        Check
-          (closed_interval
-             (fun x ->
-               field x##.value
-               |> Field.Constant.to_string |> Unsigned.UInt64.of_string
-               |> Block_time.of_uint64)
-             p##.timestamp)
+        Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp)
     ; blockchain_length =
         Check
           (closed_interval
@@ -2627,9 +2621,7 @@ type AccountPredicate =
         add_account_exn l##.value pk balance) ;
     method_ "applyPartiesTransaction" (fun l (p : parties) : unit ->
         (* TODO: this is not yet working!
-           * lacking API to create a proper tx on the JS side
-           * broken uint64 comparison leads to fail of Check_protocol_state_predicate in
-             ./src/mina_base/kernel/transaction_logic.ml
+           * lacking API to create a proper tx on the JS side (authorization)
         *)
         T.apply_transaction l##.value
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
@@ -2648,6 +2640,12 @@ type AccountPredicate =
             }
           (Command (Parties (parties p)))
         |> Or_error.ok_exn |> ignore) ;
+
+    let full = Parties.deriver @@ Fields_derivers_snapps.Derivers.o () in
+    let parties_to_json ps =
+      parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
+    in
+    static_method "partiesToJson" parties_to_json ;
     ()
 
   (*
