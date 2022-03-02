@@ -22,6 +22,10 @@ archive:
   hostPort: "10909"
   image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+  remoteSchemaAuxFiles: 
+    - name: "snapp_tables.sql"
+      url: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+
   postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"
   postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}

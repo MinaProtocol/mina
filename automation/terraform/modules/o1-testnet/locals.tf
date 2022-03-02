@@ -84,6 +84,16 @@ locals {
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
     remoteSchemaFile        = var.mina_archive_schema
+    remoteSchemaAuxFiles        = [
+      for url in var.mina_archive_schema_aux_files : {
+        scriptname = element(split("/",url), length(split("/",url))-1 )
+        # the url is going to look something like https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql
+        #the name of the script is the last pathstep in the url
+        url = url
+      }
+
+    ]
+    
 
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
