@@ -109,16 +109,16 @@ val deriver :
           ref
       ; graphql_arg_accumulator :
           (bool, Auth_required.t) Poly.t
-          Fields_derivers_graphql.Graphql_args.Acc.T.t
+          Fields_derivers_snapps.Graphql.Args.Acc.T.t
           ref
       ; graphql_creator : ('a -> (bool, Auth_required.t) Poly.t) ref
       ; graphql_fields :
           (bool, Auth_required.t) Poly.t
-          Fields_derivers_graphql.Graphql_fields.Input.T.t
+          Fields_derivers_snapps.Graphql.Fields.Input.T.t
           ref
       ; graphql_fields_accumulator :
           (bool, Auth_required.t) Poly.t
-          Fields_derivers_graphql.Graphql_fields.Accumulator.T.t
+          Fields_derivers_snapps.Graphql.Fields.Accumulator.T.t
           list
           ref
       ; map :
@@ -127,7 +127,7 @@ val deriver :
           (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; nullable_graphql_fields :
           (bool, Auth_required.t) Poly.t option
-          Fields_derivers_graphql.Graphql_fields.Input.T.t
+          Fields_derivers_snapps.Graphql.Fields.Input.T.t
           ref
       ; of_json :
           (   [> `Assoc of (string * Yojson.Safe.t) list ]
