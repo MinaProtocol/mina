@@ -485,7 +485,7 @@ let test_snapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_snapp_with_genesis_ledger_main keyfile config_file))
+       test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file))
 
 let txn_commands =
   [ ("create-snapp-account", create_snapp_account)
