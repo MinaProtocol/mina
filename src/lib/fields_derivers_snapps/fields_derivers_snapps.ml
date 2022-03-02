@@ -210,6 +210,175 @@ module Make (Schema : Graphql_intf.Schema) = struct
   let typ obj = !(obj#graphql_fields).Graphql.Fields.Input.T.run ()
 
   let arg_typ obj = !(obj#graphql_arg) ()
+
+  (* TODO: remove this or move to a %test_module once the deriver code is stable *)
+  (* Can be used to print the graphql schema, like this:
+     Fields_derivers_snapps.Test.print_schema full ;
+  *)
+  module Test = struct
+    module M = struct
+      let ( let* ) = Schema.Io.bind
+
+      let return = Schema.Io.return
+    end
+
+    let print_schema (full : _ Unified_input.t) =
+      let typ = !(full#graphql_fields).run () in
+      let query_top_level =
+        Schema.(
+          field "query" ~typ:(non_null typ)
+            ~args:Arg.[]
+            ~doc:"sample query"
+            ~resolve:(fun _ _ -> ()))
+      in
+      let schema =
+        Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
+      in
+      let res : 'a Schema.Io.t =
+        Schema.execute schema ()
+          (Fields_derivers_graphql.Test.introspection_query ())
+      in
+      let open Schema.Io in
+      bind res (function
+        | Ok (`Response data) ->
+            data |> Yojson.Basic.to_string |> printf "%s" |> return
+        | _ ->
+            failwith "Unexpected response")
+
+    module Loop = struct
+      let rec json_to_string_gql : Yojson.Safe.t -> string = function
+        | `Assoc kv ->
+            sprintf "{ %s }"
+              ( List.map kv ~f:(fun (k, v) ->
+                    sprintf "%s: %s"
+                      (Fields_derivers.under_to_camel k)
+                      (json_to_string_gql v))
+              |> String.concat ~sep:",\n" )
+        | x ->
+            Yojson.Safe.to_string x
+
+      let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
+        | `Assoc kv ->
+            `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
+        | `Bool b ->
+            `Bool b
+        | `Float f ->
+            `Float f
+        | `Int i ->
+            `Int i
+        | `List xs ->
+            `List (List.map xs ~f:json_to_safe)
+        | `Null ->
+            `Null
+        | `String s ->
+            `String s
+
+      (* Builds the graphql-expected output query shape
+       * (essentially the keys of all the nested JSON) *)
+      let rec json_keys : Yojson.Safe.t -> string = function
+        | `Assoc kv ->
+            sprintf "{\n%s\n}"
+              ( List.map kv ~f:(fun (k, v) ->
+                    sprintf "%s%s"
+                      (Fields_derivers.under_to_camel k)
+                      (json_keys v))
+              |> String.concat ~sep:"" )
+        | _ ->
+            "\n"
+
+      let arg_query json =
+        Printf.sprintf
+          {graphql|query LoopIn {
+            arg(
+              input : %s
+            )
+          }|graphql}
+          (json_to_string_gql json)
+
+      let out_query keys =
+        Printf.sprintf
+          {graphql|
+          query LoopOut {
+            out %s
+          }
+        |graphql}
+          keys
+
+      let run deriver (a : 'a) =
+        let schema =
+          let in_schema : ('a option ref, unit) Schema.field =
+            Schema.(
+              field "arg" ~typ:(non_null int)
+                ~args:Arg.[ arg "input" ~typ:(arg_typ deriver) ]
+                ~doc:"sample args query"
+                ~resolve:(fun { ctx; _ } () (input : 'a) ->
+                  ctx := Some input ;
+                  0))
+          in
+          let out_schema : ('a option ref, unit) Schema.field =
+            Schema.(
+              field "out" ~typ:(typ deriver)
+                ~args:Arg.[]
+                ~doc:"sample query"
+                ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx))
+          in
+          Schema.(
+            schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[])
+        in
+        let ctx = ref None in
+        let open M in
+        let run_query q =
+          let x = Graphql_parser.parse q in
+          match x with
+          | Ok res ->
+              Schema.execute schema ctx res
+          | Error err ->
+              failwithf "Failed to parse query: %s %s" q err ()
+        in
+        (* send json in, get keys *)
+        let* keys =
+          let json = to_json deriver a in
+          let q = arg_query json in
+          eprintf "Query is %s\n" q ;
+          let* res = run_query q in
+          match res with
+          | Ok (`Response _) ->
+              return @@ json_keys json
+          | Error e ->
+              failwithf "Unexpected response in: %s"
+                (e |> Yojson.Basic.to_string)
+                ()
+          | _ ->
+              failwith "Unexpected stream in"
+        in
+        (* read json out *)
+        let* a' =
+          let* res = run_query (out_query @@ keys) in
+          match res with
+          | Ok (`Response json) ->
+              Printf.eprintf "%s\n" (Yojson.Basic.to_string json) ;
+              let unwrap k json =
+                match json with
+                | `Assoc kv ->
+                    List.Assoc.find_exn kv ~equal:String.equal k
+                | _ ->
+                    failwithf "Expected wrapping %s" k ()
+              in
+              let inner = json |> unwrap "data" |> unwrap "out" in
+              of_json deriver (json_to_safe inner)
+          | Error e ->
+              failwithf "Unexpected response out: %s"
+                (e |> Yojson.Basic.to_string)
+                ()
+          | _ ->
+              failwith "Unexpected stream out"
+        in
+        [%test_eq: string]
+          (Yojson.Safe.to_string (to_json deriver a))
+          (Yojson.Safe.to_string (to_json deriver a')) ;
+        return ()
+    end
+  end
 end
 
 module Derivers = Make (Fields_derivers_graphql.Schema)
@@ -249,184 +418,35 @@ let%test_unit "verification key with hash, roundtrip json" =
 
 [%%endif]
 
-(* TODO: remove this or move to a %test_module once the deriver code is stable *)
-(* Can be used to print the graphql schema, like this:
-   Fields_derivers_snapps.Test.print_schema full ;
-*)
-module Test = struct
-  module IO = struct
-    type +'a t = 'a
-
-    let bind t f = f t
-
-    let return t = t
-
-    module Stream = struct
-      type 'a t = 'a Seq.t
-
-      let map t f = Seq.map f t
-
-      let iter t f = Seq.iter f t
-
-      let close _t = ()
-    end
-  end
-
-  module Schema = Graphql_schema.Make (IO)
-  module Derivers = Make (Schema)
-  include Derivers
-
-  let print_schema (full : _ Unified_input.t) =
-    let typ = !(full#graphql_fields).run () in
-    let query_top_level =
-      Schema.(
-        field "query" ~typ:(non_null typ)
-          ~args:Arg.[]
-          ~doc:"sample query"
-          ~resolve:(fun _ _ -> ()))
-    in
-    let schema =
-      Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
-    in
-    let res =
-      Schema.execute schema ()
-        (Fields_derivers_graphql.Test.introspection_query ())
-    in
-    let str =
-      match res with
-      | Ok (`Response data) ->
-          data |> Yojson.Basic.to_string
-      | _ ->
-          failwith "Unexpected response"
-    in
-    printf "%s" str
-
-  module Loop = struct
-    let rec json_to_string_gql : Yojson.Safe.t -> string = function
-      | `Assoc kv ->
-          sprintf "{ %s }"
-            ( List.map kv ~f:(fun (k, v) ->
-                  sprintf "%s: %s"
-                    (Fields_derivers.under_to_camel k)
-                    (json_to_string_gql v))
-            |> String.concat ~sep:",\n" )
-      | x ->
-          Yojson.Safe.to_string x
-
-    let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
-      | `Assoc kv ->
-          `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
-      | `Bool b ->
-          `Bool b
-      | `Float f ->
-          `Float f
-      | `Int i ->
-          `Int i
-      | `List xs ->
-          `List (List.map xs ~f:json_to_safe)
-      | `Null ->
-          `Null
-      | `String s ->
-          `String s
-
-    let arg_query json =
-      Printf.sprintf
-        {graphql|query LoopIn {
-          arg(
-            input : %s
-          )
-        }|graphql}
-        (json_to_string_gql json)
-
-    let out_query keys =
-      Printf.sprintf
-        {graphql|
-        query LoopOut {
-          out {
-            %s
-          }
-        }
-      |graphql}
-        (String.concat ~sep:"\n" keys)
-
-    let run deriver (a : 'a)
-        (keys : string list (* use Field.names to get this *)) =
-      let schema =
-        let in_schema : ('a option ref, unit) Schema.field =
-          Schema.(
-            field "arg" ~typ:(non_null int)
-              ~args:Arg.[ arg "input" ~typ:(arg_typ deriver) ]
-              ~doc:"sample args query"
-              ~resolve:(fun { ctx; _ } () (input : 'a) ->
-                ctx := Some input ;
-                0))
-        in
-        let out_schema : ('a option ref, unit) Schema.field =
-          Schema.(
-            field "out" ~typ:(typ deriver)
-              ~args:Arg.[]
-              ~doc:"sample query"
-              ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx))
-        in
-        Schema.(
-          schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[])
-      in
-      let ctx = ref None in
-      let run_query q =
-        let x = Graphql_parser.parse q in
-        match x with
-        | Ok res ->
-            Schema.execute schema ctx res
-        | Error err ->
-            failwithf "Failed to parse query: %s %s" q err ()
-      in
-      (* send json in *)
-      let () =
-        let json = to_json deriver a in
-        let q = arg_query json in
-        eprintf "Query is %s\n" q ;
-        match run_query q with
-        | Ok (`Response _) ->
-            ()
-        | Error e ->
-            failwithf "Unexpected response in: %s"
-              (e |> Yojson.Basic.to_string)
-              ()
-        | _ ->
-            failwith "Unexpected stream in"
-      in
-      (* read json out *)
-      let a' =
-        match run_query (out_query keys) with
-        | Ok (`Response json) ->
-            Printf.eprintf "%s\n" (Yojson.Basic.to_string json) ;
-            let unwrap k json =
-              match json with
-              | `Assoc kv ->
-                  List.Assoc.find_exn kv ~equal:String.equal k
-              | _ ->
-                  failwithf "Expected wrapping %s" k ()
-            in
-            let inner = json |> unwrap "data" |> unwrap "out" in
-            of_json deriver (json_to_safe inner)
-        | Error e ->
-            failwithf "Unexpected response out: %s"
-              (e |> Yojson.Basic.to_string)
-              ()
-        | _ ->
-            failwith "Unexpected stream out"
-      in
-      [%test_eq: string]
-        (Yojson.Safe.to_string (to_json deriver a))
-        (Yojson.Safe.to_string (to_json deriver a'))
-  end
-end
-
 let%test_module "Test" =
   ( module struct
+    module IO = struct
+      type +'a t = 'a
+
+      let bind t f = f t
+
+      let return t = t
+
+      module Stream = struct
+        type 'a t = 'a Seq.t
+
+        let map t f = Seq.map f t
+
+        let iter t f = Seq.iter f t
+
+        let close _t = ()
+      end
+    end
+
+    module Schema = Graphql_schema.Make (IO)
+    module Derivers = Make (Schema)
+    include Derivers
+
+    (*
     module Schema = Test.Schema
     module Derivers = Test.Derivers
     include Derivers
+    *)
     module Public_key = Signature_lib.Public_key.Compressed
 
     module Or_ignore_test = struct
@@ -471,7 +491,7 @@ let%test_module "Test" =
 
     let v1 = V.derivers @@ o ()
 
-    let%test_unit "full roundtrips" = Test.Loop.run v1 V.v V.Fields.names
+    let%test_unit "full roundtrips" = Test.Loop.run v1 V.v
 
     module V2 = struct
       type t = { field : Field.t; nothing : unit }
