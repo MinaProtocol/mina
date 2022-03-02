@@ -11,7 +11,9 @@ open Snark_params.Tick
 
 open Signature_lib
 module Impl = Pickles.Impls.Step
+module T = Token_id
 open Mina_numbers
+module Token_id = T
 open Currency
 open Pickles_types
 module Digest = Random_oracle.Digest
@@ -421,8 +423,8 @@ module Body = struct
              , 'protocol_state )
              t =
           { public_key : 'pk
-          ; update : 'update
           ; token_id : 'token_id
+          ; update : 'update
           ; balance_change : 'amount
           ; increment_nonce : 'bool
           ; events : 'events
@@ -566,8 +568,8 @@ module Body = struct
     let open Poly in
     Typ.of_hlistable
       [ Public_key.Compressed.typ
-      ; Update.typ ()
       ; Token_id.typ
+      ; Update.typ ()
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ

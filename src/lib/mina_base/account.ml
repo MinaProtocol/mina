@@ -2,6 +2,7 @@
 
 [%%import "/src/config.mlh"]
 
+module T = Token_id
 open Core_kernel
 open Mina_base_util
 open Snark_params
@@ -10,6 +11,7 @@ open Currency
 open Mina_numbers
 open Fold_lib
 open Mina_base_import
+module Token_id = T
 
 module Index = struct
   [%%versioned
@@ -222,7 +224,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ( 'pk
-           , 'tid
+           , 'id
            , 'token_permissions
            , 'token_symbol
            , 'amount
@@ -236,7 +238,7 @@ module Poly = struct
            , 'snapp_uri )
            t =
         { public_key : 'pk
-        ; token_id : 'tid
+        ; token_id : 'id
         ; token_permissions : 'token_permissions
         ; token_symbol : 'token_symbol
         ; balance : 'amount
@@ -283,6 +285,8 @@ module Poly = struct
     end
   end]
 end
+
+let token = Poly.token_id
 
 module Key = struct
   [%%versioned
@@ -377,8 +381,6 @@ module Stable = struct
 end]
 
 [%%define_locally Stable.Latest.(public_key)]
-
-let token { Poly.token_id; _ } = token_id
 
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
@@ -490,7 +492,7 @@ let crypto_hash t =
 
 type var =
   ( Public_key.Compressed.var
-  , Token_id.var
+  , Token_id.Checked.t
   , Token_permissions.var
   , Token_symbol.var
   , Balance.var
@@ -575,7 +577,7 @@ let var_of_t
      } :
       value) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.var_of_t token_id
+  ; token_id = Token_id.Checked.constant token_id
   ; token_permissions = Token_permissions.var_of_t token_permissions
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
@@ -593,7 +595,7 @@ module Checked = struct
   module Unhashed = struct
     type t =
       ( Public_key.Compressed.var
-      , Token_id.var
+      , Token_id.Checked.t
       , Token_permissions.var
       , Token_symbol.var
       , Balance.var
@@ -622,11 +624,7 @@ module Checked = struct
          ~snapp:(f (fun (x, _) -> field x))
          ~permissions:(f Permissions.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~token_id:
-           (* We use [run_checked] here to avoid routing the [Checked.t]
-              monad throughout this calculation.
-           *)
-           (f Token_id.Checked.to_input)
+         ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
          ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)

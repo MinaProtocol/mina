@@ -6,7 +6,7 @@ module Poly = struct
     module V1 = struct
       type 'command t =
         | Command of 'command
-        | Fee_transfer of Fee_transfer.Stable.V1.t
+        | Fee_transfer of Fee_transfer.Stable.V2.t
         | Coinbase of Coinbase.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -88,26 +88,15 @@ let public_keys : t -> _ = function
   | Coinbase cb ->
       Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
 
-let accounts_accessed ~next_available_token : t -> _ = function
+let accounts_accessed : t -> _ = function
   | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed ~next_available_token cmd
+      Signed_command.accounts_accessed cmd
   | Command (Parties t) ->
       Parties.accounts_accessed t
   | Fee_transfer ft ->
       Fee_transfer.receivers ft
   | Coinbase cb ->
       Coinbase.accounts_accessed cb
-
-let next_available_token (t : t) next_available_token =
-  match t with
-  | Command (Signed_command cmd) ->
-      Signed_command.next_available_token cmd next_available_token
-  | Command (Parties _t) ->
-      next_available_token
-  | Fee_transfer _ ->
-      next_available_token
-  | Coinbase _ ->
-      next_available_token
 
 let fee_payer_pk (t : t) =
   match t with
