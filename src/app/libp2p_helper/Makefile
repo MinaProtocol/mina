@@ -1,4 +1,4 @@
-.PHONY: libp2p_helper clean test
+.PHONY: libp2p_helper clean test ../../libp2p_ipc/libp2p_ipc.capnp.go
 .DEFAULT_GOAL := libp2p_helper
 
 ifeq ($(GO),)
