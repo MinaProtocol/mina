@@ -9,7 +9,9 @@ When a smart contract user wants to pull in some HTTPS-secured data, a Faux ZK O
 
 1. The Faux ZK Oracle must be allowed to send an HTTP GET/POST request on the user’s behalf to retrieve data to be included inside a circuit. For security reasons, the Faux ZK Oracle will only support domains that have been previously white-listed to fetch data from. This is to prevent users from using the Faux ZK Oracle as a malicious proxy. The white list can be implemented as a `.json` configuration file within the project structure.
 
-2. When the Faux ZK Oracle makes this request on behalf of the user and receives a response from the destination API, the data must be transformed into `Field` elements in a sensible way so that the smart contract receiving this data can parse the response in the circuit. The data should be transformed into field elements on the ZK Oracle so that the data can be signed and then verified inside a circuit directly. Additionally, because there is no support for dynamic lookup within array structures inside a circuit, JSON parsing is not an option inside a circuit directly. By encoding the data into fields before sending it back to the user, the user is able to use that data directly in their circuits.
+2. When the Faux ZK Oracle makes this request on behalf of the user and receives a response from the destination API, the data must be transformed into `Field` elements in a sensible way so that the smart contract receiving this data can parse the response in the circuit. The data should be transformed into field elements on the ZK Oracle so that the data can be signed and then verified inside a circuit directly. 
+
+The transformation of data to `Field` elements will be possible once support for dynamic lookup within array structures are implemented in SnarkyJS. By using dynamic lookup in circuits, a general purpose JSON parser can be implemented inside the ZK Oracle circuit that serializes all data receieved into an arrays of `Field` elements. Building a data structure in this way ensures all computation done on the data is done in a circuit so it's verifiable by other circuits. By encoding the data into fields before sending it back to the user, the user is able to use that data directly in their circuits.
 
 **Note**: A `Field` element is a SnarkyJS primitive that describes a finite prime field. 
 
@@ -28,7 +30,7 @@ function Get(url: string, queryParams: {})
 function Post(url: string, postData: {})
 ```
 
-Once the Faux ZK Oracle receives a successful response from the whitelisted destination, it must transform the data into a data structure consisting of `Field` elements. The data structure used to encode the data into Field elements will be heavily dependent on the response data. For simplicity, we will assume we will also get an array of JSON objects for the initial usage of an MVP. Then we can assume that we will be able to encode a JSON object into an array of Field elements. For each array representing a JSON object, we will append that array to another array that holds all JSON objects. In the end, we will have a 2D array of Field elements.
+Once the Faux ZK Oracle receives a successful response from the whitelisted destination, it must transform the data into a data structure consisting of `Field` elements. By using dynamic lookup within array structures, we can build a JSON parser inside a circuit to encode any information receieved into a data structure consisting of `Field` elements. The exact structure returned is still being designed and considered but it is most important to note that the ZK Oracle will parse the receieved JSON information inside a circuit and return a structure that has that contains `Field` elements. We can assume for now we will be able to encode a JSON object into an array of Field elements. For each array representing a JSON object, we will append that array to another array that holds all JSON objects. In the end, we will have a 2D array of Field elements.
 
 Once the response data is encoded in a sensible Field data structure, the Faux ZK Oracle will sign the encoded Field data to provide authenticity of the ZK Oracle. This signature will be checked inside a circuit for its authenticity.
 
@@ -72,6 +74,8 @@ The returned response is an array of JSON objects with the following form:
 If we receive an error from the Binance API, we can return the same error message back to the client. If we receive a 200 from the Binance API, we will send back the trade data outlined above. Note that if the user has zero trades under the specified properties, an empty list is returned.
 
 ### Serializing the Trade History data into Fields
+
+**The design below is only a proposed solution and will most likely change once dynamic lookup is implemented in SnarkyJS.**
 
 Once the response data is returned to the Faux ZK Oracle, the Oracle must serialize the user’s trade data into `Field` elements so that it can be used inside a circuit. This can be done by including only the information that is needed to calculate a percentage gain/loss for each trade and ignoring all other values. For the `price`, `quantity`, and `timestamp` fields, we can transform these into Field values directly. For the `isBuyer` property, we can encode this value into a `Bool` type which is another SnarkyJS primitive that can be used inside a circuit.
 
