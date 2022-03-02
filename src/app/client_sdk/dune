@@ -18,10 +18,19 @@
   integers_stubs_js
   js_of_ocaml
   digestif.ocaml
+  cache_dir.fake
+  run_in_thread.fake
+  mina_metrics.none
+  bindings_js
+  node_backend
   sponge
   hex)
+  (link_deps
+ ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+ ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
+ (forbidden_libraries async core re2)
  (preprocess
   (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))
