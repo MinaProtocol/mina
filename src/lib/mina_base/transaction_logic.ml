@@ -1896,6 +1896,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(f : user_acc -> _ -> user_acc) ?(fee_excess = Amount.Signed.zero)
       (ledger : L.t) (c : Parties.t) :
       (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
+    let open Or_error.Let_syntax in
+    let handle_error
+        ~(f : unit -> Inputs.Global_state.t * _ Parties_logic.Local_state.t)
+        ~f_next =
+      match f () with
+      | exception exn ->
+          Error (Error.of_exn ~backtrace:`Get exn)
+      | ( _global_state
+        , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
+          Error (Error.of_string @@ Transaction_status.Failure.to_string failure)
+      | res ->
+          f_next res
+    in
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
           ( id
@@ -1910,15 +1923,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
       if List.is_empty l_state.parties then Ok user_acc
       else
-        match M.step ~constraint_constants { perform } (g_state, l_state) with
-        | exception exn ->
-            Error (Error.of_exn ~backtrace:`Get exn)
-        | ( _global_state
-          , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
-            Error
-              (Error.of_string @@ Transaction_status.Failure.to_string failure)
-        | states ->
-            step_all (f user_acc states) states
+        handle_error
+          ~f:(fun () ->
+            M.step ~constraint_constants { perform } (g_state, l_state))
+          ~f_next:(fun states -> step_all (f user_acc states) states)
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
@@ -1934,7 +1942,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         } )
     in
     let user_acc = f init initial_state in
-    let start : Inputs.Global_state.t * _ =
+    let%bind start : (Inputs.Global_state.t * _) Or_error.t =
       let parties =
         let p = Party.Fee_payer.to_signed c.fee_payer in
         { Party.authorization = Control.Signature p.authorization
@@ -1943,11 +1951,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         }
         :: c.other_parties
       in
-      M.start ~constraint_constants
-        { parties = Inputs.Parties.of_parties_list parties
-        ; memo_hash = Signed_command_memo.hash c.memo
-        }
-        { perform } initial_state
+      handle_error
+        ~f:(fun () ->
+          M.start ~constraint_constants
+            { parties = Inputs.Parties.of_parties_list parties
+            ; memo_hash = Signed_command_memo.hash c.memo
+            }
+            { perform } initial_state)
+        ~f_next:(fun state -> Ok state)
     in
     let accounts () =
       List.map original_account_states
@@ -1958,7 +1969,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Error e
     | Ok s ->
         Ok
-          ( { accounts = accounts ()
+          ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
