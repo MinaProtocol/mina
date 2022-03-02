@@ -145,8 +145,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let unit obj : _ Unified_input.t =
     yojson obj ?doc:None ~name:"Unit"
-      ~map:(function `Null -> () | _ -> failwith "unsupported")
-      ~contramap:(fun () -> `Null)
+      ~map:(function `String "Unit" -> () | _ -> failwith "unsupported")
+      ~contramap:(fun () -> `String "Unit")
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
@@ -286,6 +286,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
                       (Fields_derivers.under_to_camel k)
                       (json_keys v))
               |> String.concat ~sep:"" )
+        | `List vs -> (
+            match vs with [] -> "\n" | v :: _ -> json_keys v )
         | _ ->
             "\n"
 
@@ -342,7 +344,6 @@ module Make (Schema : Graphql_intf.Schema) = struct
         let* keys =
           let json = to_json deriver a in
           let q = arg_query json in
-          eprintf "Query is %s\n" q ;
           let* res = run_query q in
           match res with
           | Ok (`Response _) ->
@@ -356,10 +357,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
         in
         (* read json out *)
         let* a' =
-          let* res = run_query (out_query @@ keys) in
+          let* res = run_query (out_query keys) in
           match res with
           | Ok (`Response json) ->
-              Printf.eprintf "%s\n" (Yojson.Basic.to_string json) ;
               let unwrap k json =
                 match json with
                 | `Assoc kv ->
@@ -514,7 +514,7 @@ let%test_module "Test" =
       let open Derivers in
       [%test_eq: string]
         (Yojson.Safe.to_string (to_json v2 V2.v))
-        {|{"field":"10","nothing":null}|}
+        {|{"field":"10","nothing":"Unit"}|}
 
     let%test_unit "roundtrip json'" =
       let open Derivers in

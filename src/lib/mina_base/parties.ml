@@ -454,7 +454,6 @@ let%test_module "Test" =
     let%test_unit "json roundtrip dummy" =
       [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
 
-    let%test_unit "full circuit" = ()
-
-    (* TODO Fields_derivers_snapps.Test.Loop.run full dummy Party.Fields.names *)
+    let%test_unit "full circuit" =
+      Fields_derivers_snapps.Test.Loop.run full dummy |> ignore
   end )
