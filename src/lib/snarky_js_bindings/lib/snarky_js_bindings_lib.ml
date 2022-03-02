@@ -2388,7 +2388,14 @@ type AccountPredicate =
             Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
-        ; (* TODO *) verification_key = keep Field.zero
+        ; (* TODO *) verification_key =
+            keep
+              { Snapp_basic.Flagged_option.is_some = Boolean.false_
+              ; data =
+                  Mina_base.Data_as_hash.make_unsafe
+                    (Field.constant @@ Mina_base.Snapp_account.dummy_vk_hash ())
+                    (As_prover.Ref.create (fun () -> failwith "TODO"))
+              }
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
         ; snapp_uri =
             keep
