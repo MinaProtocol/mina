@@ -145,8 +145,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let unit obj : _ Unified_input.t =
     yojson obj ?doc:None ~name:"Unit"
-      ~map:(function `Null -> () | _ -> failwith "unsupported")
-      ~contramap:(fun () -> `Null)
+      ~map:(function `String "Unit" -> () | _ -> failwith "unsupported")
+      ~contramap:(fun () -> `String "Unit")
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
@@ -286,6 +286,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
                       (Fields_derivers.under_to_camel k)
                       (json_keys v))
               |> String.concat ~sep:"" )
+        | `List vs -> (
+            match vs with [] -> "\n" | v :: _ -> json_keys v )
         | _ ->
             "\n"
 
