@@ -432,18 +432,28 @@ let deriver obj =
     ~memo:!.Signed_command_memo.deriver
   |> finish ~name:"SendSnappInput"
 
-let%test_unit "json roundtrip dummy" =
-  let party : Party.t =
-    { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
-    ; authorization = Control.dummy_of_tag Signature
-    }
-  in
-  let fee_payer : Party.Fee_payer.t =
-    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
-  in
-  let dummy : t =
-    { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
-  in
-  let module Fd = Fields_derivers_snapps.Derivers in
-  let full = deriver @@ Fd.o () in
-  [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+let%test_module "Test" =
+  ( module struct
+    let dummy =
+      let party : Party.t =
+        { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+        ; authorization = Control.dummy_of_tag Signature
+        }
+      in
+      let fee_payer : Party.Fee_payer.t =
+        { data = Party.Predicated.Fee_payer.dummy
+        ; authorization = Signature.dummy
+        }
+      in
+      { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
+
+    module Fd = Fields_derivers_snapps.Derivers
+
+    let full = deriver @@ Fd.o ()
+
+    let%test_unit "json roundtrip dummy" =
+      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+
+    let%test_unit "full circuit" =
+      Fields_derivers_snapps.Test.Loop.run full dummy |> ignore
+  end )

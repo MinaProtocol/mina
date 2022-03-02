@@ -164,10 +164,10 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
 
-      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}"
-      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,0,6))}"
+      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
       workerReplicas = snark.snark_worker_replicas
-      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,0,6))}.${var.testnet_name}"
+      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}.${var.testnet_name}"
       coordinatorRpcPort = 8301
       coordinatorHostPort = snark.snark_coordinators_host_port
       publicKey =snark.snark_worker_public_key

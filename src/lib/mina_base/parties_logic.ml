@@ -243,8 +243,7 @@ module type Party_intf = sig
   val increment_nonce : t -> bool
 
   val check_authorization :
-       account:account
-    -> commitment:transaction_commitment
+       commitment:transaction_commitment
     -> at_party:parties
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
@@ -856,6 +855,10 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Ledger.get_account party local_state.ledger
     in
     Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
+    (* Register verification key, in case it needs to be 'side-loaded' to
+       verify a snapp proof.
+    *)
+    Account.register_verification_key a ;
     let predicate_satisfied : Bool.t =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
@@ -871,7 +874,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Party.check_authorization ~account:a ~commitment ~at_party party
+      Inputs.Party.check_authorization ~commitment ~at_party party
     in
     (* The fee-payer must increment their nonce. *)
     let local_state =
@@ -1027,10 +1030,6 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_app_state app_state a in
       (a, local_state)
     in
-    (* Register verification key, in case it needs to be 'side-loaded' to
-       verify a snapp proof.
-    *)
-    Account.register_verification_key a ;
     (* Set verification key. *)
     let a, local_state =
       let verification_key = Party.Update.verification_key party in
@@ -1220,18 +1219,14 @@ module Make (Inputs : Inputs_intf) = struct
     let a', update_permitted, failure_status =
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
-    let party_succeeded =
+    let success =
       Bool.(
-        protocol_state_predicate_satisfied &&& predicate_satisfied
-        &&& update_permitted)
+        local_state.success &&& protocol_state_predicate_satisfied
+        &&& predicate_satisfied &&& update_permitted)
     in
     (* The first party must succeed. *)
-    Bool.(assert_ ((not is_start') ||| party_succeeded)) ;
-    let local_state =
-      { local_state with
-        success = Bool.( &&& ) local_state.success party_succeeded
-      }
-    in
+    Bool.(assert_ ((not is_start') ||| success)) ;
+    let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
