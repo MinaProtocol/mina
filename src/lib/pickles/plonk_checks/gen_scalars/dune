@@ -1,5 +1,12 @@
 (executable
  (name gen_scalars)
- (libraries core_kernel kimchi)
+ (libraries
+   ;opam
+   core_kernel
+   stdio
+   base
+   ;libs
+   kimchi
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

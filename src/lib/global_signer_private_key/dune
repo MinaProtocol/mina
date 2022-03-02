@@ -4,7 +4,13 @@
  (flags :standard -short-paths)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel signature_lib)
+ (libraries
+   ;opam
+   core_kernel
+   ;libs
+   signature_lib
+   snark_params
+   pickles)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

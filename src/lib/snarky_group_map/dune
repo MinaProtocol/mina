@@ -5,6 +5,8 @@
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   group_map
+   ;opam
+   core_kernel
+   ;libs
    snarky.backendless
-   core_kernel))
+   group_map))

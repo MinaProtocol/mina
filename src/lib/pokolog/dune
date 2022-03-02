@@ -4,5 +4,9 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (libraries
+   ;opam
+   core_kernel
+   bin_prot.shape
+   ;libs
    snarky.backendless
-   core_kernel))
+ ))
