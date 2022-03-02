@@ -3,16 +3,13 @@ open Mina_base
 include Sparse_ledger_base
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger)
-    ~next_available_token:(Ledger.next_available_token ledger)
-    (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
   Ledger.Any_ledger.M.foldi ledger
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
@@ -54,7 +51,6 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
