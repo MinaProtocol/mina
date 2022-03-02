@@ -737,11 +737,10 @@ end = struct
       let%map _res, `Overflow lt = range_check_flagged `Sub diff in
       lt
 
-    (* x <= y iff x < y || x = y *)
+    (* x <= y iff not (y < x) *)
     let ( <= ) x y =
-      let%bind x_lt_y = x < y in
-      let%bind eq = x = y in
-      Boolean.(x_lt_y ||| eq)
+      let%map y_lt_x = y < x in
+      Boolean.not y_lt_x
 
     (* x >= y iff y <= x *)
     let ( >= ) x y = y <= x
