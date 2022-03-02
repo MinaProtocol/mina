@@ -131,7 +131,7 @@ module Node = struct
       $fee: UInt64!,
       $nonce: UInt32,
       $memo: String) {
-        sendPayment(input:
+        ADSFASDFDASF(input:
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
             payment {
               id
@@ -376,8 +376,8 @@ module Node = struct
       exec_graphql_request ~logger ~node:t
         ~query_name:"delegate_currency_graphql" delegate_currency_obj
     in
-    let%map sent_payment_obj = delegate_currency_graphql () in
-    let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
+    let%map result_obj = delegate_currency_graphql () in
+    let (`UserCommand id_obj) = result_obj#sendPayment#payment in
     let user_cmd_id = id_obj#id in
     [%log info] "Currency Delegated"
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
