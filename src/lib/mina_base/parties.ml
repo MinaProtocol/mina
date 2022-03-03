@@ -451,3 +451,17 @@ let json_keys =
   lazy
     Fields_derivers_snapps.(
       to_json (deriver @@ Derivers.o ()) dummy |> json_keys)
+
+let%test_module "Test" =
+  ( module struct
+    module Fd = Fields_derivers_snapps.Derivers
+
+    let full = deriver @@ Fd.o ()
+
+    let%test_unit "json roundtrip dummy" =
+      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+
+    let%test_unit "full circuit" =
+      Run_in_thread.block_on_async_exn
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
+  end )

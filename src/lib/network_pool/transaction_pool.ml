@@ -9,6 +9,7 @@ open Core
 open Async
 open Mina_base
 open Pipe_lib
+open Signature_lib
 open Network_peer
 
 let max_per_15_seconds = 10
@@ -1570,7 +1571,6 @@ include Make
 
 let%test_module _ =
   ( module struct
-    open Signature_lib
     module Mock_base_ledger = Mocks.Base_ledger
     module Mock_staged_ledger = Mocks.Staged_ledger
 
@@ -2677,17 +2677,4 @@ let%test_module _ =
           [%test_eq: pool_apply] (accepted_commands apply_res) (Ok all_cmds) ;
           assert_pool_txs all_cmds ;
           Deferred.unit)
-
-    (* TODO: Where should these tests go that need block_on_async_exn? *)
-    module Fd = Fields_derivers_snapps.Derivers
-
-    let full = Parties.deriver @@ Fd.o ()
-
-    let%test_unit "json roundtrip dummy" =
-      [%test_eq: Parties.t] Parties.dummy
-        (Parties.dummy |> Fd.to_json full |> Fd.of_json full)
-
-    let%test_unit "full circuit" =
-      Thread_safe.block_on_async_exn
-      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full Parties.dummy
   end )
