@@ -108,7 +108,7 @@ module Graphql_raw = struct
              | Acc { graphql_arg_fields; graphql_arg_coerce } ->
                  Obj.magic
                  @@ Schema.Arg.(
-                      obj ?doc name ~fields:graphql_arg_fields
+                      obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
                         ~coerce:graphql_arg_coerce
                       |> non_null)) ;
         (acc#nullable_graphql_arg :=
@@ -119,7 +119,7 @@ module Graphql_raw = struct
              | Acc { graphql_arg_fields; graphql_arg_coerce } ->
                  Obj.magic
                  @@ Schema.Arg.(
-                      obj ?doc name ~fields:graphql_arg_fields
+                      obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
                         ~coerce:graphql_arg_coerce)) ;
         acc
 
