@@ -211,6 +211,35 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let arg_typ obj = !(obj#graphql_arg) ()
 
+  let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
+    | `Assoc kv ->
+        `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
+    | `Bool b ->
+        `Bool b
+    | `Float f ->
+        `Float f
+    | `Int i ->
+        `Int i
+    | `List xs ->
+        `List (List.map xs ~f:json_to_safe)
+    | `Null ->
+        `Null
+    | `String s ->
+        `String s
+
+  (* Builds the graphql-expected output query shape
+   * (essentially the keys of all the nested JSON) *)
+  let rec json_keys : Yojson.Safe.t -> string = function
+    | `Assoc kv ->
+        sprintf "{\n%s\n}"
+          ( List.map kv ~f:(fun (k, v) ->
+                sprintf "%s%s" (Fields_derivers.under_to_camel k) (json_keys v))
+          |> String.concat ~sep:"" )
+    | `List vs -> (
+        match vs with [] -> "\n" | v :: _ -> json_keys v )
+    | _ ->
+        "\n"
+
   (* TODO: remove this or move to a %test_module once the deriver code is stable *)
   (* Can be used to print the graphql schema, like this:
      Fields_derivers_snapps.Test.print_schema full ;
@@ -259,37 +288,6 @@ module Make (Schema : Graphql_intf.Schema) = struct
               (List.map xs ~f:json_to_string_gql |> String.concat ~sep:",\n")
         | x ->
             Yojson.Safe.to_string x
-
-      let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
-        | `Assoc kv ->
-            `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
-        | `Bool b ->
-            `Bool b
-        | `Float f ->
-            `Float f
-        | `Int i ->
-            `Int i
-        | `List xs ->
-            `List (List.map xs ~f:json_to_safe)
-        | `Null ->
-            `Null
-        | `String s ->
-            `String s
-
-      (* Builds the graphql-expected output query shape
-       * (essentially the keys of all the nested JSON) *)
-      let rec json_keys : Yojson.Safe.t -> string = function
-        | `Assoc kv ->
-            sprintf "{\n%s\n}"
-              ( List.map kv ~f:(fun (k, v) ->
-                    sprintf "%s%s"
-                      (Fields_derivers.under_to_camel k)
-                      (json_keys v))
-              |> String.concat ~sep:"" )
-        | `List vs -> (
-            match vs with [] -> "\n" | v :: _ -> json_keys v )
-        | _ ->
-            "\n"
 
       let arg_query json =
         Printf.sprintf

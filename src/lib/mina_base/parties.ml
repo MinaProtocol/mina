@@ -435,3 +435,19 @@ let deriver obj =
 let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
 
 let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
+
+let dummy =
+  let party : Party.t =
+    { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let fee_payer : Party.Fee_payer.t =
+    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+  in
+  { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
+
+let json_keys =
+  lazy
+    Fields_derivers_snapps.(
+      to_json (deriver @@ Derivers.o ()) dummy |> json_keys)

@@ -2679,30 +2679,15 @@ let%test_module _ =
           Deferred.unit)
 
     (* TODO: Where should these tests go that need block_on_async_exn? *)
-    let dummy =
-      let party : Party.t =
-        { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
-        ; authorization = Control.dummy_of_tag Signature
-        }
-      in
-      let fee_payer : Party.Fee_payer.t =
-        { data = Party.Predicated.Fee_payer.dummy
-        ; authorization = Signature.dummy
-        }
-      in
-      { Parties.fee_payer
-      ; other_parties = [ party ]
-      ; memo = Signed_command_memo.empty
-      }
-
     module Fd = Fields_derivers_snapps.Derivers
 
     let full = Parties.deriver @@ Fd.o ()
 
     let%test_unit "json roundtrip dummy" =
-      [%test_eq: Parties.t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+      [%test_eq: Parties.t] Parties.dummy
+        (Parties.dummy |> Fd.to_json full |> Fd.of_json full)
 
     let%test_unit "full circuit" =
       Thread_safe.block_on_async_exn
-      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full Parties.dummy
   end )
