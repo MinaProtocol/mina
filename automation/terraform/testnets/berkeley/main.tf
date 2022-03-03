@@ -143,8 +143,8 @@ module "berkeley" {
   snark_coordinators = [
     {
       snark_worker_replicas = 5
-      snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_worker_fee      = "0.01"
+      snark_worker_public_key = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
     }
   ]
