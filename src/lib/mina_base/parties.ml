@@ -455,5 +455,6 @@ let%test_module "Test" =
       [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
 
     let%test_unit "full circuit" =
-      Fields_derivers_snapps.Test.Loop.run full dummy |> ignore
+      Run_in_thread.block_on_async_exn
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
   end )
