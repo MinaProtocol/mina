@@ -28,7 +28,7 @@ module R = struct
     module V2 = struct
       type t =
         G.Stable.V1.t Pickles_base.Side_loaded_verification_key.Repr.Stable.V2.t
-        [@@deriving sexp, compare, equal, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
