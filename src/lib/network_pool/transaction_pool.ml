@@ -9,6 +9,7 @@ open Core
 open Async
 open Mina_base
 open Pipe_lib
+open Signature_lib
 open Network_peer
 
 let max_per_15_seconds = 10
