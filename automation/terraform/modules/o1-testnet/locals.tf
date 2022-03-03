@@ -83,18 +83,10 @@ locals {
     postgresDB              = "archive"
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
+    # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
     remoteSchemaFile        = var.mina_archive_schema
-    remoteSchemaAuxFiles        = [
-      for url in var.mina_archive_schema_aux_files : {
-        scriptname = element(split("/",url), length(split("/",url))-1 )
-        # the url is going to look something like https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql
-        #the name of the script is the last pathstep in the url
-        url = url
-      }
-
-    ]
+    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
     
-
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
