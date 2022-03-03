@@ -1188,14 +1188,17 @@ let pooled_snapp_commands =
          let graphql =
            Graphql_queries.Pooled_snapp_commands.make ~public_key ()
          in
-         let%map response = Graphql_client.query_exn graphql graphql_endpoint in
+         let%map _response =
+           Graphql_client.query_exn graphql graphql_endpoint
+         in
          let json_response : Yojson.Safe.t =
            `List
              ( List.map
                  ~f:
                    (Fn.compose Graphql_client.Snapp_command.to_yojson
                       Graphql_client.Snapp_command.of_obj)
-             @@ Array.to_list response#pooledSnappCommands )
+             @@ failwith "TODO: renable"
+                (* Array.to_list response#pooledSnappCommands *) )
          in
          print_string (Yojson.Safe.to_string json_response)))
 

@@ -291,22 +291,16 @@ query snapp_commands($public_key: PublicKey) {
   pooledSnappCommands(publicKey: $public_key) {
     id
     hash
-    nonce
-    feePayer { publicKey @bsDecoder(fn: "Decoders.public_key")
-               nonce @bsDecoder(fn: "Decoders.optional_nonce_from_string")
-               balance { total @bsDecoder(fn: "Decoders.balance") }
-               delegate @bsDecoder(fn: "Decoders.optional_account_id")
-               receiptChainHash @bsDecoder(fn: "Decoders.optional_receipt_chain_hash_from_string")
-               snappUri
-               tokenSymbol
-               timing { initialMinimumBalance @bsDecoder(fn: "Decoders.optional_balance")
-                        cliffTime @bsDecoder(fn: "Decoders.optional_global_slot")
-                        vestingPeriod @bsDecoder(fn: "Decoders.optional_global_slot")
-                        vestingIncrement @bsDecoder(fn: "Decoders.optional_amount")
-                      }
+    parties {
+      feePayer {
+        data {
+            predicate
+            body {
+                 publicKey @bsDecoder(fn: "Decoders.public_key")
               }
-    fee @bsDecoder(fn: "Decoders.fee")
-    feeToken @bsDecoder(fn: "Decoders.token")
+          }
+      }
+    }
   }
 }
 |}]

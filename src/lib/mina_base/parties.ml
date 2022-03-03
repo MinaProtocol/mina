@@ -430,4 +430,8 @@ let deriver obj =
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
     ~other_parties:!.(list @@ Party.deriver @@ o ())
     ~memo:!.Signed_command_memo.deriver
-  |> finish ~name:"SendSnappInput"
+  |> finish ~name:"Parties"
+
+let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
+
+let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
