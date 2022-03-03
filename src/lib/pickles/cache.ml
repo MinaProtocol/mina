@@ -98,7 +98,7 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  generate_keypair ~exposing:[ typ ] main)
+                  constraint_system ~exposing:[ typ ] main |> Keypair.generate)
             in
             Timer.clock __LOC__ ;
             ignore
@@ -194,7 +194,7 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   generate_keypair ~exposing:[ typ ] main)
+                   constraint_system ~exposing:[ typ ] main |> Keypair.generate)
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

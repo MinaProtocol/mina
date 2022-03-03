@@ -45,12 +45,6 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  (* TODO: does this actually work if it's run twice? I think not *)
-  (*
-   * options:
-   *   - assume nodes have not yet initialized by the time we get here
-   *   - associate additional state to see when initialization was last checked
-   *)
   let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
@@ -81,7 +75,15 @@ struct
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
-    let soft_timeout_in_slots = 2 * n in
+    let soft_timeout_in_slots =
+      (* We add 1 here to make sure that we see the entirety of at least 2*n
+         full slots, since slot time may be misaligned with wait times after
+         non-block-related waits.
+         This ensures that low numbers of blocks (e.g. 1 or 2) have a
+         reasonable probability of success, reducing flakiness of the tests.
+      *)
+      (2 * n) + 1
+    in
     { description = Printf.sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots

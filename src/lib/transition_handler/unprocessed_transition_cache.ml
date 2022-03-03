@@ -20,10 +20,8 @@ module Transmuter = struct
   module Target = State_hash
 
   let transmute enveloped_transition =
-    let { With_hash.hash; data = _ }, _ =
-      Envelope.Incoming.data enveloped_transition
-    in
-    hash
+    let transition, _ = Envelope.Incoming.data enveloped_transition in
+    State_hash.With_state_hashes.state_hash transition
 end
 
 module Registry = struct
