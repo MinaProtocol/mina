@@ -3,6 +3,7 @@ open Core
 open Mina_base
 open Mina_numbers
 open Signature_lib
+module Token_id = Mina_base.Token_id
 
 (* Fee increase required to replace a transaction. This represents the cost to
    the network as a whole of checking, gossiping, and storing a transaction
@@ -118,29 +119,17 @@ let currency_consumed_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> User_command.t
     -> Currency.Amount.t option =
- fun ~constraint_constants cmd ->
+ fun ~constraint_constants:_ cmd ->
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
   let amt =
     match cmd with
     | Signed_command c -> (
         match c.payload.body with
-        | Payment ({ amount; _ } as payload) ->
-            if
-              Token_id.equal c.payload.common.fee_token
-                (Payment_payload.token payload)
-            then
-              (* The fee-payer is also the sender account, include the amount. *)
-              amount
-            else (* The payment won't affect the balance of this account. *)
-              zero
+        | Payment { amount; _ } ->
+            (* The fee-payer is also the sender account, include the amount. *)
+            amount
         | Stake_delegation _ ->
-            zero
-        | Create_new_token _ ->
-            Currency.Amount.of_fee constraint_constants.account_creation_fee
-        | Create_token_account _ ->
-            Currency.Amount.of_fee constraint_constants.account_creation_fee
-        | Mint_tokens _ ->
             zero )
     | Parties _ ->
         (*TODO: document- txns succeeds with source amount insufficient in the case of snapps*)
@@ -1018,10 +1007,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           let%bind consumed =
             currency_consumed' ~constraint_constants unchecked
           in
-          let%bind () =
-            if User_command.check_tokens unchecked then return ()
-            else Error Bad_token
-          in
           let%map () =
             (* TODO: Proper exchange rate mechanism. *)
             let fee_token = User_command.fee_token unchecked in
@@ -1365,10 +1350,9 @@ let%test_module _ =
 
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
-    let gen_cmd ?sign_type ?nonce ?fee_token ?payment_token () =
+    let gen_cmd ?sign_type ?nonce () =
       User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
-        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ?fee_token
-        ?payment_token ()
+        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ()
       |> Quickcheck.Generator.map
            ~f:Transaction_hash.User_command_with_valid_signature.create
 

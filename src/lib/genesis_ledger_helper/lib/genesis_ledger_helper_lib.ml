@@ -26,7 +26,7 @@ module Accounts = struct
       in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
-          ~f:Mina_base.Token_id.of_uint64
+          ~f:Mina_base.Token_id.of_string
       in
       let account_id = Mina_base.Account_id.create pk token_id in
       let account =
@@ -299,7 +299,7 @@ module Accounts = struct
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token = Some (Mina_base.Token_id.to_uint64 account.token_id)
+      ; token = Some (Mina_base.Token_id.to_string account.token_id)
       ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =

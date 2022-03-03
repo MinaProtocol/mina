@@ -2002,15 +2002,13 @@ let%test_module _ =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
         (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
-           ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
-           ~valid_until
+           ~fee_payer_pk:(get_pk sender_idx) ~valid_until
            ~nonce:(Account.Nonce.of_int nonce)
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
            ~body:
              (Signed_command_payload.Body.Payment
                 { source_pk = get_pk sender_idx
                 ; receiver_pk = get_pk receiver_idx
-                ; token_id = Token_id.default
                 ; amount = Currency.Amount.of_int amount
                 }))
 
@@ -2353,12 +2351,6 @@ let%test_module _ =
                   Stake_delegation
                     (Set_delegate { payload with delegator = sender_pk })
               }
-          | { common
-            ; body =
-                (Create_new_token _ | Create_token_account _ | Mint_tokens _) as
-                body
-            } ->
-              { common = { common with fee_payer_pk = sender_pk }; body }
         in
         User_command.Signed_command (Signed_command.sign sender_kp payload)
       in
