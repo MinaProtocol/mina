@@ -9,6 +9,7 @@ open Pipe_lib
 open O1trace
 open Init
 open Mina_numbers
+module Token_id = Mina_base.Token_id
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -279,14 +280,8 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo ~valid_until:None
-              ~body:
-                (Payment
-                   { source_pk = signer
-                   ; receiver_pk
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+              ~memo ~valid_until:None
+              ~body:(Payment { source_pk = signer; receiver_pk; amount })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))
