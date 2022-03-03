@@ -275,7 +275,7 @@ val transaction_pool_diffs :
      Strict_pipe.Reader.t
 
 val broadcast_state :
-  t -> (External_transition.t, State_hash.t) With_hash.t -> unit
+  t -> External_transition.t State_hash.With_state_hashes.t -> unit
 
 val broadcast_snark_pool_diff : t -> Snark_pool.Resource_pool.Diff.t -> unit
 

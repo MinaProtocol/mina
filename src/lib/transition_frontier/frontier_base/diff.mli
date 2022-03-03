@@ -24,7 +24,7 @@ type lite = Lite
 module Node : sig
   type _ t =
     | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+    | Lite : External_transition.Validated.Stable.V1.t -> lite t
 end
 
 module Node_list : sig
@@ -60,7 +60,7 @@ end
  *)
 module Root_transition : sig
   type 'repr t =
-    { new_root: Root_data.Limited.t
+    { new_root: Root_data.Limited.Stable.V2.t
     ; garbage: 'repr Node_list.t
     ; just_emitted_a_proof: bool }
 
@@ -69,6 +69,9 @@ module Root_transition : sig
   module Lite : sig
     [%%versioned:
     module Stable : sig
+      module V3 : sig
+        type t = lite root_transition
+      end
       module V2 : sig
         type t = lite root_transition
       end

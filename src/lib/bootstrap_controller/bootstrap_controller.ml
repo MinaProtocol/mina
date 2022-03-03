@@ -107,7 +107,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
     Sync_ledger.Db.new_goal root_sync_ledger
       (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
       ~data:
-        ( External_transition.Initial_validated.state_hash t.current_root
+        ( (External_transition.Initial_validated.state_hashes t.current_root)
+            .state_hash
         , sender
         , expected_staged_ledger_hash )
       ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
@@ -129,7 +130,8 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
   else
     match%bind
       Mina_networking.get_ancestry t.network sender.Peer.peer_id
-        candidate_consensus_state
+        (With_hash.map_hash candidate_consensus_state
+           ~f:State_hash.State_hashes.state_hash)
     with
     | Error e ->
         [%log' error t.logger]
@@ -175,7 +177,9 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
         [%log' trace t.logger]
           "Added the transition from sync_ledger_reader into cache"
           ~metadata:
-            [ ("state_hash", State_hash.to_yojson (With_hash.hash transition))
+            [ ( "state_hash"
+              , State_hash.to_yojson
+                  (State_hash.With_state_hashes.state_hash transition) )
             ; ( "external_transition"
               , External_transition.to_yojson (With_hash.data transition) )
             ] ;
@@ -188,7 +192,10 @@ let external_transition_compare consensus_constants =
   Comparable.lift
     (fun existing candidate ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
-      if State_hash.equal (With_hash.hash existing) (With_hash.hash candidate)
+      if
+        State_hash.equal
+          (State_hash.With_state_hashes.state_hash existing)
+          (State_hash.With_state_hashes.state_hash candidate)
       then 0
       else if
         Consensus.Hooks.equal_select_status `Keep
@@ -320,18 +327,27 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                      Error.of_string "received faulty scan state from peer")
               |> Deferred.return
             in
+            let protocol_states =
+              List.map protocol_states
+                ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+            in
             let%bind protocol_states =
               Staged_ledger.Scan_state.check_required_protocol_states scan_state
                 ~protocol_states
               |> Deferred.return
             in
             let protocol_states_map =
-              State_hash.Map.of_alist_exn protocol_states
+              protocol_states
+              |> List.map ~f:(fun ps ->
+                     (State_hash.With_state_hashes.state_hash ps, ps))
+              |> State_hash.Map.of_alist_exn
             in
             let get_state hash =
               match Map.find protocol_states_map hash with
               | None ->
-                  let new_state_hash = (fst new_root).hash in
+                  let new_state_hash =
+                    State_hash.With_state_hashes.state_hash (fst new_root)
+                  in
                   [%log error]
                     ~metadata:
                       [ ("new_root", State_hash.to_yojson new_state_hash)
@@ -346,7 +362,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                       new root %{sexp:State_hash.t}"
                     hash new_state_hash
               | Some protocol_state ->
-                  Ok protocol_state
+                  Ok (With_hash.data protocol_state)
             in
             (* Construct the staged ledger before constructing the transition
              * frontier in order to verify the scan state we received.
@@ -499,13 +515,15 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               Transition_frontier.Persistent_frontier.reset_database_exn
                 persistent_frontier ~root_data:new_root_data
                 ~genesis_state_hash:
-                  precomputed_values.protocol_state_with_hash.hash
+                  (State_hash.With_state_hashes.state_hash
+                     precomputed_values.protocol_state_with_hashes)
             in
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
                   Instance.set_root_state_hash instance
-                    (External_transition.Validated.state_hash new_root))) ;
+                    (External_transition.Validated.state_hashes new_root)
+                      .state_hash)) ;
             let%map new_frontier =
               let fail msg =
                 failwith
@@ -542,7 +560,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             in
             let root_consensus_state =
               Transition_frontier.(
-                Breadcrumb.consensus_state_with_hash (root new_frontier))
+                Breadcrumb.consensus_state_with_hashes (root new_frontier))
             in
             let filtered_collected_transitions =
               List.filter collected_transitions ~f:(fun incoming_transition ->
@@ -720,7 +738,7 @@ let%test_module "Bootstrap_controller tests" =
           in
           let module E = struct
             module T = struct
-              type t = (External_transition.t, State_hash.t) With_hash.t
+              type t = External_transition.t State_hash.With_state_hashes.t
               [@@deriving sexp]
 
               let compare =
