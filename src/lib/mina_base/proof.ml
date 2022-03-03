@@ -8,8 +8,8 @@ let transaction_dummy = Dummy_values.transaction_proof
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t = Pickles.Proof.Branching_2.Stable.V1.t
+  module V2 = struct
+    type t = Pickles.Proof.Branching_2.Stable.V2.t
     [@@deriving sexp, yojson, compare]
 
     let to_latest = Fn.id
@@ -26,11 +26,11 @@ let%test_module "proof-tests" =
 
     [%%if curve_size = 255]
 
-    let%test "proof serialization v1" =
+    let%test "proof serialization v2" =
       let proof = blockchain_dummy in
-      let known_good_digest = "2371c78320ee36d95afc9021d6df41ea" in
+      let known_good_digest = "046719498d3bd2e13b7555fffc5ba3db" in
       Ppx_version_runtime.Serialization.check_serialization
-        (module Stable.V1)
+        (module Stable.V2)
         proof known_good_digest
 
     [%%else]

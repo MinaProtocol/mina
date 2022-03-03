@@ -25,15 +25,14 @@ module Validate_content = struct
   let __versioned__ = ()
 end
 
-(* do not expose refer to types in here directly; use allocation functor version instead *)
-module Raw_versioned__ = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
+[%%versioned
+module Stable = struct
+  module V2 = struct
+    module T = struct
       type t =
-        { protocol_state : Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
-        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+        { protocol_state : Protocol_state.Value.Stable.V2.t
+        ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
+        ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
         ; delta_transition_chain_proof :
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
         ; current_protocol_version : Protocol_version.Stable.V1.t
@@ -41,57 +40,78 @@ module Raw_versioned__ = struct
         ; mutable validation_callback : Validate_content.t
         }
       [@@deriving compare, sexp, fields]
-
-      let to_latest = Fn.id
-
-      type 'a creator =
-           protocol_state:Protocol_state.Value.t
-        -> protocol_state_proof:Proof.t
-        -> staged_ledger_diff:Staged_ledger_diff.t
-        -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-        -> validation_callback:Validate_content.t
-        -> ?proposed_protocol_version_opt:Protocol_version.t
-        -> unit
-        -> 'a
-
-      let map_creator c ~f ~protocol_state ~protocol_state_proof
-          ~staged_ledger_diff ~delta_transition_chain_proof ~validation_callback
-          ?proposed_protocol_version_opt () =
-        f
-          (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-             ~delta_transition_chain_proof ~validation_callback
-             ?proposed_protocol_version_opt ())
-
-      let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-          ~delta_transition_chain_proof ~validation_callback
-          ?proposed_protocol_version_opt () =
-        let current_protocol_version =
-          try Protocol_version.get_current ()
-          with _ ->
-            failwith
-              "Cannot create external transition before setting current \
-               protocol version"
-        in
-        { protocol_state
-        ; protocol_state_proof
-        ; staged_ledger_diff
-        ; delta_transition_chain_proof
-        ; current_protocol_version
-        ; proposed_protocol_version_opt
-        ; validation_callback
-        }
     end
-  end]
-end
 
-include Allocation_functor.Make.Versioned_v1.Sexp (struct
-  let id = "external_transition"
+    let to_latest = Fn.id
 
-  include Raw_versioned__
-end)
+    include T
+
+    include (
+      Allocation_functor.Make.Bin_io_and_sexp (struct
+        let id = "external_transition"
+
+        include T
+
+        let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+            ~delta_transition_chain_proof ~validation_callback
+            ?proposed_protocol_version_opt () =
+          let current_protocol_version =
+            try Protocol_version.get_current ()
+            with _ ->
+              failwith
+                "Cannot create external transition before setting current \
+                 protocol version"
+          in
+          { protocol_state
+          ; protocol_state_proof
+          ; staged_ledger_diff
+          ; delta_transition_chain_proof
+          ; current_protocol_version
+          ; proposed_protocol_version_opt
+          ; validation_callback
+          }
+
+        type 'a creator =
+             protocol_state:Protocol_state.Value.t
+          -> protocol_state_proof:Proof.t
+          -> staged_ledger_diff:Staged_ledger_diff.t
+          -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
+          -> validation_callback:Validate_content.t
+          -> ?proposed_protocol_version_opt:Protocol_version.t
+          -> unit
+          -> 'a
+
+        let map_creator c ~f ~protocol_state ~protocol_state_proof
+            ~staged_ledger_diff ~delta_transition_chain_proof
+            ~validation_callback ?proposed_protocol_version_opt () =
+          f
+            (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+               ~delta_transition_chain_proof ~validation_callback
+               ?proposed_protocol_version_opt ())
+      end) :
+        sig
+          val create :
+               protocol_state:Protocol_state.Value.t
+            -> protocol_state_proof:Proof.t
+            -> staged_ledger_diff:Staged_ledger_diff.t
+            -> delta_transition_chain_proof:
+                 State_hash.t * State_body_hash.t list
+            -> validation_callback:Validate_content.t
+            -> ?proposed_protocol_version_opt:Protocol_version.t
+            -> unit
+            -> t
+
+          include Binable.S with type t := T.t
+
+          include Sexpable.S with type t := T.t
+        end )
+  end
+end]
+
+include T
 
 [%%define_locally
-Raw_versioned__.
+Stable.Latest.
   ( protocol_state
   , protocol_state_proof
   , staged_ledger_diff
@@ -100,9 +120,10 @@ Raw_versioned__.
   , proposed_protocol_version_opt
   , validation_callback
   , set_validation_callback
-  , compare )]
-
-[%%define_locally Stable.Latest.(create, sexp_of_t, t_of_sexp)]
+  , compare
+  , create
+  , sexp_of_t
+  , t_of_sexp )]
 
 type external_transition = t
 
@@ -177,12 +198,13 @@ module Precomputed_block = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = T.t =
         { scheduled_time : Block_time.Stable.V1.t
-        ; protocol_state : Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+        ; protocol_state : Protocol_state.Value.Stable.V2.t
+        ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+        ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+              (* TODO: Delete this or find out why it is here. *)
         ; delta_transition_chain_proof :
             Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
         }
@@ -960,32 +982,22 @@ module Validated = struct
     *)
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          Stable.V1.t State_hash.With_state_hashes.Stable.V1.t
+          Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
           * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest ({ With_hash.data; _ }, delta_proof) =
-          (With_hash.of_data data ~hash_data:state_hashes, delta_proof)
       end
     end]
   end
 
   [%%versioned_binable
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        external_transition State_hash.With_state_hashes.t
+        Stable.V2.t State_hash.With_state_hashes.t
         * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
           , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
           , [ `Proof ] * (unit, Truth.True.t) Truth.t
@@ -1015,7 +1027,7 @@ module Validated = struct
           , (`Protocol_versions, Truth.True ()) ) )
 
       include Sexpable.Of_sexpable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1025,7 +1037,7 @@ module Validated = struct
                 end)
 
       include Binable.Of_binable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1058,76 +1070,6 @@ module Validated = struct
         create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hashes)
 
       include With_validation
-    end
-
-    module V1 = struct
-      type t =
-        (external_transition, State_hash.t) With_hash.t
-        * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
-          , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
-          , [ `Proof ] * (unit, Truth.True.t) Truth.t
-          , [ `Delta_transition_chain ]
-            * (State_hash.t Non_empty_list.t, Truth.True.t) Truth.t
-          , [ `Frontier_dependencies ] * (unit, Truth.True.t) Truth.t
-          , [ `Staged_ledger_diff ] * (unit, Truth.True.t) Truth.t
-          , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
-          Validation.t
-
-      let equal (a, _) (b, _) = With_hash.equal equal State_hash.equal a b
-
-      let to_latest (transition, validation) =
-        let transition =
-          With_hash.map_hash transition ~f:(fun state_hash ->
-              { State_hash.State_hashes.state_hash; state_body_hash = None })
-        in
-        (transition, validation)
-
-      let of_v2 (transition, validation) =
-        let transition =
-          With_hash.map_hash transition ~f:State_hash.State_hashes.state_hash
-        in
-        (transition, validation)
-
-      let to_yojson (transition_with_hash, _) =
-        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
-
-      let erase (transition_with_hash, validation) =
-        ( transition_with_hash
-        , Validation.extract_delta_transition_chain_witness validation )
-
-      let elaborate (transition_with_hash, delta_transition_chain_witness) =
-        ( transition_with_hash
-        , ( (`Time_received, Truth.True ())
-          , (`Genesis_state, Truth.True ())
-          , (`Proof, Truth.True ())
-          , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
-          , (`Frontier_dependencies, Truth.True ())
-          , (`Staged_ledger_diff, Truth.True ())
-          , (`Protocol_versions, Truth.True ()) ) )
-
-      include Sexpable.Of_sexpable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_sexpable = elaborate
-
-                  let to_sexpable = erase
-                end)
-
-      include Binable.Of_binable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = elaborate
-
-                  let to_binable = erase
-                end)
-
-      include With_validation
-
-      let state_hash (transition, _) = With_hash.hash transition
     end
   end]
 
@@ -1177,8 +1119,7 @@ module Validated = struct
 
   let state_body_hash ((transition, _) : t) =
     State_hash.With_state_hashes.state_body_hash transition
-      ~compute_hashes:
-        (Fn.compose Protocol_state.hashes Raw_versioned__.protocol_state)
+      ~compute_hashes:(Fn.compose Protocol_state.hashes T.protocol_state)
 
   let commands (t : t) =
     List.map (commands t) ~f:(fun x ->
@@ -1288,7 +1229,7 @@ end
 module Staged_ledger_validation = struct
   let target_hash_of_ledger_proof =
     let open Ledger_proof in
-    Fn.compose statement_target statement
+    Fn.compose Registers.ledger (Fn.compose statement_target statement)
 
   let validate_staged_ledger_diff :
          ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -1372,7 +1313,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               ( Precomputed_values.genesis_ledger precomputed_values
-              |> Lazy.force |> Ledger.merkle_root
+              |> Lazy.force |> Mina_ledger.Ledger.merkle_root
               |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof

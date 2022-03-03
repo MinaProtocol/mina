@@ -10,7 +10,7 @@
 
     Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
-open Core
+open Core_kernel
 open Snark_params
 open Snarky_backendless
 open Tick
@@ -114,7 +114,7 @@ module type S = sig
 
     val gen : t Quickcheck.Generator.t
 
-    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_bits : t -> bool list
 
@@ -122,7 +122,7 @@ module type S = sig
 
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
 
-    val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
     val empty : t
 
@@ -132,6 +132,10 @@ module type S = sig
     val equal_data : t -> t -> bool
 
     val equal_state_hash : t -> t -> bool
+
+    (** The two stacks are connected. This should be used instead of `equal` to
+    check one transaction snark statement follow the other.*)
+    val connected : ?prev:t option -> first:t -> second:t -> unit -> bool
 
     val push_coinbase : Coinbase.t -> t -> t
 

@@ -30,7 +30,6 @@ RUN apt-get -y update \
         postgresql \
         postgresql-contrib \
         apt-utils \
-        procps \
         man \
     && rm -rf /var/lib/apt/lists/*
 

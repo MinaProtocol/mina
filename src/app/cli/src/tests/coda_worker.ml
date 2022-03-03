@@ -442,7 +442,7 @@ module T = struct
             ; consensus_local_state
             ; is_seed = List.is_empty peers
             ; genesis_ledger_hash =
-                Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+                Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
             ; log_gossip_heard =
                 { snark_pool_diff = true

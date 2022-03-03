@@ -1,14 +1,9 @@
-(* user_command_memo.ml *)
+(* signed_command_memo.ml *)
 
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-open Crypto_params
-
-[%%endif]
+open Snark_params
 
 [%%versioned
 module Stable = struct
@@ -23,23 +18,27 @@ module Stable = struct
       let version_byte = Base58_check.Version_bytes.user_command_memo
     end)
 
-    let to_string (memo : t) : string = Base58_check.encode memo
+    let to_base58_check (memo : t) : string = Base58_check.encode memo
 
-    let of_string (s : string) : t = Base58_check.decode_exn s
+    let of_base58_check (s : string) : t Or_error.t = Base58_check.decode s
+
+    let of_base58_check_exn (s : string) : t = Base58_check.decode_exn s
 
     module T = struct
       type nonrec t = t
 
-      let to_string = to_string
+      let to_string = to_base58_check
 
-      let of_string = of_string
+      let of_string = of_base58_check_exn
     end
 
     include Codable.Make_of_string (T)
   end
 end]
 
-[%%define_locally Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
+[%%define_locally
+Stable.Latest.
+  (to_yojson, of_yojson, to_base58_check, of_base58_check, of_base58_check_exn)]
 
 exception Too_long_user_memo_input
 
@@ -155,6 +154,15 @@ let fold_bits t =
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
+
+let gen =
+  Quickcheck.Generator.map String.quickcheck_generator
+    ~f:create_by_digesting_string_exn
+
+let hash memo =
+  Random_oracle.hash ~init:Hash_prefix.snapp_memo
+    (Random_oracle.Legacy.pack_input
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 
 [%%ifdef consensus_mechanism]
 

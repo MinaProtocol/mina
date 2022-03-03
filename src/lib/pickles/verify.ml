@@ -19,6 +19,15 @@ module Instance = struct
         -> t
 end
 
+(* TODO: Just stick this in plonk_checks.ml *)
+module Plonk_checks = struct
+  include Plonk_checks
+  module Type1 =
+    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+  module Type2 =
+    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+end
+
 let verify_heterogenous (ts : Instance.t list) =
   let module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
@@ -46,7 +55,9 @@ let verify_heterogenous (ts : Instance.t list) =
              , app_state
              , T
                  { statement
-                 ; prev_x_hat = (x_hat1, _) as prev_x_hat
+                   (* TODO
+                      ; prev_x_hat = (x_hat1, _) as prev_x_hat
+                   *)
                  ; prev_evals = evals
                  } ))
          ->
@@ -56,7 +67,6 @@ let verify_heterogenous (ts : Instance.t list) =
             pass_through = { statement.pass_through with app_state }
           }
         in
-        let open Pairing_marlin_types in
         let open Types.Dlog_based.Proof_state in
         let sc =
           SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
@@ -79,30 +89,43 @@ let verify_heterogenous (ts : Instance.t list) =
             ~log2_size:(Domain.log2_size step_domains.h)
         in
         let zetaw = Tick.Field.mul zeta w in
-        let plonk =
+        let tick_plonk_minimal :
+            _
+            Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
+            .Minimal
+            .t =
           let chal = Challenge.Constant.to_tick_field in
-          let p, `Check_equal (lin1, lin2) =
-            Plonk_checks.derive_plonk
+          { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
+        in
+        let tick_combined_evals =
+          Plonk_checks.evals_of_split_evals
+            (module Tick.Field)
+            (Double.map evals.evals ~f:(fun e -> e.evals))
+            ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+        in
+        let tick_domain =
+          Plonk_checks.domain
+            (module Tick.Field)
+            step_domains.h ~shifts:Common.tick_shifts
+            ~domain_generator:Backend.Tick.Field.domain_generator
+        in
+        let tick_env =
+          Plonk_checks.scalars_env
+            (module Tick.Field)
+            ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
+            ~srs_length_log2:Common.Max_degree.step_log2
+            ~field_of_hex:(fun s ->
+              Kimchi_pasta.Pasta.Bigint256.of_hex_string s
+              |> Kimchi_pasta.Pasta.Fp.of_bigint)
+            ~domain:tick_domain tick_plonk_minimal tick_combined_evals
+        in
+        let plonk =
+          let p =
+            Plonk_checks.Type1.derive_plonk
               (module Tick.Field)
-              ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
-              ~mds:Tick_field_sponge.params.mds
-              ~domain:
-                (* TODO: Cache the shifts and domain_generator *)
-                (Plonk_checks.domain
-                   (module Tick.Field)
-                   step_domains.h ~shifts:Common.tick_shifts
-                   ~domain_generator:Backend.Tick.Field.domain_generator)
-              { zeta
-              ; beta = chal plonk0.beta
-              ; gamma = chal plonk0.gamma
-              ; alpha
-              }
-              (Plonk_checks.evals_of_split_evals
-                 (module Tick.Field)
-                 evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
-              x_hat1
+              ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
+              tick_combined_evals
           in
-          check (lazy "linearization_check", Tick.Field.equal lin1 lin2) ;
           { p with
             zeta = plonk0.zeta
           ; alpha = plonk0.alpha
@@ -125,17 +148,21 @@ let verify_heterogenous (ts : Instance.t list) =
               Challenge.Constant.of_bits
                 (squeeze sponge ~length:Challenge.Constant.length)
             in
-            sc (Scalar_challenge underlying)
+            sc (Scalar_challenge.create underlying)
           in
           (absorb sponge, squeeze)
         in
-        let absorb_evals (x_hat, e) =
+        let absorb_evals
+            { Dlog_plonk_types.All_evals.With_public_input.public_input = x_hat
+            ; evals = e
+            } =
           let xs, ys = Dlog_plonk_types.Evals.to_vectors e in
           List.iter
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:absorb)
         in
-        Double.(iter ~f:absorb_evals (map2 prev_x_hat evals ~f:Tuple2.create)) ;
+        Double.(iter ~f:absorb_evals evals.evals) ;
+        absorb evals.ft_eval1 ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
@@ -146,9 +173,11 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
-          Wrap.combined_inner_product
+          Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
+            ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_branching:(Nat.Add.create actual_branching)
-            evals ~x_hat:prev_x_hat
+            (Double.map evals.evals ~f:(fun e -> e.evals))
+            ~x_hat:(Double.map evals.evals ~f:(fun e -> e.public_input))
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges
                  statement.pass_through.old_bulletproof_challenges)
@@ -170,9 +199,9 @@ let verify_heterogenous (ts : Instance.t list) =
              anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , Shifted_value.to_field
+            , Shifted_value.Type1.to_field
                 (module Tick.Field)
-                combined_inner_product ~shift:Shifts.tick
+                combined_inner_product ~shift:Shifts.tick1
             , combined_inner_product_actual )
           ] ;
         plonk)

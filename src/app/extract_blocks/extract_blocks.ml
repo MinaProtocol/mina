@@ -14,6 +14,39 @@ let query_db pool ~f ~item =
       failwithf "Error getting %s from db, error: %s" item
         (Caqti_error.show msg) ()
 
+let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
+    =
+  let%bind hash_str =
+    query_db pool
+      ~f:(fun db ->
+        Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
+      ~item:"epoch ledger hash"
+  in
+  let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
+  let total_currency =
+    raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
+    |> Currency.Amount.of_uint64
+  in
+  let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
+  let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
+  let start_checkpoint =
+    raw_epoch_data.start_checkpoint |> State_hash.of_base58_check_exn
+  in
+  let lock_checkpoint =
+    raw_epoch_data.lock_checkpoint |> State_hash.of_base58_check_exn
+  in
+  let epoch_length =
+    raw_epoch_data.epoch_length |> Unsigned.UInt32.of_int64
+    |> Mina_numbers.Length.of_uint32
+  in
+  return
+    { Mina_base.Epoch_data.Poly.ledger
+    ; seed
+    ; start_checkpoint
+    ; lock_checkpoint
+    ; epoch_length
+    }
+
 let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Extensional.Block.t Deferred.t =
   let query_db ~item ~f = query_db pool ~item ~f in
@@ -43,36 +76,31 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
   in
-  let%bind staking_epoch_seed_str, staking_epoch_ledger_hash_id =
+  let%bind staking_epoch_data_raw =
     query_db
-      ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
+      ~f:(fun db -> Processor.Epoch_data.load db block.staking_epoch_data_id)
       ~item:"staking epoch data"
   in
-  let staking_epoch_seed =
-    Epoch_seed.of_base58_check_exn staking_epoch_seed_str
+  let%bind staking_epoch_data =
+    epoch_data_of_raw_epoch_data ~pool staking_epoch_data_raw
   in
-  let%bind staking_epoch_ledger_hash_str =
+  let%bind next_epoch_data_raw =
     query_db
-      ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db staking_epoch_ledger_hash_id)
-      ~item:"staking epoch ledger hash"
-  in
-  let staking_epoch_ledger_hash =
-    Frozen_ledger_hash.of_base58_check_exn staking_epoch_ledger_hash_str
-  in
-  let%bind next_epoch_seed_str, next_epoch_ledger_hash_id =
-    query_db
-      ~f:(fun db -> Sql.Epoch_data.run db block.next_epoch_data_id)
+      ~f:(fun db -> Processor.Epoch_data.load db block.next_epoch_data_id)
       ~item:"staking epoch data"
   in
-  let next_epoch_seed = Epoch_seed.of_base58_check_exn next_epoch_seed_str in
-  let%bind next_epoch_ledger_hash_str =
-    query_db
-      ~f:(fun db -> Sql.Snarked_ledger_hashes.run db next_epoch_ledger_hash_id)
-      ~item:"next epoch ledger hash"
+  let%bind next_epoch_data =
+    epoch_data_of_raw_epoch_data ~pool next_epoch_data_raw
   in
-  let next_epoch_ledger_hash =
-    Frozen_ledger_hash.of_base58_check_exn next_epoch_ledger_hash_str
+  let min_window_density =
+    block.min_window_density |> Unsigned.UInt32.of_int64
+    |> Mina_numbers.Length.of_uint32
+  in
+  let total_currency =
+    Unsigned.UInt64.of_int64 block.total_currency |> Currency.Amount.of_uint64
+  in
+  let next_available_token =
+    Unsigned.UInt64.of_int64 block.next_available_token |> Token_id.of_uint64
   in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
@@ -91,10 +119,11 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; creator
     ; block_winner
     ; snarked_ledger_hash
-    ; staking_epoch_seed
-    ; staking_epoch_ledger_hash
-    ; next_epoch_seed
-    ; next_epoch_ledger_hash
+    ; staking_epoch_data
+    ; next_epoch_data
+    ; min_window_density
+    ; total_currency
+    ; next_available_token
     ; ledger_hash
     ; height
     ; global_slot_since_hard_fork
@@ -160,7 +189,7 @@ let fill_in_user_commands pool block_state_hash =
         Option.map user_cmd.valid_until ~f:(fun valid ->
             Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32)
       in
-      let memo = user_cmd.memo |> Signed_command_memo.of_string in
+      let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
         query_db ~item:"block user commands" ~f:(fun db ->
