@@ -131,26 +131,11 @@ module Node = struct
           sendTestSnapp(parties: $parties) {
                snapp { id
                        hash
-                       nonce
                        failureReason
                      }
              }
          }
        |}]
-
-    module Send_snapp =
-    [%graphql
-    {|
-      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
-       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
-            snapp { id
-                    hash
-                    nonce
-                    failureReason
-                  }
-          }
-      }
-    |}]
 
     module Get_balance =
     [%graphql
