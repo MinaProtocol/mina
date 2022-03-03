@@ -1697,7 +1697,7 @@ let other_verification_key_constr :
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
-  let _tag, _cache, p, provers =
+  let tag, _cache, p, provers =
     Pickles.compile ~choices
       (module Snapp_statement)
       (module Snapp_statement.Constant)
@@ -1729,6 +1729,11 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     val provers =
       provers |> Obj.magic |> List.map ~f:to_js_prover |> Array.of_list
       |> Js.array
+
+    val getVerificationKeyArtifact =
+      fun () ->
+        let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+        Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
 
     val getVerificationKey =
       fun () ->
@@ -1786,7 +1791,7 @@ module Ledger = struct
   type party_update =
     < appState : js_field set_or_keep Js.js_array Js.t Js.prop
     ; delegate : public_key set_or_keep Js.prop
-    ; verificationKey : verification_key_class Js.t Js.prop
+    ; verificationKey : Js.js_string Js.t set_or_keep Js.prop
     ; votingFor : js_field set_or_keep Js.prop >
     Js.t
 
@@ -2113,6 +2118,13 @@ type AccountPredicate =
       Snapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
+  let verification_key_with_hash (vk_artifact : Js.js_string Js.t) =
+    let vk =
+      Pickles.Side_loaded.Verification_key.of_base58_check_exn
+        (Js.to_string vk_artifact)
+    in
+    { With_hash.data = vk; hash = Mina_base.Snapp_account.digest_vk vk }
+
   let body (b : party_body) : Party.Body.t =
     let update : Party.Update.t =
       let u = b##.update in
@@ -2121,8 +2133,8 @@ type AccountPredicate =
           Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
               set_or_keep field (array_get_exn u##.appState i))
       ; delegate = set_or_keep public_key u##.delegate
-      ; verification_key = (* TODO *)
-                           Keep
+      ; verification_key =
+          set_or_keep verification_key_with_hash u##.verificationKey
       ; permissions = Keep
       ; snapp_uri = Keep
       ; token_symbol = Keep
