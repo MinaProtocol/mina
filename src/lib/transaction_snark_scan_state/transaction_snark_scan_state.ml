@@ -85,7 +85,6 @@ module Job_view = struct
       type t =
         ( Frozen_ledger_hash.t
         , Pending_coinbase.Stack_versioned.t
-        , Token_id.t
         , Mina_state.Local_state.t )
         Mina_state.Registers.t
       [@@deriving to_yojson]
@@ -187,9 +186,6 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root ledger_witness
   in
-  let next_available_token_before =
-    Sparse_ledger.next_available_token ledger_witness
-  in
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
@@ -202,7 +198,6 @@ let create_expected_statement ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)
     |> Or_error.join
   in
-  let next_available_token_after = Sparse_ledger.next_available_token after in
   let target_merkle_root =
     Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
   in
@@ -231,13 +226,11 @@ let create_expected_statement ~constraint_constants
   { Transaction_snark.Statement.source =
       { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
-      ; next_available_token = next_available_token_before
       ; local_state = empty_local_state
       }
   ; target =
       { ledger = target_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
-      ; next_available_token = next_available_token_after
       ; local_state = empty_local_state
       }
   ; fee_excess
@@ -274,14 +267,6 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             s'.source.pending_coinbase_stack
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
-      and () =
-        if
-          Token_id.equal s.target.next_available_token
-            s'.source.next_available_token
-        then Ok ()
-        else
-          Or_error.error_string
-            "Statements have incompatible next_available_token state"
       in
       let statement : Transaction_snark.Statement.t =
         { source = s.source
@@ -550,14 +535,12 @@ struct
       ~(registers_begin :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
-         , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t
          option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
-         , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t) =
     let clarify_error cond err =
@@ -570,10 +553,6 @@ struct
         clarify_error
           (Frozen_ledger_hash.equal reg1.ledger reg2.ledger)
           "did not connect with snarked ledger hash"
-      and () =
-        clarify_error
-          (Token_id.equal reg1.next_available_token reg2.next_available_token)
-          "did not connect with next available token"
       and () =
         clarify_error
           (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack
