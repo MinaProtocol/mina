@@ -18,7 +18,6 @@
    logger
    merkle_ledger
    pipe_lib
-   interruptible
    network_peer
    merkle_address
    direction

@@ -12,7 +12,6 @@
    stdio
    async_kernel
    ;libs
-   blake2
    key_cache
    logger
 )

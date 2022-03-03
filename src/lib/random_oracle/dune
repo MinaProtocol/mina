@@ -14,7 +14,6 @@
    ;libs
    snark_params
    pickles.backend
-   kimchi.pasta_fq_poseidon
    sponge
    pickles
    random_oracle_input

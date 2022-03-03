@@ -24,7 +24,6 @@
    transition_router
    interruptible
    integration_test_lib
-   user_command_input
    graphql_lib
    coda_runtime_config
    mina_base
@@ -33,7 +32,6 @@
    transition_frontier
    genesis_ledger_helper
    block_time
-   exit_handlers
    block_producer
    logger
    mina_base_import

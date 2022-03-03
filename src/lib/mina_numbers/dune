@@ -20,7 +20,6 @@
    pickles
    codable
    ppx_dhall_type
-   snarky_integer
    snarky.backendless
    fold_lib
    tuple_lib

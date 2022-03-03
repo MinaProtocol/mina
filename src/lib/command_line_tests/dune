@@ -11,8 +11,6 @@
    core
    async_unix
    stdio
-   ;libs
-   cache_dir
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))

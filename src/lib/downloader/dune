@@ -13,7 +13,6 @@
    base.caml
    ;libs
    network_peer
-   mina_base
    pipe_lib
    trust_system
    logger

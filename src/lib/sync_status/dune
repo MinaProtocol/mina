@@ -10,9 +10,6 @@
    sexplib0
    base.base_internalhash_types
    ppx_inline_test.config
-   ;libs
-   currency
-   signature_lib
    )
  (preprocess
   (pps ppx_jane ppx_version ppx_deriving_yojson ppx_enumerate))

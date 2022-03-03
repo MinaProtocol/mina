@@ -9,7 +9,6 @@
    base
    ;libs
    snark_params
-   mina_compile_config
    random_oracle
    mina_signature_kind
    hash_prefixes

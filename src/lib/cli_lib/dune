@@ -37,7 +37,6 @@
    rosetta_coding
    logger
    interpolator_lib
-   logproc_lib
    mina_compile_config
    snark_params
    pickles.backend

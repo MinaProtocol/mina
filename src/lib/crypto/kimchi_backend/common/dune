@@ -28,13 +28,11 @@
    base.base_internalhash_types
    ;libs
    tuple_lib
-   snarkette
    snarky.backendless
    key_cache
    pickles_types
    hex
    kimchi
-   sgn_type
    sponge
    allocation_functor
    snarky.intf

@@ -33,7 +33,6 @@
    consensus
    perf_histograms
    mina_base
-   mina_intf
    o1trace
    gossip_net
    unix_timestamp

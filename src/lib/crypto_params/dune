@@ -11,13 +11,10 @@
    ;libs
    kimchi_backend.pasta
    pickles.backend
-   bignum_bigint
    snarky.backendless
-   hash_prefixes
    cache_dir
    group_map
    pickles
-   bowe_gabizon_hash
    tuple_lib
    kimchi_backend
  )

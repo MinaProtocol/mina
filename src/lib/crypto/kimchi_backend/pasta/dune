@@ -16,7 +16,6 @@
    base.caml
    ;libs
    sponge
-   sgn_type
    pickles_types
    kimchi_backend.common
    run_in_thread

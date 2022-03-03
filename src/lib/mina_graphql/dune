@@ -79,7 +79,6 @@
    snark_params
    rosetta_lib
    bootstrap_controller
-   mina_intf
    transition_frontier_persistent_frontier
    mina_metrics
    truth

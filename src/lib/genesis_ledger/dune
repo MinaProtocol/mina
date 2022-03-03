@@ -9,7 +9,6 @@
    key_gen
    mina_base
    signature_lib
-   coda_runtime_config
    currency
    mina_numbers
    genesis_constants

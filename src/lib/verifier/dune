@@ -25,7 +25,6 @@
    snark_params
    memory_stats
    blockchain_snark
-   precomputed_values
    mina_base
    mina_state
    pickles

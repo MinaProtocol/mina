@@ -15,7 +15,6 @@
    logger
    truth
    merkle_list_verifier
-   transition_chain_prover
    consensus
    transition_frontier
    mina_base

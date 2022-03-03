@@ -19,7 +19,7 @@
    ;libs
    file_system
    key_value_database
-   logger)
+)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))

@@ -20,7 +20,6 @@
    base.base_internalhash_types
    async_unix
    ;libs
-   signature_lib
    merkle_address
    immutable_array
    direction

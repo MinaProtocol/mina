@@ -12,9 +12,6 @@
    ppx_inline_test.config
    bin_prot.shape
    result
-   ;libs
-   quickcheck_lib
-   logger
  )
  (preprocess
   (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))

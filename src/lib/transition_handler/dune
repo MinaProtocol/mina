@@ -26,7 +26,6 @@
    otp_lib
    pipe_lib
    rose_tree
-   mina_intf
    consensus
    transition_frontier
    perf_histograms

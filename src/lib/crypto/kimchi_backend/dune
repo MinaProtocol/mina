@@ -22,7 +22,6 @@
    run_in_thread
    kimchi_backend.pasta
    pickles_types
-   sgn_type
    sponge
    snarky.intf
 ))

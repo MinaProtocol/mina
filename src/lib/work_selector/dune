@@ -32,7 +32,6 @@
    unix_timestamp
    debug_assert
    logger
-   mina_intf
    currency
    one_or_two
    transaction_snark

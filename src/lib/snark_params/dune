@@ -21,7 +21,6 @@
    sponge
    group_map
    fold_lib
-   o1trace
    tuple_lib
    bitstring_lib
    snark_bits

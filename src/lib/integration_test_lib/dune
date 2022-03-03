@@ -35,7 +35,6 @@
    mina_base
    genesis_constants
    transition_router
-   user_command_input
    signature_lib
    secrets
    network_pool

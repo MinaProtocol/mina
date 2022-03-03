@@ -37,7 +37,6 @@
    mina_base
    snark_worker
    mina_transition
-   block_producer
    daemon_rpcs
    otp_lib
    snark_work_lib

@@ -17,9 +17,7 @@
    mina_transition
    transaction_snark
    blockchain_snark
-   mina_incremental
    proof_carrying_data
-   gadt_lib
    truth
    currency
    signature_lib

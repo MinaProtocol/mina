@@ -31,7 +31,6 @@
    genesis_constants
    cache_dir
    coda_genesis_proof
-   mina_user_error
    currency
    data_hash_lib
    snark_params

@@ -8,6 +8,5 @@
    core_kernel
    ;libs
    snarky.backendless
-   kimchi_backend
    pickles_types
 ))

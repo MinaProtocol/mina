@@ -40,9 +40,7 @@
    random_oracle
    bignum_bigint
    graphql_lib
-   global_signer_private_key
    vrf_lib
-   rc_pool
    snark_params
    with_hash
    mina_ledger
@@ -51,7 +49,6 @@
    mina_base
    key_gen
    block_time
-   test_genesis_ledger
    perf_histograms
    test_util
    unix_timestamp
