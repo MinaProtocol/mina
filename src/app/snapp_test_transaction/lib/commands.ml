@@ -706,25 +706,7 @@ let%test_module "Snapps test transaction" =
           io_field "sendSnapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
-            ~resolve:
-              (fun _ () (fee_payer_result, other_parties_results, memo) ->
-              let parties_result =
-                let open Result.Let_syntax in
-                let other_parties_result = Result.all other_parties_results in
-                let%bind fee_payer = fee_payer_result in
-                let%bind other_parties = other_parties_result in
-                let result_of_exn f v ~error =
-                  try Ok (f v) with _ -> Error error
-                in
-                let%map memo =
-                  Option.value_map memo ~default:(Ok Signed_command_memo.empty)
-                    ~f:(fun memo ->
-                      result_of_exn Signed_command_memo.create_from_string_exn
-                        memo ~error:"Invalid `memo` provided.")
-                in
-                { Parties.fee_payer; other_parties; memo }
-              in
-              let parties_result = Result.ok_or_failwith parties_result in
+            ~resolve:(fun _ () (parties' : Parties.t) ->
               let failed = ref false in
               let printf_diff ~label expected got =
                 if String.equal expected got then ()
@@ -735,9 +717,9 @@ let%test_module "Snapps test transaction" =
               printf_diff ~label:"fee payer"
                 ( Party.Fee_payer.to_yojson parties.fee_payer
                 |> Yojson.Safe.to_string )
-                ( Party.Fee_payer.to_yojson parties_result.fee_payer
+                ( Party.Fee_payer.to_yojson parties'.fee_payer
                 |> Yojson.Safe.to_string ) ;
-              List.iter2_exn parties.other_parties parties_result.other_parties
+              List.iter2_exn parties.other_parties parties'.other_parties
                 ~f:(fun expected got ->
                   printf_diff ~label:"party"
                     (Party.to_yojson expected |> Yojson.Safe.to_string)
