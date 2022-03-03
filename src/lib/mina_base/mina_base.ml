@@ -18,7 +18,6 @@ module Frozen_ledger_hash = Frozen_ledger_hash
 module Frozen_ledger_hash0 = Frozen_ledger_hash0
 module Hack_snarky_tests = Hack_snarky_tests
 module Hash_prefix = Hash_prefix
-module How_to_obtain_keys = How_to_obtain_keys
 module Insecure = Insecure
 module Ledger_hash = Ledger_hash
 module Ledger_hash0 = Ledger_hash0
