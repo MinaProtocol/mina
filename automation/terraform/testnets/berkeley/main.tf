@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "berkeley"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-bionic-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-bionic"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -94,9 +94,8 @@ module "berkeley" {
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   archive_node_count  = 3
-  # mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/feature/snapps-protocol/src/app/archive/create_schema.sql" 
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"]
+  mina_archive_schema = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"]
 
 
   archive_configs       = [
