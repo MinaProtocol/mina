@@ -2472,7 +2472,7 @@ module Types = struct
               ; timing = v timing'
               ; voting_for = v voting_for
               }
-              : _ Party.Update.Poly.t ))
+              : Party.Update.t ))
           ~fields:
             [ arg "appState"
                 ~doc:"List of _exactly_ 8 field elements (null if keep)"
