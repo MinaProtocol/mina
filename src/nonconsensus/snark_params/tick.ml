@@ -87,7 +87,7 @@ module Inner_curve = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
        where it is versioned-asserted and its serialization tested
     *)
-    type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp]
+    type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp, equal, compare, hash]
 
     type _unused = unit constraint t = Tock.Field.t
 
@@ -97,8 +97,6 @@ module Inner_curve = struct
     Pasta.Fq.
       ( to_string
       , of_string
-      , equal
-      , compare
       , size
       , zero
       , one
@@ -106,8 +104,7 @@ module Inner_curve = struct
       , ( - )
       , ( * )
       , gen_uniform_incl
-      , negate
-      , hash_fold_t )]
+      , negate )]
 
     (* Pasta.Fq.gen uses the interval starting at zero
        here we follow the gen in Snark_params.Make_inner_curve_scalar, using
