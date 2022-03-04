@@ -252,6 +252,10 @@ module List = struct
           i + 1)
     in
     ()
+
+  let for_all ls ~f =
+    let open T.Let_syntax in
+    fold ls ~init:true ~f:(fun acc x -> if acc then f x else return false)
 end
 
 let%test_module "malleable error unit tests" =

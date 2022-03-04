@@ -160,12 +160,10 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
 
+type output_type = [ `Chunks | `Lines ]
+
 (* Convert a Async.Reader.t into a Strict_pipe.Reader.t *)
-let reader_to_strict_pipe reader name output_type =
-  let r, w =
-    Strict_pipe.create ~name
-      (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
-  in
+let reader_to_strict_pipe reader output_type =
   let pipe =
     match output_type with
     | `Chunks ->
@@ -173,17 +171,7 @@ let reader_to_strict_pipe reader name output_type =
     | `Lines ->
         Reader.lines reader
   in
-  don't_wait_for
-    (let%map () =
-       Pipe.iter_without_pushback pipe ~f:(fun msg ->
-           if not (Strict_pipe.Writer.is_closed w) then
-             try Strict_pipe.Writer.write w msg
-             with Strict_pipe.Overflow _ -> Strict_pipe.Writer.close w)
-     in
-     if not (Strict_pipe.Writer.is_closed w) then Strict_pipe.Writer.close w) ;
-  r
-
-type output_type = [ `Chunks | `Lines ]
+  Strict_pipe.Reader.of_linear_pipe { pipe; has_reader = false }
 
 let start_custom :
        logger:Logger.t
@@ -256,12 +244,8 @@ let start_custom :
          ~contents:(Pid.to_string @@ Process.pid process)
   in
   let terminated_ivar = Ivar.create () in
-  let stdout_pipe =
-    reader_to_strict_pipe (Process.stdout process) (name ^ "-stdout") stdout
-  in
-  let stderr_pipe =
-    reader_to_strict_pipe (Process.stderr process) (name ^ "-stderr") stderr
-  in
+  let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in
+  let stderr_pipe = reader_to_strict_pipe (Process.stderr process) stderr in
   let t =
     { process
     ; stdout_pipe

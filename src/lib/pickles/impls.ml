@@ -33,6 +33,19 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
+  module Verification_key = Tick.Verification_key
+  module Proving_key = Tick.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tick.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     (* Tick.Field.t = p < q = Tock.Field.t *)
@@ -136,6 +149,19 @@ module Wrap = struct
   module Digest = Digest.Make (Impl)
   module Wrap_field = Tock.Field
   module Step_field = Tick.Field
+  module Verification_key = Tock.Verification_key
+  module Proving_key = Tock.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tock.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     module Constant = Tick.Field

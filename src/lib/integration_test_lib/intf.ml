@@ -68,13 +68,28 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+        -> Currency.Balance.t Deferred.Or_error.t
 
       val must_get_balance :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
+
+      val get_account_permissions :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Permissions.t Deferred.Or_error.t
+
+      (** the returned Update.t is constructed from the fields of the
+          given account, as if it had been applied to the account
+      *)
+      val get_account_update :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Party.Update.t Deferred.Or_error.t
 
       val get_peer_id :
            logger:Logger.t
@@ -244,6 +259,8 @@ module Dsl = struct
       -> t
 
     val node_to_initialize : Engine.Network.Node.t -> t
+
+    val nodes_to_initialize : Engine.Network.Node.t list -> t
 
     val blocks_to_be_produced : int -> t
 

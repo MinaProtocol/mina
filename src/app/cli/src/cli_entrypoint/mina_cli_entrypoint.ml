@@ -970,7 +970,7 @@ let setup_daemon logger =
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let genesis_state_hash =
-        Precomputed_values.genesis_state_hash precomputed_values
+        (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
       in
       let genesis_ledger_hash =
         Precomputed_values.genesis_ledger precomputed_values
@@ -994,7 +994,7 @@ let setup_daemon logger =
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
           ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            precomputed_values.protocol_state_with_hashes.hash.state_hash
       in
       trace_database_initialization "epoch ledger" __LOC__ epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
