@@ -38,6 +38,10 @@ class Client {
     return minaSDK.genKeys();
   }
 
+  public signTransaction(parties: string): Number {
+    return minaSDK.signTransaction(parties);
+  }
+
   /**
    * Verifies if a key pair is valid by checking if the public key can be derived from
    * the private key and additionally checking if we can use the private key to
