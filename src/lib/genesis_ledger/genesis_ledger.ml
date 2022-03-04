@@ -33,19 +33,6 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
         (Some sk, account_with_timing account_id balance timing))
 end
 
-module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
-  include Accounts
-
-  let accounts =
-    let open Lazy.Let_syntax in
-    let%map accounts = Accounts.accounts in
-    List.map accounts ~f:(fun { pk; balance; delegate; timing } ->
-        let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_int balance in
-        let base_acct = account_with_timing account_id balance timing in
-        (None, { base_acct with delegate = Option.value ~default:pk delegate }))
-end
-
 (** Generate a ledger using the sample keypairs from [Mina_base] with the given
     balances.
 *)
@@ -79,7 +66,7 @@ module Utils = struct
     let private_key = Option.value_exn private_key ~message:sk_error_msg in
     let public_key =
       Option.value_exn
-        (Public_key.decompress account.Poly.Stable.Latest.public_key)
+        (Public_key.decompress account.public_key)
         ~message:pk_error_msg
     in
     { Keypair.public_key; private_key }
@@ -213,7 +200,7 @@ end) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
-            Balance.compare a.Account.Poly.balance b.Account.Poly.balance)
+            Balance.compare a.balance b.balance)
         |> Option.value_exn ?here:None ?error:None ~message:error_msg)
 
   let largest_account_id_exn =

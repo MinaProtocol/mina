@@ -497,7 +497,7 @@ let timing_error_to_user_command_status err =
         used, as it contains an incorrect placeholder value.
 *)
 let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
-  let open Account.Poly in
+  let open Account.Stable.Latest in
   let open Account.Timing.Poly in
   match account.timing with
   | Untimed -> (
@@ -550,7 +550,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
         at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
         is insufficient"
-      kind txn_amount txn_global_slot account.Account.Poly.balance
+      kind txn_amount txn_global_slot account.Account.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   let min_balance_error min_balance =
@@ -2554,22 +2554,7 @@ module For_tests = struct
   open Currency
 
   module Account_without_receipt_chain_hash = struct
-    type t =
-      ( Public_key.Compressed.t
-      , Token_id.t
-      , Token_permissions.t
-      , Account.Token_symbol.t
-      , Balance.t
-      , Account_nonce.t
-      , unit
-      , Public_key.Compressed.t option
-      , State_hash.t
-      , Account_timing.t
-      , Permissions.t
-      , Snapp_account.t option
-      , string )
-      Account.Poly.t
-    [@@deriving sexp, compare]
+    type t = Account.t [@@deriving sexp, compare]
   end
 
   let min_init_balance = 8_000_000_000
@@ -2831,8 +2816,8 @@ module For_tests = struct
                   other did not"
                 a ()
             in
-            let hide_rc (a : _ Account.Poly.t) =
-              { a with receipt_chain_hash = () }
+            let hide_rc (a : Account.t) =
+              { a with receipt_chain_hash = Snark_params.Tick.Field.zero }
             in
             match L.(location_of_account l1 a, location_of_account l2 a) with
             | None, None ->

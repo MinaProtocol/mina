@@ -1098,10 +1098,9 @@ module Base = struct
     [%with_label "check signature"]
       (Boolean.Assert.any [ Boolean.not is_user_command; verifies ])
 
-  let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
-      ~txn_global_slot =
+  let check_timing' ~balance_check ~timed_balance_check ~account_timing
+      ~account_balance ~txn_amount ~txn_global_slot =
     (* calculations should track Transaction_logic.validate_timing *)
-    let open Account.Poly in
     let open Account.Timing.As_record in
     let { is_timed
         ; initial_minimum_balance
@@ -1110,7 +1109,7 @@ module Base = struct
         ; vesting_period
         ; vesting_increment
         } =
-      account.timing
+      account_timing
     in
     let%bind curr_min_balance =
       Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
@@ -1121,13 +1120,13 @@ module Base = struct
       match txn_amount with
       | Some txn_amount ->
           let%bind proposed_balance, `Underflow underflow =
-            Balance.Checked.sub_amount_flagged account.balance txn_amount
+            Balance.Checked.sub_amount_flagged account_balance txn_amount
           in
           (* underflow indicates insufficient balance *)
           let%map () = balance_check (Boolean.not underflow) in
           proposed_balance
       | None ->
-          return account.balance
+          return account_balance
     in
     let%bind sufficient_timed_balance =
       Balance.Checked.( >= ) proposed_balance curr_min_balance
@@ -1144,9 +1143,21 @@ module Base = struct
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
     let%map timing =
       Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
-        ~else_:account.timing
+        ~else_:account_timing
     in
     (`Min_balance curr_min_balance, timing)
+
+  let check_timing ~balance_check ~timed_balance_check
+      ~(account : Account.Checked.t) ~txn_amount ~txn_global_slot =
+    check_timing' ~balance_check ~timed_balance_check
+      ~account_timing:account.timing ~account_balance:account.balance
+      ~txn_amount ~txn_global_slot
+
+  let check_timing_unhashed ~balance_check ~timed_balance_check
+      ~(account : Account.Checked.Unhashed.t) ~txn_amount ~txn_global_slot =
+    check_timing' ~balance_check ~timed_balance_check
+      ~account_timing:account.timing ~account_balance:account.balance
+      ~txn_amount ~txn_global_slot
 
   let side_loaded =
     Memo.of_comparable
@@ -1459,13 +1470,7 @@ module Base = struct
 
           let account_with_hash (account : Account.Checked.Unhashed.t) =
             With_hash.of_data account ~hash_data:(fun a ->
-                let a =
-                  { a with
-                    snapp =
-                      ( Snapp_account.Checked.digest a.snapp
-                      , As_prover.Ref.create (fun () -> None) )
-                  }
-                in
+                let a = Account.Checked.of_unhashed a in
                 run_checked (Account.Checked.digest a))
 
           type timing = Account_timing.var
@@ -1490,8 +1495,8 @@ module Base = struct
             let `Min_balance _, timing =
               run_checked
               @@ [%with_label "Check snapp timing"]
-                   (check_timing ~balance_check ~timed_balance_check ~account
-                      ~txn_amount:None ~txn_global_slot)
+                   (check_timing_unhashed ~balance_check ~timed_balance_check
+                      ~account ~txn_amount:None ~txn_global_slot)
             in
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
@@ -2811,7 +2816,7 @@ module Base = struct
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.delegate
              in
-             { Account.Poly.balance
+             { Account.Checked.balance
              ; public_key
              ; token_id
              ; token_permissions = account.token_permissions
@@ -3003,7 +3008,7 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             { Account.Poly.balance
+             { Account.Checked.balance
              ; public_key
              ; token_id
              ; token_permissions =
@@ -3156,7 +3161,7 @@ module Base = struct
                 of [user_command_fails], but we throw the resulting hash away
                 in [final_root] below, so it shouldn't matter.
              *)
-             { Account.Poly.balance
+             { Account.Checked.balance
              ; public_key = account.public_key
              ; token_id = account.token_id
              ; token_permissions = account.token_permissions
@@ -8130,7 +8135,7 @@ let%test_module "account timing check" =
     (* test that unchecked and checked calculations for timing agree *)
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
-      let account = Account.var_of_t account in
+      let account = Account.Checked.constant account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
       let%map `Min_balance min_balance, timing =

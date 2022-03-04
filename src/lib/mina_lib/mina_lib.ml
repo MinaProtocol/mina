@@ -698,7 +698,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   | None ->
       let open Participating_state.Option.Let_syntax in
       let%map account = get_account t account_id in
-      account.Account.Poly.nonce
+      account.Account.nonce
 
 let snark_job_state t = t.snark_job_state
 
@@ -901,7 +901,7 @@ let get_current_nonce t aid =
       let ledger_nonce =
         Participating_state.active (get_account t aid)
         |> Option.join
-        |> Option.map ~f:(fun { Account.Poly.nonce; _ } -> nonce)
+        |> Option.map ~f:(fun { Account.nonce; _ } -> nonce)
         |> Option.value ~default:nonce
       in
       Ok (`Min ledger_nonce, nonce)

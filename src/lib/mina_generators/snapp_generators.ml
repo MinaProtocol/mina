@@ -35,7 +35,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
             "gen_predicate_from: could not find account with known location"
       | Some account ->
           let%bind b = Quickcheck.Generator.bool in
-          let { Account.Poly.public_key
+          let { Account.public_key
               ; balance
               ; nonce
               ; receipt_chain_hash
@@ -238,7 +238,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
               return (Party.Predicate.Full faulty_predicate_account)
           else
             (* Nonce *)
-            let { Account.Poly.nonce; _ } = account in
+            let { Account.nonce; _ } = account in
             if succeed then return (Party.Predicate.Nonce nonce)
             else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
 

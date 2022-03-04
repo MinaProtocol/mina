@@ -793,50 +793,24 @@ module Types = struct
     end
 
     module Partial_account = struct
-      let to_full_account
-          { Account.Poly.public_key
-          ; token_id
-          ; token_permissions
-          ; token_symbol
-          ; nonce
-          ; balance
-          ; receipt_chain_hash
-          ; delegate
-          ; voting_for
-          ; timing
-          ; permissions
-          ; snapp
-          ; snapp_uri
-          } =
-        let open Option.Let_syntax in
-        let%bind public_key = public_key in
-        let%bind token_permissions = token_permissions in
-        let%bind token_symbol = token_symbol in
-        let%bind nonce = nonce in
-        let%bind receipt_chain_hash = receipt_chain_hash in
-        let%bind delegate = delegate in
-        let%bind voting_for = voting_for in
-        let%bind timing = timing in
-        let%bind permissions = permissions in
-        let%bind snapp = snapp in
-        let%map snapp_uri = snapp_uri in
-        { Account.Poly.public_key
-        ; token_id
-        ; token_permissions
-        ; token_symbol
-        ; nonce
-        ; balance
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing
-        ; permissions
-        ; snapp
-        ; snapp_uri
+      type t =
+        { public_key : Public_key.Compressed.t
+        ; token_id : Token_id.t
+        ; token_permissions : Token_permissions.t option
+        ; token_symbol : Account.Token_symbol.t option
+        ; balance : AnnotatedBalance.t
+        ; nonce : Account.Nonce.t option
+        ; receipt_chain_hash : Receipt.Chain_hash.t option
+        ; delegate : Public_key.Compressed.t option
+        ; voting_for : State_hash.t option
+        ; timing : Account.Timing.t
+        ; permissions : Permissions.t option
+        ; snapp : Snapp_account.t option
+        ; snapp_uri : string option
         }
 
       let of_full_account ?breadcrumb
-          { Account.Poly.public_key
+          { Account.public_key
           ; token_id
           ; token_permissions
           ; token_symbol
@@ -850,7 +824,7 @@ module Types = struct
           ; snapp
           ; snapp_uri
           } =
-        { Account.Poly.public_key
+        { public_key
         ; token_id
         ; token_permissions = Some token_permissions
         ; token_symbol = Some token_symbol
@@ -886,47 +860,35 @@ module Types = struct
         | Some (account, breadcrumb) ->
             of_full_account ~breadcrumb account
         | None ->
-            Account.
-              { Poly.public_key = Account_id.public_key account_id
-              ; token_id = Account_id.token_id account_id
-              ; token_permissions = None
-              ; token_symbol = None
-              ; nonce = None
-              ; delegate = None
-              ; balance =
-                  { AnnotatedBalance.total = Balance.zero
-                  ; unknown = Balance.zero
-                  ; timing = Timing.Untimed
-                  ; breadcrumb = None
-                  }
-              ; receipt_chain_hash = None
-              ; voting_for = None
-              ; timing = Timing.Untimed
-              ; permissions = None
-              ; snapp = None
-              ; snapp_uri = None
-              }
+            { public_key = Account_id.public_key account_id
+            ; token_id = Account_id.token_id account_id
+            ; token_permissions = None
+            ; token_symbol = None
+            ; nonce = None
+            ; delegate = None
+            ; balance =
+                { AnnotatedBalance.total = Balance.zero
+                ; unknown = Balance.zero
+                ; timing = Account.Timing.Untimed
+                ; breadcrumb = None
+                }
+            ; receipt_chain_hash = None
+            ; voting_for = None
+            ; timing = Account.Timing.Untimed
+            ; permissions = None
+            ; snapp = None
+            ; snapp_uri = None
+            }
 
       let of_pk coda pk =
         of_account_id coda (Account_id.create pk Token_id.default)
+
+      let account_id { public_key; token_id; _ } =
+        Account_id.create public_key token_id
     end
 
     type t =
-      { account :
-          ( Public_key.Compressed.t
-          , Token_id.t
-          , Token_permissions.t option
-          , Account.Token_symbol.t option
-          , AnnotatedBalance.t
-          , Account.Nonce.t option
-          , Receipt.Chain_hash.t option
-          , Public_key.Compressed.t option
-          , State_hash.t option
-          , Account.Timing.t
-          , Permissions.t option
-          , Snapp_account.t option
-          , string option )
-          Account.Poly.t
+      { account : Partial_account.t
       ; locked : bool option
       ; is_actively_staking : bool
       ; path : string
@@ -962,9 +924,6 @@ module Types = struct
 
     let get_best_ledger_account_pk coda pk =
       lift coda pk (Partial_account.of_pk coda pk)
-
-    let account_id { Account.Poly.public_key; token_id; _ } =
-      Account_id.create public_key token_id
 
     let auth_required =
       let open Permissions.Auth_required in
@@ -1066,21 +1025,23 @@ module Types = struct
                  ~doc:"The public identity of the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.public_key)
+                   account.Partial_account.public_key)
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.token_id)
+                   account.Partial_account.token_id)
              ; field "timing" ~typ:(non_null account_timing)
                  ~doc:"The timing associated with this account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.timing)
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Partial_account.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
                  ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Partial_account.balance)
              ; field "nonce" ~typ:string
                  ~doc:
                    "A natural number that increases with each transaction \
@@ -1088,7 +1049,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map ~f:Account.Nonce.to_string
-                     account.Account.Poly.nonce)
+                     account.Partial_account.nonce)
              ; field "inferredNonce" ~typ:string
                  ~doc:
                    "Like the `nonce` field, except it includes the scheduled \
@@ -1096,7 +1057,7 @@ module Types = struct
                     (stringified uint32)"
                  ~args:Arg.[]
                  ~resolve:(fun { ctx = coda; _ } { account; _ } ->
-                   let account_id = account_id account in
+                   let account_id = Partial_account.account_id account in
                    match
                      Mina_lib
                      .get_inferred_nonce_from_transaction_pool_and_ledger coda
@@ -1113,7 +1074,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
-                   let account_id = account_id account in
+                   let account_id = Partial_account.account_id account in
                    match%bind Mina_lib.staking_ledger coda with
                    | Genesis_epoch_ledger staking_ledger -> (
                        match
@@ -1154,7 +1115,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map ~f:Receipt.Chain_hash.to_base58_check
-                     account.Account.Poly.receipt_chain_hash)
+                     account.Partial_account.receipt_chain_hash)
              ; field "delegate" ~typ:public_key
                  ~doc:
                    "The public key to which you are delegating - if you are \
@@ -1163,7 +1124,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~deprecated:(Deprecated (Some "use delegateAccount instead"))
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.delegate)
+                   account.Partial_account.delegate)
              ; field "delegateAccount" ~typ:(Lazy.force account)
                  ~doc:
                    "The account to which you are delegating - if you are not \
@@ -1172,7 +1133,7 @@ module Types = struct
                  ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    Option.map
                      ~f:(get_best_ledger_account_pk coda)
-                     account.Account.Poly.delegate)
+                     account.Partial_account.delegate)
              ; field "delegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
                  ~doc:
@@ -1182,7 +1143,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
-                   let pk = account.Account.Poly.public_key in
+                   let pk = account.Partial_account.public_key in
                    let%map delegators =
                      Mina_lib.current_epoch_delegators coda ~pk
                    in
@@ -1213,7 +1174,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
-                   let pk = account.Account.Poly.public_key in
+                   let pk = account.Partial_account.public_key in
                    let%map delegators =
                      Mina_lib.last_epoch_delegators coda ~pk
                    in
@@ -1241,7 +1202,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map ~f:Mina_base.State_hash.to_base58_check
-                     account.Account.Poly.voting_for)
+                     account.Partial_account.voting_for)
              ; field "stakingActive" ~typ:(non_null bool)
                  ~doc:
                    "True if you are actively staking with this account on the \
@@ -1293,7 +1254,7 @@ module Types = struct
                     the snapp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp_uri)
+                   account.Partial_account.snapp_uri)
              ; field "snappState"
                  ~typ:(list @@ non_null string)
                  ~doc:
@@ -1301,7 +1262,7 @@ module Types = struct
                     with this account encoded as bignum strings"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp
+                   account.Partial_account.snapp
                    |> Option.map ~f:(fun snapp_account ->
                           snapp_account.app_state |> Snapp_state.V.to_list
                           |> List.map ~f:Snapp_basic.F.to_string))
@@ -1309,24 +1270,24 @@ module Types = struct
                  ~doc:"Permissions for updating certain fields of this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.permissions)
+                   account.Partial_account.permissions)
              ; field "tokenSymbol" ~typ:string
                  ~doc:"The token symbol associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.token_symbol)
+                   account.Partial_account.token_symbol)
              ; field "verificationKey" ~typ:account_vk
                  ~doc:"Verification key associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.value_map account.Account.Poly.snapp ~default:None
+                   Option.value_map account.Partial_account.snapp ~default:None
                      ~f:(fun snapp_account -> snapp_account.verification_key))
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
                  ~typ:(list (non_null string))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map account.Account.Poly.snapp
+                   Option.map account.Partial_account.snapp
                      ~f:(fun snapp_account ->
                        List.map ~f:Snark_params.Tick.Field.to_string
                          (Pickles_types.Vector.to_list

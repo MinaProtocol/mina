@@ -32,18 +32,18 @@ let get_keys_with_details t =
   let%map accounts = get_accounts t in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_int ))
+      , account.Account.balance |> Currency.Balance.to_int
+      , account.Account.nonce |> Account.Nonce.to_int ))
 
 let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.nonce
+  account.Account.nonce
 
 let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.balance
+  account.Account.balance
 
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Mina_lib.config t in
@@ -186,7 +186,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
-  let resulting_receipt = account.Account.Poly.receipt_chain_hash in
+  let resulting_receipt = account.Account.receipt_chain_hash in
   let open Or_error.Let_syntax in
   let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
     Result.of_option

@@ -28,6 +28,8 @@ module Merkle_tree =
     (struct
       include Account
 
+      type var = Checked.t
+
       let hash = Checked.digest
     end)
 
@@ -82,7 +84,7 @@ let get ~depth t addr =
      account [f account] at path [addr].
 *)
 let%snarkydef modify_account ~depth t aid
-    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
+    ~(filter : Account.Checked.t -> ('a, _) Checked.t) ~f =
   let%bind addr =
     request_witness
       (Account.Index.Unpacked.typ ~ledger_depth:depth)
@@ -109,7 +111,7 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
     ~filter:(fun account ->
       [%with_label "modify_account_send filter"]
         (let%bind account_already_there =
-           Account_id.Checked.equal (Account.identifier_of_var account) aid
+           Account_id.Checked.equal (Account.Checked.identifier account) aid
          in
          let%bind account_not_there =
            Public_key.Compressed.Checked.equal account.public_key
@@ -139,7 +141,7 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
     ~filter:(fun account ->
       [%with_label "modify_account_recv filter"]
         (let%bind account_already_there =
-           Account_id.Checked.equal (Account.identifier_of_var account) aid
+           Account_id.Checked.equal (Account.Checked.identifier account) aid
          in
          let%bind account_not_there =
            Public_key.Compressed.Checked.equal account.public_key

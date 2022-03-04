@@ -2091,8 +2091,8 @@ module Data = struct
 
     let supercharge_coinbase (t : Value.t) = t.supercharge_coinbase
 
-    let compute_supercharge_coinbase ~(winner_account : Mina_base.Account.var)
-        ~global_slot =
+    let compute_supercharge_coinbase
+        ~(winner_account : Mina_base.Account.Checked.t) ~global_slot =
       let open Snark_params.Tick in
       let%map winner_locked =
         Mina_base.Account.Checked.has_locked_tokens ~global_slot winner_account

@@ -1903,7 +1903,7 @@ let%test_module _ =
     let mk_account ~idx ~balance ~nonce =
       let public_key = Public_key.compress @@ test_keys.(idx).public_key in
       ( idx
-      , { Account.Poly.Stable.Latest.public_key
+      , { Account.public_key
         ; token_id = Token_id.default
         ; token_permissions =
             Token_permissions.Not_owned { account_disabled = false }
