@@ -2,5 +2,12 @@
  (name with_hash)
  (public_name with_hash)
  (libraries core_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_deriving.std ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_deriving.std
+   ppx_version
+   ppx_fields_conv)))

@@ -6,7 +6,7 @@ module Stable = struct
 
   module V1 = struct
     type ('a, 'h) t = { data : 'a; hash : 'h }
-    [@@deriving sexp, equal, compare, hash, yojson]
+    [@@deriving sexp, equal, compare, hash, yojson, fields]
 
     let to_latest data_latest hash_latest { data; hash } =
       { data = data_latest data; hash = hash_latest hash }

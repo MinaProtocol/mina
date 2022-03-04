@@ -9,6 +9,8 @@
    snark_params
    outside_hash_image
    random_oracle
+   fields_derivers
+   fields_derivers.snapps
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

@@ -473,3 +473,73 @@ let empty : t =
   ; increment_nonce = None
   ; set_voting_for = None
   }
+
+(* deriving-fields-related stuff *)
+let auth_required_to_string = function
+  | Auth_required.Stable.Latest.None ->
+      "None"
+  | Either ->
+      "Either"
+  | Proof ->
+      "Proof"
+  | Signature ->
+      "Signature"
+  | Impossible ->
+      "Impossible"
+
+let auth_required_of_string = function
+  | "None" ->
+      Auth_required.Stable.Latest.None
+  | "Either" ->
+      Either
+  | "Proof" ->
+      Proof
+  | "Signature" ->
+      Signature
+  | "Impossible" ->
+      Impossible
+  | _ ->
+      failwith "auth_required_of_string: unknown variant"
+
+let auth_required =
+  Fields_derivers_snapps.Derivers.iso_string ~name:"AuthRequired"
+    ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
+    ~of_string:auth_required_of_string
+
+let deriver obj =
+  let open Fields_derivers_snapps.Derivers in
+  Poly.Fields.make_creator obj ~stake:!.bool ~edit_state:!.auth_required
+    ~send:!.auth_required ~receive:!.auth_required ~set_delegate:!.auth_required
+    ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
+    ~set_snapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
+    ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
+    ~set_voting_for:!.auth_required
+  |> finish ~name:"Permissions"
+
+let%test_unit "json roundtrip" =
+  let open Fields_derivers_snapps.Derivers in
+  let full = o () in
+  let _a = deriver full in
+  [%test_eq: t] user_default (user_default |> to_json full |> of_json full)
+
+let%test_unit "json value" =
+  let open Fields_derivers_snapps.Derivers in
+  let full = o () in
+  let _a = deriver full in
+  [%test_eq: string]
+    (user_default |> to_json full |> Yojson.Safe.to_string)
+    ( {json|{
+        stake: true,
+        editState: "Signature",
+        send: "Signature",
+        receive: "None",
+        setDelegate: "Signature",
+        setPermissions: "Signature",
+        setVerificationKey: "Signature",
+        setSnappUri: "Signature",
+        editSequenceState: "Signature",
+        setTokenSymbol: "Signature",
+        incrementNonce: "Signature",
+        setVotingFor: "Signature"
+      }|json}
+    |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
