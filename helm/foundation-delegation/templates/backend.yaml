@@ -27,6 +27,18 @@ spec:
         - name: backend
           protocol: TCP
           containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
       {{- if .Values.backend.secret }}
         volumeMounts:
           - name: backend-creds
@@ -39,3 +51,4 @@ spec:
             - key: creds
               path: creds.json
       {{- end }}
+
