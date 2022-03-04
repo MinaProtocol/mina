@@ -7,6 +7,8 @@ module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
 
+(* TODO: I think there are other forbidden values as well. *)
+
 (** returns all the values that can fit in [~size_in_bits] bits and that are
  * either congruent with -2^[~size_in_bits] mod [~modulus] 
  * or congruent with -2^[~size_in_bits] - 1 mod [~modulus] 
@@ -31,6 +33,19 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
+  module Verification_key = Tick.Verification_key
+  module Proving_key = Tick.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tick.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     (* Tick.Field.t = p < q = Tock.Field.t *)
@@ -77,30 +92,30 @@ module Step = struct
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
 
-    let (typ_unchecked : (t, Constant.t) Typ.t), check =
-      let t0 =
-        Typ.transport
-          (Typ.tuple2 Field.typ Boolean.typ)
-          ~there:(fun x ->
-            let low, high = Util.split_last (Tock.Field.to_bits x) in
-            (Field.Constant.project low, high))
-          ~back:(fun (low, high) ->
-            let low, _ = Util.split_last (Field.Constant.unpack low) in
-            Tock.Field.of_bits (low @ [ high ]))
+    let typ_unchecked : (t, Constant.t) Typ.t =
+      Typ.transport
+        (Typ.tuple2 Field.typ Boolean.typ)
+        ~there:(fun x ->
+          match Tock.Field.to_bits x with
+          | [] ->
+              assert false
+          | low :: high ->
+              (Field.Constant.project high, low))
+        ~back:(fun (high, low) ->
+          let high = Field.Constant.unpack high in
+          Tock.Field.of_bits (low :: high))
+
+    let check t =
+      let open Internal_Basic in
+      let open Let_syntax in
+      let equal (x1, b1) (x2, b2) =
+        let%bind x_eq = Field.Checked.equal x1 (Field.Var.constant x2) in
+        let b_eq = match b2 with true -> b1 | false -> Boolean.not b1 in
+        Boolean.( && ) x_eq b_eq
       in
-      let check t =
-        let open Internal_Basic in
-        let open Let_syntax in
-        let equal (x1, b1) (x2, b2) =
-          let%bind x_eq = Field.Checked.equal x1 (Field.Var.constant x2) in
-          let b_eq = match b2 with true -> b1 | false -> Boolean.not b1 in
-          Boolean.( && ) x_eq b_eq
-        in
-        let%bind () = t0.check t in
-        Checked.List.map forbidden_shifted_values ~f:(equal t)
-        >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
-      in
-      (t0, check)
+      let%bind () = typ_unchecked.check t in
+      Checked.List.map forbidden_shifted_values ~f:(equal t)
+      >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
     let typ = { typ_unchecked with check }
 
@@ -117,8 +132,8 @@ module Step = struct
       Spec.packed_typ
         (module Impl)
         (T
-           ( Shifted_value.typ Other_field.typ_unchecked
-           , fun (Shifted_value x as t) ->
+           ( Shifted_value.Type2.typ Other_field.typ_unchecked
+           , fun (Shifted_value.Type2.Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t ))
         spec
@@ -134,6 +149,19 @@ module Wrap = struct
   module Digest = Digest.Make (Impl)
   module Wrap_field = Tock.Field
   module Step_field = Tick.Field
+  module Verification_key = Tock.Verification_key
+  module Proving_key = Tock.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tock.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     module Constant = Tick.Field
@@ -198,7 +226,7 @@ module Wrap = struct
       Spec.packed_typ
         (module Impl)
         (T
-           ( Shifted_value.typ fp
+           ( Shifted_value.Type1.typ fp
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t ))

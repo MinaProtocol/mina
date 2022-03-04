@@ -992,7 +992,7 @@ let hash_ledger =
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
-           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+           (Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
        in
        Deferred.return
        @@
@@ -1169,6 +1169,33 @@ let pooled_user_commands =
                       (Fn.compose Graphql_client.Signed_command.of_obj
                          unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
+         in
+         print_string (Yojson.Safe.to_string json_response)))
+
+let pooled_snapp_commands =
+  let public_key_flag =
+    Command.Param.(
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+  in
+  Command.async
+    ~summary:"Retrieve all the Snapp commands that are pending inclusion"
+    (Cli_lib.Background_daemon.graphql_init public_key_flag
+       ~f:(fun graphql_endpoint maybe_public_key ->
+         let public_key =
+           Yojson.Safe.to_basic
+           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
+         in
+         let graphql =
+           Graphql_queries.Pooled_snapp_commands.make ~public_key ()
+         in
+         let%map response = Graphql_client.query_exn graphql graphql_endpoint in
+         let json_response : Yojson.Safe.t =
+           `List
+             ( List.map
+                 ~f:
+                   (Fn.compose Graphql_client.Snapp_command.to_yojson
+                      Graphql_client.Snapp_command.of_obj)
+             @@ Array.to_list response#pooledSnappCommands )
          in
          print_string (Yojson.Safe.to_string json_response)))
 
@@ -1857,9 +1884,9 @@ let add_peers_graphql =
                    object
                      method host = peer.host
 
-                     method libp2p_port = peer.libp2p_port
+                     method libp2pPort = peer.libp2p_port
 
-                     method peer_id = peer.peer_id
+                     method peerId = peer.peer_id
                    end
                | None ->
                    eprintf
@@ -1894,16 +1921,10 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           (* TODO: eventually, remove CODA_ variable *)
-           let mina_config_file = "MINA_CONFIG_FILE" in
-           let coda_config_file = "CODA_CONFIG_FILE" in
-           match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-           | Some config_file, _ ->
+           match Sys.getenv "MINA_CONFIG_FILE" with
+           | Some config_file ->
                config_file
-           | None, Some config_file ->
-               (* we print a deprecation warning on daemon startup, don't print here *)
-               config_file
-           | None, None ->
+           | None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in
@@ -2411,6 +2432,7 @@ let advanced =
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
+    ; ("pooled-snapp-commands", pooled_snapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)

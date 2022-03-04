@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Import
+open Mina_base_import
 open Snark_params.Tick
 
 module Body : sig
@@ -68,7 +68,7 @@ module Common : sig
     end
   end]
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
   val gen : ?fee_token_id:Token_id.t -> unit -> t Quickcheck.Generator.t
 
@@ -86,9 +86,9 @@ module Common : sig
   val typ : (var, t) Typ.t
 
   module Checked : sig
-    val to_input :
+    val to_input_legacy :
          var
-      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.t
+      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
          , _ )
          Snark_params.Tick.Checked.t
 
@@ -172,3 +172,10 @@ val next_available_token : t -> Token_id.t -> Token_id.t
 val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t
+
+(** This module defines a weight for each payload component *)
+module Weight : sig
+  val of_body : Body.t -> int
+end
+
+val weight : t -> int

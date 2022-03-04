@@ -106,7 +106,9 @@ module Network_config = struct
     let block_producer_keypairs, runtime_accounts =
       (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
       let keypairs =
-        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
+        List.drop
+          (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+          1
       in
       if num_block_producers > List.length keypairs then
         failwith
@@ -127,6 +129,26 @@ module Network_config = struct
                   ; vesting_increment = t.vesting_increment
                   }
           in
+          (* an account may be used for snapp transactions, so add
+             permissions
+          *)
+          let (permissions
+                : Runtime_config.Accounts.Single.Permissions.t option) =
+            Some
+              { stake = false
+              ; edit_state = None
+              ; send = None
+              ; receive = None
+              ; set_delegate = None
+              ; set_permissions = None
+              ; set_verification_key = None
+              ; set_snapp_uri = None
+              ; edit_sequence_state = None
+              ; set_token_symbol = None
+              ; increment_nonce = None
+              ; set_voting_for = None
+              }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
             pk = Some (Public_key.Compressed.to_string pk)
@@ -136,6 +158,7 @@ module Network_config = struct
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
+          ; permissions
           }
         in
         let secret_name = "test-keypair-" ^ Int.to_string index in
@@ -173,7 +196,11 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; transaction_expiry_hr = None
+            }
       ; genesis =
           Some
             { k = Some k

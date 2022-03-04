@@ -1,0 +1,22 @@
+(library
+ (inline_tests)
+ (name kimchi_backend)
+ (public_name kimchi_backend)
+ (flags -warn-error -27)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+ (libraries
+  run_in_thread
+  kimchi_backend.common
+  kimchi_backend.pasta
+  hex
+  pickles_types
+  key_cache
+  sgn_type
+  snarky.backendless
+  sponge
+  snarkette
+  core_kernel
+  integers))

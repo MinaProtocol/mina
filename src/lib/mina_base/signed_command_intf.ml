@@ -2,7 +2,7 @@
 
 [%%import "/src/config.mlh"]
 
-open Import
+open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
 open Mina_numbers
@@ -111,6 +111,8 @@ module type S = sig
 
   val receiver : next_available_token:Token_id.t -> t -> Account_id.t
 
+  val public_keys : t -> Public_key.Compressed.t list
+
   val amount : t -> Currency.Amount.t option
 
   val memo : t -> Signed_command_memo.t
@@ -128,8 +130,8 @@ module type S = sig
 
   val next_available_token : t -> Token_id.t -> Token_id.t
 
-  val to_input :
-    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.t
+  val to_input_legacy :
+    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.Legacy.t
 
   (** Check that the command is used with compatible tokens. This check is fast
       and cheap, to be used for filtering.
@@ -178,6 +180,8 @@ module type S = sig
     -> Signed_command_payload.t
     -> With_valid_signature.t option
 
+  val check_valid_keys : t -> bool
+
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -187,7 +191,10 @@ module type S = sig
       -> With_valid_signature.t
   end
 
+  (** checks signature and keys *)
   val check : t -> With_valid_signature.t option
+
+  val check_only_for_signature : t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t

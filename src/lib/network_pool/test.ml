@@ -22,6 +22,11 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int
+           precomputed_values.genesis_constants.transaction_expiry_hr)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -63,8 +68,8 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader
+              ~consensus_constants ~time_controller ~expiry_ns
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind () =
@@ -136,8 +141,8 @@ let%test_module "network pool test" =
         let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-            ~local_diffs:local_reader
+            ~consensus_constants ~time_controller ~expiry_ns
+            ~incoming_diffs:pool_reader ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in

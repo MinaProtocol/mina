@@ -49,6 +49,18 @@ module Body = struct
   module Value = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          ( State_hash.Stable.V1.t
+          , Blockchain_state.Value.Stable.V2.t
+          , Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , Protocol_constants_checked.Value.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           ( State_hash.Stable.V1.t
@@ -58,7 +70,11 @@ module Body = struct
           Poly.Stable.V1.t
         [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : V2.t =
+          { t with
+            blockchain_state =
+              Blockchain_state.Value.Stable.V1.to_latest t.blockchain_state
+          }
       end
     end]
   end
@@ -97,7 +113,7 @@ module Body = struct
       ; consensus_state
       ; constants
       } =
-    Random_oracle.Input.(
+    Random_oracle.Input.Chunked.(
       append
         (Blockchain_state.to_input blockchain_state)
         (Consensus.Data.Consensus_state.to_input consensus_state)
@@ -107,20 +123,18 @@ module Body = struct
   let var_to_input
       { Poly.genesis_state_hash; blockchain_state; consensus_state; constants }
       =
-    let%bind blockchain_state =
-      Blockchain_state.var_to_input blockchain_state
-    in
-    let%bind constants = Protocol_constants_checked.var_to_input constants in
-    let%map consensus_state =
+    let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+    let constants = Protocol_constants_checked.var_to_input constants in
+    let consensus_state =
       Consensus.Data.Consensus_state.var_to_input consensus_state
     in
-    Random_oracle.Input.(
+    Random_oracle.Input.Chunked.(
       append blockchain_state consensus_state
       |> append (field (State_hash.var_to_hash_packed genesis_state_hash))
       |> append constants)
 
   let hash_checked (t : var) =
-    let%bind input = var_to_input t in
+    let input = var_to_input t in
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)
@@ -131,15 +145,15 @@ module Body = struct
   let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.snarked_ledger_hash
+    { snarked_ledger_hash = t.blockchain_state.registers.ledger
     ; snarked_next_available_token =
-        t.blockchain_state.snarked_next_available_token
+        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length_var cs
     ; min_window_density = C.min_window_density_var cs
     ; last_vrf_output = ()
     ; total_currency = C.total_currency_var cs
-    ; curr_global_slot = C.curr_global_slot_var cs
+    ; global_slot_since_hard_fork = C.curr_global_slot_var cs
     ; global_slot_since_genesis = C.global_slot_since_genesis_var cs
     ; staking_epoch_data = C.staking_epoch_data_var cs
     ; next_epoch_data = C.next_epoch_data_var cs
@@ -155,15 +169,15 @@ module Body = struct
   let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
-    { snarked_ledger_hash = t.blockchain_state.snarked_ledger_hash
+    { snarked_ledger_hash = t.blockchain_state.registers.ledger
     ; snarked_next_available_token =
-        t.blockchain_state.snarked_next_available_token
+        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length cs
     ; min_window_density = C.min_window_density cs
     ; last_vrf_output = ()
     ; total_currency = C.total_currency cs
-    ; curr_global_slot = C.curr_global_slot cs
+    ; global_slot_since_hard_fork = C.curr_global_slot cs
     ; global_slot_since_genesis = C.global_slot_since_genesis cs
     ; staking_epoch_data = C.staking_epoch_data cs
     ; next_epoch_data = C.next_epoch_data cs
@@ -173,11 +187,19 @@ end
 module Value = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
+      [@@deriving sexp, hash, compare, equal, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, hash, compare, equal, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V2.t =
+        { t with body = Body.Value.Stable.V1.to_latest t.body }
     end
   end]
 
@@ -299,9 +321,9 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
           Blockchain_state.negative_one ~constraint_constants
             ~consensus_constants
             ~genesis_ledger_hash:
-              (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+              (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:
-              (Mina_base.Ledger.next_available_token
+              (Mina_ledger.Ledger.next_available_token
                  (Lazy.force genesis_ledger))
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =
