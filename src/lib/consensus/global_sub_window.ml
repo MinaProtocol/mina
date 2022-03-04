@@ -1,26 +1,6 @@
 open Unsigned
 open Snark_params.Tick
 
-type t = uint32
-
-let succ = UInt32.succ
-
-let equal a b = UInt32.compare a b = 0
-
-let of_global_slot ~(constants : Constants.t) (s : Global_slot.t) : t =
-  UInt32.Infix.(Global_slot.slot_number s / constants.slots_per_sub_window)
-
-let sub_window ~(constants : Constants.t) t =
-  UInt32.rem t constants.sub_windows_per_window
-
-let ( >= ) a b = UInt32.compare a b >= 0
-
-let add a b = UInt32.add a b
-
-let sub a b = UInt32.sub a b
-
-let constant a = a
-
 module Checked = struct
   module T = Mina_numbers.Global_slot
 
@@ -50,10 +30,30 @@ module Checked = struct
   let equal = T.Checked.equal
 
   let constant a =
-    T.Checked.Unsafe.of_field @@ Field.Var.constant @@ Field.of_int
+    T.Checked.Unsafe.of_field @@ constant Field.typ @@ Field.of_int
     @@ UInt32.to_int a
 
   let add a (b : Mina_numbers.Length.Checked.t) = T.Checked.add a (of_length b)
 
   let ( >= ) a b = T.Checked.( >= ) a b
 end
+
+type t = uint32
+
+let succ = UInt32.succ
+
+let equal a b = UInt32.compare a b = 0
+
+let of_global_slot ~(constants : Constants.t) (s : Global_slot.t) : t =
+  UInt32.Infix.(Global_slot.slot_number s / constants.slots_per_sub_window)
+
+let sub_window ~(constants : Constants.t) t =
+  UInt32.rem t constants.sub_windows_per_window
+
+let ( >= ) a b = UInt32.compare a b >= 0
+
+let add a b = UInt32.add a b
+
+let sub a b = UInt32.sub a b
+
+let constant a = a

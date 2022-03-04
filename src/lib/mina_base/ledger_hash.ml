@@ -113,7 +113,7 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
          in
          let%bind account_not_there =
            Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
+             Public_key.Compressed.(constant typ empty)
          in
          let%bind not_there_but_writeable =
            Boolean.(account_not_there && is_writeable)
@@ -143,7 +143,7 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
          in
          let%bind account_not_there =
            Public_key.Compressed.Checked.equal account.public_key
-             Public_key.Compressed.(var_of_t empty)
+             Public_key.Compressed.(constant typ empty)
          in
          let%bind () =
            [%with_label "account is either present or empty"]

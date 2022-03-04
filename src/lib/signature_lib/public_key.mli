@@ -24,8 +24,6 @@ type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
 
-val var_of_t : t -> var
-
 val assert_equal : var -> var -> (unit, 'a) Checked.t
 
 [%%endif]
@@ -87,8 +85,6 @@ module Compressed : sig
   type var = (Field.Var.t, Boolean.var) Poly.t
 
   val typ : (var, t) Typ.t
-
-  val var_of_t : t -> var
 
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t

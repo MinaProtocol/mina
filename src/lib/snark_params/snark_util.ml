@@ -21,9 +21,9 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       (y - 1) * x = 0
     *)
     assert_r1cs
-      Field.Var.(sub (y :> Field.Var.t) (constant Field.one))
+      Field.Var.(sub (y :> Field.Var.t) (constant Field.typ Field.one))
       (x :> Field.Var.t)
-      (Field.Var.constant Field.zero)
+      (constant Field.typ Field.zero)
 
   let assert_decreasing : Boolean.var list -> (unit, _) Checked.t =
     let rec go prev (bs0 : Boolean.var list) =
@@ -52,7 +52,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       | [] ->
           acc
     in
-    go (Field.Var.constant Field.zero) Field.one (bs0 :> Field.Var.t list)
+    go (constant Field.typ Field.zero) Field.one (bs0 :> Field.Var.t list)
 
   type _ Snarky_backendless.Request.t +=
     | N_ones : bool list Snarky_backendless.Request.t
@@ -146,8 +146,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
           let (), (less, less_or_equal) =
             run_and_check
               (let%map { less; less_or_equal } =
-                 Field.Checked.compare ~bit_length (Field.Var.constant x)
-                   (Field.Var.constant y)
+                 Field.Checked.compare ~bit_length (constant Field.typ x)
+                   (constant Field.typ y)
                in
                As_prover.(
                  map2 (read Boolean.typ less)
@@ -179,7 +179,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
 
       let%test_unit "assert_decreasing" =
         let decreasing bs =
-          check (assert_decreasing (List.map ~f:Boolean.var_of_value bs)) ()
+          check (assert_decreasing (List.map ~f:(constant Boolean.typ) bs)) ()
         in
         Or_error.ok_exn (decreasing [ true; true; true; false ]) ;
         Or_error.ok_exn (decreasing [ true; true; false; false ]) ;
@@ -188,7 +188,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       let%test_unit "n_ones" =
         let total_length = 6 in
         let test n =
-          let t = n_ones ~total_length (Field.Var.constant (Field.of_int n)) in
+          let t = n_ones ~total_length (constant Field.typ (Field.of_int n)) in
           let handle_with (resp : bool list) =
             handle t (fun (With { request; respond }) ->
                 match request with
@@ -230,7 +230,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         let test x =
           let handle_with resp =
             handle
-              (num_bits_upper_bound ~max_length (Field.Var.constant x))
+              (num_bits_upper_bound ~max_length (constant Field.typ x))
               (fun (With {request; respond}) ->
                 match request with
                 | Num_bits_upper_bound -> respond (Field.of_int resp)

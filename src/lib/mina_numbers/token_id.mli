@@ -62,8 +62,6 @@ type var
 
 val typ : (var, t) Typ.t
 
-val var_of_t : t -> var
-
 module Checked : sig
   val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 

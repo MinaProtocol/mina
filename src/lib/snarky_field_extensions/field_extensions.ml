@@ -42,8 +42,6 @@ module Make (F : Intf.Basic) = struct
 
   let typ = F.typ
 
-  let constant = F.constant
-
   let scale = F.scale
 
   let assert_r1cs = F.assert_r1cs
@@ -69,14 +67,14 @@ module Make (F : Intf.Basic) = struct
 
   let negate = F.negate
 
-  let zero = constant Unchecked.zero
+  let zero = constant typ Unchecked.zero
 
-  let one = constant Unchecked.one
+  let one = constant typ Unchecked.one
 
   let div_unsafe x y =
     match (to_constant x, to_constant y) with
     | Some x, Some y ->
-        return (constant Unchecked.(x / y))
+        return (constant typ Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
           exists typ
@@ -101,7 +99,7 @@ module Make (F : Intf.Basic) = struct
         fun x y ->
           match (to_constant x, to_constant y) with
           | Some x, Some y ->
-              return (constant Unchecked.(x * y))
+              return (constant typ Unchecked.(x * y))
           | _, _ ->
               let%bind res =
                 exists typ
@@ -124,7 +122,7 @@ module Make (F : Intf.Basic) = struct
         fun x ->
           match to_constant x with
           | Some x ->
-              return (constant (Unchecked.square x))
+              return (constant typ (Unchecked.square x))
           | None ->
               let%bind res =
                 exists typ
@@ -145,7 +143,7 @@ module Make (F : Intf.Basic) = struct
         fun t ->
           match to_constant t with
           | Some x ->
-              return (constant (Unchecked.inv x))
+              return (constant typ (Unchecked.inv x))
           | None ->
               let%bind res =
                 exists typ
@@ -162,8 +160,6 @@ struct
   type t = F.t A.t
 
   type 'a t_ = 'a F.t_ A.t
-
-  let constant = A.map ~f:F.constant
 
   let to_constant =
     let exception None_exn in
@@ -257,8 +253,6 @@ struct
     let if_ = Field.Checked.if_
 
     let typ = Field.typ
-
-    let constant = Field.Var.constant
 
     let to_constant = Field.Var.to_constant
 

@@ -39,9 +39,6 @@ type var = Public_key.Compressed.var * Token_id.var
 
 let typ = Snarky_backendless.Typ.(Public_key.Compressed.typ * Token_id.typ)
 
-let var_of_t (key, tid) =
-  (Public_key.Compressed.var_of_t key, Token_id.var_of_t tid)
-
 module Checked = struct
   open Snark_params
   open Tick

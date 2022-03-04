@@ -694,7 +694,8 @@ module Data = struct
       in
       let%bind () =
         [%with_label "Account is for the default token"]
-          Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
+          Token_id.(
+            Checked.Assert.equal account.token_id (constant typ default))
       in
       let%bind () =
         [%with_label "Block stake winner matches account pk"]
@@ -1332,11 +1333,11 @@ module Data = struct
           Checked.List.mapi prev_sub_window_densities ~f:(fun i density ->
               let%bind gt_prev_sub_window =
                 Sub_window.Checked.(
-                  constant (UInt32.of_int i) > prev_relative_sub_window)
+                  constant typ (UInt32.of_int i) > prev_relative_sub_window)
               in
               let%bind lt_next_sub_window =
                 Sub_window.Checked.(
-                  constant (UInt32.of_int i) < next_relative_sub_window)
+                  constant typ (UInt32.of_int i) < next_relative_sub_window)
               in
               let%bind within_range =
                 Sub_window.Checked.(
@@ -1380,7 +1381,7 @@ module Data = struct
           Checked.List.mapi current_sub_window_densities ~f:(fun i density ->
               let%bind is_next_sub_window =
                 Sub_window.Checked.(
-                  constant (UInt32.of_int i) = next_relative_sub_window)
+                  constant typ (UInt32.of_int i) = next_relative_sub_window)
               in
               if_
                 (Checked.return is_next_sub_window)
@@ -2080,7 +2081,8 @@ module Data = struct
 
     let is_genesis (global_slot : Global_slot.Checked.t) =
       let open Mina_numbers.Global_slot in
-      Checked.equal (Checked.constant zero)
+      Checked.equal
+        (constant Checked.typ zero)
         (Global_slot.slot_number global_slot)
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
@@ -2218,7 +2220,7 @@ module Data = struct
           let%bind base =
             (* TODO: Should this be zero or some other sentinel value? *)
             Mina_base.State_hash.if_ epoch_increased
-              ~then_:Mina_base.State_hash.(var_of_t (of_hash zero))
+              ~then_:Mina_base.State_hash.(constant typ (of_hash zero))
               ~else_:previous_state.next_epoch_data.lock_checkpoint
           in
           Mina_base.State_hash.if_ in_seed_update_range

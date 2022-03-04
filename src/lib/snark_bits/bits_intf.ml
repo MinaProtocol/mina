@@ -63,8 +63,6 @@ module Snarkable = struct
 
       val var_to_triples : var -> boolean_var Triple.t list
 
-      val var_of_value : value -> var
-
       val size_in_bits : int
     end
   end

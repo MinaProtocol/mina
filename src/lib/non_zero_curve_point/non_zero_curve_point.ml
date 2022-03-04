@@ -137,9 +137,6 @@ module Compressed = struct
       ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
       ~value_of_hlist:Poly.of_hlist
 
-  let var_of_t ({ x; is_odd } : t) : var =
-    { x = Field.Var.constant x; is_odd = Boolean.var_of_value is_odd }
-
   let assert_equal (t1 : var) (t2 : var) =
     let%map () = Field.Checked.Assert.equal t1.x t2.x
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
@@ -281,8 +278,6 @@ module Uncompressed = struct
     let%bind () = equal v1_f1 v2_f1 in
     let%map () = equal v1_f2 v2_f2 in
     ()
-
-  let var_of_t (x, y) = (Field.Var.constant x, Field.Var.constant y)
 
   let typ : (var, t) Typ.t = Typ.(field * field)
 

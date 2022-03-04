@@ -1138,7 +1138,7 @@ module Base = struct
     in
     let%bind is_timed_balance_zero =
       Balance.Checked.equal curr_min_balance
-        (Balance.Checked.Unsafe.of_field Field.(Var.constant zero))
+        (Balance.Checked.Unsafe.of_field Field.(constant typ zero))
     in
     (* if current min balance is zero, then timing becomes untimed *)
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
@@ -1251,7 +1251,7 @@ module Base = struct
       let predicate_is_accept =
         let accept_digest =
           Snapp_predicate.Account.digest Snapp_predicate.Account.accept
-          |> Field.constant
+          |> constant Field.typ
         in
         let predicate_digest =
           Snapp_predicate.Account.Checked.digest predicate
@@ -1294,7 +1294,7 @@ module Base = struct
 
           let if_ = Field.if_
 
-          let empty = Field.constant Parties.Transaction_commitment.empty
+          let empty = constant Field.typ Parties.Transaction_commitment.empty
 
           let commitment ~party:{ party; _ }
               ~other_parties:{ With_hash.hash = other_parties; _ } ~memo_hash =
@@ -1594,7 +1594,7 @@ module Base = struct
 
           let empty ~depth () : t =
             let t = Sparse_ledger.empty ~depth () in
-            ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
+            ( constant Ledger_hash.typ (Sparse_ledger.merkle_root t)
             , V.create (fun () -> t) )
 
           let idx ledger id = Sparse_ledger.find_index_exn ledger id
@@ -1653,7 +1653,7 @@ module Base = struct
             let is_new =
               run_checked
                 (Public_key.Compressed.Checked.equal account.public_key
-                   Public_key.Compressed.(var_of_t empty))
+                   Public_key.Compressed.(constant typ empty))
             in
             with_label __LOC__ (fun () ->
                 Boolean.Assert.any
@@ -1723,7 +1723,7 @@ module Base = struct
 
           let empty_constant = Parties.Call_forest.With_hashes.empty
 
-          let empty = Field.constant empty_constant
+          let empty = constant Field.typ empty_constant
 
           let is_empty ({ hash = x; _ } : t) = Field.equal empty x
 
@@ -1798,7 +1798,7 @@ module Base = struct
             ; data = V.if_ b ~then_:t.data ~else_:e.data
             }
 
-          let empty = Field.constant Parties.Call_forest.With_hashes.empty
+          let empty = constant Field.typ Parties.Call_forest.With_hashes.empty
 
           let is_empty ({ hash = x; _ } : t) = Field.equal empty x
 
@@ -1995,14 +1995,14 @@ module Base = struct
 
           let equal t t' = run_checked (Amount.Checked.equal t t')
 
-          let zero = Amount.(var_of_t zero)
+          let zero = Amount.(constant typ zero)
 
           let add_flagged x y = run_checked (Amount.Checked.add_flagged x y)
 
           let add_signed_flagged (x : t) (y : Signed.t) =
             run_checked (Amount.Checked.add_signed_flagged x y)
 
-          let of_constant_fee fee = Amount.var_of_t (Amount.of_fee fee)
+          let of_constant_fee fee = Amount.(constant typ (of_fee fee))
         end
 
         module Token_id = struct
@@ -2013,9 +2013,9 @@ module Base = struct
 
           let equal x y = run_checked (Token_id.Checked.equal x y)
 
-          let default = Token_id.(var_of_t default)
+          let default = Token_id.(constant typ default)
 
-          let invalid = Token_id.(var_of_t invalid)
+          let invalid = Token_id.(constant typ invalid)
         end
 
         module Public_key = struct
@@ -2348,14 +2348,14 @@ module Base = struct
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Checked.assert_equal statement.supply_increase
-               Amount.(var_of_t zero))) ;
+               Amount.(constant typ zero))) ;
       with_label __LOC__ (fun () ->
           run_checked
             (let expected = statement.fee_excess in
              let got =
-               { fee_token_l = Token_id.(var_of_t default)
+               { fee_token_l = Token_id.(constant typ default)
                ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
-               ; Fee_excess.fee_token_r = Token_id.(var_of_t default)
+               ; Fee_excess.fee_token_r = Token_id.(constant typ default)
                ; fee_excess_r =
                    Amount.Signed.Checked.to_fee (fst init).fee_excess
                }
@@ -2388,7 +2388,7 @@ module Base = struct
         | _ ->
             false
       in
-      let b = Boolean.var_of_value prev_should_verify in
+      let b = constant Boolean.typ prev_should_verify in
       match t with
       | Proved ->
           { identifier = "proved"
@@ -2469,17 +2469,17 @@ module Base = struct
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
     let fee_token = payload.common.fee_token in
     let%bind fee_token_invalid =
-      Token_id.(Checked.equal fee_token (var_of_t invalid))
+      Token_id.(Checked.equal fee_token (constant typ invalid))
     in
     let%bind fee_token_default =
-      Token_id.(Checked.equal fee_token (var_of_t default))
+      Token_id.(Checked.equal fee_token (constant typ default))
     in
     let token = payload.body.token_id in
     let%bind token_invalid =
-      Token_id.(Checked.equal token (var_of_t invalid))
+      Token_id.(Checked.equal token (constant typ invalid))
     in
     let%bind token_default =
-      Token_id.(Checked.equal token (var_of_t default))
+      Token_id.(Checked.equal token (constant typ default))
     in
     let%bind () =
       Checked.all_unit
@@ -2686,9 +2686,9 @@ module Base = struct
     in
     let account_creation_amount =
       Amount.Checked.of_fee
-        Fee.(var_of_t constraint_constants.account_creation_fee)
+        Fee.(constant typ constraint_constants.account_creation_fee)
     in
-    let%bind is_zero_fee = Fee.(equal_var fee (var_of_t zero)) in
+    let%bind is_zero_fee = Fee.(equal_var fee (constant typ zero)) in
     let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
@@ -2765,7 +2765,7 @@ module Base = struct
                     let%map magnitude =
                       Amount.Checked.if_ should_pay_to_create
                         ~then_:account_creation_amount
-                        ~else_:Amount.(var_of_t zero)
+                        ~else_:Amount.(constant typ zero)
                     in
                     Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
@@ -2781,7 +2781,7 @@ module Base = struct
                       Amount.Signed.Checked.magnitude amount
                     in
                     Amount.Checked.if_ (Sgn.Checked.is_neg sgn) ~then_:magnitude
-                      ~else_:Amount.(var_of_t zero)
+                      ~else_:Amount.(constant typ zero)
                   in
                   let balance_check ok =
                     [%with_label "Check fee payer balance"]
@@ -2840,14 +2840,14 @@ module Base = struct
              Boolean.any [ is_stake_delegation; is_create_account ]
            in
            Amount.Checked.if_ zero_transfer
-             ~then_:(Amount.var_of_t Amount.zero)
+             ~then_:Amount.(constant typ zero)
              ~else_:payload.body.amount
          in
          (* The fee for entering the coinbase transaction is paid up front. *)
          let%bind coinbase_receiver_fee =
            Amount.Checked.if_ is_coinbase
              ~then_:(Amount.Checked.of_fee fee)
-             ~else_:(Amount.var_of_t Amount.zero)
+             ~else_:Amount.(constant typ Amount.zero)
          in
          Amount.Checked.sub base_amount coinbase_receiver_fee)
     in
@@ -2930,7 +2930,7 @@ module Base = struct
                  let%bind account_creation_amount =
                    Amount.Checked.if_ should_pay_to_create
                      ~then_:account_creation_amount
-                     ~else_:Amount.(var_of_t zero)
+                     ~else_:Amount.(constant typ zero)
                  in
                  let%bind amount_for_new_account, `Underflow underflow =
                    Amount.Checked.sub_flagged receiver_increase
@@ -2943,7 +2943,7 @@ module Base = struct
                         user_command_failure.amount_insufficient_to_create)
                  in
                  Currency.Amount.Checked.if_ user_command_fails
-                   ~then_:Amount.(var_of_t zero)
+                   ~then_:Amount.(constant typ zero)
                    ~else_:amount_for_new_account
                in
 
@@ -3070,7 +3070,7 @@ module Base = struct
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
                if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
-                 ~else_:Amount.(var_of_t zero)
+                 ~else_:Amount.(constant typ zero)
              in
              let txn_global_slot = current_global_slot in
              let%bind `Min_balance _, timing =
@@ -3181,7 +3181,7 @@ module Base = struct
       *)
       let open Amount in
       chain Signed.Checked.if_ is_coinbase
-        ~then_:(return (Signed.Checked.of_unsigned (var_of_t zero)))
+        ~then_:(return (Signed.Checked.of_unsigned (constant typ zero)))
         ~else_:
           (let user_command_excess =
              Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
@@ -3205,7 +3205,7 @@ module Base = struct
     in
     let%bind supply_increase =
       Amount.Checked.if_ is_coinbase ~then_:payload.body.amount
-        ~else_:Amount.(var_of_t zero)
+        ~else_:Amount.(constant typ zero)
     in
     let%map final_root =
       (* Ensure that only the fee-payer was charged if this was an invalid user
@@ -3275,12 +3275,12 @@ module Base = struct
       in
       let%map fee_token_l =
         Token_id.Checked.if_ fee_excess_zero
-          ~then_:Token_id.(var_of_t default)
+          ~then_:Token_id.(constant typ default)
           ~else_:t.payload.common.fee_token
       in
       { Fee_excess.fee_token_l
       ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
-      ; fee_token_r = Token_id.(var_of_t default)
+      ; fee_token_r = Token_id.(constant typ default)
       ; fee_excess_r = Fee.Signed.(Checked.constant zero)
       }
     in
@@ -3410,7 +3410,7 @@ module Merge = struct
       | _ ->
           false
     in
-    let b = Boolean.var_of_value prev_should_verify in
+    let b = constant Boolean.typ prev_should_verify in
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
@@ -8130,9 +8130,9 @@ let%test_module "account timing check" =
     (* test that unchecked and checked calculations for timing agree *)
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
-      let account = Account.var_of_t account in
-      let txn_amount = Amount.var_of_t txn_amount in
-      let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
+      let account = constant Account.typ account in
+      let txn_amount = Amount.(constant typ txn_amount) in
+      let txn_global_slot = constant Global_slot.typ txn_global_slot in
       let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
           ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
@@ -8173,7 +8173,7 @@ let%test_module "account timing check" =
         in
         let%map equal_balances_checked =
           Balance.Checked.equal checked_min_balance
-            (Balance.var_of_t unchecked_min_balance)
+            Balance.(constant typ unchecked_min_balance)
         in
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked

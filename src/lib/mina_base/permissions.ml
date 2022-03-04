@@ -222,8 +222,6 @@ module Auth_required = struct
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
           (b :> Field.Var.t))
 
-    let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
-
     let eval_no_proof
         ({ constant; signature_necessary = _; signature_sufficient } : t)
         ~signature_verifies =
@@ -410,15 +408,6 @@ module Checked = struct
       ~set_delegate:c ~set_permissions:c ~set_verification_key:c
       ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
       ~increment_nonce:c ~set_voting_for:c
-
-  let constant (t : Stable.Latest.t) : t =
-    let open Core_kernel.Field in
-    let a f = Auth_required.Checked.constant (get f t) in
-    Poly.Fields.map
-      ~stake:(fun f -> Boolean.var_of_value (get f t))
-      ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
-      ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
-      ~set_token_symbol:a ~increment_nonce:a ~set_voting_for:a
 end
 
 let typ =

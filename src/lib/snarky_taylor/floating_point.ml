@@ -38,7 +38,7 @@ let mul (type f) ~m:((module I) : f m) x y =
 let constant (type f) ~m:((module M) as m : f m) ~value ~precision =
   assert (B.(value < one lsl precision)) ;
   let open M in
-  { value = Field.constant (bigint_to_field ~m value); precision }
+  { value = constant Field.typ (bigint_to_field ~m value); precision }
 
 (* x, x^2, ..., x^n *)
 let powers ~m x n =
@@ -86,7 +86,7 @@ let le (type f) ~m:((module M) : f m) t1 t2 =
   let padding =
     let k = precision - min t1.precision t2.precision in
     let open Field in
-    constant (pow2 Constant.add ~one:Constant.one k)
+    constant Field.typ (pow2 Constant.add ~one:Constant.one k)
   in
   let x1, x2 =
     let open Field in

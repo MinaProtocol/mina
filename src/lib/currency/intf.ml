@@ -56,8 +56,6 @@ module type Basic = sig
 
   val typ : (var, t) Typ.t
 
-  val var_of_t : t -> var
-
   val var_to_bits :
     var -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 

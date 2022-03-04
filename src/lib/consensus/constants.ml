@@ -146,7 +146,7 @@ module Constants_checked :
 
   type bool_type = Boolean.var
 
-  let constant c = N.Unsafe.of_field (Field.Var.constant (Field.of_int c))
+  let constant c = N.Unsafe.of_field (constant Field.typ (Field.of_int c))
 
   let zero = constant 0
 
@@ -405,7 +405,7 @@ module Checked = struct
     in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
       let constant c =
-        N.Unsafe.of_field (Field.Var.constant (Field.of_int c))
+        N.Unsafe.of_field (constant Field.typ (Field.of_int c))
       in
       let per_year = constant 12 in
       let slot_duration_ms =

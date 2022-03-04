@@ -72,9 +72,6 @@ module Bits = struct
 
   let typ = Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ
 
-  let constant (b1, b2, b3) =
-    Boolean.(var_of_value b1, var_of_value b2, var_of_value b3)
-
   [%%endif]
 end
 
@@ -131,23 +128,6 @@ module Unpacked = struct
 
   let coinbase = { empty with is_coinbase = true; is_user_command = false }
 
-  let of_bits_t (bits : Bits.t) : t =
-    match
-      List.Assoc.find ~equal:Bits.equal
-        [ (Bits.payment, payment)
-        ; (Bits.stake_delegation, stake_delegation)
-        ; (Bits.create_account, create_account)
-        ; (Bits.mint_tokens, mint_tokens)
-        ; (Bits.fee_transfer, fee_transfer)
-        ; (Bits.coinbase, coinbase)
-        ]
-        bits
-    with
-    | Some t ->
-        t
-    | None ->
-        raise (Invalid_argument "Transaction_union_tag.Unpacked.of_bits_t")
-
   let to_bits_t (t : t) : Bits.t =
     match
       List.Assoc.find ~equal
@@ -188,7 +168,7 @@ module Unpacked = struct
     *)
     let b1, b2, b3 =
       List.fold
-        ~init:Field.(Var.(constant zero, constant zero, constant zero))
+        ~init:Field.(constant typ zero, constant typ zero, constant typ zero)
         [ (Bits.payment, is_payment)
         ; (Bits.stake_delegation, is_stake_delegation)
         ; (Bits.create_account, is_create_account)
@@ -232,25 +212,6 @@ module Unpacked = struct
           [%with_label "User command flag is correctly set"]
             (Boolean.Assert.exactly_one
                [ is_user_command; is_fee_transfer; is_coinbase ]))
-    }
-
-  let constant
-      ({ is_payment
-       ; is_stake_delegation
-       ; is_create_account
-       ; is_mint_tokens
-       ; is_fee_transfer
-       ; is_coinbase
-       ; is_user_command
-       } :
-        t) : var =
-    { is_payment = Boolean.var_of_value is_payment
-    ; is_stake_delegation = Boolean.var_of_value is_stake_delegation
-    ; is_create_account = Boolean.var_of_value is_create_account
-    ; is_mint_tokens = Boolean.var_of_value is_mint_tokens
-    ; is_fee_transfer = Boolean.var_of_value is_fee_transfer
-    ; is_coinbase = Boolean.var_of_value is_coinbase
-    ; is_user_command = Boolean.var_of_value is_user_command
     }
 
   let is_payment ({ is_payment; _ } : var) = is_payment
@@ -314,16 +275,8 @@ let t_of_unpacked_t (unpacked : Unpacked.t) : t =
 
 let bits_t_of_t tag = Unpacked.to_bits_t (unpacked_t_of_t tag)
 
-let t_of_bits_t tag = t_of_unpacked_t (Unpacked.of_bits_t tag)
-
-let unpacked_of_t tag = Unpacked.constant (unpacked_t_of_t tag)
-
-let bits_of_t tag = Bits.constant (bits_t_of_t tag)
-
 let unpacked_typ =
   Typ.transport Unpacked.typ ~there:unpacked_t_of_t ~back:t_of_unpacked_t
-
-let bits_typ = Typ.transport Bits.typ ~there:bits_t_of_t ~back:t_of_bits_t
 
 let%test_module "predicates" =
   ( module struct

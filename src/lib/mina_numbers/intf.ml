@@ -68,8 +68,6 @@ module type S_checked = sig
 
   type var
 
-  val constant : unchecked -> var
-
   type t = var
 
   val zero : t

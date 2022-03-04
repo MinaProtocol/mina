@@ -705,7 +705,7 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
           in
           let packeds2 =
             Array.init (Array.length packeds) ~f:(fun _ ->
-                (Tick.Field.Var.constant Tick.Field.zero, 0))
+                (Tick.Field.(Tick.constant typ zero), 0))
           in
           let%map () =
             Array.foldi packeds ~init:(Store.return ())

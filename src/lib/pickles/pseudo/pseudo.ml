@@ -14,7 +14,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     | None, [ (x, i) ] when Field.Constant.(equal x one) ->
         Snarky_backendless.Cvar.Var (Impl.Var.index i)
     | Some c, [] ->
-        Field.constant c
+        constant Field.typ c
     | _ ->
         let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
         Field.Assert.equal x y ; y

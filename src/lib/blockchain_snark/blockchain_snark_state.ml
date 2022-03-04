@@ -150,7 +150,7 @@ let%snarkydef step ~(logger : Logger.t)
       match constraint_constants.fork with
       | Some { previous_state_hash = fork_prev; _ } ->
           State_hash.if_ is_base_case
-            ~then_:(State_hash.var_of_t fork_prev)
+            ~then_:(constant State_hash.typ fork_prev)
             ~else_:t.previous_state_hash
       | None ->
           Checked.return t.previous_state_hash
@@ -168,7 +168,7 @@ let%snarkydef step ~(logger : Logger.t)
         (previous_state |> Protocol_state.blockchain_state).registers
         { txn_snark.target with pending_coinbase_stack = () }
     and supply_increase_is_zero =
-      Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
+      Currency.Amount.(equal_var txn_snark.supply_increase (constant typ zero))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =

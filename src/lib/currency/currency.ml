@@ -172,8 +172,6 @@ end = struct
   let var_to_input_legacy (t : var) =
     var_to_bits_ t >>| Random_oracle.Input.Legacy.bitstring
 
-  let var_of_t (t : t) : var = Field.Var.constant (Field.project (to_bits t))
-
   let if_ cond ~then_ ~else_ : (var, _) Checked.t =
     Field.Checked.if_ cond ~then_ ~else_
 
@@ -587,11 +585,9 @@ end = struct
         in
         repr t >>= to_bits >>| Random_oracle.Input.Legacy.bitstring
 
-      let constant ({ magnitude; sgn } as t) =
-        { Signed_var.repr =
-            Some
-              { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
-        ; value = Some (Field.Var.constant (to_field t))
+      let constant t =
+        { Signed_var.repr = Some (constant repr_typ t)
+        ; value = Some (constant Field.typ (to_field t))
         }
 
       let of_unsigned magnitude : var =
@@ -843,7 +839,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_success
                 (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (constant typ lo - constant typ hi))
 
         let%test_unit "subtraction_soundness" =
           let generator =
@@ -855,7 +851,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_failure
                 (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (constant typ lo - constant typ hi))
 
         let%test_unit "addition_completeness" =
           let generator =
@@ -867,7 +863,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_success
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (constant typ x + constant typ y))
 
         let%test_unit "addition_soundness" =
           let generator =
@@ -881,7 +877,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (constant typ x + constant typ y))
 
         let%test_unit "formatting_roundtrip" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in

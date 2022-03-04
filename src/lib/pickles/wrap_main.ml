@@ -115,10 +115,10 @@ let pack_statement max_branching t =
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size
-  |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+  |> Dlog_plonk_types.Shifts.map ~f:(constant Field.typ)
 
 let domain_generator ~log2_size =
-  Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
+  Backend.Tock.Field.domain_generator ~log2_size |> constant Field.typ
 
 let split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
   Typ.transport
@@ -239,7 +239,9 @@ let wrap_main
           with_label __LOC__ (fun () ->
               choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant)))
+                   ~f:
+                     (Plonk_verification_key_evals.map
+                        ~f:(constant Inner_curve.typ))))
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->

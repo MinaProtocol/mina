@@ -158,17 +158,6 @@ module Body = struct
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
-    let constant
-        ({ tag; source_pk; receiver_pk; token_id; amount; token_locked } : t) :
-        var =
-      { tag = Tag.unpacked_of_t tag
-      ; source_pk = Public_key.Compressed.var_of_t source_pk
-      ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
-      ; token_id = Token_id.var_of_t token_id
-      ; amount = Currency.Amount.var_of_t amount
-      ; token_locked = Boolean.var_of_value token_locked
-      }
-
     let to_input_legacy
         { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
       let%map token_id = Token_id.Checked.to_input_legacy token_id
@@ -236,11 +225,6 @@ module Checked = struct
       Signed_command_payload.Common.Checked.to_input_legacy common
     and body = Body.Checked.to_input_legacy body in
     Random_oracle.Input.Legacy.append common body
-
-  let constant ({ common; body } : t) : var =
-    { common = Signed_command_payload.Common.Checked.constant common
-    ; body = Body.Checked.constant body
-    }
 end
 
 [%%endif]

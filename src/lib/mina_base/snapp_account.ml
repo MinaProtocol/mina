@@ -44,7 +44,7 @@ module Events = struct
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
+      Checked.equal (Data_as_hash.hash e) (constant typ (Lazy.force empty_hash)))
 
   let pop_checked (events : var) : Event.t Data_as_hash.t * var =
     let open Run in

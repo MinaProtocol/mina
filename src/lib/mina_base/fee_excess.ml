@@ -136,9 +136,9 @@ let typ : (var, t) Typ.t = Poly.typ Token_id.typ Fee.Signed.typ
 
 let var_of_t ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t) :
     var =
-  { fee_token_l = Token_id.var_of_t fee_token_l
+  { fee_token_l = constant Token_id.typ fee_token_l
   ; fee_excess_l = Fee.Signed.Checked.constant fee_excess_l
-  ; fee_token_r = Token_id.var_of_t fee_token_r
+  ; fee_token_r = constant Token_id.typ fee_token_r
   ; fee_excess_r = Fee.Signed.Checked.constant fee_excess_r
   }
 
@@ -236,7 +236,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
   let combine (fee_token, fee_excess) fee_excess_m =
     let%bind fee_token_equal = Token_id.Checked.equal fee_token fee_token_m in
     let%bind fee_excess_zero =
-      Field.(Checked.equal (Var.constant zero)) fee_excess
+      Field.(Checked.equal (constant typ zero)) fee_excess
     in
     let%bind may_move = Boolean.(fee_token_equal ||| fee_excess_zero) in
     let%bind fee_token =
@@ -244,7 +244,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     in
     let%map fee_excess_to_move =
       Field.Checked.if_ may_move ~then_:fee_excess_m
-        ~else_:Field.(Var.constant zero)
+        ~else_:Field.(constant typ zero)
     in
     ( (fee_token, Field.Var.add fee_excess fee_excess_to_move)
     , Field.Var.sub fee_excess_m fee_excess_to_move )
@@ -266,7 +266,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
   in
   let%map () =
     [%with_label "Fee excess is eliminated"]
-      Field.(Checked.Assert.equal (Var.constant zero) fee_excess_m)
+      Field.(Checked.Assert.equal (constant typ zero) fee_excess_m)
   in
   ((fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r))
 
@@ -314,7 +314,7 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   (* Use the same token for both if [fee_excess_l] is zero. *)
   let%bind fee_token_l =
     let%bind excess_is_zero =
-      Field.(Checked.equal (Var.constant zero) fee_excess_l)
+      Field.(Checked.equal (constant typ zero) fee_excess_l)
     in
     Token_id.Checked.if_ excess_is_zero ~then_:fee_token_r ~else_:fee_token_l
   in
@@ -323,7 +323,7 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     let%bind tokens_equal = Token_id.Checked.equal fee_token_l fee_token_r in
     let%map amount_to_move =
       Field.Checked.if_ tokens_equal ~then_:fee_excess_r
-        ~else_:Field.(Var.constant zero)
+        ~else_:Field.(constant typ zero)
     in
     ( Field.Var.add fee_excess_l amount_to_move
     , Field.Var.sub fee_excess_r amount_to_move )
@@ -331,18 +331,18 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   (* Use the default token if the excess is zero. *)
   let%bind fee_token_l =
     let%bind excess_is_zero =
-      Field.(Checked.equal (Var.constant zero) fee_excess_l)
+      Field.(Checked.equal (constant typ zero) fee_excess_l)
     in
     Token_id.Checked.if_ excess_is_zero
-      ~then_:Token_id.(var_of_t default)
+      ~then_:Token_id.(constant typ default)
       ~else_:fee_token_l
   in
   let%map fee_token_r =
     let%bind excess_is_zero =
-      Field.(Checked.equal (Var.constant zero) fee_excess_r)
+      Field.(Checked.equal (constant typ zero) fee_excess_r)
     in
     Token_id.Checked.if_ excess_is_zero
-      ~then_:Token_id.(var_of_t default)
+      ~then_:Token_id.(constant typ default)
       ~else_:fee_token_r
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }

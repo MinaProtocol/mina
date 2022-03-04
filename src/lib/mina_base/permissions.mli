@@ -84,8 +84,6 @@ module Checked : sig
 
   val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
-  val constant : Stable.Latest.t -> t
-
   val if_ : Boolean.var -> then_:t -> else_:t -> t
 end
 

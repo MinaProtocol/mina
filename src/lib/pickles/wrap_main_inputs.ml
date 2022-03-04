@@ -35,7 +35,7 @@ module Other_field = struct
 end
 
 let sponge_params =
-  Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
+  Sponge.Params.(map sponge_params_constant ~f:(constant Impl.Field.typ))
 
 module Unsafe = struct
   let unpack_unboolean ?(length = Field.size_in_bits) x =

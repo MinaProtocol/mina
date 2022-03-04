@@ -109,7 +109,7 @@ module Step = struct
       let open Internal_Basic in
       let open Let_syntax in
       let equal (x1, b1) (x2, b2) =
-        let%bind x_eq = Field.Checked.equal x1 (Field.Var.constant x2) in
+        let%bind x_eq = Field.Checked.equal x1 (constant Field.typ x2) in
         let b_eq = match b2 with true -> b1 | false -> Boolean.not b1 in
         Boolean.( && ) x_eq b_eq
       in
@@ -207,7 +207,7 @@ module Wrap = struct
       let check t =
         let open Internal_Basic in
         let open Let_syntax in
-        let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
+        let equal x1 x2 = Field.Checked.equal x1 (constant Field.typ x2) in
         let%bind () = t0.check t in
         Checked.List.map forbidden_shifted_values ~f:(equal t)
         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true

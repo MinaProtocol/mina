@@ -46,8 +46,6 @@ module type Basic = sig
 
   val typ : (t, Unchecked.t) Typ.t
 
-  val constant : Unchecked.t -> t
-
   val to_constant : t -> Unchecked.t option
 
   val scale : t -> Field.t -> t

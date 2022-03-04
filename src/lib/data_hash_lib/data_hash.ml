@@ -50,16 +50,6 @@ struct
     ; mutable bits : Boolean.var Bitstring.Lsb_first.t option
     }
 
-  let var_of_t t =
-    let n = Bigint.of_field t in
-    { digest = Field.Var.constant t
-    ; bits =
-        Some
-          (Bitstring.Lsb_first.of_list
-             (List.init M.length_in_bits ~f:(fun i ->
-                  Boolean.var_of_value (Bigint.test_bit n i))))
-    }
-
   open Let_syntax
 
   let var_to_hash_packed { digest; _ } = digest
@@ -76,7 +66,17 @@ struct
     | Some bits ->
         return (bits :> Boolean.var list)
     | None ->
-        let%map bits = unpack t.digest in
+        let%map bits =
+          match Field.Var.to_constant t.digest with
+          | Some digest ->
+              (* This is a constant, don't add constraints. *)
+              let n = Bigint.of_field digest in
+              return
+                (List.init M.length_in_bits ~f:(fun i ->
+                     constant Boolean.typ (Bigint.test_bit n i)))
+          | None ->
+              unpack t.digest
+        in
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
         bits
 

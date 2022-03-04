@@ -26,8 +26,6 @@ type var = private Field.Var.t
 val typ : (var, t) Typ.t
 
 module Checked : sig
-  val constant : t -> var
-
   val neg : var
 
   val pos : var

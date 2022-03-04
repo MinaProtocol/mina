@@ -49,16 +49,12 @@ module type S = sig
     val of_coinbase : Coinbase.t -> t
 
     val genesis : t
-
-    val var_of_t : t -> var
   end
 
   module type Data_hash_intf = sig
     type t = private Field.t [@@deriving sexp, compare, equal, yojson, hash]
 
     type var
-
-    val var_of_t : t -> var
 
     val typ : (var, t) Typ.t
 
@@ -107,8 +103,6 @@ module type S = sig
     type var
 
     val data_hash : t -> Hash.t
-
-    val var_of_t : t -> var
 
     val typ : (var, t) Typ.t
 
@@ -182,8 +176,6 @@ module type S = sig
       type var = Boolean.var * Boolean.var
 
       val typ : (var, t) Typ.t
-
-      val var_of_t : t -> var
     end
 
     module Poly : sig
@@ -210,8 +202,6 @@ module type S = sig
     val genesis : t
 
     val typ : (var, t) Typ.t
-
-    val var_of_t : t -> var
   end
 
   val create : depth:int -> unit -> t Or_error.t

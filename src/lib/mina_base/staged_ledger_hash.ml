@@ -152,9 +152,6 @@ module Non_snark = struct
     Array.reduce_exn ~f:append
       (Array.of_list_map t ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
 
-  let var_of_t t : var =
-    List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
-
   [%%if proof_level = "check"]
 
   let warn_improper_transport () = ()
@@ -242,13 +239,6 @@ let genesis ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   { non_snark = Non_snark.genesis ~genesis_ledger_hash
   ; pending_coinbase_hash = Pending_coinbase.merkle_root pending_coinbase
   }
-
-let var_of_t ({ pending_coinbase_hash; non_snark } : t) : var =
-  let non_snark = Non_snark.var_of_t non_snark in
-  let pending_coinbase_hash =
-    Pending_coinbase.Hash.var_of_t pending_coinbase_hash
-  in
-  { non_snark; pending_coinbase_hash }
 
 let to_input ({ non_snark; pending_coinbase_hash } : t) =
   Random_oracle.Input.Chunked.(

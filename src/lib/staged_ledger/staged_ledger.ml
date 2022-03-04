@@ -3203,14 +3203,16 @@ let%test_module "staged ledger tests" =
         let%bind root_after_popping, _deleted_stack =
           Pending_coinbase.Checked.pop_coinbases ~constraint_constants
             ~proof_emitted
-            (Hash.var_of_t root_before)
+            (constant Hash.typ root_before)
         in
-        let pc_update_var = Update.var_of_t pc_update in
+        let pc_update_var = constant Update.typ pc_update in
         let coinbase_receiver =
-          Public_key.Compressed.(var_of_t coinbase_receiver)
+          constant Public_key.Compressed.typ coinbase_receiver
         in
-        let supercharge_coinbase = Boolean.var_of_value supercharge_coinbase in
-        let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
+        let supercharge_coinbase = constant Boolean.typ supercharge_coinbase in
+        let state_body_hash_var =
+          constant State_body_hash.typ state_body_hash
+        in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
           root_after_popping pc_update_var ~coinbase_receiver
           ~supercharge_coinbase state_body_hash_var

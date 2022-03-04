@@ -26,8 +26,6 @@ module Checked : sig
   type unchecked = t
 
   type t = private Boolean.var array
-
-  val constant : unchecked -> t
 end
 
 (** typ representation *)

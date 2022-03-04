@@ -91,8 +91,6 @@ module Common : sig
       -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
          , _ )
          Snark_params.Tick.Checked.t
-
-    val constant : t -> var
   end
 
   [%%endif]

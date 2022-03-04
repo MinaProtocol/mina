@@ -190,8 +190,6 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
       val create : Constant.t -> t
     end
 
-    val constant : Constant.t -> t
-
     val multiscale_known :
       (Boolean.var list * Scaling_precomputation.t) array -> t
   end

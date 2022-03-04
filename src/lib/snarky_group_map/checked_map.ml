@@ -60,7 +60,16 @@ module Make
     end) =
 struct
   open P
-  include Group_map.Make (M.Field.Constant) (M.Field) (P)
+
+  include Group_map.Make
+            (M.Field.Constant)
+            (struct
+              include M.Field
+
+              let constant = M.constant typ
+            end)
+            (P)
+
   open M
 
   let to_group =
@@ -69,5 +78,5 @@ struct
       (wrap
          (module M)
          ~potential_xs
-         ~y_squared:Field.(fun ~x -> (x * x * x) + scale x a + constant b))
+         ~y_squared:Field.(fun ~x -> (x * x * x) + scale x a + constant typ b))
 end

@@ -42,9 +42,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
     let open Infix in
     Int.equal 0 (compare ((x lsr i) land one) one)
 
-  let constant x =
-    Array.init length ~f:(Fn.compose Boolean.var_of_value (get_bit x))
-
   let typ =
     let open Unsigned.UInt32 in
     let open Infix in

@@ -139,14 +139,6 @@ module Update = struct
         }
       [@@deriving hlist]
 
-      let constant (t : value) : t =
-        { initial_minimum_balance = Balance.var_of_t t.initial_minimum_balance
-        ; cliff_time = Global_slot.Checked.constant t.cliff_time
-        ; cliff_amount = Amount.var_of_t t.cliff_amount
-        ; vesting_period = Global_slot.Checked.constant t.vesting_period
-        ; vesting_increment = Amount.var_of_t t.vesting_increment
-        }
-
       let to_input
           ({ initial_minimum_balance
            ; cliff_time

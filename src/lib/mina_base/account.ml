@@ -196,9 +196,6 @@ module Token_symbol = struct
     in
     Field.Checked.Assert.equal t actual
 
-  let var_of_value x =
-    Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
-
   let of_field (x : Field.t) : t =
     of_bits
       (Pickles_types.Vector.of_list_and_length_exn
@@ -558,37 +555,6 @@ let typ : (var, value) Typ.t =
   in
   typ' snapp
 
-let var_of_t
-    ({ public_key
-     ; token_id
-     ; token_permissions
-     ; token_symbol
-     ; balance
-     ; nonce
-     ; receipt_chain_hash
-     ; delegate
-     ; voting_for
-     ; timing
-     ; permissions
-     ; snapp
-     ; snapp_uri
-     } :
-      value) =
-  { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.var_of_t token_id
-  ; token_permissions = Token_permissions.var_of_t token_permissions
-  ; token_symbol = Token_symbol.var_of_value token_symbol
-  ; balance = Balance.var_of_t balance
-  ; nonce = Nonce.Checked.constant nonce
-  ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
-  ; voting_for = State_hash.var_of_t voting_for
-  ; timing = Timing.var_of_t timing
-  ; permissions = Permissions.Checked.constant permissions
-  ; snapp = Field.Var.constant (hash_snapp_account_opt snapp)
-  ; snapp_uri = Field.Var.constant (hash_snapp_uri snapp_uri)
-  }
-
 module Checked = struct
   module Unhashed = struct
     type t =
@@ -694,7 +660,7 @@ module Checked = struct
         ~cliff_amount ~vesting_period ~vesting_increment
     in
     let%map zero_min_balance =
-      Balance.equal_var Balance.(var_of_t zero) cur_min_balance
+      Balance.equal_var Balance.(constant typ zero) cur_min_balance
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance

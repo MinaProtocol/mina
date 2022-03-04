@@ -19,7 +19,7 @@ module Checked = struct
     let open Tick in
     let module Length = Mina_numbers.Length in
     let constant c =
-      Length.Checked.Unsafe.of_field (Field.Var.constant (Field.of_int c))
+      Length.Checked.Unsafe.of_field (constant Field.typ (Field.of_int c))
     in
     let%bind third_epoch =
       let%bind q, r =

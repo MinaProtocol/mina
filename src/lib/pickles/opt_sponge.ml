@@ -231,7 +231,7 @@ struct
       let%test_unit "correctness" =
         let params : _ Sponge.Params.t =
           let a () =
-            Array.init 3 ~f:(fun _ -> Field.(constant (Constant.random ())))
+            Array.init 3 ~f:(fun _ -> Field.(constant typ (Constant.random ())))
           in
           { mds = Array.init 3 ~f:(fun _ -> a ())
           ; round_constants = Array.init 40 ~f:(fun _ -> a ())

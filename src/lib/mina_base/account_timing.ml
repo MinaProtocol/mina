@@ -138,28 +138,6 @@ let var_to_input
      ; Amount.var_to_input vesting_increment
     |]
 
-let var_of_t (t : t) : var =
-  let As_record.
-        { is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; cliff_amount
-        ; vesting_period
-        ; vesting_increment
-        } =
-    to_record t
-  in
-  As_record.
-    { is_timed = Boolean.var_of_value is_timed
-    ; initial_minimum_balance = Balance.var_of_t initial_minimum_balance
-    ; cliff_time = Global_slot.Checked.constant cliff_time
-    ; cliff_amount = Amount.var_of_t cliff_amount
-    ; vesting_period = Global_slot.Checked.constant vesting_period
-    ; vesting_increment = Amount.var_of_t vesting_increment
-    }
-
-let untimed_var = var_of_t Untimed
-
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
@@ -228,6 +206,8 @@ let typ : (var, t) Typ.t =
   let var_to_hlist = As_record.to_hlist in
   Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
     ~value_of_hlist
+
+let untimed_var = constant typ Untimed
 
 (* we can't use the generic if_ with the above typ, because Global_slot.typ doesn't work correctly with it
     so we define a custom if_

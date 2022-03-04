@@ -33,9 +33,6 @@ module Coinbase_data = struct
 
   type var = Public_key.Compressed.var * Amount.var
 
-  let var_of_t ((public_key, amount) : t) =
-    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
-
   let to_input (pk, amount) =
     let open Random_oracle.Input.Chunked in
     List.reduce_exn ~f:append
@@ -115,8 +112,6 @@ module type Data_hash_intf = sig
   type t = private Field.t [@@deriving sexp, compare, equal, yojson, hash]
 
   type var
-
-  val var_of_t : t -> var
 
   val typ : (var, t) Typ.t
 
@@ -268,11 +263,6 @@ module State_stack = struct
       (Stack_hash.var_to_input t.init)
       (Stack_hash.var_to_input t.curr)
 
-  let var_of_t (t : t) =
-    { Poly.init = Stack_hash.var_of_t t.init
-    ; curr = Stack_hash.var_of_t t.curr
-    }
-
   let data_spec = Snark_params.Tick.Data_spec.[ Stack_hash.typ; Stack_hash.typ ]
 
   let typ : (var, t) Typ.t =
@@ -420,10 +410,6 @@ module Update = struct
       | true, true ->
           Update_two_coinbase_in_second
 
-    let var_of_t t =
-      let x, y = to_bits t in
-      Boolean.(var_of_value x, var_of_value y)
-
     let typ =
       Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
 
@@ -470,11 +456,6 @@ module Update = struct
 
   let genesis : t =
     { coinbase_amount = Currency.Amount.zero; action = Action.Update_none }
-
-  let var_of_t (t : t) : var =
-    { action = Action.var_of_t t.action
-    ; coinbase_amount = Amount.var_of_t t.coinbase_amount
-    }
 end
 
 (* Sparse_ledger.Make is applied more than once in the code, so
@@ -590,11 +571,6 @@ module T = struct
             hash ~init:Hash_prefix_states.coinbase_stack
               (pack_input (var_to_input t))))
 
-    let var_of_t t =
-      { Poly.data = Coinbase_stack.var_of_t t.Poly.data
-      ; state = State_stack.var_of_t t.state
-      }
-
     let gen =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind data = Coinbase_stack.gen in
@@ -697,7 +673,7 @@ module T = struct
         in
         Boolean.(valid_coinbase_stacks && valid_state_stacks)
 
-      let empty = var_of_t empty
+      let empty = constant typ empty
 
       let create_with (t : var) =
         { empty with state = State_stack.create ~init:t.state.init }
@@ -725,7 +701,6 @@ module T = struct
       , to_bits
       , to_bytes
       , equal_var
-      , var_of_t
       , var_of_hash_packed
       , var_to_hash_packed
       , typ )]
@@ -840,7 +815,7 @@ module T = struct
             map (read Update.Action.typ action) ~f:(fun act ->
                 Find_index_of_newest_stacks act))
       in
-      let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
+      let equal_to_zero x = Amount.(equal_var x (constant typ zero)) in
       let%bind no_update = Update.Action.Checked.no_update action in
       let update_state_stack (stack : Stack.var) =
         (*get previous stack to carry-forward the stack of state body hashes*)
@@ -859,7 +834,7 @@ module T = struct
         let%bind stack = update_state_stack stack in
         let%bind total_coinbase_amount =
           let coinbase_amount =
-            Currency.Amount.var_of_t constraint_constants.coinbase_amount
+            constant Currency.Amount.typ constraint_constants.coinbase_amount
           in
           let supercharged_coinbase =
             let amt =
@@ -867,7 +842,7 @@ module T = struct
                 (Currency.Amount.scale constraint_constants.coinbase_amount
                    constraint_constants.supercharged_coinbase_factor)
             in
-            Currency.Amount.var_of_t amt
+            constant Currency.Amount.typ amt
           in
           Currency.Amount.Checked.if_ supercharge_coinbase
             ~then_:supercharged_coinbase ~else_:coinbase_amount
@@ -1350,9 +1325,9 @@ let%test_unit "Checked_stack = Unchecked_stack" =
       let checked =
         let comp =
           let open Snark_params.Tick in
-          let cb_var = Coinbase_data.(var_of_t coinbase_data) in
+          let cb_var = Coinbase_data.(constant typ coinbase_data) in
           let%map res =
-            Stack.Checked.push_coinbase cb_var (Stack.var_of_t base)
+            Stack.Checked.push_coinbase cb_var (constant Stack.typ base)
           in
           As_prover.read Stack.typ res
         in
@@ -1392,23 +1367,23 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let checked_merkle_root =
         let comp =
           let open Snark_params.Tick in
-          let amount_var = Amount.var_of_t amount in
-          let action_var = Update.Action.var_of_t action in
+          let update =
+            constant Update.typ { action; coinbase_amount = amount }
+          in
           let coinbase_receiver_var =
-            Public_key.Compressed.var_of_t coinbase.receiver
+            constant Public_key.Compressed.typ coinbase.receiver
           in
           let supercharge_coinbase_var =
-            Boolean.var_of_value supercharged_coinbase
+            constant Boolean.typ supercharged_coinbase
           in
-          let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
+          let state_body_hash_var =
+            constant State_body_hash.typ state_body_hash
+          in
           let%map result =
             handle
               (f_add_coinbase
-                 (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action = action_var
-                 ; coinbase_amount = amount_var
-                 }
-                 ~coinbase_receiver:coinbase_receiver_var
+                 (constant Hash.typ (merkle_root pending_coinbases))
+                 update ~coinbase_receiver:coinbase_receiver_var
                  ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack))
@@ -1452,23 +1427,23 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
       let checked_merkle_root =
         let comp =
           let open Snark_params.Tick in
-          let amount_var = Amount.var_of_t amount in
-          let action_var = Update.Action.(var_of_t action) in
+          let update =
+            constant Update.typ { action; coinbase_amount = amount }
+          in
           let coinbase_receiver_var =
-            Public_key.Compressed.var_of_t coinbase.receiver
+            constant Public_key.Compressed.typ coinbase.receiver
           in
           let supercharge_coinbase_var =
-            Boolean.var_of_value supercharged_coinbase
+            constant Boolean.typ supercharged_coinbase
           in
-          let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
+          let state_body_hash_var =
+            constant State_body_hash.typ state_body_hash
+          in
           let%map result =
             handle
               (f_add_coinbase
-                 (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action = action_var
-                 ; coinbase_amount = amount_var
-                 }
-                 ~coinbase_receiver:coinbase_receiver_var
+                 (constant Hash.typ (merkle_root pending_coinbases))
+                 update ~coinbase_receiver:coinbase_receiver_var
                  ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
@@ -1492,7 +1467,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let%map current, _previous =
             handle
               (f_pop_coinbase ~proof_emitted:Boolean.true_
-                 (Hash.var_of_t checked_merkle_root))
+                 (constant Hash.typ checked_merkle_root))
               (unstage (handler ~depth unchecked ~is_new_stack:false))
           in
           As_prover.read Hash.typ current

@@ -85,8 +85,6 @@ type var = T.Checked.t
 
 let typ = T.typ
 
-let var_of_t = T.Checked.constant
-
 module Checked = struct
   type t = var
 
@@ -124,7 +122,7 @@ let%test_unit "var_of_t preserves the underlying value" =
   Quickcheck.test gen ~f:(fun tid ->
       [%test_eq: t] tid
         (Test_util.checked_to_unchecked Typ.unit typ
-           (fun () -> Snark_params.Tick.Checked.return (var_of_t tid))
+           (fun () -> Snark_params.Tick.Checked.return (constant typ tid))
            ()))
 
 [%%endif]

@@ -70,7 +70,7 @@ module Chain_hash = struct
     end
 
     let constant (t : t) =
-      var_of_hash_packed (Field.Var.constant (t :> Field.t))
+      var_of_hash_packed (constant Field.typ (t :> Field.t))
 
     type t = var
 
@@ -106,10 +106,10 @@ module Chain_hash = struct
             let open Snark_params.Tick.Checked.Let_syntax in
             let payload =
               Transaction_union_payload.(
-                Checked.constant (of_user_command_payload payload))
+                constant typ (of_user_command_payload payload))
             in
             let%map res =
-              Checked.cons (Signed_command payload) (var_of_t base)
+              Checked.cons (Signed_command payload) (constant typ base)
             in
             As_prover.read typ res
           in

@@ -84,8 +84,6 @@ module type Weierstrass_checked_intf = sig
 
   val negate : t -> t
 
-  val constant : unchecked -> t
-
   val add_unsafe :
     t -> t -> ([ `I_thought_about_this_very_carefully of t ], _) Checked.t
 
@@ -156,8 +154,8 @@ module Make_weierstrass_checked
     let open F in
     let%bind x2 = square x in
     let%bind x3 = x2 * x in
-    let%bind ax = constant Params.a * x in
-    assert_square y (x3 + ax + constant Params.b)
+    let%bind ax = constant F.typ Params.a * x in
+    assert_square y (x3 + ax + constant F.typ Params.b)
 
   let typ : (t, Curve.t) Typ.t =
     let unchecked =
@@ -168,10 +166,6 @@ module Make_weierstrass_checked
     { unchecked with check = assert_on_curve }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
-
-  let constant (t : Curve.t) : t =
-    let x, y = Curve.to_affine_exn t in
-    F.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
     let%map () = F.assert_equal x1 x2 and () = F.assert_equal y1 y2 in
@@ -308,7 +302,7 @@ module Make_weierstrass_checked
     let two = Field.of_int 2 in
     let%map () =
       assert_r1cs (F.scale lambda two) ay
-        (F.scale x_squared (Field.of_int 3) + F.constant Params.a)
+        (F.scale x_squared (Field.of_int 3) + constant F.typ Params.a)
     and () = assert_square lambda (bx + F.scale ax two)
     and () = assert_r1cs lambda (ax - bx) (by + ay) in
     (bx, by)
@@ -320,7 +314,7 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)))
+          (a1 * cond) + (a2 * (constant Field.typ Field.one - cond)))
     in
     (choose x1 x2, choose y1 y2)
 
@@ -355,7 +349,7 @@ module Make_weierstrass_checked
       let open F.Unchecked in
       let ( * ) x b = F.map_ x ~f:(fun x -> Field.Var.scale b x) in
       let ( +^ ) = F.( + ) in
-      F.constant a1
+      constant F.typ a1
       +^ ((a2 - a1) * (b0 :> Field.Var.t))
       +^ ((a3 - a1) * (b1 :> Field.Var.t))
       +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Var.t))
@@ -370,7 +364,7 @@ module Make_weierstrass_checked
   let lookup_single_bit (b : Boolean.var) (t1, t2) =
     let lookup_one (a1, a2) =
       let open F in
-      constant a1
+      constant typ a1
       + map_ Unchecked.(a2 - a1) ~f:(Field.Var.scale (b :> Field.Var.t))
     in
     let x1, y1 = Curve.to_affine_exn t1 and x2, y2 = Curve.to_affine_exn t2 in
@@ -456,7 +450,7 @@ module Make_weierstrass_checked
     let unshift =
       Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
     in
-    Shifted.add result_with_shift (constant unshift)
+    Shifted.add result_with_shift (constant typ unshift)
 
   let to_constant (x, y) =
     let open Option.Let_syntax in

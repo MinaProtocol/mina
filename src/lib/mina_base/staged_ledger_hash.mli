@@ -9,8 +9,6 @@ type value [@@deriving sexp, equal, compare, hash]
 
 type var
 
-val var_of_t : t -> var
-
 val typ : (var, t) Typ.t
 
 val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t

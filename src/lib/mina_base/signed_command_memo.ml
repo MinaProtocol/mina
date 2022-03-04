@@ -177,12 +177,6 @@ module Checked = struct
   type unchecked = t
 
   type t = Boolean.var array
-
-  let constant unchecked =
-    assert (Int.(String.length (unchecked :> string) = memo_length)) ;
-    Array.map
-      (Blake2.string_to_bits (unchecked :> string))
-      ~f:Boolean.var_of_value
 end
 
 let length_in_bits = 8 * memo_length

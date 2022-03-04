@@ -215,7 +215,7 @@ module For_step = struct
     ; var_to_field_elements
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
-          ~f:Step_main_inputs.Inner_curve.constant
+          ~f:(Step_main_inputs.Impl.constant Step_main_inputs.Inner_curve.typ)
     ; wrap_domains
     ; step_domains = `Known step_domains
     }

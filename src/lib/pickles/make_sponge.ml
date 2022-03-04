@@ -95,7 +95,8 @@ struct
       (fun a ->
         make_checked (fun () ->
             let s =
-              S_checked.create (Sponge.Params.map ~f:Field.constant params)
+              S_checked.create
+                (Sponge.Params.map ~f:(constant Field.typ) params)
             in
             Array.iter a ~f:(S_checked.absorb s) ;
             S_checked.squeeze s))

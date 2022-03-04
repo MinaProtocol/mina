@@ -41,10 +41,6 @@ module Bits : sig
     var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
 
-val bits_of_t : t -> Bits.var
-
-val bits_typ : (Bits.var, t) Typ.t
-
 module Unpacked : sig
   (** Full representation. This pre-computes all of the tag variables, but may
       still be convered to bits without adding any constraints.
@@ -70,8 +66,6 @@ module Unpacked : sig
   val to_input_legacy :
     var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
-
-val unpacked_of_t : t -> Unpacked.var
 
 val unpacked_typ : (Unpacked.var, t) Typ.t
 

@@ -34,7 +34,7 @@ type var = Field.Var.t
 
 let typ : (var, t) Typ.t =
   let open Typ in
-  { check = (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
+  { check = (fun x -> assert_r1cs x x (constant Field.typ Field.one))
   ; store = (fun t -> Store.store (to_field t))
   ; read = (fun x -> Read.(read x >>| of_field_exn))
   ; alloc = Alloc.alloc
@@ -52,28 +52,26 @@ module Checked = struct
   let is_pos (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      one_half * (v + Field.Var.constant Field.one))
+      one_half * (v + constant Field.typ Field.one))
 
   let is_neg (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      neg_one_half * (v - Field.Var.constant Field.one))
+      neg_one_half * (v - constant Field.typ Field.one))
 
   let pos_if_true (b : Boolean.var) =
     let open Field.Checked in
-    (two * (b :> Field.Var.t)) - Field.Var.constant Field.one
+    (two * (b :> Field.Var.t)) - constant Field.typ Field.one
 
   let neg_if_true (b : Boolean.var) =
     let open Field.Checked in
-    (neg_two * (b :> Field.Var.t)) + Field.Var.constant Field.one
+    (neg_two * (b :> Field.Var.t)) + constant Field.typ Field.one
 
   let negate t = Field.Var.scale t neg_one
 
-  let constant = Fn.compose Field.Var.constant to_field
+  let neg = constant typ Neg
 
-  let neg = constant Neg
-
-  let pos = constant Pos
+  let pos = constant typ Pos
 
   let if_ = Field.Checked.if_
 end

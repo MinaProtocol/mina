@@ -197,7 +197,7 @@ struct
         match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
         | [| g |] ->
             let g = Inner_curve.Constant.of_affine g in
-            Inner_curve.constant g
+            constant Inner_curve.typ g
         | _ ->
             assert false)
     |> Vector.map2
@@ -226,8 +226,8 @@ struct
           | [| g |] ->
               let open Inner_curve.Constant in
               let g = of_affine g in
-              ( Inner_curve.constant g
-              , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+              ( constant Inner_curve.typ g
+              , constant Inner_curve.typ (negate (pow2pow g actual_shift)) )
           | xs ->
               failwithf "expected commitment to have length 1. got %d"
                 (Array.length xs) ()
@@ -257,7 +257,13 @@ struct
     let f =
       lazy
         (let module M =
-           Group_map.Bw19.Make (Field.Constant) (Field)
+           Group_map.Bw19.Make
+             (Field.Constant)
+             (struct
+               include Field
+
+               let constant = constant typ
+             end)
              (struct
                let params =
                  Group_map.Bw19.Params.create
@@ -272,8 +278,8 @@ struct
           ~y_squared:(fun ~x ->
             Field.(
               (x * x * x)
-              + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b))
+              + (constant typ Inner_curve.Params.a * x)
+              + constant typ Inner_curve.Params.b))
         |> unstage)
     in
     fun x -> Lazy.force f x
@@ -387,7 +393,7 @@ struct
           let b_u = scale_fast u advice.b in
           let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
           let z2_h =
-            scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
+            scale_fast (constant Inner_curve.typ (Lazy.force Generators.h)) z_2
           in
           z_1_g_plus_b_u + z2_h
         in
@@ -711,11 +717,11 @@ struct
 
   let shift1 =
     Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:(constant Field.typ) (create (module Field.Constant)))
 
   let shift2 =
     Shifted_value.Type2.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:(constant Field.typ) (create (module Field.Constant)))
 
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
@@ -802,11 +808,11 @@ struct
       Plonk_checks.scalars_env
         (module Field)
         ~srs_length_log2:Common.Max_degree.wrap_log2
-        ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
+        ~endo:(constant Field.typ Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
           Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-          |> Kimchi_pasta.Pasta.Fq.of_bigint |> Field.constant)
+          |> Kimchi_pasta.Pasta.Fq.of_bigint |> constant Field.typ)
         ~domain (Plonk.to_minimal plonk) combined_evals
     in
     let combined_inner_product_correct =

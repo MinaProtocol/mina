@@ -30,10 +30,6 @@ struct
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.Legacy.bitstring bits)
 
-  let constant n =
-    Field.Var.constant
-      (Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n)))
-
   let () = assert (Int.(N.length_in_bits mod 16 = 0))
 
   let range_check' (t : var) =
@@ -90,7 +86,7 @@ struct
   let is_succ ~pred ~succ =
     let open Snark_params.Tick in
     let open Field in
-    Checked.(equal (pred + Var.constant one) succ)
+    Checked.(equal (pred + constant typ one) succ)
 
   let gte x y =
     let open Pickles.Impls.Step in
@@ -134,7 +130,7 @@ struct
     Checked.return (Field.Var.add t (c :> Field.Var.t))
 
   let succ (t : var) =
-    Checked.return (Field.Var.add t (Field.Var.constant Field.one))
+    Checked.return (Field.Var.add t (constant Field.typ Field.one))
 
   let seal x = make_checked (fun () -> Pickles.Util.seal m x)
 
@@ -178,7 +174,7 @@ struct
 
   let ( = ) = equal
 
-  let zero = Field.Var.constant Field.zero
+  let zero = constant Field.typ Field.zero
 end
 
 [%%endif]

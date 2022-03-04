@@ -159,16 +159,6 @@ module Common = struct
       ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   module Checked = struct
-    let constant
-        ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : t) : var =
-      { fee = Currency.Fee.var_of_t fee
-      ; fee_token = Token_id.var_of_t fee_token
-      ; fee_payer_pk = Public_key.Compressed.var_of_t fee_payer_pk
-      ; nonce = Account_nonce.Checked.constant nonce
-      ; memo = Memo.Checked.constant memo
-      ; valid_until = Global_slot.Checked.constant valid_until
-      }
-
     let to_input_legacy
         ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : var) =
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce

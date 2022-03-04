@@ -87,13 +87,6 @@ let var_to_input_legacy { Poly.source_pk; receiver_pk; token_id; amount } =
      ; amount
     |]
 
-let var_of_t ({ source_pk; receiver_pk; token_id; amount } : t) : var =
-  { source_pk = Public_key.Compressed.var_of_t source_pk
-  ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
-  ; token_id = Token_id.var_of_t token_id
-  ; amount = Amount.var_of_t amount
-  }
-
 [%%endif]
 
 let gen_aux ?source_pk ~token_id ~max_amount =

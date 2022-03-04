@@ -130,12 +130,14 @@ struct
                 | `Packed_bits (s, n) ->
                     ( Ops.scale_fast2'
                         (module F)
-                        (Inner_curve.constant x) s ~num_bits:n
+                        (constant Inner_curve.typ x)
+                        s ~num_bits:n
                     , n )
                 | `Field s ->
                     ( Ops.scale_fast2'
                         (module F)
-                        (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
+                        (constant Inner_curve.typ x)
+                        s ~num_bits:Field.size_in_bits
                     , Field.size_in_bits )
               in
               let n =
@@ -146,7 +148,7 @@ struct
           |> Array.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
                  (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2))
         in
-        Inner_curve.(acc + constant (Constant.negate correction)))
+        Inner_curve.(acc + constant typ (Constant.negate correction)))
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
@@ -180,7 +182,13 @@ struct
     let f =
       lazy
         (let module M =
-           Group_map.Bw19.Make (Field.Constant) (Field)
+           Group_map.Bw19.Make
+             (Field.Constant)
+             (struct
+               include Field
+
+               let constant = constant typ
+             end)
              (struct
                let params =
                  Group_map.Bw19.Params.create
@@ -195,8 +203,8 @@ struct
           ~y_squared:(fun ~x ->
             Field.(
               (x * x * x)
-              + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b))
+              + (constant typ Inner_curve.Params.a * x)
+              + constant typ Inner_curve.Params.b))
         |> unstage)
     in
     fun x -> Lazy.force f x
@@ -297,7 +305,9 @@ struct
               let b_u = scale_fast2 u advice.b in
               let z_1_g_plus_b_u = scale_fast2 (sg + b_u) z_1 in
               let z2_h =
-                scale_fast2 (Inner_curve.constant (Lazy.force Generators.h)) z_2
+                scale_fast2
+                  (constant Inner_curve.typ (Lazy.force Generators.h))
+                  z_2
               in
               z_1_g_plus_b_u + z2_h)
         in
@@ -471,10 +481,10 @@ struct
 
   let shifts ~log2_size =
     Common.tick_shifts ~log2_size
-    |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+    |> Dlog_plonk_types.Shifts.map ~f:(constant Field.typ)
 
   let domain_generator ~log2_size =
-    Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
+    Backend.Tick.Field.domain_generator ~log2_size |> constant Field.typ
 
   module O = One_hot_vector.Make (Impl)
 
@@ -590,7 +600,8 @@ struct
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
               (run (fun () ->
-                   (checked_domain ())#vanishing_polynomial (Field.constant pt))))
+                   (checked_domain ())#vanishing_polynomial
+                     (constant Field.typ pt))))
 
       let%test_unit "side loaded domains" =
         let module O = One_hot_vector.Make (Impl) in
@@ -622,7 +633,7 @@ struct
                 (d_unchecked#vanishing_polynomial pt)
                 (run (fun () ->
                      (checked_domain ())#vanishing_polynomial
-                       (Field.constant pt)))
+                       (constant Field.typ pt)))
             in
             check Domains.h Domains.h)
     end )
@@ -746,11 +757,11 @@ struct
 
   let shift1 =
     Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:(constant Field.typ) (create (module Field.Constant)))
 
   let shift2 =
     Shifted_value.Type2.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:(constant Field.typ) (create (module Field.Constant)))
 
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
@@ -873,11 +884,11 @@ struct
           Plonk_checks.scalars_env
             (module Field)
             ~srs_length_log2:Common.Max_degree.step_log2
-            ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
+            ~endo:((constant Field.typ) Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-              |> Kimchi_pasta.Pasta.Fp.of_bigint |> Field.constant)
+              |> Kimchi_pasta.Pasta.Fp.of_bigint |> constant Field.typ)
             ~domain plonk_minimal combined_evals)
     in
     let open Field in

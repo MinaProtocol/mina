@@ -56,7 +56,8 @@ let%test_unit "group-map test" =
             let x, y =
               Snarky_group_map.Checked.to_group
                 (module M)
-                ~params (M.Field.constant t)
+                ~params
+                M.(constant Field.typ t)
             in
             fun () -> M.As_prover.(read_var x, read_var y))
           ()
@@ -164,7 +165,7 @@ module Tock = struct
                   let add = None
                 end)
 
-      let add_known_unsafe t x = add_unsafe t (constant x)
+      let add_known_unsafe t x = add_unsafe t (constant typ x)
     end
 
     let typ = Checked.typ
@@ -220,7 +221,7 @@ module Tick = struct
                         Tick0.with_state (As_prover.return ()) c)
                 end)
 
-      let add_known_unsafe t x = add_unsafe t (constant x)
+      let add_known_unsafe t x = add_unsafe t (constant typ x)
     end
 
     let typ = Checked.typ

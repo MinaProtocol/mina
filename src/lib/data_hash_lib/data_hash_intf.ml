@@ -40,8 +40,6 @@ module type Basic = sig
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 
-  val var_of_t : t -> var
-
   (* TODO : define bit ops using Random_oracle instead of Pedersen.Digest,
      move this outside of consensus_mechanism guard
   *)

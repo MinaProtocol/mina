@@ -32,8 +32,6 @@ type var
 
 val typ : (var, t) Snark_params.Tick.Typ.t
 
-val var_of_t : t -> var
-
 module Checked : sig
   open Snark_params
   open Tick

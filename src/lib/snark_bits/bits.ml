@@ -253,9 +253,6 @@ module Snarkable = struct
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
 
-      let var_of_value v =
-        List.init V.length ~f:(fun i -> Boolean.var_of_value (V.get v i))
-
       let size_in_bits = size_in_bits
     end
 
@@ -279,7 +276,7 @@ module Snarkable = struct
     let%snarkydef increment_var bs =
       let open Impl in
       let v = Field.Var.pack bs in
-      let v' = Field.Var.add v (Field.Var.constant Field.one) in
+      let v' = Field.Var.add v (constant Field.typ Field.one) in
       Field.Checked.unpack v' ~length:V.length
 
     let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
@@ -344,10 +341,6 @@ module Snarkable = struct
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
-
-      let var_of_value v =
-        unpack_field Field.unpack ~bit_length v
-        |> List.map ~f:Boolean.var_of_value
 
       let size_in_bits = size_in_bits
     end

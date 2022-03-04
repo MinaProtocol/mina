@@ -33,16 +33,6 @@ open Snark_params.Tick
 
 type var = { token_owner : Boolean.var; token_locked : Boolean.var }
 
-let var_of_t = function
-  | Token_owned { disable_new_accounts } ->
-      { token_owner = Boolean.true_
-      ; token_locked = Boolean.var_of_value disable_new_accounts
-      }
-  | Not_owned { account_disabled } ->
-      { token_owner = Boolean.false_
-      ; token_locked = Boolean.var_of_value account_disabled
-      }
-
 let typ : (var, t) Typ.t =
   let open Typ in
   { alloc =
