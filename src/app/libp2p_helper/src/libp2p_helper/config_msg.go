@@ -141,7 +141,12 @@ func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrI
 			pubsub.WithDirectPeers(directPeers),
 			pubsub.WithValidateQueueSize(validationQueueSize),
 			pubsub.WithMessageIdFn(func(pmsg *pb.Message) string {
-				hash, err := blake2b.New256([]byte(pmsg.GetTopic()))
+				hmacKey := []byte(pmsg.GetTopic())
+				if len(hmacKey) > 64 {
+					hmacKey2 := blake2b.Sum256(hmacKey)
+					hmacKey = hmacKey2[:]
+				}
+				hash, err := blake2b.New256(hmacKey)
 				panicOnErr(err)
 				_, err = hash.Write(pmsg.GetData())
 				panicOnErr(err)
