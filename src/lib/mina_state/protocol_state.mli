@@ -13,10 +13,10 @@ module Poly : sig
   end]
 end
 
-val hash_abstract :
+val hashes_abstract :
      hash_body:('body -> State_body_hash.t)
   -> (State_hash.t, 'body) Poly.t
-  -> State_hash.t
+  -> State_hash.State_hashes.t
 
 module Body : sig
   module Poly : sig
@@ -130,9 +130,10 @@ val negative_one :
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
-val hash : Value.t -> State_hash.t
+val hashes : Value.t -> State_hash.State_hashes.t
 
 (** Same as [hash], but accept the [body_hash] directly to avoid re-computing
     it.
 *)
-val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t
+val hashes_with_body :
+  Value.t -> body_hash:State_body_hash.t -> State_hash.State_hashes.t
