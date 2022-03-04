@@ -391,9 +391,9 @@ let run_test () : unit Deferred.t =
         let balance_sheet =
           Public_key.Compressed.Map.of_alist_exn
             (List.map accounts
-               ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
-                 ( Public_key.compress keypair.public_key
-                 , account.Account.balance )))
+               ~f:(fun
+                    ((keypair, account) : Signature_lib.Keypair.t * Account.t)
+                  -> (Public_key.compress keypair.public_key, account.balance)))
         in
         let%bind updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
