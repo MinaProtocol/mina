@@ -39,10 +39,10 @@ end) =
 module Node = struct
   [%%versioned_binable
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : External_transition.Validated.Stable.V2.t -> lite t
+        | Lite : External_transition.Validated.Stable.V3.t -> lite t
 
       include Dummy_binable1 (struct
         type nonrec 'a t = 'a t
@@ -67,7 +67,7 @@ module Node_list = struct
 
   let to_lite =
     let f { transition; _ } =
-      External_transition.Validated.state_hash transition
+      (External_transition.Validated.state_hashes transition).state_hash
     in
     List.map ~f
 
@@ -120,9 +120,9 @@ module Root_transition = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V4 = struct
         type t =
-          { new_root : Root_data.Limited.Stable.V2.t
+          { new_root : Root_data.Limited.Stable.V3.t
           ; garbage : Node_list.Lite.Stable.V1.t
           ; just_emitted_a_proof : bool
           }
@@ -138,8 +138,8 @@ module Root_transition = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V2 = struct
-          type t = Lite_binable.Stable.V2.t
+        module V4 = struct
+          type t = Lite_binable.Stable.V4.t
 
           let to_latest = Fn.id
         end
@@ -148,23 +148,23 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
-      module V2 = struct
+      module V4 = struct
         type t = lite root_transition
 
         module T_nonbinable = struct
           type nonrec t = t
 
           let to_binable ({ new_root; garbage; just_emitted_a_proof } : t) :
-              Binable_arg.Stable.V2.t =
+              Binable_arg.Stable.V4.t =
             { new_root; garbage; just_emitted_a_proof }
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V2.t) : t =
+                Binable_arg.Stable.V4.t) : t =
             { new_root; garbage; just_emitted_a_proof }
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
 
         let to_latest = Fn.id
       end
@@ -177,7 +177,7 @@ module T = struct
   module Stable = struct
     module V2 = struct
       type ('repr, 'mutant) t =
-        | New_node : 'repr Node.Stable.V2.t -> ('repr, unit) t
+        | New_node : 'repr Node.Stable.V3.t -> ('repr, unit) t
         | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
         | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
@@ -209,8 +209,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        State_hash.to_yojson
-          (External_transition.Validated.state_hash transition)
+        let x, _ = transition in
+        State_hash.to_yojson (State_hash.With_state_hashes.state_hash x)
     | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
         let garbage_hashes =
           match garbage with
@@ -220,7 +220,9 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hash new_root))
+          [ ( "new_root"
+            , State_hash.to_yojson
+                (Root_data.Limited.hashes new_root).state_hash )
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
           ]
@@ -250,8 +252,8 @@ module Lite_binable = struct
 
     module V2 = struct
       type t =
-        | New_node of External_transition.Validated.Stable.V2.t
-        | Root_transitioned of Root_transition.Lite.Stable.V2.t
+        | New_node of External_transition.Validated.Stable.V3.t
+        | Root_transitioned of Root_transition.Lite.Stable.V4.t
         | Best_tip_changed of State_hash.Stable.V1.t
 
       let to_latest = Fn.id

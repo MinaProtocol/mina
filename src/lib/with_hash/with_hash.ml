@@ -22,4 +22,6 @@ let hash { hash; _ } = hash
 
 let map t ~f = { t with data = f t.data }
 
+let map_hash t ~f = { t with hash = f t.hash }
+
 let of_data data ~hash_data = { data; hash = hash_data data }
