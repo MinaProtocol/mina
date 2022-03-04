@@ -2,7 +2,6 @@ open Core_kernel
 open Currency
 open Signature_lib
 module Global_slot = Mina_numbers.Global_slot
-module Token_id = Token_id
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
@@ -2222,9 +2221,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 end
 
 module For_tests = struct
-  module Tid = Token_id
   open Mina_numbers
-  module Token_id = Tid
   open Currency
 
   module Account_without_receipt_chain_hash = struct

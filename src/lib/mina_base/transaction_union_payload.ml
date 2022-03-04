@@ -13,7 +13,6 @@ open Snark_params.Tick
 
 open Signature_lib
 module Tag = Transaction_union_tag
-module Tid = Token_id
 
 module Body = struct
   type ('tag, 'public_key, 'token_id, 'amount, 'bool) t_ =
@@ -26,7 +25,8 @@ module Body = struct
     }
   [@@deriving sexp, hlist]
 
-  type t = (Tag.t, Public_key.Compressed.t, Tid.t, Currency.Amount.t, bool) t_
+  type t =
+    (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
   [@@deriving sexp]
 
   let of_user_command_payload_body = function
@@ -34,7 +34,7 @@ module Body = struct
         { tag = Tag.Payment
         ; source_pk
         ; receiver_pk
-        ; token_id = Tid.default
+        ; token_id = Token_id.default
         ; amount
         ; token_locked = false
         }
@@ -42,7 +42,7 @@ module Body = struct
         { tag = Tag.Stake_delegation
         ; source_pk = delegator
         ; receiver_pk = new_delegate
-        ; token_id = Tid.default
+        ; token_id = Token_id.default
         ; amount = Currency.Amount.zero
         ; token_locked = false
         }
@@ -93,17 +93,17 @@ module Body = struct
     and token_id =
       match tag with
       | Payment ->
-          Tid.gen
+          Token_id.gen
       | Stake_delegation ->
-          return Tid.default
+          return Token_id.default
       | Create_account ->
-          Tid.gen
+          Token_id.gen
       | Mint_tokens ->
-          Tid.gen
+          Token_id.gen
       | Fee_transfer ->
-          return Tid.default
+          return Token_id.default
       | Coinbase ->
-          return Tid.default
+          return Token_id.default
     in
     { tag; source_pk; receiver_pk; token_id; amount; token_locked }
 
@@ -112,7 +112,7 @@ module Body = struct
   type var =
     ( Tag.Unpacked.var
     , Public_key.Compressed.var
-    , Tid.Checked.t
+    , Token_id.Checked.t
     , Currency.Amount.var
     , Boolean.var )
     t_
@@ -122,7 +122,7 @@ module Body = struct
       [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
-      ; Tid.typ
+      ; Token_id.typ
       ; Currency.Amount.typ
       ; Boolean.typ
       ]
@@ -138,7 +138,7 @@ module Body = struct
       { tag = Tag.unpacked_of_t tag
       ; source_pk = Public_key.Compressed.var_of_t source_pk
       ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
-      ; token_id = Tid.Checked.constant token_id
+      ; token_id = Token_id.Checked.constant token_id
       ; amount = Currency.Amount.var_of_t amount
       ; token_locked = Boolean.var_of_value token_locked
       }
@@ -148,7 +148,8 @@ module Body = struct
       let%map amount = Currency.Amount.var_to_input_legacy amount
       and () =
         make_checked (fun () ->
-            Tid.Checked.Assert.equal token_id (Tid.Checked.constant Tid.default))
+            Token_id.Checked.Assert.equal token_id
+              (Token_id.Checked.constant Token_id.default))
       in
       let token_id = Signed_command_payload.Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -327,15 +328,15 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
   | Payment | Stake_delegation | Create_account | Mint_tokens ->
       (* For all user commands, the fee excess is just the fee. *)
-      Fee_excess.of_single (Tid.default, Fee.Signed.of_unsigned fee)
+      Fee_excess.of_single (Token_id.default, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
       let excess =
         Option.value_exn (Amount.add_fee amount fee)
         |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
       in
-      Fee_excess.of_single (Tid.default, excess)
+      Fee_excess.of_single (Token_id.default, excess)
   | Coinbase ->
-      Fee_excess.of_single (Tid.default, Fee.Signed.zero)
+      Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
