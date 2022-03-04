@@ -15,6 +15,25 @@ module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
 module Global_slot = Mina_numbers.Global_slot
 
+(* This represents the random oracle input corresponding to the old form of the token
+   ID, which was a 64-bit integer. The default token id was the number 1.
+
+   The corresponding random oracle input is still needed for signing non-snapp
+   transactions to maintain compatibility with the old transaction format.
+*)
+module Legacy_token_id = struct
+  let default : (Field.t, bool) Random_oracle_input.Legacy.t =
+    Random_oracle_input.Legacy.bitstring
+      (Snark_bits.Bits.UInt64.to_bits Unsigned.UInt64.one)
+
+  let default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
+      =
+    { field_elements = Array.map default.field_elements ~f:Field.Var.constant
+    ; bitstrings =
+        Array.map default.bitstrings ~f:(List.map ~f:Boolean.var_of_value)
+    }
+end
+
 module Common = struct
   module Poly = struct
     [%%versioned
@@ -113,7 +132,7 @@ module Common = struct
     let bitstring = Random_oracle.Input.Legacy.bitstring in
     Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
       [| Currency.Fee.to_input_legacy fee
-       ; Mina_numbers.Token_id.to_input_legacy Mina_numbers.Token_id.default
+       ; Legacy_token_id.default
        ; Public_key.Compressed.to_input_legacy fee_payer_pk
        ; Account_nonce.to_input_legacy nonce
        ; Global_slot.to_input_legacy valid_until
@@ -172,9 +191,8 @@ module Common = struct
         =
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce
       and valid_until = Global_slot.Checked.to_input_legacy valid_until
-      and fee_token =
-        Mina_numbers.Token_id.(Checked.to_input_legacy (var_of_t default))
       and fee = Currency.Fee.var_to_input_legacy fee in
+      let fee_token = Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
         [| fee
          ; fee_token

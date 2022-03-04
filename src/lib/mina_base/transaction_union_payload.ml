@@ -145,13 +145,12 @@ module Body = struct
 
     let to_input_legacy
         { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
-      let%map token_id =
-        Mina_numbers.Token_id.(Checked.to_input_legacy (var_of_t default))
-      and amount = Currency.Amount.var_to_input_legacy amount
+      let%map amount = Currency.Amount.var_to_input_legacy amount
       and () =
         make_checked (fun () ->
             Tid.Checked.Assert.equal token_id (Tid.Checked.constant Tid.default))
       in
+      let token_id = Signed_command_payload.Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
         [| Tag.Unpacked.to_input_legacy tag
          ; Public_key.Compressed.Checked.to_input_legacy source_pk
@@ -171,7 +170,7 @@ module Body = struct
       [| Tag.to_input_legacy tag
        ; Public_key.Compressed.to_input_legacy source_pk
        ; Public_key.Compressed.to_input_legacy receiver_pk
-       ; Mina_numbers.Token_id.(to_input_legacy default)
+       ; Signed_command_payload.Legacy_token_id.default
        ; Currency.Amount.to_input_legacy amount
        ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
       |]

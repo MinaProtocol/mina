@@ -4,6 +4,18 @@ open Core_kernel
 open Mina_base_import
 open Snark_params.Tick
 
+(* This represents the random oracle input corresponding to the old form of the token
+   ID, which was a 64-bit integer. The default token id was the number 1.
+
+   The corresponding random oracle input is still needed for signing non-snapp
+   transactions to maintain compatibility with the old transaction format.
+*)
+module Legacy_token_id : sig
+  val default : (Field.t, bool) Random_oracle_input.Legacy.t
+
+  val default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
+end
+
 module Body : sig
   type t =
     | Payment of Payment_payload.t

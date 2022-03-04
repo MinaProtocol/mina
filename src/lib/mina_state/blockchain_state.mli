@@ -48,7 +48,7 @@ module Value : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
-        , Mina_numbers.Token_id.Stable.V1.t
+        , Unsigned_extended.UInt64.Stable.V1.t
         , Block_time.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
