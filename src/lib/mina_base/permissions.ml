@@ -307,9 +307,8 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('bool, 'controller) t =
-        { stake : 'bool
-        ; edit_state : 'controller
+      type 'controller t =
+        { edit_state : 'controller
         ; send : 'controller
         ; receive : 'controller
         ; set_delegate : 'controller
@@ -325,24 +324,21 @@ module Poly = struct
     end
   end]
 
-  let to_input ~field_of_bool controller t =
+  let to_input controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    Stable.Latest.Fields.fold ~init:[]
-      ~stake:
-        (f (fun x -> Random_oracle.Input.Chunked.packed (field_of_bool x, 1)))
-      ~edit_state:(f controller) ~send:(f controller)
-      ~set_delegate:(f controller) ~set_permissions:(f controller)
-      ~set_verification_key:(f controller) ~receive:(f controller)
-      ~set_snapp_uri:(f controller) ~edit_sequence_state:(f controller)
-      ~set_token_symbol:(f controller) ~increment_nonce:(f controller)
-      ~set_voting_for:(f controller)
+    Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
+      ~send:(f controller) ~set_delegate:(f controller)
+      ~set_permissions:(f controller) ~set_verification_key:(f controller)
+      ~receive:(f controller) ~set_snapp_uri:(f controller)
+      ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
+      ~increment_nonce:(f controller) ~set_voting_for:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (bool, Auth_required.Stable.V2.t) Poly.Stable.V2.t
+    type t = Auth_required.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
@@ -361,7 +357,6 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
         Auth_required.gen_for_none_given_authorization
   in
   let open Quickcheck.Generator.Let_syntax in
-  let%bind stake = Quickcheck.Generator.bool in
   let%bind edit_state = auth_required_gen in
   let%bind send = auth_required_gen in
   let%bind receive = auth_required_gen in
@@ -374,8 +369,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind increment_nonce = auth_required_gen in
   let%bind set_voting_for = auth_required_gen in
   return
-    { Poly.stake
-    ; edit_state
+    { Poly.edit_state
     ; send
     ; receive
     ; set_delegate
@@ -391,13 +385,9 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
-  type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
+  type t = Auth_required.Checked.t Poly.Stable.Latest.t
 
-  let to_input (x : t) =
-    Poly.to_input Auth_required.Checked.to_input x
-      ~field_of_bool:(fun (b : Boolean.var) -> (b :> Field.Var.t))
-
-  open Pickles.Impls.Step
+  let to_input (x : t) = Poly.to_input Auth_required.Checked.to_input x
 
   let if_ b ~then_ ~else_ =
     let g cond f =
@@ -406,26 +396,24 @@ module Checked = struct
         ~else_:(Core_kernel.Field.get f else_)
     in
     let c = g Auth_required.Checked.if_ in
-    Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
-      ~set_delegate:c ~set_permissions:c ~set_verification_key:c
-      ~set_snapp_uri:c ~edit_sequence_state:c ~set_token_symbol:c
-      ~increment_nonce:c ~set_voting_for:c
+    Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
+      ~set_permissions:c ~set_verification_key:c ~set_snapp_uri:c
+      ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
+      ~set_voting_for:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
     let a f = Auth_required.Checked.constant (get f t) in
-    Poly.Fields.map
-      ~stake:(fun f -> Boolean.var_of_value (get f t))
-      ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
-      ~set_verification_key:a ~set_snapp_uri:a ~edit_sequence_state:a
-      ~set_token_symbol:a ~increment_nonce:a ~set_voting_for:a
+    Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
+      ~set_permissions:a ~set_verification_key:a ~set_snapp_uri:a
+      ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
+      ~set_voting_for:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
-    [ Boolean.typ
-    ; Auth_required.typ
+    [ Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -442,11 +430,10 @@ let typ =
 
 [%%endif]
 
-let to_input (x : t) = Poly.to_input ~field_of_bool Auth_required.to_input x
+let to_input (x : t) = Poly.to_input Auth_required.to_input x
 
 let user_default : t =
-  { stake = true
-  ; edit_state = Signature
+  { edit_state = Signature
   ; send = Signature
   ; receive = None
   ; set_delegate = Signature
@@ -460,8 +447,7 @@ let user_default : t =
   }
 
 let empty : t =
-  { stake = false
-  ; edit_state = None
+  { edit_state = None
   ; send = None
   ; receive = None
   ; set_delegate = None
@@ -508,8 +494,8 @@ let auth_required =
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
-  Poly.Fields.make_creator obj ~stake:!.bool ~edit_state:!.auth_required
-    ~send:!.auth_required ~receive:!.auth_required ~set_delegate:!.auth_required
+  Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
+    ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
     ~set_snapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
@@ -529,7 +515,6 @@ let%test_unit "json value" =
   [%test_eq: string]
     (user_default |> to_json full |> Yojson.Safe.to_string)
     ( {json|{
-        stake: true,
         editState: "Signature",
         send: "Signature",
         receive: "None",
