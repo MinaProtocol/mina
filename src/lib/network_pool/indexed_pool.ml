@@ -3,7 +3,6 @@ open Core
 open Mina_base
 open Mina_numbers
 open Signature_lib
-module Token_id = Mina_base.Token_id
 
 (* Fee increase required to replace a transaction. This represents the cost to
    the network as a whole of checking, gossiping, and storing a transaction

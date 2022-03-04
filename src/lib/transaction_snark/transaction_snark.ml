@@ -7536,8 +7536,6 @@ let%test_module "account timing check" =
       in
       Or_error.is_error @@ Tick.run_and_check checked_timing_computation ()
 
-    module Token_id = Mina_base.Token_id
-
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
       let account_id = Account_id.create pk Token_id.default in

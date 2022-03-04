@@ -5,9 +5,7 @@
 open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
-module Tid = Token_id
 open Mina_numbers
-module Token_id = Tid
 
 module type Gen_intf = sig
   type t

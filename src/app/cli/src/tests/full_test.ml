@@ -9,7 +9,6 @@ open Pipe_lib
 open O1trace
 open Init
 open Mina_numbers
-module Token_id = Mina_base.Token_id
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 

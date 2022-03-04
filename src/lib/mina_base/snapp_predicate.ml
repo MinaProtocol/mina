@@ -10,9 +10,7 @@ open Snark_params.Tick
 
 open Signature_lib
 module A = Account
-module Tid = Token_id
 open Mina_numbers
-module Token_id = Tid
 open Currency
 open Snapp_basic
 open Pickles_types

@@ -2,7 +2,6 @@
 
 [%%import "/src/config.mlh"]
 
-module T = Token_id
 open Core_kernel
 open Mina_base_util
 open Snark_params
@@ -11,7 +10,6 @@ open Currency
 open Mina_numbers
 open Fold_lib
 open Mina_base_import
-module Token_id = T
 
 module Index = struct
   [%%versioned

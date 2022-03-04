@@ -2,9 +2,7 @@
 
 open Core_kernel
 open Mina_base_import
-module Tid = Token_id
 open Mina_numbers
-module Token_id = Tid
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
 

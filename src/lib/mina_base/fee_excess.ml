@@ -47,8 +47,6 @@ open Tick
 
 [%%endif]
 
-module Token_id = Token_id
-
 module Poly = struct
   [%%versioned
   module Stable = struct

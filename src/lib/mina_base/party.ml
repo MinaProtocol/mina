@@ -11,9 +11,7 @@ open Snark_params.Tick
 
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module T = Token_id
 open Mina_numbers
-module Token_id = T
 open Currency
 open Pickles_types
 module Digest = Random_oracle.Digest
