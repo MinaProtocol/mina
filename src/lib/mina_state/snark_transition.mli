@@ -30,6 +30,15 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
+    module V2 : sig
+      type t =
+        ( Blockchain_state.Value.Stable.V2.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Pending_coinbase.Update.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+    end
+
     module V1 : sig
       type t =
         ( Blockchain_state.Value.Stable.V1.t
@@ -37,6 +46,8 @@ module Value : sig
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
+
+      val to_latest : t -> V2.t
     end
   end]
 end
@@ -62,7 +73,7 @@ val create_value :
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
-  -> genesis_ledger:Ledger.t Lazy.t
+  -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
   -> Value.t
 
 val consensus_transition :

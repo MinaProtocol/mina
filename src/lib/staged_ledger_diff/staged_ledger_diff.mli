@@ -38,6 +38,8 @@ module Pre_diff_two : sig
     }
   [@@deriving compare, sexp, yojson]
 
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+
   module Stable : sig
     module V1 : sig
       type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
@@ -56,6 +58,8 @@ module Pre_diff_one : sig
     }
   [@@deriving compare, sexp, yojson]
 
+  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+
   module Stable : sig
     module V1 : sig
       type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
@@ -70,11 +74,11 @@ module Pre_diff_with_at_most_two_coinbase : sig
   [@@deriving compare, sexp, yojson]
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving compare, sexp, yojson, bin_io, version]
     end
   end
-  with type V1.t = t
+  with type V2.t = t
 end
 
 module Pre_diff_with_at_most_one_coinbase : sig
@@ -83,11 +87,11 @@ module Pre_diff_with_at_most_one_coinbase : sig
   [@@deriving compare, sexp, yojson]
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving compare, sexp, yojson, bin_io, version]
     end
   end
-  with type V1.t = t
+  with type V2.t = t
 end
 
 module Diff : sig
@@ -97,24 +101,26 @@ module Diff : sig
   [@@deriving compare, sexp, yojson]
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving compare, sexp, bin_io, yojson, version]
     end
   end
-  with type V1.t = t
+  with type V2.t = t
 end
 
 type t = { diff : Diff.t } [@@deriving compare, sexp, compare, yojson, fields]
 
 module Stable : sig
-  module V1 : sig
-    type t = { diff : Diff.t }
+  module V2 : sig
+    type t = { diff : Diff.Stable.V2.t }
     [@@deriving compare, sexp, compare, yojson, bin_io, version]
+
+    val to_latest : t -> t
   end
 
-  module Latest = V1
+  module Latest = V2
 end
-with type V1.t = t
+with type V2.t = t
 
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =

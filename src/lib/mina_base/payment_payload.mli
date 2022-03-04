@@ -1,6 +1,6 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
-open Import
+open Mina_base_import
 
 module Poly : sig
   type ('public_key, 'token_id, 'amount) t =
@@ -57,9 +57,9 @@ type var = (Public_key.Compressed.var, Token_id.var, Currency.Amount.var) Poly.t
 
 val typ : (var, t) Typ.t
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
-val var_to_input :
-  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+val var_to_input_legacy :
+  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t, _) Checked.t
 
 val var_of_t : t -> var

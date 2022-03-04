@@ -1,0 +1,36 @@
+(library
+ (inline_tests)
+ (name kimchi_backend_common)
+ (public_name kimchi_backend.common)
+ (flags -warn-error -27)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_coda
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_deriving.std
+   h_list.ppx))
+ (libraries
+  hex
+  digestif
+  pickles_types
+  kimchi
+  key_cache
+  sgn_type
+  snarky.backendless
+  sponge
+  snarkette
+  core_kernel
+  integers
+  allocation_functor))
+
+(rule
+ (targets version.ml)
+ (deps
+  (:< gen_version.sh)
+  (source_tree ../../proof-systems))
+ (action
+  (run %{<} %{targets})))

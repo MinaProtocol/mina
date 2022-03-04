@@ -447,6 +447,14 @@ module Block_latency = struct
 
     let clear : unit -> unit = fun _ -> ()
   end
+
+  module Validation_acceptance_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
 end
 
 module Rejected_blocks = struct

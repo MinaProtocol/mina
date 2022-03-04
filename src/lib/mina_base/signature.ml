@@ -75,4 +75,5 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 [%%endif]
 
 [%%define_locally
-Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
+Stable.Latest.
+  (of_base58_check_exn, of_base58_check, of_yojson, to_yojson, to_base58_check)]

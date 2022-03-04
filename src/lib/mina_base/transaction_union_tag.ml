@@ -10,7 +10,7 @@ open Snark_params.Tick
 
 [%%else]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 
@@ -64,7 +64,7 @@ module Bits = struct
 
   let to_bits (b1, b2, b3) = [ b1; b2; b3 ]
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%ifdef consensus_mechanism]
 
@@ -270,7 +270,7 @@ module Unpacked = struct
 
   let to_bits t = Bits.to_bits (to_bits_var t)
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%endif]
 end
@@ -291,7 +291,7 @@ let unpacked_t_of_t = function
 
 let to_bits tag = Bits.to_bits (Unpacked.to_bits_t (unpacked_t_of_t tag))
 
-let to_input tag = Random_oracle.Input.bitstring (to_bits tag)
+let to_input_legacy tag = Random_oracle.Input.Legacy.bitstring (to_bits tag)
 
 [%%ifdef consensus_mechanism]
 

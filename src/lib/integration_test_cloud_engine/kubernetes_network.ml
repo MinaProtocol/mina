@@ -7,6 +7,8 @@ open Integration_test_lib
 
 let mina_archive_container_id = "archive"
 
+let node_password = "naughty blue worm"
+
 type config =
   { testnet_name : string
   ; cluster : string
@@ -121,6 +123,35 @@ module Node = struct
       }
     |}]
 
+    (* TODO: temporary version *)
+    module Send_test_snapp =
+    [%graphql
+    {|
+         mutation ($parties: SendTestSnappInput!) {
+          sendTestSnapp(parties: $parties) {
+               snapp { id
+                       hash
+                       nonce
+                       failureReason
+                     }
+             }
+         }
+       |}]
+
+    module Send_snapp =
+    [%graphql
+    {|
+      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
+       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
+            snapp { id
+                    hash
+                    nonce
+                    failureReason
+                  }
+          }
+      }
+    |}]
+
     module Get_balance =
     [%graphql
     {|
@@ -155,6 +186,49 @@ module Node = struct
       query {
         bestChain {
           stateHash
+        }
+      }
+    |}]
+
+    module Account =
+    [%graphql
+    {|
+      query ($public_key: PublicKey, $token: UInt64) {
+        account (publicKey : $public_key, token : $token) {
+          balance { liquid
+                    locked
+                    total
+                  }
+          delegate
+          nonce
+          permissions { editSequenceState
+                        editState
+                        incrementNonce
+                        receive
+                        send
+                        setDelegate
+                        setPermissions
+                        setSnappUri
+                        setTokenSymbol
+                        setVerificationKey
+                        setVotingFor
+                        stake
+                      }
+          sequenceEvents
+          snappState
+          snappUri
+          timing { cliffTime
+                   cliffAmount
+                   vestingPeriod
+                   vestingIncrement
+                   initialMinimumBalance
+                 }
+          token
+          tokenSymbol
+          verificationKey { verificationKey
+                            hash
+                          }
+          votingFor
         }
       }
     |}]
@@ -283,6 +357,236 @@ module Node = struct
     get_balance ~logger t ~account_id
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
+  let get_account ~logger t ~account_id =
+    [%log info] "Getting account"
+      ~metadata:
+        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        :: logger_metadata t ) ;
+    let pk = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
+    let get_account_obj =
+      Graphql.Account.make
+        ~public_key:(Graphql_lib.Encoders.public_key pk)
+        ~token:(Graphql_lib.Encoders.token token)
+        ()
+    in
+    exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
+      get_account_obj
+
+  let permissions_of_account_permissions account_permissions :
+      Mina_base.Permissions.t =
+    (* the polymorphic variants come from Partial_accounts.auth_required in Mina_graphql *)
+    let to_auth_required = function
+      | `Either ->
+          Mina_base.Permissions.Auth_required.Either
+      | `Impossible ->
+          Impossible
+      | `None ->
+          None
+      | `Proof ->
+          Proof
+      | `Signature ->
+          Signature
+    in
+    { stake = account_permissions#stake
+    ; edit_sequence_state =
+        to_auth_required account_permissions#editSequenceState
+    ; edit_state = to_auth_required account_permissions#editState
+    ; increment_nonce = to_auth_required account_permissions#incrementNonce
+    ; receive = to_auth_required account_permissions#receive
+    ; send = to_auth_required account_permissions#send
+    ; set_delegate = to_auth_required account_permissions#setDelegate
+    ; set_permissions = to_auth_required account_permissions#setPermissions
+    ; set_snapp_uri = to_auth_required account_permissions#setSnappUri
+    ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
+    ; set_verification_key =
+        to_auth_required account_permissions#setVerificationKey
+    ; set_voting_for = to_auth_required account_permissions#setVotingFor
+    }
+
+  let get_account_permissions ~logger t ~account_id =
+    let open Deferred.Or_error in
+    let open Let_syntax in
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | Some account -> (
+        match account#permissions with
+        | Some ledger_permissions ->
+            return @@ permissions_of_account_permissions ledger_permissions
+        | None ->
+            fail
+              (Error.of_string "Could not get permissions from ledger account")
+        )
+    | None ->
+        fail (Error.of_string "Could not get account from ledger")
+
+  (* return a Party.Update.t with all fields `Set` to the
+     value in the account, or `Keep` if value unavailable,
+     as if this update had been applied to the account
+  *)
+  let get_account_update ~logger t ~account_id =
+    let open Deferred.Or_error in
+    let open Let_syntax in
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | Some account ->
+        let open Mina_base.Snapp_basic.Set_or_keep in
+        let%bind app_state =
+          match account#snappState with
+          | Some strs ->
+              let fields =
+                Array.to_list strs
+                |> Base.List.map ~f:(fun s ->
+                       Set (Pickles.Backend.Tick.Field.of_string s))
+              in
+              return (Mina_base.Snapp_state.V.of_list_exn fields)
+          | None ->
+              fail (Error.of_string "Expected snapp account with an app state")
+        in
+        let%bind delegate =
+          match account#delegate with
+          | Some (`String s) ->
+              return
+                (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
+          | Some json ->
+              fail
+                (Error.of_string
+                   (sprintf "Expected string encoding of delegate, got %s"
+                      (Yojson.Basic.to_string json)))
+          | None ->
+              fail (Error.of_string "Expected delegate in account")
+        in
+        let%bind verification_key =
+          match account#verificationKey with
+          | Some vk_obj ->
+              let data =
+                Pickles.Side_loaded.Verification_key.of_base58_check_exn
+                  vk_obj#verificationKey
+              in
+              let hash = Pickles.Backend.Tick.Field.of_string vk_obj#hash in
+              return (Set ({ data; hash } : _ With_hash.t))
+          | None ->
+              fail
+                (Error.of_string "Expected verification key in snapp account")
+        in
+        let%bind permissions =
+          match account#permissions with
+          | Some perms ->
+              return @@ Set (permissions_of_account_permissions perms)
+          | None ->
+              fail (Error.of_string "Expected permissions in account")
+        in
+        let%bind snapp_uri =
+          match account#snappUri with
+          | Some s ->
+              return @@ Set s
+          | None ->
+              fail (Error.of_string "Expected snapp URI in account")
+        in
+        let%bind token_symbol =
+          match account#tokenSymbol with
+          | Some s ->
+              return @@ Set s
+          | None ->
+              fail (Error.of_string "Expected token symbol in account")
+        in
+        let%bind timing =
+          let timing = account#timing in
+          let cliff_amount = timing#cliffAmount in
+          let cliff_time = timing#cliffTime in
+          let vesting_period = timing#vestingPeriod in
+          let vesting_increment = timing#vestingIncrement in
+          let initial_minimum_balance = timing#initialMinimumBalance in
+          match
+            ( cliff_amount
+            , cliff_time
+            , vesting_period
+            , vesting_increment
+            , initial_minimum_balance )
+          with
+          | None, None, None, None, None ->
+              return @@ Keep
+          | Some amt, Some tm, Some period, Some incr, Some bal ->
+              let%bind cliff_amount =
+                match amt with
+                | `String s ->
+                    return @@ Currency.Amount.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for cliff amount in account timing")
+              in
+              let%bind cliff_time =
+                match tm with
+                | `String s ->
+                    return @@ Mina_numbers.Global_slot.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for cliff time in account timing")
+              in
+              let%bind vesting_period =
+                match period with
+                | `String s ->
+                    return @@ Mina_numbers.Global_slot.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting period in account timing")
+              in
+              let%bind vesting_increment =
+                match incr with
+                | `String s ->
+                    return @@ Currency.Amount.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting increment in account \
+                          timing")
+              in
+              let%bind initial_minimum_balance =
+                match bal with
+                | `String s ->
+                    return @@ Currency.Balance.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting increment in account \
+                          timing")
+              in
+              return
+                (Set
+                   ( { initial_minimum_balance
+                     ; cliff_amount
+                     ; cliff_time
+                     ; vesting_period
+                     ; vesting_increment
+                     }
+                     : Mina_base.Party.Update.Timing_info.t ))
+          | _ ->
+              fail (Error.of_string "Some pieces of account timing are missing")
+        in
+        let%bind voting_for =
+          match account#votingFor with
+          | Some s ->
+              return @@ Set (Mina_base.State_hash.of_base58_check_exn s)
+          | None ->
+              fail (Error.of_string "Expected voting-for state hash in account")
+        in
+        return
+          ( { app_state
+            ; delegate
+            ; verification_key
+            ; permissions
+            ; snapp_uri
+            ; token_symbol
+            ; timing
+            ; voting_for
+            }
+            : Mina_base.Party.Update.t )
+    | None ->
+        fail (Error.of_string "Could not get account from ledger")
+
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment" ~metadata:(logger_metadata t) ;
@@ -294,14 +598,14 @@ module Node = struct
       ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:"naughty blue worm"
+        Graphql.Unlock_account.make ~password:node_password
           ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
-    let%bind _ = unlock_sender_account_graphql () in
+    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let send_payment_graphql () =
       let send_payment_obj =
         Graphql.Send_payment.make
@@ -325,6 +629,51 @@ module Node = struct
       =
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+    [%log info] "Sending a snapp"
+      ~metadata:
+        [ ("namespace", `String t.config.namespace)
+        ; ("pod_id", `String (id t))
+        ] ;
+    let open Deferred.Or_error.Let_syntax in
+    let fee_payer_pk = parties.fee_payer.data.body.public_key in
+    let fee_payer_pk_str =
+      fee_payer_pk |> Signature_lib.Public_key.Compressed.to_base58_check
+    in
+    [%log info] "send_snapp: unlocking fee payer account"
+      ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
+    let unlock_sender_account_graphql () =
+      let unlock_account_obj =
+        Graphql.Unlock_account.make ~password:node_password
+          ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
+    in
+    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
+    let parties_json =
+      Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
+    in
+    let send_snapp_graphql () =
+      let send_snapp_obj =
+        Graphql.Send_test_snapp.make ~parties:parties_json ()
+      in
+      exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
+        send_snapp_obj
+    in
+    let%bind sent_snapp_obj = send_snapp_graphql () in
+    let%bind () =
+      match sent_snapp_obj#sendTestSnapp#snapp#failureReason with
+      | None ->
+          return ()
+      | Some s ->
+          Deferred.Or_error.errorf "Snapp failed, reason: %s" s
+    in
+    let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
+    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
+    return snapp_id
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if t doesn't happen to be an archive node *)
