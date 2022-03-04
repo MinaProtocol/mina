@@ -112,10 +112,13 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
               let%bind state, sequence_state, proved_state =
                 match snapp with
                 | None ->
+                    let len =
+                      Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+                    in
                     (* won't raise, correct length given *)
                     let state =
                       Snapp_state.V.of_list_exn
-                        (List.init 8 ~f:(fun _ -> Or_ignore.Ignore))
+                        (List.init len ~f:(fun _ -> Or_ignore.Ignore))
                     in
                     let sequence_state = Or_ignore.Ignore in
                     let proved_state = Or_ignore.Ignore in

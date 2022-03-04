@@ -441,7 +441,13 @@ module Node = struct
               in
               return (Mina_base.Snapp_state.V.of_list_exn fields)
           | None ->
-              fail (Error.of_string "Expected snapp account with an app state")
+              fail
+                (Error.of_string
+                   (sprintf
+                      "Expected snapp account with an app state for public key \
+                       %s"
+                      (Signature_lib.Public_key.Compressed.to_base58_check
+                         (Mina_base.Account_id.public_key account_id))))
         in
         let%bind delegate =
           match account#delegate with
@@ -467,7 +473,12 @@ module Node = struct
               return (Set ({ data; hash } : _ With_hash.t))
           | None ->
               fail
-                (Error.of_string "Expected verification key in snapp account")
+                (Error.of_string
+                   (sprintf
+                      "Expected snapp account with a verification key for \
+                       public_key %s"
+                      (Signature_lib.Public_key.Compressed.to_base58_check
+                         (Mina_base.Account_id.public_key account_id))))
         in
         let%bind permissions =
           match account#permissions with
