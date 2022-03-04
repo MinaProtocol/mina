@@ -62,7 +62,7 @@ module Transaction_applied = struct
         module V2 = struct
           type t =
             | Payment of
-                { previous_empty_accounts : Account_id.Stable.V1.t list }
+                { previous_empty_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
                 { previous_delegate : Public_key.Compressed.Stable.V1.t option }
             | Failed
@@ -90,7 +90,7 @@ module Transaction_applied = struct
       module V1 = struct
         type t =
           { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
+              (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V2.t
           }
         [@@deriving sexp]
@@ -120,7 +120,7 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           { fee_transfer : Fee_transfer.Stable.V2.t
-          ; previous_empty_accounts : Account_id.Stable.V1.t list
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
           ; balances : Transaction_status.Fee_transfer_balance_data.Stable.V1.t
           }
@@ -137,7 +137,7 @@ module Transaction_applied = struct
       module V1 = struct
         type t =
           { coinbase : Coinbase.Stable.V1.t
-          ; previous_empty_accounts : Account_id.Stable.V1.t list
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
           ; balances : Transaction_status.Coinbase_balance_data.Stable.V1.t
           }

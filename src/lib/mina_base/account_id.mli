@@ -48,7 +48,7 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]

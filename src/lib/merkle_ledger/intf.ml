@@ -45,7 +45,7 @@ module type Account_id = sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
     end
   end]

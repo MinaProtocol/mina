@@ -169,7 +169,7 @@ module Account_id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_base.Account_id.Stable.V1.t
+      type t = Mina_base.Account_id.Stable.V2.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id

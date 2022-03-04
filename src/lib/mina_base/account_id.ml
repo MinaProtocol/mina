@@ -84,7 +84,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t = Public_key.Compressed.Stable.V1.t * Digest.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]
 

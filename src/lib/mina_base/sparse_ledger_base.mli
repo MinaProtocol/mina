@@ -6,7 +6,7 @@ module Stable : sig
   module V2 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
+      , Account_id.Stable.V2.t
       , Account.Stable.V2.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
     [@@deriving sexp, to_yojson]
