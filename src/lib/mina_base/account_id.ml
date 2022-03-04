@@ -5,10 +5,10 @@ open Mina_base_import
 
 module Digest = struct
   let of_bigstring_exn =
-    Binable.of_bigstring (module Kimchi_pasta.Pasta.Fp.Stable.Latest)
+    Binable.of_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
 
   let to_bigstring =
-    Binable.to_bigstring (module Kimchi_pasta.Pasta.Fp.Stable.Latest)
+    Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
 
   module Base58_check = Base58_check.Make (struct
     let description = "Private key"
@@ -30,7 +30,7 @@ module Digest = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Kimchi_pasta.Pasta.Fp.Stable.V1.t
+      type t = Pickles.Backend.Tick.Field.Stable.V1.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
@@ -53,7 +53,7 @@ module Digest = struct
 
   (* Just matters that this no one can find a preimage to this with poseidon.
      Chose 1 for consistency for the old uint64 based token IDs *)
-  let default : t = Kimchi_pasta.Pasta.Fp.one
+  let default : t = Pickles.Backend.Tick.Field.one
 
   let gen : t Quickcheck.Generator.t = Snark_params.Tick.Field.gen
 
