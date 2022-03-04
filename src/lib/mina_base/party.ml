@@ -531,12 +531,12 @@ module Body = struct
   end]
 
   (* * Balance change for the fee payer is always going to be Neg, so represent it using
-        an unsigned fee,
-      * token id is always going to be the default, so use unit value as a
-        placeholder,
-      * increment nonce must always be true for a fee payer, so use unit as a
-        placeholder.
-      TODO: what about use_full_commitment? it's unit here and bool there
+       an unsigned fee,
+     * token id is always going to be the default, so use unit value as a
+       placeholder,
+     * increment nonce must always be true for a fee payer, so use unit as a
+       placeholder.
+     TODO: what about use_full_commitment? it's unit here and bool there
   *)
   module Fee_payer = struct
     [%%versioned

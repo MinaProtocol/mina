@@ -444,12 +444,6 @@ let%test_module "Test" =
     module Schema = Graphql_schema.Make (IO)
     module Derivers = Make (Schema)
     include Derivers
-
-    (*
-    module Schema = Test.Schema
-    module Derivers = Test.Derivers
-    include Derivers
-    *)
     module Public_key = Signature_lib.Public_key.Compressed
 
     module Or_ignore_test = struct
