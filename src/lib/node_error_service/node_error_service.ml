@@ -15,7 +15,8 @@ type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
 [@@deriving to_yojson]
 
 type node_error_data =
-  { peer_id : string
+  { version : int
+  ; peer_id : string
   ; ip_address : string
   ; public_key : Public_key.Compressed.t option
   ; git_branch : string
@@ -128,7 +129,8 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
       let%bind hardware_info = Mina_lib.Conf_dir.get_hw_info () in
       send_node_error_data ~logger
         ~url:(Uri.of_string node_error_url)
-        { peer_id
+        { version = 1
+        ; peer_id
         ; ip_address
         ; public_key
         ; git_branch
