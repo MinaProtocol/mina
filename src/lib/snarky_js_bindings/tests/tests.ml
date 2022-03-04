@@ -5,7 +5,10 @@ module Field = Impl.Field
 (* function to check a circuit defined by a 'main' function *)
 let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   (* Core_kernel.printf "generating keypair...\n" ; *)
-  let kp = Impl.generate_keypair ~exposing:spec (main ?w:None) in
+  let kp =
+    Impl.constraint_system ~exposing:spec (main ?w:None)
+    |> Impl.Keypair.generate
+  in
   let pk = Impl.Keypair.pk kp in
   (* Core_kernel.printf "prove...\n" ; *)
   let proof =
