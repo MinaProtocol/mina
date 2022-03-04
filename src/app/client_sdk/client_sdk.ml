@@ -32,6 +32,17 @@ let _ =
            val publicKey = pk_str_js
          end
 
+       method signTransaction (parties_js : string_js) =
+         let parties = parties_js |> Js.to_string in
+         let parties_json = Yojson.Safe.from_string parties in
+         let _test =
+           Fields_derivers_snapps.of_json
+             (Parties.deriver @@ Fields_derivers_snapps.derivers ())
+             parties_json
+         in
+         (* Return JSON to inspect in mina-signer *)
+         Yojson.Safe.to_string parties_json
+
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =
          let sk =
