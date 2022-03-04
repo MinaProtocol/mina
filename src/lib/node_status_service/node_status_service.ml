@@ -50,7 +50,8 @@ type block =
 [@@deriving to_yojson]
 
 type node_status_data =
-  { block_height_at_best_tip : int
+  { version : int
+  ; block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states option
@@ -184,7 +185,8 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { block_height_at_best_tip =
+            { version = 1
+            ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
                 |> Transition_frontier.Breadcrumb.blockchain_length
                 |> Unsigned.UInt32.to_int
