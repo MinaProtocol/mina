@@ -488,7 +488,7 @@ let%test_module "Test" =
       module Args = struct
         let manual_typ =
           Schema.Arg.(
-            obj "T1_arg" ?doc:None
+            obj "T1_argInput" ?doc:None
               ~fields:
                 [ arg "bar" ~typ:(non_null (list (non_null string)))
                 ; arg "fooHello" ~typ:int
@@ -554,8 +554,9 @@ let%test_module "Test" =
       module Args = struct
         let manual_typ =
           Schema.Arg.(
-            obj "T2_arg" ?doc:None ~fields:[ arg "foo" ~typ:T1.Args.manual_typ ]
-              ~coerce:(fun foo -> Or_ignore_test.of_option foo))
+            obj "T2_argInput" ?doc:None
+              ~fields:[ arg "foo" ~typ:T1.Args.manual_typ ] ~coerce:(fun foo ->
+                Or_ignore_test.of_option foo))
 
         let derived init =
           let open Graphql_args in
