@@ -499,7 +499,7 @@ let auth_required_of_string = function
   | "Impossible" ->
       Impossible
   | _ ->
-      failwith "impossible"
+      failwith "auth_required_of_string: unknown variant"
 
 let auth_required =
   Fields_derivers_snapps.Derivers.iso_string ~name:"AuthRequired"

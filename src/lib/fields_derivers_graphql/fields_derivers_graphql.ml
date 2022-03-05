@@ -106,6 +106,8 @@ module Graphql_raw = struct
              | Init ->
                  failwith "Graphql args need at least one field"
              | Acc { graphql_arg_fields; graphql_arg_coerce } ->
+                 (* TODO: Figure out why the typechecker doesn't like this
+                  * expression and remove Obj.magic. *)
                  Obj.magic
                  @@ Schema.Arg.(
                       obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
@@ -117,6 +119,7 @@ module Graphql_raw = struct
              | Init ->
                  failwith "Graphql args need at least one field"
              | Acc { graphql_arg_fields; graphql_arg_coerce } ->
+                 (* TODO: See above *)
                  Obj.magic
                  @@ Schema.Arg.(
                       obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
@@ -219,7 +222,6 @@ module Graphql_raw = struct
           :: rest ;
         ((fun _ -> failwith "Unused"), acc)
 
-      (* TODO: Do we need doc and deprecated and name on finish? *)
       let finish ~name ?doc ((_creator, obj) : 'u * _ Accumulator.t) : _ Input.t
           =
         let graphql_fields_accumulator = !(obj#graphql_fields_accumulator) in
@@ -287,7 +289,6 @@ module Graphql_raw = struct
              { run = (fun () -> Schema.(list (!(x#graphql_fields).run ()))) }) ;
         obj
 
-      (* I can't get OCaml to typecheck this poperly unless we pass the same fresh function twice *)
       let option (x : ('input_type, 'b, 'c, 'nullable) Input.t) obj :
           ('input_type option, _, 'c option, _) Input.t =
         obj#graphql_fields := !(x#nullable_graphql_fields) ;
@@ -353,108 +354,9 @@ end
 module Schema = Graphql_schema.Make (IO)
 module Graphql = Graphql_raw.Make (Schema)
 
-(** Convert this async Graphql_fields schema type into the official
-        Graphql_async one. The real Graphql_async functor application *is*
-        equivalent but the way the library is designed we can't actually see it so
-        this boils down to an Obj.magic. *)
-let typ_conv (typ : ('a, 'b) Schema.typ) : ('a, 'b) Graphql_async.Schema.typ =
-  Obj.magic typ
-
 module Test = struct
-  let introspection_query_raw =
-    {graphql|
-query IntrospectionQuery {
-    __schema {
-      queryType { name }
-      mutationType { name }
-      subscriptionType { name }
-      types {
-        ...FullType
-      }
-      directives {
-        name
-        description
-        locations
-        args {
-          ...InputValue
-        }
-      }
-    }
-  }
-  fragment FullType on __Type {
-    kind
-    name
-    description
-    fields(includeDeprecated: true) {
-      name
-      description
-      args {
-        ...InputValue
-      }
-      type {
-        ...TypeRef
-      }
-      isDeprecated
-      deprecationReason
-    }
-    inputFields {
-      ...InputValue
-    }
-    interfaces {
-      ...TypeRef
-    }
-    enumValues(includeDeprecated: true) {
-      name
-      description
-      isDeprecated
-      deprecationReason
-    }
-    possibleTypes {
-      ...TypeRef
-    }
-  }
-  fragment InputValue on __InputValue {
-    name
-    description
-    type { ...TypeRef }
-    defaultValue
-  }
-  fragment TypeRef on __Type {
-    kind
-    name
-    ofType {
-      kind
-      name
-      ofType {
-        kind
-        name
-        ofType {
-          kind
-          name
-          ofType {
-            kind
-            name
-            ofType {
-              kind
-              name
-              ofType {
-                kind
-                name
-                ofType {
-                  kind
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-|graphql}
-
   let introspection_query () =
-    match Graphql_parser.parse introspection_query_raw with
+    match Graphql_parser.parse Fields_derivers.introspection_query_raw with
     | Ok res ->
         res
     | Error err ->
@@ -494,6 +396,8 @@ let%test_module "Test" =
         ; .. >
         as
         'row =
+      (* We have to declare these outside of the object, otherwise the method
+       * will create a new ref each time it is called. *)
       let open Graphql_fields in
       let graphql_fields =
         ref Input.T.{ run = (fun () -> failwith "unimplemented1") }
