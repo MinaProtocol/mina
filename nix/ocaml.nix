@@ -166,23 +166,38 @@ let
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
 
-      mina_client_sdk = pkgs.stdenv.mkDerivation {
+      mina_client_sdk = self.mina.overrideAttrs (_: {
         pname = "mina_client_sdk";
         version = "dev";
         src = filtered-src;
 
-        buildInputs = ocaml-libs;
+        outputs = [ "out" ];
+
+        checkInputs = [ pkgs.nodejs ];
 
         buildPhase = ''
           export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
           dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
         '';
 
+        doCheck = true;
+        checkPhase = ''
+          node src/app/client_sdk/tests/run_unit_tests.js
+
+          dune build src/app/client_sdk/tests/test_signatures.exe
+          ./_build/default/src/app/client_sdk/tests/test_signatures.exe > nat.consensus.json
+          node src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
+          if ! diff -q nat.consensus.json js.nonconsensus.json; then
+            echo "Consensus and JS code generate different signatures";
+            exit 1
+          fi
+        '';
+
         installPhase = ''
           mkdir -p $out/share/client_sdk
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
         '';
-      };
+      });
 
       mina_build_config = pkgs.stdenv.mkDerivation {
         pname = "mina_build_config";
