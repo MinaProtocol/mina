@@ -333,6 +333,61 @@ module Graphql_raw = struct
   end
 end
 
+module Graphql_query = struct
+  module Input = struct
+    type 'a t = < graphql_query : string option ref ; .. > as 'a
+  end
+
+  module Accumulator = struct
+    type 'a t =
+      < graphql_query_accumulator : (string * string option) list ref ; .. >
+      as
+      'a
+      constraint 'a t = 'a Input.t
+  end
+
+  let add_field : 'a Input.t -> 'field -> 'obj -> 'creator * 'obj =
+   fun t_field field acc_obj ->
+    let rest = !(acc_obj#graphql_query_accumulator) in
+    acc_obj#graphql_query_accumulator :=
+      (Fields_derivers.name_under_to_camel field, !(t_field#graphql_query))
+      :: rest ;
+    ((fun _ -> failwith "unused"), acc_obj)
+
+  let finish (_creator, obj) =
+    let graphql_query_accumulator = !(obj#graphql_query_accumulator) in
+    obj#graphql_query :=
+      Some
+        (sprintf "{\n%s\n}"
+           ( List.map graphql_query_accumulator ~f:(fun (k, v) ->
+                 match v with None -> k | Some v -> sprintf "%s %s" k v)
+           |> List.rev |> String.concat ~sep:"\n" )) ;
+    obj
+
+  let scalar obj =
+    obj#graphql_query := None ;
+    obj
+
+  let int obj = scalar obj
+
+  let string obj = scalar obj
+
+  let bool obj = scalar obj
+
+  (* nullable and lists of things are projected to the inner thing ONLY IF inner
+   * projectable. *)
+  let wrapped x obj =
+    obj#graphql_query := !(x#graphql_query) ;
+    obj
+
+  let option x obj = wrapped x obj
+
+  let list x obj = wrapped x obj
+
+  let run ~prefix obj =
+    Option.map !(obj#graphql_query) ~f:(fun x -> prefix ^ x ^ "}")
+end
+
 module IO = struct
   include Async_kernel.Deferred
 
@@ -355,12 +410,15 @@ module Schema = Graphql_schema.Make (IO)
 module Graphql = Graphql_raw.Make (Schema)
 
 module Test = struct
-  let introspection_query () =
-    match Graphql_parser.parse Fields_derivers.introspection_query_raw with
+  let parse_query str =
+    match Graphql_parser.parse str with
     | Ok res ->
         res
     | Error err ->
         failwith err
+
+  let introspection_query () =
+    parse_query Fields_derivers.introspection_query_raw
 end
 
 let%test_module "Test" =
@@ -412,6 +470,8 @@ let%test_module "Test" =
       let graphql_fields_accumulator = ref [] in
       let graphql_arg_accumulator = ref Graphql_args.Acc.T.Init in
       let graphql_creator = ref (fun _ -> failwith "unimplemented7") in
+      let graphql_query = ref None in
+      let graphql_query_accumulator = ref [] in
       object
         method graphql_fields = graphql_fields
 
@@ -430,26 +490,39 @@ let%test_module "Test" =
         method graphql_arg_accumulator = graphql_arg_accumulator
 
         method graphql_creator = graphql_creator
+
+        method graphql_query = graphql_query
+
+        method graphql_query_accumulator = graphql_query_accumulator
       end
 
     let o () = deriver ()
 
-    let hit_server q =
+    let raw_server q c =
       let schema = Schema.(schema [ q ] ~mutations:[] ~subscriptions:[]) in
-      let res = Schema.execute schema () (Test.introspection_query ()) in
+      let res = Schema.execute schema () c in
       match res with
       | Ok (`Response data) ->
           data |> Yojson.Basic.to_string
+      | Error err ->
+          failwithf "Unexpected error: %s" (Yojson.Basic.to_string err) ()
       | _ ->
           failwith "Unexpected response"
 
+    let query_schema typ v =
+      Schema.(
+        field "query" ~typ:(non_null typ)
+          ~args:Arg.[]
+          ~doc:"sample query"
+          ~resolve:(fun _ _ -> v))
+
+    let query_for_all typ v str =
+      raw_server (query_schema typ v) (Test.parse_query str)
+
+    let hit_server q = raw_server q (Test.introspection_query ())
+
     let hit_server_query (typ : _ Schema.typ) v =
-      hit_server
-        Schema.(
-          field "query" ~typ:(non_null typ)
-            ~args:Arg.[]
-            ~doc:"sample query"
-            ~resolve:(fun _ _ -> v))
+      hit_server (query_schema typ v)
 
     let hit_server_args (arg_typ : 'a Schema.Arg.arg_typ) =
       hit_server
@@ -503,6 +576,16 @@ let%test_module "Test" =
             ~bar:!.(list @@ string @@ o ())
           |> finish ~name:"T1_arg" ?doc:None
       end
+
+      module Query = struct
+        let derived init =
+          let open Graphql_query in
+          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          Fields.make_creator init
+            ~foo_hello:!.(option @@ int @@ o ())
+            ~bar:!.(list @@ string @@ o ())
+          |> finish
+      end
     end
 
     module Or_ignore_test = struct
@@ -524,6 +607,12 @@ let%test_module "Test" =
           let open Graphql_args in
           let opt = option x (o ()) in
           map ~f:of_option opt init
+      end
+
+      module Query = struct
+        let derived x init =
+          let open Graphql_query in
+          option x init
       end
     end
 
@@ -565,6 +654,25 @@ let%test_module "Test" =
             ~foo:!.(Or_ignore_test.Args.derived @@ T1.Args.derived @@ o ())
           |> finish ~name:"T2_arg" ?doc:None
       end
+
+      module Query = struct
+        let manual =
+          {|
+            {
+              foo {
+                fooHello
+                bar
+              }
+            } }
+          |}
+
+        let derived init =
+          let open Graphql_query in
+          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          Fields.make_creator init
+            ~foo:!.(Or_ignore_test.Query.derived @@ T1.Query.derived @@ o ())
+          |> finish
+      end
     end
 
     let%test_unit "T2 fold" =
@@ -589,4 +697,18 @@ let%test_module "Test" =
       [%test_eq: string]
         (hit_server_args generated_arg_typ)
         (hit_server_args T2.Args.manual_typ)
+
+    let%test_unit "T2 query expected & parses" =
+      let open Graphql_fields in
+      let generated_typ =
+        let typ_input = T2.(option @@ derived @@ o ()) (o ()) in
+        !(typ_input#graphql_fields).run ()
+      in
+      let open Graphql_query in
+      let generated_query = T2.Query.(option @@ derived @@ o ()) (o ()) in
+      let prefix = "query TestQuery { query" in
+      [%test_eq: string]
+        (query_for_all generated_typ T2.v1
+           (Option.value_exn (run ~prefix generated_query)))
+        (query_for_all generated_typ T2.v1 (prefix ^ T2.Query.manual))
   end )
