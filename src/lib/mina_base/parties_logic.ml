@@ -30,6 +30,10 @@ module type Bool_intf = sig
   val assert_ : t -> unit
 
   val all : t list -> t
+
+  type failure_status
+
+  val assert_with_failure_status : t -> failure_status -> unit
 end
 
 module type Balance_intf = sig
@@ -642,8 +646,6 @@ module type Inputs_intf = sig
   end
 
   module Local_state : sig
-    type failure_status
-
     type t =
       ( Parties.t
       , Call_stack.t
@@ -652,7 +654,7 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , failure_status )
+      , Bool.failure_status )
       Local_state.t
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
@@ -768,7 +770,7 @@ module Make (Inputs : Inputs_intf) = struct
          ; full_transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
-         ; failure : Local_state.failure_status
+         ; failure : Bool.failure_status
          ; .. >
          as
          'env)
@@ -1225,7 +1227,10 @@ module Make (Inputs : Inputs_intf) = struct
         &&& predicate_satisfied &&& update_permitted)
     in
     (* The first party must succeed. *)
-    Bool.(assert_ ((not is_start') ||| success)) ;
+    Bool.(
+      assert_with_failure_status
+        ((not is_start') ||| success)
+        local_state.failure_status) ;
     let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.

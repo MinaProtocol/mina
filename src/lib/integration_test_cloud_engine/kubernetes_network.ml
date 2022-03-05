@@ -174,6 +174,49 @@ module Node = struct
         }
       }
     |}]
+
+    module Account =
+    [%graphql
+    {|
+      query ($public_key: PublicKey, $token: UInt64) {
+        account (publicKey : $public_key, token : $token) {
+          balance { liquid
+                    locked
+                    total
+                  }
+          delegate
+          nonce
+          permissions { editSequenceState
+                        editState
+                        incrementNonce
+                        receive
+                        send
+                        setDelegate
+                        setPermissions
+                        setSnappUri
+                        setTokenSymbol
+                        setVerificationKey
+                        setVotingFor
+                        stake
+                      }
+          sequenceEvents
+          snappState
+          snappUri
+          timing { cliffTime
+                   cliffAmount
+                   vestingPeriod
+                   vestingIncrement
+                   initialMinimumBalance
+                 }
+          token
+          tokenSymbol
+          verificationKey { verificationKey
+                            hash
+                          }
+          votingFor
+        }
+      }
+    |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -298,6 +341,247 @@ module Node = struct
   let must_get_balance ~logger t ~account_id =
     get_balance ~logger t ~account_id
     |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_account ~logger t ~account_id =
+    [%log info] "Getting account"
+      ~metadata:
+        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        :: logger_metadata t ) ;
+    let pk = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
+    let get_account_obj =
+      Graphql.Account.make
+        ~public_key:(Graphql_lib.Encoders.public_key pk)
+        ~token:(Graphql_lib.Encoders.token token)
+        ()
+    in
+    exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
+      get_account_obj
+
+  let permissions_of_account_permissions account_permissions :
+      Mina_base.Permissions.t =
+    (* the polymorphic variants come from Partial_accounts.auth_required in Mina_graphql *)
+    let to_auth_required = function
+      | `Either ->
+          Mina_base.Permissions.Auth_required.Either
+      | `Impossible ->
+          Impossible
+      | `None ->
+          None
+      | `Proof ->
+          Proof
+      | `Signature ->
+          Signature
+    in
+    { stake = account_permissions#stake
+    ; edit_sequence_state =
+        to_auth_required account_permissions#editSequenceState
+    ; edit_state = to_auth_required account_permissions#editState
+    ; increment_nonce = to_auth_required account_permissions#incrementNonce
+    ; receive = to_auth_required account_permissions#receive
+    ; send = to_auth_required account_permissions#send
+    ; set_delegate = to_auth_required account_permissions#setDelegate
+    ; set_permissions = to_auth_required account_permissions#setPermissions
+    ; set_snapp_uri = to_auth_required account_permissions#setSnappUri
+    ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
+    ; set_verification_key =
+        to_auth_required account_permissions#setVerificationKey
+    ; set_voting_for = to_auth_required account_permissions#setVotingFor
+    }
+
+  let get_account_permissions ~logger t ~account_id =
+    let open Deferred.Or_error in
+    let open Let_syntax in
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | Some account -> (
+        match account#permissions with
+        | Some ledger_permissions ->
+            return @@ permissions_of_account_permissions ledger_permissions
+        | None ->
+            fail
+              (Error.of_string "Could not get permissions from ledger account")
+        )
+    | None ->
+        fail (Error.of_string "Could not get account from ledger")
+
+  (* return a Party.Update.t with all fields `Set` to the
+     value in the account, or `Keep` if value unavailable,
+     as if this update had been applied to the account
+  *)
+  let get_account_update ~logger t ~account_id =
+    let open Deferred.Or_error in
+    let open Let_syntax in
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | Some account ->
+        let open Mina_base.Snapp_basic.Set_or_keep in
+        let%bind app_state =
+          match account#snappState with
+          | Some strs ->
+              let fields =
+                Array.to_list strs
+                |> Base.List.map ~f:(fun s ->
+                       Set (Pickles.Backend.Tick.Field.of_string s))
+              in
+              return (Mina_base.Snapp_state.V.of_list_exn fields)
+          | None ->
+              fail
+                (Error.of_string
+                   (sprintf
+                      "Expected snapp account with an app state for public key \
+                       %s"
+                      (Signature_lib.Public_key.Compressed.to_base58_check
+                         (Mina_base.Account_id.public_key account_id))))
+        in
+        let%bind delegate =
+          match account#delegate with
+          | Some (`String s) ->
+              return
+                (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
+          | Some json ->
+              fail
+                (Error.of_string
+                   (sprintf "Expected string encoding of delegate, got %s"
+                      (Yojson.Basic.to_string json)))
+          | None ->
+              fail (Error.of_string "Expected delegate in account")
+        in
+        let%bind verification_key =
+          match account#verificationKey with
+          | Some vk_obj ->
+              let data =
+                Pickles.Side_loaded.Verification_key.of_base58_check_exn
+                  vk_obj#verificationKey
+              in
+              let hash = Pickles.Backend.Tick.Field.of_string vk_obj#hash in
+              return (Set ({ data; hash } : _ With_hash.t))
+          | None ->
+              fail
+                (Error.of_string
+                   (sprintf
+                      "Expected snapp account with a verification key for \
+                       public_key %s"
+                      (Signature_lib.Public_key.Compressed.to_base58_check
+                         (Mina_base.Account_id.public_key account_id))))
+        in
+        let%bind permissions =
+          match account#permissions with
+          | Some perms ->
+              return @@ Set (permissions_of_account_permissions perms)
+          | None ->
+              fail (Error.of_string "Expected permissions in account")
+        in
+        let%bind snapp_uri =
+          match account#snappUri with
+          | Some s ->
+              return @@ Set s
+          | None ->
+              fail (Error.of_string "Expected snapp URI in account")
+        in
+        let%bind token_symbol =
+          match account#tokenSymbol with
+          | Some s ->
+              return @@ Set s
+          | None ->
+              fail (Error.of_string "Expected token symbol in account")
+        in
+        let%bind timing =
+          let timing = account#timing in
+          let cliff_amount = timing#cliffAmount in
+          let cliff_time = timing#cliffTime in
+          let vesting_period = timing#vestingPeriod in
+          let vesting_increment = timing#vestingIncrement in
+          let initial_minimum_balance = timing#initialMinimumBalance in
+          match
+            ( cliff_amount
+            , cliff_time
+            , vesting_period
+            , vesting_increment
+            , initial_minimum_balance )
+          with
+          | None, None, None, None, None ->
+              return @@ Keep
+          | Some amt, Some tm, Some period, Some incr, Some bal ->
+              let%bind cliff_amount =
+                match amt with
+                | `String s ->
+                    return @@ Currency.Amount.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for cliff amount in account timing")
+              in
+              let%bind cliff_time =
+                match tm with
+                | `String s ->
+                    return @@ Mina_numbers.Global_slot.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for cliff time in account timing")
+              in
+              let%bind vesting_period =
+                match period with
+                | `String s ->
+                    return @@ Mina_numbers.Global_slot.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting period in account timing")
+              in
+              let%bind vesting_increment =
+                match incr with
+                | `String s ->
+                    return @@ Currency.Amount.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting increment in account \
+                          timing")
+              in
+              let%bind initial_minimum_balance =
+                match bal with
+                | `String s ->
+                    return @@ Currency.Balance.of_string s
+                | _ ->
+                    fail
+                      (Error.of_string
+                         "Expected string for vesting increment in account \
+                          timing")
+              in
+              return
+                (Set
+                   ( { initial_minimum_balance
+                     ; cliff_amount
+                     ; cliff_time
+                     ; vesting_period
+                     ; vesting_increment
+                     }
+                     : Mina_base.Party.Update.Timing_info.t ))
+          | _ ->
+              fail (Error.of_string "Some pieces of account timing are missing")
+        in
+        let%bind voting_for =
+          match account#votingFor with
+          | Some s ->
+              return @@ Set (Mina_base.State_hash.of_base58_check_exn s)
+          | None ->
+              fail (Error.of_string "Expected voting-for state hash in account")
+        in
+        return
+          ( { app_state
+            ; delegate
+            ; verification_key
+            ; permissions
+            ; snapp_uri
+            ; token_symbol
+            ; timing
+            ; voting_for
+            }
+            : Mina_base.Party.Update.t )
+    | None ->
+        fail (Error.of_string "Could not get account from ledger")
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =

@@ -117,8 +117,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
-            new_block
-            |> Mina_transition.External_transition.Validated.state_hash
+            ( new_block
+            |> Mina_transition.External_transition.Validated.state_hashes )
+              .state_hash
           in
           (let path, log = !precomputed_block_writer in
            let precomputed_block =

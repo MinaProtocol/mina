@@ -222,7 +222,7 @@ module type State_hooks = sig
       -> constants:Constants.t
       -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:
-               (protocol_state, Mina_base.State_hash.t) With_hash.t
+               protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
@@ -653,8 +653,10 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> select_status
 
@@ -689,8 +691,10 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> bool
 
