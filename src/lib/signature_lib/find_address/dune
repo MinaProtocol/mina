@@ -1,0 +1,3 @@
+(executable
+ (name find_address)
+ (libraries core_kernel signature_lib))
