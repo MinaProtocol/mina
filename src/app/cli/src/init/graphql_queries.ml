@@ -299,8 +299,8 @@ query snapp_commands($public_key: PublicKey) {
 |}]
 
 module Pooled_snapp_commands = struct
-  (* Pass parties_json_keys as a string to avoid dependency hell *)
-  let full_query_string parties_json_keys =
+  (* Pass parties_inner_query as a string to avoid dependency hell *)
+  let full_query_string parties_inner_query =
     Printf.sprintf
       {graphql|
       query snapp_commands($public_key: PublicKey) {
@@ -312,7 +312,7 @@ module Pooled_snapp_commands = struct
         }
       }
       |graphql}
-      parties_json_keys
+      parties_inner_query
 end
 
 module Next_available_token =

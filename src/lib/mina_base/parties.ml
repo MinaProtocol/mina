@@ -447,10 +447,10 @@ let dummy =
   in
   { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
 
-let json_keys =
+let inner_query =
   lazy
-    Fields_derivers_snapps.(
-      to_json (deriver @@ Derivers.o ()) dummy |> json_keys)
+    (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
+       Fields_derivers_snapps.(inner_query (deriver @@ Derivers.o ())))
 
 let%test_module "Test" =
   ( module struct

@@ -1196,7 +1196,7 @@ let pooled_snapp_commands =
 
              method query =
                Graphql_queries.Pooled_snapp_commands.full_query_string
-                 (Lazy.force Parties.json_keys)
+                 (Lazy.force Parties.inner_query)
            end
          in
          let%bind raw_response =

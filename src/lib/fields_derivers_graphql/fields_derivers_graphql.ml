@@ -384,8 +384,7 @@ module Graphql_query = struct
 
   let list x obj = wrapped x obj
 
-  let run ~prefix obj =
-    Option.map !(obj#graphql_query) ~f:(fun x -> prefix ^ x ^ "}")
+  let inner_query obj = !(obj#graphql_query)
 end
 
 module IO = struct
@@ -663,7 +662,7 @@ let%test_module "Test" =
                 fooHello
                 bar
               }
-            } }
+            }
           |}
 
         let derived init =
@@ -705,10 +704,13 @@ let%test_module "Test" =
         !(typ_input#graphql_fields).run ()
       in
       let open Graphql_query in
-      let generated_query = T2.Query.(option @@ derived @@ o ()) (o ()) in
+      let generated_query =
+        T2.Query.(option @@ derived @@ o ()) (o ())
+        |> inner_query |> Option.value_exn
+      in
       let prefix = "query TestQuery { query" in
+      let suffix = "}" in
       [%test_eq: string]
-        (query_for_all generated_typ T2.v1
-           (Option.value_exn (run ~prefix generated_query)))
-        (query_for_all generated_typ T2.v1 (prefix ^ T2.Query.manual))
+        (query_for_all generated_typ T2.v1 (prefix ^ generated_query ^ suffix))
+        (query_for_all generated_typ T2.v1 (prefix ^ T2.Query.manual ^ suffix))
   end )

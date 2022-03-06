@@ -121,6 +121,8 @@ val deriver :
           Fields_derivers_snapps.Graphql.Fields.Accumulator.T.t
           list
           ref
+      ; graphql_query : string option ref
+      ; graphql_query_accumulator : (string * string option) list ref
       ; map :
           ((bool, Auth_required.t) Poly.t -> (bool, Auth_required.t) Poly.t) ref
       ; nullable_graphql_arg :
