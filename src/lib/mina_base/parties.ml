@@ -436,6 +436,11 @@ let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
 
 let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
 
+let to_json x = Fields_derivers_snapps.(to_json (deriver @@ Derivers.o ())) x
+
+let arg_query_string x =
+  Fields_derivers_snapps.Test.Loop.json_to_string_gql @@ to_json x
+
 let dummy =
   let party : Party.t =
     { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
