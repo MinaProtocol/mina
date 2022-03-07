@@ -97,7 +97,8 @@ module "gossipqa" {
   use_embedded_runtime_config = true
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
+  mina_archive_schema = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"]
 
   archive_configs       = [
     {

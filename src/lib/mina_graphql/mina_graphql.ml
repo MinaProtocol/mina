@@ -2315,7 +2315,7 @@ module Types = struct
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
         obj "BalanceChange" ~doc:"A signed amount"
           ~coerce:(fun magnitude sgn ->
-            try Ok Currency.Signed_poly.{ magnitude; sgn }
+            try Ok ({ magnitude; sgn } : Currency.Amount.Signed.t)
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "magnitude" ~doc:"An amount of MINA"
@@ -2427,7 +2427,7 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "cliffTime" ~doc:"Cliff time, a global slot, as a string"
                 ~typ:(non_null string)
-            ; arg "cliffAmount" ~doc:"Cliff amoount, as a string"
+            ; arg "cliffAmount" ~doc:"Cliff amount, as a string"
                 ~typ:(non_null string)
             ; arg "vestingPeriod"
                 ~doc:"Vesting period, a number of slots, as a string"
@@ -2463,8 +2463,7 @@ module Types = struct
             let%bind vk' = s vk in
             let%bind perms' = s perms in
             let%map timing' = s timing in
-            Party.Update.Poly.
-              { app_state
+            ( { app_state
               ; delegate = v delegate
               ; verification_key = v vk'
               ; permissions = v perms'
@@ -2472,7 +2471,8 @@ module Types = struct
               ; token_symbol = v tok_sym
               ; timing = v timing'
               ; voting_for = v voting_for
-              })
+              }
+              : _ Party.Update.Poly.t ))
           ~fields:
             [ arg "appState"
                 ~doc:"List of _exactly_ 8 field elements (null if keep)"
@@ -2513,7 +2513,7 @@ module Types = struct
         let i name typ =
           obj (name ^ "Interval")
             ~coerce:(fun lower upper ->
-              Snapp_predicate.Closed_interval.{ lower; upper })
+              { Snapp_predicate.Closed_interval.lower; upper })
             ~fields:
               [ arg "lower" ~typ:(non_null typ)
               ; arg "upper" ~typ:(non_null typ)
@@ -2686,8 +2686,7 @@ module Types = struct
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              Party.Body.Poly.
-                { public_key
+              ( { public_key
                 ; update
                 ; token_id
                 ; increment_nonce
@@ -2699,6 +2698,7 @@ module Types = struct
                 ; protocol_state
                 ; use_full_commitment
                 }
+                : Party.Body.t )
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "publicKey" ~doc:"Public key as a Base58Check string"
@@ -2819,7 +2819,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%map body = body in
             let predicate = nonce in
-            Party.Predicated.Poly.{ body; predicate })
+            { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"fee payer party"
                 ~typ:(non_null snapp_fee_payer_party_body)
@@ -2845,7 +2845,7 @@ module Types = struct
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Fee_payer.{ data; authorization })
+            Ok { Party.Fee_payer.data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
                 ~typ:(non_null snapp_party_predicated_fee_payer)
@@ -2884,16 +2884,15 @@ module Types = struct
             let open Result.Let_syntax in
             let v o = Snapp_basic.Or_ignore.of_option o in
             let%map state = state_result in
-            ( Snapp_predicate.Account.Poly.
-                { balance = v balance
-                ; nonce = v nonce
-                ; receipt_chain_hash = v receipt_chain_hash
-                ; public_key = v public_key
-                ; delegate = v delegate
-                ; state
-                ; sequence_state = v sequence_state
-                ; proved_state = v proved_state
-                }
+            ( { Snapp_predicate.Account.Poly.balance = v balance
+              ; nonce = v nonce
+              ; receipt_chain_hash = v receipt_chain_hash
+              ; public_key = v public_key
+              ; delegate = v delegate
+              ; state
+              ; sequence_state = v sequence_state
+              ; proved_state = v proved_state
+              }
               : Snapp_predicate.Account.t ))
           ~fields:
             [ arg "balance" ~typ:Interval.balance
@@ -2946,7 +2945,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind body = body_result in
             let%bind predicate = predicate_result in
-            Ok Party.Predicated.Poly.{ body; predicate })
+            Ok { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"Body of the party predicated"
                 ~typ:(non_null snapp_party_body)
@@ -2985,7 +2984,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind data = predicated_result in
             let%bind authorization = authorization_result in
-            Ok Party.{ data; authorization })
+            Ok { Party.data; authorization })
           ~fields:
             [ arg "data" ~doc:"Predicated party"
                 ~typ:(non_null snapp_party_predicated)
@@ -4936,12 +4935,10 @@ module Queries = struct
           (Mina_lib.config coda).precomputed_values.constraint_constants
         transition
     in
-    With_hash.Stable.Latest.
-      { data =
-          Filtered_external_transition.of_transition transition `All
-            transactions
-      ; hash
-      }
+    { With_hash.Stable.Latest.data =
+        Filtered_external_transition.of_transition transition `All transactions
+    ; hash
+    }
 
   let best_chain =
     io_field "bestChain"

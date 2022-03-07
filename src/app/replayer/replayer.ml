@@ -1184,7 +1184,7 @@ module Snapp_helpers = struct
       let sgn =
         if Int64.is_negative body_data.balance_change then Sgn.Neg else Sgn.Pos
       in
-      Currency.Signed_poly.{ magnitude; sgn }
+      ({ magnitude; sgn } : _ Currency.Signed_poly.t)
     in
     let increment_nonce = body_data.increment_nonce in
     let%bind events = get_field_arrays ~pool body_data.events_ids in
@@ -1232,7 +1232,7 @@ module Snapp_helpers = struct
           let lower = to_token_id bounds.token_id_lower_bound in
           let upper = to_token_id bounds.token_id_upper_bound in
           Snapp_basic.Or_ignore.Check
-            Snapp_predicate.Closed_interval.{ lower; upper }
+            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind timestamp =
       match protocol_state_data.timestamp_id with
@@ -1247,7 +1247,7 @@ module Snapp_helpers = struct
           let lower = to_timestamp bounds.timestamp_lower_bound in
           let upper = to_timestamp bounds.timestamp_upper_bound in
           Snapp_basic.Or_ignore.Check
-            Snapp_predicate.Closed_interval.{ lower; upper }
+            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let length_bounds_of_id = function
       | None ->
@@ -1263,7 +1263,7 @@ module Snapp_helpers = struct
           let lower = to_length bounds.length_lower_bound in
           let upper = to_length bounds.length_upper_bound in
           Snapp_basic.Or_ignore.Check
-            Snapp_predicate.Closed_interval.{ lower; upper }
+            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind blockchain_length =
       length_bounds_of_id protocol_state_data.blockchain_length_id
@@ -1285,7 +1285,7 @@ module Snapp_helpers = struct
           let lower = to_amount bounds.amount_lower_bound in
           let upper = to_amount bounds.amount_upper_bound in
           Snapp_basic.Or_ignore.Check
-            Snapp_predicate.Closed_interval.{ lower; upper }
+            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     (* TODO: this will change *)
     let last_vrf_output = () in
@@ -1307,7 +1307,7 @@ module Snapp_helpers = struct
           let lower = to_slot bounds.global_slot_lower_bound in
           let upper = to_slot bounds.global_slot_upper_bound in
           Snapp_basic.Or_ignore.Check
-            Snapp_predicate.Closed_interval.{ lower; upper }
+            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind global_slot_since_hard_fork =
       global_slot_of_id protocol_state_data.curr_global_slot_since_hard_fork
@@ -1492,7 +1492,8 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         let lower = to_balance bounds.balance_lower_bound in
                         let upper = to_balance bounds.balance_upper_bound in
                         Snapp_basic.Or_ignore.Check
-                          Snapp_predicate.Closed_interval.{ lower; upper }
+                          ( { lower; upper }
+                            : _ Snapp_predicate.Closed_interval.t )
                   in
                   let%bind nonce =
                     match snapp_account_data.nonce_id with
@@ -1510,7 +1511,8 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         let lower = to_nonce bounds.nonce_lower_bound in
                         let upper = to_nonce bounds.nonce_upper_bound in
                         Snapp_basic.Or_ignore.Check
-                          Snapp_predicate.Closed_interval.{ lower; upper }
+                          ( { lower; upper }
+                            : _ Snapp_predicate.Closed_interval.t )
                   in
                   let receipt_chain_hash =
                     Option.value_map snapp_account_data.receipt_chain_hash

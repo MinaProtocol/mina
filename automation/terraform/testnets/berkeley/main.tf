@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-test-snapps.tfstate"
+    key     = "terraform-berkeley.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -59,9 +59,9 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name = "test-snapps"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-lk86-berkeley-ci-f0a4f08-focal"
+  testnet_name = "berkeley"
+  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -75,7 +75,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "test-snapps" {
+module "berkeley" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -94,7 +94,9 @@ module "test-snapps" {
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/feature/snapps-protocol/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"]
+
 
   archive_configs       = [
     {
@@ -141,8 +143,8 @@ module "test-snapps" {
   snark_coordinators = [
     {
       snark_worker_replicas = 5
-      snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_worker_fee      = "0.01"
+      snark_worker_public_key = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
     }
   ]
@@ -172,6 +174,6 @@ module "test-snapps" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/test-snapps.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley.txt"
 }
 

@@ -52,6 +52,10 @@
    crypto_params
    debug_assert
    fold_lib
+   fields_derivers
+   fields_derivers.snapps
+   fields_derivers.json
+   fields_derivers.graphql
    hash_prefixes
    one_or_two
    outside_hash_image

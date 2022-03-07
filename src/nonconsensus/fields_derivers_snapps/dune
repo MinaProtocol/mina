@@ -1,0 +1,32 @@
+(library
+ (name fields_derivers_snapps)
+ (public_name fields_derivers_snapps_nonconsensus)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+   ;opam 
+   core_kernel
+   fieldslib
+   ;libs
+   signature_lib_nonconsensus
+   unsigned_extended_nonconsensus
+   mina_numbers_nonconsensus
+   currency_nonconsensus
+   fields_derivers.graphql
+   fields_derivers
+   fields_derivers.json
+   with_hash
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps
+   ppx_deriving_yojson
+   ppx_optcomp
+   ppx_base
+   ppx_fields_conv
+   ppx_let
+   ppx_inline_test
+   ppx_assert
+   ppx_version
+   ppx_custom_printf)))

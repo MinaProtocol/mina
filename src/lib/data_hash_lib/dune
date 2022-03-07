@@ -5,28 +5,32 @@
  (library_flags -linkall)
  (libraries
    ;opam
-   ppx_inline_test.config
-   bin_prot.shape
-   base
-   core_kernel
-   sexplib0
-   base.base_internalhash_types
-   base.caml
    result
+   base.base_internalhash_types
+   core_kernel
+   bin_prot.shape
+   ppx_inline_test.config
+   base
+   sexplib0
+   base.caml
    ;libs
-   snarky.backendless
-   bignum_bigint
-   fold_lib
-   random_oracle_input
-   snark_bits
-   outside_hash_image
-   codable
-   snark_params
-   random_oracle
-   pickles
-   base58_check
+   fields_derivers.graphql
+   fields_derivers
    bitstring_lib
+   pickles
+   snark_params
+   outside_hash_image
+   random_oracle_input
+   bignum_bigint
+   snarky.backendless
+   fold_lib
+   snark_bits
+   codable
+   random_oracle
+   base58_check
    snarky.intf
+   fields_derivers.snapps
+   fields_derivers.json
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
