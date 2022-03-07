@@ -35,7 +35,7 @@ fs.readdirSync(wasmPath)
   });
 
 let snarkyjs = require("snarkyjs");
-if (!nodeModulesExists) fs.rmSync(nodeModules);
+if (!nodeModulesExists) fs.rmdirSync(nodeModules);
 
 let didShutdown = false;
 

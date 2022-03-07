@@ -3,6 +3,11 @@ await snarkyjs.snarky_ready;
 
 let { Poseidon, Circuit, Field } = snarkyjs;
 
+let { unitTestPoseidon } = snarkyjs;
+console.log("Starting snarky version");
+unitTestPoseidon();
+console.log("Done snarky version");
+
 let FieldTyp = {
   sizeInFields: () => 1,
   toFields: (f) => f,

@@ -30,9 +30,9 @@ extern "C" {
 }
 
 // produces a warning, but can be useful
-// macro_rules! console_log {
-//     ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
-// }
+macro_rules! console_log {
+    ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
+}
 
 #[wasm_bindgen]
 pub fn console_log(s: &str) {

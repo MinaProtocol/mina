@@ -2,6 +2,12 @@ module Backend = Kimchi_pasta.Vesta_based_plonk
 module Impl = Pickles.Impls.Step
 module Field = Impl.Field
 
+let pp_vec v =
+  let len = Backend.Field.Vector.length v in
+  for i = 0 to len - 1 do
+    Format.eprintf "  %s@." (Backend.Field.to_string (Backend.Field.Vector.get v i))
+  done
+
 (* function to check a circuit defined by a 'main' function *)
 let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   (* Core_kernel.printf "generating keypair...\n" ; *)
@@ -14,6 +20,10 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   let proof =
     Impl.generate_witness_conv
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
+        Format.eprintf "public_inputs:@." ;
+        pp_vec public_inputs ;
+        Format.eprintf "auxiliary_inputs:@." ;
+        pp_vec auxiliary_inputs ;
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
           ~primary:public_inputs)
       spec (main ?w:priv) () pub

@@ -591,6 +591,7 @@ macro_rules! impl_proof {
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> WasmProverProof {
+                console_log!("{:?}", index.0);
                 {
                     let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
