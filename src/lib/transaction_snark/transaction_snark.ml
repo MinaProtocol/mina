@@ -1316,6 +1316,10 @@ module Base = struct
           type t = var
 
           let assert_ = Assert.is_true
+
+          type failure_status = unit
+
+          let assert_with_failure_status b _failure_status = Assert.is_true b
         end
 
         module Controller = struct
@@ -2032,8 +2036,6 @@ module Base = struct
         end
 
         module Local_state = struct
-          type failure_status = unit
-
           type t =
             ( Parties.t
             , Call_stack.t
@@ -2042,7 +2044,7 @@ module Base = struct
             , Ledger.t
             , Bool.t
             , Transaction_commitment.t
-            , failure_status )
+            , Bool.failure_status )
             Parties_logic.Local_state.t
 
           let add_check (t : t) _failure b =
@@ -5339,9 +5341,18 @@ let%test_module "transaction_snark" =
 
     let apply_parties_with_proof ledger parties =
       let witnesses =
-        parties_witnesses_exn ~constraint_constants ~state_body
-          ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-          (`Ledger ledger) parties
+        match
+          Or_error.try_with (fun () ->
+              parties_witnesses_exn ~constraint_constants ~state_body
+                ~fee_excess:Amount.Signed.zero
+                ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties)
+        with
+        | Ok a ->
+            a
+        | Error e ->
+            failwith
+              (sprintf "parties_witnesses_exn failed with %s"
+                 (Error.to_string_hum e))
       in
       let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
@@ -5846,6 +5857,78 @@ let%test_module "transaction_snark" =
                   { Permissions.user_default with edit_state = Proof }
                 test_spec ~init_ledger
                 ~snapp_pk:(Signature_lib.Public_key.compress new_kp.public_key))
+
+        let%test_unit "snapp transaction with non-existent fee payer account" =
+          let open Transaction_logic.For_tests in
+          let gen =
+            let open Quickcheck.Generator.Let_syntax in
+            let%bind test_spec = Test_spec.gen in
+            let pks =
+              Signature_lib.Public_key.Compressed.Set.of_list
+                (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+                     Public_key.compress (fst s).public_key))
+            in
+            let%map kp =
+              Quickcheck.Generator.filter Signature_lib.Keypair.gen
+                ~f:(fun kp ->
+                  not
+                    (Signature_lib.Public_key.Compressed.Set.mem pks
+                       (Signature_lib.Public_key.compress kp.public_key)))
+            in
+            (test_spec, kp)
+          in
+          Quickcheck.test ~trials:1 gen
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                  let spec = List.hd_exn specs in
+                  let fee = Currency.Fee.of_int 1_000_000 in
+                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let memo =
+                    Signed_command_memo.create_from_string_exn
+                      "Snapp create account"
+                  in
+                  (*making new_kp the fee-payer for this to fail*)
+                  let test_spec : Spec.t =
+                    { sender = (new_kp, Account.Nonce.zero)
+                    ; fee
+                    ; receivers = []
+                    ; amount
+                    ; snapp_account_keypair = Some (fst spec.sender)
+                    ; memo
+                    ; new_snapp_account = true
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    }
+                  in
+                  let parties = deploy_snapp test_spec ~constraint_constants in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  ( match
+                      Ledger.apply_transaction ledger ~constraint_constants
+                        ~txn_state_view:
+                          (Mina_state.Protocol_state.Body.view state_body)
+                        (Transaction.Command (Parties parties))
+                    with
+                  | Error _ ->
+                      (*TODO : match on exact error*) ()
+                  | Ok _ ->
+                      failwith "Ledger.apply_transaction should have failed" ) ;
+                  (*Sparse ledger application fails*)
+                  match
+                    Or_error.try_with (fun () ->
+                        parties_witnesses_exn ~constraint_constants ~state_body
+                          ~fee_excess:Amount.Signed.zero
+                          ~pending_coinbase_init_stack:init_stack
+                          (`Ledger ledger) [ parties ])
+                  with
+                  | Ok _a ->
+                      failwith "Expected sparse ledger application to fail"
+                  | Error _e ->
+                      ()))
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
@@ -8389,7 +8472,7 @@ let%test_module "transaction_undos" =
         List.map (List.zip_exn source_accounts new_keys)
           ~f:(fun ((s, _, nonce, _), r) ->
             let sender_pk = Public_key.compress s.public_key in
-            let reciever_pk = Public_key.compress r.public_key in
+            let receiver_pk = Public_key.compress r.public_key in
             let fee = Currency.Fee.of_int 10 in
             let payload : Signed_command.Payload.t =
               Signed_command.Payload.create ~fee ~fee_token:Token_id.default
@@ -8398,7 +8481,7 @@ let%test_module "transaction_undos" =
                 ~body:
                   (Payment
                      { source_pk = sender_pk
-                     ; receiver_pk = reciever_pk
+                     ; receiver_pk
                      ; token_id = Token_id.default
                      ; amount
                      })

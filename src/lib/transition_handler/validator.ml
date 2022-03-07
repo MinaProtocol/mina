@@ -16,7 +16,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
     Envelope.Incoming.data enveloped_transition
     |> External_transition.Validation.forget_validation_with_hash
   in
-  let transition_hash = With_hash.hash transition in
+  let transition_hash = State_hash.With_state_hashes.state_hash transition in
   let root_breadcrumb = Transition_frontier.root frontier in
   let%bind () =
     Option.fold
@@ -40,7 +40,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
                  [ ("selection_context", `String "Transition_handler.Validator")
                  ])
             ~existing:
-              (Transition_frontier.Breadcrumb.consensus_state_with_hash
+              (Transition_frontier.Breadcrumb.consensus_state_with_hashes
                  root_breadcrumb)
             ~candidate:
               (With_hash.map ~f:External_transition.consensus_state transition)))
@@ -62,9 +62,11 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
   let module Lru = Core_extended_cache.Lru in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun transition_env ->
-         let { With_hash.hash = transition_hash; data = transition }, _ =
-           Envelope.Incoming.data transition_env
+         let transition_with_hash, _ = Envelope.Incoming.data transition_env in
+         let transition_hash =
+           State_hash.With_state_hashes.state_hash transition_with_hash
          in
+         let transition = With_hash.data transition_with_hash in
          let sender = Envelope.Incoming.sender transition_env in
          match
            validate_transition ~consensus_constants ~logger ~frontier

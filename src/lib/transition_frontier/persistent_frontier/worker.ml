@@ -2,6 +2,7 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
+open Mina_transition
 open Frontier_base
 
 type input = Diff.Lite.E.t list
@@ -85,8 +86,8 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (Mina_transition.External_transition.Validated
-                          .state_hash transition)) )
+                         (External_transition.Validated.state_hashes transition)
+                           .state_hash) )
                 ; ("parent", `String (State_hash.to_base58_check h))
                 ] ;
             Ok ()

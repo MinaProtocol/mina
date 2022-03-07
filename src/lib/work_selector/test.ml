@@ -108,7 +108,9 @@ struct
       let%map pool =
         gen_snark_pool
           ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
-                Ok (Lazy.force precomputed_values).protocol_state_with_hash.data)
+                Ok
+                  (Lazy.force precomputed_values).protocol_state_with_hashes
+                    .data)
           |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in

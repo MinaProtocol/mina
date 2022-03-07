@@ -75,7 +75,7 @@ module Inputs = struct
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol
 
-  let protocol_state_with_hash =
+  let protocol_state_with_hashes =
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
 end
@@ -100,7 +100,7 @@ module Dummy = struct
            ; genesis_ledger = (module Test_genesis_ledger)
            ; genesis_epoch_data
            ; consensus_constants
-           ; protocol_state_with_hash
+           ; protocol_state_with_hashes
            ; constraint_system_digests = hashes
            ; proof_data = None
            })
@@ -132,7 +132,7 @@ module Make_real () = struct
              ; genesis_ledger = (module Test_genesis_ledger)
              ; genesis_epoch_data
              ; consensus_constants
-             ; protocol_state_with_hash
+             ; protocol_state_with_hashes
              ; constraint_system_digests = None
              ; blockchain_proof_system_id = None
              }
@@ -164,7 +164,7 @@ let main () =
 
       let for_unit_tests =
         lazy
-          (let protocol_state_with_hash =
+          (let protocol_state_with_hashes =
              Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
                ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
@@ -181,7 +181,7 @@ let main () =
            ; genesis_ledger = Genesis_ledger.for_unit_tests
            ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
-           ; protocol_state_with_hash
+           ; protocol_state_with_hashes
            ; constraint_system_digests =
                lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
            ; proof_data = None
@@ -198,7 +198,7 @@ let main () =
              Consensus.Constants.create ~constraint_constants
                ~protocol_constants:genesis_constants.protocol
            in
-           let protocol_state_with_hash =
+           let protocol_state_with_hashes =
              Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
                ~constraint_constants ~consensus_constants
@@ -210,7 +210,7 @@ let main () =
            ; genesis_ledger = (module Test_genesis_ledger)
            ; genesis_epoch_data
            ; consensus_constants
-           ; protocol_state_with_hash
+           ; protocol_state_with_hashes
            ; constraint_system_digests =
                [%e
                  match compiled_values with
@@ -245,8 +245,8 @@ let main () =
                      ; genesis_ledger = inputs.genesis_ledger
                      ; genesis_epoch_data = inputs.genesis_epoch_data
                      ; consensus_constants = inputs.consensus_constants
-                     ; protocol_state_with_hash =
-                         inputs.protocol_state_with_hash
+                     ; protocol_state_with_hashes =
+                         inputs.protocol_state_with_hashes
                      ; constraint_system_digests =
                          lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
                      ; proof_data =
