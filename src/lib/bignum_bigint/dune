@@ -4,11 +4,11 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async_kernel
    bignum.bigint
-   ;libs
+   ;; local libraries
    fold_lib
 )
  (preprocess

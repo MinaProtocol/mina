@@ -5,7 +5,7 @@
  (modules perf_histograms0 perf_histograms histogram rpc intf)
  (inline_tests)
 (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    bin_prot.shape
    async_rpc_kernel
@@ -17,7 +17,7 @@
    async.async_rpc
    base.caml
    async_kernel
-   ;libs
+   ;; local libraries
    mina_metrics
 )
  (preprocess

@@ -5,10 +5,10 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    bin_prot.shape
-   ;libs
+   ;; local libraries
    kimchi_backend.pasta
    pickles.backend
    snarky.backendless

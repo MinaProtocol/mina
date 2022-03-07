@@ -4,7 +4,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    integers
    base.caml
    async_kernel
@@ -12,7 +12,7 @@
    core
    async
    sexplib0
-   ;libs
+   ;; local libraries
    best_tip_prover
    transition_handler
    o1trace

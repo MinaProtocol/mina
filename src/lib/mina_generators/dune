@@ -4,13 +4,13 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_let ppx_version))
  (libraries
-   ;opam
+   ;; opam libraries
    yojson
    core_kernel
    base_quickcheck
    core
    base
-   ;libs
+   ;; local libraries
    sgn
    pickles_types
    pickles

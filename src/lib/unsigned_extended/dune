@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    result
    base
@@ -16,7 +16,7 @@
    base.base_internalhash_types
    bin_prot.shape
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    bignum_bigint
    snark_params
    ppx_dhall_type

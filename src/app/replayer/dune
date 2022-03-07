@@ -3,7 +3,7 @@
  (name replayer)
  (public_name replayer)
  (libraries
-   ;opam
+   ;; opam libraries
    stdio
    sexplib0
    result
@@ -22,7 +22,7 @@
    uri
    integers
    async_unix
-   ;libs
+   ;; local libraries
    with_hash
    snark_params
    pickles_types

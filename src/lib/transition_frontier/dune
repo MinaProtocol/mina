@@ -2,10 +2,10 @@
  (name transition_frontier)
  (public_name transition_frontier)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    ppx_deriving_yojson.runtime
-   ;libs
+   ;; local libraries
    downloader
    transition_frontier_base
    transition_frontier_persistent_root

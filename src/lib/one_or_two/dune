@@ -4,7 +4,7 @@
  (flags :standard -short-paths)
  (library_flags -linkall)
 (libraries
-  ;opam
+  ;; opam libraries
   bin_prot.shape
   base
   async_kernel

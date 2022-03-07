@@ -5,7 +5,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    base.caml
    sexplib0
@@ -14,7 +14,7 @@
    bin_prot.shape
    base
    base.base_internalhash_types
-   ;libs
+   ;; local libraries
    snarky.backendless
    random_oracle_input
    pickles.backend

@@ -3,7 +3,7 @@
  (public_name parallel)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    async_rpc_kernel
    async
    core

@@ -4,10 +4,10 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    base
-   ;libs
+   ;; local libraries
    snark_params
    random_oracle
    mina_signature_kind

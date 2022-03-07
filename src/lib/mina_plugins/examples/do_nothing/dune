@@ -1,10 +1,10 @@
 (library
  (name plugin_do_nothing)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    core
-   ;libs
+   ;; local libraries
    mina_plugins
    mina_lib
    logger

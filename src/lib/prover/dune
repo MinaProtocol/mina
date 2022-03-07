@@ -2,7 +2,7 @@
  (name prover)
  (public_name prover)
  (libraries
-   ;opam
+   ;; opam libraries
    base64
    async_unix
    rpc_parallel
@@ -13,7 +13,7 @@
    bin_prot.shape
    base.caml
    sexplib0
-   ;libs
+   ;; local libraries
    with_hash
    coda_genesis_ledger
    mina_metrics

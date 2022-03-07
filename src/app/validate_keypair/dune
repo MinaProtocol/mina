@@ -4,11 +4,11 @@
  (public_name validate_keypair)
  (modes native)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async
    async_unix
-   ;libs
+   ;; local libraries
    mina_version
    cli_lib
  )

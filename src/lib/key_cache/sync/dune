@@ -2,13 +2,13 @@
  (public_name key_cache.sync)
  (name key_cache_sync)
  (libraries
-   ;opam
+   ;; opam libraries
    async
    core
    core_kernel
    base
    stdio
-   ;libs
+   ;; local libraries
    key_cache
    logger
    )

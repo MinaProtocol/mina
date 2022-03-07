@@ -4,7 +4,7 @@
  (flags :standard -short-paths)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    zarith
    bignum.bigint
    bin_prot.shape
@@ -14,7 +14,7 @@
    core_kernel
    bignum
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    test_util
    snarky.backendless
    genesis_constants

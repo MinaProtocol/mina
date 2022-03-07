@@ -2,9 +2,9 @@
  (name cache_dir)
  (public_name cache_dir)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
-   ;libs
+   ;; local libraries
    key_cache
    logger
    )

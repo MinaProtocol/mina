@@ -3,7 +3,7 @@
  (public_name ppx_register_event)
  (kind ppx_deriver)
  (libraries
-   ;opam
+   ;; opam libraries
    ocaml-compiler-libs.common
    ppxlib.ast
    ppx_deriving_yojson
@@ -12,7 +12,7 @@
    compiler-libs.common
    ocaml-migrate-parsetree
    base
-   ;libs
+   ;; local libraries
    interpolator_lib
  )
  (instrumentation (backend bisect_ppx))

@@ -3,7 +3,7 @@
  (name swap_bad_balances)
  (public_name swap_bad_balances)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    base
    archive_lib
@@ -17,7 +17,7 @@
    integers
    async_unix
    async.async_command
-   ;libs
+   ;; local libraries
    currency
    logger
  )

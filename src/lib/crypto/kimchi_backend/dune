@@ -8,11 +8,11 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-   ;opam
+   ;; opam libraries
    integers
    core_kernel
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    kimchi
    snarkette
    snarky.backendless

@@ -2,7 +2,7 @@
  (name fake_network)
  (public_name fake_network)
  (libraries
-   ;opam
+   ;; opam libraries
    core.uuid
    core_kernel.uuid
    async_unix
@@ -12,7 +12,7 @@
    base.caml
    async_kernel
    sexplib0
-   ;libs
+   ;; local libraries
    snark_params
    pickles
    pickles.backend

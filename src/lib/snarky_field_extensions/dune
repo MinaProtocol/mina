@@ -5,13 +5,13 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
  (libraries
-   ;opam
+   ;; opam libraries
    bignum.bigint
    sexplib0
    core_kernel
    ppx_inline_test.config
    result
-   ;libs
+   ;; local libraries
    snarkette
    snarky.backendless
 ))

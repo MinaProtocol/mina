@@ -2,7 +2,7 @@
  (name vrf_evaluator)
  (public_name vrf_evaluator)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    async_kernel
    rpc_parallel
@@ -12,7 +12,7 @@
    bin_prot.shape
    sexplib0
    base.caml
-   ;libs
+   ;; local libraries
    error_json
    currency
    unsigned_extended

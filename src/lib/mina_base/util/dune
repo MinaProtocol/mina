@@ -2,9 +2,9 @@
  (name mina_base_util)
  (public_name mina_base.util)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    snark_params
    bignum_bigint
 )

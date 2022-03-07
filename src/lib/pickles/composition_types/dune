@@ -5,12 +5,12 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    bin_prot.shape
    core_kernel
    base.caml
-   ;libs
+   ;; local libraries
    kimchi_backend.pasta
    snarky.backendless
    pickles_types

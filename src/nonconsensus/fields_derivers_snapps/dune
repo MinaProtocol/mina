@@ -4,10 +4,10 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam 
+   ;; opam libraries
    core_kernel
    fieldslib
-   ;libs
+   ;; local libraries
    signature_lib_nonconsensus
    unsigned_extended_nonconsensus
    mina_numbers_nonconsensus

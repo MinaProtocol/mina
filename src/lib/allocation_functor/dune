@@ -3,12 +3,12 @@
   (public_name allocation_functor)
   (inline_tests)
   (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    result
    ppx_inline_test.config
    sexplib0
-   ;libs
+   ;; local libraries
    mina_metrics
   )
   (instrumentation (backend bisect_ppx))

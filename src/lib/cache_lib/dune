@@ -3,14 +3,14 @@
  (public_name cache_lib)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    core_kernel
    base
    base.base_internalhash_types
    core
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    logger
    )
  (preprocessor_deps ../../config.mlh)

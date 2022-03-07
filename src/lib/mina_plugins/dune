@@ -2,12 +2,12 @@
  (public_name mina_plugins)
  (name mina_plugins)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    dynlink
    core
    base
-   ;libs
+   ;; local libraries
    mina_lib
    logger
 )

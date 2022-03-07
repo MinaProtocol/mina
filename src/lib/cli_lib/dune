@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    sexplib0
    async.async_command
@@ -22,7 +22,7 @@
    async_rpc_kernel
    bin_prot.shape
    stdio
-   ;libs
+   ;; local libraries
    genesis_constants
    random_oracle
    pickles

@@ -4,13 +4,13 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    bin_prot.shape
    core_kernel
    base.caml
    sexplib0
    core
-   ;libs
+   ;; local libraries
    transaction_snark
    signature_lib
    one_or_two

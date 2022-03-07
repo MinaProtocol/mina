@@ -2,11 +2,11 @@
  (name rose_tree)
  (public_name rose_tree)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async_kernel
    result
-   ;libs
+   ;; local libraries
    non_empty_list
 )
  (instrumentation (backend bisect_ppx))

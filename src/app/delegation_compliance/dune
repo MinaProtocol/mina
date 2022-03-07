@@ -3,7 +3,7 @@
  (name delegation_compliance)
  (public_name delegation_compliance)
  (libraries
-   ;opam
+   ;; opam libraries
    stdio
    uri
    integers
@@ -23,7 +23,7 @@
    base.base_internalhash_types
    async.async_command
    async_unix
-   ;libs
+   ;; local libraries
    archive_lib
    logger
    signature_lib

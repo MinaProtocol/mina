@@ -4,10 +4,10 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    core
-   ;libs
+   ;; local libraries
    merkle_list_verifier
    mina_state
    mina_base

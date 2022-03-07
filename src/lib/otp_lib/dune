@@ -3,11 +3,11 @@
  (public_name otp_lib)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async_kernel
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    pipe_lib
    )
  (instrumentation (backend bisect_ppx))

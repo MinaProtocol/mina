@@ -3,9 +3,9 @@
  (public_name transition_frontier_base)
  (flags -w -22)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    mina_base
    mina_ledger
    mina_state

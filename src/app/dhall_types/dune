@@ -3,14 +3,14 @@
  (name dump_dhall_types)
  (public_name dump_dhall_types)
  (libraries
-   ;opam
+   ;; opam libraries
    base
    core_kernel
    async_kernel
    core
    stdio
    base.caml
-   ;libs
+   ;; local libraries
    coda_runtime_config
    ppx_dhall_type
  )

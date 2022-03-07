@@ -2,13 +2,13 @@
  (name ledger_proof)
  (public_name ledger_proof)
  (libraries
-   ;opam
+   ;; opam libraries
    base
    sexplib0
    core_kernel
    bin_prot.shape
    base.caml
-   ;libs
+   ;; local libraries
    transaction_snark
    mina_base
    currency

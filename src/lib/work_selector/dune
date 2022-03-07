@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    bin_prot.shape
    sexplib0
    core
@@ -16,7 +16,7 @@
    async_kernel
    ppx_inline_test.config
    async_unix
-   ;libs
+   ;; local libraries
    transaction_protocol_state
    transaction_snark_work
    transition_frontier_base

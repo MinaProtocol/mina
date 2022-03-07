@@ -2,10 +2,10 @@
  (name extensions)
  (public_name transition_frontier_extensions)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    core_kernel
-   ;libs
+   ;; local libraries
    transition_frontier_base
    transition_frontier_full_frontier
    mina_base

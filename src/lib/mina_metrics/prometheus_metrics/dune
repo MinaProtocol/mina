@@ -2,7 +2,7 @@
  (public_name mina_metrics.prometheus)
  (name mina_metrics_prometheus)
  (libraries
-   ;opam
+   ;; opam libraries
    conduit-async
    ppx_hash.runtime-lib
    fmt
@@ -19,7 +19,7 @@
    base.base_internalhash_types
    uri
    async_unix
-   ;libs
+   ;; local libraries
    logger
  )
  (preprocessor_deps ../../../config.mlh)

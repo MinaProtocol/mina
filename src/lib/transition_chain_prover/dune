@@ -4,10 +4,10 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries
-   ;opam
+   ;; opam libraries
    core
    core_kernel
-   ;libs
+   ;; local libraries
    transition_frontier_extensions
    mina_transition
    mina_state

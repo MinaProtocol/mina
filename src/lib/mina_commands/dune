@@ -2,14 +2,14 @@
  (name mina_commands)
  (public_name mina_commands)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    core_kernel
    core
    async
    async_unix
    sexplib0
-   ;libs
+   ;; local libraries
    pickles.backend
    mina_base.import
    kimchi_backend

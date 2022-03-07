@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    base.caml
    bin_prot.shape
@@ -15,7 +15,7 @@
    base
    base.base_internalhash_types
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    bignum_bigint
    pickles
    codable

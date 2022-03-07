@@ -4,7 +4,7 @@
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries
-   ;opam
+   ;; opam libraries
    js_of_ocaml
    integers
    core_kernel
@@ -15,7 +15,7 @@
    ppx_deriving.runtime
    result
    ppx_deriving_yojson.runtime
-   ;libs
+   ;; local libraries
    sponge
    integers_stubs_js
    mina_numbers_nonconsensus

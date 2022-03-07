@@ -1,7 +1,7 @@
 (executable
  (name gen)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    compiler-libs
    ocaml-migrate-parsetree
@@ -14,7 +14,7 @@
    core_kernel
    stdio
    ocaml-compiler-libs.common
-   ;libs
+   ;; local libraries
    crypto_params
    tuple_lib
    crs

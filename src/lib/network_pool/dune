@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    async_unix
    base.base_internalhash_types
@@ -17,7 +17,7 @@
    base.caml
    bin_prot.shape
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    mina_generators
    sgn
    transition_frontier_base

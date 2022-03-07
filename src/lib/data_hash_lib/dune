@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    base.base_internalhash_types
    core_kernel
@@ -13,7 +13,7 @@
    base
    sexplib0
    base.caml
-   ;libs
+   ;; local libraries
    fields_derivers.graphql
    fields_derivers
    bitstring_lib

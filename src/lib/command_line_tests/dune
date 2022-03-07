@@ -3,7 +3,7 @@
  (public_name command_line_tests)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    core_kernel
    ppx_inline_test.config

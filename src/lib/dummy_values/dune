@@ -3,9 +3,9 @@
  (public_name dummy_values)
  (flags :standard -short-paths)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    crypto_params
    snarky.backendless
    pickles

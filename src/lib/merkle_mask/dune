@@ -3,7 +3,7 @@
  (public_name merkle_mask)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    async_kernel
    async
@@ -17,7 +17,7 @@
    base.base_internalhash_types
    core.uuid
    stdio
-   ;libs
+   ;; local libraries
    immutable_array
    debug_assert
    merkle_ledger

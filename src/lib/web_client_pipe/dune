@@ -4,12 +4,12 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    core_kernel
    async_kernel
-   ;libs
+   ;; local libraries
    error_json
    pipe_lib
    logger

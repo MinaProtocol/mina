@@ -4,9 +4,9 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    snarkette
    snarky_field_extensions
    sgn_type

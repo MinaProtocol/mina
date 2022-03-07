@@ -3,13 +3,13 @@
  (public_name logproc_lib)
  (modules logproc_lib filter)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    yojson
    angstrom
    re2
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    interpolator_lib
 )
  (instrumentation (backend bisect_ppx))
@@ -24,11 +24,11 @@
  (public_name interpolator_lib)
  (modules interpolator)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    yojson
    angstrom
-   ;libs
+   ;; local libraries
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))

@@ -2,7 +2,7 @@
  (name cstubs_applicative)
  (public_name cstubs_applicative)
  (libraries
-   ;opam
+   ;; opam libraries
    base
    ctypes
    ctypes.stubs

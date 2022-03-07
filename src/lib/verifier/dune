@@ -2,7 +2,7 @@
  (name verifier)
  (public_name verifier)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    async
    core_kernel
@@ -13,7 +13,7 @@
    bin_prot.shape
    core
    async_unix
-   ;libs
+   ;; local libraries
    kimchi_backend
    logger.file_system
    error_json

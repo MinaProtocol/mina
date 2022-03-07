@@ -3,12 +3,12 @@
  (public_name transition_frontier_persistent_frontier)
  (flags -w -22)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    yojson
    rpc_parallel
-   ;libs
+   ;; local libraries
    transition_frontier_base
    transition_frontier_persistent_root
    block_time

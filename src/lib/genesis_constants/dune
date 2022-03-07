@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    base
    bin_prot.shape
@@ -13,7 +13,7 @@
    base.caml
    sexplib0
    integers
-   ;libs
+   ;; local libraries
    unsigned_extended
    mina_numbers
    pickles

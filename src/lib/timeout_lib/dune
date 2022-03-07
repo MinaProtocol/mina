@@ -2,11 +2,11 @@
  (name timeout_lib)
  (public_name timeout_lib)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async_kernel
    core
-   ;libs
+   ;; local libraries
    logger
  )
  (instrumentation (backend bisect_ppx))

@@ -2,14 +2,14 @@
  (name genesis_ledger_helper_lib)
  (public_name genesis_ledger_helper.lib)
  (libraries
-   ;opam
+   ;; opam libraries
    splittable_random
    integers
    core_kernel
    core
    sexplib0
    base64
-   ;libs
+   ;; local libraries
    mina_base.import
    random_oracle
    data_hash_lib

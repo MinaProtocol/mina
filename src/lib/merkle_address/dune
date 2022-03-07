@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
 (libraries
-  ;opam
+  ;; opam libraries
   base.base_internalhash_types
   bin_prot.shape
   ppx_version.runtime
@@ -13,7 +13,7 @@
   sexplib0
   base.caml
   ppx_inline_test.config
-  ;libs
+  ;; local libraries
   direction)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson bitstring.ppx))

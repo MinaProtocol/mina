@@ -5,7 +5,7 @@
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (libraries
-   ;opam
+   ;; opam libraries
    integers
    base.caml
    bin_prot.shape
@@ -14,7 +14,7 @@
    core_kernel
    base
    base.base_internalhash_types
-   ;libs
+   ;; local libraries
    bitstring_lib
    pickles
    unsigned_extended

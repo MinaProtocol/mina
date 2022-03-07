@@ -2,7 +2,7 @@
  (public_name cache_dir.native)
  (name cache_dir_native)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    async_unix
    base
@@ -11,7 +11,7 @@
    core_kernel
    stdio
    async_kernel
-   ;libs
+   ;; local libraries
    key_cache
    logger
 )

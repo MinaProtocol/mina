@@ -3,13 +3,13 @@
  (public_name transaction_witness)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    bin_prot.shape
    sexplib0
    core_kernel
    core
-   ;libs
+   ;; local libraries
    currency
    mina_ledger
    mina_state

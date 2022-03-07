@@ -5,11 +5,11 @@
  (modes native)
  (modules test_signatures)
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    base
    core_kernel
-   ;libs
+   ;; local libraries
    pickles.backend
    string_sign
    snark_params
@@ -34,11 +34,11 @@
  (modes native)
  (modules test_signatures_nonconsensus)
  (libraries
-   ;opam 
+   ;; opam libraries 
    core_kernel
    base
    sexplib0
-   ;libs
+   ;; local libraries
    mina_base_nonconsensus.import
    mina_signature_kind
    mina_base_nonconsensus

@@ -3,12 +3,12 @@
  (public_name node_status)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    core_kernel
    async
    async_kernel
-   ;libs
+   ;; local libraries
    mina_net2
    mina_networking)
  (preprocess

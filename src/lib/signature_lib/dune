@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    bignum.bigint
    ppx_inline_test.config
    base
@@ -15,7 +15,7 @@
    bin_prot.shape
    base.caml
    result
-   ;libs
+   ;; local libraries
    crypto_params
    kimchi_backend.pasta
    random_oracle_input

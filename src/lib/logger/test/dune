@@ -1,12 +1,12 @@
 (library
  (name logger_test)
  (libraries
-   ;opam 
+   ;; opam libraries 
    ppx_inline_test.config
    core
    async
    core_kernel
-   ;libs
+   ;; local libraries
    logger
    logger.file_system
  )

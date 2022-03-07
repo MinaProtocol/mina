@@ -2,9 +2,9 @@
  (name precomputed)
  (public_name pickles.precomputed)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    pickles_types
    kimchi_backend
    kimchi_backend.pasta

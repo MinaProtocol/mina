@@ -4,12 +4,12 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane h_list.ppx ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    sexplib0
    core
    base.caml
-   ;libs
+   ;; local libraries
    snarkette
    snarky_curves
    sgn_type

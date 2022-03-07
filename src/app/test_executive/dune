@@ -1,7 +1,7 @@
 (executable
  (name test_executive)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    async
    core
@@ -10,7 +10,7 @@
    cmdliner
    base.caml
    async_unix
-   ;libs
+   ;; local libraries
    with_hash
    data_hash_lib
    kimchi_backend

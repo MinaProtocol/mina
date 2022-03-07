@@ -2,12 +2,12 @@
  (name error_json)
  (public_name error_json)
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    yojson
    base
    sexplib
-   ;libs
+   ;; local libraries
    mina_version
  )
  (instrumentation (backend bisect_ppx))

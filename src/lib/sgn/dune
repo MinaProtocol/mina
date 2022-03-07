@@ -3,7 +3,7 @@
  (public_name sgn)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_deriving_yojson.runtime
    core_kernel
    yojson
@@ -11,7 +11,7 @@
    base
    bin_prot.shape
    base.caml
-   ;libs
+   ;; local libraries
    snark_params
    sgn_type
    pickles

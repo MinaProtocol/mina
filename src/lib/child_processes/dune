@@ -8,7 +8,7 @@
                ppx_assert ppx_coda ppx_version ppx_here ppx_custom_printf ppx_deriving.show
                ppx_inline_test ppx_let ppx_pipebang))
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    integers
    async_unix
@@ -22,7 +22,7 @@
    ppx_hash.runtime-lib
    async_kernel
    base.caml
-   ;libs
+   ;; local libraries
    file_system
    error_json
    logger

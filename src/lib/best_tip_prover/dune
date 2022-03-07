@@ -4,11 +4,11 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    core
    core_kernel
    async_kernel
-   ;libs
+   ;; local libraries
    with_hash
    precomputed_values
    proof_carrying_data

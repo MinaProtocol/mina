@@ -2,10 +2,10 @@
  (public_name coda_genesis_ledger)
  (name genesis_ledger)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    base
-   ;libs
+   ;; local libraries
    key_gen
    mina_base
    signature_lib

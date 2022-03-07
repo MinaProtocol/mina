@@ -3,7 +3,7 @@
  (name extract_blocks)
  (public_name extract_blocks)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    core
    base
@@ -16,7 +16,7 @@
    async_kernel
    uri
    async.async_command
-   ;libs
+   ;; local libraries
    archive_lib
    data_hash_lib
    signature_lib

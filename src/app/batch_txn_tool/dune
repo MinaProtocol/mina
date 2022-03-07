@@ -1,7 +1,7 @@
 (executable
  (name batch_txn_tool)
  (libraries
-   ;opam
+   ;; opam libraries
    async.async_command
    integers
    base
@@ -12,7 +12,7 @@
    async_kernel
    yojson
    async_unix
-   ;libs
+   ;; local libraries
    currency
    mina_base.import
    graphql_lib

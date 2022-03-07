@@ -5,7 +5,7 @@
  (inline_tests)
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
-   ;opam
+   ;; opam libraries
    integers
    core_kernel
    async_kernel
@@ -16,7 +16,7 @@
    result
    ppx_inline_test.config
    core
-   ;libs
+   ;; local libraries
    mina_ledger
    mina_numbers
    unsigned_extended

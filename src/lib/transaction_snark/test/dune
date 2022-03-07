@@ -1,7 +1,7 @@
 (library
   (name transaction_snark_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    async_unix
    async
@@ -10,7 +10,7 @@
    core_kernel
    base64
    yojson
-   ;libs
+   ;; local libraries
    random_oracle_input
    pickles.backend
    mina_base.import

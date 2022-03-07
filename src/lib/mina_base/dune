@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    result
    bin_prot.shape
@@ -22,7 +22,7 @@
    base_quickcheck
    core_kernel.uuid
    rocks
-   ;libs
+   ;; local libraries
    run_in_thread
    kimchi_backend_common
    kimchi_backend.pasta

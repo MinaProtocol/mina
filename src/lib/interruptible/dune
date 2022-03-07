@@ -4,11 +4,11 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async_kernel
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    run_in_thread
    )
  (preprocess

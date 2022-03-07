@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    async_kernel
    base.base_internalhash_types
@@ -18,7 +18,7 @@
    base.md5
    base.caml
    async_unix
-   ;libs
+   ;; local libraries
    mina_base.import
    hash_prefix_states
    kimchi_backend.common

@@ -2,7 +2,7 @@
  (name gen_keys)
  (flags -g)
  (libraries
-   ;opam
+   ;; opam libraries
    ppxlib
    async
    core
@@ -15,7 +15,7 @@
    compiler-libs
    async_kernel
    async_unix
-   ;libs
+   ;; local libraries
    mina_base
    cache_dir
    transaction_snark

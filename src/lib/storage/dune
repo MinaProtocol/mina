@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    core_kernel
@@ -15,7 +15,7 @@
    async_kernel
    async_unix
    base.caml
-   ;libs
+   ;; local libraries
    logger
    )
  (preprocess

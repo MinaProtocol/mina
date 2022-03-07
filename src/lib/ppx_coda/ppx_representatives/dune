@@ -3,7 +3,7 @@
  (public_name ppx_representatives)
  (kind ppx_deriver)
  (libraries
-   ;opam
+   ;; opam libraries
    ppxlib.ast
    ocaml-compiler-libs.common
    compiler-libs.common

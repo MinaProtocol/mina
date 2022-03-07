@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    async_rpc_kernel
    sexplib0
    async_kernel
@@ -19,7 +19,7 @@
    ppx_hash.runtime-lib
    async_unix
    bin_prot.shape
-   ;libs
+   ;; local libraries
    one_or_two
    mina_metrics
    logger

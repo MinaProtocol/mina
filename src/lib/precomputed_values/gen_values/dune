@@ -1,7 +1,7 @@
 (executable
  (name gen_values)
  (libraries
-   ;opam
+   ;; opam libraries
    stdio
    async_kernel
    compiler-libs
@@ -15,7 +15,7 @@
    ocaml-compiler-libs.common
    async_unix
    base.caml
-   ;libs
+   ;; local libraries
    coda_runtime_config
    consensus
    transaction_snark

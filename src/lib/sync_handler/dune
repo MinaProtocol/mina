@@ -5,13 +5,13 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane))
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    core
    async
    core_kernel
    async_kernel
-   ;libs
+   ;; local libraries
    with_hash
    data_hash_lib
    trust_system

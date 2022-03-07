@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    ppx_inline_test.config
    base.caml
@@ -15,7 +15,7 @@
    uri
    sexplib0
    integers
-   ;libs
+   ;; local libraries
    hex
    random_oracle_input
    mina_numbers

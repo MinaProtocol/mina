@@ -2,7 +2,7 @@
  (name downloader)
  (public_name downloader)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    async
    core
@@ -11,7 +11,7 @@
    core_kernel.pairing_heap
    async_unix
    base.caml
-   ;libs
+   ;; local libraries
    network_peer
    pipe_lib
    trust_system

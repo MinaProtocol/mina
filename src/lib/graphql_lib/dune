@@ -2,7 +2,7 @@
  (name graphql_lib)
  (public_name graphql_lib)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    uri
    core_kernel
@@ -15,7 +15,7 @@
    graphql-cohttp
    async_kernel
    result
-   ;libs
+   ;; local libraries
    mina_numbers
    currency
    signature_lib

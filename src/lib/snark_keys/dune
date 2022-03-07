@@ -2,11 +2,11 @@
  (name snark_keys)
  (public_name snark_keys)
  (libraries
-   ;opam 
+   ;; opam libraries 
    core
    async
    core_kernel
-   ;libs
+   ;; local libraries
    pickles
    blockchain_snark
    transaction_snark

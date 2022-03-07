@@ -1,7 +1,7 @@
 (executable
  (name gen)
  (libraries
-   ;opam
+   ;; opam libraries
    stdio
    base.caml
    sexplib0
@@ -16,7 +16,7 @@
    base
    bin_prot.shape
    ocaml-compiler-libs.common
-   ;libs
+   ;; local libraries
    kimchi_backend.pasta
    group_map
    tuple_lib

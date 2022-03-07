@@ -2,11 +2,11 @@
  (name quickcheck_lib)
  (public_name quickcheck_lib)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    base
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    currency
    rose_tree
 )

@@ -3,7 +3,7 @@
  (name missing_blocks_auditor)
  (public_name missing_blocks_auditor)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async_kernel
    uri
@@ -15,7 +15,7 @@
    base
    async_unix
    async.async_command
-   ;libs
+   ;; local libraries
    logger
  )
  (preprocessor_deps ../../config.mlh)

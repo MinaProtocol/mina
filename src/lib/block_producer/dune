@@ -4,13 +4,13 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    async_kernel
    core_kernel
    core
    async
-   ;libs
+   ;; local libraries
    mina_metrics
    mina_net2
    debug_assert

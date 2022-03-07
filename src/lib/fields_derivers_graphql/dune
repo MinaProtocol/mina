@@ -2,7 +2,7 @@
  (name fields_derivers_graphql)
  (public_name fields_derivers.graphql)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    graphql_parser
    graphql-async
@@ -11,7 +11,7 @@
    core_kernel
    yojson
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    fields_derivers
  )
  (instrumentation (backend bisect_ppx))

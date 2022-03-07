@@ -2,7 +2,7 @@
  (name node_addrs_and_ports)
  (public_name node_addrs_and_ports)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    yojson
@@ -10,7 +10,7 @@
    base.caml
    core_kernel
    bin_prot.shape
-   ;libs
+   ;; local libraries
    network_peer
    )
  (inline_tests)

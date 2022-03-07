@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    base.caml
    sexplib0
    bin_prot.shape
@@ -17,7 +17,7 @@
    async.async_rpc
    async_rpc_kernel
    async_kernel
-   ;libs
+   ;; local libraries
    network_peer
    genesis_constants
    currency

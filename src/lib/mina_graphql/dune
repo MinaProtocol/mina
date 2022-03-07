@@ -2,7 +2,7 @@
  (name mina_graphql)
  (public_name mina_graphql)
  (libraries
-   ;opam
+   ;; opam libraries
    archive_lib
    integers
    bignum
@@ -21,7 +21,7 @@
    sexplib0
    ppx_deriving_yojson.runtime
    graphql_parser
-   ;libs
+   ;; local libraries
    kimchi_backend.pasta
    mina_base.util
    mina_ledger

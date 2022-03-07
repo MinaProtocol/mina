@@ -2,7 +2,7 @@
  (name consensus_vrf)
  (public_name consensus.vrf)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    bignum.bigint
    base.caml
@@ -14,7 +14,7 @@
    bignum
    integers
    bin_prot.shape
-   ;libs
+   ;; local libraries
    mina_base.util
    kimchi_backend.pasta
    genesis_constants

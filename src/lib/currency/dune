@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    base.base_internalhash_types
    core_kernel
    bin_prot.shape
@@ -15,7 +15,7 @@
    result
    ppx_inline_test.config
    zarith
-   ;libs
+   ;; local libraries
    bignum_bigint
    bitstring_lib
    crypto_params

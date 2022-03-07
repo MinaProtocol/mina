@@ -5,7 +5,7 @@
  (modules (:standard \ proof_of_stake_fuzzer))
  (library_flags (-linkall))
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    async_unix
    core.uuid
@@ -24,7 +24,7 @@
    core_kernel.uuid
    async_rpc_kernel
    sexp_diff_kernel
-   ;libs
+   ;; local libraries
    mina_base.util
    unsigned_extended
    kimchi_backend.pasta

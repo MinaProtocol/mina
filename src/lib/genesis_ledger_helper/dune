@@ -3,7 +3,7 @@
  (name genesis_ledger_helper)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    core_kernel.uuid
    async_unix
@@ -13,7 +13,7 @@
    async_kernel
    core.uuid
    base.caml
-   ;libs
+   ;; local libraries
    mina_ledger
    with_hash
    blockchain_snark

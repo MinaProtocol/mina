@@ -3,7 +3,7 @@
  (name migrate_balances_table)
  (public_name migrate_balances_table)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    base
    async_kernel
@@ -15,7 +15,7 @@
    uri
    async_unix
    async.async_command
-   ;libs
+   ;; local libraries
    logger
  )
  (preprocessor_deps ../../config.mlh)

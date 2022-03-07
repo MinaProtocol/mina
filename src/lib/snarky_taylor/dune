@@ -5,12 +5,12 @@
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    bignum.bigint
    core_kernel
    bignum
    sexplib0
-   ;libs
+   ;; local libraries
    snarky.backendless
    snarky_integer
    ))

@@ -5,7 +5,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_register_event))
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib0
    core
    async_kernel
@@ -13,7 +13,7 @@
    async
    async_unix
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    mina_numbers
    gadt_lib
    child_processes

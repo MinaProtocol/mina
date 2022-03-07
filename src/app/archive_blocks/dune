@@ -3,7 +3,7 @@
  (name archive_blocks)
  (public_name archive_blocks)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    core
    result
@@ -18,7 +18,7 @@
    base
    base.caml
    async.async_command
-   ;libs
+   ;; local libraries
    logger
    mina_transition
    genesis_constants

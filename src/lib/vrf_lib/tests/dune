@@ -4,13 +4,13 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    core_kernel
    ppx_inline_test.config
    sexplib0
    ppx_deriving.runtime
-   ;libs
+   ;; local libraries
    snark_params
    signature_lib
    test_util

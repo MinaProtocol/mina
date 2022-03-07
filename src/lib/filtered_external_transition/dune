@@ -3,13 +3,13 @@
  (public_name filtered_external_transition)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    bin_prot.shape
    base.caml
    base
    core
-   ;libs
+   ;; local libraries
    staged_ledger_diff
    staged_ledger
    transaction_snark_work

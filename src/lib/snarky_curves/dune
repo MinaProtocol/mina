@@ -4,11 +4,11 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_snarky ppx_jane ppx_compare))
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    sexplib0
    bignum.bigint
-   ;libs
+   ;; local libraries
    bitstring_lib
    snarky.backendless
    snarky_field_extensions

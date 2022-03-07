@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    base
    core_kernel
@@ -17,7 +17,7 @@
    bin_prot.shape
    base.caml
    async_unix
-   ;libs
+   ;; local libraries
    mina_metrics
    non_empty_list
    pipe_lib

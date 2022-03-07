@@ -5,7 +5,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane))
  (libraries
-   ;opam
+   ;; opam libraries
    integers
    base.base_internalhash_types
    async
@@ -16,7 +16,7 @@
    sexplib0
    ppx_inline_test.config
    async_unix
-   ;libs
+   ;; local libraries
    mina_base.import
    pickles.backend
    one_or_two

@@ -2,12 +2,12 @@
  (public_name mina_intf)
  (name mina_intf)
  (libraries
-   ;opam
+   ;; opam libraries
    async_kernel
    core
    core_kernel
    sexplib0
-   ;libs
+   ;; local libraries
    mina_net2
    staged_ledger
    consensus

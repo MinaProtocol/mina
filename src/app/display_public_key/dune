@@ -4,13 +4,13 @@
  (public_name display_public_key)
  (modes native)
  (libraries
-   ;opam
+   ;; opam libraries
    base
    async_kernel
    async
    core
    base.caml
-   ;libs
+   ;; local libraries
    cli_lib
    signature_lib
    secrets

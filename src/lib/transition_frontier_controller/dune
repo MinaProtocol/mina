@@ -4,12 +4,12 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda))
  (libraries
-   ;opam
+   ;; opam libraries
    base
    async_kernel
    core_kernel
    core
-   ;libs
+   ;; local libraries
    transition_frontier
    data_hash_lib
    mina_metrics

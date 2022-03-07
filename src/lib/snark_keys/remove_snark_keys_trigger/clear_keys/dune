@@ -1,13 +1,13 @@
 (executable
  (name clear_keys)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    core_kernel
    async_kernel
    stdio
-   ;libs
+   ;; local libraries
    file_system
    cache_dir
    snarky.backendless)

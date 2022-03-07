@@ -2,7 +2,7 @@
  (public_name key_cache.async)
  (name key_cache_async)
  (libraries
-   ;opam
+   ;; opam libraries
    async
    core
    async_kernel
@@ -10,7 +10,7 @@
    core_kernel
    base
    base.caml
-   ;libs
+   ;; local libraries
    key_cache
    logger
    )

@@ -3,13 +3,13 @@
  (inline_tests)
  (public_name pipe_lib)
  (libraries
-   ;opam
+   ;; opam libraries
    sexplib
    core_kernel
    async_kernel
    core
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    run_in_thread
    logger
 )

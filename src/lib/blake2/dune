@@ -5,7 +5,7 @@
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_compare ppx_deriving_yojson))
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    base.base_internalhash_types
    bin_prot.shape
    ppx_version.runtime

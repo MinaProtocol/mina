@@ -2,13 +2,13 @@
  (name snarky_taylor_tests)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    bignum.bigint
    core_kernel
    bignum
    ppx_inline_test.config
    base
-   ;libs
+   ;; local libraries
    pickles
    snarky_integer
    snark_params

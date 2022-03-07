@@ -2,7 +2,7 @@
  (name snark_keys_header)
  (public_name snark_keys_header)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    sexplib0
    base

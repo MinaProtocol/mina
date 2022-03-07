@@ -3,10 +3,10 @@
  (public_name string_sign)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    kimchi_backend
    pickles.backend
    kimchi_backend.pasta

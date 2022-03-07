@@ -2,7 +2,7 @@
  (public_name o1trace_webkit_event)
  (name o1trace_webkit_event)
  (libraries
-   ;opam
+   ;; opam libraries
    core.time_stamp_counter
    base
    async_unix
@@ -11,7 +11,7 @@
    core_kernel
    base.caml
    async_kernel
-   ;libs
+   ;; local libraries
    webkit_trace_event.binary
    webkit_trace_event
    o1trace

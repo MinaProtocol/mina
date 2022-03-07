@@ -1,7 +1,7 @@
 (library
  (name mina_net2_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    ppx_inline_test.config
@@ -11,7 +11,7 @@
    sexplib0
    bin_prot.shape
    base.caml
-   ;libs
+   ;; local libraries
    mina_net2
    inline_test_quiet_logs
    logger

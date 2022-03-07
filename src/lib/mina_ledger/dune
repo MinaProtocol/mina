@@ -5,7 +5,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
  (libraries
-   ;opam
+   ;; opam libraries
    rocks
    integers
    async_kernel
@@ -19,7 +19,7 @@
    async
    core_kernel.uuid
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    syncable_ledger
    snark_params
    pickles

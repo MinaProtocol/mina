@@ -2,7 +2,7 @@
  (name mina_net2)
  (public_name mina_net2)
  (libraries
-   ;opam
+   ;; opam libraries
    async
    base58
    base64
@@ -19,7 +19,7 @@
    sexplib0
    base.caml
    base.base_internalhash_types
-   ;libs
+   ;; local libraries
    error_json
    child_processes
    file_system

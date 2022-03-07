@@ -2,13 +2,13 @@
  (name fields_derivers_json)
  (public_name fields_derivers.json)
  (libraries
-   ;opam
+   ;; opam libraries
    yojson
    fieldslib
    ppx_inline_test.config
    core_kernel
    result
-   ;libs
+   ;; local libraries
    fields_derivers
  )
  (instrumentation (backend bisect_ppx))

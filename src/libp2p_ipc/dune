@@ -4,7 +4,7 @@
  (flags -w -53)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    result
    base.base_internalhash_types
    base
@@ -18,7 +18,7 @@
    ppx_hash.runtime-lib
    async_kernel
    ppx_inline_test.config
-   ;libs
+   ;; local libraries
    pipe_lib
    network_peer
  )

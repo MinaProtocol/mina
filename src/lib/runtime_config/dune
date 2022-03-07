@@ -2,14 +2,14 @@
  (name runtime_config)
  (public_name coda_runtime_config)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    bin_prot.shape
    base.caml
    base
    sexplib0
    result
-   ;libs
+   ;; local libraries
    currency
    mina_numbers
    ppx_dhall_type

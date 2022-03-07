@@ -2,9 +2,9 @@
  (name persistent_root)
  (public_name transition_frontier_persistent_root)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    mina_base
    mina_ledger
    transition_frontier_base

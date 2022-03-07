@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    compiler-libs
    ocaml-migrate-parsetree
    core_kernel

@@ -1,7 +1,7 @@
 (executable
  (name gen_values)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    stdio
    base.caml
@@ -14,7 +14,7 @@
    compiler-libs
    async_kernel
    ocaml-compiler-libs.common
-   ;libs
+   ;; local libraries
    pickles_types
    pickles
    crypto_params

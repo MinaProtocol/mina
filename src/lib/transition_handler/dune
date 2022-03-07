@@ -3,7 +3,7 @@
  (public_name transition_handler)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    sexplib0
    core_kernel
@@ -13,7 +13,7 @@
    base.base_internalhash_types
    async_kernel
    integers
-   ;libs
+   ;; local libraries
    error_json
    data_hash_lib
    inline_test_quiet_logs

@@ -13,14 +13,14 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-   ;opam
+   ;; opam libraries
    ppx_inline_test.config
    sexplib0
    result
    core_kernel
    base.caml
    bin_prot.shape
-   ;libs
+   ;; local libraries
    snarky.backendless
    tuple_lib
 ))

@@ -3,13 +3,13 @@
  (public_name mina_caqti)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    async
    caqti-async
    caqti
    async_kernel
-   ;libs
+   ;; local libraries
    mina_base
    )
  (preprocess

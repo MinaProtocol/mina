@@ -3,10 +3,10 @@
  (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    core_kernel
-   ;libs
+   ;; local libraries
    genesis_constants
    mina_state
    coda_genesis_proof

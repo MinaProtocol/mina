@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;opam
+   ;; opam libraries
    core
    async
    core_kernel
@@ -14,7 +14,7 @@
    core_kernel.pairing_heap
    async_unix
    base.base_internalhash_types
-   ;libs
+   ;; local libraries
    logger
    pipe_lib
    inline_test_quiet_logs

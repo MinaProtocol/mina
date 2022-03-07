@@ -3,7 +3,7 @@
  (public_name memory_stats)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    async_unix
    core_kernel
    jemalloc
@@ -11,7 +11,7 @@
    core
    async
    base
-   ;libs
+   ;; local libraries
    logger)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_version ppx_let))

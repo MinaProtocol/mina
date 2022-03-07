@@ -14,7 +14,7 @@
    ppx_deriving.std
    h_list.ppx))
  (libraries
-   ;opam
+   ;; opam libraries
    result
    async_kernel
    sexplib0
@@ -26,7 +26,7 @@
    ppx_inline_test.config
    bignum.bigint
    base.base_internalhash_types
-   ;libs
+   ;; local libraries
    tuple_lib
    snarky.backendless
    key_cache

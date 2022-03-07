@@ -3,7 +3,7 @@
  (public_name blockchain_snark)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    base.md5
    base.caml
    core_kernel
@@ -12,7 +12,7 @@
    async
    bin_prot.shape
    async_kernel
-   ;libs
+   ;; local libraries
    pickles.backend
    allocation_functor
    crypto_params

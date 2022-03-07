@@ -2,9 +2,9 @@
  (name full_frontier)
  (public_name transition_frontier_full_frontier)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
-   ;libs
+   ;; local libraries
    transition_frontier_base
    transition_frontier_persistent_root
    consensus

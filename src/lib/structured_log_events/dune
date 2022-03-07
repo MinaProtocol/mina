@@ -4,11 +4,11 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    yojson
    sexplib0
-   ;libs
+   ;; local libraries
    interpolator_lib
    )
  (preprocess

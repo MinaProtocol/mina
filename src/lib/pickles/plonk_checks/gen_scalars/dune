@@ -1,11 +1,11 @@
 (executable
  (name gen_scalars)
  (libraries
-   ;opam
+   ;; opam libraries
    core_kernel
    stdio
    base
-   ;libs
+   ;; local libraries
    kimchi
 )
  (instrumentation (backend bisect_ppx))

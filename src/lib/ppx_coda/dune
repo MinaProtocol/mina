@@ -3,7 +3,7 @@
  (public_name ppx_coda)
  (kind ppx_deriver)
  (libraries
-   ;opam
+   ;; opam libraries
    ocaml-migrate-parsetree
    ppxlib.ast
    ppx_deriving.api
@@ -13,7 +13,7 @@
    core_kernel
    base
    base.caml
-   ;libs
+   ;; local libraries
    ppx_representatives
    ppx_register_event
    ppx_to_enum
