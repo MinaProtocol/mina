@@ -110,8 +110,7 @@ module Json_layout = struct
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
@@ -126,8 +125,7 @@ module Json_layout = struct
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
-          [| "stake"
-           ; "edit_state"
+          [| "edit_state"
            ; "send"
            ; "receive"
            ; "set_delegate"
