@@ -2,7 +2,28 @@
  (name filtered_external_transition)
  (public_name filtered_external_transition)
  (library_flags -linkall)
- (libraries core_kernel mina_base mina_state mina_transition)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   bin_prot.shape
+   base.caml
+   base
+   core
+   ;; local libraries
+   staged_ledger_diff
+   staged_ledger
+   transaction_snark_work
+   consensus
+   data_hash_lib
+   currency
+   with_hash
+   mina_base
+   mina_state
+   mina_transition
+   signature_lib
+   mina_base.import
+   mina_numbers
+ )
  (preprocess
   (pps ppx_coda ppx_version ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

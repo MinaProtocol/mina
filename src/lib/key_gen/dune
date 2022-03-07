@@ -3,7 +3,7 @@
  (public_name key_gen)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (libraries core_kernel signature_lib))
+ (libraries core_kernel signature_lib base))
 
 (rule
  (targets sample_keypairs.ml sample_keypairs.json)

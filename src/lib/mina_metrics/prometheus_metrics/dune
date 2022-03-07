@@ -1,7 +1,27 @@
 (library
  (public_name mina_metrics.prometheus)
  (name mina_metrics_prometheus)
- (libraries async cohttp cohttp-async logger jemalloc prometheus)
+ (libraries
+   ;; opam libraries
+   conduit-async
+   ppx_hash.runtime-lib
+   fmt
+   re
+   base
+   core
+   async_kernel
+   core_kernel
+   prometheus
+   jemalloc
+   cohttp-async
+   cohttp
+   async
+   base.base_internalhash_types
+   uri
+   async_unix
+   ;; local libraries
+   logger
+ )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_let ppx_version ppx_pipebang ppx_custom_printf ppx_optcomp))

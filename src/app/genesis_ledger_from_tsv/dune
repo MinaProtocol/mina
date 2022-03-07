@@ -2,7 +2,7 @@
  (package genesis_ledger_from_tsv)
  (name genesis_ledger_from_tsv)
  (public_name genesis_ledger_from_tsv)
- (libraries async core_kernel logger consensus currency genesis_constants mina_numbers runtime_config signature_lib)
+ (libraries async core_kernel logger consensus currency genesis_constants mina_numbers runtime_config signature_lib base base.caml)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_sexp_conv ppx_let ppx_hash ppx_compare )))

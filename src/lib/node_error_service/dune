@@ -1,0 +1,39 @@
+(library
+  (name node_error_service)
+  (public_name node_error_service)
+  (inline_tests)
+  (libraries
+    ;; opam libraries
+    core.uuid
+    uri
+    cohttp-async
+    async
+    core_kernel
+    core
+    cohttp
+    async_kernel
+    core_kernel.uuid
+    integers
+    ;; local libraries
+    error_json
+    transition_frontier_base
+    rfc3339_time
+    gossip_net
+    signature_lib
+    network_peer
+    mina_base
+    mina_networking
+    mina_incremental
+    sync_status
+    pipe_lib
+    transition_frontier
+    logger
+    mina_lib
+    node_addrs_and_ports
+    mina_version
+    participating_state
+    mina_metrics
+   )
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_coda ppx_version))
+  (instrumentation (backend bisect_ppx))
+  (synopsis "Node error service library for collection error report from nodes"))

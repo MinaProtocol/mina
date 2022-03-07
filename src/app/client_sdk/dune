@@ -4,21 +4,36 @@
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries
-  core_kernel
-  snark_params_nonconsensus
-  rosetta_lib_nonconsensus
-  mina_base_nonconsensus
-  data_hash_lib_nonconsensus
-  random_oracle_nonconsensus
-  signature_lib_nonconsensus
-  string_sign_nonconsensus
-  zarith_stubs_js
-  integers
-  integers_stubs_js
-  js_of_ocaml
-  digestif.ocaml
-  sponge
-  hex_nonconsensus)
+   ;; opam libraries
+   js_of_ocaml
+   integers
+   core_kernel
+   zarith_stubs_js
+   digestif.ocaml
+   base
+   yojson
+   ppx_deriving.runtime
+   result
+   ppx_deriving_yojson.runtime
+   ;; local libraries
+   sponge
+   integers_stubs_js
+   mina_numbers_nonconsensus
+   rosetta_lib_nonconsensus
+   data_hash_lib_nonconsensus
+   signature_lib_nonconsensus
+   string_sign_nonconsensus
+   random_oracle_nonconsensus
+   mina_base_nonconsensus
+   mina_base_nonconsensus.import
+   snark_params_nonconsensus
+   hex_nonconsensus
+   mina_signature_kind
+   random_oracle_input
+   snarkette
+   currency_nonconsensus
+   rosetta_coding_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))

@@ -116,11 +116,11 @@ func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
 
 func ClearRootDownloadState(bs BitswapState, root root) {
 	rootStates := bs.RootDownloadStates()
-	nodeParams := bs.NodeDownloadParams()
 	state, has := rootStates[root]
 	if !has {
 		return
 	}
+	nodeParams := bs.NodeDownloadParams()
 	delete(rootStates, root)
 	state.allDescendants.ForEach(func(c cid.Cid) error {
 		np, hasNp := nodeParams[c]
@@ -173,9 +173,7 @@ func (bs *BitswapCtx) NewSession(downloadTimeout time.Duration) (BlockRequester,
 func (bs *BitswapCtx) RegisterDeadlineTracker(root_ root, downloadTimeout time.Duration) {
 	go func() {
 		<-time.After(downloadTimeout)
-		if _, has := bs.rootDownloadStates[root_]; has {
-			bs.deadlineChan <- root_
-		}
+		bs.deadlineChan <- root_
 	}()
 }
 func (bs *BitswapCtx) GetStatus(key [32]byte) (codanet.RootBlockStatus, error) {

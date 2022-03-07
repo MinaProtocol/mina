@@ -182,8 +182,7 @@ module Snapp_permissions = struct
     Caqti_type.enum ~encode ~decode "snapp_auth_required_type"
 
   type t =
-    { stake : bool
-    ; edit_state : Permissions.Auth_required.t
+    { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
@@ -199,27 +198,24 @@ module Snapp_permissions = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ bool
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ]
+      [ auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ]
 
   let table_name = "snapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
     let value =
-      { stake = perms.stake
-      ; edit_state = perms.edit_state
+      { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
       ; set_delegate = perms.set_delegate
@@ -2664,7 +2660,8 @@ module Block = struct
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
-      ({ data = t; hash } : (External_transition.t, State_hash.t) With_hash.t) =
+      ({ data = t; hash = { state_hash = hash; _ } } :
+        External_transition.t State_hash.With_state_hashes.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:(External_transition.protocol_state t)
       ~staged_ledger_diff:(External_transition.staged_ledger_diff t)
@@ -2674,7 +2671,7 @@ module Block = struct
       (t : External_transition.Precomputed_block.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
-      ~hash:(Protocol_state.hash t.protocol_state)
+      ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
@@ -3173,6 +3170,9 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
+          [%log info] "Attempting to add block data for $state_hash"
+            ~metadata:
+              [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
@@ -3211,8 +3211,9 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hash)
+      ( block.External_transition.Precomputed_block.protocol_state
+      |> Protocol_state.hashes )
+        .state_hash)
 
 let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
@@ -3222,14 +3223,16 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added { block; _ }) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
-        let hash block = With_hash.hash block in
+        let hash = State_hash.With_state_hashes.state_hash in
         match%map
           add_block_aux ~logger ~delete_older_than ~hash ~add_block pool block
         with
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                [ ( "block"
+                  , State_hash.With_state_hashes.state_hash block
+                    |> State_hash.to_yojson )
                 ; ("error", `String (Caqti_error.show e))
                 ]
               "Failed to archive block: $block, see $error"
@@ -3398,8 +3401,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 "Precomputed block $block could not be archived: $error"
                 ~metadata:
                   [ ( "block"
-                    , Protocol_state.hash precomputed_block.protocol_state
-                      |> State_hash.to_yojson )
+                    , (Protocol_state.hashes precomputed_block.protocol_state)
+                        .state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
           | Ok () ->

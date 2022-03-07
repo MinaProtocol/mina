@@ -2700,7 +2700,7 @@
             },
             {
               "name": "cliffAmount",
-              "description": "Cliff amoount, as a string",
+              "description": "Cliff amount, as a string",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2778,7 +2778,7 @@
             },
             {
               "name": "cliffAmount",
-              "description": "Cliff amoount, as a string",
+              "description": "Cliff amount, as a string",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3054,22 +3054,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "stake",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -3222,20 +3206,6 @@
                 "ofType": {
                   "kind": "ENUM",
                   "name": "AuthRequired",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "stake",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
                   "ofType": null
                 }
               },
@@ -9417,22 +9387,6 @@
           "name": "AccountPermissions",
           "description": null,
           "fields": [
-            {
-              "name": "stake",
-              "description": "Permission to stake",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
             {
               "name": "editState",
               "description": "Authorization required to edit snapp state",
