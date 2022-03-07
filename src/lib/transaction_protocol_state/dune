@@ -16,7 +16,6 @@
    snark_params
    snarky.backendless
    mina_state
-   mina_base
    sgn
    )
  (preprocess

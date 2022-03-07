@@ -25,7 +25,6 @@
    sgn
    currency
    child_processes
-   precomputed_values
    memory_stats
    blockchain_snark
    mina_transition

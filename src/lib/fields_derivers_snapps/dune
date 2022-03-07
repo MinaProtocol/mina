@@ -20,7 +20,6 @@
    currency
    snark_params
    pickles
-   mina_numbers
    fields_derivers
    unsigned_extended
    with_hash

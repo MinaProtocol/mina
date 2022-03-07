@@ -22,7 +22,6 @@
    mina_base
    mina_intf
    transition_frontier
-   merkle_address
    best_tip_prover
    mina_transition
    network_peer

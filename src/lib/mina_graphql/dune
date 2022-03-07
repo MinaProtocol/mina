@@ -13,8 +13,6 @@
    graphql-async
    core
    async
-   cohttp
-   graphql-cohttp
    core_kernel
    async_unix
    result
@@ -22,6 +20,7 @@
    ppx_deriving_yojson.runtime
    graphql_parser
    ;; local libraries
+   network_pool
    kimchi_backend.pasta
    mina_base.util
    mina_ledger
@@ -29,14 +28,8 @@
    mina_incremental
    coda_genesis_ledger
    work_selector
-   ledger_catchup
-   proof_carrying_data
-   o1trace
-   interruptible
    error_json
-   transition_frontier_persistent_root
    mina_networking
-   transition_frontier_controller
    consensus.vrf
    trust_system
    with_hash
@@ -78,13 +71,6 @@
    mina_net2
    snark_params
    rosetta_lib
-   bootstrap_controller
-   transition_frontier_persistent_frontier
-   mina_metrics
-   truth
-   transition_handler
-   best_tip_prover
-   network_pool
    random_oracle
    coda_genesis_proof
    mina_version

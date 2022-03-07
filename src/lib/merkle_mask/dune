@@ -18,10 +18,8 @@
    core.uuid
    stdio
    ;; local libraries
-   immutable_array
    debug_assert
    merkle_ledger
-   merkle_address
    visualization
    non_empty_list
    direction

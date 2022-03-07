@@ -20,8 +20,5 @@
    kimchi_backend.common
    run_in_thread
    kimchi
-   hex
-   key_cache
-   snarky.backendless
    snarkette
 ))

@@ -53,10 +53,8 @@
    mina_networking
    consensus
    o1trace
-   debug_assert
    unix_timestamp
    filtered_external_transition
-   mina_intf
    mina_version
    pipe_lib
    user_command_input
@@ -65,11 +63,9 @@
    secrets
    work_selector
    mina_ledger
-   otp_lib
    protocol_version
    snark_worker
    participating_state
-   transaction_inclusion_status
    cli_lib
    signature_lib
    mina_base
