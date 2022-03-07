@@ -20,7 +20,11 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let graphql_creator = ref (fun _ -> failwith "unimplemented") in
 
     let to_json = ref (fun _ -> failwith "unimplemented") in
-    let of_json = ref (fun _ -> failwith "unimplemented") in
+    let of_json =
+      ref (fun _ ->
+          Printf.printf "OF_JSON DERIVERS UNIMPLEMENTED\n" ;
+          failwith "unimplemented")
+    in
     let to_json_accumulator = ref [] in
     let of_json_creator = ref String.Map.empty in
 
@@ -44,7 +48,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
       method to_json = to_json
 
-      method of_json = of_json
+      method of_json =
+        Printf.printf "OBJECT OF_JSON\n" ;
+        of_json
 
       method to_json_accumulator = to_json_accumulator
 
@@ -203,7 +209,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
-  let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
+  let to_json obj x =
+    Printf.printf "TO_JSON\n" ;
+    !(obj#to_json) @@ !(obj#contramap) x
 
   let of_json obj x = !(obj#map) @@ !(obj#of_json) x
 

@@ -832,6 +832,7 @@ module Protocol_state = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
+      Printf.printf "EPOCH DATA DERIVER\n" ;
       let ledger obj' =
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
@@ -999,6 +1000,7 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    Printf.printf "SNAPP PROTOCOL DERIVER\n" ;
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
       ~snarked_next_available_token:!.Numeric.Derivers.token_id

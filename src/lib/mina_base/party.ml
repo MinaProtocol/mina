@@ -1111,6 +1111,7 @@ module Fee_payer = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    Printf.printf "FEE_PAYER_DERIVER\n" ;
     Fields.make_creator obj
       ~data:!.Predicated.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
@@ -1183,6 +1184,7 @@ let increment_nonce (t : t) : bool = t.data.body.increment_nonce
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
+  Printf.printf "PARTY DERIVER\n" ;
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
   |> finish ~name:"SnappParty" ~doc:"A party to a snapp transaction"

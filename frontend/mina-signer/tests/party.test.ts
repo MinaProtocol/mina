@@ -220,14 +220,16 @@ let PARTY = `{
 }`
 
 describe("Party", () => {
-    let client: Client;
-    beforeAll(async () => {
-      client = new Client({ network: "mainnet" });
-    });
-    it("tests party", () => {
-      const party = client.signTransaction(PARTY)
-      console.log("DEBUG", party)
-      expect(true).toBeTruthy();
-    });
+  let client: Client;
+
+  beforeAll(async () => {
+    client = new Client({ network: "mainnet" });
+  });
+
+  it("tests party", () => {
+    const party = client.signTransaction(PARTY)
+    console.log("DEBUG", party)
+    expect(true).toBeTruthy();
+  });
 });
 
