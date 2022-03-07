@@ -91,6 +91,7 @@
    coda_runtime_config
    mina_base.import
    pickles.backend
-   pickles_types)
+   pickles_types
+   graphql)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))
