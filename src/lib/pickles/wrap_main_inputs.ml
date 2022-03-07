@@ -70,8 +70,7 @@ module Sponge = struct
 end
 
 let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S)
-  in
+  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
   T.test Tock_field_sponge.params
 
 module Input_domain = struct
@@ -82,7 +81,7 @@ module Input_domain = struct
             (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
                (Tick.Keypair.load_urs ()) domain_size i)
               .unshifted.(0)
-            |> Or_infinity.finite_exn ) )
+            |> Or_infinity.finite_exn))
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
@@ -161,7 +160,7 @@ module Inner_curve = struct
   include (
     T :
       module type of T
-      with module Scaling_precomputation := T.Scaling_precomputation )
+        with module Scaling_precomputation := T.Scaling_precomputation )
 
   module Scaling_precomputation = T.Scaling_precomputation
 
@@ -169,9 +168,9 @@ module Inner_curve = struct
 
   let scale t bs =
     with_label __LOC__ (fun () ->
-        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
+        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs))
 
-  let to_field_elements (x, y) = [x; y]
+  let to_field_elements (x, y) = [ x; y ]
 
   let assert_equal (x1, y1) (x2, y2) =
     Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2

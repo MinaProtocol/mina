@@ -1,11 +1,9 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
 (* TODO: temporary hack *)
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 [%%versioned
 module Stable = struct
@@ -14,10 +12,11 @@ module Stable = struct
       | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
       | Signature of Signature.Stable.V1.t
       | Both of
-          { signature: Signature.Stable.V1.t
-          ; proof: Pickles.Side_loaded.Proof.Stable.V1.t }
+          { signature : Signature.Stable.V1.t
+          ; proof : Pickles.Side_loaded.Proof.Stable.V1.t
+          }
       | None_given
-    [@@deriving sexp, eq, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end
@@ -31,9 +30,9 @@ module Stable = struct
     type t =
       | Proof of unit
       | Signature of Signature.Stable.V1.t
-      | Both of {signature: Signature.Stable.V1.t; proof: unit}
+      | Both of { signature : Signature.Stable.V1.t; proof : unit }
       | None_given
-    [@@deriving sexp, eq, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end

@@ -17,7 +17,7 @@ module Fee : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash, yojson, eq]
+      type t [@@deriving sexp, compare, hash, yojson, equal]
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t
@@ -47,21 +47,22 @@ module Fee : sig
   module Checked : sig
     include
       Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
-       and type value := t
+        with type var := var
+         and type signed_var := Signed.var
+         and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
 
   [%%endif]
 end
+[@@warning "-32"]
 
 module Amount : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash, eq, yojson]
+      type t [@@deriving sexp, compare, hash, equal, yojson]
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t
@@ -98,9 +99,9 @@ module Amount : sig
   module Checked : sig
     include
       Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
-       and type value := t
+        with type var := var
+         and type signed_var := Signed.var
+         and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -113,12 +114,13 @@ module Amount : sig
 
   [%%endif]
 end
+[@@warning "-32"]
 
 module Balance : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash, yojson, eq]
+      type t [@@deriving sexp, compare, hash, yojson, equal]
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t
@@ -149,15 +151,15 @@ module Balance : sig
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
 
     val sub_amount_flagged :
-      var -> Amount.var -> (var * [`Underflow of Boolean.var], _) Checked.t
+      var -> Amount.var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
 
     val add_amount_flagged :
-      var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
+      var -> Amount.var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val add_signed_amount_flagged :
          var
       -> Amount.Signed.var
-      -> (var * [`Overflow of Boolean.var], _) Checked.t
+      -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
@@ -180,3 +182,4 @@ module Balance : sig
 
   [%%endif]
 end
+[@@warning "-32"]

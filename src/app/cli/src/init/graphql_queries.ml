@@ -116,18 +116,6 @@ query pendingSnarkWork {
   }
 |}]
 
-module Set_staking =
-[%graphql
-{|
-mutation ($public_key: PublicKey) {
-  setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
-    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
-    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
-    }
-  }
-|}]
-
 module Set_coinbase_receiver =
 [%graphql
 {|
@@ -363,5 +351,23 @@ mutation ($transaction: RosettaTransaction!) {
       id
     }
   }
+}
+|}]
+
+module Import_account =
+[%graphql
+{|
+mutation ($path: String!, $password: String!) {
+  importAccount (path: $path, password: $password) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    already_imported: alreadyImported
+    success
+  }
+}
+|}]
+
+module Runtime_config = [%graphql {|
+query {
+  runtimeConfig
 }
 |}]

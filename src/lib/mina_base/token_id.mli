@@ -1,15 +1,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
 
-[%%else]
+[%%ifndef consensus_mechanism]
 
-open Snark_params_nonconsensus
 open Import
 
 [%%endif]
@@ -17,7 +13,7 @@ open Import
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp, eq, hash, compare, yojson]
+    type t [@@deriving sexp, equal, hash, compare, yojson]
   end
 end]
 

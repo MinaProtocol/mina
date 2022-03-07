@@ -45,7 +45,7 @@ let log ~terms x =
   let open Sequence in
   unfold ~init:(a, 1) ~f:(fun (ai, i) ->
       let t = ai / of_int i in
-      Some ((if Int.(i mod 2 = 0) then neg t else t), (ai * a, Int.(i + 1))) )
+      Some ((if Int.(i mod 2 = 0) then neg t else t), (ai * a, Int.(i + 1))))
   |> Fn.flip take terms |> fold ~init:zero ~f:( + )
 
 (* This computes the number of terms of a taylor series one needs to compute
@@ -62,10 +62,9 @@ let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
   least ~such_that:(fun n ->
       let nn = B.of_int n in
       let d = derivative_magnitude_upper_bound Int.(n + 1) in
-      Bignum.(of_bigint (factorial nn) / d > lower_bound) )
+      Bignum.(of_bigint (factorial nn) / d > lower_bound))
 
-let ceil_log2 n =
-  least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
+let ceil_log2 n = least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
 
 let binary_expansion x =
   assert (Bignum.(x < one)) ;
@@ -75,10 +74,10 @@ let binary_expansion x =
     ~f:(fun (rem, pt) ->
       let b = Bignum.(rem >= pt) in
       let rem = if b then Bignum.(rem - pt) else rem in
-      Some (b, Bignum.(rem, pt / two)) )
+      Some (b, Bignum.(rem, pt / two)))
 
 module Coeff_integer_part = struct
-  type t = [`Zero | `One] [@@deriving sexp]
+  type t = [ `Zero | `One ] [@@deriving sexp]
 
   let of_int_exn : int -> t = function
     | 0 ->
@@ -93,12 +92,13 @@ end
 
 module Params = struct
   type t =
-    { total_precision: int
-    ; per_term_precision: int
-    ; terms_needed: int
+    { total_precision : int
+    ; per_term_precision : int
+    ; terms_needed : int
           (* As a special case, we permite the x^1 coefficient to have absolute value < 2 (rather than < 1) *)
-    ; linear_term_integer_part: Coeff_integer_part.t
-    ; coefficients: ([`Neg | `Pos] * B.t) array }
+    ; linear_term_integer_part : Coeff_integer_part.t
+    ; coefficients : ([ `Neg | `Pos ] * B.t) array
+    }
 end
 
 (* This module constructs a snarky function for computing the function
@@ -109,7 +109,7 @@ end
 *)
 module Exp = struct
   (* An upper bound on the magnitude nth derivative of base^x in [0, 1) is
-   |log(base)|^n *)
+     |log(base)|^n *)
 
   let derivative_magnitude_upper_bound n ~log_base = Bignum.(log_base ** n)
 
@@ -120,16 +120,16 @@ module Exp = struct
       ~bits_of_precision
 
   type bit_params =
-    {total_precision: int; terms_needed: int; per_term_precision: int}
+    { total_precision : int; terms_needed : int; per_term_precision : int }
 
   (* This figures out how many bits we can hope to calculate given our field
-   size. This is because computing the terms
+     size. This is because computing the terms
 
-   x^k
+     x^k
 
-   in the taylor series will start to overflow when k is too large. E.g.,
-   if our field has 298 bits and x has 32 bits, then we cannot easily compute
-   x^10, since representing it exactly requires 320 bits. *)
+     in the taylor series will start to overflow when k is too large. E.g.,
+     if our field has 298 bits and x has 32 bits, then we cannot easily compute
+     x^10, since representing it exactly requires 320 bits. *)
   let bit_params ~field_size_in_bits ~log_base =
     let using_linear_term_whole_part = true in
     greatest ~such_that:(fun k ->
@@ -141,8 +141,8 @@ module Exp = struct
         in
         let per_term_precision = ceil_log2 (B.of_int n) + k in
         if (n * per_term_precision) + per_term_precision < field_size_in_bits
-        then Some {per_term_precision; terms_needed= n; total_precision= k}
-        else None )
+        then Some { per_term_precision; terms_needed = n; total_precision = k }
+        else None)
 
   let params ~field_size_in_bits ~base =
     let abs_log_base =
@@ -150,9 +150,10 @@ module Exp = struct
       assert (Bignum.(log_base < zero)) ;
       Bignum.abs log_base
     in
-    let {total_precision; terms_needed; per_term_precision} =
+    let { total_precision; terms_needed; per_term_precision } =
       bit_params ~field_size_in_bits ~log_base:abs_log_base
     in
+
     (* Precompute the coefficeints
 
        log(base)^i / i !
@@ -180,7 +181,7 @@ module Exp = struct
                 c )
             in
             ( (if i mod 2 = 0 then `Neg else `Pos)
-            , c_frac |> bignum_as_fixed_point per_term_precision ) )
+            , c_frac |> bignum_as_fixed_point per_term_precision ))
       in
       (coefficients, !linear_term_integer_part)
     in
@@ -188,7 +189,8 @@ module Exp = struct
     ; terms_needed
     ; per_term_precision
     ; coefficients
-    ; linear_term_integer_part }
+    ; linear_term_integer_part
+    }
 
   module Unchecked = struct
     let one_minus_exp (params : Params.t) x =
@@ -200,7 +202,7 @@ module Exp = struct
           let x_i = Bignum.(x_i * x) in
           let c = Bignum.(of_bigint c / denom) in
           let c = match sgn with `Pos -> c | `Neg -> Bignum.neg c in
-          (Bignum.(acc + (x_i * c)), x_i) )
+          (Bignum.(acc + (x_i * c)), x_i))
       |> fst
       |> fun acc ->
       Bignum.(
@@ -217,10 +219,10 @@ module Exp = struct
           let term = Floating_point.(mul ~m ci xi) in
           match sum with
           | None ->
-              assert (sgn = `Pos) ;
+              assert ([%equal: [ `Pos | `Neg ]] sgn `Pos) ;
               Some term
           | Some s ->
-              Some (Floating_point.add_signed ~m s (sgn, term)) )
+              Some (Floating_point.add_signed ~m s (sgn, term)))
       |> Option.value_exn
     in
     match linear_term_integer_part with
@@ -230,17 +232,17 @@ module Exp = struct
         Floating_point.add ~m acc x_powers.(0)
 
   let one_minus_exp ~m
-      { Params.total_precision= _
+      { Params.total_precision = _
       ; terms_needed
       ; per_term_precision
       ; linear_term_integer_part
-      ; coefficients } x =
+      ; coefficients
+      } x =
     let powers = Floating_point.powers ~m x terms_needed in
     let coefficients =
       Array.map coefficients ~f:(fun (sgn, c) ->
           ( sgn
-          , Floating_point.constant ~m ~value:c ~precision:per_term_precision
-          ) )
+          , Floating_point.constant ~m ~value:c ~precision:per_term_precision ))
     in
     taylor_sum ~m powers coefficients linear_term_integer_part
 end

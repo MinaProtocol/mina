@@ -16,7 +16,8 @@ let dirs_trustlist =
   ; "tablecloth"
   ; "zexe"
   ; "marlin"
-  ; "snarky" ]
+  ; "snarky"
+  ; "_opam" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
@@ -55,7 +56,7 @@ let main dry_run check path =
           let prog, args = ("ocamlformat", ["--doc-comments=before"; file]) in
           let%bind formatted = Process.run_exn ~prog ~args () in
           let%bind raw = Reader.file_contents file in
-          if formatted <> raw then (
+          if not (String.equal formatted raw) then (
             eprintf "File: %s has needs to be ocamlformat-ed\n" file ;
             exit 1 )
           else return ()

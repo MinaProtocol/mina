@@ -6,16 +6,14 @@ type t =
   , Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t )
   Plonk_verifier_index.t
 
-external create :
-  Marlin_plonk_bindings_pasta_fq_index.t -> t
+external create : Marlin_plonk_bindings_pasta_fq_index.t -> t
   = "caml_pasta_fq_plonk_verifier_index_create"
 
 external read :
   ?offset:int -> Marlin_plonk_bindings_pasta_fq_urs.t -> string -> t
   = "caml_pasta_fq_plonk_verifier_index_read"
 
-external write :
-  ?append:bool -> t -> string -> unit
+external write : ?append:bool -> t -> string -> unit
   = "caml_pasta_fq_plonk_verifier_index_write"
 
 external shifts :

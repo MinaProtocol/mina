@@ -3,11 +3,10 @@
  (public_name cache_dir)
  (libraries
    ; opam deps
-   async
-   core
+   async_kernel
    ; libs
-   key_cache
-   blake2
-   logger)
+   key_cache)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_let ppx_custom_printf)))
+ (preprocess (pps ppx_version))
+ (virtual_modules cache_dir)
+ (default_implementation cache_dir.native))

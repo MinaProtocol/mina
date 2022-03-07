@@ -26,11 +26,7 @@ module Memoized = struct
         raise e
 
   let create ~f arg =
-    try Result.Ok (f arg) with
-    | Sys.Break as e ->
-        raise e
-    | e ->
-        Result.Error e
+    try Result.Ok (f arg) with Sys.Break as e -> raise e | e -> Result.Error e
 end
 
 module type Store = sig
@@ -82,10 +78,11 @@ struct
   type 'a with_init_args = 'a Store.with_init_args Strat.with_init_args
 
   type ('k, 'v) t =
-    { destruct: ('v -> unit) option
+    { destruct : ('v -> unit) option
           (** Function to be called on removal of values from the store *)
-    ; strat: 'k Strat.t
-    ; store: ('k, 'v) Store.t  (** The actual key value store*) }
+    ; strat : 'k Strat.t
+    ; store : ('k, 'v) Store.t  (** The actual key value store*)
+    }
 
   type ('a, 'b) memo = ('a, ('b, exn) Result.t) t
 
@@ -100,7 +97,7 @@ struct
 
   let touch_key cache key =
     List.iter (Strat.touch cache.strat key) ~f:(fun k ->
-        clear_from_store cache k )
+        clear_from_store cache k)
 
   let find cache k =
     let res = Store.find cache.store k in
@@ -115,17 +112,17 @@ struct
     Option.iter (Store.find cache.store key) ~f:(fun v ->
         Strat.remove cache.strat key ;
         Option.call ~f:cache.destruct v ;
-        Store.remove cache.store key )
+        Store.remove cache.store key)
 
   let clear cache =
     Option.iter cache.destruct ~f:(fun destruct ->
-        List.iter (Store.data cache.store) ~f:destruct ) ;
+        List.iter (Store.data cache.store) ~f:destruct) ;
     Strat.clear cache.strat ;
     Store.clear cache.store
 
   let create ~destruct =
     Strat.cps_create ~f:(fun strat ->
-        Store.cps_create ~f:(fun store -> {strat; destruct; store}) )
+        Store.cps_create ~f:(fun store -> { strat; destruct; store }))
 
   let call_with_cache ~cache f arg =
     match find cache arg with
@@ -141,20 +138,21 @@ struct
     Strat.cps_create ~f:(fun strat ->
         Store.cps_create ~f:(fun store ->
             let destruct = Option.map destruct ~f:(fun f -> Result.iter ~f) in
-            let cache = {strat; destruct; store} in
+            let cache = { strat; destruct; store } in
             let memd_f arg = call_with_cache ~cache f arg in
-            (cache, memd_f) ) )
+            (cache, memd_f)))
 end
 
 module Strategy = struct
   module Lru = struct
     type 'a t =
       { (* sorted in order of descending recency *)
-        list: 'a Doubly_linked.t
+        list : 'a Doubly_linked.t
       ; (* allows fast lookup in the list above *)
-        table: ('a, 'a Doubly_linked.Elt.t) Hashtbl.t
-      ; mutable maxsize: int
-      ; mutable size: int }
+        table : ('a, 'a Doubly_linked.Elt.t) Hashtbl.t
+      ; mutable maxsize : int
+      ; mutable size : int
+      }
 
     type 'a with_init_args = int -> 'a
 
@@ -185,13 +183,14 @@ module Strategy = struct
     let remove lru x =
       Option.iter (Hashtbl.find lru.table x) ~f:(fun el ->
           Doubly_linked.remove lru.list el ;
-          Hashtbl.remove lru.table x )
+          Hashtbl.remove lru.table x)
 
     let create maxsize =
-      { list= Doubly_linked.create ()
-      ; table= Hashtbl.Poly.create () ~size:100
+      { list = Doubly_linked.create ()
+      ; table = Hashtbl.Poly.create () ~size:100
       ; maxsize
-      ; size= 0 }
+      ; size = 0
+      }
 
     let cps_create ~f maxsize = f (create maxsize)
 
@@ -234,7 +233,7 @@ let keep_one ?(destruct = ignore) f =
   () ;
   fun x ->
     match !v with
-    | Some (x', y) when x' = x ->
+    | Some (x', y) when Poly.( = ) x' x ->
         Memoized.return y
     | _ ->
         Option.iter !v ~f:(fun (_, y) -> Result.iter ~f:destruct y) ;

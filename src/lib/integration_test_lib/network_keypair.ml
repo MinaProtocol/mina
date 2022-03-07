@@ -2,10 +2,11 @@ open Signature_lib
 open Core_kernel
 
 type t =
-  { keypair: Keypair.t
-  ; secret_name: string
-  ; public_key_file: string
-  ; private_key_file: string }
+  { keypair : Keypair.t
+  ; secret_name : string
+  ; public_key_file : string
+  ; private_key_file : string
+  }
 [@@deriving to_yojson]
 
 let create_network_keypair ~keypair ~secret_name =
@@ -23,4 +24,4 @@ let create_network_keypair ~keypair ~secret_name =
     Secrets.Secret_box.encrypt ~plaintext ~password
     |> Secrets.Secret_box.to_yojson |> Yojson.Safe.to_string
   in
-  {keypair; secret_name; public_key_file; private_key_file}
+  { keypair; secret_name; public_key_file; private_key_file }

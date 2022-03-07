@@ -19,9 +19,9 @@ module Variable_base = struct
       let r = Scalar.random () in
       let h = Group.(r * base) in
       let c = Hash.(to_scalar (create h)) in
-      {h; s= Scalar.(r + (c * log))}
+      { h; s = Scalar.(r + (c * log)) }
 
-    let verify ({h; s} : t) ({base; element} : Instance.t) =
+    let verify ({ h; s } : t) ({ base; element } : Instance.t) =
       let c = Hash.(to_scalar (create h)) in
       let open Group in
       equal (s * base) (h + (c * element))
@@ -37,7 +37,7 @@ module Variable_base = struct
       type t = (Group.t, Group.t) Instance.t
     end
 
-    let verify' k ({h; s} : t) ({base; element} : Instance.t) =
+    let verify' k ({ h; s } : t) ({ base; element } : Instance.t) =
       let open Impl.Checked in
       let%bind c = Hash.(create h >>| to_scalar) in
       let open Group in

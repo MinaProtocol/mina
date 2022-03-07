@@ -1,0 +1,5 @@
+(executable
+ (name batch_txn_tool)
+ (libraries signature_lib core mina_base graphql_lib secrets core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version graphql_ppx ppx_let)))

@@ -1,18 +1,8 @@
 (* quickcheck_lib.ml *)
 
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
-
-[%%ifndef
-consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-
-[%%endif]
 
 let of_array array = Quickcheck.Generator.of_list @@ Array.to_list array
 
@@ -72,7 +62,7 @@ let gen_symm_dirichlet : int -> float list Quickcheck.Generator.t =
         (* technically this should be (0, 1] and not (0, 1) but I expect it
            doesn't matter for our purposes. *)
         let%map uniform = Float.gen_uniform_excl 0. 1. in
-        Float.log uniform )
+        Float.log uniform)
   in
   let sum = List.fold gammas ~init:0. ~f:(fun x y -> x +. y) in
   List.map gammas ~f:(fun gamma -> gamma /. sum)
@@ -85,6 +75,8 @@ module type Int_s = sig
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
+
+  val ( > ) : t -> t -> bool
 
   val of_int : int -> t
 
@@ -123,9 +115,9 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
              impossible. "
       | head :: rest ->
           (* Going through floating point land may have caused some rounding error. We
-           tack it onto the first result so that the sum of the output is equal to n. 
-         *)
-          if n > total then M.(head + (n - total)) :: rest
+             tack it onto the first result so that the sum of the output is equal to n.
+          *)
+          if M.( > ) n total then M.(head + (n - total)) :: rest
           else M.(head - (total - n)) :: rest )
 
 let gen_division = gen_division_generic (module Int)
@@ -159,14 +151,14 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
           in
           let%map forks =
             map_gens positive_fork_sizes ~f:(fun s ->
-                tuple2 node_gen (with_size ~size:(s - 1) self) )
+                tuple2 node_gen (with_size ~size:(s - 1) self))
           in
           fun parent ->
             Rose_tree.T
-              (parent, List.map forks ~f:(fun (this, f) -> f (this parent))) )
+              (parent, List.map forks ~f:(fun (this, f) -> f (this parent))))
 
-let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
-    (node_gen : ('a -> 'a) t) =
+let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)
+    =
   let%bind root = root_gen in
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
@@ -175,7 +167,7 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
       (* this case is optional but more effecient *)
       | 1 ->
           let%map this = node_gen in
-          fun parent -> [this parent]
+          fun parent -> [ this parent ]
       | n ->
           let%bind this = node_gen in
           let%bind fork_count = geometric ~p 1 >>| Int.max n in
@@ -185,7 +177,7 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
           in
           fun parent ->
             let x = this parent in
-            x :: List.bind forks ~f:(fun f -> f x) )
+            x :: List.bind forks ~f:(fun f -> f x))
 
 let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
   let%bind root = root_gen in
@@ -196,7 +188,7 @@ let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
       | n ->
           let%bind this = node_gen in
           let%map f = with_size ~size:(n - 1) self in
-          fun parent -> parent :: f (this parent) )
+          fun parent -> parent :: f (this parent))
 
 let%test_module "Quickcheck lib tests" =
   ( module struct
@@ -222,7 +214,7 @@ let%test_module "Quickcheck lib tests" =
                     else
                       Or_error.errorf
                         !"elements do not add up correctly %d %d"
-                        elem next_elem )
+                        elem next_elem)
               in
-              assert (Result.is_ok result) )
+              assert (Result.is_ok result))
   end )

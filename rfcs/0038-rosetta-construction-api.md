@@ -149,21 +149,22 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
+Compressed public keys are accepted of the following form:
+
+Field elements are expected to be backed by a 32-byte array where the highest bits of the field are stored in arr[31].
+
+Presented is a hex encoded 32-byte array where the highest bit of arr[31] is the `is_odd` parity bit.
 
 ```
-|----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
+|----- pk : Fq.t (32 bytes) ------{is_odd}--|
+
 ```
 
 Example:
 
-`(123123, 234234)`
+The encoding `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398390`
 
-is encoded as the string:
-
-`000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
-
-(abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
+Decodes to the field represented by the number `fad1d3e31aede102793fb2cce62b4f1e71a214c94ce18ad5756eba67ef398310`. That's the same as the encoding, except that the 9 representing the high nybble of the final byte is replaced by 1, by zeroing the high bit. Because the high bit was set, is_odd is true.
 
 **Name**
 
@@ -272,15 +273,23 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we want to make it easy for alternate signers to be created (eg. the ledger), we'll want this encoding to be some faithful representation of the bytes upon which the signature operation acts.
 
-Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input with a custom protocol as defined below and send that byte-buffer as hex-encoded ascii.
+Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input in two ways as defined below and send that byte-buffer as hex-encoded ascii.
+
 
 ```
-// Serialization schema for Random oracle input
+// Serialization schema for Random oracle input (1)
 
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t above)
+yy yy ...    #
+             # Field elements are represented by laying out their bits from high
+             # to low (adding a padding zero at the highest bit in the front)
+             # and then grouping by 8 and converting to bytes:
+             #
+             #     (always zero) Bit254 Bit253 Bit252 ... Bit2 Bit1 Bit0
+             #     |----groups of 8---|--groups of 8---|
+             #
              #
 00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
@@ -290,16 +299,41 @@ A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte wit
 // Note: Edited on 8/18 to include 4-byte length of bits in the bitstring to remove any ambiguity between the zero-padding and true zeros in the bitstring
 ```
 
-Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
+```
+// Serialization schema for Random oracle input (2)
+// This is denoted as "signerInput" in the output
+//
+// The prefix and suffix can be used by a signer more easily
+
+SignerInput (JSON):
+{
+  prefix: [field],
+  suffix: [field]
+}
+
+// where the fields are encoded as strings like above
+// example:
+
+{
+  prefix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ],
+  suffix: [ "000000000000000000000000000000000000000000000000000000000001E0F3", ... ]
+}
+
+A signer would take the prefix and suffix and use it during `derive` (which doesn't necessarily need to be exactly the same as the implementation Mina (it just needs to be "random"). And use `px`, `py`, and `r` in between prefix and suffix for hash.
+```
+
+Another important property of the unsigned-transaction and signed-transaction representations is that they are invertible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
 
 ```
-{ randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex  *)
+{ randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex *)
+, signerInput : SignerInput
 , payment: Payment?
 , stakeDelegation: StakeDelegation?
 }
 // where stakeDelegation and payemnt are currently defined in the client-sdk shown below
 // it is an error to treat stakeDelegation / payment in any way other than a variant, but it is encoded unsafely like this becuase JSON is garbage-fire and can't represent sum types ergonomically
 ```
+
 
 ```reasonml
 // Taken from Client-SDK code
@@ -349,20 +383,21 @@ This endpoint will also accept a query parameter `?plain_random_oracle`
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
-// Signature encoding
-
-a signature is a field and a scalar
-|----- field 32bytes ----|---- scalar 32bytes ---|
-Use the same hex-encoded little endian represenation as described above for
-the public key for these 64 bytes
-```
-
-```
 {
-  signature: string (* Signature as described above *),
+  signature: string (* Signature hex bytes as described below *),
   payment: payment?,
   stakeDelegation: stakeDelegation?
 }
+```
+
+**Format**
+
+```
+// Signature encoding
+
+a signature is a field and a scalar
+|---- field 32bytes (Fp) ---|----- scalar 32bytes (Fq) ----|
+Use the same hex-encoded representation as described above for the public keys for each of the 32byte chunks.
 ```
 
 #### Parse Endpoint

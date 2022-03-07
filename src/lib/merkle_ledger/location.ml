@@ -72,11 +72,11 @@ module T = struct
   let parse ~ledger_depth (str : Bigstring.t) : (t, unit) Result.t =
     let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
     let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
-    if prefix = Prefix.generic then Result.return (Generic data)
+    if UInt8.equal prefix Prefix.generic then Result.return (Generic data)
     else
       let path = Addr.of_byte_string (Bigstring.to_string data) in
       let slice_path = Addr.slice path 0 in
-      if prefix = Prefix.account then
+      if UInt8.equal prefix Prefix.account then
         Result.return (Account (slice_path ledger_depth))
       else if UInt8.to_int prefix <= ledger_depth then
         Result.return (Hash (slice_path (ledger_depth - UInt8.to_int prefix)))
@@ -118,8 +118,7 @@ module T = struct
 
   let next : t -> t Option.t = function
     | Generic _ ->
-        raise
-          (Invalid_argument "next: generic locations have no next location")
+        raise (Invalid_argument "next: generic locations have no next location")
     | Account path ->
         Addr.next path |> Option.map ~f:(fun next -> Account next)
     | Hash path ->
@@ -127,8 +126,7 @@ module T = struct
 
   let prev : t -> t Option.t = function
     | Generic _ ->
-        raise
-          (Invalid_argument "prev: generic locations have no prev location")
+        raise (Invalid_argument "prev: generic locations have no prev location")
     | Account path ->
         Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
     | Hash path ->

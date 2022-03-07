@@ -3,12 +3,16 @@ open Mina_base
 open Currency
 open Signature_lib
 
+let all_equal ~equal ~compare ls =
+  Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
+      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+
 module Make
     (Engine : Intf.Engine.S)
     (Event_router : Intf.Dsl.Event_router_intf with module Engine := Engine)
     (Network_state : Intf.Dsl.Network_state_intf
-                     with module Engine := Engine
-                      and module Event_router := Event_router) =
+                       with module Engine := Engine
+                        and module Event_router := Event_router) =
 struct
   open Network_state
   module Node = Engine.Network.Node
@@ -29,56 +33,77 @@ struct
         -> predicate
 
   type t =
-    { description: string
-    ; predicate: predicate
-    ; soft_timeout: Network_time_span.t
-    ; hard_timeout: Network_time_span.t }
+    { description : string
+    ; predicate : predicate
+    ; soft_timeout : Network_time_span.t
+    ; hard_timeout : Network_time_span.t
+    }
 
   let with_timeouts ?soft_timeout ?hard_timeout t =
     { t with
-      soft_timeout= Option.value soft_timeout ~default:t.soft_timeout
-    ; hard_timeout= Option.value hard_timeout ~default:t.hard_timeout }
+      soft_timeout = Option.value soft_timeout ~default:t.soft_timeout
+    ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
+    }
 
-  let node_to_initialize node =
+  let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
       if
-        String.Map.find state.node_initialization (Node.id node)
-        |> Option.value ~default:false
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false)
       then Predicate_passed
       else Predicate_continuation ()
     in
-    { description= Printf.sprintf "\"%s\" to initialize" (Node.id node)
-    ; predicate= Network_state_predicate (check (), check)
-    ; soft_timeout= Literal (Time.Span.of_min 10.0)
-    ; hard_timeout= Literal (Time.Span.of_min 15.0) }
+    let description =
+      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+      |> Printf.sprintf "[%s] to initialize"
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Literal (Time.Span.of_min 10.0)
+    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    }
+
+  let node_to_initialize node = nodes_to_initialize [ node ]
 
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
     let init state = Predicate_continuation state.blocks_generated in
     let check init_blocks_generated state =
-      Printf.printf !"%d\n%!" (state.blocks_generated - init_blocks_generated) ;
       if state.blocks_generated - init_blocks_generated >= n then
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
-    let soft_timeout_in_slots = 2 * n in
-    { description= Printf.sprintf "%d blocks to be produced" n
-    ; predicate= Network_state_predicate (init, check)
-    ; soft_timeout= Slots soft_timeout_in_slots
-    ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
+    let soft_timeout_in_slots =
+      (* We add 1 here to make sure that we see the entirety of at least 2*n
+         full slots, since slot time may be misaligned with wait times after
+         non-block-related waits.
+         This ensures that low numbers of blocks (e.g. 1 or 2) have a
+         reasonable probability of success, reducing flakiness of the tests.
+      *)
+      (2 * n) + 1
+    in
+    { description = Printf.sprintf "%d blocks to be produced" n
+    ; predicate = Network_state_predicate (init, check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
 
   let nodes_to_synchronize (nodes : Node.t list) =
-    let all_equal ls =
-      Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-          [h] = List.find_all_dups ~compare:State_hash.compare ls )
-    in
     let check () state =
+      let all_best_tips_equal =
+        all_equal ~equal:[%equal: State_hash.t option]
+          ~compare:[%compare: State_hash.t option]
+      in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find_exn state.best_tips_by_node (Node.id node) )
+            String.Map.find state.best_tips_by_node (Node.id node))
       in
-      if all_equal best_tips then Predicate_passed
+      if
+        List.for_all best_tips ~f:Option.is_some
+        && all_best_tips_equal best_tips
+      then Predicate_passed
       else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 * 3 in
@@ -87,12 +112,14 @@ struct
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
       |> String.concat ~sep:", "
     in
-    { description= Printf.sprintf "%s to synchronize" formatted_nodes
-    ; predicate= Network_state_predicate (check (), check)
-    ; soft_timeout= Slots soft_timeout_in_slots
-    ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
+    { description = Printf.sprintf "%s to synchronize" formatted_nodes
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
 
-  let payment_to_be_included_in_frontier ~sender ~receiver ~amount =
+  let payment_to_be_included_in_frontier ~sender_pub_key ~receiver_pub_key
+      ~amount =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
@@ -102,9 +129,9 @@ struct
             Signed_command.payload signed_cmd |> Signed_command_payload.body
           in
           match body with
-          | Payment {source_pk; receiver_pk; amount= paid_amt; token_id= _}
-            when Public_key.Compressed.equal source_pk sender
-                 && Public_key.Compressed.equal receiver_pk receiver
+          | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
+            when Public_key.Compressed.equal source_pk sender_pub_key
+                 && Public_key.Compressed.equal receiver_pk receiver_pub_key
                  && Currency.Amount.equal paid_amt amount ->
               true
           | _ ->
@@ -116,7 +143,7 @@ struct
       let payment_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_payment )
+            |> command_matches_payment)
       in
       match payment_opt with
       | Some cmd_with_status ->
@@ -138,12 +165,13 @@ struct
           Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
-    { description=
+    { description =
         Printf.sprintf "payment from %s to %s of amount %s"
-          (Public_key.Compressed.to_string sender)
-          (Public_key.Compressed.to_string receiver)
+          (Public_key.Compressed.to_string sender_pub_key)
+          (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)
-    ; predicate= Event_predicate (Event_type.Breadcrumb_added, (), check)
-    ; soft_timeout= Slots soft_timeout_in_slots
-    ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
+    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
 end

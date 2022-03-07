@@ -4,8 +4,9 @@ open Pipe_lib
 open Strict_pipe
 
 type 'data t =
-  { job_writer: ('data, crash buffered, unit) Writer.t
-  ; f: 'data -> unit Deferred.t }
+  { job_writer : ('data, crash buffered, unit) Writer.t
+  ; f : 'data -> unit Deferred.t
+  }
 
 let create ?(buffer_capacity = 30) ~job_capacity f =
   let job_reader, job_writer =
@@ -41,7 +42,7 @@ let create ?(buffer_capacity = 30) ~job_capacity f =
   don't_wait_for
     (Reader.iter_without_pushback job_reader ~f:(fun job ->
          if !active_jobs < job_capacity then run_job job
-         else pending_jobs := !pending_jobs @ [job] )) ;
-  {job_writer; f}
+         else pending_jobs := !pending_jobs @ [ job ])) ;
+  { job_writer; f }
 
 let dispatch t data = Writer.write t.job_writer data

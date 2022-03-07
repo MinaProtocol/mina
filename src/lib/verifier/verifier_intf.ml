@@ -11,7 +11,7 @@ module Base = struct
          t
       -> Mina_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
-   communicating with the verifier. *)
+            communicating with the verifier. *)
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
@@ -38,6 +38,7 @@ module type S = sig
   val create :
        logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option
     -> t Deferred.t

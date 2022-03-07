@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Fold_lib
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
@@ -6,7 +6,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     let to_string b = if b then "1" else "0" in
     String.concat ~sep:" "
       (List.map trips ~f:(fun (b1, b2, b3) ->
-           to_string b1 ^ to_string b2 ^ to_string b3 ))
+           to_string b1 ^ to_string b2 ^ to_string b3))
 
   let checked_to_unchecked typ1 typ2 checked input =
     let open Impl in
@@ -35,19 +35,19 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       |> Or_error.ok_exn
     in
     let unchecked = Fold.to_list (fold input) in
-    if not (checked = unchecked) then
+    if not ([%equal: (bool * bool * bool) list] checked unchecked) then
       failwithf
         !"Got %s (%d)\nexpected %s (%d)"
         (triple_string checked) (List.length checked) (triple_string unchecked)
         (List.length unchecked) ()
 
-  let test_equal ?(equal = ( = )) typ1 typ2 checked unchecked input =
+  let test_equal ?(equal = Poly.( = )) typ1 typ2 checked unchecked input =
     let checked_result = checked_to_unchecked typ1 typ2 checked input in
     assert (equal checked_result (unchecked input))
 
   let arbitrary_string ~len =
     String.init (Random.int len) ~f:(fun _ ->
-        Char.of_int_exn (Random.int_incl 0 255) )
+        Char.of_int_exn (Random.int_incl 0 255))
 
   let with_randomness r f =
     let s = Caml.Random.get_state () in

@@ -10,14 +10,17 @@ locals {
 
   peers = var.additional_peers
 
-  coda_vars = {
+  daemon = {
     runtimeConfig        = var.runtime_config
-    image                = var.coda_image
+    image                = var.mina_image
+    useCustomEntrypoint  = var.use_custom_entrypoint
+    customEntrypoint     = var.custom_entrypoint
     privkeyPass          = var.block_producer_key_pass
     seedPeers            = local.peers
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
+    logTxnPoolGossip = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
@@ -32,14 +35,17 @@ locals {
 
   seed_vars = {
     testnetName = var.testnet_name
-    coda = {
-      runtimeConfig = local.coda_vars.runtimeConfig
-      image         = var.coda_image
+    mina = {
+      runtimeConfig = local.daemon.runtimeConfig
+      image         = var.mina_image
+      useCustomEntrypoint  = var.use_custom_entrypoint
+      customEntrypoint     = var.custom_entrypoint
       privkeyPass   = var.block_producer_key_pass
       // TODO: Change this to a better name
       seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
+      logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
         client  = "8301"
         graphql = "3085"
@@ -70,12 +76,12 @@ locals {
   block_producer_vars = {
     testnetName = var.testnet_name
 
-    coda = local.coda_vars
+    mina = local.daemon
 
     healthcheck = local.healthcheck_vars
 
     userAgent = {
-      image         = var.coda_agent_image
+      image         = var.mina_agent_image
       minFee        = var.agent_min_fee
       maxFee        = var.agent_max_fee
       minTx         = var.agent_min_tx
@@ -86,10 +92,10 @@ locals {
     }
 
     bots = {
-      image = var.coda_bots_image
+      image = var.mina_bots_image
       faucet = {
-        amount = var.coda_faucet_amount
-        fee    = var.coda_faucet_fee
+        amount = var.mina_faucet_amount
+        fee    = var.mina_faucet_fee
       }
     }
 
@@ -113,10 +119,12 @@ locals {
 
   archive_vars = [for item in var.archive_configs : {
       testnetName = var.testnet_name
-      coda        = {
-        image         = var.coda_image
+      mina        = {
+        image         = var.mina_image
+        useCustomEntrypoint  = var.use_custom_entrypoint
+        customEntrypoint     = var.custom_entrypoint
         seedPeers     = local.peers
-        runtimeConfig = local.coda_vars.runtimeConfig
+        runtimeConfig = local.daemon.runtimeConfig
         seedPeersURL  = var.seed_peers_url
       }
       healthcheck = local.healthcheck_vars
@@ -150,28 +158,38 @@ locals {
       }
     }]
 
-  snark_worker_vars = {
-    testnetName = var.testnet_name
-    coda        = local.coda_vars
-    healthcheck = local.healthcheck_vars
-    worker = {
-      active      = var.snark_worker_replicas > 0
-      numReplicas = var.snark_worker_replicas
+  snark_vars = [
+    for i, snark in var.snark_coordinators: {
+      testnetName = var.testnet_name
+      mina        = local.daemon
+      healthcheck = local.healthcheck_vars
+
+      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      workerReplicas = snark.snark_worker_replicas
+      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}.${var.testnet_name}"
+      coordinatorRpcPort = 8301
+      coordinatorHostPort = snark.snark_coordinators_host_port
+      publicKey =snark.snark_worker_public_key
+      snarkFee = snark.snark_worker_fee
+      workSelectionAlgorithm = "seq"
     }
-    coordinator = {
-      active        = var.snark_worker_replicas > 0
-      deployService = var.snark_worker_replicas > 0
-      publicKey     = var.snark_worker_public_key
-      snarkFee      = var.snark_worker_fee
-      hostPort      = var.snark_worker_host_port
+  ]
+
+  plain_node_vars = [
+    for i, node in var.plain_node_configs: {
+      testnetName = var.testnet_name
+      mina        = local.daemon
+      healthcheck = local.healthcheck_vars
+      name = node.name
     }
-  }
+  ]
 
   watchdog_vars = {
     testnetName = var.testnet_name
     image       = var.watchdog_image
-    coda = {
-      image                = var.coda_image
+    mina = {
+      image                = var.mina_image
       ports                = { metrics : 8000 }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }

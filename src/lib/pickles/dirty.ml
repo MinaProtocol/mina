@@ -1,4 +1,4 @@
-type t = [`Cache_hit | `Generated_something | `Locally_generated]
+type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
 
 let ( + ) x y =
   match (x, y) with

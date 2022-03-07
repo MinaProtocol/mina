@@ -7,13 +7,14 @@
  *)
 
 type t =
-  { network_identifier: Network_identifier.t
-  ; block_identifier: Block_identifier.t
-  ; transaction_identifier: Transaction_identifier.t }
-[@@deriving yojson {strict= false}, show]
+  { network_identifier : Network_identifier.t
+  ; block_identifier : Block_identifier.t
+  ; transaction_identifier : Transaction_identifier.t
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** A BlockTransactionRequest is used to fetch a Transaction included in a block that is not returned in a BlockResponse. *)
 let create (network_identifier : Network_identifier.t)
     (block_identifier : Block_identifier.t)
     (transaction_identifier : Transaction_identifier.t) : t =
-  {network_identifier; block_identifier; transaction_identifier}
+  { network_identifier; block_identifier; transaction_identifier }

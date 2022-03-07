@@ -8,8 +8,7 @@ let runtime_config = Runtime_config.Test_configs.split_snarkless
 let main who_produces () =
   let logger = Logger.create () in
   let%bind precomputed_values, _runtime_config =
-    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
-      ~proof_level:None
+    Genesis_ledger_helper.inputs_from_config_file ~logger ~proof_level:None
       (Lazy.force runtime_config)
     >>| Or_error.ok_exn
   in
@@ -28,7 +27,7 @@ let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share prefixes"
     (let%map_open who_produces =
-       flag "--who-produces" ~aliases:["who-produces"]
+       flag "--who-produces" ~aliases:[ "who-produces" ]
          ~doc:"ID node number which will be producing blocks" (required int)
      in
      main who_produces)

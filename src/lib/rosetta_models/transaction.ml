@@ -7,13 +7,14 @@
  *)
 
 type t =
-  { transaction_identifier: Transaction_identifier.t
-  ; operations: Operation.t list
+  { transaction_identifier : Transaction_identifier.t
+  ; operations : Operation.t list
   ; (* Transactions that are related to other transactions (like a cross-shard transaction) should include the tranaction_identifier of these transactions in the metadata. *)
-    metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+    metadata : Yojson.Safe.t option [@default None]
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** Transactions contain an array of Operations that are attributable to the same TransactionIdentifier. *)
 let create (transaction_identifier : Transaction_identifier.t)
     (operations : Operation.t list) : t =
-  {transaction_identifier; operations; metadata= None}
+  { transaction_identifier; operations; metadata = None }

@@ -1,18 +1,11 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
+
+[%%ifdef consensus_mechanism]
+
 open Snark_bits
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -55,10 +48,6 @@ module type Basic = sig
   include Bits_intf.S with type t := t
 
   [%%endif]
-
-  val to_string : t -> string
-
-  val of_string : string -> t
 
   val to_base58_check : t -> string
 

@@ -15,21 +15,10 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec =
-      let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/app/libp2p_helper"),
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/nonconsensus"),
-        S.strictly (S.contains "Makefile"),
-        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
-        S.exactly "scripts/link-coredumps" "sh",
-        S.exactly "buildkite/scripts/unit-test" "sh"
-      ]
-
-      in
-
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "scr/app/libp2p_helper"),
+          S.strictlyStart (S.contains "src/app/libp2p_helper"),
+          S.strictlyStart (S.contains "src/libp2p_ipc"),
           S.exactly "Makefile" "",
           S.exactly "buildkite/src/Jobs/Test/Libp2pUnitTest" "dhall"
         ],
@@ -40,10 +29,30 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.codaToolchain} "cd src/app/libp2p_helper/src && /usr/lib/go/bin/go mod download && /usr/lib/go/bin/go test . ./libp2p_helper"
+            Cmd.run "chmod -R 777 src/libp2p_ipc",
+            Cmd.runInDocker
+              Cmd.Docker::
+                { image=ContainerImages.minaToolchainBuster
+                , extraEnv = [ "GO=/usr/lib/go/bin/go" ]
+                } "make -C src/app/libp2p_helper test"
           ],
           label = "libp2p unit-tests",
           key = "libp2p-unit-tests",
+          target = Size.Large,
+          docker = None Docker.Type
+        },
+      Command.build
+        Command.Config::{
+          commands = [
+            Cmd.run "chmod -R 777 src/libp2p_ipc",
+            Cmd.runInDocker
+              Cmd.Docker::
+                { image=ContainerImages.minaToolchainBuster
+                , extraEnv = [ "GO=/usr/lib/go/bin/go" ]
+                } "make -C src/app/libp2p_helper test-bs-qc"
+          ],
+          label = "libp2p bitswap QuickCheck",
+          key = "libp2p-bs-qc",
           target = Size.Large,
           docker = None Docker.Type
         }

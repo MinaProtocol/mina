@@ -11,7 +11,7 @@ let read_hidden_line ~error_help_message prompt : Bytes.t Async.Deferred.t =
   let () =
     if isatty then
       Terminal_io.tcsetattr ~mode:Terminal_io.TCSANOW
-        {(Option.value_exn old_termios) with c_echo= false; c_echonl= true}
+        { (Option.value_exn old_termios) with c_echo = false; c_echonl = true }
         stdin
   in
   Writer.write (Lazy.force Writer.stdout) prompt ;

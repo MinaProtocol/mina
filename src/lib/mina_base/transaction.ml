@@ -8,7 +8,7 @@ module Poly = struct
         | Command of 'command
         | Fee_transfer of Fee_transfer.Stable.V1.t
         | Coinbase of Coinbase.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -20,7 +20,7 @@ module Valid = struct
   module Stable = struct
     module V1 = struct
       type t = User_command.Valid.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -34,7 +34,7 @@ end
 module Stable = struct
   module V1 = struct
     type t = User_command.Stable.V1.t Poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
@@ -70,7 +70,8 @@ let public_keys : t -> _ = function
   | Command (Signed_command cmd) ->
       [ Signed_command.fee_payer_pk cmd
       ; Signed_command.source_pk cmd
-      ; Signed_command.receiver_pk cmd ]
+      ; Signed_command.receiver_pk cmd
+      ]
   | Command (Snapp_command t) ->
       Snapp_command.(accounts_accessed (t :> t))
       |> List.map ~f:Account_id.public_key

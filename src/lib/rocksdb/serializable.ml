@@ -2,10 +2,10 @@ open Core_kernel
 
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S
-  with module M := Key_value_database.Monad.Ident
-   and type key := Key.t
-   and type value := Value.t
-   and type config := string = struct
+    with module M := Key_value_database.Monad.Ident
+     and type key := Key.t
+     and type value := Value.t
+     and type config := string = struct
   type t = Database.t
 
   let create directory = Database.create directory
@@ -19,6 +19,11 @@ module Make (Key : Binable.S) (Value : Binable.S) :
     in
     Binable.of_bigstring (module Value) serialized_value
 
+  let get_batch t ~keys =
+    Database.get_batch t
+      ~keys:(List.map keys ~f:(Binable.to_bigstring (module Key)))
+    |> List.map ~f:(Option.map ~f:(Binable.of_bigstring (module Value)))
+
   let set t ~key ~data =
     Database.set t
       ~key:(Binable.to_bigstring (module Key) key)
@@ -28,7 +33,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
     let key_data_pairs =
       List.map update_pairs ~f:(fun (key, data) ->
           ( Binable.to_bigstring (module Key) key
-          , Binable.to_bigstring (module Value) data ) )
+          , Binable.to_bigstring (module Value) data ))
     in
     let remove_keys =
       List.map remove_keys ~f:(Binable.to_bigstring (module Key))
@@ -41,7 +46,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
   let to_alist t =
     List.map (Database.to_alist t) ~f:(fun (key, value) ->
         ( Binable.of_bigstring (module Key) key
-        , Binable.of_bigstring (module Value) value ) )
+        , Binable.of_bigstring (module Value) value ))
 end
 
 (** Database Interface for storing heterogeneous key-value pairs. Similar to
@@ -114,8 +119,7 @@ module GADT = struct
       let set t ~(key : 'a Key.t) ~(data : 'a) : unit =
         set_raw t ~key ~data:(bin_data_dump key data)
 
-      let remove t ~(key : 'a Key.t) =
-        Database.remove t ~key:(bin_key_dump key)
+      let remove t ~(key : 'a Key.t) = Database.remove t ~key:(bin_key_dump key)
     end
 
     let create directory = Database.create directory

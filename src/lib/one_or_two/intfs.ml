@@ -1,4 +1,4 @@
-type 'a t = [`One of 'a | `Two of 'a * 'a]
+type 'a t = [ `One of 'a | `Two of 'a * 'a ]
 
 (** One_or_two operations in a two-parameter monad. *)
 module type Monadic2 = sig

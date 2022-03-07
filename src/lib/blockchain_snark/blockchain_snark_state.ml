@@ -15,12 +15,14 @@ end
 
 module Witness = struct
   type t =
-    {prev_state: Protocol_state.Value.t; transition: Snark_transition.Value.t}
+    { prev_state : Protocol_state.Value.t
+    ; transition : Snark_transition.Value.t
+    }
 end
 
-let blockchain_handler on_unhandled {Witness.prev_state; transition} =
+let blockchain_handler on_unhandled { Witness.prev_state; transition } =
   let open Snarky_backendless.Request in
-  fun (With {request; respond} as r) ->
+  fun (With { request; respond } as r) ->
     let k x = respond (Provide x) in
     match request with
     | Prev_state ->
@@ -34,8 +36,8 @@ let wrap_handler h w =
   match h with
   | None ->
       blockchain_handler
-        (fun (Snarky_backendless.Request.With {respond; _}) ->
-          respond Unhandled )
+        (fun (Snarky_backendless.Request.With { respond; _ }) ->
+          respond Unhandled)
         w
   | Some h ->
       (* TODO: Clean up the handler composition interface. *)
@@ -70,8 +72,8 @@ let%snarkydef step ~(logger : Logger.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     Hlist.HlistId.
       [ previous_state_hash
-      ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t) ]
-    new_state_hash : (_, _) Tick.Checked.t =
+      ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t)
+      ] new_state_hash : (_, _) Tick.Checked.t =
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
@@ -121,14 +123,14 @@ let%snarkydef step ~(logger : Logger.t)
     in
     let%bind previous_state_hash =
       match constraint_constants.fork with
-      | Some {previous_state_hash= fork_prev; _} ->
+      | Some { previous_state_hash = fork_prev; _ } ->
           State_hash.if_ is_base_case
             ~then_:(State_hash.var_of_t fork_prev)
             ~else_:t.previous_state_hash
       | None ->
           Checked.return t.previous_state_hash
     in
-    let t = {t with previous_state_hash} in
+    let t = { t with previous_state_hash } in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in
       with_label __LOC__ (State_hash.assert_equal h new_state_hash)
@@ -193,7 +195,8 @@ let%snarkydef step ~(logger : Logger.t)
             |> Blockchain_state.snarked_next_available_token )
         ; Token_id.Checked.equal txn_snark.next_available_token_after
             ( transition |> Snark_transition.blockchain_state
-            |> Blockchain_state.snarked_next_available_token ) ]
+            |> Blockchain_state.snarked_next_available_token )
+        ]
       >>= Boolean.all
     in
     let%bind nothing_changed =
@@ -205,7 +208,8 @@ let%snarkydef step ~(logger : Logger.t)
         [ ledger_hash_didn't_change
         ; supply_increase_is_zero
         ; no_coinbases_popped
-        ; next_available_token_didn't_change ]
+        ; next_available_token_didn't_change
+        ]
     in
     let%bind correct_coinbase_status =
       let new_root =
@@ -216,11 +220,11 @@ let%snarkydef step ~(logger : Logger.t)
       Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
     in
     let%bind () =
-      Boolean.Assert.any [txn_snark_input_correct; nothing_changed]
+      Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ]
     in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
-      Boolean.all [updated_consensus_state; correct_coinbase_status]
+      Boolean.all [ updated_consensus_state; correct_coinbase_status ]
     in
     let%map () =
       as_prover
@@ -249,7 +253,8 @@ let%snarkydef step ~(logger : Logger.t)
                 ; ("updated_consensus_state", `Bool updated_consensus_state)
                 ; ("correct_coinbase_status", `Bool correct_coinbase_status)
                 ; ("result", `Bool result)
-                ; ("no_coinbases_popped", `Bool no_coinbases_popped) ]))
+                ; ("no_coinbases_popped", `Bool no_coinbases_popped)
+                ]))
     in
     (transaction_snark_should_verifiy, result)
   in
@@ -267,17 +272,18 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         Boolean.not is_base_case
   in
-  let%map () = Boolean.Assert.any [is_base_case; success] in
+  let%map () = Boolean.Assert.any [ is_base_case; success ] in
   (prev_should_verify, txn_snark_should_verify)
 
-let check w ?handler ~proof_level ~constraint_constants txn_snark
-    new_state_hash : unit Or_error.t =
+let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
+    : unit Or_error.t =
   let open Tick in
   check
     (Fn.flip handle (wrap_handler handler w)
        (let%bind prev =
           exists State_hash.typ
-            ~compute:(As_prover.return (Protocol_state.hash w.prev_state))
+            ~compute:
+              (As_prover.return (Protocol_state.hashes w.prev_state).state_hash)
         and curr =
           exists State_hash.typ ~compute:(As_prover.return new_state_hash)
         and txn_snark =
@@ -285,23 +291,23 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark
             ~compute:(As_prover.return txn_snark)
         in
         step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-          [prev; txn_snark] curr))
+          [ prev; txn_snark ] curr))
     ()
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
-  { identifier= "step"
-  ; prevs= [self; transaction_snark]
-  ; main=
-      (fun [x1; x2] x ->
+  { identifier = "step"
+  ; prevs = [ self; transaction_snark ]
+  ; main =
+      (fun [ x1; x2 ] x ->
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               [x1; x2] x)
+               [ x1; x2 ] x)
         in
-        [b1; b2] )
-  ; main_value=
-      (fun [prev; (txn : Transaction_snark.Statement.With_sok.t)] curr ->
+        [ b1; b2 ])
+  ; main_value =
+      (fun [ prev; (txn : Transaction_snark.Statement.With_sok.t) ] curr ->
         let lh t =
           Protocol_state.blockchain_state t
           |> Blockchain_state.snarked_ledger_hash
@@ -315,24 +321,29 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
                 txn.Transaction_snark.Statement.supply_increase
             ; Pending_coinbase.Stack.equal
                 txn.pending_coinbase_stack_state.source
-                txn.pending_coinbase_stack_state.target ]
-          |> not ] ) }
+                txn.pending_coinbase_stack_state.target
+            ]
+          |> not
+        ])
+  }
 
 module Statement = struct
   type t = Protocol_state.Value.t
 
-  let to_field_elements (t : t) : Tick.Field.t array = [|Protocol_state.hash t|]
+  let to_field_elements (t : t) : Tick.Field.t array =
+    [| (Protocol_state.hashes t).state_hash |]
 end
 
 module Statement_var = struct
   type t = State_hash.var
 
-  let to_field_elements (t : t) = [|State_hash.var_to_hash_packed t|]
+  let to_field_elements (t : t) = [| State_hash.var_to_hash_packed t |]
 end
 
 let typ =
-  Typ.transport State_hash.typ ~there:Protocol_state.hash ~back:(fun _ ->
-      failwith "cannot unhash" )
+  Typ.transport State_hash.typ
+    ~there:(fun t -> (Protocol_state.hashes t).state_hash)
+    ~back:(fun _ -> failwith "cannot unhash")
 
 type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
@@ -340,8 +351,8 @@ type tag =
 module type S = sig
   module Proof :
     Pickles.Proof_intf
-    with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
-     and type statement = Protocol_state.Value.t
+      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+       and type statement = Protocol_state.Value.t
 
   val tag : tag
 
@@ -351,44 +362,17 @@ module type S = sig
 
   val step :
        Witness.t
-    -> ( Protocol_state.Value.t
-         * (Transaction_snark.Statement.With_sok.t * unit)
+    -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
        , N2.n * (N2.n * unit)
        , N1.n * (N2.n * unit)
        , Protocol_state.Value.t
        , Proof.t Async.Deferred.t )
        Pickles.Prover.t
+
+  val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
-
-module Make (T : sig
-  val tag : Transaction_snark.tag
-
-  val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val proof_level : Genesis_constants.Proof_level.t
-end) : S = struct
-  open T
-
-  let tag, cache_handle, p, Pickles.Provers.[step] =
-    Pickles.compile ~cache:Cache_dir.cache
-      (module Statement_var)
-      (module Statement)
-      ~typ
-      ~branches:(module Nat.N1)
-      ~max_branching:(module Nat.N2)
-      ~name:"blockchain-snark"
-      ~constraint_constants:
-        (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants)
-      ~choices:(fun ~self ->
-        [rule ~proof_level ~constraint_constants T.tag self] )
-
-  let step = with_handler step
-
-  module Proof = (val p)
-end
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -400,8 +384,40 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
              step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               [x1; x2] x
+               [ x1; x2 ] x
            in
            ()
          in
-         Tick.constraint_system ~exposing:[Mina_base.State_hash.typ] main) ) ]
+         Tick.constraint_system ~exposing:[ Mina_base.State_hash.typ ] main) )
+  ]
+
+module Make (T : sig
+  val tag : Transaction_snark.tag
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
+end) : S = struct
+  open T
+
+  let tag, cache_handle, p, Pickles.Provers.[ step ] =
+    Pickles.compile ~cache:Cache_dir.cache
+      (module Statement_var)
+      (module Statement)
+      ~typ
+      ~branches:(module Nat.N1)
+      ~max_branching:(module Nat.N2)
+      ~name:"blockchain-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants)
+      ~choices:(fun ~self ->
+        [ rule ~proof_level ~constraint_constants T.tag self ])
+
+  let step = with_handler step
+
+  let constraint_system_digests =
+    lazy (constraint_system_digests ~proof_level ~constraint_constants ())
+
+  module Proof = (val p)
+end

@@ -7,8 +7,8 @@
  *)
 
 type t =
-  {index: int64 option [@default None]; hash: string option [@default None]}
-[@@deriving yojson {strict= false}, show]
+  { index : int64 option [@default None]; hash : string option [@default None] }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** When fetching data by BlockIdentifier, it may be possible to only specify the index or hash. If neither property is specified, it is assumed that the client is making a request at the current block. *)
-let create () : t = {index= None; hash= None}
+let create () : t = { index = None; hash = None }

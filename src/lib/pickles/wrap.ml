@@ -4,7 +4,8 @@ open Pickles_types
 open Hlist
 open Tuple_lib
 open Common
-open Core
+open Core_kernel
+open Async_kernel
 open Import
 open Types
 open Backend
@@ -36,8 +37,8 @@ let combined_inner_product (type actual_branching)
     let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
     let v : (Tick.Field.t array, _) Vector.t =
       Vector.append
-        (Vector.map b_polys ~f:(fun f -> [|f pt|]))
-        ([|x_hat|] :: a) (snd pi)
+        (Vector.map b_polys ~f:(fun f -> [| f pt |]))
+        ([| x_hat |] :: a) (snd pi)
     in
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations
@@ -49,7 +50,7 @@ let combined_inner_product (type actual_branching)
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
-          Int.(Max_degree.step - (deg mod Max_degree.step)) )
+          Int.(Max_degree.step - (deg mod Max_degree.step)))
       v b
   in
   let open Tick.Field in
@@ -66,7 +67,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     ((module Req) : (max_branching, max_local_max_branchings) Requests.Wrap.t)
     ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk ~step_domains
     ~wrap_domains ~pairing_plonk_indices pk
-    ({statement= prev_statement; prev_evals; proof; index= which_index} :
+    ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
       , (_, actual_branching) Vector.t
@@ -91,16 +92,17 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     M.f prev_statement.pass_through
   in
   let prev_statement_with_hashes : _ Types.Pairing_based.Statement.t =
-    { proof_state=
+    { proof_state =
         { prev_statement.proof_state with
-          me_only=
+          me_only =
             (* TODO: Careful here... the length of
                old_buletproof_challenges inside the me_only
                might not be correct *)
             Common.hash_pairing_me_only ~app_state:to_field_elements
               (P.Base.Me_only.Pairing_based.prepare ~dlog_plonk_index
-                 prev_statement.proof_state.me_only) }
-    ; pass_through=
+                 prev_statement.proof_state.me_only)
+        }
+    ; pass_through =
         (let module M =
            H1.Map
              (P.Base.Me_only.Dlog_based.Prepared)
@@ -115,9 +117,10 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
-        V.f Max_local_max_branchings.length (M.f prev_me_only)) }
+        V.f Max_local_max_branchings.length (M.f prev_me_only))
+    }
   in
-  let handler (Snarky_backendless.Request.With {request; respond}) =
+  let handler (Snarky_backendless.Request.With { request; respond }) =
     let open Req in
     let k x = respond (Provide x) in
     match request with
@@ -129,7 +132,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             (P.Base.Me_only.Dlog_based.Prepared)
             (E01 (Pairing_acc))
             (struct
-              let f : type a.
+              let f :
+                  type a.
                   a P.Base.Me_only.Dlog_based.Prepared.t -> Pairing_acc.t =
                fun t -> t.sg
             end)
@@ -166,8 +170,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   in
   let actual_branching = Vector.length prev_challenges in
   let lte =
-    Nat.lte_exn actual_branching
-      (Length.to_nat Max_local_max_branchings.length)
+    Nat.lte_exn actual_branching (Length.to_nat Max_local_max_branchings.length)
   in
   let o =
     let sgs =
@@ -187,7 +190,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       Vector.(
         map2 (Vector.trim sgs lte) prev_challenges ~f:(fun commitment cs ->
             { Tick.Proof.Challenge_polynomial.commitment
-            ; challenges= Vector.to_array cs } )
+            ; challenges = Vector.to_array cs
+            })
         |> to_list)
       public_input proof
   in
@@ -198,11 +202,12 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     in
     let sponge_digest_before_evaluations = O.digest_before_evaluations o in
     let plonk0 =
-      { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
+      { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha =
           scalar_chal O.alpha
-      ; beta= O.beta o
-      ; gamma= O.gamma o
-      ; zeta= scalar_chal O.zeta }
+      ; beta = O.beta o
+      ; gamma = O.gamma o
+      ; zeta = scalar_chal O.zeta
+      }
     in
     let r = scalar_chal O.u in
     let xi = scalar_chal O.v in
@@ -237,10 +242,11 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         ~old_bulletproof_challenges:prev_challenges
     in
     let me_only : _ P.Base.Me_only.Dlog_based.t =
-      { sg= proof.openings.proof.sg
-      ; old_bulletproof_challenges=
+      { sg = proof.openings.proof.sg
+      ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
-              t.deferred_values.bulletproof_challenges ) }
+              t.deferred_values.bulletproof_challenges)
+      }
     in
     let chal = Challenge.Constant.of_tick_field in
     let new_bulletproof_challenges, b =
@@ -249,7 +255,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             let x =
               Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x
             in
-            x )
+            x)
       in
       let chals =
         Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x)
@@ -261,7 +267,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         b_poly zeta + (r * b_poly zetaw)
       in
       let prechals =
-        Array.map prechals ~f:(fun x -> {Bulletproof_challenge.prechallenge= x})
+        Array.map prechals ~f:(fun x ->
+            { Bulletproof_challenge.prechallenge = x })
       in
       (prechals, b)
     in
@@ -275,7 +282,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
              (module Tick.Field)
              domain ~shifts:Common.tick_shifts
              ~domain_generator:Backend.Tick.Field.domain_generator)
-        {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
+        { plonk0 with zeta = As_field.zeta; alpha = As_field.alpha }
         (Plonk_checks.evals_of_split_evals
            (module Tick.Field)
            proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
@@ -285,34 +292,38 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let shift_value =
       Shifted_value.of_field (module Tick.Field) ~shift:Shifts.tick
     in
-    { proof_state=
-        { deferred_values=
+    { proof_state =
+        { deferred_values =
             { xi
-            ; b= shift_value b
-            ; bulletproof_challenges=
+            ; b = shift_value b
+            ; bulletproof_challenges =
                 Vector.of_array_and_length_exn new_bulletproof_challenges
                   Tick.Rounds.n
-            ; combined_inner_product= shift_value combined_inner_product
-            ; which_branch= which_index
-            ; plonk=
+            ; combined_inner_product = shift_value combined_inner_product
+            ; which_branch = which_index
+            ; plonk =
                 { plonk with
-                  zeta= plonk0.zeta
-                ; alpha= plonk0.alpha
-                ; beta= chal plonk0.beta
-                ; gamma= chal plonk0.gamma } }
-        ; sponge_digest_before_evaluations=
+                  zeta = plonk0.zeta
+                ; alpha = plonk0.alpha
+                ; beta = chal plonk0.beta
+                ; gamma = chal plonk0.gamma
+                }
+            }
+        ; sponge_digest_before_evaluations =
             Digest.Constant.of_tick_field sponge_digest_before_evaluations
-        ; me_only }
-    ; pass_through= prev_statement.proof_state.me_only }
+        ; me_only
+        }
+    ; pass_through = prev_statement.proof_state.me_only
+    }
   in
   let me_only_prepared =
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
-  let%map.Async next_proof =
+  let%map.Deferred next_proof =
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
-          ~f:(fun {Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs} ->
+          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
               ~auxiliary:auxiliary_inputs pk
               ~message:
@@ -322,23 +333,25 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                        (Lazy.force Dummy.Ipa.Wrap.sg))
                     me_only_prepared.old_bulletproof_challenges
                     ~f:(fun sg chals ->
-                      { Tock.Proof.Challenge_polynomial.commitment= sg
-                      ; challenges= Vector.to_array chals } )
-                |> Vector.to_list ) )
-          [input]
-          (fun x () ->
-            ( Impls.Wrap.handle (fun () -> (wrap_main (conv x) : unit)) handler
-              : unit ) )
+                      { Tock.Proof.Challenge_polynomial.commitment = sg
+                      ; challenges = Vector.to_array chals
+                      })
+                |> Vector.to_list ))
+          [ input ]
+          (fun x () : unit ->
+            Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler)
           ()
-          { pass_through= prev_statement_with_hashes.proof_state.me_only
-          ; proof_state=
+          { pass_through = prev_statement_with_hashes.proof_state.me_only
+          ; proof_state =
               { next_statement.proof_state with
-                me_only=
-                  Common.hash_dlog_me_only max_branching me_only_prepared } }
-    )
+                me_only =
+                  Common.hash_dlog_me_only max_branching me_only_prepared
+              }
+          })
   in
-  ( { proof= next_proof
-    ; statement= Types.Dlog_based.Statement.to_minimal next_statement
-    ; prev_evals= proof.openings.evals
-    ; prev_x_hat= x_hat }
+  ( { proof = next_proof
+    ; statement = Types.Dlog_based.Statement.to_minimal next_statement
+    ; prev_evals = proof.openings.evals
+    ; prev_x_hat = x_hat
+    }
     : _ P.Base.Dlog_based.t )

@@ -14,8 +14,8 @@
     },
     "environment" : [
         { "name" : "DISCORD_API_KEY", "value" : "${discord_api_key}" },
-        { "name" : "CODA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
-        { "name" : "CODA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
+        { "name" : "MINA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
+        { "name" : "MINA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
         { "name" : "FAUCET_PUBLICKEY", "value" : "${faucet_public_key}" },
         { "name" : "FAUCET_PASSWORD", "value" : "${faucet_password}" },
         { "name" : "ECHO_PUBLICKEY", "value" : "${echo_public_key}" },
@@ -47,7 +47,7 @@
         { "name" : "DAEMON_DISCOVERY_PORT", "value" : "${coda_discovery_port}" },
         { "name" : "DAEMON_METRICS_PORT", "value" : "${coda_metrics_port}" },
         { "name" : "DAEMON_CLIENT_PORT", "value" : "${coda_client_port}" },
-        { "name" : "CODA_PRIVKEY_PASS", "value" : "${coda_privkey_pass}" },
+        { "name" : "MINA_PRIVKEY_PASS", "value" : "${coda_privkey_pass}" },
         { "name" : "CODA_TESTNET", "value" : "${coda_testnet}" }
     ]
   }

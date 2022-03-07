@@ -1,11 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%if
-defined genesis_ledger]
+[%%if defined genesis_ledger]
 
-[%%inject
-"genesis_ledger", genesis_ledger]
+[%%inject "genesis_ledger", genesis_ledger]
 
 include Genesis_ledger.Make (struct
   include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
@@ -17,7 +14,6 @@ end)
 
 [%%else]
 
-[%%optcomp.error
-"\"genesis_ledger\" not set in config.mlh"]
+[%%optcomp.error "\"genesis_ledger\" not set in config.mlh"]
 
 [%%endif]

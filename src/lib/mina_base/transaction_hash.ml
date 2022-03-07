@@ -1,5 +1,7 @@
 open Core_kernel
 
+[%%import "/src/config.mlh"]
+
 module T = struct
   include Blake2.Make ()
 end
@@ -22,10 +24,15 @@ let to_yojson t = `String (to_base58_check t)
 let of_yojson = function
   | `String str ->
       Result.map_error (of_base58_check str) ~f:(fun _ ->
-          "Transaction_hash.of_yojson: Error decoding string from \
-           base58_check format" )
+          "Transaction_hash.of_yojson: Error decoding string from base58_check \
+           format")
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
+
+let hash_signed_command =
+  Fn.compose digest_string Signed_command.to_base58_check
+
+[%%ifdef consensus_mechanism]
 
 let hash_command = Fn.compose digest_string User_command.to_base58_check
 
@@ -45,8 +52,10 @@ module User_command_with_valid_signature = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( (User_command.Valid.Stable.V1.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        ( (User_command.Valid.Stable.V1.t
+        [@hash.ignore])
+        , (T.Stable.V1.t
+        [@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
 
@@ -60,20 +69,20 @@ module User_command_with_valid_signature = struct
   end]
 
   let create (c : User_command.Valid.t) : t =
-    {data= c; hash= hash_command (User_command.forget_check c)}
+    { data = c; hash = hash_command (User_command.forget_check c) }
 
-  let data ({data; _} : t) = data
+  let data ({ data; _ } : t) = data
 
-  let command ({data; _} : t) = User_command.forget_check data
+  let command ({ data; _ } : t) = User_command.forget_check data
 
-  let hash ({hash; _} : t) = hash
+  let hash ({ hash; _ } : t) = hash
 
-  let forget_check ({data; hash} : t) =
-    {With_hash.data= User_command.forget_check data; hash}
+  let forget_check ({ data; hash } : t) =
+    { With_hash.data = User_command.forget_check data; hash }
 
   include Comparable.Make (Stable.Latest)
 
-  let make data hash : t = {data; hash}
+  let make data hash : t = { data; hash }
 end
 
 module User_command = struct
@@ -87,8 +96,10 @@ module User_command = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( (User_command.Stable.V1.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        ( (User_command.Stable.V1.t
+        [@hash.ignore])
+        , (T.Stable.V1.t
+        [@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
 
@@ -101,16 +112,18 @@ module User_command = struct
     end
   end]
 
-  let create (c : User_command.t) : t = {data= c; hash= hash_command c}
+  let create (c : User_command.t) : t = { data = c; hash = hash_command c }
 
-  let data ({data; _} : t) = data
+  let data ({ data; _ } : t) = data
 
-  let command ({data; _} : t) = data
+  let command ({ data; _ } : t) = data
 
-  let hash ({hash; _} : t) = hash
+  let hash ({ hash; _ } : t) = hash
 
-  let of_checked ({data; hash} : User_command_with_valid_signature.t) : t =
-    {With_hash.data= User_command.forget_check data; hash}
+  let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
+    { With_hash.data = User_command.forget_check data; hash }
 
   include Comparable.Make (Stable.Latest)
 end
+
+[%%endif]

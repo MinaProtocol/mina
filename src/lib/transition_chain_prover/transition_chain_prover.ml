@@ -9,7 +9,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Mina_intf.Transition_chain_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t = struct
+    with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let find_in_root_history frontier state_hash =
@@ -56,7 +56,8 @@ module Make (Inputs : Inputs_intf) :
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    (External_transition.Validated.state_hash first_transition, merkle_list)
+    ( (External_transition.Validated.state_hashes first_transition).state_hash
+    , merkle_list )
 end
 
 include Make (struct

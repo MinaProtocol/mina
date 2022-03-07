@@ -4,6 +4,8 @@ open Core_kernel
 module Rounds = struct
   let rounds_full = 63
 
+  let initial_ark = true
+
   let rounds_partial = 0
 end
 
@@ -64,15 +66,15 @@ module T (M : Sponge.Intf.T) = M
 module Test
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
     (S_constant : Sponge.Intf.Sponge
-                  with module Field := T(Impl.Field.Constant)
-                   and module State := Sponge.State
-                   and type input := Impl.field
-                   and type digest := Impl.field)
+                    with module Field := T(Impl.Field.Constant)
+                     and module State := Sponge.State
+                     and type input := Impl.field
+                     and type digest := Impl.field)
     (S_checked : Sponge.Intf.Sponge
-                 with module Field := Impl.Field
-                  and module State := Sponge.State
-                  and type input := Impl.Field.t
-                  and type digest := Impl.Field.t) =
+                   with module Field := Impl.Field
+                    and module State := Sponge.State
+                    and type input := Impl.Field.t
+                    and type digest := Impl.Field.t) =
 struct
   open Impl
 
@@ -89,10 +91,10 @@ struct
               S_checked.create (Sponge.Params.map ~f:Field.constant params)
             in
             Array.iter a ~f:(S_checked.absorb s) ;
-            S_checked.squeeze s ) )
+            S_checked.squeeze s))
       (fun a ->
         let s = S_constant.create params in
         Array.iter a ~f:(S_constant.absorb s) ;
-        S_constant.squeeze s )
+        S_constant.squeeze s)
       a
 end

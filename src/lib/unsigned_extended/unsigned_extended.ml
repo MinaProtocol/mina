@@ -1,28 +1,15 @@
 (* unsigned_extended.ml *)
 
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 include Intf
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 module type Unsigned_intf = Unsigned.S
 
 module Extend
     (Unsigned : Unsigned.S) (M : sig
-        val length : int
+      val length : int
     end) : S with type t = Unsigned.t = struct
   ;;
   assert (M.length < Field.size_in_bits - 3)

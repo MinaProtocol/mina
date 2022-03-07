@@ -1,17 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
-[%%ifdef
-consensus_mechanism]
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
-
 open Core_kernel
 open Hash_prefixes
 
@@ -66,18 +52,20 @@ let coinbase_merkle_tree =
 
 let vrf_message = salt vrf_message
 
-[%%if
-mainnet]
+let signature_for_mainnet = salt signature_mainnet
 
-let signature = salt signature_mainnet
+let signature_for_testnet = salt signature_testnet
 
-[%%else]
-
-let signature = salt signature_testnet
-
-[%%endif]
+let signature =
+  match Mina_signature_kind.t with
+  | Mainnet ->
+      signature_for_mainnet
+  | Testnet ->
+      signature_for_testnet
 
 let vrf_output = salt vrf_output
+
+let vrf_evaluation = salt vrf_evaluation
 
 let epoch_seed = salt epoch_seed
 

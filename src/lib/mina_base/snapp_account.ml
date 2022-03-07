@@ -1,21 +1,10 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 
@@ -25,14 +14,15 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('app_state, 'vk) t = {app_state: 'app_state; verification_key: 'vk}
-      [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
+      type ('app_state, 'vk) t =
+        { app_state : 'app_state; verification_key : 'vk }
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 end
 
 type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
-  {app_state: 'app_state; verification_key: 'vk}
+  { app_state : 'app_state; verification_key : 'vk }
 
 [%%versioned
 module Stable = struct
@@ -44,7 +34,7 @@ module Stable = struct
         With_hash.Stable.V1.t
         option )
       Poly.Stable.V1.t
-    [@@deriving sexp, eq, compare, hash, yojson]
+    [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
   end
@@ -57,8 +47,7 @@ let digest_vk (t : Side_loaded_verification_key.t) =
     hash ~init:Hash_prefix_states.side_loaded_vk
       (pack_input (Side_loaded_verification_key.to_input t)))
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t =
@@ -77,7 +66,7 @@ module Checked = struct
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input' {t with verification_key= Lazy.force t.verification_key.hash}
+    to_input' { t with verification_key = Lazy.force t.verification_key.hash }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -102,7 +91,7 @@ let typ : (Checked.t, t) Typ.t =
           | None ->
               Pickles.Side_loaded.Verification_key.dummy
           | Some x ->
-              With_hash.data x )
+              With_hash.data x)
         ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
       |> Typ.transport_var ~there:With_hash.data
            ~back:
@@ -129,8 +118,9 @@ let to_input (t : t) =
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
-  { app_state= Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
-  ; verification_key= None }
+  { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
+  ; verification_key = None
+  }
 
 let digest (t : t) =
   Random_oracle.(

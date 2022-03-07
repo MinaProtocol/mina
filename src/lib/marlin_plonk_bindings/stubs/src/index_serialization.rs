@@ -6,7 +6,7 @@ use algebra::{
 
 use commitment_dlog::{
     commitment::{CommitmentCurve, CommitmentField, PolyComm},
-    srs::SRS,
+    srs::{SRS, SRSValue as PlonkSRSValue},
 };
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
@@ -14,9 +14,7 @@ use plonk_circuits::{
     constraints::{zk_polynomial, zk_w, ConstraintSystem as PlonkConstraintSystem},
     domains::EvaluationDomains as PlonkEvaluationDomains,
 };
-use plonk_protocol_dlog::index::{
-    Index as PlonkIndex, SRSValue as PlonkSRSValue, VerifierIndex as PlonkVerifierIndex,
-};
+use plonk_protocol_dlog::index::{Index as PlonkIndex, VerifierIndex as PlonkVerifierIndex};
 use std::io::{Error, ErrorKind, Read, Result as IoResult, Write};
 
 pub fn write_vec<A: ToBytes, W: Write>(v: &Vec<A>, mut writer: W) -> IoResult<()> {

@@ -7,13 +7,13 @@ let check :
        | `Invalid
        | `Valid_assuming of User_command.Valid.t * _ list ] = function
   | User_command.Signed_command c -> (
-    match Signed_command.check c with
-    | None ->
-        `Invalid
-    | Some c ->
-        `Valid (User_command.Signed_command c) )
+      match Signed_command.check c with
+      | None ->
+          `Invalid
+      | Some c ->
+          `Valid (User_command.Signed_command c) )
   | Snapp_command (cmd, vks) ->
-      with_return (fun {return} ->
+      with_return (fun { return } ->
           let payload =
             lazy
               Snapp_command.(
@@ -35,13 +35,16 @@ let check :
               , (p : Snapp_command.Party.Authorized.Proved.t)
               , (other : Snapp_command.Party.Body.t) ) =
             let statement : Snapp_statement.t =
-              {predicate= p.data.predicate; body1= p.data.body; body2= other}
+              { predicate = p.data.predicate
+              ; body1 = p.data.body
+              ; body2 = other
+              }
             in
             match p.authorization with
             | Signature s ->
                 check_signature s p.data.body.pk ;
                 None
-            | Both {signature; proof} ->
+            | Both { signature; proof } ->
                 check_signature signature p.data.body.pk ;
                 Some (vk, statement, proof)
             | Proof p ->
@@ -54,17 +57,19 @@ let check :
             List.filter_map ~f:statement_to_check
               ( match (cmd, vks) with
               | Proved_proved r, `Two (vk1, vk2) ->
-                  [(vk1, r.one, r.two.data.body); (vk2, r.two, r.one.data.body)]
+                  [ (vk1, r.one, r.two.data.body)
+                  ; (vk2, r.two, r.one.data.body)
+                  ]
               | Proved_signed r, `One vk1 ->
                   check_signature r.two.authorization r.two.data.body.pk ;
-                  [(vk1, r.one, r.two.data.body)]
+                  [ (vk1, r.one, r.two.data.body) ]
               | Proved_empty r, `One vk1 ->
                   let two =
                     Option.value_map r.two
                       ~default:Snapp_command.Party.Body.dummy ~f:(fun two ->
-                        two.data.body )
+                        two.data.body)
                   in
-                  [(vk1, r.one, two)]
+                  [ (vk1, r.one, two) ]
               | Signed_signed r, `Zero ->
                   check_signature r.one.authorization r.one.data.body.pk ;
                   check_signature r.two.authorization r.two.data.body.pk ;
@@ -82,4 +87,4 @@ let check :
           | [] ->
               `Valid v
           | _ :: _ ->
-              `Valid_assuming (v, statements_to_check) )
+              `Valid_assuming (v, statements_to_check))

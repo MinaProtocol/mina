@@ -2,11 +2,11 @@
  (name merkle_mask)
  (public_name merkle_mask)
  (library_flags -linkall)
- (libraries core debug_assert bitstring integers immutable_array
+ (libraries core_kernel debug_assert bitstring integers immutable_array
             merkle_ledger merkle_address yojson visualization)
  (preprocess
   (pps
-    ppx_deriving.eq
+    ppx_compare
     ppx_deriving.show
     ppx_deriving_yojson
     ppx_jane
