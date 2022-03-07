@@ -260,6 +260,10 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
+
+let of_js_field (x : field_class Js.t) = x##.value
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -1038,6 +1042,24 @@ let array_map2 t1 t2 ~f =
   array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
   res
 
+module Poseidon_sponge_checked =
+  Sponge.Make_sponge (Pickles.Step_main_inputs.Sponge.Permutation)
+module Poseidon_sponge =
+  Sponge.Make_sponge (Sponge.Poseidon (Pickles.Tick_field_sponge.Inputs))
+
+let sponge_params_checked =
+  Sponge.Params.(
+    map pasta_p_3 ~f:(Fn.compose Field.constant Field.Constant.of_string))
+
+let sponge_params = Sponge.Params.(map pasta_p_3 ~f:Field.Constant.of_string)
+
+type sponge =
+  | Checked of Poseidon_sponge_checked.t
+  | Unchecked of Poseidon_sponge.t
+
+let to_unchecked (x : Field.t) =
+  match x with Constant x -> x | x -> As_prover.read_var x
+
 let poseidon =
   object%js
     method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
@@ -1058,6 +1080,27 @@ let poseidon =
           array_iter xs ~f:(Field.absorb s) ;
           new%js field_constr
             (As_field.of_field (Impl.Field.constant (Field.squeeze s)))
+
+    (* returns a "sponge" that stays opaque to JS *)
+    method spongeCreate () : sponge =
+      if Impl.in_checked_computation () then
+        Checked
+          (Poseidon_sponge_checked.create ?init:None sponge_params_checked)
+      else Unchecked (Poseidon_sponge.create ?init:None sponge_params)
+
+    method spongeAbsorb (sponge : sponge) field : unit =
+      match sponge with
+      | Checked s ->
+          Poseidon_sponge_checked.absorb s (of_js_field field)
+      | Unchecked s ->
+          Poseidon_sponge.absorb s (to_unchecked @@ of_js_field field)
+
+    method spongeSqueeze (sponge : sponge) =
+      match sponge with
+      | Checked s ->
+          Poseidon_sponge_checked.squeeze s |> to_js_field
+      | Unchecked s ->
+          Poseidon_sponge.squeeze s |> Field.constant |> to_js_field
   end
 
 class type verification_key_class =

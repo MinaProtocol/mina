@@ -7,6 +7,7 @@
    kimchi_backend
    run_in_thread.fake
    kimchi
+   random_oracle
    js_of_ocaml
    bindings_js
    integers_stubs_js
