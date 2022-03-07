@@ -21,9 +21,17 @@ extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
     }
 }
 
-ocaml::custom!(CamlPastaFpPlonkIndex {
-    finalize: caml_pasta_fp_plonk_index_finalize,
-});
+impl ocaml::custom::Custom for CamlPastaFpPlonkIndex {
+    const NAME: &'static str = "CamlPastaFpPlonkIndex\0";
+    const USED: usize = 1;
+    /// Encourage the GC to free when there are > 12 in memory
+    const MAX: usize = 12;
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        finalize: Some(caml_pasta_fp_plonk_index_finalize),
+        ..ocaml::custom::DEFAULT_CUSTOM_OPS
+    };
+}
 
 #[ocaml_gen::func]
 #[ocaml::func]
