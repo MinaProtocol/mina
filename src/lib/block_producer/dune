@@ -4,10 +4,55 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   async core mina_base mina_ledger mina_intf mina_state
-   mina_transition consensus interruptible o1trace pipe_lib
-   prover transaction_snark_scan_state transition_frontier
-   network_pool unix_timestamp otp_lib transition_chain_prover vrf_evaluator)
+   ;; opam libraries
+   sexplib0
+   async_kernel
+   core_kernel
+   core
+   async
+   ;; local libraries
+   mina_metrics
+   mina_net2
+   debug_assert
+   blockchain_snark
+   with_hash
+   truth
+   mina_numbers
+   transaction_snark
+   ledger_proof
+   error_json
+   currency
+   logger
+   signature_lib
+   transition_frontier
+   transaction_snark_scan_state
+   prover
+   mina_state
+   mina_intf
+   mina_ledger
+   mina_base
+   mina_transition
+   consensus
+   interruptible
+   o1trace
+   pipe_lib
+   network_pool
+   unix_timestamp
+   otp_lib
+   transition_chain_prover
+   vrf_evaluator
+   transition_frontier_base
+   block_time
+   staged_ledger
+   staged_ledger_diff
+   mina_compile_config
+   precomputed_values
+   coda_genesis_proof
+   transition_frontier_extensions
+   unsigned_extended
+   genesis_constants
+   data_hash_lib
+ )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_register_event))
  (instrumentation (backend bisect_ppx))

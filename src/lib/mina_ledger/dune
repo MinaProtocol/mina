@@ -4,4 +4,40 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
- (libraries mina_base core core_kernel merkle_ledger merkle_mask rocksdb syncable_ledger signature_lib))
+ (libraries
+   ;; opam libraries
+   rocks
+   integers
+   async_kernel
+   base.caml
+   base
+   core
+   core_kernel
+   sexplib0
+   bin_prot.shape
+   base.base_internalhash_types
+   async
+   core_kernel.uuid
+   ppx_inline_test.config
+   ;; local libraries
+   syncable_ledger
+   snark_params
+   pickles
+   mina_base.import
+   rocksdb
+   random_oracle
+   currency
+   genesis_constants
+   merkle_mask
+   merkle_ledger
+   mina_base
+   signature_lib
+   mina_numbers
+   debug_assert
+   merkle_address
+   key_value_database
+   data_hash_lib
+   quickcheck_lib
+   snarky.backendless
+   unsigned_extended
+))

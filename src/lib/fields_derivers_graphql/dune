@@ -1,7 +1,19 @@
 (library
  (name fields_derivers_graphql)
  (public_name fields_derivers.graphql)
- (libraries core_kernel fieldslib fields_derivers graphql graphql-async graphql_parser)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   graphql_parser
+   graphql-async
+   graphql
+   fieldslib
+   core_kernel
+   yojson
+   ppx_inline_test.config
+   ;; local libraries
+   fields_derivers
+ )
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess (pps ppx_jane ppx_fields_conv ppx_let ppx_inline_test ppx_custom_printf ppx_version)))

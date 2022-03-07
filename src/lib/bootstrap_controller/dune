@@ -5,14 +5,47 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_register_event))
  (libraries
+   ;; opam libraries
+   sexplib0
    core
+   async_kernel
+   core_kernel
+   async
+   async_unix
+   ppx_inline_test.config
+   ;; local libraries
+   mina_numbers
+   gadt_lib
+   child_processes
+   transition_frontier_base
+   mina_metrics
+   error_json
+   with_hash
+   mina_state
+   inline_test_quiet_logs
+   transition_frontier_persistent_frontier
+   verifier
+   data_hash_lib
+   logger
+   network_peer
+   sync_handler
+   transition_frontier
+   pipe_lib
+   mina_transition
    mina_base
    mina_ledger
-   mina_transition
    syncable_ledger
-   pipe_lib
    consensus
-   transition_frontier
    mina_networking
-   sync_handler
-   fake_network))
+   fake_network
+   trust_system
+   transition_frontier_persistent_root
+   precomputed_values
+   truth
+   merkle_ledger
+   staged_ledger
+   genesis_constants
+   coda_genesis_ledger
+   block_time
+   mina_base.util
+   ))

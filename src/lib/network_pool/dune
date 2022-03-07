@@ -3,7 +3,59 @@
  (public_name network_pool)
  (inline_tests)
  (library_flags -linkall)
- (libraries async core one_or_two pipe_lib quickcheck_lib verifier mina_base mina_ledger mina_generators ledger_proof transaction_snark transition_frontier consensus mina_numbers)
+ (libraries
+   ;; opam libraries
+   result
+   async_unix
+   base.base_internalhash_types
+   base
+   async_kernel
+   core_kernel
+   core
+   async
+   sexplib0
+   base.caml
+   bin_prot.shape
+   ppx_inline_test.config
+   ;; local libraries
+   mina_generators
+   sgn
+   transition_frontier_base
+   staged_ledger
+   child_processes
+   precomputed_values
+   o1trace
+   snark_work_lib
+   mina_net2
+   logger
+   transaction_snark_work
+   genesis_constants
+   mina_numbers
+   transition_frontier
+   ledger_proof
+   verifier
+   pipe_lib
+   one_or_two
+   quickcheck_lib
+   mina_base
+   transaction_snark
+   consensus
+   network_peer
+   currency
+   trust_system
+   block_time
+   transition_frontier_extensions
+   signature_lib
+   inline_test_quiet_logs
+   pickles
+   error_json
+   mina_metrics
+   interruptible
+   merkle_ledger
+   data_hash_lib
+   mina_ledger
+   mina_base.import
+ )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_base ppx_coda ppx_version ppx_register_event ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv))

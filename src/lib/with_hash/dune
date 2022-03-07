@@ -1,7 +1,7 @@
 (library
  (name with_hash)
  (public_name with_hash)
- (libraries core_kernel)
+ (libraries bin_prot.shape sexplib0 base.caml core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -1,6 +1,21 @@
 (library
  (name snarky_blake2_tests)
  (inline_tests)
- (libraries snarky_blake2 snarky snark_params)
+ (libraries
+   ;; opam libraries 
+   base
+   ppx_inline_test.config
+   core_kernel
+   base.base_internalhash_types
+   digestif
+   ;; local libraries
+   blake2
+   pickles
+   snark_params
+   snarky
+   snarky_blake2
+   snarky.backendless
+   crypto_params
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_inline_test ppx_let ppx_assert ppx_sexp_conv ppx_version)))

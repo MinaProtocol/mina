@@ -4,4 +4,43 @@
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
- (libraries core_kernel staged_ledger transition_chain_verifier truth mina_base mina_ledger mina_net2 mina_state precomputed_values consensus protocol_version staged_ledger_diff verifier allocation_functor))
+ (libraries
+   ;; opam libraries
+   integers
+   core_kernel
+   async_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   base64
+   result
+   ppx_inline_test.config
+   core
+   ;; local libraries
+   mina_ledger
+   mina_numbers
+   unsigned_extended
+   ledger_proof
+   logger
+   blockchain_snark
+   unix_timestamp
+   allocation_functor
+   verifier
+   staged_ledger_diff
+   protocol_version
+   consensus
+   precomputed_values
+   mina_state
+   mina_net2
+   mina_base
+   truth
+   transition_chain_verifier
+   staged_ledger
+   data_hash_lib
+   block_time
+   non_empty_list
+   with_hash
+   signature_lib
+   genesis_constants
+   transaction_snark_work
+))
