@@ -129,7 +129,7 @@ struct
             Signed_command.payload signed_cmd |> Signed_command_payload.body
           in
           match body with
-          | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
+          | Payment { source_pk; receiver_pk; amount = paid_amt }
             when Public_key.Compressed.equal source_pk sender_pub_key
                  && Public_key.Compressed.equal receiver_pk receiver_pub_key
                  && Currency.Amount.equal paid_amt amount ->
