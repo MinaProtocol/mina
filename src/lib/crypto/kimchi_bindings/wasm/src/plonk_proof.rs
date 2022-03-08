@@ -590,8 +590,7 @@ macro_rules! impl_proof {
                 witness: WasmVecVecF,
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
-            ) -> WasmProverProof {
-                console_log!("{:?}", index.0);
+            ) -> Result<WasmProverProof, JsValue> {
                 {
                     let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
@@ -651,13 +650,9 @@ macro_rules! impl_proof {
                     DefaultFqSponge<_, PlonkSpongeConstants15W>,
                     DefaultFrSponge<_, PlonkSpongeConstants15W>,
                 >(&group_map, witness, index, prev);
-                return match maybe_proof {
-                    Ok(proof) => proof.into(),
-                    Err(err) => {
-                        log(&err.to_string());
-                        panic!("thrown an error")
-                    }
-                }
+                let proof =
+                    maybe_proof.map_err(|e| JsValue::from_str(&e.to_string()))?;
+                Ok(proof.into())
             }
 
             #[wasm_bindgen]

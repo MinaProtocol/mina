@@ -2,12 +2,49 @@ module Backend = Kimchi_pasta.Vesta_based_plonk
 module Impl = Pickles.Impls.Step
 module Field = Impl.Field
 
-let pp_vec v =
-  let len = Backend.Field.Vector.length v in
-  for i = 0 to len - 1 do
-    Format.eprintf "  %s@." (Backend.Field.to_string (Backend.Field.Vector.get v i))
-  done
+let run_poseidon_test () =
+let module Backend = Kimchi_pasta.Vesta_based_plonk in
+let module Impl = Pickles.Impls.Step in
+let module Field = Impl.Field in
+  let keygen_prove_verify (main : ?w:'a -> unit -> unit) spec ?priv () =
+    (* Core_kernel.printf "generating keypair...\n" ; *)
+    let kp =
+      Impl.constraint_system ~exposing:spec (main ?w:None)
+      |> Impl.Keypair.generate
+    in
+    let pk = Impl.Keypair.pk kp in
+    (* Core_kernel.printf "prove...\n" ; *)
+    let proof =
+      Impl.generate_witness_conv
+        ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
+          Backend.Proof.create pk ~auxiliary:auxiliary_inputs
+            ~primary:public_inputs)
+        spec (main ?w:priv) ()
+    in
+    let vk = Impl.Keypair.vk kp in
+    (* TODO: make work for larger arbitrary pub spec *)
+    let pub_vec = Backend.Field.Vector.create () in
+    (* Core_kernel.printf "verify...\n" ; *)
+    let ok = Backend.Proof.verify proof vk pub_vec in
+    Core_kernel.printf (if ok then "ok\n" else "not ok\n") ;
+    assert ok
+  in
 
+  Core_kernel.printf "unit test poseidon\n" ;
+
+  let main ?w:_ () =
+    let hash = Random_oracle.Checked.hash [| Field.one |] in
+    ignore hash
+  in
+  keygen_prove_verify main
+    Impl.Data_spec.[ ]
+    () ~priv:()
+
+let%test_unit "poseidon" =
+  Core_kernel.printf "unit test poseidon\n" ;
+  run_poseidon_test ()
+
+(*
 (* function to check a circuit defined by a 'main' function *)
 let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   (* Core_kernel.printf "generating keypair...\n" ; *)
@@ -20,10 +57,6 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   let proof =
     Impl.generate_witness_conv
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
-        Format.eprintf "public_inputs:@." ;
-        pp_vec public_inputs ;
-        Format.eprintf "auxiliary_inputs:@." ;
-        pp_vec auxiliary_inputs ;
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
           ~primary:public_inputs)
       spec (main ?w:priv) () pub
@@ -76,7 +109,7 @@ let%test_unit "poseidon" =
   in
   keygen_prove_verify main
     Impl.Data_spec.[ Field.typ ]
-    (to_unchecked hash) ~priv:(to_unchecked preimage)
+    (to_unchecked hash) ~priv:(to_unchecked preimage)*)
 
 (* let%test_unit "simple" =
   (* Core_kernel.printf "unit test simple\n" ; *)

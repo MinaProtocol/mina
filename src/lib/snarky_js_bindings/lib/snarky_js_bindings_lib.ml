@@ -2699,13 +2699,7 @@ let run_poseidon_test () =
 let module Backend = Kimchi_pasta.Vesta_based_plonk in
 let module Impl = Pickles.Impls.Step in
 let module Field = Impl.Field in
-let pp_vec v =
-  let len = Backend.Field.Vector.length v in
-  for i = 0 to len - 1 do
-    Format.eprintf "  %s@." (Backend.Field.to_string (Backend.Field.Vector.get v i))
-  done
-in
-  let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
+  let keygen_prove_verify (main : ?w:'a -> unit -> unit) spec ?priv () =
     (* Core_kernel.printf "generating keypair...\n" ; *)
     let kp =
       Impl.constraint_system ~exposing:spec (main ?w:None)
@@ -2716,66 +2710,28 @@ in
     let proof =
       Impl.generate_witness_conv
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
-        Format.eprintf "public_inputs:@." ;
-        pp_vec public_inputs ;
-        Format.eprintf "auxiliary_inputs:@." ;
-        pp_vec auxiliary_inputs ;
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs)
-        spec (main ?w:priv) () pub
+        spec (main ?w:priv) ()
     in
     let vk = Impl.Keypair.vk kp in
     (* TODO: make work for larger arbitrary pub spec *)
     let pub_vec = Backend.Field.Vector.create () in
-    Backend.Field.Vector.emplace_back pub_vec pub ;
     (* Core_kernel.printf "verify...\n" ; *)
     let ok = Backend.Proof.verify proof vk pub_vec in
     Core_kernel.printf (if ok then "ok\n" else "not ok\n") ;
     assert ok
   in
 
-  let read_witness typ w =
-    Impl.exists typ ~compute:(fun () -> Core_kernel.Option.value_exn w)
-  in
-
-  let to_unchecked (x : Field.t) =
-    match x with Constant y -> y | y -> Impl.As_prover.read_var y
-  in
-
-  let poseidon_hash input =
-    let digest =
-      try Random_oracle.Checked.hash input
-      with _ ->
-        Random_oracle.hash (Core_kernel.Array.map ~f:to_unchecked input)
-        |> Field.constant
-    in
-    (* debug hash value: *)
-    (* let () =
-         try
-           let s = digest |> to_unchecked |> Field.Constant.to_string in
-           Core_kernel.printf "got hash\n" ;
-           Core_kernel.printf "%s\n" s ;
-           ()
-         with _ ->
-           Impl.as_prover (fun () ->
-               let s = digest |> to_unchecked |> Field.Constant.to_string in
-               Core_kernel.printf "got hash (as_prover)\n" ;
-               Core_kernel.printf "%s\n" s)
-       in *)
-    digest
-  in
-
   Core_kernel.printf "unit test poseidon\n" ;
-  let preimage = Field.one in
-  let hash = poseidon_hash [| preimage |] in
 
-  let main ?w z () =
-    let preimage = read_witness Field.typ w in
-    Field.Assert.equal (poseidon_hash [| preimage |]) z
+  let main ?w:_ () =
+    let hash = Random_oracle.Checked.hash [| Field.one |] in
+    ignore hash
   in
   keygen_prove_verify main
-    Impl.Data_spec.[ Field.typ ]
-    (to_unchecked hash) ~priv:(to_unchecked preimage)
+    Impl.Data_spec.[ ]
+    () ~priv:()
 
 let export () =
   Js.export "Field" field_class ;
