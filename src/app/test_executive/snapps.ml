@@ -372,16 +372,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       [%log info] "Snapps transaction included in transition frontier"
     in
     let%bind () =
-      section "send a snapp to create a snapp account"
+      section "Send a snapp to create snapp accounts"
         (send_snapp parties_create_account)
     in
     let%bind () =
       section
-        "Wait for snapp to create account to be included in transition frontier"
+        "Wait for snapp to create accounts to be included in transition \
+         frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "send a snapp to update permissions"
+      section "Send a snapp to update permissions"
         (send_snapp parties_update_permissions)
     in
     let%bind () =
