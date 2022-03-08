@@ -21,18 +21,12 @@
    base.caml
    ;; local libraries
    key_gen
-   transition_router
-   interruptible
    integration_test_lib
    graphql_lib
    coda_runtime_config
    mina_base
-   pipe_lib
    genesis_constants
-   transition_frontier
    genesis_ledger_helper
-   block_time
-   block_producer
    logger
    mina_base_import
    signature_lib

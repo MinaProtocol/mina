@@ -13,18 +13,11 @@
    consensus
    precomputed_values
    genesis_constants
-   with_hash
    mina_transition
-   transaction_snark
-   blockchain_snark
    proof_carrying_data
-   truth
-   currency
-   signature_lib
    cache_lib
    mina_base
    mina_state
-   snark_work_lib
    pipe_lib
    network_peer
    logger

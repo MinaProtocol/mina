@@ -18,13 +18,11 @@
    bin_prot.shape
    async_unix
    ;; local libraries
-   vrf_lib
    mina_base.import
    data_hash_lib
    mina_state
    transaction_witness
    transaction_snark
-   pipe_lib
    mina_base
    snark_work_lib
    one_or_two
@@ -35,7 +33,6 @@
    parallel_scan
    sgn
    ledger_proof
-   snark_params
    genesis_constants
    o1trace
    with_hash

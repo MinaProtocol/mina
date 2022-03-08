@@ -22,7 +22,6 @@
    random_oracle_input
    mina_base.import
    mina_ledger
-   sparse_ledger_lib
    quickcheck_lib
    mina_metrics
    coda_genesis_ledger
@@ -34,12 +33,10 @@
    transaction_snark_work
    ledger_proof
    logger
-   merkle_mask
    transaction_snark
    transaction_snark_scan_state
    sgn
    mina_base
-   pipe_lib
    verifier
    staged_ledger_diff
    signature_lib

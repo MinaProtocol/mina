@@ -28,7 +28,6 @@
    kimchi_backend.pasta
    mina_base.import
    sgn
-   mina_metrics
    pickles_types
    blake2
    pickles
@@ -45,22 +44,18 @@
    genesis_constants
    block_time
    base58_check
-   allocation_functor
    bignum_bigint
    mina_compile_config
    codable
    crypto_params
    debug_assert
    fold_lib
-   fields_derivers
    fields_derivers.snapps
    fields_derivers.json
    fields_derivers.graphql
-   hash_prefixes
    one_or_two
    outside_hash_image
    quickcheck_lib
-   snark_bits
    snarky.backendless
    test_util
    unsigned_extended
@@ -68,7 +63,6 @@
    random_oracle_input
    data_hash_lib
    pickles.backend
-   bitstring_lib
    mina_signature_kind
    mina_base.util
    kimchi_backend
