@@ -49,22 +49,6 @@ module Protocol_state = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { previous_state_hash : State_hash.Stable.V1.t
-        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V1.t
-        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V1.t
-        }
-
-      let to_latest (t : t) : V2.t =
-        { previous_state_hash = t.previous_state_hash
-        ; blockchain_state =
-            Mina_state.Blockchain_state.Value.Stable.V1.to_latest
-              t.blockchain_state
-        ; consensus_state = t.consensus_state
-        }
-    end
   end]
 end
 

@@ -15,17 +15,6 @@ module Poly : sig
         }
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
-
-    module V1 : sig
-      type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        { staged_ledger_hash : 'staged_ledger_hash
-        ; snarked_ledger_hash : 'snarked_ledger_hash
-        ; genesis_ledger_hash : 'snarked_ledger_hash
-        ; snarked_next_available_token : 'token_id
-        ; timestamp : 'time
-        }
-      [@@deriving sexp, equal, compare, fields, yojson]
-    end
   end]
 end
 
@@ -42,18 +31,6 @@ module Value : sig
       [@@deriving sexp, equal, compare, hash, yojson]
 
       val to_latest : t -> t
-    end
-
-    module V1 : sig
-      type t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Unsigned_extended.UInt64.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
-
-      val to_latest : t -> V2.t
     end
   end]
 end

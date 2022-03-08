@@ -15,34 +15,6 @@ module Poly = struct
         }
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
-
-    module V1 = struct
-      type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        { staged_ledger_hash : 'staged_ledger_hash
-        ; snarked_ledger_hash : 'snarked_ledger_hash
-        ; genesis_ledger_hash : 'snarked_ledger_hash
-        ; snarked_next_available_token : 'token_id
-        ; timestamp : 'time
-        }
-      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
-
-      let to_latest
-          { staged_ledger_hash
-          ; snarked_ledger_hash
-          ; genesis_ledger_hash
-          ; snarked_next_available_token = _
-          ; timestamp
-          } =
-        { V2.staged_ledger_hash
-        ; genesis_ledger_hash
-        ; timestamp
-        ; registers =
-            { Registers.ledger = snarked_ledger_hash
-            ; pending_coinbase_stack = ()
-            ; local_state = Local_state.dummy
-            }
-        }
-    end
   end]
 end
 
@@ -70,18 +42,6 @@ module Value = struct
       [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Unsigned_extended.UInt64.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
-
-      let to_latest (t : t) : V2.t = Poly.Stable.V1.to_latest t
     end
   end]
 end
