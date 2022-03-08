@@ -11,9 +11,9 @@ module Digest = struct
     Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
 
   module Base58_check = Base58_check.Make (struct
-    let description = "Private key"
+    let description = "Token ID"
 
-    let version_byte = Base58_check.Version_bytes.private_key
+    let version_byte = Base58_check.Version_bytes.token_id_key
   end)
 
   let to_base58_check t : string =
