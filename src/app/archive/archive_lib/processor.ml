@@ -1724,13 +1724,13 @@ module Coinbase = struct
         ( ( coinbase_typ
           , t.receiver_id
           , t.amount
-          , Token_id.(to_string default) |> Int64.of_string )
+          , Token_id.(to_string default) )
         , t.hash )
     in
     let decode ((_, receiver_id, amount, _), hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
