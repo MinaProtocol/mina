@@ -7,7 +7,7 @@ module Digest = struct
   [%%ifdef consensus_mechanism]
 
   let of_bigstring_exn =
-    Binable.of_bigstring (module Snark_params.Tick.Field.Stable.Latest)
+    Binable.of_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
 
   let to_bigstring =
     Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
