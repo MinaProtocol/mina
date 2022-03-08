@@ -43,8 +43,7 @@ let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
   let amount = Currency.Amount.of_int amount in
   let body =
-    Signed_command_payload.Body.Payment
-      { source_pk; receiver_pk; amount }
+    Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount }
   in
   Signed_command_payload.Poly.{ common; body }
 
