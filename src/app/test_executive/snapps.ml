@@ -258,7 +258,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Snapp failed: %s, but expected \"%s\"" err_str substring )
     in
-    let get_account_permissions ~account_id =
+    let get_account_permissions account_id =
       [%log info] "Getting permissions for account"
         ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
       match%bind.Deferred
@@ -273,7 +273,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.hard_error (Error.of_string err_str)
     in
-    let get_account_update ~account_id =
+    let get_account_update account_id =
       [%log info] "Getting update for account"
         ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
       match%bind.Deferred
@@ -397,9 +397,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              [%log info] "Verifying permissions for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-             let%bind ledger_permissions =
-               get_account_permissions ~account_id
-             in
+             let%bind ledger_permissions = get_account_permissions account_id in
              if
                Mina_base.Permissions.equal ledger_permissions
                  permissions_updated
@@ -434,7 +432,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              [%log info] "Verifying updates for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-             let%bind ledger_update = get_account_update ~account_id in
+             let%bind ledger_update = get_account_update account_id in
              if
                compatible_updates ~ledger_update
                  ~requested_update:snapp_update_all
