@@ -72,8 +72,6 @@ DROP TABLE snapp_nonce_bounds;
 
 DROP TABLE snapp_timestamp_bounds;
 
-DROP TABLE snapp_token_id_bounds;
-
 DROP TYPE snapp_auth_required_type;
 
 DROP TYPE snapp_authorization_kind_type;
