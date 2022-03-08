@@ -14,7 +14,6 @@
    transaction_snark
    one_or_two
    ledger_proof
-   mina_base
    signature_lib
    )
  (instrumentation (backend bisect_ppx))

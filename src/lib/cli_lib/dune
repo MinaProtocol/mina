@@ -30,7 +30,6 @@
    signature_lib
    currency
    rosetta_lib
-   graphql_lib
    secrets
    mina_base
    work_selector

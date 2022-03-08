@@ -10,7 +10,6 @@
    core
    base.caml
    ;; local libraries
-   snarkette
    snarky_curves
    sgn_type
    snarky.backendless
