@@ -1,5 +1,5 @@
 (library
- (name signature_lib_nonconsensus)
+ (name signature_lib)
  (public_name signature_lib_nonconsensus)
  (library_flags -linkall)
  (inline_tests)

@@ -10,7 +10,7 @@
 
     Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
-open Core
+open Core_kernel
 open Snark_params
 open Snarky_backendless
 open Tick
@@ -21,11 +21,11 @@ module type S = sig
   type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
-    module V2 : sig
+    module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V2
+    module Latest = V1
   end
 
   module Coinbase_data : sig
@@ -132,6 +132,10 @@ module type S = sig
     val equal_data : t -> t -> bool
 
     val equal_state_hash : t -> t -> bool
+
+    (** The two stacks are connected. This should be used instead of `equal` to
+    check one transaction snark statement follow the other.*)
+    val connected : ?prev:t option -> first:t -> second:t -> unit -> bool
 
     val push_coinbase : Coinbase.t -> t -> t
 

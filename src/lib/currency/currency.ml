@@ -1,20 +1,14 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_bits
+open Snark_params
+open Tick
 
 [%%ifdef consensus_mechanism]
 
-open Snark_bits
 open Bitstring_lib
-open Snark_params
-open Tick
 open Let_syntax
-
-[%%else]
-
-open Snark_params_nonconsensus
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
@@ -58,7 +52,10 @@ end) : sig
 
   [%%else]
 
-  include S with type t = Unsigned.t
+  include
+    S
+      with type t = Unsigned.t
+       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
 
   [%%endif]
 
@@ -190,13 +187,135 @@ end = struct
         in
         actual_packed)
 
+  (** [range_check t] asserts that [0 <= t < 2^length_in_bits].
+
+      Any value consumed or returned by functions in this module must satisfy
+      this assertion.
+  *)
   let range_check t =
     let%bind actual = range_check' t in
     Field.Checked.Assert.equal actual t
 
+  (** [range_check_flag t] returns a [Boolean.var] that is true when
+      [0 <= t < 2^length_in_bits], and false otherwise.
+
+      This function MUST NOT be used to constrain return values. Use
+      [range_adjust_flagged] instead.
+
+      This function should only be used for comparison operations, where the
+      result of an addition or subtraction is unused. For example,
+      [let ( <= ) x y = range_check_flag (Field.Var.sub y x)].
+  *)
   let range_check_flag t =
     let%bind actual = range_check' t in
     Field.Checked.equal actual t
+
+  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
+
+  let modulus_as_field =
+    lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
+
+  let double_modulus_as_field =
+    lazy (Field.(mul (of_int 2)) (Lazy.force modulus_as_field))
+
+  (** [range_adjust_flagged kind t] returns [t'] that fits in [length_in_bits]
+      bits, and satisfies [t' = t + k * 2^length_in_bits] for some [k].
+      The [`Overflow b] return value is false iff [t' = t].
+
+      This function should be used when [t] was computed via addition or
+      subtraction, to calculate the equivalent value that would be returned by
+      overflowing or underflowing an integer with [length_in_bits] bits.
+
+      The [`Add] and [`Sub] values for [kind] are specializations that use
+      fewer constraints and perform fewer calculations. Any inputs that satisfy
+      the invariants for [`Add] or [`Sub] will return the same value if
+      [`Add_or_sub] is used instead.
+
+      Invariants:
+      * if [kind] is [`Add], [0 <= t < 2 * 2^length_in_bits - 1];
+      * if [kind] is [`Sub], [- 2^length_in_bits < t < 2^length_in_bits];
+      * if [kind] is [`Add_or_sub],
+        [- 2^length_in_bits < t < 2 * 2^length_in_bits - 1].
+  *)
+  let range_adjust_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
+    let%bind adjustment_factor =
+      exists Field.typ
+        ~compute:
+          As_prover.(
+            let%map t = read Field.typ t in
+            match kind with
+            | `Add ->
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* Within range. *)
+                  Field.zero
+                else
+                  (* Overflowed. We compensate by subtracting [modulus_as_field]. *)
+                  Field.(negate one)
+            | `Sub ->
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* Within range. *)
+                  Field.zero
+                else
+                  (* Underflowed, but appears as an overflow because of wrapping in
+                     the field (that is, -1 is the largest field element, -2 is the
+                     second largest, etc.). Compensate by adding [modulus_as_field].
+                  *)
+                  Field.one
+            | `Add_or_sub ->
+                (* This case is a little more nuanced: -modulus_as_field < t <
+                   2*modulus_as_field, and we need to detect which 'side of 0' we
+                   are. Thus, we have 3 cases:
+                *)
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* 1. we are already in the desired range, no adjustment; *)
+                  Field.zero
+                else if
+                  Int.(Field.compare t (Lazy.force double_modulus_as_field) < 0)
+                then
+                  (* 2. we are in the range
+                        [modulus_as_field <= t < 2 * modulus_as_field],
+                        so this was an addition that overflowed, and we should
+                        compensate by subtracting [modulus_as_field];
+                  *)
+                  Field.(negate one)
+                else
+                  (* 3. we are outside of either range, so this must be the
+                        underflow of a subtraction, and we should compensate by
+                        adding [modulus_as_field].
+                  *)
+                  Field.one)
+    in
+    let%bind out_of_range =
+      match kind with
+      | `Add ->
+          (* 0 or -1 => 0 or 1 *)
+          Boolean.of_field (Field.Var.negate adjustment_factor)
+      | `Sub ->
+          (* Already 0 or 1 *)
+          Boolean.of_field adjustment_factor
+      | `Add_or_sub ->
+          (* The return flag [out_of_range] is a boolean represented by either 0
+             when [t] is in range or 1 when [t] is out-of-range.
+             Notice that [out_of_range = adjustment_factor^2] gives us exactly
+             the desired values, and moreover we can ensure that
+             [adjustment_factor] is exactly one of -1, 0 or 1 by checking that
+             [out_of_range] is boolean.
+          *)
+          Field.Checked.mul adjustment_factor adjustment_factor
+          >>= Boolean.of_field
+    in
+    (* [t_adjusted = t + adjustment_factor * modulus_as_field] *)
+    let t_adjusted =
+      let open Field.Var in
+      add t (scale adjustment_factor (Lazy.force modulus_as_field))
+    in
+    let%bind t_adjusted = seal t_adjusted in
+    let%bind actual = range_check' t_adjusted in
+    let%map () =
+      with_label "range_adjust_flagged"
+        (Field.Checked.Assert.equal actual t_adjusted)
+    in
+    (t_adjusted, `Overflow out_of_range)
 
   let of_field (x : Field.t) : t =
     of_bits (List.take (Field.unpack x) length_in_bits)
@@ -208,8 +327,6 @@ end = struct
       { Field.typ with check = range_check }
       ~there:to_field ~back:of_field
 
-  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
-
   [%%endif]
 
   let zero = Unsigned.zero
@@ -218,6 +335,10 @@ end = struct
 
   let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
+  let sub_flagged x y =
+    let z = Unsigned.sub x y in
+    (z, `Underflow (x < y))
+
   let add x y =
     let z = Unsigned.add x y in
     if z < x then None else Some z
@@ -225,6 +346,15 @@ end = struct
   let add_flagged x y =
     let z = Unsigned.add x y in
     (z, `Overflow (z < x))
+
+  let add_signed_flagged x y =
+    match y.Signed_poly.sgn with
+    | Sgn.Pos ->
+        let z, `Overflow b = add_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
+    | Sgn.Neg ->
+        let z, `Underflow b = sub_flagged x y.Signed_poly.magnitude in
+        (z, `Overflow b)
 
   let scale u64 i =
     let i = Unsigned.of_int i in
@@ -249,8 +379,6 @@ end = struct
     [@@deriving sexp, hash, compare, yojson, hlist]
 
     type t = (Unsigned.t, Sgn.t) Signed_poly.t [@@deriving sexp, hash, yojson]
-
-    type signed_fee = t
 
     let compare : t -> t -> int =
       let cmp = [%compare: (Unsigned.t, Sgn.t) Signed_poly.t] in
@@ -324,6 +452,22 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
+    let add_flagged (x : t) (y : t) : t * [ `Overflow of bool ] =
+      match (x.sgn, y.sgn) with
+      | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
+          let magnitude, `Overflow b = add_flagged x.magnitude y.magnitude in
+          (create ~sgn ~magnitude, `Overflow b)
+      | Pos, Neg | Neg, Pos ->
+          let c = compare_magnitude x.magnitude y.magnitude in
+          ( ( if Int.( < ) c 0 then
+              create ~sgn:y.sgn
+                ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
+            else if Int.( > ) c 0 then
+              create ~sgn:x.sgn
+                ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
+            else zero )
+          , `Overflow false )
+
     let negate t =
       if Unsigned.(equal zero t.magnitude) then zero
       else { t with sgn = Sgn.negate t.sgn }
@@ -337,6 +481,8 @@ end = struct
     let of_fee = Fn.id
 
     [%%ifdef consensus_mechanism]
+
+    type signed_fee = t
 
     let magnitude_to_field = to_field
 
@@ -500,15 +646,35 @@ end = struct
             ~compute:
               (let open As_prover in
               let%map x = read typ x and y = read typ y in
-              Option.value_map (add x y) ~f:(fun r -> r.sgn) ~default:Sgn.Pos)
+              match add x y with
+              | Some r ->
+                  r.sgn
+              | None -> (
+                  match (x.sgn, y.sgn) with
+                  | Sgn.Neg, Sgn.Neg ->
+                      (* Ensure that we provide a value in the range
+                         [-modulus_as_field < magnitude < 2*modulus_as_field]
+                         for [range_adjust_flagged].
+                      *)
+                      Sgn.Neg
+                  | _ ->
+                      Sgn.Pos ))
         in
-        let%bind res_value = seal (Field.Var.add xv yv) in
+        let value = Field.Var.add xv yv in
         let%bind magnitude =
-          Tick.Field.Checked.mul (sgn :> Field.Var.t) res_value
+          Tick.Field.Checked.mul (sgn :> Field.Var.t) value
         in
-        let%map no_overflow = range_check_flag magnitude in
-        ( { Signed_var.repr = Some { magnitude; sgn }; value = Some res_value }
-        , `Overflow (Boolean.not no_overflow) )
+        let%bind res_magnitude, `Overflow overflow =
+          range_adjust_flagged `Add_or_sub magnitude
+        in
+        (* Recompute the result from [res_magnitude], since it may have been
+           adjusted.
+        *)
+        let%map res_value = Field.Checked.mul (sgn :> Field.Var.t) magnitude in
+        ( { Signed_var.repr = Some { magnitude = res_magnitude; sgn }
+          ; value = Some res_value
+          }
+        , `Overflow overflow )
 
       let add (x : var) (y : var) =
         let%bind xv = value x and yv = value y in
@@ -561,8 +727,8 @@ end = struct
 
     let sub_flagged x y =
       let%bind z = seal (Field.Var.sub x y) in
-      let%map no_underflow = range_check_flag z in
-      (z, `Underflow (Boolean.not no_underflow))
+      let%map z, `Overflow underflow = range_adjust_flagged `Sub z in
+      (z, `Underflow underflow)
 
     let sub_or_zero x y =
       make_checked (fun () ->
@@ -612,8 +778,8 @@ end = struct
 
     let add_flagged x y =
       let%bind z = seal (Field.Var.add x y) in
-      let%map no_overflow = range_check_flag z in
-      (z, `Overflow (Boolean.not no_overflow))
+      let%map z, `Overflow overflow = range_adjust_flagged `Add z in
+      (z, `Overflow overflow)
 
     let ( - ) = sub
 
@@ -628,8 +794,8 @@ end = struct
     let add_signed_flagged (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       let%bind res = seal (Field.Var.add t d) in
-      let%map no_overflow = range_check_flag res in
-      (res, `Overflow (Boolean.not no_overflow))
+      let%map res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
+      (res, `Overflow overflow)
 
     let scale (f : Field.Var.t) (t : var) =
       let%bind res = Field.Checked.mul t f in
@@ -838,6 +1004,10 @@ module Amount = struct
     let of_fee (fee : Fee.var) : var = fee
 
     let to_fee (t : var) : Fee.var = t
+
+    module Unsafe = struct
+      let of_field : Field.Var.t -> var = Fn.id
+    end
   end
 
   [%%endif]
@@ -871,7 +1041,13 @@ module Balance = struct
 
   let add_amount = Amount.add
 
+  let add_amount_flagged = Amount.add_flagged
+
   let sub_amount = Amount.sub
+
+  let sub_amount_flagged = Amount.sub_flagged
+
+  let add_signed_amount_flagged = Amount.add_signed_flagged
 
   let ( + ) = add_amount
 
@@ -906,6 +1082,89 @@ module Balance = struct
   end
 
   [%%endif]
+end
+
+module Fee_rate = struct
+  type t = Q.t
+
+  let uint64_to_z u64 = Z.of_string @@ Unsigned.UInt64.to_string u64
+
+  let uint64_of_z z = Unsigned.UInt64.of_string @@ Z.to_string z
+
+  let max_uint64_z = uint64_to_z Unsigned.UInt64.max_int
+
+  let fits_uint64 z =
+    let open Z in
+    leq zero z && leq z max_uint64_z
+
+  (** check if a Q.t is in range *)
+  let check_q Q.{ num; den } : bool =
+    let open Z in
+    fits_uint64 num && fits_int32 den
+    && if equal zero den then equal zero num else true
+
+  let of_q q = if check_q q then Some q else None
+
+  let of_q_exn q = Option.value_exn (of_q q)
+
+  let to_q = ident
+
+  let make fee weight = of_q @@ Q.make (uint64_to_z fee) (Z.of_int weight)
+
+  let make_exn fee weight = Option.value_exn (make fee weight)
+
+  let to_uint64 Q.{ num; den } =
+    if Z.(equal den Z.one) then Some (uint64_of_z num) else None
+
+  let to_uint64_exn fr = Option.value_exn (to_uint64 fr)
+
+  let add x y = of_q @@ Q.add x y
+
+  let add_flagged x y =
+    let z = Q.add x y in
+    (z, `Overflow (check_q z))
+
+  let sub x y = of_q @@ Q.sub x y
+
+  let sub_flagged x y =
+    let z = Q.sub x y in
+    (z, `Underflow (check_q z))
+
+  let mul x y = of_q @@ Q.mul x y
+
+  let div x y = of_q @@ Q.div x y
+
+  let ( + ) = add
+
+  let ( - ) = sub
+
+  let ( * ) = mul
+
+  let scale fr s = fr * Q.of_int s
+
+  let scale_exn fr s = Option.value_exn (scale fr s)
+
+  let compare = Q.compare
+
+  let t_of_sexp sexp =
+    let open Ppx_sexp_conv_lib.Conv in
+    pair_of_sexp Fee.t_of_sexp int_of_sexp sexp
+    |> fun (fee, weight) -> make_exn fee weight
+
+  let sexp_of_t Q.{ num = fee; den = weight } =
+    let sexp_of_fee fee = Fee.sexp_of_t @@ uint64_of_z fee in
+    let sexp_of_weight weight = sexp_of_int @@ Z.to_int weight in
+    sexp_of_pair sexp_of_fee sexp_of_weight (fee, weight)
+
+  include Comparable.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+
+    let t_of_sexp = t_of_sexp
+
+    let sexp_of_t = sexp_of_t
+  end)
 end
 
 let%test_module "sub_flagged module" =

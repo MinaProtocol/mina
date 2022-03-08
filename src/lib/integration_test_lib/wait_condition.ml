@@ -45,12 +45,6 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  (* TODO: does this actually work if it's run twice? I think not *)
-  (*
-   * options:
-   *   - assume nodes have not yet initialized by the time we get here
-   *   - associate additional state to see when initialization was last checked
-   *)
   let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
@@ -81,7 +75,15 @@ struct
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
-    let soft_timeout_in_slots = 2 * n in
+    let soft_timeout_in_slots =
+      (* We add 1 here to make sure that we see the entirety of at least 2*n
+         full slots, since slot time may be misaligned with wait times after
+         non-block-related waits.
+         This ensures that low numbers of blocks (e.g. 1 or 2) have a
+         reasonable probability of success, reducing flakiness of the tests.
+      *)
+      (2 * n) + 1
+    in
     { description = Printf.sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
@@ -168,6 +170,53 @@ struct
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)
+    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let snapp_to_be_included_in_frontier ~parties =
+    let command_matches_parties cmd =
+      let open User_command in
+      match cmd with
+      | Parties p ->
+          Parties.equal p parties
+      | Signed_command _ ->
+          false
+    in
+    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let snapp_opt =
+        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
+            cmd_with_status.With_status.data |> User_command.forget_check
+            |> command_matches_parties)
+      in
+      match snapp_opt with
+      | Some cmd_with_status ->
+          let actual_status = cmd_with_status.With_status.status in
+          let was_applied =
+            match actual_status with
+            | Transaction_status.Applied _ ->
+                true
+            | _ ->
+                false
+          in
+          if was_applied then Predicate_passed
+          else
+            Predicate_failure
+              (Error.createf "Unexpected status in matching payment: %s"
+                 ( Transaction_status.to_yojson actual_status
+                 |> Yojson.Safe.to_string ))
+      | None ->
+          Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 8 in
+    { description =
+        sprintf "snapp with fee payer %s and other parties (%s)"
+          (Public_key.Compressed.to_base58_check
+             parties.fee_payer.data.body.public_key)
+          ( List.map parties.other_parties ~f:(fun party ->
+                Public_key.Compressed.to_base58_check party.data.body.public_key)
+          |> String.concat ~sep:", " )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

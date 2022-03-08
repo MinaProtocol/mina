@@ -6,7 +6,7 @@ let name = "transaction-snark-profiler"
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
-  include Sparse_ledger
+  include Mina_ledger.Sparse_ledger
 
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
@@ -14,14 +14,16 @@ end
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
+  let ledger =
+    Mina_ledger.Ledger.create ~depth:constraint_constants.ledger_depth ()
+  in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
       let account_id = Account_id.create public_key Token_id.default in
-      Ledger.create_new_account_exn ledger account_id
+      Mina_ledger.Ledger.create_new_account_exn ledger account_id
         (Account.create account_id (Currency.Balance.of_int 10_000))) ;
   let txn (from_kp : Signature_lib.Keypair.t) (to_kp : Signature_lib.Keypair.t)
       amount fee nonce =
@@ -121,7 +123,7 @@ let precomputed_values = Precomputed_values.compiled_inputs
 let state_body =
   Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hash.data |> Protocol_state.body))
+        values.protocol_state_with_hashes.data |> Protocol_state.body))
 
 let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
@@ -168,16 +170,28 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let span, proof =
           time (fun () ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  T.of_transaction ~sok_digest:Sok_message.Digest.default
-                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                    ~init_stack:coinbase_stack_source
-                    ~next_available_token_before ~next_available_token_after
-                    ~pending_coinbase_stack_state:
-                      { source = coinbase_stack_source
-                      ; target = coinbase_stack_target
+                  T.of_non_parties_transaction
+                    ~statement:
+                      { sok_digest = Sok_message.Digest.default
+                      ; source =
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger
+                          ; pending_coinbase_stack = coinbase_stack_source
+                          ; next_available_token = next_available_token_before
+                          ; local_state = Mina_state.Local_state.empty
+                          }
+                      ; target =
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger'
+                          ; pending_coinbase_stack = coinbase_stack_target
+                          ; next_available_token = next_available_token_after
+                          ; local_state = Mina_state.Local_state.empty
+                          }
+                      ; supply_increase =
+                          Transaction.supply_increase t |> Or_error.ok_exn
+                      ; fee_excess =
+                          Transaction.fee_excess (Transaction.forget t)
+                          |> Or_error.ok_exn
                       }
-                    ~snapp_account1:None ~snapp_account2:None
+                    ~init_stack:coinbase_stack_source
                     { Transaction_protocol_state.Poly.transaction = t
                     ; block_data = Lazy.force state_body
                     }
@@ -306,10 +320,10 @@ let generate_base_snarks_witness sparse_ledger0
 let run profiler num_transactions repeats preeval =
   let ledger, transactions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Mina_base.Sparse_ledger.of_ledger_subset_exn ledger
+    Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
       ( fst
       @@ List.fold
-           ~init:([], Ledger.next_available_token ledger)
+           ~init:([], Mina_ledger.Ledger.next_available_token ledger)
            transactions
            ~f:(fun (participants, next_available_token) t ->
              ( List.rev_append

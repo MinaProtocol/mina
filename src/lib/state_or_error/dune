@@ -3,7 +3,7 @@
  (public_name state_or_error)
  (library_flags -linkall)
  (inline_tests)
- (libraries core ppx_fields_conv)
+ (libraries core_kernel ppx_fields_conv)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_jane ppx_version ppx_compare ppx_deriving.make ppx_deriving_yojson))

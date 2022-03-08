@@ -1,8 +1,8 @@
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
+use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::prover::ProverProof;
 use kimchi::{index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof};
-use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants15W,

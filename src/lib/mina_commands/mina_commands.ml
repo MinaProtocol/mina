@@ -3,7 +3,6 @@ open Async
 open Signature_lib
 open Mina_numbers
 open Mina_base
-open Mina_state
 
 (** For status *)
 let txn_count = ref 0
@@ -12,13 +11,13 @@ let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_account ledger addr in
-  Ledger.get ledger loc
+  let%bind loc = Mina_ledger.Ledger.location_of_account ledger addr in
+  Mina_ledger.Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
-  Ledger.to_list ledger
+  Mina_ledger.Ledger.to_list ledger
 
 let string_of_public_key =
   Fn.compose Public_key.Compressed.to_base58_check Account.public_key
@@ -61,19 +60,6 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset_ip trust_system ip_address
 
-let replace_block_production_keys keys pks =
-  let kps =
-    List.filter_map pks ~f:(fun pk ->
-        let open Option.Let_syntax in
-        let%map kps =
-          Mina_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
-        in
-        (kps, pk))
-  in
-  Mina_lib.replace_block_production_keypairs keys
-    (Keypair.And_compressed_pk.Set.of_list kps) ;
-  kps |> List.map ~f:snd
-
 let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in
@@ -93,7 +79,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   | Ok ([ Signed_command txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
-        "Scheduled payment $command" ;
+        "Scheduled command $command" ;
       Ok txn
   | Ok (valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
@@ -110,8 +96,8 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                         .to_yojson snd)
                    invalid_commands) )
           ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
+        "Invalid result from scheduling a user command" ;
+      Error (Error.of_string "Internal error while scheduling a user command")
   | Error e ->
       Error e
 
@@ -124,6 +110,47 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
+let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
+  let open Participating_state.Let_syntax in
+  (* hack to get types to work out *)
+  let%map () = return () in
+  let open Deferred.Let_syntax in
+  let%map result = Mina_lib.add_snapp_transactions t [ snapp_parties ] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok ([], [ failed_txn ]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([ User_command.Parties txn ], []) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:[ ("snapp_command", Parties.to_yojson txn) ]
+        "Scheduled Snapp command $snapp_command" ;
+      Ok txn
+  | Ok (valid_commands, invalid_commands) ->
+      [%log' info (Mina_lib.top_level_logger t)]
+        ~metadata:
+          [ ( "valid_snapp_commands"
+            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+          ; ( "invalid_snapp_commands"
+            , `List
+                (List.map
+                   ~f:
+                     (Fn.compose
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .Diff_error
+                        .to_yojson snd)
+                   invalid_commands) )
+          ]
+        "Invalid result from scheduling a Snapp transaction" ;
+      Error
+        (Error.of_string "Internal error while scheduling a Snapp transaction")
+  | Error e ->
+      Error e
+
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
 
@@ -134,8 +161,8 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
       match proof_elem with
       | Signed_command c ->
           Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Parties _ ->
-          failwith "TODO"
+      | Parties x ->
+          Receipt.Elt.Parties (Parties.commitment x)
     in
     Receipt.Chain_hash.cons p parent_hash
 end)
@@ -145,7 +172,7 @@ let chain_id_inputs (t : Mina_lib.t) =
   let config = Mina_lib.config t in
   let precomputed_values = config.precomputed_values in
   let genesis_state_hash =
-    Precomputed_values.genesis_state_hash precomputed_values
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
   let genesis_constants = precomputed_values.genesis_constants in
   let snark_keys =
@@ -288,12 +315,17 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
+      Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
     in
-    let num_accounts = Ledger.num_accounts ledger in
-    let%bind state = Mina_lib.best_protocol_state t in
-    let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
-    let consensus_state = state |> Protocol_state.consensus_state in
+    let num_accounts = Mina_ledger.Ledger.num_accounts ledger in
+    let%bind best_tip = Mina_lib.best_tip t in
+    let state_hash =
+      Transition_frontier.Breadcrumb.state_hash best_tip
+      |> State_hash.to_base58_check
+    in
+    let consensus_state =
+      Transition_frontier.Breadcrumb.consensus_state best_tip
+    in
     let blockchain_length =
       Length.to_int
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state

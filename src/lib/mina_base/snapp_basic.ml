@@ -2,7 +2,7 @@
 
 open Core_kernel
 
-let field_of_bool = Util.field_of_bool
+let field_of_bool = Mina_base_util.field_of_bool
 
 [%%ifdef consensus_mechanism]
 
@@ -72,7 +72,16 @@ module Flagged_option = struct
 
   let to_option { is_some; data } = Option.some_if is_some data
 
+  let map ~f { is_some; data } = { is_some; data = f data }
+
   [%%ifdef consensus_mechanism]
+
+  let if_ ~(if_ : 'b -> then_:'var -> else_:'var -> 'var) b ~then_ ~else_ =
+    { is_some =
+        Run.run_checked
+          (Boolean.if_ b ~then_:then_.is_some ~else_:else_.is_some)
+    ; data = if_ b ~then_:then_.data ~else_:else_.data
+    }
 
   let typ t =
     Typ.of_hlistable [ Boolean.typ; t ] ~var_to_hlist:to_hlist
@@ -105,6 +114,21 @@ module Set_or_keep = struct
 
   let is_keep = function Keep -> true | _ -> false
 
+  let deriver inner obj =
+    let open Fields_derivers_snapps.Derivers in
+    iso ~map:of_option ~contramap:to_option
+      ((option @@ inner @@ o ()) (o ()))
+      obj
+
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* with equal probability, return a Set or a Keep *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%bind a = gen_a in
+      return (Set a)
+    else return Keep
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
@@ -122,10 +146,20 @@ module Set_or_keep = struct
     val typ :
       dummy:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
+    val optional_typ :
+         to_option:('new_value -> 'value option)
+      -> of_option:('value option -> 'new_value)
+      -> ('var, 'new_value) Typ.t
+      -> ('var t, 'value Stable.Latest.t) Typ.t
+
+    val map : f:('a -> 'b) -> 'a t -> 'b t
+
     val to_input :
          'a t
       -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
       -> Field.Var.t Random_oracle_input.Chunked.t
+
+    val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
 
@@ -138,17 +172,42 @@ module Set_or_keep = struct
 
     let is_keep x = Boolean.not (Flagged_option.is_some x)
 
+    let map = Flagged_option.map
+
     let typ ~dummy t =
       Typ.transport
         (Flagged_option.option_typ ~default:dummy t)
         ~there:to_option ~back:of_option
 
+    let optional_typ (type new_value value var) :
+           to_option:(new_value -> value option)
+        -> of_option:(value option -> new_value)
+        -> (var, new_value) Typ.t
+        -> (var t, value Stable.Latest.t) Typ.t =
+     fun ~to_option ~of_option t ->
+      Typ.transport (Flagged_option.typ t)
+        ~there:(function
+          | Set x ->
+              { Flagged_option.is_some = true; data = of_option (Some x) }
+          | Keep ->
+              { Flagged_option.is_some = false; data = of_option None })
+        ~back:(function
+          | { Flagged_option.is_some = true; data = x } ->
+              Set (Option.value_exn (to_option x))
+          | { Flagged_option.is_some = false; data = x } ->
+              assert (Option.is_none (to_option x)) ;
+              Keep)
+
     let to_input (t : _ t) ~f =
       Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
           (b :> Field.Var.t))
+
+    let make_unsafe is_keep data = { Flagged_option.is_some = is_keep; data }
   end
 
   let typ = Checked.typ
+
+  let optional_typ = Checked.optional_typ
 
   [%%endif]
 
@@ -166,9 +225,24 @@ module Or_ignore = struct
     end
   end]
 
+  let gen gen_a =
+    let open Quickcheck.Let_syntax in
+    (* choose constructor *)
+    let%bind b = Quickcheck.Generator.bool in
+    if b then
+      let%map a = gen_a in
+      Check a
+    else return Ignore
+
   let to_option = function Ignore -> None | Check x -> Some x
 
   let of_option = function None -> Ignore | Some x -> Check x
+
+  let deriver inner obj =
+    let open Fields_derivers_snapps.Derivers in
+    iso ~map:of_option ~contramap:to_option
+      ((option @@ inner @@ o ()) (o ()))
+      obj
 
   [%%ifdef consensus_mechanism]
 
@@ -190,6 +264,10 @@ module Or_ignore = struct
       -> Field.Var.t Random_oracle_input.Chunked.t
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
+
+    val make_unsafe_implicit : 'a -> 'a t
+
+    val make_unsafe_explicit : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t =
       | Implicit of 'a
@@ -225,6 +303,11 @@ module Or_ignore = struct
         ~there:(function Implicit _ -> assert false | Explicit t -> t)
         ~back:(fun t -> Explicit t)
       |> Typ.transport ~there:to_option ~back:of_option
+
+    let make_unsafe_implicit data = Implicit data
+
+    let make_unsafe_explicit is_ignore data =
+      Explicit { is_some = is_ignore; data }
   end
 
   let typ_implicit = Checked.typ_implicit
@@ -322,6 +405,6 @@ let invalid_public_key : Public_key.Compressed.t Lazy.t =
 
 [%%else]
 
-module F = Snark_params_nonconsensus.Field
+module F = Snark_params.Tick.Field
 
 [%%endif]

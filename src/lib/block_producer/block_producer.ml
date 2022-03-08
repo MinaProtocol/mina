@@ -4,9 +4,7 @@ open Pipe_lib
 open Mina_base
 open Mina_state
 open Mina_transition
-open Signature_lib
 open O1trace
-open Otp_lib
 module Time = Block_time
 
 type Structured_log_events.t += Block_produced
@@ -120,8 +118,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
   let previous_protocol_state_hash =
-    Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
-      previous_protocol_state
+    (Protocol_state.hashes_with_body
+       ~body_hash:previous_protocol_state_body_hash previous_protocol_state)
+      .state_hash
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
@@ -190,7 +189,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
-          @@ Ledger.unregister_mask_exn ~loc:__LOC__
+          @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( (match diff with Ok diff -> diff | Error _ -> assert false)
@@ -237,19 +236,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target)
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
+            let next_registers =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
+                  { ( Ledger_proof.statement proof
+                    |> Ledger_proof.statement_target )
+                    with
+                    pending_coinbase_stack = ()
+                  }
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
+                  |> Blockchain_state.registers
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -271,8 +268,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
+                ~registers:next_registers ~genesis_ledger_hash
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =
@@ -535,7 +531,7 @@ module Vrf_evaluation_state = struct
 end
 
 let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
-    ~get_completed_work ~transaction_resource_pool ~time_controller ~keypairs
+    ~get_completed_work ~transaction_resource_pool ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
@@ -678,9 +674,11 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
             | Some
                 (protocol_state, internal_transition, pending_coinbase_witness)
               ->
-                let protocol_state_hash = Protocol_state.hash protocol_state in
-                let consensus_state_with_hash =
-                  { With_hash.hash = protocol_state_hash
+                let protocol_state_hashes =
+                  Protocol_state.hashes protocol_state
+                in
+                let consensus_state_with_hashes =
+                  { With_hash.hash = protocol_state_hashes
                   ; data = Protocol_state.consensus_state protocol_state
                   }
                 in
@@ -690,20 +688,20 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                          ~existing:
                            (With_hash.map ~f:External_transition.consensus_state
                               previous_transition)
-                         ~candidate:consensus_state_with_hash ~logger)
+                         ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
                          over their parent" ;
-                    let root_consensus_state_with_hash =
+                    let root_consensus_state_with_hashes =
                       Transition_frontier.root frontier
-                      |> Breadcrumb.consensus_state_with_hash
+                      |> Breadcrumb.consensus_state_with_hashes
                     in
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select
-                         ~existing:root_consensus_state_with_hash
+                         ~existing:root_consensus_state_with_hashes
                          ~constants:consensus_constants
-                         ~candidate:consensus_state_with_hash ~logger)
+                         ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
@@ -732,7 +730,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                       Internal_transition.staged_ledger_diff internal_transition
                     in
                     let previous_state_hash =
-                      Protocol_state.hash previous_protocol_state
+                      (Protocol_state.hashes previous_protocol_state).state_hash
                     in
                     let delta_transition_chain_proof =
                       Transition_chain_prover.prove
@@ -744,7 +742,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     let%bind transition =
                       let open Result.Let_syntax in
                       External_transition.Validation.wrap
-                        { With_hash.hash = protocol_state_hash
+                        { With_hash.hash = protocol_state_hashes
                         ; data =
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
@@ -807,7 +805,9 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
                     let metadata =
-                      [ ("state_hash", State_hash.to_yojson protocol_state_hash)
+                      [ ( "state_hash"
+                        , State_hash.to_yojson protocol_state_hashes.state_hash
+                        )
                       ]
                     in
                     [%log debug] ~metadata
@@ -816,7 +816,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     Deferred.choose
                       [ Deferred.choice
                           (Transition_registry.register transition_registry
-                             protocol_state_hash)
+                             protocol_state_hashes.state_hash)
                           (Fn.const (Ok `Transition_accepted))
                       ; Deferred.choice
                           ( Time.Timeout.create time_controller
@@ -875,22 +875,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
       let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
         trace_recurring "check next block timing" (fun () ->
-            (* See if we want to change keypairs *)
-            let _keypairs =
-              match Agent.get keypairs with
-              | keypairs, `Different ->
-                  (* Perform block production key swap since we have new
-                     keypairs *)
-                  Consensus.Data.Local_state.block_production_keys_swap
-                    ~constants:consensus_constants consensus_local_state
-                    ( Keypair.And_compressed_pk.Set.to_list keypairs
-                    |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                    (Time.now time_controller) ;
-                  (*TODO: propagate updated delegatee table to the VRF evaluator*)
-                  keypairs
-              | keypairs, `Same ->
-                  keypairs
-            in
             (* Begin checking for the ability to produce a block *)
             match Broadcast_pipe.Reader.peek frontier_reader with
             | None ->
@@ -1122,19 +1106,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                              Deferred.return () )))
       in
       let start () =
-        (* Schedule to wake up immediately on the next tick of the producer loop
-         * instead of immediately mutating local_state here as there could be a
-         * race.
-         *
-         * Given that rescheduling takes the min of the two timeouts, we won't
-         * erase this timeout even if the last run of the producer wants to wait
-         * for a long while.
-         * *)
-        Agent.on_update keypairs ~f:(fun _new_keypairs ->
-            Singleton_scheduler.schedule scheduler (Time.now time_controller)
-              ~f:
-                (check_next_block_timing Mina_numbers.Global_slot.zero
-                   Mina_numbers.Length.zero)) ;
         check_next_block_timing Mina_numbers.Global_slot.zero
           Mina_numbers.Length.zero ()
       in
@@ -1177,9 +1148,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; staged_ledger_diff
       ; delta_transition_chain_proof
       } =
-    let protocol_state_hash = Protocol_state.hash protocol_state in
-    let consensus_state_with_hash =
-      { With_hash.hash = protocol_state_hash
+    let protocol_state_hashes = Protocol_state.hashes protocol_state in
+    let consensus_state_with_hashes =
+      { With_hash.hash = protocol_state_hashes
       ; data = Protocol_state.consensus_state protocol_state
       }
     in
@@ -1211,19 +1182,19 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  ~existing:
                    (With_hash.map ~f:External_transition.consensus_state
                       previous_transition)
-                 ~candidate:consensus_state_with_hash ~logger)
+                 ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over \
                  their parent" ;
-            let root_consensus_state_with_hash =
+            let root_consensus_state_with_hashes =
               Transition_frontier.root frontier
-              |> Breadcrumb.consensus_state_with_hash
+              |> Breadcrumb.consensus_state_with_hashes
             in
             [%test_result: [ `Take | `Keep ]]
-              (Consensus.Hooks.select ~existing:root_consensus_state_with_hash
+              (Consensus.Hooks.select ~existing:root_consensus_state_with_hashes
                  ~constants:consensus_constants
-                 ~candidate:consensus_state_with_hash ~logger)
+                 ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over the \
@@ -1231,12 +1202,12 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
-            With_hash.hash previous_transition
+            State_hash.With_state_hashes.state_hash previous_transition
           in
           let%bind transition =
             let open Result.Let_syntax in
             External_transition.Validation.wrap
-              { With_hash.hash = protocol_state_hash
+              { With_hash.hash = protocol_state_hashes
               ; data =
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
@@ -1284,7 +1255,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
             Block_produced ;
           let metadata =
-            [ ("state_hash", State_hash.to_yojson protocol_state_hash) ]
+            [ ( "state_hash"
+              , State_hash.to_yojson protocol_state_hashes.state_hash )
+            ]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async.Deferred () =
@@ -1295,7 +1268,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Deferred.choose
             [ Deferred.choice
                 (Transition_registry.register transition_registry
-                   protocol_state_hash)
+                   protocol_state_hashes.state_hash)
                 (Fn.const (Ok `Transition_accepted))
             ; Deferred.choice
                 ( Time.Timeout.create time_controller (Time.Span.of_ms 20000L)

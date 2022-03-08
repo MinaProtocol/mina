@@ -45,6 +45,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> incoming_diffs:
          ( Resource_pool.Diff.t Envelope.Incoming.t
          * Mina_net2.Validation_callback.t )
@@ -100,7 +101,7 @@ module Diff_versioned : sig
     module V2 : sig
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty

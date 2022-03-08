@@ -13,10 +13,10 @@ module Poly : sig
   end]
 end
 
-val hash_abstract :
+val hashes_abstract :
      hash_body:('body -> State_body_hash.t)
   -> (State_hash.t, 'body) Poly.t
-  -> State_hash.t
+  -> State_hash.State_hashes.t
 
 module Body : sig
   module Poly : sig
@@ -31,6 +31,16 @@ module Body : sig
   module Value : sig
     [%%versioned:
     module Stable : sig
+      module V2 : sig
+        type t =
+          ( State_hash.Stable.V1.t
+          , Blockchain_state.Value.Stable.V2.t
+          , Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , Protocol_constants_checked.Value.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+      end
+
       module V1 : sig
         type t =
           ( State_hash.Stable.V1.t
@@ -39,6 +49,8 @@ module Body : sig
           , Protocol_constants_checked.Value.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving equal, ord, hash, sexp, to_yojson]
+
+        val to_latest : t -> V2.t
       end
     end]
   end
@@ -70,9 +82,16 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
+    module V2 : sig
+      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, yojson]
+    end
+
     module V1 : sig
       type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson]
+
+      val to_latest : t -> V2.t
     end
   end]
 
@@ -122,7 +141,7 @@ val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
 val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
-     genesis_ledger:Mina_base.Ledger.t Lazy.t
+     genesis_ledger:Mina_ledger.Ledger.t Lazy.t
   -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
@@ -130,9 +149,10 @@ val negative_one :
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
-val hash : Value.t -> State_hash.t
+val hashes : Value.t -> State_hash.State_hashes.t
 
 (** Same as [hash], but accept the [body_hash] directly to avoid re-computing
     it.
 *)
-val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t
+val hashes_with_body :
+  Value.t -> body_hash:State_body_hash.t -> State_hash.State_hashes.t

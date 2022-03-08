@@ -1,15 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Async_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
 
 module Partial_reason = struct
   type t =
@@ -48,7 +38,7 @@ module Variant = struct
     | `Signature_invalid
     | `Memo_invalid
     | `Graphql_uri_not_set
-    | (* We want each of these to be an explicitly different error *)
+    | (* We want each of these Transaction_submit... to be distinct errors *)
       `Transaction_submit_no_sender
     | `Transaction_submit_duplicate
     | `Transaction_submit_bad_nonce
@@ -90,7 +80,7 @@ end = struct
 
   let kind { extra_context = _; kind } = kind
 
-  let message = function
+  let message : Variant.t -> string = function
     | `Sql _ ->
         "SQL failure"
     | `Json_parse _ ->
@@ -144,7 +134,7 @@ end = struct
     | `Transaction_submit_expired ->
         "Can't send transaction: Expired"
 
-  let context = function
+  let context : Variant.t -> string option = function
     | `Sql msg ->
         Some msg
     | `Json_parse optional_msg ->
@@ -224,7 +214,7 @@ end = struct
     | `Transaction_submit_expired ->
         None
 
-  let retriable = function
+  let retriable : Variant.t -> bool = function
     | `Sql _ ->
         false
     | `Json_parse _ ->
@@ -279,7 +269,7 @@ end = struct
         false
 
   (* Unlike message above, description can be updated whenever we see fit *)
-  let description = function
+  let description : Variant.t -> string = function
     | `Sql _ ->
         "We encountered a SQL failure."
     | `Json_parse _ ->

@@ -112,7 +112,7 @@ build_rosetta_all_sigs: ocaml_checks
 
 build_intgtest: ocaml_checks
 	$(info Starting Build)
-	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
 client_sdk: ocaml_checks
@@ -262,8 +262,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon

@@ -397,6 +397,21 @@ let setup_daemon logger =
   and node_status_url =
     flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
       ~doc:"URL of the node status collection service"
+  and node_error_url =
+    flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
+      ~doc:"URL of the node error collection service"
+  and contact_info =
+    flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
+      ~doc:
+        "contact info used in node error report service (it could be either \
+         email address or discord username), it should be less than 200 \
+         characters"
+    |> Command.Param.map ~f:(fun opt ->
+           Option.value_map opt ~default:None ~f:(fun s ->
+               if String.length s < 200 then Some s
+               else
+                 Mina_user_error.raisef
+                   "The length of contact info exceeds 200 characters:\n %s" s))
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -424,8 +439,9 @@ let setup_daemon logger =
       if is_background then (
         Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
           conf_dir ;
-        Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
-          ~redirect_stderr:`Dev_null () )
+        Daemon.daemonize ~allow_threads_to_have_been_created:true
+          ~redirect_stdout:`Dev_null ?cd:working_dir ~redirect_stderr:`Dev_null
+          () )
       else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
     in
     Stdout_log.setup log_json log_level ;
@@ -435,21 +451,21 @@ let setup_daemon logger =
     Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
            ~num_rotate:1) ;
     let rejected_blocks_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger_file_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-rejected-blocks.log"
            ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
     let version_metadata =
@@ -737,7 +753,6 @@ let setup_daemon logger =
         maybe_from_config YJ.Util.to_string_option "node-status-url"
           node_status_url
       in
-
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
         (*if
@@ -955,14 +970,17 @@ let setup_daemon logger =
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let genesis_state_hash =
-        Precomputed_values.genesis_state_hash precomputed_values
+        (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
       in
       let genesis_ledger_hash =
         Precomputed_values.genesis_ledger precomputed_values
-        |> Lazy.force |> Ledger.merkle_root
+        |> Lazy.force |> Mina_ledger.Ledger.merkle_root
       in
-      let initial_block_production_keypairs =
-        block_production_keypair |> Option.to_list |> Keypair.Set.of_list
+      let block_production_keypairs =
+        block_production_keypair
+        |> Option.map ~f:(fun kp ->
+               (kp, Public_key.compress kp.Keypair.public_key))
+        |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
       in
       let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
@@ -976,7 +994,7 @@ let setup_daemon logger =
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
           ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            precomputed_values.protocol_state_with_hashes.hash.state_hash
       in
       trace_database_initialization "epoch ledger" __LOC__ epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
@@ -1076,6 +1094,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; isolate = Option.value ~default:false isolate
           ; keypair = libp2p_keypair
           ; all_peers_seen_metric
+          ; known_private_ip_nets = Option.value ~default:[] client_trustlist
           }
       in
       let net_config =
@@ -1185,7 +1204,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~time_controller ~block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
@@ -1201,7 +1220,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~child_pids:pids ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind { Coda_initialization.coda

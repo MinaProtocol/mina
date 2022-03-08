@@ -1,6 +1,13 @@
 (library
  (name timeout_lib)
  (public_name timeout_lib)
- (libraries core_kernel async_kernel logger)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async_kernel
+   core
+   ;; local libraries
+   logger
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_coda)))

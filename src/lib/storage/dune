@@ -3,7 +3,21 @@
  (public_name storage)
  (inline_tests)
  (library_flags -linkall)
- (libraries core async logger)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   core_kernel
+   bin_prot.shape
+   bin_prot
+   base
+   sexplib0
+   async_kernel
+   async_unix
+   base.caml
+   ;; local libraries
+   logger
+   )
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))

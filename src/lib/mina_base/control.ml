@@ -18,6 +18,18 @@ module Stable = struct
   end
 end]
 
+(* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
+let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
+  lazy
+    (Quickcheck.Generator.of_list
+       (let dummy_proof =
+          let n2 = Pickles_types.Nat.N2.n in
+          let proof = Pickles.Proof.dummy n2 n2 n2 in
+          Proof proof
+        in
+        let dummy_signature = Signature Signature.dummy in
+        [ dummy_proof; dummy_signature; None_given ]))
+
 [%%else]
 
 [%%versioned
@@ -54,6 +66,8 @@ end]
 
 module Tag = struct
   type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+
+  let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
 end
 
 let tag : t -> Tag.t = function
@@ -63,3 +77,63 @@ let tag : t -> Tag.t = function
       Signature
   | None_given ->
       None_given
+
+[%%ifdef consensus_mechanism]
+
+let dummy_of_tag : Tag.t -> t = function
+  | Proof ->
+      let n2 = Pickles_types.Nat.N2.n in
+      let proof = Pickles.Proof.dummy n2 n2 n2 in
+      Proof proof
+  | Signature ->
+      Signature Signature.dummy
+  | None_given ->
+      None_given
+
+let signature_deriver obj =
+  Fields_derivers_snapps.Derivers.iso_string obj ~name:"Signature"
+    ~to_string:Signature.to_base58_check
+    ~of_string:Signature.of_base58_check_exn
+
+module As_record = struct
+  type t =
+    { proof : Pickles.Side_loaded.Proof.t option
+    ; signature : Signature.t option
+    }
+  [@@deriving fields]
+
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    Fields.make_creator obj
+      ~proof:!.(option @@ proof @@ o ())
+      ~signature:!.(option @@ signature_deriver @@ o ())
+    |> finish ~name:"Control"
+end
+
+let to_record = function
+  | Proof p ->
+      { As_record.proof = Some p; signature = None }
+  | Signature s ->
+      { proof = None; signature = Some s }
+  | None_given ->
+      { proof = None; signature = None }
+
+let of_record = function
+  | { As_record.proof = Some p; _ } ->
+      Proof p
+  | { signature = Some s; _ } ->
+      Signature s
+  | _ ->
+      None_given
+
+let deriver obj =
+  Fields_derivers_snapps.Derivers.iso_record ~of_record ~to_record
+    As_record.deriver obj
+
+let%test_unit "json rountrip" =
+  let module Fd = Fields_derivers_snapps.Derivers in
+  let full = deriver (Fd.o ()) in
+  let control = dummy_of_tag Proof in
+  [%test_eq: t] control (control |> Fd.to_json full |> Fd.of_json full)
+
+[%%endif]

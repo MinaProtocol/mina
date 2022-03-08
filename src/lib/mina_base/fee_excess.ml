@@ -34,7 +34,7 @@ open Core_kernel
 
 [%%ifndef consensus_mechanism]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 
@@ -165,10 +165,14 @@ let to_input_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
 
 let assert_equal_checked (t1 : var) (t2 : var) =
   Checked.all_unit
-    [ Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l
-    ; Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l
-    ; Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r
-    ; Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r
+    [ [%with_label "fee_token_l"]
+        (Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l)
+    ; [%with_label "fee_excess_l"]
+        (Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l)
+    ; [%with_label "fee_token_r"]
+        (Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r)
+    ; [%with_label "fee_excess_r"]
+        (Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r)
     ]
 
 [%%endif]

@@ -1,7 +1,6 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snarky_backendless
-module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
 open Let_syntax
@@ -154,7 +153,7 @@ module Coinbase_stack = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -214,7 +213,7 @@ module Stack_hash = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -524,13 +523,13 @@ end
 module Merkle_tree_versioned = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V1 = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
         , Stack_versioned.Stable.V1.t
         , unit )
-        Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
+        Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -640,6 +639,24 @@ module T = struct
     let equal_state_hash t1 t2 = State_stack.equal t1.Poly.state t2.Poly.state
 
     let equal_data t1 t2 = Coinbase_stack.equal t1.Poly.data t2.Poly.data
+
+    let connected ?(prev : t option = None) ~first ~second () =
+      let coinbase_stack_connected =
+        (*same as old stack or second could be a new stack with empty data*)
+        equal_data first second || Coinbase_stack.(equal empty second.Poly.data)
+      in
+      let state_stack_connected =
+        (*1. same as old stack or
+          2. new stack initialized with the stack state of last block. Not possible to know this unless we track all the stack states because they are updated once per block (init=curr)
+          3. [second] could be a new stack initialized with the latest state of [first] or
+          4. [second] starts from the previous state of [first]. This is not available in either [first] or [second] *)
+        equal_state_hash first second
+        || Stack_hash.equal second.state.init second.state.curr
+        || Stack_hash.equal first.state.curr second.state.curr
+        || Option.value_map prev ~default:true ~f:(fun prev ->
+               Stack_hash.equal prev.state.curr second.state.curr)
+      in
+      coinbase_stack_connected && state_stack_connected
 
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack.push t.Poly.data cb in
@@ -1017,8 +1034,7 @@ module T = struct
     let root_hash = hash_at_level depth in
     { Poly.tree =
         make_tree
-          (Merkle_tree.of_hash ~depth ~next_available_token:()
-             ~next_available_index:None root_hash)
+          (Merkle_tree.of_hash ~depth ~next_available_token:() root_hash)
           Stack_id.zero
     ; pos_list = []
     ; new_pos = Stack_id.zero
@@ -1233,9 +1249,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V1 = struct
     type t =
-      ( Merkle_tree_versioned.Stable.V2.t
+      ( Merkle_tree_versioned.Stable.V1.t
       , Stack_id.Stable.V1.t )
       Poly_versioned.Stable.V1.t
     [@@deriving sexp, to_yojson]
@@ -1258,7 +1274,7 @@ let%test_unit "add stack + remove stack = initial tree " =
   in
   let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
-      Async.Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
@@ -1275,7 +1291,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           in
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
-          Async.Deferred.return ()))
+          Async_kernel.Deferred.return ()))
 
 module type Pending_coinbase_intf = sig
   type t [@@deriving sexp]

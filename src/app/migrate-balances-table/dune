@@ -3,11 +3,19 @@
  (name migrate_balances_table)
  (public_name migrate_balances_table)
  (libraries
+   ;; opam libraries
+   core
+   base
+   async_kernel
+   caqti-driver-postgresql
+   caqti
    async
    core_kernel
-   caqti
    caqti-async
-   caqti-driver-postgresql
+   uri
+   async_unix
+   async.async_command
+   ;; local libraries
    logger
  )
  (preprocessor_deps ../../config.mlh)

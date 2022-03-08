@@ -47,11 +47,11 @@ module Tuple5 (F : T3) (G : T3) (H : T3) (I : T3) (J : T3) = struct
     * ('a, 'b, 'c) J.t
 end
 
-module Fst = struct
+module Arg1 = struct
   type ('a, _, _) t = 'a
 end
 
-module Snd = struct
+module Arg2 = struct
   type (_, 'a, _) t = 'a
 end
 
@@ -186,7 +186,7 @@ module H1 = struct
 end
 
 module H2 = struct
-  module Fst = struct
+  module Arg1 = struct
     type ('a, _) t = 'a
   end
 
@@ -228,15 +228,6 @@ module H2 = struct
           let y = C.f x in
           y :: f xs
   end
-end
-
-module Hlist_1 (F : sig
-  type (_, _) t
-end) =
-struct
-  type (_, 's) t =
-    | [] : (unit, _) t
-    | ( :: ) : ('a1, 's) F.t * ('b1, 's) t -> ('a1 * 'b1, 's) t
 end
 
 module H3_2 = struct
@@ -508,7 +499,7 @@ module H3 = struct
       match (xs, ys) with [], [] -> [] | x :: xs, y :: ys -> (x, y) :: f xs ys
   end
 
-  module Fst = struct
+  module Arg1 = struct
     type ('a, _, _) t = 'a
   end
 
@@ -705,7 +696,7 @@ module H4_2 = struct
   end
 end
 
-module Hlist3_1 (F : sig
+module H3_1 (F : sig
   type (_, _, _, _) t
 end) =
 struct
@@ -727,6 +718,7 @@ end
 
 module Id = Hlist0.Id
 module HlistId = Hlist0.HlistId
+module H1_1 = Hlist0.H1_1
 
 module Map_1_specific
     (F : T2)
@@ -738,8 +730,7 @@ module Map_1_specific
       val f : ('a, b1) F.t -> ('a, b2) G.t
     end) =
 struct
-  let rec f : type a. (a, C.b1) Hlist_1(F).t -> (a, C.b2) Hlist_1(G).t =
-    function
+  let rec f : type a. (a, C.b1) H1_1(F).t -> (a, C.b2) H1_1(G).t = function
     | [] ->
         []
     | x :: xs ->
@@ -756,7 +747,7 @@ module type Max_s = sig
 
   val n : n t
 
-  val p : (ns, n) Hlist_1(Lte).t
+  val p : (ns, n) H1_1(Lte).t
 end
 
 type 'ns max = (module Max_s with type ns = 'ns)
@@ -772,7 +763,7 @@ let rec max : type n ns. (n * ns) H1.T(Nat).t -> (n * ns) max =
 
         let n = x
 
-        let p : (_, _) Hlist_1(Lte).t = [ Lte.refl x ]
+        let p : (_, _) H1_1(Lte).t = [ Lte.refl x ]
       end in
       (module M : Max_s with type ns = n * ns)
   | x :: (_ :: _ as ys) -> (
@@ -786,7 +777,7 @@ let rec max : type n ns. (n * ns) H1.T(Nat).t -> (n * ns) max =
 
             let n = Max.n
 
-            let p : (ns, Max.n) Hlist_1(Lte).t = p_x :: Max.p
+            let p : (ns, Max.n) H1_1(Lte).t = p_x :: Max.p
           end in
           (module M)
       | `Gt gt ->
@@ -809,7 +800,7 @@ let rec max : type n ns. (n * ns) H1.T(Nat).t -> (n * ns) max =
 
             let n = x
 
-            let p : (ns, n) Hlist_1(Lte).t = Lte.refl x :: M.f Max.p
+            let p : (ns, n) H1_1(Lte).t = Lte.refl x :: M.f Max.p
           end in
           (module M) )
 

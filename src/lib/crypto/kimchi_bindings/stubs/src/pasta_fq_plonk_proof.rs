@@ -16,11 +16,11 @@ use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
 };
 
+use kimchi::circuits::polynomial::COLUMNS;
+use kimchi::circuits::scalars::ProofEvaluations;
 use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
-use kimchi::circuits::scalars::ProofEvaluations;
-use kimchi::circuits::polynomial::COLUMNS;
 use oracle::{
     poseidon::PlonkSpongeConstants15W,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -34,7 +34,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     witness: Vec<CamlFqVector>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> CamlProverProof<CamlGPallas, CamlFq> {
+) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
         let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -83,8 +83,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
             DefaultFqSponge<PallasParameters, PlonkSpongeConstants15W>,
             DefaultFrSponge<Fq, PlonkSpongeConstants15W>,
         >(&group_map, witness, index, prev)
-        .unwrap();
-        proof.into()
+        .map_err(|e| ocaml::Error::Error(e.into()))?;
+        Ok(proof.into())
     })
 }
 

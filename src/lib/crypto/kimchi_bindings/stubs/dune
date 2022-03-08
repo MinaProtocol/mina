@@ -43,6 +43,7 @@
 
 (rule
  (target kimchi.ml)
+ (mode promote)
  (deps
   Cargo.toml
   ../../../../.ocamlformat

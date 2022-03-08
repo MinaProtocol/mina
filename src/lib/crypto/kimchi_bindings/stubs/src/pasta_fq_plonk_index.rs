@@ -1,7 +1,7 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::index::{expr_linearization, Index as DlogIndex};
-use kimchi::circuits::{gate::CircuitGate, constraints::ConstraintSystem};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,9 +21,17 @@ extern "C" fn caml_pasta_fq_plonk_index_finalize(v: ocaml::Raw) {
     }
 }
 
-ocaml::custom!(CamlPastaFqPlonkIndex {
-    finalize: caml_pasta_fq_plonk_index_finalize,
-});
+impl ocaml::custom::Custom for CamlPastaFqPlonkIndex {
+    const NAME: &'static str = "CamlPastaFqPlonkIndex\0";
+    const USED: usize = 1;
+    /// Encourage the GC to free when there are > 12 in memory
+    const MAX: usize = 12;
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        finalize: Some(caml_pasta_fq_plonk_index_finalize),
+        ..ocaml::custom::DEFAULT_CUSTOM_OPS
+    };
+}
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -39,7 +47,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .map(|gate| CircuitGate::<Fq> {
             typ: gate.typ,
             wires: gate.wires,
-            c: gate.c.clone(),
+            coeffs: gate.coeffs.clone(),
         })
         .collect();
 
@@ -136,7 +144,10 @@ pub fn caml_pasta_fq_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fp_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, None);
+
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    t.linearization = linearization;
+    t.powers_of_alpha = powers_of_alpha;
 
     Ok(CamlPastaFqPlonkIndex(Box::new(t)))
 }
