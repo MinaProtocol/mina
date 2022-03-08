@@ -1721,10 +1721,7 @@ module Coinbase = struct
   let typ =
     let encode t =
       Ok
-        ( ( coinbase_typ
-          , t.receiver_id
-          , t.amount
-          , Token_id.(to_string default) )
+        ( (coinbase_typ, t.receiver_id, t.amount, Token_id.(to_string default))
         , t.hash )
     in
     let decode ((_, receiver_id, amount, _), hash) =
