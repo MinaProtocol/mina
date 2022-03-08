@@ -121,7 +121,7 @@ module Node = struct
       }
     |}]
 
-    module Delegate_currency =
+    module Send_delegation =
     [%graphql
     {|
       mutation ($sender: PublicKey!,
@@ -131,9 +131,9 @@ module Node = struct
       $fee: UInt64!,
       $nonce: UInt32,
       $memo: String) {
-        ADSFASDFDASF(input:
+        sendDelegation(input:
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-            payment {
+            delegation {
               id
             }
           }
@@ -347,6 +347,7 @@ module Node = struct
 
   let delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =
+    (* todo rename everything to "send delegation" *)
     [%log info] "Delegating currency" ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let sender_pk_str =
@@ -366,7 +367,7 @@ module Node = struct
     let%bind _ = unlock_sender_account_graphql () in
     let delegate_currency_graphql () =
       let delegate_currency_obj =
-        Graphql.Delegate_currency.make
+        Graphql.Send_delegation.make
           ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
@@ -377,7 +378,7 @@ module Node = struct
         ~query_name:"delegate_currency_graphql" delegate_currency_obj
     in
     let%map result_obj = delegate_currency_graphql () in
-    let (`UserCommand id_obj) = result_obj#sendPayment#payment in
+    let (`UserCommand id_obj) = result_obj#sendDelegation#delegation in
     let user_cmd_id = id_obj#id in
     [%log info] "Currency Delegated"
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;

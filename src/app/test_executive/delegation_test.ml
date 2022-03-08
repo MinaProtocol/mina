@@ -56,5 +56,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~sender_pub_key:delegation_sender_pub_key
               ~receiver_pub_key:delegation_receiver_pub_key ~amount))
     in
+    (* grab node_b's balance, then check to make sure node_b is still getting coinbase rewards.  wait a few blocks, make sure node_b's balance has increased, if it increases at least a little bit, then the test passes.  if after several blocks it receives no coinbase rewards, then fail *)
     Malleable_error.return ()
 end
