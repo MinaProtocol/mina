@@ -13,7 +13,11 @@ open Snark_params.Tick
 module Legacy_token_id : sig
   val default : (Field.t, bool) Random_oracle_input.Legacy.t
 
+  [%%ifdef consensus_mechanism]
+
   val default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
+
+  [%%endif]
 end
 
 module Body : sig

@@ -4,11 +4,23 @@ open Core_kernel
 open Mina_base_import
 
 module Digest = struct
+  [%%ifdef consensus_mechanism]
+
   let of_bigstring_exn =
-    Binable.of_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
+    Binable.of_bigstring (module Snark_params.Tick.Field.Stable.Latest)
 
   let to_bigstring =
     Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
+
+  [%%else]
+
+  let of_bigstring_exn =
+    Binable.of_bigstring (module Snark_params.Tick.Field.Stable.Latest)
+
+  let to_bigstring =
+    Binable.to_bigstring (module Snark_params.Tick.Field.Stable.Latest)
+
+  [%%endif]
 
   module Base58_check = Base58_check.Make (struct
     let description = "Token ID"
@@ -27,6 +39,8 @@ module Digest = struct
 
   let of_string = of_base58_check_exn
 
+  [%%ifdef consensus_mechanism]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -43,6 +57,26 @@ module Digest = struct
     end
   end]
 
+  [%%else]
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Snark_params.Tick.Field.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash]
+
+      let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
+
+      let of_yojson (j : Yojson.Safe.t) : (t, string) result =
+        try Ok (of_string (Yojson.Safe.Util.to_string j))
+        with e -> Error (Exn.to_string e)
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  [%%endif]
+
   [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
   include Comparable.Make_binable (Stable.Latest)
@@ -53,12 +87,14 @@ module Digest = struct
 
   (* Just matters that this no one can find a preimage to this with poseidon.
      Chose 1 for consistency for the old uint64 based token IDs *)
-  let default : t = Pickles.Backend.Tick.Field.one
+  let default : t = Snark_params.Tick.Field.one
 
   let gen : t Quickcheck.Generator.t = Snark_params.Tick.Field.gen
 
   let gen_non_default =
     Quickcheck.Generator.filter gen ~f:(fun x -> not (equal x default))
+
+  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -80,6 +116,8 @@ module Digest = struct
   end
 
   let typ = Snark_params.Tick.Field.typ
+
+  [%%endif]
 end
 
 [%%versioned

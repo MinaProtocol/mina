@@ -25,6 +25,8 @@ module Digest : sig
 
   val gen_non_default : t Quickcheck.Generator.t
 
+  [%%ifdef consensus_mechanism]
+
   module Checked : sig
     open Pickles.Impls.Step
 
@@ -44,6 +46,8 @@ module Digest : sig
   end
 
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+
+  [%%endif]
 end
 
 [%%versioned:

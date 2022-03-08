@@ -3,13 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
@@ -26,12 +20,16 @@ module Legacy_token_id = struct
     Random_oracle_input.Legacy.bitstring
       (Snark_bits.Bits.UInt64.to_bits Unsigned.UInt64.one)
 
+  [%%ifdef consensus_mechanism]
+
   let default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
       =
     { field_elements = Array.map default.field_elements ~f:Field.Var.constant
     ; bitstrings =
         Array.map default.bitstrings ~f:(List.map ~f:Boolean.var_of_value)
     }
+
+  [%%endif]
 end
 
 module Common = struct
@@ -63,8 +61,6 @@ module Common = struct
     end]
   end
 
-  [%%if feature_tokens]
-
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -80,53 +76,6 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
-
-  [%%else]
-
-  module Binable_arg = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Currency.Fee.Stable.V1.t
-          , Public_key.Compressed.Stable.V1.t
-          , Token_id.Stable.V1.t
-          , Account_nonce.Stable.V1.t
-          , Global_slot.Stable.V1.t
-          , Memo.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving compare, equal, sexp, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  let check (t : Binable_arg.t) =
-    if Token_id.equal t.fee_token Token_id.default then t
-    else failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
-
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      type t = Binable_arg.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
-
-      include Binable.Of_binable
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = check
-
-                  let to_binable = check
-                end)
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  [%%endif]
 
   let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : t) =
     let bitstring = Random_oracle.Input.Legacy.bitstring in
@@ -222,8 +171,6 @@ module Body = struct
     end]
   end
 
-  [%%if feature_tokens]
-
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -235,47 +182,6 @@ module Body = struct
       let to_latest = Fn.id
     end
   end]
-
-  [%%else]
-
-  let check (t : Binable_arg.t) =
-    let fail () =
-      failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
-    in
-    match t with
-    | Payment p ->
-        if Token_id.equal p.token_id Token_id.default then t else fail ()
-    | Stake_delegation _ ->
-        t
-    | Create_new_token _ | Create_token_account _ | Mint_tokens _ ->
-        fail ()
-
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      type t = Binable_arg.Stable.V1.t =
-        | Payment of Payment_payload.Stable.V1.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
-        | Create_new_token of New_token_payload.Stable.V1.t
-        | Create_token_account of New_account_payload.Stable.V1.t
-        | Mint_tokens of Minting_payload.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
-
-      include Binable.Of_binable
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = check
-
-                  let to_binable = check
-                end)
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  [%%endif]
 
   module Tag = Transaction_union_tag
 

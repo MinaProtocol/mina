@@ -209,6 +209,8 @@ module Payload_common = struct
     Poly.t
   [@@deriving sexp]
 
+  [%%ifdef consensus_mechanism]
+
   module Checked = struct
     type value = t
 
@@ -245,6 +247,8 @@ module Payload_common = struct
       ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_of_hlist:of_hlist
+
+  [%%endif]
 end
 
 type t = (Payload_common.t, Body.t) Signed_command_payload.Poly.t
