@@ -2288,6 +2288,178 @@ module Block_and_signed_command = struct
       (block_id, user_command_id)
 end
 
+module Block_and_snapp_command = struct
+  type t =
+    { block_id : int
+    ; snapp_command_id : int
+    ; sequence_no : int
+    ; fee_payer_balance_id : int
+    ; other_parties_balance_ids : int array
+    ; status : string
+    ; failure_reason : string option
+    }
+  [@@deriving hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ int; int; int; int; Mina_caqti.array_int_typ; string; option string ]
+
+  let add (module Conn : CONNECTION) ~block_id ~snapp_command_id ~sequence_no
+      ~status ~failure_reason ~fee_payer_balance_id ~other_parties_balance_ids =
+    let failure_reason =
+      Option.map ~f:Transaction_status.Failure.to_string failure_reason
+    in
+    let amount_to_int64 x =
+      Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+    in
+    Conn.exec
+      (Caqti_request.exec typ
+         {sql| INSERT INTO snapps_user_commands
+                 (block_id,
+                  snapp_command_id,
+                  sequence_no,
+                  status,
+                  failure_reason,
+                  fee_payer_balance_id,
+                  other_parties_balances_ids)
+               VALUES (?, ?, ?, ?::user_command_status, ?, ?, ?, ?, ?, ?, ?)
+         |sql})
+      { block_id
+      ; snapp_command_id
+      ; sequence_no
+      ; status
+      ; failure_reason
+      ; fee_payer_balance_id
+      ; other_parties_balance_ids
+      }
+
+  (* TODO !!!! this will have to change, need a way to get balances for snapps *)
+  let add_with_status (module Conn : CONNECTION) ~block_id ~block_height
+      ~snapp_command_id ~sequence_no ~(status : Transaction_status.t)
+      ~fee_payer_id ~other_parties_balances_ids =
+    let open Deferred.Result.Let_syntax in
+    let ( status_str
+        , failure_reason
+        , fee_payer_account_creation_fee_paid
+        , receiver_account_creation_fee_paid
+        , created_token
+        , { Transaction_status.Balance_data.fee_payer_balance
+          ; source_balance
+          ; receiver_balance
+          } ) =
+      match status with
+      | Applied
+          ( { fee_payer_account_creation_fee_paid
+            ; receiver_account_creation_fee_paid
+            ; created_token
+            }
+          , balances ) ->
+          ( "applied"
+          , None
+          , fee_payer_account_creation_fee_paid
+          , receiver_account_creation_fee_paid
+          , created_token
+          , balances )
+      | Failed (failure, balances) ->
+          ("failed", Some failure, None, None, None, balances)
+    in
+    let pk_of_id id =
+      let%map pk_str = Public_key.find_by_id (module Conn) id in
+      Signature_lib.Public_key.Compressed.of_base58_check pk_str
+      |> Or_error.ok_exn
+      (* Note: This is safe because the database will already have the
+       * correctly formatted public key by this point. *)
+    in
+    let nonce_int64_of_pk pk =
+      Signature_lib.Public_key.Compressed.Map.find nonce_map pk
+      |> Option.map ~f:(fun nonce ->
+             Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
+    in
+    let add_optional_balance id balance ~block_id ~block_height
+        ~block_sequence_no ~block_secondary_sequence_no ~nonce =
+      match balance with
+      | None ->
+          Deferred.Result.return None
+      | Some balance ->
+          let%map balance_id =
+            Balance.add_if_doesn't_exist
+              (module Conn)
+              ~public_key_id:id ~balance ~block_id ~block_height
+              ~block_sequence_no ~block_secondary_sequence_no ~nonce
+          in
+          Some balance_id
+    in
+    (* Any transaction included in a block will have had its fee paid, so we can
+     * assume the fee payer balance will be Some here *)
+    let fee_payer_balance = Option.value_exn fee_payer_balance in
+    let%bind fee_payer_balance_id =
+      let%bind fee_payer_pk = pk_of_id fee_payer_id in
+      let nonce = nonce_int64_of_pk fee_payer_pk in
+      Balance.add_if_doesn't_exist
+        (module Conn)
+        ~public_key_id:fee_payer_id ~balance:fee_payer_balance ~block_id
+        ~block_height ~block_sequence_no:sequence_no
+        ~block_secondary_sequence_no:0 ~nonce
+    in
+    let%bind source_balance_id =
+      let%bind source_pk = pk_of_id source_id in
+      let nonce = nonce_int64_of_pk source_pk in
+      add_optional_balance source_id source_balance ~block_id ~block_height
+        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
+    in
+    let%bind receiver_balance_id =
+      let%bind receiver_pk = pk_of_id receiver_id in
+      let nonce = nonce_int64_of_pk receiver_pk in
+      add_optional_balance receiver_id receiver_balance ~block_id ~block_height
+        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
+    in
+    add
+      (module Conn)
+      ~block_id ~snapp_command_id ~sequence_no ~status:status_str
+      ~failure_reason ~fee_payer_balance_id ~other_parties_balance_ids
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
+      ~snapp_command_id ~sequence_no ~(status : string) ~failure_reason
+      ~fee_payer_balance_id ~other_parties_balance_ids =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt
+           Caqti_type.(tup3 int int int)
+           Caqti_type.string
+           {sql| SELECT 'exists' FROM blocks_snapp_commands
+                 WHERE block_id = $1
+                 AND snapp_command_id = $2
+                 AND sequence_no = $3
+           |sql})
+        (block_id, snapp_command_id, sequence_no)
+    with
+    | Some _ ->
+        return ()
+    | None ->
+        add
+          (module Conn)
+          ~block_id ~snapp_command_id ~sequence_no ~status ~failure_reason
+          ~fee_payer_balance_id ~other_parties_balance_ids
+
+  let load (module Conn : CONNECTION) ~block_id ~snapp_command_id =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int)
+         typ
+         {sql| SELECT block_id, user_command_id,
+               sequence_no,
+               status,failure_reason,
+               fee_payer_balance_id,
+               other_parties_balance_ids,
+               FROM blocks_snapp_commands
+               WHERE block_id = $1
+               AND snapp_command_id = $2
+           |sql})
+      (block_id, snapp_command_id)
+end
+
 module Block = struct
   type t =
     { state_hash : string
@@ -2566,8 +2738,13 @@ module Block = struct
                         ~sequence_no ~status:user_command.status ~fee_payer_id
                         ~source_id ~receiver_id ~nonce_map
                       >>| ignore
-                  | Parties _ ->
-                      Deferred.Result.return ()
+                  | Parties parties ->
+                      Block_and_snapp_command.add_with_status
+                        (module Conn)
+                        ~block_id ~block_height:height ~snapp_command_id:id
+                        ~sequence_no ~status:user_command.status ~fee_payer_id
+                        ~other_parties_ids
+                      >>| ignore
                 in
                 (sequence_no + 1, nonce_map)
             | { data = Fee_transfer fee_transfer_bundled; status } ->
