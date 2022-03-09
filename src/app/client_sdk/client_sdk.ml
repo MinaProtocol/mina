@@ -33,19 +33,57 @@ let _ =
          end
 
        method signTransaction (parties_js : string_js)
-           (_sk_base58_check_js : string_js) =
+           (sk_base58_check_js : string_js) =
          let parties = parties_js |> Js.to_string in
          let parties_json = Yojson.Safe.from_string parties in
          let deriver = Parties.deriver in
+         let sk =
+           Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
+         in
          let parties =
            Fields_derivers_snapps.of_json
              (deriver @@ Fields_derivers_snapps.derivers ())
              parties_json
          in
+         let other_parties = parties.other_parties in
+         let fee_payer = parties.fee_payer in
+         let memo = parties.memo in
+         let protocol_state = parties.fee_payer.data.body.protocol_state in
+         let protocol_state_predicate_hash =
+           Snapp_predicate.Protocol_state.digest protocol_state
+         in
+         let other_parties_data =
+           List.map (fun (party : Party.t) -> party.data) other_parties
+         in
+         let ps =
+           Parties.Call_forest.of_parties_list
+             ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+             other_parties_data
+           |> Parties.Call_forest.accumulate_hashes_predicated
+         in
+         let other_parties_hash = Parties.Call_forest.hash ps in
+         let commitment : Parties.Transaction_commitment.t =
+           Parties.Transaction_commitment.create ~other_parties_hash
+             ~protocol_state_predicate_hash
+             ~memo_hash:(Signed_command_memo.hash memo)
+         in
+         let full_commitment =
+           Parties.Transaction_commitment.with_fee_payer commitment
+             ~fee_payer_hash:
+               Party.Predicated.(digest (of_fee_payer fee_payer.data))
+         in
+         let fee_payer =
+           let fee_payer_signature_auth =
+             Signature_lib.Schnorr.Chunked.sign sk
+               (Random_oracle.Input.Chunked.field full_commitment)
+           in
+           { fee_payer with authorization = fee_payer_signature_auth }
+         in
+         let new_parties = { Parties.fee_payer; other_parties; memo } in
          let parties_json =
            Fields_derivers_snapps.to_json
              (deriver @@ Fields_derivers_snapps.derivers ())
-             parties
+             new_parties
          in
          (* Return JSON to inspect in mina-signer *)
          Yojson.Safe.to_string parties_json
