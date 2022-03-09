@@ -435,7 +435,7 @@ let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ; fee
     ; receivers = []
     ; amount
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = true
     ; snapp_update = Party.Update.dummy
@@ -468,7 +468,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with verification_key; snapp_uri }
@@ -479,7 +479,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -505,7 +505,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; fee
     ; receivers
     ; amount
-    ; snapp_account_keypair = None
+    ; snapp_account_keypairs = []
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = Party.Update.dummy
@@ -531,7 +531,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with app_state }
@@ -542,7 +542,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -564,7 +564,7 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with snapp_uri }
@@ -575,7 +575,7 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -599,7 +599,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = Party.Update.dummy
@@ -610,7 +610,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -632,7 +632,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with token_symbol }
@@ -643,7 +643,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -666,7 +666,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with permissions }
@@ -677,7 +677,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~constraint_constants spec
   in
   (*Util.print_snapp_transaction parties ;*)
   let%map () =
