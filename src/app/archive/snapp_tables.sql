@@ -196,6 +196,7 @@ CREATE TABLE snapp_party_body
 ( id                                    serial     PRIMARY KEY
 , public_key_id                         int        NOT NULL REFERENCES public_keys(id)
 , update_id                             int        NOT NULL REFERENCES snapp_updates(id)
+, token_id                              text       NOT NULL
 , balance_change                        bigint     NOT NULL
 , increment_nonce                       boolean    NOT NULL
 , events_ids                            int[]      NOT NULL
