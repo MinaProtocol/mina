@@ -48,9 +48,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
       method to_json = to_json
 
-      method of_json =
-        Printf.printf "OBJECT OF_JSON\n" ;
-        of_json
+      method of_json = of_json
 
       method to_json_accumulator = to_json_accumulator
 

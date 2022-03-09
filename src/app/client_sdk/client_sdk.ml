@@ -8,6 +8,7 @@ open Mina_base
 open Rosetta_lib
 open Rosetta_coding
 open Js_util
+open Core
 
 let _ =
   Js.export "minaSDK"
@@ -32,13 +33,20 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       method signTransaction (parties_js : string_js) =
+       method signTransaction (parties_js : string_js)
+           (_sk_base58_check_js : string_js) =
          let parties = parties_js |> Js.to_string in
          let parties_json = Yojson.Safe.from_string parties in
-         let _test =
+         let deriver = Parties.deriver in
+         let parties =
            Fields_derivers_snapps.of_json
-             (Parties.deriver @@ Fields_derivers_snapps.derivers ())
+             (deriver @@ Fields_derivers_snapps.derivers ())
              parties_json
+         in
+         let parties_json =
+           Fields_derivers_snapps.to_json
+             (deriver @@ Fields_derivers_snapps.derivers ())
+             parties
          in
          (* Return JSON to inspect in mina-signer *)
          Yojson.Safe.to_string parties_json
@@ -65,8 +73,8 @@ let _ =
          |> Public_key.Compressed.to_base58_check |> Js.string
 
        (** is the public key valid and derivable from private key; can
-           the private key be used to sign a transaction?
-       *)
+          the private key be used to sign a transaction?
+      *)
        method validKeypair (keypair_js : keypair_js) =
          let sk_base58_check = Js.to_string keypair_js##.privateKey in
          let pk_base58_check = Js.to_string keypair_js##.publicKey in
