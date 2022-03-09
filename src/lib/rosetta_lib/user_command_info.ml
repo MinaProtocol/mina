@@ -521,16 +521,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; coin_change = None
           ; metadata
           }
-      | `Create_token ->
-          { Operation.operation_identifier
-          ; related_operations
-          ; status = Option.map ~f:Operation_statuses.name status
-          ; account = None
-          ; _type = Operation_types.name `Create_token
-          ; amount = None
-          ; coin_change = None
-          ; metadata
-          }
       | `Delegate_change ->
           { Operation.operation_identifier
           ; related_operations
