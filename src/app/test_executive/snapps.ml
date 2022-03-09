@@ -188,6 +188,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (snapp_update, parties_update_all)
     in
+    let parties_invalid_nonce =
+      let p = parties_update_all in
+      { p with
+        fee_payer =
+          { p.fee_payer with
+            data =
+              { p.fee_payer.data with
+                predicate = Mina_base.Account.Nonce.of_int 42
+              }
+          }
+      }
+    in
+    let parties_invalid_signature =
+      let p = parties_update_all in
+      { p with
+        fee_payer =
+          { data =
+              { p.fee_payer.data with
+                predicate = Mina_base.Account.Nonce.of_int 4
+              }
+          ; authorization = Mina_base.Signature.dummy
+          }
+      }
+    in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -206,6 +230,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
             err_str
+    in
+    let send_invalid_snapp parties substring =
+      [%log info] "Sending snapp" ;
+      match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
+      | Ok _snapp_id ->
+          [%log error] "Snapps transaction succeeded, expected error \"%s\""
+            substring ;
+          Malleable_error.soft_error_format ~value:()
+            "Snapps transaction succeeded, expected error \"%s\"" substring
+      | Error err ->
+          let err_str = Error.to_string_mach err in
+          if String.is_substring ~substring err_str then (
+            [%log info] "Snapps transaction failed as expected"
+              ~metadata:[ ("error", `String err_str) ] ;
+            Malleable_error.return () )
+          else (
+            [%log error]
+              "Error sending snapp, for a reason other than the expected \"%s\""
+              substring
+              ~metadata:[ ("error", `String err_str) ] ;
+            Malleable_error.soft_error_format ~value:()
+              "Snapp failed: %s, but expected \"%s\"" err_str substring )
     in
     let get_account_permissions () =
       [%log info] "Getting account permissions" ;
@@ -237,15 +283,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.hard_error (Error.of_string err_str)
     in
-    let wait_for_snapp parties =
-      let%map () =
-        wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
-      in
-      [%log info] "Snapps transaction included in transition frontier"
-    in
-    let compatible_updates (ledger_update : Mina_base.Party.Update.t)
-        (requested_update : Mina_base.Party.Update.t) : bool =
+    let compatible_updates ~(ledger_update : Mina_base.Party.Update.t)
+        ~(requested_update : Mina_base.Party.Update.t) : bool =
       (* the "update" in the ledger is derived from the account
 
          if the requested update has `Set` for a field, we
@@ -320,6 +359,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
         ~f:Fn.id
     in
+    let wait_for_snapp parties =
+      let%map () =
+        wait_for t @@ with_timeout
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+      in
+      [%log info] "Snapps transaction included in transition frontier"
+    in
     let%bind () =
       section "send a snapp to create a snapp account"
         (send_snapp parties_create_account)
@@ -371,7 +417,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Verify snapp updates in ledger"
         (let%bind ledger_update = get_account_update () in
-         if compatible_updates ledger_update snapp_update_all then (
+         if compatible_updates ~ledger_update ~requested_update:snapp_update_all
+         then (
            [%log info] "Ledger update and requested update are compatible" ;
            return () )
          else (
@@ -385,6 +432,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.hard_error
              (Error.of_string
                 "Ledger update and requested update are incompatible") ))
+    in
+    let%bind () =
+      section "Send a snapp with an invalid nonce"
+        (send_invalid_snapp parties_invalid_nonce "Invalid_nonce")
+    in
+    let%bind () =
+      section "Send a snapp with an invalid signature"
+        (send_invalid_snapp parties_invalid_signature "Invalid_signature")
     in
     return ()
 end
