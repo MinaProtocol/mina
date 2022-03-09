@@ -6,12 +6,21 @@
  (preprocess (pps ppx_version ppx_optcomp ppx_sexp_conv ppx_compare ppx_inline_test ppx_assert ppx_compare ppx_deriving_yojson ppx_let))
  (inline_tests)
  (libraries
-   kimchi_pasta_fp_poseidon
-   random_oracle_input
+   ;; opam libraries
+   ppx_inline_test.config
+   base
    core_kernel
-   o1trace
-   pickles
-   snarky.backendless
+   sexplib0
+   ;; local libraries
+   snark_params
+   pickles.backend
    sponge
+   pickles
+   random_oracle_input
+   o1trace
+   snarky.backendless
    kimchi.pasta_fp_poseidon
-   kimchi.pasta_fq_poseidon))
+   kimchi
+   kimchi_backend.pasta
+   fold_lib
+))
