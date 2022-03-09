@@ -6,8 +6,7 @@ let () = Backend.Keypair.set_urs_info []
    *)
 
 let loose_permissions : Mina_base.Permissions.t =
-  { stake = true
-  ; edit_state = None
+  { edit_state = None
   ; send = None
   ; receive = None
   ; set_delegate = None
