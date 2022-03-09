@@ -33,7 +33,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in
-
     let%bind () =
       section "delegate all mina currency from node_b to node_a"
         (let amount = Currency.Amount.of_int 2_000_000_000 in
@@ -47,15 +46,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Util.pub_key_of_node delegation_sender
          in
          let%bind () =
-           Network.Node.must_delegate_currency ~logger delegation_sender
+           Network.Node.must_send_delegation ~logger delegation_sender
              ~sender_pub_key:delegation_sender_pub_key
              ~receiver_pub_key:delegation_receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier
+           (Wait_condition.signed_command_to_be_included_in_frontier
               ~sender_pub_key:delegation_sender_pub_key
-              ~receiver_pub_key:delegation_receiver_pub_key ~amount))
+              ~receiver_pub_key:delegation_receiver_pub_key ~amount
+              ~command_type:Send_delegation))
     in
-    (* grab node_b's balance, then check to make sure node_b is still getting coinbase rewards.  wait a few blocks, make sure node_b's balance has increased, if it increases at least a little bit, then the test passes.  if after several blocks it receives no coinbase rewards, then fail *)
     Malleable_error.return ()
 end

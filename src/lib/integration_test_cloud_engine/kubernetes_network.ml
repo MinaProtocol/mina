@@ -345,15 +345,13 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
-      =
-    (* todo rename everything to "send delegation" *)
-    [%log info] "Delegating currency" ~metadata:(logger_metadata t) ;
+  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+    [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let sender_pk_str =
       Signature_lib.Public_key.Compressed.to_string sender_pub_key
     in
-    [%log info] "delegate_currency: unlocking account"
+    [%log info] "send_delegation: unlocking account"
       ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
@@ -365,8 +363,8 @@ module Node = struct
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
-    let delegate_currency_graphql () =
-      let delegate_currency_obj =
+    let send_delegation_graphql () =
+      let send_delegation_obj =
         Graphql.Send_delegation.make
           ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
@@ -374,19 +372,19 @@ module Node = struct
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
       in
-      exec_graphql_request ~logger ~node:t
-        ~query_name:"delegate_currency_graphql" delegate_currency_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"send_delegation_graphql"
+        send_delegation_obj
     in
-    let%map result_obj = delegate_currency_graphql () in
+    let%map result_obj = send_delegation_graphql () in
     let (`UserCommand id_obj) = result_obj#sendDelegation#delegation in
     let user_cmd_id = id_obj#id in
-    [%log info] "Currency Delegated"
+    [%log info] "stake delegation sent"
       ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
     ()
 
-  let must_delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =
-    delegate_currency ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =

@@ -57,7 +57,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val delegate_currency :
+      val send_delegation :
            logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
@@ -66,7 +66,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Deferred.Or_error.t
 
-      val must_delegate_currency :
+      val must_send_delegation :
            logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
@@ -262,10 +262,13 @@ module Dsl = struct
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    val payment_to_be_included_in_frontier :
+    type command_type = Send_payment | Send_delegation
+
+    val signed_command_to_be_included_in_frontier :
          sender_pub_key:Public_key.Compressed.t
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
+      -> command_type:command_type
       -> t
   end
 

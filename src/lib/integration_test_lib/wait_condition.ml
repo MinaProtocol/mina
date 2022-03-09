@@ -118,8 +118,17 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let payment_to_be_included_in_frontier ~sender_pub_key ~receiver_pub_key
-      ~amount =
+  type command_type = Send_payment | Send_delegation
+
+  let command_type_to_string command_type =
+    match command_type with
+    | Send_payment ->
+        "Send Payment"
+    | Send_delegation ->
+        "Send Delegation"
+
+  let signed_command_to_be_included_in_frontier ~sender_pub_key
+      ~receiver_pub_key ~amount ~command_type =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
@@ -132,8 +141,20 @@ struct
           | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
             when Public_key.Compressed.equal source_pk sender_pub_key
                  && Public_key.Compressed.equal receiver_pk receiver_pub_key
-                 && Currency.Amount.equal paid_amt amount ->
-              true
+                 && Currency.Amount.equal paid_amt amount -> (
+              match command_type with Send_payment -> true | _ -> false )
+          | Stake_delegation dl -> (
+              match dl with
+              | Set_delegate
+                  { delegator : Public_key.Compressed.t
+                  ; new_delegate : Public_key.Compressed.t
+                  }
+                when Public_key.Compressed.equal delegator sender_pub_key
+                     && Public_key.Compressed.equal new_delegate
+                          receiver_pub_key -> (
+                  match command_type with Send_delegation -> true | _ -> false )
+              | _ ->
+                  false )
           | _ ->
               false )
       | Snapp_command _ ->
@@ -166,7 +187,9 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     { description =
-        Printf.sprintf "payment from %s to %s of amount %s"
+        Printf.sprintf
+          "payment signed command of type %s from %s to %s of amount %s"
+          (command_type_to_string command_type)
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)

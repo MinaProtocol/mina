@@ -74,8 +74,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount
+              ~command_type:Send_payment))
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
@@ -89,8 +90,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount
+              ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 6_900_000_000_000 in

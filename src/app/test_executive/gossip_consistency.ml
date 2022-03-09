@@ -55,8 +55,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let%bind () =
           let%map () =
             wait_for dsl
-              (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-                 ~receiver_pub_key ~amount)
+              (Wait_condition.signed_command_to_be_included_in_frontier
+                 ~sender_pub_key ~receiver_pub_key ~amount
+                 ~command_type:Send_payment)
           in
           [%log info]
             "gossip_consistency test: payment #%d successfully included in \
