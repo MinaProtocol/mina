@@ -1185,19 +1185,8 @@ let pooled_snapp_commands =
            Yojson.Safe.to_basic
            @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
          in
-         let graphql_partial =
-           Graphql_queries.Pooled_snapp_commands_partial.make ~public_key ()
-         in
          let graphql =
-           object
-             method parse = graphql_partial#parse
-
-             method variables = graphql_partial#variables
-
-             method query =
-               Graphql_queries.Pooled_snapp_commands.full_query_string
-                 (Lazy.force Parties.inner_query)
-           end
+           Graphql_queries.Pooled_snapp_commands.make ~public_key ()
          in
          let%bind raw_response =
            Graphql_client.query_json_exn graphql graphql_endpoint

@@ -2256,11 +2256,12 @@ module Types = struct
           | _ ->
               Error "Expected string for fee")
 
-    let send_test_snapp =
+    let internal_send_snapp =
       scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
         ~coerce:(fun json ->
           let json = to_yojson json in
-          Mina_base.Parties.of_yojson json)
+          Result.try_with (fun () -> Mina_base.Parties.of_json json)
+          |> Result.map_error ~f:(fun ex -> Exn.to_string ex))
 
     let precomputed_block =
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
@@ -3389,9 +3390,11 @@ module Mutations = struct
       ~doc:"Mock a snapp transaction, no effect on blockchain"
       ~f:mock_snapp_command
 
-  let send_test_snapp =
-    io_field "sendTestSnapp" ~doc:"Send a test snapp"
-      ~args:Arg.[ arg "parties" ~typ:(non_null Types.Input.send_test_snapp) ]
+  let internal_send_snapp =
+    io_field "internalSendSnapp"
+      ~doc:"Send a snapp (for internal testing purposes)"
+      ~args:
+        Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_snapp) ]
       ~typ:(non_null Types.Payload.send_snapp)
       ~resolve:(fun { ctx = mina; _ } () parties ->
         send_snapp_command mina parties)
@@ -3728,7 +3731,7 @@ module Mutations = struct
     ; mint_tokens
     ; send_snapp
     ; mock_snapp
-    ; send_test_snapp
+    ; internal_send_snapp
     ; export_logs
     ; set_coinbase_receiver
     ; set_snark_worker

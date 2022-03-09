@@ -5907,8 +5907,8 @@
               "deprecationReason": null
             },
             {
-              "name": "sendTestSnapp",
-              "description": "Send a test snapp",
+              "name": "internalSendSnapp",
+              "description": "Send a snapp (for internal testing purposes)",
               "args": [
                 {
                   "name": "parties",

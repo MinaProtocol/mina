@@ -6,5 +6,5 @@
  (preprocessor_deps ../../../graphql_schema.json)
  (preprocess (pps ppx_coda graphql_ppx ppx_optcomp ppx_version ppx_let ppx_inline_test ppx_custom_printf ppx_deriving_yojson ppx_pipebang ppx_sexp_conv))
  (libraries
-   core async mina_base key_gen pipe_lib runtime_config genesis_constants graphql_lib transition_frontier user_command_input genesis_ledger_helper integration_test_lib block_time interruptible exit_handlers transition_router block_producer)
+   core async mina_base key_gen pipe_lib runtime_config genesis_constants graphql_lib transition_frontier user_command_input genesis_ledger_helper integration_test_lib block_time interruptible exit_handlers transition_router block_producer generated_graphql_queries)
 )

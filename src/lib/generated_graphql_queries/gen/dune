@@ -1,0 +1,8 @@
+(executable
+ (name gen)
+ (libraries core ppxlib yojson mina_base)
+ (preprocess
+  (pps ppx_jane graphql_ppx ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
+ (modes native))
+

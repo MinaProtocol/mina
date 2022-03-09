@@ -438,6 +438,8 @@ let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
 
 let to_json x = Fields_derivers_snapps.(to_json (deriver @@ Derivers.o ())) x
 
+let of_json x = Fields_derivers_snapps.(of_json (deriver @@ Derivers.o ())) x
+
 let arg_query_string x =
   Fields_derivers_snapps.Test.Loop.json_to_string_gql @@ to_json x
 

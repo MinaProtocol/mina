@@ -284,40 +284,7 @@ query user_commands($public_key: PublicKey) {
 }
 |}]
 
-(* Keep this query parsed at compile time to ensure there are no errors + pull
- * the correct mutation variables. We don't include the full parties selectors
- * because it's tediuos to keep up-to-date, instead we'll generate those
- * dynamically in an other query and swap that in when the query is executed
- * (see below). *)
-module Pooled_snapp_commands_partial =
-[%graphql
-{|
-query snapp_commands($public_key: PublicKey) {
-  pooledSnappCommands(publicKey: $public_key) {
-    id
-    hash
-    failureReason
-    parties { memo }
-  }
-}
-|}]
-
-module Pooled_snapp_commands = struct
-  (* Pass parties_inner_query as a string to avoid dependency hell *)
-  let full_query_string parties_inner_query =
-    Printf.sprintf
-      {graphql|
-      query snapp_commands($public_key: PublicKey) {
-        pooledSnappCommands(publicKey: $public_key) {
-          id
-          hash
-          failureReason
-          parties %s
-        }
-      }
-      |graphql}
-      parties_inner_query
-end
+module Pooled_snapp_commands = Generated_graphql_queries.Pooled_snapp_commands
 
 module Next_available_token =
 [%graphql
