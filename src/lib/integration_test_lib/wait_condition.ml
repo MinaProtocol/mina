@@ -187,8 +187,7 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     { description =
-        Printf.sprintf
-          "payment signed command of type %s from %s to %s of amount %s"
+        Printf.sprintf "signed command of type %s from %s to %s of amount %s"
           (command_type_to_string command_type)
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
