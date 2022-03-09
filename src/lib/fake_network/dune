@@ -27,7 +27,6 @@
    transition_frontier
    mina_base
    gadt_lib
-   gossip_net
    mina_networking
    sync_handler
    network_peer

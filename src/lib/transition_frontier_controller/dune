@@ -18,16 +18,8 @@
    mina_transition
    o1trace
    pipe_lib
-   consensus
-   mina_intf
    mina_base
-   syncable_ledger
-   merkle_address
-   merkle_mask
-   sync_handler
    transition_handler
-   test_genesis_ledger
-   mina_networking
    ledger_catchup
    transition_frontier_extensions
    transition_frontier_base

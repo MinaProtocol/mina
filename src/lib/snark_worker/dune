@@ -29,9 +29,7 @@
    cli_lib
    genesis_constants
    transaction_witness
-   sparse_ledger_lib
    perf_histograms
-   blockchain_snark
    snark_work_lib
    currency
    mina_base

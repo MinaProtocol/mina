@@ -22,7 +22,6 @@
    consensus
    precomputed_values
    logger
-   secrets
    currency
    mina_state
    signature_lib

@@ -33,12 +33,9 @@
    consensus
    perf_histograms
    mina_base
-   o1trace
    gossip_net
-   unix_timestamp
    proof_carrying_data
    network_pool
-   transition_frontier
    sync_status
    network_peer
    data_hash_lib

@@ -179,6 +179,7 @@ module R = struct
   module Stable = struct
     module V2 = struct
       type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -190,7 +191,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving hash]
 
       let to_latest = Fn.id
 
@@ -239,6 +240,20 @@ module Stable = struct
         in
         { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }
 
+      (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
+
+      let sexp_of_t t = R.sexp_of_t (to_repr t)
+
+      let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
+
+      let to_yojson t = R.to_yojson (to_repr t)
+
+      let of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
+
+      let equal x y = R.equal (to_repr x) (to_repr y)
+
+      let compare x y = R.compare (to_repr x) (to_repr y)
+
       include Binable.Of_binable
                 (R.Stable.V2)
                 (struct
@@ -256,7 +271,16 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_base58_check, of_base58_check, of_base58_check_exn)]
+Stable.Latest.
+  ( to_base58_check
+  , of_base58_check
+  , of_base58_check_exn
+  , sexp_of_t
+  , t_of_sexp
+  , to_yojson
+  , of_yojson
+  , equal
+  , compare )]
 
 let dummy : t =
   { step_data = At_most.[]

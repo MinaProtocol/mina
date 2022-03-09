@@ -35,14 +35,11 @@
    inline_test_quiet_logs
    mina_networking
    mina_metrics
-   merkle_address
    pipe_lib
    transition_handler
    non_empty_list
    transition_frontier
    consensus
-   mina_intf
-   syncable_ledger
    mina_base
    transition_chain_verifier
    fake_network

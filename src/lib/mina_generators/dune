@@ -21,7 +21,6 @@
    signature_lib
    mina_ledger
    mina_base
-   quickcheck_lib
    random_oracle
    with_hash
    mina_base.import

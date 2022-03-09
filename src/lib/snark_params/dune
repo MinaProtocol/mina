@@ -21,7 +21,6 @@
    sponge
    group_map
    fold_lib
-   tuple_lib
    bitstring_lib
    snark_bits
    pickles

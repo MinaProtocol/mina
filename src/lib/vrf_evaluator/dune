@@ -17,7 +17,6 @@
    currency
    unsigned_extended
    interruptible
-   random_oracle
    signature_lib
    consensus
    mina_base
