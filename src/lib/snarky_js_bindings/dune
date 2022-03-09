@@ -8,7 +8,7 @@
  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
  (instrumentation (backend bisect_ppx))
- (forbidden_libraries async core re2)
+ (forbidden_libraries async core re2 ctypes)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
 
 (executable
@@ -21,5 +21,5 @@
  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.wasm)
  (instrumentation (backend bisect_ppx))
- (forbidden_libraries async core re2)
+ (forbidden_libraries async core re2 ctypes)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
