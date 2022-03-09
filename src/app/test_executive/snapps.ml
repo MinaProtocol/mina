@@ -117,7 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sequence_events = []
         }
       in
-      let%map.Deferred parties, _vk =
+      let%map.Deferred parties =
         Transaction_snark.For_tests.update_state ~constraint_constants
           parties_spec
       in
@@ -182,7 +182,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sequence_events = []
         }
       in
-      let%map.Deferred parties_update_all, _vk =
+      let%map.Deferred parties_update_all =
         Transaction_snark.For_tests.update_state ~constraint_constants
           parties_spec
       in
