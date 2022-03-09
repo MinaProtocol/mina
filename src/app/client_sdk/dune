@@ -4,7 +4,6 @@
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries
-  core
   core_kernel
   snark_params
   rosetta_lib
@@ -32,6 +31,6 @@
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
- (forbidden_libraries async re2)
+ (forbidden_libraries async core re2)
  (preprocess
   (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))

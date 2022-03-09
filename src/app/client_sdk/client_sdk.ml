@@ -8,7 +8,6 @@ open Mina_base
 open Rosetta_lib
 open Rosetta_coding
 open Js_util
-open Core
 
 let _ =
   Js.export "minaSDK"
