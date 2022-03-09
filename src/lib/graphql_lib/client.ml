@@ -66,22 +66,6 @@ module Connection_error = struct
         Error.createf !"Graphql error: %s" e
 end
 
-let rec basic_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
-  | `Assoc kv ->
-      `Assoc (List.map kv ~f:(fun (k, v) -> (k, basic_to_safe v)))
-  | `Bool b ->
-      `Bool b
-  | `Float f ->
-      `Float f
-  | `Int i ->
-      `Int i
-  | `List xs ->
-      `List (List.map xs ~f:basic_to_safe)
-  | `Null ->
-      `Null
-  | `String s ->
-      `String s
-
 module Make (Config : Config_intf) = struct
   (* basic version *)
   let query_json' query_obj uri =
@@ -136,7 +120,8 @@ module Make (Config : Config_intf) = struct
 
   (* safe *)
   let query_json query_obj uri =
-    query_json' query_obj uri |> Deferred.Result.map ~f:basic_to_safe
+    query_json' query_obj uri
+    |> Deferred.Result.map ~f:(fun (x : Yojson.Basic.t) -> (x :> Yojson.Safe.t))
 
   let query query_obj uri =
     let open Deferred.Result.Let_syntax in
