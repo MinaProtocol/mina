@@ -2,7 +2,7 @@ open Async
 open Core
 open Pipe_lib
 
-type catchup_job_states =
+type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
   { finished : int
   ; failed : int
   ; to_download : int
@@ -50,7 +50,8 @@ type block =
 [@@deriving to_yojson]
 
 type node_status_data =
-  { block_height_at_best_tip : int
+  { version : int
+  ; block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states option
@@ -167,40 +168,9 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
       let catchup_job_states =
         match Transition_frontier.catchup_tree tf with
         | Full catchup_tree ->
-            let catchup_states =
-              Transition_frontier.Full_catchup_tree.to_node_status_report
-                catchup_tree
-            in
-            let init =
-              { finished = 0
-              ; failed = 0
-              ; to_download = 0
-              ; to_initial_validate = 0
-              ; to_verify = 0
-              ; wait_for_parent = 0
-              ; to_build_breadcrumb = 0
-              }
-            in
             Some
-              (List.fold catchup_states ~init ~f:(fun acc (state, n) ->
-                   match state with
-                   | Transition_frontier.Full_catchup_tree.Node.State.Enum
-                     .Finished ->
-                       { acc with finished = n }
-                   | Failed ->
-                       { acc with failed = n }
-                   | To_download ->
-                       { acc with to_download = n }
-                   | To_initial_validate ->
-                       { acc with to_initial_validate = n }
-                   | To_verify ->
-                       { acc with to_verify = n }
-                   | Wait_for_parent ->
-                       { acc with wait_for_parent = n }
-                   | To_build_breadcrumb ->
-                       { acc with to_build_breadcrumb = n }
-                   | Root ->
-                       acc))
+              (Transition_frontier.Full_catchup_tree.to_node_status_report
+                 catchup_tree)
         | _ ->
             None
       in
@@ -215,7 +185,8 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { block_height_at_best_tip =
+            { version = 1
+            ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
                 |> Transition_frontier.Breadcrumb.blockchain_length
                 |> Unsigned.UInt32.to_int
