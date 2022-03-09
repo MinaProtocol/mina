@@ -21,13 +21,13 @@ use mina_curves::pasta::{
     vesta::{Affine as GAffine, VestaParameters},
 };
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use std::convert::TryInto;
 
-type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>;
-type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstants15W>;
+type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
+type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -99,8 +99,8 @@ pub fn caml_pasta_fp_plonk_proof_verify(
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
     ProverProof::verify::<
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
     >(
         &group_map,
         &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
@@ -125,8 +125,8 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
     let group_map = GroupMap::<Fq>::setup();
 
     ProverProof::<GAffine>::verify::<
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
     .is_ok()
 }
