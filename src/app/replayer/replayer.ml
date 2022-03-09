@@ -1105,8 +1105,7 @@ module Snapp_helpers = struct
               ~item:"snapp verification key"
           in
           let perms : Mina_base.Permissions.t =
-            { stake = perms_data.stake
-            ; edit_state = perms_data.edit_state
+            { edit_state = perms_data.edit_state
             ; send = perms_data.send
             ; receive = perms_data.receive
             ; set_delegate = perms_data.set_delegate

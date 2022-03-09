@@ -979,10 +979,7 @@ module Types = struct
 
     let account_permissions =
       obj "AccountPermissions" ~fields:(fun _ ->
-          [ field "stake" ~typ:(non_null bool) ~doc:"Permission to stake"
-              ~args:Arg.[]
-              ~resolve:(fun _ permission -> permission.Permissions.Poly.stake)
-          ; field "editState" ~typ:(non_null auth_required)
+          [ field "editState" ~typ:(non_null auth_required)
               ~doc:"Authorization required to edit snapp state"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
@@ -2362,12 +2359,11 @@ module Types = struct
       let snapp_permissions =
         obj "Permissions"
           ~coerce:
-            (fun stake edit_state send receive set_delegate set_permissions
+            (fun edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
                  set_token_symbol increment_nonce set_voting_for ->
             Ok
-              { Permissions.Poly.stake
-              ; edit_state
+              { Permissions.Poly.edit_state
               ; send
               ; receive
               ; set_delegate
@@ -2380,8 +2376,7 @@ module Types = struct
               ; set_voting_for
               })
           ~fields:
-            [ arg "stake" ~typ:(non_null bool)
-            ; arg "editState" ~typ:(non_null snapp_auth_required)
+            [ arg "editState" ~typ:(non_null snapp_auth_required)
             ; arg "send" ~typ:(non_null snapp_auth_required)
             ; arg "receive" ~typ:(non_null snapp_auth_required)
             ; arg "setDelegate" ~typ:(non_null snapp_auth_required)

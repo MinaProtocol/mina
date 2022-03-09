@@ -136,8 +136,7 @@ module Network_config = struct
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
             Some
-              { stake = false
-              ; edit_state = None
+              { edit_state = None
               ; send = None
               ; receive = None
               ; set_delegate = None

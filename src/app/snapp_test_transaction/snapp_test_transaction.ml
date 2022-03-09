@@ -398,7 +398,7 @@ let update_permissions =
            ~doc:"KEYFILE Private key file to create a new snapp account"
            Param.(required string)
        and edit_state =
-         Param.flag "--edit-stake" ~doc:"Proof|Signature|Either|None"
+         Param.flag "--edit-state" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and send =
          Param.flag "--send" ~doc:"Proof|Signature|Either|None"
@@ -440,8 +440,7 @@ let update_permissions =
        let fee = Option.value ~default:Flags.default_fee fee in
        let permissions : Permissions.t Snapp_basic.Set_or_keep.t =
          Snapp_basic.Set_or_keep.Set
-           { Permissions.Poly.stake = true
-           ; edit_state = Util.auth_of_string edit_state
+           { Permissions.Poly.edit_state = Util.auth_of_string edit_state
            ; send = Util.auth_of_string send
            ; receive = Util.auth_of_string receive
            ; set_permissions = Util.auth_of_string set_permissions
