@@ -3,12 +3,93 @@
  (public_name mina_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core mina_intf mina_version pipe_lib user_command_input logger async
-            filtered_external_transition unix_timestamp debug_assert o1trace consensus
-            child_processes incremental secrets work_selector mina_ledger
-            mina_networking block_producer genesis_constants sync_handler transition_router node_addrs_and_ports
-            otp_lib protocol_version snark_worker participating_state transaction_inclusion_status
-            sync_status daemon_rpcs archive_lib exit_handlers uptime_service vrf_evaluator node_status_service)
+ (libraries
+   ;; opam libraries
+   integers
+   async_unix
+   sexplib0
+   archive_lib
+   core
+   async
+   incremental
+   core_kernel
+   async_kernel
+   base.caml
+   base.base_internalhash_types
+   uri
+   stdio
+   result
+   bin_prot.shape
+   ;; local libraries
+   transition_chain_prover
+   best_tip_prover
+   proof_carrying_data
+   mina_compile_config
+   coda_runtime_config
+   ledger_proof
+   mina_net2
+   network_peer
+   mina_incremental
+   mina_numbers
+   precomputed_values
+   transition_frontier_base
+   with_hash
+   currency
+   mina_user_error
+   gossip_net
+   transition_frontier
+   trust_system
+   node_status_service
+   vrf_evaluator
+   uptime_service
+   exit_handlers
+   daemon_rpcs
+   sync_status
+   node_addrs_and_ports
+   transition_router
+   sync_handler
+   genesis_constants
+   block_producer
+   mina_networking
+   consensus
+   o1trace
+   unix_timestamp
+   filtered_external_transition
+   mina_version
+   pipe_lib
+   user_command_input
+   logger
+   child_processes
+   secrets
+   work_selector
+   mina_ledger
+   protocol_version
+   snark_worker
+   participating_state
+   cli_lib
+   signature_lib
+   mina_base
+   mina_transition
+   transition_frontier_extensions
+   block_time
+   error_json
+   unsigned_extended
+   mina_metrics
+   staged_ledger
+   mina_state
+   network_pool
+   timeout_lib
+   prover
+   verifier
+   non_empty_list
+   snark_work_lib
+   truth
+   ledger_catchup
+   genesis_ledger_helper
+   coda_genesis_proof
+   mina_base.import
+   data_hash_lib
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
  (synopsis "Coda gut layer"))

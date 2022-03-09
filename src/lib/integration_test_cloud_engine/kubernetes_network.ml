@@ -186,7 +186,6 @@ module Node = struct
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
-                        stake
                       }
           sequenceEvents
           snappState
@@ -362,8 +361,7 @@ module Node = struct
       | `Signature ->
           Signature
     in
-    { stake = account_permissions#stake
-    ; edit_sequence_state =
+    { edit_sequence_state =
         to_auth_required account_permissions#editSequenceState
     ; edit_state = to_auth_required account_permissions#editState
     ; increment_nonce = to_auth_required account_permissions#incrementNonce

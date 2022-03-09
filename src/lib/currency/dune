@@ -4,18 +4,34 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-  core_kernel
-  mina_numbers
-  fold_lib
-  tuple_lib
-  snark_bits
-  sgn
-  snark_params
-  random_oracle
-  unsigned_extended
-  test_util
-  codable
-  ppx_dhall_type)
+   ;; opam libraries
+   base.base_internalhash_types
+   core_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   base
+   integers
+   result
+   ppx_inline_test.config
+   zarith
+   ;; local libraries
+   bignum_bigint
+   bitstring_lib
+   ppx_dhall_type
+   codable
+   test_util
+   unsigned_extended
+   mina_numbers
+   snark_bits
+   sgn
+   snark_params
+   random_oracle
+   random_oracle_input
+   pickles
+   snarky.backendless
+   kimchi_backend.common
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps

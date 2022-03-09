@@ -2,8 +2,37 @@
  (name blockchain_snark)
  (public_name blockchain_snark)
  (library_flags -linkall)
- (libraries core cache_dir snarky.backendless snark_params mina_base mina_state
-            transaction_snark bignum_bigint consensus)
+ (libraries
+   ;; opam libraries
+   base.md5
+   base.caml
+   core_kernel
+   core
+   sexplib0
+   async
+   bin_prot.shape
+   async_kernel
+   ;; local libraries
+   pickles.backend
+   allocation_functor
+   crypto_params
+   logger
+   consensus
+   transaction_snark
+   cache_dir
+   snarky.backendless
+   snark_params
+   mina_base
+   mina_state
+   pickles_types
+   pickles
+   genesis_constants
+   currency
+   sgn
+   random_oracle
+   kimchi_backend.pasta
+   data_hash_lib
+   )
  (inline_tests)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_compare))

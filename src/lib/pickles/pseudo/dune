@@ -5,8 +5,13 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
  (libraries
-   plonk_checks
-   one_hot_vector
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
    pickles_types
+   pickles.plonk_checks
+   pickles.one_hot_vector
    snarky.backendless
-   core_kernel))
+   pickles_base
+ )
+)

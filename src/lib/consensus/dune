@@ -5,27 +5,72 @@
  (modules (:standard \ proof_of_stake_fuzzer))
  (library_flags (-linkall))
  (libraries
-   snarky_taylor
+   ;; opam libraries
+   ppx_inline_test.config
+   async_unix
+   core.uuid
+   async_kernel
+   graphql-async
+   sexplib0
+   base.caml
+   integers
+   async
+   core
+   yojson
    core_kernel
+   bin_prot.shape
+   base
+   result
+   core_kernel.uuid
+   async_rpc_kernel
+   sexp_diff_kernel
+   ;; local libraries
+   mina_base.util
+   unsigned_extended
+   kimchi_backend.pasta
+   fold_lib
+   random_oracle_input
+   outside_hash_image
+   logger
+   hash_prefix_states
+   genesis_constants
+   error_json
+   merkle_ledger
+   pickles.backend
+   random_oracle
+   bignum_bigint
+   graphql_lib
+   vrf_lib
+   snark_params
+   with_hash
+   mina_ledger
    consensus.vrf
+   snarky_taylor
    mina_base
    key_gen
-   mina_ledger
-   network_peer
    block_time
-   with_hash
-   test_genesis_ledger
-   snark_params
    perf_histograms
-   rc_pool
    test_util
-   vrf_lib
    unix_timestamp
-   global_signer_private_key
    non_zero_curve_point
-   yojson
    mina_metrics
-   graphql_lib)
+   mina_numbers
+   signature_lib
+   snarky.backendless
+   blake2
+   crypto_params
+   data_hash_lib
+   currency
+   file_system
+   coda_genesis_ledger
+   interruptible
+   network_peer
+   pickles
+   snark_bits
+   sparse_ledger_lib
+   trust_system
+   mina_base.import
+ )
  (preprocessor_deps "../../config.mlh")
  (preprocess
   (pps

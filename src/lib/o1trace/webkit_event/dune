@@ -1,6 +1,20 @@
 (library
  (public_name o1trace_webkit_event)
  (name o1trace_webkit_event)
- (libraries async core webkit_trace_event webkit_trace_event.binary o1trace)
+ (libraries
+   ;; opam libraries
+   core.time_stamp_counter
+   base
+   async_unix
+   core
+   async
+   core_kernel
+   base.caml
+   async_kernel
+   ;; local libraries
+   webkit_trace_event.binary
+   webkit_trace_event
+   o1trace
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

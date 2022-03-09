@@ -979,10 +979,7 @@ module Types = struct
 
     let account_permissions =
       obj "AccountPermissions" ~fields:(fun _ ->
-          [ field "stake" ~typ:(non_null bool) ~doc:"Permission to stake"
-              ~args:Arg.[]
-              ~resolve:(fun _ permission -> permission.Permissions.Poly.stake)
-          ; field "editState" ~typ:(non_null auth_required)
+          [ field "editState" ~typ:(non_null auth_required)
               ~doc:"Authorization required to edit snapp state"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->

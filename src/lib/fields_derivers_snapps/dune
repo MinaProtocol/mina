@@ -2,17 +2,28 @@
  (name fields_derivers_snapps)
  (public_name fields_derivers.snapps)
  (libraries
-  core_kernel
-  fieldslib
-  fields_derivers
-  fields_derivers.json
-  fields_derivers.graphql
-  mina_numbers
-  unsigned_extended
-  currency
-  signature_lib
-  pickles
-  with_hash)
+   ;; opam libraries
+   result
+   ppx_inline_test.config
+   integers
+   graphql
+   fieldslib
+   core_kernel
+   base.caml
+   base
+   sexplib0
+   graphql_parser
+   ;; local libraries
+   signature_lib
+   fields_derivers.graphql
+   fields_derivers.json
+   currency
+   snark_params
+   pickles
+   fields_derivers
+   unsigned_extended
+   with_hash
+ )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

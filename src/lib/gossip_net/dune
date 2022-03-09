@@ -3,8 +3,39 @@
  (public_name gossip_net)
  (library_flags -linkall)
  (inline_tests)
- (libraries perf_histograms core mina_base mina_transition mina_net2 network_pool trust_system pipe_lib logger async
-            o1trace node_addrs_and_ports mina_metrics)
+ (libraries
+   ;; opam libraries
+   uri
+   async.async_rpc
+   async_kernel
+   base
+   base.caml
+   bin_prot.shape
+   async_rpc_kernel
+   async
+   core
+   core_kernel
+   sexplib0
+   cohttp-async
+   async_unix
+   base.base_internalhash_types
+   ppx_hash.runtime-lib
+   ;; local libraries
+   network_peer
+   logger
+   pipe_lib
+   trust_system
+   network_pool
+   mina_net2
+   mina_transition
+   mina_base
+   perf_histograms
+   o1trace
+   node_addrs_and_ports
+   mina_metrics
+   child_processes
+   error_json
+)
  (preprocess
   (pps ppx_coda ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp
        ppx_here ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf ppx_pipebang))

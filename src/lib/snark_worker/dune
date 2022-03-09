@@ -3,10 +3,45 @@
  (public_name snark_worker)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async cli_lib currency snark_work_lib mina_base mina_ledger
-            blockchain_snark transaction_snark perf_histograms
-            logger.file_system
-            core_kernel.hash_heap sparse_ledger_lib ledger_proof transaction_witness)
+ (libraries
+   ;; opam libraries
+   async_rpc_kernel
+   sexplib0
+   async_kernel
+   base
+   async
+   core
+   core_kernel.hash_heap
+   core_kernel
+   async.async_rpc
+   async.async_command
+   base.base_internalhash_types
+   ppx_hash.runtime-lib
+   async_unix
+   bin_prot.shape
+   ;; local libraries
+   one_or_two
+   mina_metrics
+   logger
+   signature_lib
+   logger.file_system
+   mina_base.import
+   cli_lib
+   genesis_constants
+   transaction_witness
+   perf_histograms
+   snark_work_lib
+   currency
+   mina_base
+   transaction_snark
+   ledger_proof
+   mina_ledger
+   transaction_snark_work
+   error_json
+   mina_compile_config
+   mina_state
+   transaction_protocol_state
+ )
  (preprocess
   (pps
     ppx_bin_prot

@@ -21,33 +21,6 @@ module type Type = sig
 end
 
 module Update = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'state_element
-             , 'pk
-             , 'vk
-             , 'perms
-             , 'snapp_uri
-             , 'token_symbol
-             , 'timing
-             , 'voting_for )
-             t =
-          { app_state : 'state_element Snapp_state.V.Stable.V1.t
-          ; delegate : 'pk
-          ; verification_key : 'vk
-          ; permissions : 'perms
-          ; snapp_uri : 'snapp_uri
-          ; token_symbol : 'token_symbol
-          ; timing : 'timing
-          ; voting_for : 'voting_for
-          }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
-      end
-    end]
-  end
-
   module Timing_info = struct
     [%%versioned
     module Stable = struct
@@ -207,19 +180,22 @@ module Update = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t =
-        ( F.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-        , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-          , F.Stable.V1.t )
-          With_hash.Stable.V1.t
-          Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        , string Set_or_keep.Stable.V1.t
-        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
-        , State_hash.Stable.V1.t Set_or_keep.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+        { app_state :
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Snapp_state.V.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; verification_key :
+            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
+            , F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
+        ; snapp_uri : string Set_or_keep.Stable.V1.t
+        ; token_symbol :
+            Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
+        }
+      [@@deriving compare, equal, sexp, hash, yojson, fields, hlist]
 
       let to_latest = Fn.id
     end
@@ -287,25 +263,29 @@ module Update = struct
         ; timing
         ; voting_for
         }
-        : _ Poly.t )
+        : t )
 
   module Checked = struct
     open Pickles.Impls.Step
 
     type t =
-      ( Field.t Set_or_keep.Checked.t
-      , Public_key.Compressed.var Set_or_keep.Checked.t
-      , ( Boolean.var
-        , (Side_loaded_verification_key.t option, Field.Constant.t) With_hash.t
-          Data_as_hash.t )
-        Snapp_basic.Flagged_option.t
-        Set_or_keep.Checked.t
-      , Permissions.Checked.t Set_or_keep.Checked.t
-      , string Data_as_hash.t Set_or_keep.Checked.t
-      , Account.Token_symbol.var Set_or_keep.Checked.t
-      , Timing_info.Checked.t Set_or_keep.Checked.t
-      , State_hash.var Set_or_keep.Checked.t )
-      Poly.t
+      { app_state : Field.t Set_or_keep.Checked.t Snapp_state.V.t
+      ; delegate : Public_key.Compressed.var Set_or_keep.Checked.t
+      ; verification_key :
+          ( Boolean.var
+          , ( Side_loaded_verification_key.t option
+            , Field.Constant.t )
+            With_hash.t
+            Data_as_hash.t )
+          Snapp_basic.Flagged_option.t
+          Set_or_keep.Checked.t
+      ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
+      ; snapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
+      ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
+      ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
+      ; voting_for : State_hash.var Set_or_keep.Checked.t
+      }
+    [@@deriving hlist]
 
     let to_input
         ({ app_state
@@ -386,7 +366,6 @@ module Update = struct
       ]
 
   let typ () : (Checked.t, t) Typ.t =
-    let open Poly in
     let open Pickles.Impls.Step in
     Typ.of_hlistable
       [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
@@ -424,13 +403,13 @@ module Update = struct
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
       ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
       ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let deriver obj =
     let open Fields_derivers_snapps in
     finish ~name:"PartyUpdate"
-    @@ Poly.Fields.make_creator
+    @@ Fields.make_creator
          ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
@@ -457,7 +436,7 @@ module Update = struct
          { With_hash.data; hash })
     in
     let update : t =
-      { Poly.app_state
+      { app_state
       ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
       ; permissions = Set_or_keep.Set Permissions.user_default

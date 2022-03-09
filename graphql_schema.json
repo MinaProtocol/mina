@@ -1292,22 +1292,6 @@
           "description": null,
           "fields": [
             {
-              "name": "stake",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "editState",
               "description": null,
               "args": [],
@@ -1485,20 +1469,6 @@
             }
           ],
           "inputFields": [
-            {
-              "name": "stake",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
             {
               "name": "editState",
               "description": null,
@@ -8844,22 +8814,6 @@
           "description": null,
           "fields": [
             {
-              "name": "stake",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "editState",
               "description": null,
               "args": [],
@@ -12790,22 +12744,6 @@
           "name": "AccountPermissions",
           "description": null,
           "fields": [
-            {
-              "name": "stake",
-              "description": "Permission to stake",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
             {
               "name": "editState",
               "description": "Authorization required to edit snapp state",

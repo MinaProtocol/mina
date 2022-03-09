@@ -50,8 +50,7 @@ module Accounts = struct
         | None ->
             account.permissions
         | Some
-            { stake
-            ; edit_state
+            { edit_state
             ; send
             ; receive
             ; set_delegate
@@ -76,8 +75,7 @@ module Accounts = struct
               | Impossible ->
                   Impossible
             in
-            { Mina_base.Permissions.Poly.stake
-            ; edit_state = auth_required edit_state
+            { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
@@ -232,8 +230,7 @@ module Accounts = struct
           | Impossible ->
               Impossible
         in
-        let { Mina_base.Permissions.Poly.stake
-            ; edit_state
+        let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
             ; set_delegate
@@ -248,8 +245,8 @@ module Accounts = struct
           account.permissions
         in
         Some
-          { Runtime_config.Accounts.Single.Permissions.stake
-          ; edit_state = auth_required edit_state
+          { Runtime_config.Accounts.Single.Permissions.edit_state =
+              auth_required edit_state
           ; send = auth_required send
           ; receive = auth_required receive
           ; set_delegate = auth_required set_delegate

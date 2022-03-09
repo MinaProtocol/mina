@@ -4,13 +4,33 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
+   ;; opam libraries
+   result
+   base.base_internalhash_types
    core_kernel
-   codable
+   bin_prot.shape
+   ppx_inline_test.config
+   base
+   sexplib0
+   base.caml
+   ;; local libraries
+   fields_derivers.graphql
+   fields_derivers
+   bitstring_lib
+   pickles
    snark_params
    outside_hash_image
+   random_oracle_input
+   bignum_bigint
+   snarky.backendless
+   fold_lib
+   snark_bits
+   codable
    random_oracle
-   fields_derivers
+   base58_check
+   snarky.intf
    fields_derivers.snapps
+   fields_derivers.json
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

@@ -182,8 +182,7 @@ module Snapp_permissions = struct
     Caqti_type.enum ~encode ~decode "snapp_auth_required_type"
 
   type t =
-    { stake : bool
-    ; edit_state : Permissions.Auth_required.t
+    { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
@@ -199,27 +198,24 @@ module Snapp_permissions = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ bool
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ]
+      [ auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ]
 
   let table_name = "snapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
     let value =
-      { stake = perms.stake
-      ; edit_state = perms.edit_state
+      { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
       ; set_delegate = perms.set_delegate

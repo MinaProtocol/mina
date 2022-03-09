@@ -4,46 +4,68 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   allocation_functor
+   ;; opam libraries
+   async_kernel
+   result
+   bin_prot.shape
+   ppx_inline_test.config
+   sexplib0
+   yojson
+   ppx_version.runtime
+   digestif
+   sexp_diff_kernel
+   core_kernel
+   base.caml
+   base
+   base.base_internalhash_types
+   integers
+   base_quickcheck
+   core_kernel.uuid
+   rocks
+   ;; local libraries
+   run_in_thread
+   kimchi_backend_common
+   kimchi_backend.pasta
+   mina_base.import
+   sgn
+   pickles_types
+   blake2
+   pickles
+   sparse_ledger_lib
+   snark_params
+   signature_lib
+   rosetta_coding
+   random_oracle
+   o1trace
+   hash_prefix_states
+   dummy_values
+   currency
+   mina_numbers
+   genesis_constants
+   block_time
    base58_check
    bignum_bigint
-   block_time
    mina_compile_config
-   genesis_constants
-   digestif
-   mina_numbers
    codable
-   core_kernel
    crypto_params
-   currency
    debug_assert
-   dummy_values
    fold_lib
-   fields_derivers
    fields_derivers.snapps
-   hash_prefix_states
-   hash_prefixes
-   linked_tree
-   mina_base.import
-   mina_base.util
+   fields_derivers.json
+   fields_derivers.graphql
    one_or_two
-   o1trace
    outside_hash_image
-   ppx_version.runtime
    quickcheck_lib
-   random_oracle
-   rosetta_coding
-   sexp_diff_kernel
-   signature_lib
-   snark_bits
-   snark_params
    snarky.backendless
-   sparse_ledger_lib
    test_util
    unsigned_extended
-   visualization
    with_hash
-   yojson
+   random_oracle_input
+   data_hash_lib
+   pickles.backend
+   mina_signature_kind
+   mina_base.util
+   kimchi_backend
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

@@ -2,8 +2,21 @@
  (name sgn)
  (public_name sgn)
  (library_flags -linkall)
- (libraries sgn_type snark_params core_kernel ppx_deriving_yojson.runtime
-            yojson)
+ (libraries
+   ;; opam libraries
+   ppx_deriving_yojson.runtime
+   core_kernel
+   yojson
+   sexplib0
+   base
+   bin_prot.shape
+   base.caml
+   ;; local libraries
+   snark_params
+   sgn_type
+   pickles
+   snarky.backendless
+   )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_compare ppx_deriving_yojson))

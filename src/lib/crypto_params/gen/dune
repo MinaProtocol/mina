@@ -1,6 +1,32 @@
 (executable
  (name gen)
- (libraries pickles async core crs digestif fold_lib snarky.backendless tuple_lib ppxlib group_map)
+ (libraries
+   ;; opam libraries
+   stdio
+   base.caml
+   sexplib0
+   core_kernel
+   compiler-libs
+   ppxlib
+   digestif
+   core
+   async
+   ocaml-migrate-parsetree
+   ppxlib.ast
+   base
+   bin_prot.shape
+   ocaml-compiler-libs.common
+   ;; local libraries
+   kimchi_backend.pasta
+   group_map
+   tuple_lib
+   snarky.backendless
+   fold_lib
+   crs
+   pickles
+   pickles.backend
+   kimchi_backend
+ )
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))
