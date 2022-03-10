@@ -3,8 +3,29 @@
  (public_name currency_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel fold_lib tuple_lib snark_bits_nonconsensus bignum_bigint random_oracle_nonconsensus sgn_nonconsensus snark_params_nonconsensus
-            unsigned_extended_nonconsensus codable ppx_dhall_type)
+ (libraries
+   ;;opam libraries
+   result
+   zarith
+   integers
+   sexplib0
+   bin_prot.shape
+   core_kernel
+   base.caml
+   base
+   base.base_internalhash_types
+   ppx_inline_test.config
+   ;;local libraries
+   codable
+   bignum_bigint
+   ppx_dhall_type
+   random_oracle_input
+   snark_params_nonconsensus
+   random_oracle_nonconsensus
+   snark_bits_nonconsensus
+   unsigned_extended_nonconsensus
+   sgn_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson h_list.ppx ppx_inline_test ppx_fields_conv))
