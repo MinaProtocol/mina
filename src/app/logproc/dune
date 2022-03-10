@@ -6,7 +6,6 @@
    ;;opam libraries
    result
    stdio
-   angstrom
    core
    yojson
    cmdliner

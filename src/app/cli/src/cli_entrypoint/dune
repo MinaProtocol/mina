@@ -20,7 +20,6 @@
    uri
    async.async_command
    result
-   jemalloc
    ;;local libraries
    verifier
    ledger_proof

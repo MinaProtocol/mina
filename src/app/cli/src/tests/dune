@@ -69,8 +69,6 @@
    work_selector
    mina_compile_config
    unsigned_extended
-   transition_frontier
-   mina_version
  )
 
  (preprocessor_deps ../../../../config.mlh)

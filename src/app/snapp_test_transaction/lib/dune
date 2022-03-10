@@ -8,11 +8,6 @@
    splittable_random
    result
    async
-   yojson
-   caqti-driver-postgresql
-   caqti
-   caqti-async
-   archive_lib
    async_kernel
    core
    core_kernel
@@ -37,7 +32,6 @@
    mina_generators
    mina_base
    currency
-   cli_lib
    mina_ledger
    mina_graphql
    genesis_constants

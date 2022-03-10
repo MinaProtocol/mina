@@ -10,9 +10,7 @@
    block_time
    currency
    signature_lib
-   mina_transition
    mina_base
-   graphql_lib
    mina_numbers
  )
  (preprocessor_deps ../../archive_graphql_schema.json)

@@ -4,7 +4,6 @@
  (libraries
    ;;opam libraries
    async_kernel
-   caqti-driver-postgresql
    caqti
    archive_lib
    core

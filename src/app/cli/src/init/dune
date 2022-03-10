@@ -51,8 +51,6 @@
    data_hash_lib
    currency
    genesis_constants
-   web_request
-   snarky_log
    bash_colors
    graphql_lib
    node_status
@@ -71,8 +69,6 @@
    protocol_version
    node_error_service
    genesis_ledger_helper
-   transition_frontier
-   web_client_pipe
    signature_lib
    mina_base.import
    mina_numbers

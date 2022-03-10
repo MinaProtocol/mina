@@ -12,16 +12,9 @@
    async.async_command
    ;;local libraries
    genesis_constants
-   snarky.backendless
-   mina_state
-   mina_base
    coda_runtime_config
    mina_ledger
    genesis_ledger_helper
-   blockchain_snark
-   coda_genesis_proof
-   snark_params
-   staged_ledger
    logger
    cache_dir
  )

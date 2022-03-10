@@ -9,8 +9,6 @@
    async_unix
    result
    base
-   caqti-driver-postgresql
-   ppx_deriving_yojson.runtime
    core_kernel
    cohttp
    caqti
@@ -18,9 +16,6 @@
    caqti-async
    cohttp-async
    archive_lib
-   yojson
-   ctypes
-   async_ssl
    base.caml
    async_kernel
    uri

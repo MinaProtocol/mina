@@ -6,12 +6,9 @@
    ;;opam libraries
    async_kernel
    core
-   ppx_deriving_yojson.runtime
-   async_ssl
    core_kernel
    async
    lib
-   yojson
    async_unix
    async.async_command
    ;;local libraries
@@ -20,8 +17,6 @@
    rosetta_coding
    rosetta_lib
    string_sign
-   logger
-   rosetta_models
    signature_lib
    mina_base
    snark_params
