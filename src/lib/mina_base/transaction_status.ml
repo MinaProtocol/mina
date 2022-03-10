@@ -301,33 +301,39 @@ module Coinbase_balance_data = struct
     end
   end]
 
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
-        failwith
-          "Unexpected source balance for Coinbase_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let coinbase_receiver_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Coinbase_balance_data.of_balance_data"
-    in
-    { coinbase_receiver_balance
-    ; fee_transfer_receiver_balance = receiver_balance
-    }
+  let of_balance_data_exn = function
+    | Balance_data.Signed_command_balances
+        { fee_payer_balance; source_balance; receiver_balance } ->
+        ( match source_balance with
+        | Some _ ->
+            failwith
+              "Unexpected source balance for \
+               Coinbase_balance_data.of_balance_data"
+        | None ->
+            () ) ;
+        let coinbase_receiver_balance =
+          match fee_payer_balance with
+          | Some balance ->
+              balance
+          | None ->
+              failwith
+                "Missing fee-payer balance for \
+                 Coinbase_balance_data.of_balance_data"
+        in
+        { coinbase_receiver_balance
+        ; fee_transfer_receiver_balance = receiver_balance
+        }
+    | Parties_balances _ ->
+        failwith "Cannot create Coinbase_balance_data.t from Parties_balances"
 
   let to_balance_data
-      { coinbase_receiver_balance; fee_transfer_receiver_balance } =
-    { Balance_data.fee_payer_balance = Some coinbase_receiver_balance
-    ; source_balance = None
-    ; receiver_balance = fee_transfer_receiver_balance
-    }
+      { coinbase_receiver_balance; fee_transfer_receiver_balance } :
+      Balance_data.t =
+    Signed_command_balances
+      { fee_payer_balance = Some coinbase_receiver_balance
+      ; source_balance = None
+      ; receiver_balance = fee_transfer_receiver_balance
+      }
 end
 
 module Fee_transfer_balance_data = struct
@@ -344,31 +350,37 @@ module Fee_transfer_balance_data = struct
     end
   end]
 
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
+  let of_balance_data_exn = function
+    | Balance_data.Signed_command_balances
+        { fee_payer_balance; source_balance; receiver_balance } ->
+        ( match source_balance with
+        | Some _ ->
+            failwith
+              "Unexpected source balance for \
+               Fee_transfer_balance_data.of_balance_data"
+        | None ->
+            () ) ;
+        let receiver1_balance =
+          match fee_payer_balance with
+          | Some balance ->
+              balance
+          | None ->
+              failwith
+                "Missing fee-payer balance for \
+                 Fee_transfer_balance_data.of_balance_data"
+        in
+        { receiver1_balance; receiver2_balance = receiver_balance }
+    | Parties_balances _ ->
         failwith
-          "Unexpected source balance for \
-           Fee_transfer_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let receiver1_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Fee_transfer_balance_data.of_balance_data"
-    in
-    { receiver1_balance; receiver2_balance = receiver_balance }
+          "Cannot create Fee_transfer_balance_data.t from Parties_balances"
 
-  let to_balance_data { receiver1_balance; receiver2_balance } =
-    { Balance_data.fee_payer_balance = Some receiver1_balance
-    ; source_balance = None
-    ; receiver_balance = receiver2_balance
-    }
+  let to_balance_data { receiver1_balance; receiver2_balance } : Balance_data.t
+      =
+    Signed_command_balances
+      { fee_payer_balance = Some receiver1_balance
+      ; source_balance = None
+      ; receiver_balance = receiver2_balance
+      }
 end
 
 module Internal_command_balance_data = struct
@@ -390,23 +402,24 @@ module Auxiliary_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
-        }
+        | Signed_command_data of
+            { receiver_account_creation_fee_paid :
+                Currency.Amount.Stable.V1.t option
+            }
+        | Parties_data of
+            { fee_payer_account_creation_fee_paid :
+                Currency.Amount.Stable.V1.t option
+            ; other_parties_account_creation_fees_paid :
+                Currency.Amount.Stable.V1.t option list
+            }
       [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let empty =
-    { fee_payer_account_creation_fee_paid = None
-    ; receiver_account_creation_fee_paid = None
-    ; created_token = None
-    }
+  let empty_signed_command_data =
+    Signed_command_data { receiver_account_creation_fee_paid = None }
 end
 
 [%%versioned

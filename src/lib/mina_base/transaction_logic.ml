@@ -804,7 +804,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; status =
               Applied
                 ( Transaction_status.Auxiliary_data.empty
-                , Transaction_status.Balance_data.empty )
+                , Transaction_status.Balance_data.empty_signed_command_balances
+                )
           }
       ; previous_receipt_chain_hash = account.receipt_chain_hash
       ; fee_payer_timing = account.timing

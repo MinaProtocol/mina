@@ -175,9 +175,7 @@ CREATE TABLE blocks_user_commands
 , sequence_no     int NOT NULL
 , status          user_command_status NOT NULL
 , failure_reason  text
-, fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
-, created_token     bigint
 , fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
 , receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE
@@ -219,6 +217,9 @@ CREATE TABLE snapp_party_balances
 /* a join table between blocks and snapp_commands, with some additional information
    sequence_no gives the order within all transactions in the block
 
+   other_parties_account_creation_fees gives account creation fees in the same order as the
+   other parties in the snapps_command; these may be NULL
+
    other_parties_balance_ids refers to balances in the same order as the other parties in the
    snapps_command; these are unenforced foreign keys, and not NULL
 
@@ -226,13 +227,14 @@ CREATE TABLE snapp_party_balances
 */
 
 CREATE TABLE blocks_snapp_commands
-( block_id                   int    NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, snapp_command_id           int    NOT NULL REFERENCES snapp_commands(id) ON DELETE CASCADE
-, sequence_no                int    NOT NULL
-, status                     user_command_status NOT NULL
-, failure_reason             text
-, fee_payer_balance_id       int    NOT NULL REFERENCES balances(id)
-, other_parties_balance_ids  int[]  NOT NULL
+( block_id                             int                 NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
+, snapp_command_id                     int                 NOT NULL REFERENCES snapp_commands(id) ON DELETE CASCADE
+, sequence_no                          int                 NOT NULL
+, status                               user_command_status NOT NULL
+, failure_reason                       text
+, fee_payer_balance_id                 int                 NOT NULL REFERENCES balances(id)
+, other_parties_account_creation_fees  bigint[]            NOT NULL
+, other_parties_balance_ids            int[]               NOT NULL
 , PRIMARY KEY (block_id, snapp_command_id, sequence_no)
 );
 
