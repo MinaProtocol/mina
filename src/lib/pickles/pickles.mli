@@ -239,5 +239,5 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t Deferred.t )
+       , ('max_branching, 'max_branching) Proof.t Promise.t )
        H3_2.T(Prover).t
