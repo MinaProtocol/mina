@@ -3547,9 +3547,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
                  >>= Base.main ~constraint_constants))
-              handler)
-           ())
-      : unit * unit )
+              handler))
+      : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state
@@ -3608,7 +3607,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
+  generate_auxiliary_input [ Statement.With_sok.typ ] main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state
@@ -4391,7 +4390,7 @@ module For_tests = struct
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
-            (unit, _) Checked.t =
+            unit Checked.t =
           Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
@@ -5433,10 +5432,9 @@ let%test_module "transaction_snark" =
           (`Ledger ledger) parties
       in
       let open Impl in
-      List.fold ~init:((), ()) witnesses
+      List.fold ~init:() witnesses
         ~f:(fun _ (witness, spec, statement, snapp_stmt) ->
-          run_and_check
-            (fun () ->
+          run_and_check (fun () ->
               let s =
                 exists Statement.With_sok.typ ~compute:(fun () -> statement)
               in
@@ -5449,7 +5447,6 @@ let%test_module "transaction_snark" =
                 (Parties_segment.Basic.to_single_list spec)
                 snapp_stmt s ~witness ;
               fun () -> ())
-            ()
           |> Or_error.ok_exn)
 
     let%test_unit "snapps-based payment" =
@@ -5458,8 +5455,7 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger [ parties ])
-          |> fun ((), ()) -> ())
+              apply_parties ledger [ parties ]))
 
     let%test_unit "Consecutive snapps-based payments" =
       let open Transaction_logic.For_tests in
@@ -5475,8 +5471,7 @@ let%test_module "transaction_snark" =
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger partiess)
-          |> fun ((), ()) -> ())
+              apply_parties ledger partiess))
 
     (* Disabling until new-style snapp transactions are fully implemented.
 
@@ -5537,13 +5532,13 @@ let%test_module "transaction_snark" =
 
           (* check that two public keys are equal *)
           let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
-              (Boolean.var, _) Checked.t =
+              Boolean.var Checked.t =
             [ Field.Checked.equal x0 x1; Field.Checked.equal y0 y1 ]
             |> Checked.List.all >>= Boolean.all
 
           (* check that two public keys are not equal *)
           let neq_pk (pk0 : Public_key.var) (pk1 : Public_key.var) :
-              (Boolean.var, _) Checked.t =
+              Boolean.var Checked.t =
             eq_pk pk0 pk1 >>| Boolean.not
 
           (* check that the witness has distinct public keys for each signature *)
@@ -5559,7 +5554,7 @@ let%test_module "transaction_snark" =
           let%snarkydef distinct_public_keys x = distinct_public_keys x
 
           (* check a signature on msg against a public key *)
-          let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
+          let check_sig pk msg sigma : Boolean.var Checked.t =
             let%bind (module S) = Inner_curve.Checked.Shifted.create () in
             Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
@@ -5570,7 +5565,7 @@ let%test_module "transaction_snark" =
                 (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
                 ~compute:(As_prover.return pubkeys)
             in
-            let verify_sig (sigma, pk) : (Boolean.var, _) Checked.t =
+            let verify_sig (sigma, pk) : Boolean.var Checked.t =
               Checked.List.exists pubkeys ~f:(fun pk' ->
                   [ eq_pk pk pk'; check_sig pk' commitment sigma ]
                   |> Checked.List.all >>= Boolean.all)
@@ -5611,7 +5606,7 @@ let%test_module "transaction_snark" =
                  let witness = [ (sigma_var, pk_var) ] in
                  check_witness 1 [ pk ] msg_var witness)
                 |> Checked.map ~f:As_prover.return
-                |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+                |> run_and_check |> Or_error.ok_exn)
 
           let%test_unit "2-of-2" =
             let gen =
@@ -5650,7 +5645,7 @@ let%test_module "transaction_snark" =
                  in
                  check_witness 2 [ pk0; pk1 ] msg_var witness)
                 |> Checked.map ~f:As_prover.return
-                |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+                |> run_and_check |> Or_error.ok_exn)
         end
 
         let gen_snapp_ledger =
@@ -6002,7 +5997,7 @@ let%test_module "transaction_snark" =
                     let multisig_rule : _ Pickles.Inductive_rule.t =
                       let multisig_main
                           (tx_commitment : Snapp_statement.Checked.t) :
-                          (unit, _) Checked.t =
+                          unit Checked.t =
                         let%bind pk0_var =
                           exists Inner_curve.typ
                             ~request:(As_prover.return @@ Pubkey 0)
@@ -6286,8 +6281,7 @@ let%test_module "transaction_snark" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  apply_parties ledger [ parties ])
-              |> fun ((), ()) -> ())
+                  apply_parties ledger [ parties ]))
       end )
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
@@ -8214,8 +8208,8 @@ let%test_module "account timing check" =
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked
       in
-      let (), equal_balances =
-        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation ()
+      let equal_balances =
+        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
       in
       equal_balances
 
@@ -8227,7 +8221,7 @@ let%test_module "account timing check" =
         in
         As_prover.read Account.Timing.typ checked_timing
       in
-      Or_error.is_error @@ Tick.run_and_check checked_timing_computation ()
+      Or_error.is_error @@ Tick.run_and_check checked_timing_computation
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in

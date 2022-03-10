@@ -372,7 +372,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
           [ input ]
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler)
-          ()
           { pass_through = prev_statement_with_hashes.proof_state.me_only
           ; proof_state =
               { next_statement.proof_state with

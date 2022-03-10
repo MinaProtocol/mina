@@ -69,20 +69,18 @@ module Checked : sig
 
   val to_input_legacy :
        var
-    -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
-       , _ )
-       Tick.Checked.t
+    -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t Tick.Checked.t
 
-  val next : var -> (var, _) Checked.t
+  val next : var -> var Checked.t
 
-  val next_if : var -> Boolean.var -> (var, _) Checked.t
+  val next_if : var -> Boolean.var -> var Checked.t
 
-  val equal : var -> var -> (Boolean.var, _) Checked.t
+  val equal : var -> var -> Boolean.var Checked.t
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
   module Assert : sig
-    val equal : var -> var -> (unit, _) Checked.t
+    val equal : var -> var -> unit Checked.t
   end
 
   type t = var
@@ -91,15 +89,15 @@ module Checked : sig
     val of_field : Field.Var.t -> t
   end
 
-  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( = ) : t -> t -> Boolean.var Checked.t
 
-  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( < ) : t -> t -> Boolean.var Checked.t
 
-  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( > ) : t -> t -> Boolean.var Checked.t
 
-  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( <= ) : t -> t -> Boolean.var Checked.t
 
-  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( >= ) : t -> t -> Boolean.var Checked.t
 end
 
 [%%endif]

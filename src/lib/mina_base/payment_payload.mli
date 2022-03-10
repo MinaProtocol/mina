@@ -60,6 +60,6 @@ val typ : (var, t) Typ.t
 val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
 val var_to_input_legacy :
-  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t, _) Checked.t
+  var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t Checked.t
 
 val var_of_t : t -> var
