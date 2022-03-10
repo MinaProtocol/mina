@@ -1689,6 +1689,11 @@ let other_verification_key_constr :
     (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
   Obj.magic verification_key_class
 
+type proof = (Pickles_types.Nat.z, Pickles_types.Nat.z) Pickles.Proof.t
+
+module Statement_with_proof =
+  Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
@@ -1716,14 +1721,28 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let module Proof = (val p) in
   let to_js_prover prover public_input =
-    Run_in_thread.block_on_async_exn (fun () ->
-        prover ?handler:None []
-          Snapp_statement.(public_input |> of_js |> to_constant))
+    (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
+    let prevs = Obj.magic [] in
+    (* let prevs = Statement_with_proof.([]) in *)
+    prover ?handler:None prevs
+      Snapp_statement.(public_input |> of_js |> to_constant)
+    |> Promise_js_helpers.to_js
+  in
+
+  (* TODO: would be nice to create a general map function that is used here *)
+  let rec to_js_provers :
+      type a b c.
+         (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
+         (* (_, _, _, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t *)
+      -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
+    function
+    | [] ->
+        []
+    | p :: ps ->
+        to_js_prover p :: to_js_provers ps
   in
   object%js
-    val provers =
-      provers |> Obj.magic |> List.map ~f:to_js_prover |> Array.of_list
-      |> Js.array
+    val provers = provers |> to_js_provers |> Array.of_list |> Js.array
 
     val getVerificationKeyArtifact =
       fun () ->

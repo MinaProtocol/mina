@@ -44,6 +44,8 @@
    cache_dir.fake
    digestif.ocaml
    mina_metrics.none
+   promise.js
+   promise.js_helpers
    run_in_thread.fake)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_version js_of_ocaml-ppx)))
