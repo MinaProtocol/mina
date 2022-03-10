@@ -116,6 +116,8 @@ module Node = struct
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
             payment {
               id
+              nonce
+              hash
             }
           }
       }
@@ -135,6 +137,8 @@ module Node = struct
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
             delegation {
               id
+              nonce
+              hash
             }
           }
       }
@@ -302,6 +306,9 @@ module Node = struct
     get_balance ~logger t ~account_id
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
+  type signed_command_result =
+    { id : string; hash : string; nonce : Unsigned.uint32 }
+
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment" ~metadata:(logger_metadata t) ;
@@ -334,11 +341,20 @@ module Node = struct
         send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
-    let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
-    let user_cmd_id = id_obj#id in
+    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      }
+    in
     [%log info] "Sent payment"
-      ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
-    ()
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
+        ] ;
+    res
 
   let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =
@@ -376,11 +392,20 @@ module Node = struct
         send_delegation_obj
     in
     let%map result_obj = send_delegation_graphql () in
-    let (`UserCommand id_obj) = result_obj#sendDelegation#delegation in
-    let user_cmd_id = id_obj#id in
+    let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      }
+    in
     [%log info] "stake delegation sent"
-      ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
-    ()
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
+        ] ;
+    res
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =

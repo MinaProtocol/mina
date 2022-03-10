@@ -128,20 +128,21 @@ struct
         "Send Delegation"
 
   let signed_command_to_be_included_in_frontier ~sender_pub_key
-      ~receiver_pub_key ~amount ~command_type =
+      ~receiver_pub_key ~amount ~nonce ~command_type =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
       | Signed_command signed_cmd -> (
           let open Signature_lib in
-          let body =
-            Signed_command.payload signed_cmd |> Signed_command_payload.body
-          in
+          let payload = Signed_command.payload signed_cmd in
+          let body = payload |> Signed_command_payload.body in
           match body with
           | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
             when Public_key.Compressed.equal source_pk sender_pub_key
                  && Public_key.Compressed.equal receiver_pk receiver_pub_key
-                 && Currency.Amount.equal paid_amt amount -> (
+                 && Currency.Amount.equal paid_amt amount
+                 && Mina_numbers.Account_nonce.equal nonce
+                      (Signed_command_payload.nonce payload) -> (
               match command_type with Send_payment -> true | _ -> false )
           | Stake_delegation dl -> (
               match dl with

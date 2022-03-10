@@ -20,7 +20,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-          (* ; { balance = "1000"; timing = Untimed } *)
         ]
     ; num_snark_workers = 0
     }
@@ -45,7 +44,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind delegation_sender_pub_key =
            Util.pub_key_of_node delegation_sender
          in
-         let%bind () =
+         let%bind { nonce; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender
              ~sender_pub_key:delegation_sender_pub_key
              ~receiver_pub_key:delegation_receiver_pub_key ~amount ~fee
@@ -53,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~sender_pub_key:delegation_sender_pub_key
-              ~receiver_pub_key:delegation_receiver_pub_key ~amount
+              ~receiver_pub_key:delegation_receiver_pub_key ~amount ~nonce
               ~command_type:Send_delegation))
     in
     Malleable_error.return ()
