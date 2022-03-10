@@ -30,7 +30,7 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypair = Some new_kp
+            ; snapp_account_keypairs = [ new_kp ]
             ; memo
             ; new_snapp_account = false
             ; snapp_update
@@ -55,7 +55,7 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypair = Some new_kp
+            ; snapp_account_keypairs = [ new_kp ]
             ; memo
             ; new_snapp_account = false
             ; snapp_update
@@ -79,7 +79,7 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypair = Some new_kp
+            ; snapp_account_keypairs = [ new_kp ]
             ; memo
             ; new_snapp_account = false
             ; snapp_update
@@ -107,7 +107,7 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypair = Some new_kp
+            ; snapp_account_keypairs = [ new_kp ]
             ; memo
             ; new_snapp_account = false
             ; snapp_update
@@ -137,7 +137,7 @@ let%test_module "Fee payer tests" =
                 ; fee
                 ; receivers = []
                 ; amount
-                ; snapp_account_keypair = Some (fst spec.sender)
+                ; snapp_account_keypairs = [ fst spec.sender ]
                 ; memo
                 ; new_snapp_account = true
                 ; snapp_update
