@@ -1,10 +1,6 @@
 module Backend = Kimchi_backend.Pasta.Vesta_based_plonk
 module Other_backend = Kimchi_backend.Pasta.Pallas_based_plonk
 
-(*
-let () = Backend.Keypair.set_urs_info []
-   *)
-
 let loose_permissions : Mina_base.Permissions.t =
   { edit_state = None
   ; send = None
@@ -1721,7 +1717,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let module Proof = (val p) in
   let to_js_prover prover public_input =
     Run_in_thread.block_on_async_exn (fun () ->
-        prover ~handler:(Obj.magic 0) []
+        prover ?handler:None []
           Snapp_statement.(public_input |> of_js |> to_constant))
   in
   object%js
@@ -2406,7 +2402,8 @@ type AccountPredicate =
               ; data =
                   Mina_base.Data_as_hash.make_unsafe
                     (Field.constant @@ Mina_base.Snapp_account.dummy_vk_hash ())
-                    (As_prover.Ref.create (fun () -> failwith "TODO"))
+                    (As_prover.Ref.create (fun () ->
+                         { With_hash.data = None; hash = Field.Constant.zero }))
               }
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
         ; snapp_uri =
