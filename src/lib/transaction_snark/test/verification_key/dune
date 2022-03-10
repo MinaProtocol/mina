@@ -1,5 +1,5 @@
 (library
-  (name app_state_tests)
+  (name verification_key_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -11,6 +11,8 @@
    yojson
    ;; local libraries
    mina_base.import
+   pickles.backend
+   kimchi_backend.pasta
    pickles
    transaction_snark
    snark_params
@@ -25,6 +27,8 @@
    mina_numbers
    sgn
    transaction_snark_tests
+   with_hash
+   random_oracle
    )
   (library_flags -linkall)
   (inline_tests)

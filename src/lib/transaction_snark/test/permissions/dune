@@ -1,5 +1,5 @@
 (library
-  (name app_state_tests)
+  (name permissions_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config

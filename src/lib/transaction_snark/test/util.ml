@@ -161,3 +161,54 @@ let gen_snapp_ledger =
              (Public_key.compress kp.public_key)))
   in
   (test_spec, kp)
+
+let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
+    ~init_ledger ~snapp_pk =
+  let open Transaction_logic.For_tests in
+  Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+          (*create a snapp account*)
+          Transaction_snark.For_tests.create_trivial_snapp_account
+            ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
+          let open Async.Deferred.Let_syntax in
+          let%bind parties =
+            Transaction_snark.For_tests.update_state ~snapp_prover
+              ~constraint_constants test_spec
+          in
+          apply_parties_with_merges ledger [ parties ]))
+
+let permissions_from_update (update : Party.Update.t) ~auth =
+  let default = Permissions.user_default in
+  { default with
+    edit_state =
+      ( if
+        Snapp_state.V.to_list update.app_state
+        |> List.exists ~f:Snapp_basic.Set_or_keep.is_set
+      then auth
+      else default.edit_state )
+  ; set_delegate =
+      ( if Snapp_basic.Set_or_keep.is_keep update.delegate then
+        default.set_delegate
+      else auth )
+  ; set_verification_key =
+      ( if Snapp_basic.Set_or_keep.is_keep update.verification_key then
+        default.set_verification_key
+      else auth )
+  ; set_permissions =
+      ( if Snapp_basic.Set_or_keep.is_keep update.permissions then
+        default.set_permissions
+      else auth )
+  ; set_snapp_uri =
+      ( if Snapp_basic.Set_or_keep.is_keep update.snapp_uri then
+        default.set_snapp_uri
+      else auth )
+  ; set_token_symbol =
+      ( if Snapp_basic.Set_or_keep.is_keep update.token_symbol then
+        default.set_token_symbol
+      else auth )
+  ; set_voting_for =
+      ( if Snapp_basic.Set_or_keep.is_keep update.voting_for then
+        default.set_voting_for
+      else auth )
+  }

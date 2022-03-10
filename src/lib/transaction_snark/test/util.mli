@@ -54,3 +54,24 @@ val trivial_snapp :
 val gen_snapp_ledger :
   (Transaction_logic.For_tests.Test_spec.t * Signature_lib.Keypair.t)
   Base_quickcheck.Generator.t
+
+val test_snapp_update :
+     ?snapp_permissions:Permissions.t
+  -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+  -> snapp_prover:
+       ( unit
+       , unit
+       , unit
+       , Snapp_statement.t
+       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+         Async.Deferred.t )
+       Pickles.Prover.t
+  -> Transaction_snark.For_tests.Spec.t
+  -> init_ledger:Transaction_logic.For_tests.Init_ledger.t
+  -> snapp_pk:Account.key
+  -> unit
+
+val permissions_from_update :
+     Party.Update.t
+  -> auth:Permissions.Auth_required.t
+  -> Permissions.Auth_required.t Permissions.Poly.t

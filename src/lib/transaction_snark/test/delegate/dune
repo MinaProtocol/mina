@@ -1,5 +1,5 @@
 (library
-  (name app_state_tests)
+  (name delegate_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
