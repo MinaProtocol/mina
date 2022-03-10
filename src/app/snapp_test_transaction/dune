@@ -3,23 +3,31 @@
  (name snapp_test_transaction)
  (public_name snapp_test_transaction)
  (libraries
-   async_kernel
-   core
-   caqti
-   caqti-async
+   ;;opam libraries
+   async.async_command
+   base
+   core_kernel
    caqti-driver-postgresql
-   cli_lib
-   currency
+   caqti
+   core
+   async_kernel
+   caqti-async
    archive_lib
-   mina_base
-   mina_graphql
-   mina_state
-   genesis_constants
-   genesis_ledger_helper
-   secrets
    yojson
-   transaction_snark
    snapp_test_transaction_lib
+   async
+   async_unix
+   ;;local libraries
+   transaction_snark
+   secrets
+   genesis_constants
+   mina_graphql
+   currency
+   cli_lib
+   mina_base
+   mina_state
+   genesis_ledger_helper
+   signature_lib
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
