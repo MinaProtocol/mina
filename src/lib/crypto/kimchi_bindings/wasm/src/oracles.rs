@@ -150,6 +150,16 @@ macro_rules! impl_oracles {
                     digest_before_evaluations: $WasmF) -> Self {
                     Self {o, p_eval0, p_eval1, opening_prechallenges, digest_before_evaluations}
                 }
+
+                #[wasm_bindgen(getter)]
+                pub fn opening_prechallenges(&self) -> WasmFlatVector<$WasmF> {
+                    self.opening_prechallenges.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_opening_prechallenges(&mut self, x: WasmFlatVector<$WasmF>) {
+                    self.opening_prechallenges = x;
+                }
             }
 
             #[wasm_bindgen]
