@@ -21,7 +21,7 @@ Here's the summary if you want to contribute code:
 
 Bug reports should include, at minimal, the `coda -version` output and
 a description of the error. See the [bug report
-template](.github/ISSUE_TEMPLATE/1-BUG_REPORT.yml). Documentation
+template](.github/ISSUE_TEMPLATES/bug_report.md). Documentation
 issues and failing tests should be reported using respective templates.
 
 All bugs need to be reproduced before they can be fixed. Anyone can try and

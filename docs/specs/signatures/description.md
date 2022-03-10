@@ -288,7 +288,7 @@ applications without recourse to the blockchain, even multiple times.
 ## Blind Signatures
 
 Schnorr signatures admit a very [simple **blind signature**
-construction](https://www.math.uni-frankfurt.de/~dmst/research/papers/schnorr.blind_sigs_attack.2001.pdf)
+construction](https://publikationen.ub.uni-frankfurt.de/files/4292/schnorr.blind_sigs_attack.2001.pdf)
 which is a signature that a signer produces at the behest of another
 party without learning what he has signed. These can for example be used
 in [Partially Blind Atomic
@@ -301,7 +301,7 @@ While the traditional Schnorr blind signatures are vulnerable to
 [Wagner's
 attack](https://www.iacr.org/archive/crypto2002/24420288/24420288.pdf),
 there are [a number of
-mitigations](https://www.math.uni-frankfurt.de/~dmst/teaching/SS2012/Vorlesung/EBS5.pdf)
+mitigations](https://web.archive.org/web/20211102002134/https://www.math.uni-frankfurt.de/~dmst/teaching/SS2012/Vorlesung/EBS5.pdf)
 which allow them to be usable in practice without any known attacks.
 Nevertheless, more analysis is required to be confident about the
 security of the blind signature scheme.
