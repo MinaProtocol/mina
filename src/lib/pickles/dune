@@ -57,5 +57,6 @@
    snark_keys_header
    tuple_lib
    run_in_thread
+   promise
    kimchi_backend.common
 ))

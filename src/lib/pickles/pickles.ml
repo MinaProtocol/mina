@@ -420,7 +420,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          , widthss
          , heightss
          , A_value.t
-         , (max_branching, max_branching) Proof.t Deferred.t )
+         , (max_branching, max_branching) Proof.t Promise.t )
          H3_2.T(Prover).t
          * _
          * _
@@ -707,7 +707,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
              , local_heights )
              H3.T(Statement_with_proof).t
           -> A_value.t
-          -> (Max_branching.n, Max_branching.n) Proof.t Deferred.t =
+          -> (Max_branching.n, Max_branching.n) Proof.t Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.branching in
@@ -738,7 +738,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             in
             M.f prevs
           in
-          let%bind.Deferred proof =
+          let%bind.Promise proof =
             step handler ~maxes:(module Maxes) prevs next_state
           in
           let proof =
@@ -752,7 +752,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 }
             }
           in
-          let%map.Deferred proof =
+          let%map.Promise proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
@@ -779,7 +779,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
              , xs3
              , xs4
              , A_value.t
-             , (max_branching, max_branching) Proof.t Deferred.t )
+             , (max_branching, max_branching) Proof.t Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -926,7 +926,7 @@ let compile :
          , widthss
          , heightss
          , a_value
-         , (max_branching, max_branching) Proof.t Deferred.t )
+         , (max_branching, max_branching) Proof.t Promise.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
      ~branches ~max_branching ~name ~constraint_constants ~choices ->
@@ -1053,7 +1053,7 @@ let%test_module "test no side-loaded" =
       in
       let b0 =
         Common.time "b0" (fun () ->
-            Run_in_thread.block_on_async_exn (fun () ->
+            Promise.block_on_async_exn (fun () ->
                 Blockchain_snark.step
                   [ (s_neg_one, b_neg_one); (s_neg_one, b_neg_one) ]
                   Field.Constant.zero))
@@ -1063,7 +1063,7 @@ let%test_module "test no side-loaded" =
             Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
       let b1 =
         Common.time "b1" (fun () ->
-            Run_in_thread.block_on_async_exn (fun () ->
+            Promise.block_on_async_exn (fun () ->
                 Blockchain_snark.step
                   [ (Field.Constant.zero, b0); (Field.Constant.zero, b0) ]
                   Field.Constant.one))
