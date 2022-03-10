@@ -35,6 +35,7 @@
    fold_lib
    pickles.backend
    kimchi_backend
+   h_list
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

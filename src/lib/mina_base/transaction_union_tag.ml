@@ -205,34 +205,35 @@ module Unpacked = struct
     Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
   let typ : (var, t) Typ.t =
-    let base_typ = Poly.typ Boolean.typ in
-    { base_typ with
-      check =
-        (fun ( { is_payment
-               ; is_stake_delegation
-               ; is_create_account
-               ; is_mint_tokens
-               ; is_fee_transfer
-               ; is_coinbase
-               ; is_user_command
-               } as t ) ->
-          let open Checked.Let_syntax in
-          let%bind () = base_typ.check t in
-          let%bind () =
-            [%with_label "Only one tag is set"]
-              (Boolean.Assert.exactly_one
-                 [ is_payment
+    let (Typ base_typ) = Poly.typ Boolean.typ in
+    Typ
+      { base_typ with
+        check =
+          (fun ( { is_payment
                  ; is_stake_delegation
                  ; is_create_account
                  ; is_mint_tokens
                  ; is_fee_transfer
                  ; is_coinbase
-                 ])
-          in
-          [%with_label "User command flag is correctly set"]
-            (Boolean.Assert.exactly_one
-               [ is_user_command; is_fee_transfer; is_coinbase ]))
-    }
+                 ; is_user_command
+                 } as t ) ->
+            let open Checked.Let_syntax in
+            let%bind () = base_typ.check t in
+            let%bind () =
+              [%with_label "Only one tag is set"]
+                (Boolean.Assert.exactly_one
+                   [ is_payment
+                   ; is_stake_delegation
+                   ; is_create_account
+                   ; is_mint_tokens
+                   ; is_fee_transfer
+                   ; is_coinbase
+                   ])
+            in
+            [%with_label "User command flag is correctly set"]
+              (Boolean.Assert.exactly_one
+                 [ is_user_command; is_fee_transfer; is_coinbase ]))
+      }
 
   let constant
       ({ is_payment

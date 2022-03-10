@@ -45,36 +45,19 @@ let var_of_t = function
 
 let typ : (var, t) Typ.t =
   let open Typ in
-  { alloc =
-      Alloc.(
-        let%bind token_owner = Boolean.typ.alloc in
-        let%map token_locked = Boolean.typ.alloc in
-        { token_owner; token_locked })
-  ; read =
-      Read.(
-        fun t ->
-          let%bind token_owner = Boolean.typ.read t.token_owner in
-          let%map token_locked = Boolean.typ.read t.token_locked in
-          if token_owner then
-            Token_owned { disable_new_accounts = token_locked }
-          else Not_owned { account_disabled = token_locked })
-  ; store =
-      Store.(
-        function
-        | Token_owned { disable_new_accounts } ->
-            let%bind token_owner = Boolean.typ.store true in
-            let%map token_locked = Boolean.typ.store disable_new_accounts in
-            { token_owner; token_locked }
-        | Not_owned { account_disabled } ->
-            let%bind token_owner = Boolean.typ.store false in
-            let%map token_locked = Boolean.typ.store account_disabled in
-            { token_owner; token_locked })
-  ; check =
-      Checked.(
-        fun { token_owner; token_locked } ->
-          all_unit
-            [ Boolean.typ.check token_owner; Boolean.typ.check token_locked ])
-  }
+  Boolean.typ * Boolean.typ
+  |> Typ.transport_var
+       ~back:(fun (token_owner, token_locked) -> { token_owner; token_locked })
+       ~there:(fun { token_owner; token_locked } -> (token_owner, token_locked))
+  |> Typ.transport
+       ~there:(function
+         | Token_owned { disable_new_accounts } ->
+             (true, disable_new_accounts)
+         | Not_owned { account_disabled } ->
+             (false, account_disabled))
+       ~back:(fun (token_owner, token_locked) ->
+         if token_owner then Token_owned { disable_new_accounts = token_locked }
+         else Not_owned { account_disabled = token_locked })
 
 let var_to_input { token_owner; token_locked } =
   let bs = [ token_owner; token_locked ] in

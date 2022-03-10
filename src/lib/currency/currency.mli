@@ -11,8 +11,7 @@ module Signed_var : sig
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
   (* Invariant: At least one of these is Some *)
-  type nonrec 'mag t =
-    { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
+  type nonrec 'mag t = { repr : 'mag repr; mutable value : Field.Var.t option }
 end
 
 [%%endif]
