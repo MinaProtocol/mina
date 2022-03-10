@@ -132,7 +132,7 @@ module Proof = Plonk_dlog_proof.Make (struct
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
         ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Run_in_thread.run_in_thread (fun () ->
+          Promise.run_in_thread (fun () ->
               create pk auxiliary_input prev_challenges prev_sgs))
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
