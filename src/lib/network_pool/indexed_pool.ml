@@ -911,8 +911,12 @@ let remove_lowest_fee :
 let get_highest_fee :
     t -> Transaction_hash.User_command_with_valid_signature.t option =
  fun t ->
-  Option.map ~f:(Fn.compose Set.min_elt_exn Tuple2.get2)
-  @@ Map.max_elt t.applicable_by_fee
+  Option.map
+    ~f:
+      (Fn.compose
+         Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
+         Tuple2.get2)
+  @@ Currency.Fee_rate.Map.max_elt t.applicable_by_fee
 
 (* Add a command that came in from gossip, or return an error. We need to check
    a whole bunch of conditions here and return the appropriate errors.
