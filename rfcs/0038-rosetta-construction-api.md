@@ -77,7 +77,7 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshal-keys) to the [client-sdk](#marshal-keys), the [generate-keypair binary](#marshal-keys), and the offcial [Coda CLI](#marshal-keys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshal-keys) to the [client-sdk](#marshal-keys), the [generate-keypair binary](#marshal-keys), and the offcial [Mina CLI](#marshal-keys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
 
 The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#add-curves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
