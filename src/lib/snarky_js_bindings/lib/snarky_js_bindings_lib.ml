@@ -2143,7 +2143,7 @@ type AccountPredicate =
     let update : Party.Update.t =
       let u = b##.update in
 
-      { Party.Update.Poly.app_state =
+      { Party.Update.app_state =
           Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
               set_or_keep field (array_get_exn u##.appState i))
       ; delegate = set_or_keep public_key u##.delegate
