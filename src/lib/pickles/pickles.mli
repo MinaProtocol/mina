@@ -65,7 +65,7 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Deferred.t
+  val verify : (statement * t) list -> bool Promise.t
 end
 
 module Proof : sig
@@ -97,7 +97,7 @@ val verify :
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
-  -> bool Deferred.t
+  -> bool Promise.t
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
@@ -193,7 +193,7 @@ module Side_loaded : sig
   val verify :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> (Verification_key.t * 'value * Proof.t) list
-    -> bool Deferred.t
+    -> bool Promise.t
 
   (* Must be called in the inductive rule snarky function defining a
      rule for which this tag is used as a predecessor. *)

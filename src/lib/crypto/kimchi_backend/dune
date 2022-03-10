@@ -19,7 +19,6 @@
    key_cache
    hex
    kimchi_backend.common
-   run_in_thread
    kimchi_backend.pasta
    pickles_types
    sponge

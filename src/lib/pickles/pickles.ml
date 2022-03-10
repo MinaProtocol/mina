@@ -253,7 +253,7 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Deferred.t
+  val verify : (statement * t) list -> bool Promise.t
 end
 
 module Prover = struct
@@ -882,7 +882,7 @@ module Side_loaded = struct
               ; index =
                   ( match vk.wrap_vk with
                   | None ->
-                      return (Deferred.return false)
+                      return (Promise.return false)
                   | Some x ->
                       x )
               ; data =
@@ -1059,7 +1059,7 @@ let%test_module "test no side-loaded" =
                   Field.Constant.zero))
       in
       assert (
-        Run_in_thread.block_on_async_exn (fun () ->
+        Promise.block_on_async_exn (fun () ->
             Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
       let b1 =
         Common.time "b1" (fun () ->
@@ -1072,8 +1072,8 @@ let%test_module "test no side-loaded" =
 
     let%test_unit "verify" =
       assert (
-        Run_in_thread.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify xs) )
+        Promise.block_on_async_exn (fun () -> Blockchain_snark.Proof.verify xs)
+      )
   end )
 
 (*
