@@ -264,18 +264,27 @@ module Balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer_balance : Currency.Balance.Stable.V1.t option
-        ; source_balance : Currency.Balance.Stable.V1.t option
-        ; receiver_balance : Currency.Balance.Stable.V1.t option
-        }
+        | Signed_command_balances of
+            { fee_payer_balance : Currency.Balance.Stable.V1.t option
+            ; source_balance : Currency.Balance.Stable.V1.t option
+            ; receiver_balance : Currency.Balance.Stable.V1.t option
+            }
+        | Parties_balances of
+            { fee_payer_balance : Currency.Balance.Stable.V1.t
+            ; other_parties_balances : Currency.Balance.Stable.V1.t list
+            }
       [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let empty =
-    { fee_payer_balance = None; source_balance = None; receiver_balance = None }
+  let empty_signed_command_balances =
+    Signed_command_balances
+      { fee_payer_balance = None
+      ; source_balance = None
+      ; receiver_balance = None
+      }
 end
 
 module Coinbase_balance_data = struct
