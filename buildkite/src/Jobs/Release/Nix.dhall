@@ -66,12 +66,12 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = Nix.nixBuild "mina-daemon-docker"
+            , commands = Nix.nixBuild "mina-daemon-docker\"; cp -Lr result \"mina-docker.tar.gz"
             , label = "Build Docker image with Nix"
             , key = "mina-daemon-docker-with-nix"
             , target = Size.Large
             , docker = None Docker.Type
-            , artifact_paths = [ S.contains "result" ]
+            , artifact_paths = [ S.contains "mina-docker.tar.gz" ]
             }
         ]
       }

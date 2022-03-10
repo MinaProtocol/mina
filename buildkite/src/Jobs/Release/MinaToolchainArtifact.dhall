@@ -32,7 +32,6 @@ Pipeline.build
 
       -- mina-toolchain Debian 11 "Bullseye" Toolchain
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="bullseye",
         extra_args="--no-cache",
@@ -69,7 +68,6 @@ Pipeline.build
 
       -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
       let toolchainFocalSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="focal",
         extra_args="--no-cache",
