@@ -4299,7 +4299,7 @@ struct
             statement
     in
     let open Async in
-    let%map proof = res in
+    let%map proof = Promise_native_helpers.to_deferred res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
@@ -4312,6 +4312,7 @@ struct
           (Base.transaction_union_handler handler transaction state_body
              init_stack)
         statement
+      |> Promise_native_helpers.to_deferred
     in
     { statement; proof }
 
@@ -4359,6 +4360,7 @@ struct
     let open Async in
     let%map proof =
       merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
+      |> Promise_native_helpers.to_deferred
     in
     Ok { statement = s; proof }
 
@@ -4733,6 +4735,7 @@ module For_tests = struct
               in
               let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
                 trivial_prover ~handler [] tx_statement
+                |> Promise_native_helpers.to_deferred
               in
               { Party.data = snapp_party.data; authorization = Proof pi }
           | Signature ->
@@ -4924,6 +4927,7 @@ module For_tests = struct
     in
     let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
+      |> Promise_native_helpers.to_deferred
     in
     let fee_payer_signature_auth =
       let txn_comm =
@@ -6250,7 +6254,9 @@ let%test_module "transaction_snark" =
                         respond Unhandled
                   in
                   let pi : Pickles.Side_loaded.Proof.t =
-                    (fun () -> multisig_prover ~handler [] tx_statement)
+                    (fun () ->
+                      multisig_prover ~handler [] tx_statement
+                      |> Promise_native_helpers.to_deferred)
                     |> Async.Thread_safe.block_on_async_exn
                   in
                   let fee_payer =
