@@ -32,7 +32,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -55,7 +55,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -82,7 +82,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -109,7 +109,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -135,7 +135,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -162,7 +162,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -189,7 +189,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -216,7 +216,7 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypair = Some new_kp
+          ; snapp_account_keypairs = [ new_kp ]
           ; memo
           ; new_snapp_account = false
           ; snapp_update
@@ -245,7 +245,7 @@ module Make (Input : Input_intf) = struct
               ; fee
               ; receivers = []
               ; amount
-              ; snapp_account_keypair = Some new_kp
+              ; snapp_account_keypairs = [ new_kp ]
               ; memo
               ; new_snapp_account = false
               ; snapp_update
@@ -259,7 +259,7 @@ module Make (Input : Input_intf) = struct
             (*Ledger.apply_transaction should be applied if fee payer update is successfull*)
             let parties =
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  Transaction_snark.For_tests.update_state test_spec
+                  Transaction_snark.For_tests.update_states test_spec
                     ~snapp_prover ~constraint_constants)
             in
             Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
