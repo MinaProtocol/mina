@@ -1,0 +1,7 @@
+(executable
+ (name cargo_target_dir)
+ (libraries yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
