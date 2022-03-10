@@ -363,10 +363,14 @@ type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 module type S = sig
-  module Proof :
-    Pickles.Proof_intf
-      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
-       and type statement = Protocol_state.Value.t
+  module Proof : sig
+    include
+      Pickles.Proof_intf
+        with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+         and type statement = Protocol_state.Value.t
+
+    val verify : (statement * t) list -> bool Async.Deferred.t
+  end
 
   val tag : tag
 
@@ -386,7 +390,9 @@ module type S = sig
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
-let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
+let verify ts ~key =
+  Pickles.verify (module Nat.N2) (module Statement) key ts
+  |> Promise_native_helpers.to_deferred
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -435,5 +441,10 @@ end) : S = struct
   let constraint_system_digests =
     lazy (constraint_system_digests ~proof_level ~constraint_constants ())
 
-  module Proof = (val p)
+  module Proof = struct
+    include (val p)
+
+    let verify statements =
+      verify statements |> Promise_native_helpers.to_deferred
+  end
 end

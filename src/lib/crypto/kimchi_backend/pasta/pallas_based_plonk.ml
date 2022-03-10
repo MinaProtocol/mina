@@ -101,7 +101,7 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify =
       with_lagranges (fun lgrs vks ts ->
-          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
+          Promise.run_in_thread (fun () -> batch_verify lgrs vks ts))
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
