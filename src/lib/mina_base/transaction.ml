@@ -3,7 +3,7 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type 'command t =
         | Command of 'command
         | Fee_transfer of Fee_transfer.Stable.V2.t
@@ -28,7 +28,7 @@ module Valid = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = User_command.Valid.Stable.V2.t Poly.Stable.V1.t
+      type t = User_command.Valid.Stable.V2.t Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -42,7 +42,7 @@ end
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = User_command.Stable.V2.t Poly.Stable.V1.t
+    type t = User_command.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id

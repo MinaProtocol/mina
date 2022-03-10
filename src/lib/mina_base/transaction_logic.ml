@@ -133,7 +133,7 @@ module Transaction_applied = struct
   module Coinbase_applied = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { coinbase : Coinbase.Stable.V1.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
@@ -154,7 +154,7 @@ module Transaction_applied = struct
         type t =
           | Command of Command_applied.Stable.V2.t
           | Fee_transfer of Fee_transfer_applied.Stable.V2.t
-          | Coinbase of Coinbase_applied.Stable.V1.t
+          | Coinbase of Coinbase_applied.Stable.V2.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
