@@ -64,5 +64,14 @@ in  Pipeline.build
             , target = Size.Small
             , docker = None Docker.Type
             }
+        , Command.build
+            Command.Config::{
+            , commands = Nix.nixBuild "mina-daemon-docker"
+            , label = "Build Docker image with Nix"
+            , key = "mina-daemon-docker-with-nix"
+            , target = Size.Large
+            , docker = None Docker.Type
+            , artifact_paths = [ S.contains "result" ]
+            }
         ]
       }
