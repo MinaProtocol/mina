@@ -108,7 +108,7 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Deferred.t
+      -> t Promise.t
 
     val verify : Verifier_index.t -> t -> bool
 
@@ -348,7 +348,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Deferred res =
+    let%map.Promise res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res
