@@ -173,7 +173,7 @@ let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =
-            Transaction_snark.For_tests.update_state ~snapp_prover
+            Transaction_snark.For_tests.update_states ~snapp_prover
               ~constraint_constants test_spec
           in
           apply_parties_with_merges ledger [ parties ]))

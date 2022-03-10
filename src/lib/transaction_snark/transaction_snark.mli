@@ -544,7 +544,7 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; snapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
@@ -561,7 +561,7 @@ module For_tests : sig
     -> Spec.t
     -> Parties.t
 
-  val update_state :
+  val update_states :
        ?snapp_prover:
          ( unit
          , unit
