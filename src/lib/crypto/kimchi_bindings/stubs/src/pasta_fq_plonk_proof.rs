@@ -7,7 +7,6 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
 use mina_curves::pasta::{
@@ -16,11 +15,11 @@ use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
 };
 
-use kimchi::circuits::polynomial::COLUMNS;
 use kimchi::circuits::scalars::ProofEvaluations;
 use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use oracle::{
     poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -91,41 +90,35 @@ pub fn caml_pasta_fq_plonk_proof_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
-    lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> bool {
-    let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
-
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    ProverProof::verify::<
+    batch_verify::<
+        GAffine,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-    >(
-        &group_map,
-        &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
-    )
+    >(&group_map, &[(&index.into(), &proof.into())].to_vec())
     .is_ok()
 }
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlPolyComm<CamlGPallas>>>,
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
     proofs: Vec<CamlProverProof<CamlGPallas, CamlFq>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
-        .zip(lgr_comms.into_iter())
         .zip(proofs.into_iter())
-        .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
+        .map(|(i, p)| (i.into(), p.into()))
         .collect();
-    let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
+    let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
     let group_map = GroupMap::<Fp>::setup();
 
-    ProverProof::<GAffine>::verify::<
+    batch_verify::<
+        GAffine,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
