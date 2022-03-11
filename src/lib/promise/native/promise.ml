@@ -11,5 +11,3 @@ let create f =
   Ivar.read ivar
 
 let to_deferred p = p
-
-let of_deferred d = d
