@@ -45,6 +45,7 @@ let tests : test list =
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ; ("snapps", (module Snapps.Make : Intf.Test.Functor_intf))
