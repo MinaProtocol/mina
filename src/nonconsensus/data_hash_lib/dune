@@ -3,7 +3,29 @@
  (public_name data_hash_lib_nonconsensus)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel codable snark_params_nonconsensus outside_hash_image_nonconsensus random_oracle_nonconsensus fields_derivers fields_derivers_snapps_nonconsensus)
+ (libraries
+   ;;opam libraries
+   ppx_inline_test.config
+   base.caml
+   sexplib0
+   core_kernel
+   base
+   bin_prot.shape
+   base.base_internalhash_types
+   result
+   ;;local libraries
+   base58_check
+   fields_derivers.json
+   random_oracle_input
+   fields_derivers
+   codable
+   fields_derivers.graphql
+   fold_lib
+   outside_hash_image_nonconsensus
+   snark_params_nonconsensus
+   random_oracle_nonconsensus
+   fields_derivers_snapps_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_inline_test ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp))
