@@ -147,33 +147,7 @@ module Node = struct
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp =
-    [%graphql
-    {|
-         mutation ($parties: SendTestSnappInput!) {
-          sendTestSnapp(parties: $parties) {
-               snapp { id
-                       hash
-                       nonce
-                       failureReason
-                     }
-             }
-         }
-       |}]
-
-    module Send_snapp =
-    [%graphql
-    {|
-      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
-       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
-            snapp { id
-                    hash
-                    nonce
-                    failureReason
-                  }
-          }
-      }
-    |}]
+    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
 
     module Get_balance =
     [%graphql
@@ -698,7 +672,7 @@ module Node = struct
     in
     let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let parties_json =
-      Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
+      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
     let send_snapp_graphql () =
       let send_snapp_obj =
@@ -709,13 +683,13 @@ module Node = struct
     in
     let%bind sent_snapp_obj = send_snapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#sendTestSnapp#snapp#failureReason with
+      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
       | None ->
           return ()
       | Some s ->
           Deferred.Or_error.errorf "Snapp failed, reason: %s" s
     in
-    let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
+    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
     [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
     return snapp_id
 

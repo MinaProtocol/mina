@@ -78,6 +78,7 @@
    mina_base.import
    pickles.backend
    pickles_types
-   graphql)
+   graphql
+   fields_derivers.graphql)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

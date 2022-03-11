@@ -41,5 +41,6 @@
    kimchi_pasta
    with_hash
    data_hash_lib
+   generated_graphql_queries
    )
 )

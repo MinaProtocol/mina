@@ -18,6 +18,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let nullable_graphql_arg = ref (fun () -> failwith "unimplemented") in
     let graphql_arg_accumulator = ref Graphql.Args.Acc.T.Init in
     let graphql_creator = ref (fun _ -> failwith "unimplemented") in
+    let graphql_query = ref None in
+    let graphql_query_accumulator = ref [] in
 
     let to_json = ref (fun _ -> failwith "unimplemented") in
     let of_json = ref (fun _ -> failwith "unimplemented") in
@@ -42,6 +44,10 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
       method graphql_creator = graphql_creator
 
+      method graphql_query = graphql_query
+
+      method graphql_query_accumulator = graphql_query_accumulator
+
       method to_json = to_json
 
       method of_json = of_json
@@ -63,6 +69,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       constraint 'a = _ Fields_derivers_json.Of_yojson.Input.t
       constraint 'a = _ Graphql.Fields.Input.t
       constraint 'a = _ Graphql.Args.Input.t
+      constraint 'a = _ Fields_derivers_graphql.Graphql_query.Input.t
   end
 
   let yojson obj ?doc ~name ~map ~contramap : _ Unified_input.t =
@@ -95,7 +102,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     obj#map := map ;
 
-    obj
+    Fields_derivers_graphql.Graphql_query.scalar obj
 
   let iso_string ?doc obj ~(to_string : 'a -> string)
       ~(of_string : string -> 'a) ~name =
@@ -129,18 +136,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _a = Graphql.Fields.int obj in
     let _b = Graphql.Args.int obj in
     let _c = Fields_derivers_json.To_yojson.int obj in
+    let _d = Fields_derivers_graphql.Graphql_query.int obj in
     Fields_derivers_json.Of_yojson.int obj
 
   let string obj : _ Unified_input.t =
     let _a = Graphql.Fields.string obj in
     let _b = Graphql.Args.string obj in
     let _c = Fields_derivers_json.To_yojson.string obj in
+    let _d = Fields_derivers_graphql.Graphql_query.string obj in
     Fields_derivers_json.Of_yojson.string obj
 
   let bool obj : _ Unified_input.t =
     let _a = Graphql.Fields.bool obj in
     let _b = Graphql.Args.bool obj in
     let _c = Fields_derivers_json.To_yojson.bool obj in
+    let _d = Fields_derivers_graphql.Graphql_query.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
   let unit obj : _ Unified_input.t =
@@ -164,18 +174,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _a = Graphql.Fields.option x obj in
     let _b = Graphql.Args.option x obj in
     let _c = Fields_derivers_json.To_yojson.option x obj in
+    let _d = Fields_derivers_graphql.Graphql_query.option x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
   let list (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Graphql.Fields.list x obj in
     let _b = Graphql.Args.list x obj in
     let _c = Fields_derivers_json.To_yojson.list x obj in
+    let _d = Fields_derivers_graphql.Graphql_query.list x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
   let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Graphql.Fields.contramap ~f:contramap x obj in
     let _b = Graphql.Args.map ~f:map x obj in
     let _c = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
+    let _d = Fields_derivers_graphql.Graphql_query.wrapped x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
 
   let iso_record ~of_record ~to_record record_deriver obj =
@@ -191,7 +204,10 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let c1, acc'' = Graphql.Args.add_field x fd acc' in
     let _, acc''' = Fields_derivers_json.To_yojson.add_field x fd acc'' in
     let c2, acc'''' = Fields_derivers_json.Of_yojson.add_field x fd acc''' in
-    ((function `Left x -> c1 x | `Right x -> c2 x), acc'''')
+    let _, acc''''' =
+      Fields_derivers_graphql.Graphql_query.add_field x fd acc''''
+    in
+    ((function `Left x -> c1 x | `Right x -> c2 x), acc''''')
 
   let ( !. ) x fd acc = add_field (x @@ o ()) fd acc
 
@@ -200,6 +216,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.finish ~name ?doc ((fun x -> f (`Left x)), acc) in
     let _c =
       Fields_derivers_json.To_yojson.finish ((fun x -> f (`Right x)), acc)
+    in
+    let _d =
+      Fields_derivers_graphql.Graphql_query.finish ((fun x -> f (`Left x)), acc)
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
@@ -210,6 +229,24 @@ module Make (Schema : Graphql_intf.Schema) = struct
   let typ obj = !(obj#graphql_fields).Graphql.Fields.Input.T.run ()
 
   let arg_typ obj = !(obj#graphql_arg) ()
+
+  let inner_query obj = Fields_derivers_graphql.Graphql_query.inner_query obj
+
+  let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
+    | `Assoc kv ->
+        `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
+    | `Bool b ->
+        `Bool b
+    | `Float f ->
+        `Float f
+    | `Int i ->
+        `Int i
+    | `List xs ->
+        `List (List.map xs ~f:json_to_safe)
+    | `Null ->
+        `Null
+    | `String s ->
+        `String s
 
   (* TODO: remove this or move to a %test_module once the deriver code is stable *)
   (* Can be used to print the graphql schema, like this:
@@ -260,37 +297,6 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | x ->
             Yojson.Safe.to_string x
 
-      let rec json_to_safe : Yojson.Basic.t -> Yojson.Safe.t = function
-        | `Assoc kv ->
-            `Assoc (List.map kv ~f:(fun (k, v) -> (k, json_to_safe v)))
-        | `Bool b ->
-            `Bool b
-        | `Float f ->
-            `Float f
-        | `Int i ->
-            `Int i
-        | `List xs ->
-            `List (List.map xs ~f:json_to_safe)
-        | `Null ->
-            `Null
-        | `String s ->
-            `String s
-
-      (* Builds the graphql-expected output query shape
-       * (essentially the keys of all the nested JSON) *)
-      let rec json_keys : Yojson.Safe.t -> string = function
-        | `Assoc kv ->
-            sprintf "{\n%s\n}"
-              ( List.map kv ~f:(fun (k, v) ->
-                    sprintf "%s%s"
-                      (Fields_derivers.under_to_camel k)
-                      (json_keys v))
-              |> String.concat ~sep:"" )
-        | `List vs -> (
-            match vs with [] -> "\n" | v :: _ -> json_keys v )
-        | _ ->
-            "\n"
-
       let arg_query json =
         Printf.sprintf
           {graphql|query LoopIn {
@@ -340,14 +346,14 @@ module Make (Schema : Graphql_intf.Schema) = struct
           | Error err ->
               failwithf "Failed to parse query: %s %s" q err ()
         in
-        (* send json in, get keys *)
-        let* keys =
+        (* send json in *)
+        let* () =
           let json = to_json deriver a in
           let q = arg_query json in
           let* res = run_query q in
           match res with
           | Ok (`Response _) ->
-              return @@ json_keys json
+              return @@ ()
           | Error e ->
               failwithf "Unexpected response in: %s"
                 (e |> Yojson.Basic.to_string)
@@ -355,9 +361,14 @@ module Make (Schema : Graphql_intf.Schema) = struct
           | _ ->
               failwith "Unexpected stream in"
         in
+        (* get query *)
+        let inner_query =
+          Option.value_exn
+            (Fields_derivers_graphql.Graphql_query.inner_query deriver)
+        in
         (* read json out *)
         let* a' =
-          let* res = run_query (out_query keys) in
+          let* res = run_query (out_query inner_query) in
           match res with
           | Ok (`Response json) ->
               let unwrap k json =
