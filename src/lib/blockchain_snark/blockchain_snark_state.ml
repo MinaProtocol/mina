@@ -392,7 +392,7 @@ end
 
 let verify ts ~key =
   Pickles.verify (module Nat.N2) (module Statement) key ts
-  |> Promise_native_helpers.to_deferred
+  |> Promise.to_deferred
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -435,8 +435,7 @@ end) : S = struct
         [ rule ~proof_level ~constraint_constants T.tag self ])
 
   let step witness ?handler prevs statement =
-    (with_handler step) witness ?handler prevs statement
-    |> Promise_native_helpers.to_deferred
+    (with_handler step) witness ?handler prevs statement |> Promise.to_deferred
 
   let constraint_system_digests =
     lazy (constraint_system_digests ~proof_level ~constraint_constants ())
@@ -444,7 +443,6 @@ end) : S = struct
   module Proof = struct
     include (val p)
 
-    let verify statements =
-      verify statements |> Promise_native_helpers.to_deferred
+    let verify statements = verify statements |> Promise.to_deferred
   end
 end

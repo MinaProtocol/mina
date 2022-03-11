@@ -102,6 +102,26 @@ function deferred_return(value) {
   };
 }
 
+// Provides: deferred_create
+function deferred_create(promise_creator) {
+  var deferred = {
+    promise: new Promise(function (resolve) {
+      promise_creator(resolve);
+    })
+      .then(function (value) {
+        deferred.value = value;
+        deferred.isDetermined = true;
+      })
+      .catch(function (err) {
+        deferred.error = err;
+        deferred.isDetermined = true;
+        throw err;
+      }),
+    isDetermined: false,
+  };
+  return deferred;
+}
+
 // Provides: deferred_to_promise
 function deferred_to_promise(deferred) {
   return deferred.promise;

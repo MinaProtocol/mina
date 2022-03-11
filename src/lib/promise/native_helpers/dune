@@ -1,7 +1,0 @@
-(library
- (public_name promise.native_helpers)
- (name promise_native_helpers)
- (libraries promise.native async_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)

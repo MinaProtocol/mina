@@ -3644,7 +3644,7 @@ let verify (ts : (t * _) list) ~key =
       (module Statement.With_sok)
       key
       (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-    |> Promise_native_helpers.to_deferred
+    |> Promise.to_deferred
   else Async.return false
 
 let constraint_system_digests ~constraint_constants () =
@@ -4224,7 +4224,7 @@ struct
   let verification_key = Proof.verification_key
 
   let verify_against_digest { statement; proof } =
-    Proof.verify [ (statement, proof) ] |> Promise_native_helpers.to_deferred
+    Proof.verify [ (statement, proof) ] |> Promise.to_deferred
 
   let verify ts =
     if
@@ -4233,7 +4233,7 @@ struct
     then
       Proof.verify
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-      |> Promise_native_helpers.to_deferred
+      |> Promise.to_deferred
     else Async.return false
 
   let of_parties_segment_exn ~statement ~snapp_statement ~witness
@@ -4301,7 +4301,7 @@ struct
             statement
     in
     let open Async in
-    let%map proof = Promise_native_helpers.to_deferred res in
+    let%map proof = Promise.to_deferred res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
@@ -4314,7 +4314,7 @@ struct
           (Base.transaction_union_handler handler transaction state_body
              init_stack)
         statement
-      |> Promise_native_helpers.to_deferred
+      |> Promise.to_deferred
     in
     { statement; proof }
 
@@ -4362,7 +4362,7 @@ struct
     let open Async in
     let%map proof =
       merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
-      |> Promise_native_helpers.to_deferred
+      |> Promise.to_deferred
     in
     Ok { statement = s; proof }
 
@@ -4736,8 +4736,7 @@ module For_tests = struct
                 match request with _ -> respond Unhandled
               in
               let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
-                trivial_prover ~handler [] tx_statement
-                |> Promise_native_helpers.to_deferred
+                trivial_prover ~handler [] tx_statement |> Promise.to_deferred
               in
               { Party.data = snapp_party.data; authorization = Proof pi }
           | Signature ->
@@ -4928,8 +4927,7 @@ module For_tests = struct
       match request with _ -> respond Unhandled
     in
     let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
-      trivial_prover ~handler [] tx_statement
-      |> Promise_native_helpers.to_deferred
+      trivial_prover ~handler [] tx_statement |> Promise.to_deferred
     in
     let fee_payer_signature_auth =
       let txn_comm =
@@ -6258,7 +6256,7 @@ let%test_module "transaction_snark" =
                   let pi : Pickles.Side_loaded.Proof.t =
                     (fun () ->
                       multisig_prover ~handler [] tx_statement
-                      |> Promise_native_helpers.to_deferred)
+                      |> Promise.to_deferred)
                     |> Async.Thread_safe.block_on_async_exn
                   in
                   let fee_payer =
@@ -6683,7 +6681,7 @@ let%test_module "transaction_snark" =
               in
               Async.Thread_safe.block_on_async (fun () ->
                   Proof.verify [ (proof13.statement, proof13.proof) ]
-                  |> Promise_native_helpers.to_deferred)
+                  |> Promise.to_deferred)
               |> Result.ok_exn))
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
