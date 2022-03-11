@@ -256,7 +256,8 @@ module Make (Input : Input_intf) = struct
               }
             in
             let snapp_pk = Public_key.compress new_kp.public_key in
-            (*Ledger.apply_transaction should be applied if fee payer update is successfull*)
+            (*Ledger.apply_transaction should be successful if fee payer update
+              is successful*)
             let parties =
               Async.Thread_safe.block_on_async_exn (fun () ->
                   Transaction_snark.For_tests.update_states test_spec
