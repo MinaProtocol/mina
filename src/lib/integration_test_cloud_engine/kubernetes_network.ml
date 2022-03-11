@@ -123,6 +123,38 @@ module Node = struct
       }
     |}]
 
+    module Send_payment_with_raw_sig =
+    [%graphql
+    {|
+      mutation ($sender: PublicKey!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $token: UInt64!,
+      $fee: UInt64!,
+      $nonce: UInt32!,
+      $memo: String!,
+      $validUntil: UInt32!,
+      $rawSignature: String!
+      ) 
+      {
+        sendPayment(
+          input:
+          {
+            from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo, validUntil: $validUntil
+          },
+          signature: {rawSignature: $rawSignature}
+        )
+        {
+          
+          payment {
+            id
+            nonce
+            hash
+          }
+        }
+      }
+    |}]
+
     module Send_delegation =
     [%graphql
     {|
@@ -406,6 +438,49 @@ module Node = struct
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
+
+  let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~raw_signature =
+    [%log info] "Sending a payment with raw signature"
+      ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let send_payment_graphql () =
+      let send_payment_obj =
+        Graphql.Send_payment_with_raw_sig.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~token:(Graphql_lib.Encoders.uint64 (Unsigned.UInt64.of_int 0))
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ~nonce:(Graphql_lib.Encoders.uint32 (Unsigned.UInt32.of_int 0))
+          ~memo:""
+          ~validUntil:(Graphql_lib.Encoders.uint32 (Unsigned.UInt32.of_int 0))
+          ~rawSignature:raw_signature ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
+    in
+    let%map sent_payment_obj = send_payment_graphql () in
+    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      }
+    in
+    [%log info] "Sent payment"
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
+        ] ;
+    res
+
+  let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~raw_signature =
+    send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~raw_signature
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =
