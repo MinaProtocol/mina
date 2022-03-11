@@ -1,7 +1,6 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snarky_backendless
-module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
 open Let_syntax
@@ -154,7 +153,7 @@ module Coinbase_stack = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -214,7 +213,7 @@ module Stack_hash = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -1275,7 +1274,7 @@ let%test_unit "add stack + remove stack = initial tree " =
   in
   let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
-      Async.Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
@@ -1292,7 +1291,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           in
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
-          Async.Deferred.return ()))
+          Async_kernel.Deferred.return ()))
 
 module type Pending_coinbase_intf = sig
   type t [@@deriving sexp]

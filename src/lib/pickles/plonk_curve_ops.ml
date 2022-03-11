@@ -70,6 +70,71 @@ struct
   let chunks_needed ~num_bits =
     (num_bits + (bits_per_chunk - 1)) / bits_per_chunk
 
+  let scale_fast_msb_bits base
+      (Pickles_types.Shifted_value.Type1.Shifted_value
+        (bits_msb : Boolean.var array)) : Field.t * Field.t =
+    let ((x_base, y_base) as base) = seal base in
+    let ( !! ) = As_prover.read_var in
+    let mk f = exists Field.typ ~compute:f in
+    (* MSB bits *)
+    let num_bits = Array.length bits_msb in
+    let chunks = num_bits / bits_per_chunk in
+    [%test_eq: int] (num_bits mod bits_per_chunk) 0 ;
+    let acc = ref (add_fast base base) in
+    let n_acc = ref Field.zero in
+    let rounds_rev = ref [] in
+    for chunk = 0 to chunks - 1 do
+      let open Field.Constant in
+      let double x = x + x in
+      let bs =
+        Array.init bits_per_chunk ~f:(fun i ->
+            (bits_msb.(Int.((chunk * bits_per_chunk) + i)) :> Field.t))
+      in
+      let n_acc_prev = !n_acc in
+      n_acc :=
+        mk (fun () ->
+            Array.fold bs ~init:!!n_acc_prev ~f:(fun acc b -> double acc + !!b)) ;
+      let accs, slopes =
+        Array.fold_map bs ~init:!acc ~f:(fun (x_acc, y_acc) b ->
+            let s1 =
+              mk (fun () ->
+                  (!!y_acc - (!!y_base * (double !!b - one)))
+                  / (!!x_acc - !!x_base))
+            in
+            let s1_squared = mk (fun () -> square !!s1) in
+            let s2 =
+              mk (fun () ->
+                  (double !!y_acc / (double !!x_acc + !!x_base - !!s1_squared))
+                  - !!s1)
+            in
+            let x_res = mk (fun () -> !!x_base + square !!s2 - !!s1_squared) in
+            let y_res = mk (fun () -> ((!!x_acc - !!x_res) * !!s2) - !!y_acc) in
+            let acc' = (x_res, y_res) in
+            (acc', (acc', s1)))
+        |> snd |> Array.unzip
+      in
+      let accs = Array.append [| !acc |] accs in
+      acc := Array.last accs ;
+      rounds_rev :=
+        { Kimchi_backend_common.Scale_round.accs
+        ; bits = bs
+        ; ss = slopes
+        ; n_prev = n_acc_prev
+        ; n_next = !n_acc
+        ; base
+        }
+        :: !rounds_rev
+    done ;
+    assert_
+      [ { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (EC_scale { state = Array.of_list_rev !rounds_rev })
+        }
+      ] ;
+    (* TODO: Return n_acc ? *)
+    !acc
+
   (*
      Computes
 

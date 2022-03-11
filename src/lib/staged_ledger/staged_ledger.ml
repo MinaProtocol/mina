@@ -8,6 +8,8 @@ open Mina_base
 open Currency
 open O1trace
 open Signature_lib
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -1830,6 +1832,8 @@ module T = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) ~supercharge_coinbase =
     let open Result.Let_syntax in
+    let module Transaction_validator = Transaction_snark.Transaction_validator
+    in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     let is_new_account pk =
@@ -2414,8 +2418,8 @@ let%test_module "staged ledger tests" =
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
-        User_command_generators.sequence_parties_with_ledger ~length:num_snapps
-          ()
+        Mina_generators.User_command_generators.sequence_parties_with_ledger
+          ~length:num_snapps ()
       in
       let snapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
@@ -2670,11 +2674,14 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Mina_base.Ledger.location_of_account test_mask
+                  (Ledger.location_of_account test_mask
                      (Account_id.create snark_worker_pk Token_id.default)) )))
 
     let compute_statuses ~ledger ~coinbase_amount diff =
       let generate_status =
+        let module Transaction_validator =
+          Transaction_snark.Transaction_validator
+        in
         let status_ledger = Transaction_validator.create ledger in
         fun txn ->
           O1trace.measure "get txn status" (fun () ->

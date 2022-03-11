@@ -74,7 +74,7 @@ module Json_layout = struct
 
       module Permissions = struct
         module Auth_required = struct
-          type t = None | Either | Proof | Signature | Both | Impossible
+          type t = None | Either | Proof | Signature | Impossible
           [@@deriving dhall_type, sexp, bin_io_unversioned]
 
           let to_yojson = function
@@ -86,8 +86,6 @@ module Json_layout = struct
                 `String "proof"
             | Signature ->
                 `String "signature"
-            | Both ->
-                `String "both"
             | Impossible ->
                 `String "impossible"
 
@@ -102,8 +100,6 @@ module Json_layout = struct
                     Ok Proof
                 | "signature" ->
                     Ok Signature
-                | "both" ->
-                    Ok Both
                 | "impossible" ->
                     Ok Impossible
                 | _ ->
@@ -114,8 +110,7 @@ module Json_layout = struct
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
@@ -130,8 +125,7 @@ module Json_layout = struct
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
-          [| "stake"
-           ; "edit_state"
+          [| "edit_state"
            ; "send"
            ; "receive"
            ; "set_delegate"

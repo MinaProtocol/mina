@@ -109,6 +109,17 @@ module Block = struct
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
     Conn.find max_slot_query ()
 
+  let next_slot_query =
+    Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
+      {sql| SELECT global_slot_since_genesis FROM blocks
+            WHERE global_slot_since_genesis >= $1
+            ORDER BY global_slot_since_genesis ASC
+            LIMIT 1
+      |sql}
+
+  let get_next_slot (module Conn : Caqti_async.CONNECTION) slot =
+    Conn.find_opt next_slot_query slot
+
   let state_hashes_by_slot_query =
     Caqti_request.collect Caqti_type.int Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
@@ -442,4 +453,17 @@ module Parent_block = struct
   let get_parent_state_hash (module Conn : Caqti_async.CONNECTION)
       epoch_ledgers_state_hash =
     Conn.find query_parent_state_hash epoch_ledgers_state_hash
+end
+
+module Balances = struct
+  let query_insert_nonce =
+    Caqti_request.exec
+      Caqti_type.(tup2 int int64)
+      {sql| UPDATE balances
+            SET nonce = $2
+            WHERE id = $1
+      |sql}
+
+  let insert_nonce (module Conn : Caqti_async.CONNECTION) ~id ~nonce =
+    Conn.exec query_insert_nonce (id, nonce)
 end

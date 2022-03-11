@@ -4,16 +4,38 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   blake2
-   core_kernel
-   hash_prefix_states
-   mina_signature_kind
-   non_zero_curve_point
+   ;; opam libraries
+   bignum.bigint
+   ppx_inline_test.config
+   base
+   sexplib0
+   yojson
    ppx_version.runtime
-   random_oracle
+   core_kernel
+   bin_prot.shape
+   base.caml
+   result
+   ;; local libraries
+   crypto_params
+   kimchi_backend.pasta
+   random_oracle_input
+   bitstring_lib
+   codable
    snark_params
+   mina_signature_kind
+   blake2
+   hash_prefix_states
+   non_zero_curve_point
+   random_oracle
    snarky.backendless
-   yojson)
+   bignum_bigint
+   base58_check
+   snarky_curves
+   pickles
+   fold_lib
+   pickles.backend
+   kimchi_backend
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

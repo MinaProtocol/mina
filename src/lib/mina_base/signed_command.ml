@@ -1,7 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Import
+open Mina_base_import
 open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload

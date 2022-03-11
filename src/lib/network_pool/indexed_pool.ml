@@ -911,8 +911,12 @@ let remove_lowest_fee :
 let get_highest_fee :
     t -> Transaction_hash.User_command_with_valid_signature.t option =
  fun t ->
-  Option.map ~f:(Fn.compose Set.min_elt_exn Tuple2.get2)
-  @@ Map.max_elt t.applicable_by_fee
+  Option.map
+    ~f:
+      (Fn.compose
+         Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
+         Tuple2.get2)
+  @@ Currency.Fee_rate.Map.max_elt t.applicable_by_fee
 
 (* Add a command that came in from gossip, or return an error. We need to check
    a whole bunch of conditions here and return the appropriate errors.
@@ -1430,7 +1434,8 @@ let%test_module _ =
                 failwith "should've succeeded")
 
     let%test_unit "age-based expiry" =
-      Quickcheck.test ~trials:1 (User_command_generators.parties_with_ledger ())
+      Quickcheck.test ~trials:1
+        (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (cmd, _, _, _) ->
           let cmd =
             Transaction_hash.User_command_with_valid_signature.create cmd
@@ -1454,18 +1459,18 @@ let%test_module _ =
 
     let%test_unit "sequential adds (all valid)" =
       let gen :
-          ( Ledger.init_state
+          ( Mina_ledger.Ledger.init_state
           * Transaction_hash.User_command_with_valid_signature.t list )
           Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init = Ledger.gen_initial_ledger_state in
+        let%bind ledger_init = Mina_ledger.Ledger.gen_initial_ledger_state in
         let%map cmds = User_command.Valid.Gen.sequence ledger_init in
         ( ledger_init
         , List.map ~f:Transaction_hash.User_command_with_valid_signature.create
             cmds )
       in
       let shrinker :
-          ( Ledger.init_state
+          ( Mina_ledger.Ledger.init_state
           * Transaction_hash.User_command_with_valid_signature.t list )
           Quickcheck.Shrinker.t =
         Quickcheck.Shrinker.create (fun (init_state, cmds) ->
@@ -1475,7 +1480,7 @@ let%test_module _ =
       Quickcheck.test gen ~trials:1000
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
+            Mina_ledger.Ledger.init_state
             * Transaction_hash.User_command_with_valid_signature.t list]
         ~shrinker ~shrink_attempts:`Exhaustive ~seed:(`Deterministic "d")
         ~sizes:(Sequence.repeat 10) ~f:(fun (ledger_init, cmds) ->
@@ -1600,8 +1605,8 @@ let%test_module _ =
                 Quickcheck.Generator.tuple2 (return sender)
                   (Quickcheck_lib.of_array test_keys)
               in
-              User_command_generators.payment ~sign_type:`Fake ~key_gen
-                ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
+              Mina_generators.User_command_generators.payment ~sign_type:`Fake
+                ~key_gen ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
@@ -1638,7 +1643,8 @@ let%test_module _ =
             Quickcheck.Generator.tuple2 (return sender)
               (Quickcheck_lib.of_array test_keys)
           in
-          User_command_generators.payment ~sign_type:`Fake ~key_gen
+          Mina_generators.User_command_generators.payment ~sign_type:`Fake
+            ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~fee_range:0 ()
@@ -1737,54 +1743,6 @@ let%test_module _ =
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds")
-
-    let%test_unit "applicable_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.applicable_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
-
-    let%test_unit "all_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.all_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
 
     let%test_unit "remove_lowest_fee" =
       let cmds =

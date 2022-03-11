@@ -39,6 +39,9 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
+      type signed_command_result =
+        { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
+
       val send_payment :
            logger:Logger.t
         -> t
@@ -46,7 +49,7 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
-        -> unit Deferred.Or_error.t
+        -> signed_command_result Deferred.Or_error.t
 
       val must_send_payment :
            logger:Logger.t
@@ -55,7 +58,25 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
-        -> unit Malleable_error.t
+        -> signed_command_result Malleable_error.t
+
+      val send_delegation :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> signed_command_result Deferred.Or_error.t
+
+      val must_send_delegation :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> signed_command_result Malleable_error.t
 
       (** returned string is the transaction id *)
       val send_snapp :
@@ -68,13 +89,28 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+        -> Currency.Balance.t Deferred.Or_error.t
 
       val must_get_balance :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
+
+      val get_account_permissions :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Permissions.t Deferred.Or_error.t
+
+      (** the returned Update.t is constructed from the fields of the
+          given account, as if it had been applied to the account
+      *)
+      val get_account_update :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Party.Update.t Deferred.Or_error.t
 
       val get_peer_id :
            logger:Logger.t
@@ -245,14 +281,20 @@ module Dsl = struct
 
     val node_to_initialize : Engine.Network.Node.t -> t
 
+    val nodes_to_initialize : Engine.Network.Node.t list -> t
+
     val blocks_to_be_produced : int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    val payment_to_be_included_in_frontier :
+    type command_type = Send_payment | Send_delegation
+
+    val signed_command_to_be_included_in_frontier :
          sender_pub_key:Public_key.Compressed.t
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
+      -> nonce:Mina_numbers.Account_nonce.t
+      -> command_type:command_type
       -> t
 
     val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t

@@ -3,13 +3,13 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
+open Mina_base_util
 open Snark_params
 open Tick
 open Currency
 open Mina_numbers
 open Fold_lib
-open Import
+open Mina_base_import
 
 module Index = struct
   [%%versioned
@@ -134,12 +134,15 @@ module Token_symbol = struct
   (* 48 = max_length * 8 *)
   module Num_bits = Pickles_types.Nat.N48
 
+  let num_bits = Pickles_types.Nat.to_int Num_bits.n
+
   let to_bits (x : t) =
     Pickles_types.Vector.init Num_bits.n ~f:(fun i ->
-        try
-          let c = x.[i / 8] |> Char.to_int in
+        let byte_index = i / 8 in
+        if byte_index < String.length x then
+          let c = x.[byte_index] |> Char.to_int in
           c land (1 lsl (i mod 8)) <> 0
-        with _ -> false)
+        else false)
 
   let of_bits x : t =
     let c, j, chars =
@@ -172,34 +175,44 @@ module Token_symbol = struct
         (Char.gen_uniform_inclusive Char.min_value Char.max_value))
       ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
+  let to_field (x : t) : Field.t =
+    Field.project (Pickles_types.Vector.to_list (to_bits x))
+
   let to_input (x : t) =
-    Random_oracle_input.Chunked.packeds
-      (List.to_array
-         (List.map
-            ~f:(fun b -> (field_of_bool b, 1))
-            (Pickles_types.Vector.to_list (to_bits x))))
+    Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
   [%%ifdef consensus_mechanism]
 
-  type var = (Boolean.var, Num_bits.n) Pickles_types.Vector.t
+  type var = Field.Var.t
+
+  let range_check (t : var) =
+    let%bind actual =
+      make_checked (fun () ->
+          let _, _, actual_packed =
+            Pickles.Scalar_challenge.to_field_checked' ~num_bits m
+              (Kimchi_backend_common.Scalar_challenge.create t)
+          in
+          actual_packed)
+    in
+    Field.Checked.Assert.equal t actual
 
   let var_of_value x =
     Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
 
+  let of_field (x : Field.t) : t =
+    of_bits
+      (Pickles_types.Vector.of_list_and_length_exn
+         (List.take (Field.unpack x) num_bits)
+         Num_bits.n)
+
   let typ : (var, t) Typ.t =
-    Typ.transport ~there:to_bits ~back:of_bits
-    @@ Pickles_types.Vector.typ Boolean.typ Num_bits.n
+    Typ.transport
+      { Field.typ with check = range_check }
+      ~there:to_field ~back:of_field
 
-  let var_to_input (x : var) =
-    Random_oracle_input.Chunked.packeds
-      (List.to_array
-         (List.map
-            ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
-            (Pickles_types.Vector.to_list x)))
+  let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
-  let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
-    Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
-        Snark_params.Tick.Run.Boolean.if_ b ~then_ ~else_)
+  let if_ = Tick.Run.Field.if_
 
   [%%endif]
 end
@@ -626,6 +639,10 @@ module Checked = struct
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:crypto_hash_prefix (pack_input (to_input t))))
+
+  let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
+
+  let amount_upper_bound = Bignum_bigint.(one lsl Amount.length_in_bits)
 
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =

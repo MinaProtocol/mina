@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 module Digest = Kimchi_backend.Pasta.Basic.Fp
 
 module Call_forest = struct
@@ -201,7 +201,7 @@ module Stable = struct
       ; other_parties : Party.Stable.V1.t list
       ; memo : Signed_command_memo.Stable.V1.t
       }
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson, fields]
 
     let to_latest = Fn.id
 
@@ -424,3 +424,37 @@ let weight (parties : t) : int =
     ; Weight.other_parties other_parties
     ; Weight.memo memo
     ]
+
+let deriver obj =
+  let open Fields_derivers_snapps.Derivers in
+  Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
+    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~memo:!.Signed_command_memo.deriver
+  |> finish ~name:"SendSnappInput"
+
+let%test_module "Test" =
+  ( module struct
+    let dummy =
+      let party : Party.t =
+        { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+        ; authorization = Control.dummy_of_tag Signature
+        }
+      in
+      let fee_payer : Party.Fee_payer.t =
+        { data = Party.Predicated.Fee_payer.dummy
+        ; authorization = Signature.dummy
+        }
+      in
+      { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
+
+    module Fd = Fields_derivers_snapps.Derivers
+
+    let full = deriver @@ Fd.o ()
+
+    let%test_unit "json roundtrip dummy" =
+      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+
+    let%test_unit "full circuit" =
+      Run_in_thread.block_on_async_exn
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
+  end )

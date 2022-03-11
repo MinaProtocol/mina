@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_state
 open Mina_transition
 open Frontier_base
@@ -36,11 +37,11 @@ module Node = struct
 end
 
 module Protocol_states_for_root_scan_state = struct
-  type t = Protocol_state.value State_hash.Map.t
+  type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
   let protocol_states_for_next_root_scan_state protocol_states_for_old_root
       ~new_scan_state
-      ~(old_root_state : (Protocol_state.value, State_hash.t) With_hash.t) =
+      ~(old_root_state : Protocol_state.value State_hash.With_state_hashes.t) =
     let required_state_hashes =
       Staged_ledger.Scan_state.required_state_hashes new_scan_state
       |> State_hash.Set.to_list
@@ -49,11 +50,12 @@ module Protocol_states_for_root_scan_state = struct
       (*Note: Protocol states for the next root should all be in this map
         assuming roots transition to their successors and do not skip any node in
         between*)
-      State_hash.Map.set protocol_states_for_old_root ~key:old_root_state.hash
-        ~data:old_root_state.data
+      State_hash.Map.set protocol_states_for_old_root
+        ~key:(State_hash.With_state_hashes.state_hash old_root_state)
+        ~data:old_root_state
     in
-    List.map required_state_hashes ~f:(fun hash ->
-        (hash, State_hash.Map.find_exn protocol_state_map hash))
+    List.map required_state_hashes
+      ~f:(State_hash.Map.find_exn protocol_state_map)
 end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
@@ -92,7 +94,10 @@ let find_exn t hash =
 let find_protocol_state (t : t) hash =
   match find t hash with
   | None ->
-      State_hash.Map.find t.protocol_states_for_root_scan_state hash
+      let%map.Option s =
+        State_hash.Map.find t.protocol_states_for_root_scan_state hash
+      in
+      With_hash.data s
   | Some breadcrumb ->
       Some
         ( Breadcrumb.validated_transition breadcrumb
@@ -117,10 +122,12 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
-    External_transition.Validated.state_hash root_data.transition
+    (External_transition.Validated.state_hashes root_data.transition).state_hash
   in
   let protocol_states_for_root_scan_state =
-    State_hash.Map.of_alist_exn root_data.protocol_states
+    root_data.protocol_states
+    |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
+    |> State_hash.Map.of_alist_exn
   in
   let root_protocol_state =
     External_transition.Validated.protocol_state root_data.transition
@@ -164,8 +171,7 @@ let root_data t =
   let root = root t in
   { transition = Breadcrumb.validated_transition root
   ; staged_ledger = Breadcrumb.staged_ledger root
-  ; protocol_states =
-      State_hash.Map.to_alist t.protocol_states_for_root_scan_state
+  ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
   }
 
 let max_length { max_length; _ } = max_length
@@ -286,7 +292,6 @@ let visualize_to_string t =
 (* given an heir, calculate the diff that will transition the root to that heir *)
 let calculate_root_transition_diff t heir =
   let root = root t in
-  let root_hash = t.root in
   let heir_hash = Breadcrumb.state_hash heir in
   let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
@@ -312,8 +317,7 @@ let calculate_root_transition_diff t heir =
     Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
       t.protocol_states_for_root_scan_state
       ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
-      ~old_root_state:
-        { With_hash.hash = root_hash; data = Breadcrumb.protocol_state root }
+      ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
   let new_root_data =
     Root_data.Limited.create ~transition:heir_transition
@@ -398,7 +402,10 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 1 *)
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
-        let hash = External_transition.Validated.state_hash node.transition in
+        let hash =
+          (External_transition.Validated.state_hashes node.transition)
+            .state_hash
+        in
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
@@ -500,7 +507,9 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     of the new_root_protocol_states since those transactions would have been
     deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
-    State_hash.Map.of_alist_exn new_root_protocol_states
+    new_root_protocol_states
+    |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
+    |> State_hash.Map.of_alist_exn
   in
   t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
   let new_root_node = { new_root_node with breadcrumb = new_root_breadcrumb } in
@@ -533,8 +542,9 @@ let calculate_diffs t breadcrumb =
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
                ~constants:t.precomputed_values.consensus_constants
-               ~existing:(Breadcrumb.consensus_state_with_hash current_best_tip)
-               ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
+               ~existing:
+                 (Breadcrumb.consensus_state_with_hashes current_best_tip)
+               ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb)
                ~logger:
                  (Logger.extend t.logger
                     [ ( "selection_context"
@@ -569,7 +579,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = Root_data.Limited.hash new_root in
+      let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
       let old_root_hash = t.root in
       let new_root_protocol_states =
         Root_data.Limited.protocol_states new_root

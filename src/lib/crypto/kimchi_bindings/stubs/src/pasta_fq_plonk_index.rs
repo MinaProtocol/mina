@@ -21,9 +21,17 @@ extern "C" fn caml_pasta_fq_plonk_index_finalize(v: ocaml::Raw) {
     }
 }
 
-ocaml::custom!(CamlPastaFqPlonkIndex {
-    finalize: caml_pasta_fq_plonk_index_finalize,
-});
+impl ocaml::custom::Custom for CamlPastaFqPlonkIndex {
+    const NAME: &'static str = "CamlPastaFqPlonkIndex\0";
+    const USED: usize = 1;
+    /// Encourage the GC to free when there are > 12 in memory
+    const MAX: usize = 12;
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        finalize: Some(caml_pasta_fq_plonk_index_finalize),
+        ..ocaml::custom::DEFAULT_CUSTOM_OPS
+    };
+}
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -39,7 +47,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .map(|gate| CircuitGate::<Fq> {
             typ: gate.typ,
             wires: gate.wires,
-            c: gate.c.clone(),
+            coeffs: gate.coeffs.clone(),
         })
         .collect();
 
@@ -47,7 +55,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     let cs = match ConstraintSystem::<Fq>::create(
         gates,
         vec![],
-        oracle::pasta::fq_3::params(),
+        oracle::pasta::fq_kimchi::params(),
         public as usize,
     ) {
         None => {
@@ -72,7 +80,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // create index
     Ok(CamlPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fp_3::params(), endo_q, srs.clone()),
+        DlogIndex::<GAffine>::create(cs, oracle::pasta::fp_kimchi::params(), endo_q, srs.clone()),
     )))
 }
 
@@ -133,10 +141,13 @@ pub fn caml_pasta_fq_plonk_index_read(
 
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
+    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fp_3::params();
-    t.linearization = expr_linearization(t.cs.domain.d1, false, &None);
+    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
+
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    t.linearization = linearization;
+    t.powers_of_alpha = powers_of_alpha;
 
     Ok(CamlPastaFqPlonkIndex(Box::new(t)))
 }

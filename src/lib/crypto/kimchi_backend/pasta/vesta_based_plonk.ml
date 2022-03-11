@@ -38,7 +38,7 @@ module R1CS_constraint_system =
     (struct
       let params =
         Sponge.Params.(
-          map pasta_p_3 ~f:(fun x ->
+          map pasta_p_kimchi ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x)))
     end)
 
@@ -96,11 +96,8 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     include Kimchi.Protocol.Proof.Fp
 
-    let verify = with_lagrange verify
-
-    let batch_verify =
-      with_lagranges (fun lgrs vks ts ->
-          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
+    let batch_verify vks ts =
+      Run_in_thread.run_in_thread (fun () -> batch_verify vks ts)
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =

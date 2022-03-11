@@ -1,7 +1,7 @@
 (library
  (name mina_metrics)
  (public_name mina_metrics)
- (libraries async_kernel logger uri)
+ (libraries async_kernel logger uri core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules mina_metrics)

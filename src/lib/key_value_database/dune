@@ -2,7 +2,7 @@
  (name key_value_database)
  (public_name key_value_database)
  (library_flags (-linkall))
- (libraries core_kernel)
+ (libraries core_kernel sexplib0)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (synopsis "Collection of key-value databases used in Coda"))

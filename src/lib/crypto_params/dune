@@ -5,16 +5,19 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   cache_dir
+   ;; opam libraries
    core_kernel
-   hash_prefixes
-   group_map
+   bin_prot.shape
+   ;; local libraries
+   kimchi_backend.pasta
+   pickles.backend
    snarky.backendless
+   cache_dir
+   group_map
    pickles
-   bignum_bigint
-   bowe_gabizon_hash
-   random_oracle
-   tuple_lib)
+   tuple_lib
+   kimchi_backend
+ )
  (preprocess
   (pps ppx_version ppx_jane h_list.ppx))
  (instrumentation (backend bisect_ppx))

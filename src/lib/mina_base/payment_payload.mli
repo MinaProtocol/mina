@@ -1,6 +1,6 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
-open Import
+open Mina_base_import
 
 module Poly : sig
   type ('public_key, 'token_id, 'amount) t =

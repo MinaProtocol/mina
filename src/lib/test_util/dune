@@ -3,7 +3,17 @@
  (public_name test_util)
  (library_flags -linkall)
  (inline_tests)
- (libraries snark_params fold_lib core_kernel snarky.backendless)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   base.caml
+   ;; local libraries
+   snark_params
+   fold_lib
+   snarky.backendless
+   pickles
+   crypto_params
+   )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

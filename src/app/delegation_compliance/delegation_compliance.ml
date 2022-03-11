@@ -8,6 +8,7 @@
 open Core_kernel
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Signature_lib
 
 type input = { epoch : int; staking_ledger : Runtime_config.Ledger.t }

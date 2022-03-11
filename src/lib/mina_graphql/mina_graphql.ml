@@ -2,6 +2,7 @@ open Core
 open Async
 open Graphql_async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency
 
@@ -965,6 +966,95 @@ module Types = struct
     let account_id { Account.Poly.public_key; token_id; _ } =
       Account_id.create public_key token_id
 
+    let auth_required =
+      let open Permissions.Auth_required in
+      enum "AccountAuthRequired" ~doc:"Kind of authorization required"
+        ~values:
+          [ enum_value "None" ~value:None
+          ; enum_value "Either" ~value:Either
+          ; enum_value "Proof" ~value:Proof
+          ; enum_value "Signature" ~value:Signature
+          ; enum_value "Impossible" ~value:Impossible
+          ]
+
+    let account_permissions =
+      obj "AccountPermissions" ~fields:(fun _ ->
+          [ field "editState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit snapp state"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.edit_state)
+          ; field "send" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to send tokens"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.send)
+          ; field "receive" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to receive tokens"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "setDelegate" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the delegate"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_delegate)
+          ; field "setPermissions" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to change permissions"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_permissions)
+          ; field "setVerificationKey" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to set the verification key of the \
+                 snapp associated with the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_verification_key)
+          ; field "setSnappUri" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to change the URI of the snapp \
+                 associated with the account "
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_snapp_uri)
+          ; field "editSequenceState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit the sequence state"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.edit_sequence_state)
+          ; field "setTokenSymbol" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the token symbol"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_token_symbol)
+          ; field "incrementNonce" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to increment the nonce"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.increment_nonce)
+          ; field "setVotingFor" ~typ:(non_null auth_required)
+              ~doc:
+                "Authorization required to set the state hash the account is \
+                 voting for"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_voting_for)
+          ])
+
+    let account_vk =
+      obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
+        ~fields:(fun _ ->
+          [ field "verificationKey"
+              ~doc:"Verification key in Base58Check format"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Side_loaded.Verification_key.to_base58_check vk.data)
+          ; field "hash" ~doc:"Hash of verification key" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (vk : _ With_hash.t) ->
+                Pickles.Backend.Tick.Field.to_string vk.hash)
+          ])
+
     let rec account =
       lazy
         (obj "Account" ~doc:"An account record according to the daemon"
@@ -1041,12 +1131,11 @@ module Types = struct
                    | Ledger_db staking_ledger -> (
                        try
                          let index =
-                           Mina_base.Ledger.Db.index_of_account_exn
-                             staking_ledger account_id
+                           Ledger.Db.index_of_account_exn staking_ledger
+                             account_id
                          in
                          let delegate_account =
-                           Mina_base.Ledger.Db.get_at_index_exn staking_ledger
-                             index
+                           Ledger.Db.get_at_index_exn staking_ledger index
                          in
                          let delegate_key = delegate_account.public_key in
                          Some (get_best_ledger_account_pk coda delegate_key)
@@ -1213,11 +1302,32 @@ module Types = struct
                    |> Option.map ~f:(fun snapp_account ->
                           snapp_account.app_state |> Snapp_state.V.to_list
                           |> List.map ~f:Snapp_basic.F.to_string))
+             ; field "permissions" ~typ:account_permissions
+                 ~doc:"Permissions for updating certain fields of this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.permissions)
              ; field "tokenSymbol" ~typ:string
                  ~doc:"The token symbol associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol)
+             ; field "verificationKey" ~typ:account_vk
+                 ~doc:"Verification key associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   Option.value_map account.Account.Poly.snapp ~default:None
+                     ~f:(fun snapp_account -> snapp_account.verification_key))
+             ; field "sequenceEvents"
+                 ~doc:"Sequence events associated with this account"
+                 ~typ:(list (non_null string))
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   Option.map account.Account.Poly.snapp
+                     ~f:(fun snapp_account ->
+                       List.map ~f:Snark_params.Tick.Field.to_string
+                         (Pickles_types.Vector.to_list
+                            snapp_account.sequence_state)))
              ]))
 
     let account = Lazy.force account
@@ -1412,7 +1522,7 @@ module Types = struct
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
-            |> Signed_command_memo.to_string)
+            |> Signed_command_memo.to_base58_check)
       ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
@@ -2202,7 +2312,7 @@ module Types = struct
           ((Amount.t, Sgn.t) Signed_poly.t, string) Result.t option arg_typ =
         obj "BalanceChange" ~doc:"A signed amount"
           ~coerce:(fun magnitude sgn ->
-            try Ok Currency.Signed_poly.{ magnitude; sgn }
+            try Ok ({ magnitude; sgn } : Currency.Amount.Signed.t)
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "magnitude" ~doc:"An amount of MINA"
@@ -2243,19 +2353,17 @@ module Types = struct
             ; enum_value "Either" ~value:Either
             ; enum_value "Proof" ~value:Proof
             ; enum_value "Signature" ~value:Signature
-            ; enum_value "Both" ~value:Both
             ; enum_value "Impossible" ~value:Impossible
             ]
 
       let snapp_permissions =
         obj "Permissions"
           ~coerce:
-            (fun stake edit_state send receive set_delegate set_permissions
+            (fun edit_state send receive set_delegate set_permissions
                  set_verification_key set_snapp_uri edit_sequence_state
                  set_token_symbol increment_nonce set_voting_for ->
             Ok
-              { Permissions.Poly.stake
-              ; edit_state
+              { Permissions.Poly.edit_state
               ; send
               ; receive
               ; set_delegate
@@ -2268,8 +2376,7 @@ module Types = struct
               ; set_voting_for
               })
           ~fields:
-            [ arg "stake" ~typ:(non_null bool)
-            ; arg "editState" ~typ:(non_null snapp_auth_required)
+            [ arg "editState" ~typ:(non_null snapp_auth_required)
             ; arg "send" ~typ:(non_null snapp_auth_required)
             ; arg "receive" ~typ:(non_null snapp_auth_required)
             ; arg "setDelegate" ~typ:(non_null snapp_auth_required)
@@ -2315,7 +2422,7 @@ module Types = struct
                 ~typ:(non_null string)
             ; arg "cliffTime" ~doc:"Cliff time, a global slot, as a string"
                 ~typ:(non_null string)
-            ; arg "cliffAmount" ~doc:"Cliff amoount, as a string"
+            ; arg "cliffAmount" ~doc:"Cliff amount, as a string"
                 ~typ:(non_null string)
             ; arg "vestingPeriod"
                 ~doc:"Vesting period, a number of slots, as a string"
@@ -2351,8 +2458,7 @@ module Types = struct
             let%bind vk' = s vk in
             let%bind perms' = s perms in
             let%map timing' = s timing in
-            Party.Update.Poly.
-              { app_state
+            ( { app_state
               ; delegate = v delegate
               ; verification_key = v vk'
               ; permissions = v perms'
@@ -2360,7 +2466,8 @@ module Types = struct
               ; token_symbol = v tok_sym
               ; timing = v timing'
               ; voting_for = v voting_for
-              })
+              }
+              : Party.Update.t ))
           ~fields:
             [ arg "appState"
                 ~doc:"List of _exactly_ 8 field elements (null if keep)"
@@ -2401,7 +2508,7 @@ module Types = struct
         let i name typ =
           obj (name ^ "Interval")
             ~coerce:(fun lower upper ->
-              Snapp_predicate.Closed_interval.{ lower; upper })
+              { Snapp_predicate.Closed_interval.lower; upper })
             ~fields:
               [ arg "lower" ~typ:(non_null typ)
               ; arg "upper" ~typ:(non_null typ)
@@ -2574,8 +2681,7 @@ module Types = struct
               let events = mk_field_arrays events in
               let sequence_events = mk_field_arrays sequence_events in
               let call_data = Snark_params.Tick.Field.of_string call_data in
-              Party.Body.Poly.
-                { public_key
+              ( { public_key
                 ; update
                 ; token_id
                 ; increment_nonce
@@ -2587,6 +2693,7 @@ module Types = struct
                 ; protocol_state
                 ; use_full_commitment
                 }
+                : Party.Body.t )
             with exn -> Error (Exn.to_string exn))
           ~fields:
             [ arg "publicKey" ~doc:"Public key as a Base58Check string"
@@ -2707,7 +2814,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%map body = body in
             let predicate = nonce in
-            Party.Predicated.Poly.{ body; predicate })
+            { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"fee payer party"
                 ~typ:(non_null snapp_fee_payer_party_body)
@@ -2733,7 +2840,7 @@ module Types = struct
           ~coerce:(fun data authorization ->
             let open Result.Let_syntax in
             let%bind data = data in
-            Ok Party.Fee_payer.{ data; authorization })
+            Ok { Party.Fee_payer.data; authorization })
           ~fields:
             [ arg "data" ~doc:"party with a signature and nonce predicate"
                 ~typ:(non_null snapp_party_predicated_fee_payer)
@@ -2772,16 +2879,15 @@ module Types = struct
             let open Result.Let_syntax in
             let v o = Snapp_basic.Or_ignore.of_option o in
             let%map state = state_result in
-            ( Snapp_predicate.Account.Poly.
-                { balance = v balance
-                ; nonce = v nonce
-                ; receipt_chain_hash = v receipt_chain_hash
-                ; public_key = v public_key
-                ; delegate = v delegate
-                ; state
-                ; sequence_state = v sequence_state
-                ; proved_state = v proved_state
-                }
+            ( { Snapp_predicate.Account.Poly.balance = v balance
+              ; nonce = v nonce
+              ; receipt_chain_hash = v receipt_chain_hash
+              ; public_key = v public_key
+              ; delegate = v delegate
+              ; state
+              ; sequence_state = v sequence_state
+              ; proved_state = v proved_state
+              }
               : Snapp_predicate.Account.t ))
           ~fields:
             [ arg "balance" ~typ:Interval.balance
@@ -2834,7 +2940,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind body = body_result in
             let%bind predicate = predicate_result in
-            Ok Party.Predicated.Poly.{ body; predicate })
+            Ok { Party.Predicated.Poly.body; predicate })
           ~fields:
             [ arg "body" ~doc:"Body of the party predicated"
                 ~typ:(non_null snapp_party_body)
@@ -2873,7 +2979,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind data = predicated_result in
             let%bind authorization = authorization_result in
-            Ok Party.{ data; authorization })
+            Ok { Party.data; authorization })
           ~fields:
             [ arg "data" ~doc:"Predicated party"
                 ~typ:(non_null snapp_party_predicated)
@@ -4770,7 +4876,9 @@ module Queries = struct
             } =
           (Mina_lib.config coda).precomputed_values
         in
-        let { With_hash.data = genesis_state; hash } =
+        let { With_hash.data = genesis_state
+            ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+            } =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
@@ -4822,12 +4930,10 @@ module Queries = struct
           (Mina_lib.config coda).precomputed_values.constraint_constants
         transition
     in
-    With_hash.Stable.Latest.
-      { data =
-          Filtered_external_transition.of_transition transition `All
-            transactions
-      ; hash
-      }
+    { With_hash.Stable.Latest.data =
+        Filtered_external_transition.of_transition transition `All transactions
+    ; hash
+    }
 
   let best_chain =
     io_field "bestChain"

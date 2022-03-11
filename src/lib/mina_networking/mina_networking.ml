@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Mina_transition
 open Network_peer
@@ -1244,7 +1245,7 @@ let create (config : Config.t)
                       , [ ("hash", Ledger_hash.to_yojson hash)
                         ; ( "query"
                           , Syncable_ledger.Query.to_yojson
-                              Ledger.Addr.to_yojson query )
+                              Mina_ledger.Ledger.Addr.to_yojson query )
                         ; ("error", Error_json.error_to_yojson err)
                         ] ) ))
           else return ()
@@ -1512,7 +1513,8 @@ let create (config : Config.t)
                   [ ("external_transition", External_transition.to_yojson state)
                   ]
                 (Block_received
-                   { state_hash = External_transition.state_hash state
+                   { state_hash =
+                       (External_transition.state_hashes state).state_hash
                    ; sender = Envelope.Incoming.sender envelope
                    }) ;
             Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
@@ -1619,7 +1621,8 @@ let broadcast_state t state =
   let msg = Gossip_net.Message.New_state (With_hash.data state) in
   [%str_log' info t.logger]
     ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
-    (Gossip_new_state { state_hash = With_hash.hash state }) ;
+    (Gossip_new_state
+       { state_hash = State_hash.With_state_hashes.state_hash state }) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
@@ -1804,8 +1807,8 @@ module Sl_downloader = struct
             end)
             (struct
               type t =
-                (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
-                * Mina_base.Sync_ledger.Answer.t
+                (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
+                * Sync_ledger.Answer.t
               [@@deriving to_yojson]
 
               let key = fst
@@ -1816,11 +1819,11 @@ end
 let glue_sync_ledger :
        t
     -> preferred:Peer.t list
-    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+    -> (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
-       * Mina_base.Sync_ledger.Query.t
-       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       * Sync_ledger.Query.t
+       * Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t ~preferred query_reader response_writer ->

@@ -3,7 +3,6 @@ open Async
 open Signature_lib
 open Mina_numbers
 open Mina_base
-open Mina_state
 
 (** For status *)
 let txn_count = ref 0
@@ -12,13 +11,13 @@ let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_account ledger addr in
-  Ledger.get ledger loc
+  let%bind loc = Mina_ledger.Ledger.location_of_account ledger addr in
+  Mina_ledger.Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
-  Ledger.to_list ledger
+  Mina_ledger.Ledger.to_list ledger
 
 let string_of_public_key =
   Fn.compose Public_key.Compressed.to_base58_check Account.public_key
@@ -173,7 +172,7 @@ let chain_id_inputs (t : Mina_lib.t) =
   let config = Mina_lib.config t in
   let precomputed_values = config.precomputed_values in
   let genesis_state_hash =
-    Precomputed_values.genesis_state_hash precomputed_values
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
   let genesis_constants = precomputed_values.genesis_constants in
   let snark_keys =
@@ -316,12 +315,17 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
+      Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check
     in
-    let num_accounts = Ledger.num_accounts ledger in
-    let%bind state = Mina_lib.best_protocol_state t in
-    let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
-    let consensus_state = state |> Protocol_state.consensus_state in
+    let num_accounts = Mina_ledger.Ledger.num_accounts ledger in
+    let%bind best_tip = Mina_lib.best_tip t in
+    let state_hash =
+      Transition_frontier.Breadcrumb.state_hash best_tip
+      |> State_hash.to_base58_check
+    in
+    let consensus_state =
+      Transition_frontier.Breadcrumb.consensus_state best_tip
+    in
     let blockchain_length =
       Length.to_int
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
