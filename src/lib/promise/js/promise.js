@@ -10,9 +10,11 @@ function deferred_run(func) {
       })
       .catch(function (err) {
         deferred.error = err;
+        deferred.isError = true;
         deferred.isDetermined = true;
         throw err;
       }),
+    isError: false,
     isDetermined: false,
   };
   return deferred;
@@ -30,9 +32,11 @@ function deferred_map(deferred, func) {
       })
       .catch(function (err) {
         newDeferred.error = err;
+        newDeferred.isError = true;
         newDeferred.isDetermined = true;
         throw err;
       }),
+    isError: false,
     isDetermined: false,
   };
   return newDeferred;
@@ -53,9 +57,11 @@ function deferred_bind(deferred, func) {
       })
       .catch(function (err) {
         newDeferred.error = err;
+        newDeferred.isError = true;
         newDeferred.isDetermined = true;
         throw err;
       }),
+    isError: false,
     isDetermined: false,
   };
   return newDeferred;
@@ -75,11 +81,10 @@ function deferred_is_determined(deferred) {
 
 // Provides: deferred_peek
 function deferred_peek(deferred) {
-  if (deferred.isDetermined) {
-    return [1, deferred.value];
-  } else {
-    return [0];
+  if (!deferred.isDetermined || deferred.isError) {
+    return 0;
   }
+  return [0, deferred.value];
 }
 
 // Provides: deferred_value_exn
@@ -87,7 +92,7 @@ function deferred_value_exn(deferred) {
   if (!deferred.isDetermined) {
     throw Error("Deferred has not returned yet.");
   }
-  if (deferred.error) {
+  if (deferred.isError) {
     throw deferred.error;
   }
   return deferred.value;
@@ -98,6 +103,7 @@ function deferred_return(value) {
   return {
     promise: Promise.resolve(value),
     value: value,
+    isError: false,
     isDetermined: true,
   };
 }
@@ -114,9 +120,11 @@ function deferred_create(promise_creator) {
       })
       .catch(function (err) {
         deferred.error = err;
+        deferred.isError = true;
         deferred.isDetermined = true;
         throw err;
       }),
+    isError: false,
     isDetermined: false,
   };
   return deferred;
@@ -138,9 +146,11 @@ function deferred_of_promise(promise) {
       })
       .catch(function (err) {
         deferred.error = err;
+        deferred.isError = true;
         deferred.isDetermined = true;
         throw err;
       }),
+    isError: false,
     isDetermined: false,
   };
   return deferred;
