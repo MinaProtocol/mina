@@ -16,6 +16,4 @@ val create : (('a -> unit) -> unit) -> 'a t
 
 val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
-val of_deferred : 'a Async_kernel.Deferred.t -> 'a t
-
 include Base.Monad.S with type 'a t := 'a t

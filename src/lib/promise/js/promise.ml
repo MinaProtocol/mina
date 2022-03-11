@@ -27,9 +27,6 @@ let to_deferred promise =
   upon promise (fun x -> Ivar.fill ivar x) ;
   Ivar.read ivar
 
-let of_deferred deferred =
-  create (fun resolve -> Async_kernel.Deferred.upon deferred resolve)
-
 include Base.Monad.Make (struct
   type nonrec 'a t = 'a t
 
