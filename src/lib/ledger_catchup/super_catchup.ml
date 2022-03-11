@@ -611,7 +611,7 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
 open Frontier_base
 
 let check_invariant ~downloader t =
-  O1trace.time_execution' "checking_super_catchup_invariants" (fun () ->
+  O1trace.sync_thread "check_super_catchup_invariants" (fun () ->
       Downloader.check_invariant downloader ;
       [%test_eq: int]
         (Downloader.total_jobs downloader)
@@ -719,7 +719,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
         "set_state $exn"
   in
   let rec run_node (node : Node.t) =
-    O1trace.time_execution "in_super_catchup_fstm" (fun () ->
+    O1trace.thread "exec_super_catchup_fstm" (fun () ->
         let state_hash = node.state_hash in
         let failed ?error ~sender failure_reason =
           [%log' debug t.logger] "failed with $error"
@@ -1043,7 +1043,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
               | None ->
                   `Some [] ) )
     in
-    O1trace.time_execution "in_super_catchup_downloader" (fun () ->
+    O1trace.thread "super_catchup_downloader" (fun () ->
         Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
           ~get:(fun peer hs ->
             let sec =
@@ -1083,7 +1083,7 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
-  O1trace.time_execution "handling_super_catchup_jobs" (fun () ->
+  O1trace.thread "handle_super_catchup_jobs" (fun () ->
       Strict_pipe.Reader.iter_without_pushback catchup_job_reader
         ~f:(fun (target_parent_hash, forest) ->
           (* whenever anything comes through the catchup_job_reader, this anonymous function is called. `target_parent_hash` is actually the parent of all the trees in `forest`, is in other words if one expands `target_parent_hash` and combines it with `forest` them one actually obtains a single tree. *)
@@ -1286,10 +1286,11 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
-  run_catchup ~logger ~trust_system ~verifier ~network ~frontier
-    ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
-    ~catchup_breadcrumbs_writer ~build_func:Transition_frontier.Breadcrumb.build
-  |> don't_wait_for
+  O1trace.background_thread "perform_super_catchup" (fun () ->
+      run_catchup ~logger ~trust_system ~verifier ~network ~frontier
+        ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer
+        ~build_func:Transition_frontier.Breadcrumb.build)
 
 (* Unit tests *)
 

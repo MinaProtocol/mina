@@ -1436,15 +1436,15 @@ let create (config : Config.t)
             Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget })))
   in
   let%map gossip_net =
-    O1trace.time_execution "in_gossip_net" (fun () ->
+    O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers)
   in
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
   let fake_time = Time.now () in
-  O1trace.time_execution "in_networking_updating_node_status" (fun () ->
-      Clock.every' (Time.Span.of_min 1.) (fun () ->
+  Clock.every' (Time.Span.of_min 1.) (fun () ->
+      O1trace.thread "update_node_status" (fun () ->
           match%bind
             get_node_status
               { data = (); sender = Local; received_at = fake_time }
@@ -1481,9 +1481,9 @@ let create (config : Config.t)
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =
-    O1trace.time_execution "in_networking_handling_received_gossips" (fun () ->
-        Strict_pipe.Reader.partition_map3 received_gossips
-          ~f:(fun (envelope, valid_cb) ->
+    Strict_pipe.Reader.partition_map3 received_gossips
+      ~f:(fun (envelope, valid_cb) ->
+        O1trace.sync_thread "handle_pubsub_gossips" (fun () ->
             Ivar.fill_if_empty first_received_message_signal () ;
             Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
             match Envelope.Incoming.data envelope with

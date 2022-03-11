@@ -1,7 +1,8 @@
 (library
  (name o1trace)
  (public_name o1trace)
- (libraries core async)
+ (libraries core async ocamlgraph)
+ (inline_tests)
  (synopsis "Basic event tracing")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane)))

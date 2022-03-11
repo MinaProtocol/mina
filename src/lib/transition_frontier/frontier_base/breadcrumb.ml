@@ -67,7 +67,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
     ~transition:(transition_with_validation :
                   External_transition.Almost_validated.t) ~sender
     ~transition_receipt_time () =
-  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
+  O1trace.thread "build_breadcrumb" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
@@ -472,35 +472,16 @@ module For_tests = struct
       in
       List.rev ls
 
-  let build_fail ?skip_staged_ledger_verification ~logger ~precomputed_values
-      ~verifier ~trust_system ~parent
-      ~transition:(transition_with_validation :
-                    External_transition.Almost_validated.t) ~sender
-      ~transition_receipt_time () : (t,
+  let build_fail ?skip_staged_ledger_verification:_ ~logger:_ ~precomputed_values:_
+      ~verifier:_ ~trust_system:_ ~parent:_
+      ~transition:_ ~sender:_
+      ~transition_receipt_time:_ () : (t,
       [> `Fatal_error of exn
        | `Invalid_staged_ledger_diff of Core_kernel.Error.t
        | `Invalid_staged_ledger_hash of Core_kernel.Error.t ])
      result Async_kernel.Deferred.t =
-     O1trace.trace_recurring "Breadcrumb.build" ( 
-       fun () ->
-
-        let _ = logger in
-        let _ = precomputed_values in
-        let _ = skip_staged_ledger_verification in
-        let _ = verifier in
-        let _ = sender in
-        let _ = transition_receipt_time in
-        let _ = trust_system in
-        let _ = parent in
-        let _ = transition_with_validation in
-
        Deferred.return (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
-
-      
-
-     )
-
-    end
+end
 
 
 (*         match%bind

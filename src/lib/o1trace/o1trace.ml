@@ -1,176 +1,207 @@
-open Core
+open Core_kernel
 open Async
-include Intf
+module Execution_timer = Execution_timer
+module Plugins = Plugins
+module Thread = Thread
 
-module Thread = struct
-  type t = { name : string; mutable elapsed : Time_ns.Span.t }
-  [@@deriving sexp_of]
+(* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
+let () = Plugins.enable_plugin (module Execution_timer)
 
-  let threads : t String.Table.t = String.Table.create ()
+let on_job_enter' (fiber : Thread.Fiber.t) =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_job_enter fiber)
 
-  let register name =
-    match Hashtbl.find threads name with
-    | Some thread ->
-        thread
-    | None ->
-        let thread = { name; elapsed = Time_ns.Span.zero } in
-        Hashtbl.set threads ~key:name ~data:thread ;
-        thread
-
-  let iter_threads ~f = Hashtbl.iter threads ~f:(fun t -> f t.name)
-
-  let get_elapsed_time name =
-    let open Option.Let_syntax in
-    let%map thread = Hashtbl.find threads name in
-    thread.elapsed
-end
-
-module Fiber = struct
-  include Hashable.Make (struct
-    type t = string list [@@deriving compare, hash, sexp]
-  end)
-
-  let next_id = ref 1
-
-  type t = { id : int; parent : t option; thread : Thread.t }
-  [@@deriving sexp_of]
-
-  let ctx_id : t Type_equal.Id.t = Type_equal.Id.create ~name:"fiber" sexp_of_t
-
-  let fibers : t Table.t = Table.create ()
-
-  let rec fiber_key name parent =
-    name
-    :: Option.value_map parent ~default:[] ~f:(fun p ->
-           fiber_key p.thread.name p.parent)
-
-  let register name parent =
-    let key = fiber_key name parent in
-    match Hashtbl.find fibers key with
-    | Some fiber ->
-        fiber
-    | None ->
-        let thread = Thread.register name in
-        let fiber = { id = !next_id; parent; thread } in
-        incr next_id ;
-        Hashtbl.set fibers ~key ~data:fiber ;
-        fiber
-
-  let apply_to_context t ctx =
-    let ctx = Execution_context.with_tid ctx t.id in
-    Execution_context.with_local ctx ctx_id (Some t)
-
-  let rec record_elapsed_time span t =
-    t.thread.elapsed <- Time_ns.Span.(t.thread.elapsed + span) ;
-    Option.iter t.parent ~f:(record_elapsed_time span)
-end
-
-module No_trace = struct
-  module Hooks = struct
-    let on_job_enter _ = ()
-
-    let on_job_exit _ _ = ()
-  end
-
-  let measure _ f = f ()
-
-  let trace _ f = f ()
-
-  let trace_event _ = ()
-
-  let trace_recurring = trace
-
-  let trace_task _ f = don't_wait_for (f ())
-
-  let trace_recurring_task = trace_task
-end
-
-let implementation = ref (module No_trace : S_with_hooks)
-
-let set_implementation x = implementation := x
-
-let measure name f =
-  let (module M) = !implementation in
-  M.measure name f
-
-let trace_event name =
-  let (module M) = !implementation in
-  M.trace_event name
-
-let trace name f =
-  let (module M) = !implementation in
-  M.trace name f
-
-let trace_recurring name f =
-  let (module M) = !implementation in
-  M.trace_recurring name f
-
-let trace_recurring_task name f =
-  let (module M) = !implementation in
-  M.trace_recurring_task name f
-
-let trace_task name f =
-  let (module M) = !implementation in
-  M.trace_task name f
-
-let forget_tid f =
-  let new_ctx =
-    Execution_context.with_tid Scheduler.(current_execution_context ()) 0
-  in
-  let res = Scheduler.within_context new_ctx f |> Result.ok in
-  Option.value_exn res
-
-(* execution timing *)
-
-let time_execution' (name : string) (f : unit -> 'a) =
-  let thread = Thread.register name in
-  let start_time = Time_ns.now () in
-  let x = f () in
-  let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
-  thread.elapsed <- Time_ns.Span.(thread.elapsed + elapsed_time) ;
-  x
-
-let time_execution (name : string) (f : unit -> 'a) =
-  let rec find_recursive_call (fiber : Fiber.t) =
-    if String.equal fiber.thread.name name then Some fiber
-    else Option.bind fiber.parent ~f:find_recursive_call
-  in
-  let ctx = Scheduler.current_execution_context () in
-  let parent = Execution_context.find_local ctx Fiber.ctx_id in
-  if
-    Option.value_map parent ~default:false ~f:(fun p ->
-        String.equal p.thread.name name)
-  then f ()
-  else
-    let fiber =
-      match Option.bind parent ~f:find_recursive_call with
-      | Some fiber ->
-          fiber
-      | None ->
-          Fiber.register name parent
-    in
-    let ctx = Fiber.apply_to_context fiber ctx in
-    match Scheduler.within_context ctx f with
-    | Error () ->
-        failwithf
-          "timing task `%s` failed, exception reported to parent monitor" name
-          ()
-    | Ok x ->
-        x
-
-(* scheduler hooks *)
+let on_job_exit' fiber elapsed_time =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_job_exit fiber elapsed_time)
 
 let on_job_enter ctx =
-  let (module M) = !implementation in
-  M.Hooks.on_job_enter ctx
+  Option.iter (Thread.Fiber.of_context ctx) ~f:on_job_enter'
 
 let on_job_exit ctx elapsed_time =
-  Option.iter
-    (Execution_context.find_local ctx Fiber.ctx_id)
-    ~f:(Fiber.record_elapsed_time elapsed_time) ;
-  let (module M) = !implementation in
-  M.Hooks.on_job_exit ctx elapsed_time
+  Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
+      on_job_exit' thread elapsed_time)
+
+let current_sync_fiber = ref None
+
+(* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
+let grab_parent_fiber ?ctx () =
+  Writer.(
+    writef (Lazy.force stdout) "have sync fiber: %b, have context: %b\n"
+      (Option.is_some !current_sync_fiber)
+      (Option.is_some ctx)) ;
+  match (!current_sync_fiber, ctx) with
+  | None, None ->
+      None
+  | None, Some ctx ->
+      Execution_context.find_local ctx Thread.Fiber.ctx_id
+  | Some fiber, _ ->
+      current_sync_fiber := None ;
+      Some fiber
+
+(* TODO: in general, I think the fiber setup needs some more thought *)
+(* TODO: realization -- need to store a sync_fiber flag on the current scheduler ctx state and then have a hook for `don't_wait_for` or something (still have to worry about `ignore x : 'a Deferred.t` though) *)
+
+(* look through a fiber stack to find a recursive fiber call *)
+let rec find_recursive_fiber thread_name parent_thread_name
+    (fiber : Thread.Fiber.t) =
+  let thread_matches = String.equal fiber.thread.name thread_name in
+  let parent_thread_matches =
+    Option.equal String.equal
+      (Option.map fiber.parent ~f:(fun p -> p.thread.name))
+      parent_thread_name
+  in
+  if thread_matches && parent_thread_matches then Some fiber
+  else
+    Option.bind fiber.parent
+      ~f:(find_recursive_fiber thread_name parent_thread_name)
+
+let exec_thread ?ctx ~exec_same_thread ~exec_new_thread name =
+  let sync_fiber = !current_sync_fiber in
+  (* mistake is here *)
+  let parent = grab_parent_fiber ?ctx () in
+  let parent_name = Option.map parent ~f:(fun p -> p.thread.name) in
+  Writer.(
+    writef (Lazy.force stdout)
+      !"grabbed parent name: %{sexp:string option}\n"
+      parent_name) ;
+  let result =
+    if
+      Option.value_map parent ~default:false ~f:(fun p ->
+          String.equal p.thread.name name)
+    then exec_same_thread ()
+    else
+      let fiber =
+        match Option.bind parent ~f:(find_recursive_fiber name parent_name) with
+        | Some fiber ->
+            fiber
+        | None ->
+            Thread.Fiber.register name parent
+      in
+      exec_new_thread fiber
+  in
+  current_sync_fiber := sync_fiber ;
+  result
+
+let thread name f =
+  let ctx = Scheduler.current_execution_context () in
+  exec_thread name ~ctx ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+      let ctx = Thread.Fiber.apply_to_context fiber ctx in
+      match Scheduler.within_context ctx f with
+      | Error () ->
+          failwithf
+            "timing task `%s` failed, exception reported to parent monitor" name
+            ()
+      | Ok x ->
+          x)
+
+let background_thread name f = don't_wait_for (thread name f)
+
+(* it is unsafe to call into the scheduler directly within a `sync_thread` *)
+let sync_thread name f =
+  exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+      current_sync_fiber := Some fiber ;
+      on_job_enter' fiber ;
+      let start_time = Time_ns.now () in
+      let result = f () in
+      let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
+      on_job_exit' fiber elapsed_time ;
+      result)
 
 let () = Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }
 
-(* FUTURE: migrate to `thread` and `label` based api, with dynamic multidispatch for tracing subsystems *)
+(*
+let () =
+  Scheduler.Expert.set_on_end_of_cycle (fun () ->
+    Option.iter (Thread.current_thread ()) ~f:(fun thread ->
+      dispatch_plugins thread (fun (module Plugin) state -> Plugin.on_cycle_end thread.name state)) ;
+    (* this line should probably live inside Async_kernel *)
+    sch.cycle_started <- true)
+*)
+
+let%test_module "thread tests" =
+  ( module struct
+    let child_of n =
+      match
+        let%bind.Option fiber =
+          grab_parent_fiber ~ctx:(Scheduler.current_execution_context ()) ()
+        in
+        fiber.parent
+      with
+      | Some parent ->
+          Writer.(writef (Lazy.force stdout) "parent = %s\n" parent.thread.name) ;
+          String.equal parent.thread.name n
+      | None ->
+          Writer.(write (Lazy.force stdout) "no parent found\n") ;
+          false
+
+    let test' f =
+      Hashtbl.clear Thread.threads ;
+      Thread_safe.block_on_async_exn (fun () ->
+          let s = Ivar.create () in
+          f (Ivar.fill s) ;
+          let%bind () = Ivar.read s in
+          Writer.(flushed (Lazy.force stdout)))
+
+    let test f = test' (fun s -> don't_wait_for (f s))
+
+    let%test_unit "thread > thread > thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      stop () ;
+                      Deferred.unit))))
+
+    let%test_unit "thread > background_thread > thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      stop () ;
+                      Deferred.unit)) ;
+              Deferred.unit))
+
+    let%test_unit "sync_thread > sync_thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              sync_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop ())))
+
+    let%test_unit "thread > sync_thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              sync_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop ()) ;
+              Deferred.unit))
+
+    let%test_unit "sync_thread > background_thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ;
+                  Deferred.unit)))
+
+    let%test_unit "sync_thread > background_thread > sync_thread > thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  sync_thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      don't_wait_for
+                        (thread "d" (fun () ->
+                             assert (child_of "c") ;
+                             stop () ;
+                             Deferred.unit))) ;
+                  Deferred.unit)))
+
+    (* TODO: recursion tests *)
+  end )

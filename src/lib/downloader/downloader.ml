@@ -368,7 +368,7 @@ end = struct
     end
 
     let maxes ~compare xs =
-      O1trace.time_execution' "in_downloader_maxes" (fun () ->
+      O1trace.sync_thread "compute_downloader_maxes" (fun () ->
           Sequence.fold xs ~init:[] ~f:(fun acc x ->
               match acc with
               | [] ->
@@ -379,7 +379,7 @@ end = struct
           |> List.rev)
 
     let useful_peer t ~pending_jobs =
-      O1trace.time_execution' "in_downloader_useful_peer" (fun () ->
+      O1trace.sync_thread "compute_downloader_useful_peers" (fun () ->
           let ts =
             List.rev
               (Preferred_heap.fold t.all_preferred ~init:[] ~f:(fun acc p ->
@@ -499,7 +499,7 @@ end = struct
     let ignore_period = Time.Span.of_min 2.
 
     let update t u =
-      O1trace.time_execution' "in_downloader_update" (fun () ->
+      O1trace.sync_thread "update_downloader" (fun () ->
           match u with
           | Add_knowledge { peer; claimed; out_of_band } ->
               if not out_of_band then
@@ -699,7 +699,7 @@ end = struct
 
   let refresh_peers t peers =
     Broadcast_pipe.Reader.iter peers ~f:(fun peers ->
-        O1trace.time_execution' "in_downloader_refreshing_peers" (fun () ->
+        O1trace.sync_thread "refresh_downloader_peers" (fun () ->
             let peers' = Peer.Set.of_list peers in
             let new_peers = Set.diff peers' t.all_peers in
             Useful_peers.update t.useful_peers
@@ -745,7 +745,7 @@ end = struct
     clear_queue pending
 
   let download t peer xs =
-    O1trace.time_execution "in_downloader_download" (fun () ->
+    O1trace.thread "download" (fun () ->
         let f xs =
           let n = List.length xs in
           `Assoc
@@ -987,7 +987,7 @@ end = struct
       r
     in
     let rec jobs_to_download stop =
-      O1trace.time_execution "in_downloader_jobs_to_download" (fun () ->
+      O1trace.thread "wait_for_jobs_to_download" (fun () ->
           if total_jobs t <> 0 then return `Ok
           else
             match%bind
@@ -1001,75 +1001,70 @@ end = struct
             | `Ok ->
                 jobs_to_download stop)
     in
-    let () =
-      let request_r, request_w =
-        Strict_pipe.create ~name:"knowledge-requests" Strict_pipe.Synchronous
-      in
-      upon stop (fun () -> Strict_pipe.Writer.close request_w) ;
-      let refresh_knowledge stop peer =
-        Clock.every' (Time.Span.of_min 7.) ~stop (fun () ->
-            match%bind jobs_to_download stop with
-            | `Finished ->
-                Deferred.unit
-            | `Ok ->
-                if not (Strict_pipe.Writer.is_closed request_w) then
-                  Strict_pipe.Writer.write request_w peer
-                else Deferred.unit)
-      in
-      let ps : unit Ivar.t Peer.Table.t = Peer.Table.create () in
-      Broadcast_pipe.Reader.iter peers ~f:(fun peers ->
-          O1trace.time_execution' "in_downloader_maintaining_peers" (fun () ->
-              let peers = Peer.Hash_set.of_list peers in
-              Hashtbl.filteri_inplace ps ~f:(fun ~key:p ~data:finished ->
-                  let keep = Hash_set.mem peers p in
-                  if not keep then Ivar.fill_if_empty finished () ;
-                  keep) ;
-              Hash_set.iter peers ~f:(fun p ->
-                  if not (Hashtbl.mem ps p) then (
-                    let finished = Ivar.create () in
-                    refresh_knowledge (Ivar.read finished) p ;
-                    Hashtbl.add_exn ps ~key:p ~data:finished ))) ;
-          Deferred.unit)
-      |> don't_wait_for ;
-      let throttle =
-        Throttle.create ~continue_on_error:true ~max_concurrent_jobs:8
-      in
-      let get_knowledge ctx peer =
-        Throttle.enqueue throttle (fun () -> knowledge ctx peer)
-      in
-      Broadcast_pipe.Reader.iter knowledge_context ~f:(fun _ ->
-          O1trace.time_execution' "in_downloader_refreshing_knowledge"
-            (fun () ->
-              Hashtbl.mapi_inplace ps ~f:(fun ~key:p ~data:finished ->
-                  Ivar.fill_if_empty finished () ;
+    let request_r, request_w =
+      Strict_pipe.create ~name:"knowledge-requests" Strict_pipe.Synchronous
+    in
+    upon stop (fun () -> Strict_pipe.Writer.close request_w) ;
+    let refresh_knowledge stop peer =
+      Clock.every' (Time.Span.of_min 7.) ~stop (fun () ->
+          match%bind jobs_to_download stop with
+          | `Finished ->
+              Deferred.unit
+          | `Ok ->
+              if not (Strict_pipe.Writer.is_closed request_w) then
+                Strict_pipe.Writer.write request_w peer
+              else Deferred.unit)
+    in
+    let ps : unit Ivar.t Peer.Table.t = Peer.Table.create () in
+    Broadcast_pipe.Reader.iter peers ~f:(fun peers ->
+        O1trace.sync_thread "maintain_downloader_peers" (fun () ->
+            let peers = Peer.Hash_set.of_list peers in
+            Hashtbl.filteri_inplace ps ~f:(fun ~key:p ~data:finished ->
+                let keep = Hash_set.mem peers p in
+                if not keep then Ivar.fill_if_empty finished () ;
+                keep) ;
+            Hash_set.iter peers ~f:(fun p ->
+                if not (Hashtbl.mem ps p) then (
                   let finished = Ivar.create () in
                   refresh_knowledge (Ivar.read finished) p ;
-                  finished)) ;
-          Deferred.unit)
-      |> don't_wait_for ;
-      Strict_pipe.Reader.iter request_r ~f:(fun peer ->
-          O1trace.time_execution "in_downloader_dispatching_requests" (fun () ->
-              (* TODO: The pipe/clock logic is not quite right, but it is good enough. *)
-              if Deferred.is_determined stop then Deferred.unit
-              else
-                let%map () = Throttle.capacity_available throttle in
-                don't_wait_for
-                  (let ctx = Broadcast_pipe.Reader.peek knowledge_context in
-                   (* TODO: Check if already downloading a job from them here. *)
-                   Useful_peers.update t.useful_peers
-                     (Knowledge_request_starting peer) ;
-                   let%map k = get_knowledge ctx peer in
-                   Useful_peers.update t.useful_peers
-                     (Knowledge
-                        { out_of_band = false
-                        ; peer
-                        ; claimed = k
-                        ; active_jobs = active_jobs t
-                        }))))
-      |> don't_wait_for
+                  Hashtbl.add_exn ps ~key:p ~data:finished ))) ;
+        Deferred.unit)
+    |> don't_wait_for ;
+    let throttle =
+      Throttle.create ~continue_on_error:true ~max_concurrent_jobs:8
     in
-    don't_wait_for
-      (O1trace.time_execution "in_downloader_fstm" (fun () -> step t)) ;
+    let get_knowledge ctx peer =
+      Throttle.enqueue throttle (fun () -> knowledge ctx peer)
+    in
+    O1trace.background_thread "refresh_downloader_knowledge" (fun () ->
+        Broadcast_pipe.Reader.iter knowledge_context ~f:(fun _ ->
+            O1trace.sync_thread "refresh_downloader_knowledge" (fun () ->
+                Hashtbl.mapi_inplace ps ~f:(fun ~key:p ~data:finished ->
+                    Ivar.fill_if_empty finished () ;
+                    let finished = Ivar.create () in
+                    refresh_knowledge (Ivar.read finished) p ;
+                    finished)) ;
+            Deferred.unit)) ;
+    O1trace.background_thread "dispatch_downloader_requests" (fun () ->
+        Strict_pipe.Reader.iter request_r ~f:(fun peer ->
+            (* TODO: The pipe/clock logic is not quite right, but it is good enough. *)
+            if Deferred.is_determined stop then Deferred.unit
+            else
+              let%map () = Throttle.capacity_available throttle in
+              don't_wait_for
+                (let ctx = Broadcast_pipe.Reader.peek knowledge_context in
+                 (* TODO: Check if already downloading a job from them here. *)
+                 Useful_peers.update t.useful_peers
+                   (Knowledge_request_starting peer) ;
+                 let%map k = get_knowledge ctx peer in
+                 Useful_peers.update t.useful_peers
+                   (Knowledge
+                      { out_of_band = false
+                      ; peer
+                      ; claimed = k
+                      ; active_jobs = active_jobs t
+                      })))) ;
+    O1trace.background_thread "execute_downlader_node_fstm" (fun () -> step t) ;
     upon stop (fun () -> tear_down t) ;
     every ~stop (Time.Span.of_sec 30.) (fun () ->
         [%log' debug t.logger]

@@ -284,7 +284,6 @@ let stream_messages pipe =
     | Error FramingError.Incomplete ->
         Deferred.unit
   in
-
   let rec scheduler_loop () =
     let%bind () = Scheduler.yield () in
     if !complete then Deferred.unit
@@ -292,19 +291,17 @@ let stream_messages pipe =
       let%bind () = read_frames () in
       scheduler_loop ()
   in
-  don't_wait_for
-    (let%map () =
-       Strict_pipe.Reader.iter pipe
-         ~f:(Fn.compose Deferred.return (FramedStream.add_fragment stream))
-     in
-     complete := true) ;
-  don't_wait_for (scheduler_loop ()) ;
+  O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
+      let%map () =
+        Strict_pipe.Reader.iter pipe
+          ~f:(Fn.compose Deferred.return (FramedStream.add_fragment stream))
+      in
+      complete := true) ;
+  O1trace.background_thread "parse_libp2p_ipc_message_frames" scheduler_loop ;
   r
 
 let read_incoming_messages reader =
-  Strict_pipe.Reader.map
-    (O1trace.time_execution "ipc_stream_messages" (fun () ->
-         stream_messages reader))
+  Strict_pipe.Reader.map (stream_messages reader)
     ~f:
       (Or_error.map ~f:(fun msg ->
            Reader.DaemonInterface.Message.of_message msg))

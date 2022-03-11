@@ -60,63 +60,65 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
        , unit )
        Writer.t) ~unprocessed_transition_cache =
   let module Lru = Core_extended_cache.Lru in
-  don't_wait_for
-    (Reader.iter transition_reader ~f:(fun transition_env ->
-         let { With_hash.hash = transition_hash; data = transition }, _ =
-           Envelope.Incoming.data transition_env
-         in
-         let sender = Envelope.Incoming.sender transition_env in
-         match
-           validate_transition ~consensus_constants ~logger ~frontier
-             ~unprocessed_transition_cache transition_env
-         with
-         | Ok cached_transition ->
-             let%map () =
-               Trust_system.record_envelope_sender trust_system logger sender
-                 ( Trust_system.Actions.Sent_useful_gossip
-                 , Some
-                     ( "external transition $state_hash"
-                     , [ ("state_hash", State_hash.to_yojson transition_hash)
-                       ; ("transition", External_transition.to_yojson transition)
-                       ] ) )
-             in
-             let transition_time =
-               External_transition.protocol_state transition
-               |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-               |> Block_time.to_time
-             in
-             Perf_histograms.add_span ~name:"accepted_transition_remote_latency"
-               (Core_kernel.Time.diff
-                  Block_time.(now time_controller |> to_time)
-                  transition_time) ;
-             Writer.write valid_transition_writer cached_transition
-         | Error (`In_frontier _) | Error (`In_process _) ->
-             Trust_system.record_envelope_sender trust_system logger sender
-               ( Trust_system.Actions.Sent_old_gossip
-               , Some
-                   ( "external transition with state hash $state_hash"
-                   , [ ("state_hash", State_hash.to_yojson transition_hash)
-                     ; ("transition", External_transition.to_yojson transition)
-                     ] ) )
-         | Error `Disconnected ->
-             Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
-             [%log error]
-               ~metadata:
-                 [ ("state_hash", State_hash.to_yojson transition_hash)
-                 ; ("reason", `String "not selected over current root")
-                 ; ( "protocol_state"
-                   , External_transition.protocol_state transition
-                     |> Protocol_state.value_to_yojson )
-                 ]
-               "Validation error: external transition with state hash \
-                $state_hash was rejected for reason $reason" ;
-             Trust_system.record_envelope_sender trust_system logger sender
-               ( Trust_system.Actions.Disconnected_chain
-               , Some
-                   ( "received transition that was not connected to our chain \
-                      from $sender"
-                   , [ ( "sender"
-                       , Envelope.Sender.to_yojson
-                           (Envelope.Incoming.sender transition_env) )
-                     ; ("transition", External_transition.to_yojson transition)
-                     ] ) )))
+  O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
+      Reader.iter transition_reader ~f:(fun transition_env ->
+          let { With_hash.hash = transition_hash; data = transition }, _ =
+            Envelope.Incoming.data transition_env
+          in
+          let sender = Envelope.Incoming.sender transition_env in
+          match
+            validate_transition ~consensus_constants ~logger ~frontier
+              ~unprocessed_transition_cache transition_env
+          with
+          | Ok cached_transition ->
+              let%map () =
+                Trust_system.record_envelope_sender trust_system logger sender
+                  ( Trust_system.Actions.Sent_useful_gossip
+                  , Some
+                      ( "external transition $state_hash"
+                      , [ ("state_hash", State_hash.to_yojson transition_hash)
+                        ; ( "transition"
+                          , External_transition.to_yojson transition )
+                        ] ) )
+              in
+              let transition_time =
+                External_transition.protocol_state transition
+                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+                |> Block_time.to_time
+              in
+              Perf_histograms.add_span
+                ~name:"accepted_transition_remote_latency"
+                (Core_kernel.Time.diff
+                   Block_time.(now time_controller |> to_time)
+                   transition_time) ;
+              Writer.write valid_transition_writer cached_transition
+          | Error (`In_frontier _) | Error (`In_process _) ->
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Sent_old_gossip
+                , Some
+                    ( "external transition with state hash $state_hash"
+                    , [ ("state_hash", State_hash.to_yojson transition_hash)
+                      ; ("transition", External_transition.to_yojson transition)
+                      ] ) )
+          | Error `Disconnected ->
+              Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
+              [%log error]
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("reason", `String "not selected over current root")
+                  ; ( "protocol_state"
+                    , External_transition.protocol_state transition
+                      |> Protocol_state.value_to_yojson )
+                  ]
+                "Validation error: external transition with state hash \
+                 $state_hash was rejected for reason $reason" ;
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Disconnected_chain
+                , Some
+                    ( "received transition that was not connected to our chain \
+                       from $sender"
+                    , [ ( "sender"
+                        , Envelope.Sender.to_yojson
+                            (Envelope.Incoming.sender transition_env) )
+                      ; ("transition", External_transition.to_yojson transition)
+                      ] ) )))

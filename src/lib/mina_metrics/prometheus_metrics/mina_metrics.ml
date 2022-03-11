@@ -1463,25 +1463,31 @@ end
 module Execution_times = struct
   let tracked_metrics = String.Table.create ()
 
-  let create_metric name =
+  let create_metric thread =
+    let name = O1trace.Thread.name thread in
     let info : MetricInfo.t =
-      { name = MetricName.v (Printf.sprintf "Mina_Daemon_time_spent_%s_ms" name)
+      { name =
+          MetricName.v
+            (Printf.sprintf "Mina_Daemon_time_spent_in_thread_%s_ms" name)
       ; help = Printf.sprintf "Total number of ms spent on '%s'" name
       ; metric_type = Counter
       ; label_names = []
       }
     in
     let collect () =
-      let elapsed = Option.value_exn (O1trace.Thread.get_elapsed_time name) in
+      let elapsed =
+        Option.value_exn (O1trace.Execution_timer.elapsed_time_of_thread thread)
+      in
       LabelSetMap.singleton []
         [ Sample_set.sample (Time_ns.Span.to_ms elapsed) ]
     in
     CollectorRegistry.register CollectorRegistry.default info collect
 
   let sync_metrics () =
-    O1trace.Thread.iter_threads ~f:(fun name ->
+    O1trace.Thread.iter_threads ~f:(fun thread ->
+        let name = O1trace.Thread.name thread in
         if not (Hashtbl.mem tracked_metrics name) then
-          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric name))
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread))
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
 end
@@ -1540,9 +1546,8 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
 type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
-  don't_wait_for
-    (O1trace.time_execution "collecting_gc_metrics" Runtime.gc_stat) ;
-  O1trace.time_execution "serving_metrics"
+  O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
+  O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
        ~registry:CollectorRegistry.default)
 

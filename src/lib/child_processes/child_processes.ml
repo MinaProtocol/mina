@@ -258,20 +258,16 @@ let start_custom :
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe =
-    O1trace.time_execution "in_libp2p_child_processes_stdout" (fun () ->
-        reader_to_strict_pipe (Process.stdout process) (name ^ "-stdout") stdout)
+    reader_to_strict_pipe (Process.stdout process) (name ^ "-stdout") stdout
   in
   let stderr_pipe =
-    O1trace.time_execution "in_libp2p_child_processes_stderr" (fun () ->
-        reader_to_strict_pipe (Process.stderr process) (name ^ "-stderr") stderr)
+    reader_to_strict_pipe (Process.stderr process) (name ^ "-stderr") stderr
   in
   let t =
     { process
     ; stdout_pipe
     ; stderr_pipe
-    ; stdin =
-        O1trace.time_execution "in_libp2p_child_processes_stdin" (fun () ->
-            Process.stdin process)
+    ; stdin = Process.stdin process
     ; terminated_ivar
     ; killing = false
     ; termination_response = termination

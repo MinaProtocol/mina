@@ -1,7 +1,6 @@
 open Core
 open Async
 open Network_peer
-open O1trace
 open Pipe_lib
 open Mina_base.Rpc_intf
 
@@ -106,8 +105,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               (Network_peer.Peer.to_multiaddr_string peer)
               ()
         | `Within_capacity ->
-            time_execution (Printf.sprintf "handling_rpc_%s" Impl.name)
-              (fun () -> handler peer ~version q)
+            O1trace.thread (Printf.sprintf "handle_rpc_%s" Impl.name) (fun () ->
+                handler peer ~version q)
       in
       Impl.implement_multi handler
 
@@ -172,13 +171,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
           (fun () ->
-            trace "mina_net2" (fun () ->
-                O1trace.time_execution "in_mina_net2" (fun () ->
-                    Mina_net2.create
-                      ~all_peers_seen_metric:config.all_peers_seen_metric
-                      ~on_peer_connected:(fun _ -> record_peer_connection ())
-                      ~on_peer_disconnected:ignore ~logger:config.logger
-                      ~conf_dir ~pids)))
+            O1trace.thread "mina_net2" (fun () ->
+                Mina_net2.create
+                  ~all_peers_seen_metric:config.all_peers_seen_metric
+                  ~on_peer_connected:(fun _ -> record_peer_connection ())
+                  ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
+                  ~pids))
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -289,8 +287,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~on_unknown_rpc:(`Call handle_unknown_rpc)
             in
             let%bind () =
-              O1trace.time_execution "in_gossip_net_handling_protocol_streams"
-                (fun () ->
+              O1trace.thread "handle_protocol_streams" (fun () ->
                   Mina_net2.open_protocol net2 ~on_handler_error:`Raise
                     ~protocol:rpc_transport_proto (fun stream ->
                       let peer = Mina_net2.Libp2p_stream.remote_peer stream in
@@ -513,7 +510,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
       in
       let do_ban (banned_peer, expiration) =
-        O1trace.time_execution "in_gossip_net_executing_bans" (fun () ->
+        O1trace.thread "execute_gossip_net_bans" (fun () ->
             don't_wait_for
               ( Clock.at expiration
               >>= fun () ->
@@ -564,8 +561,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ; restart_helper = (fun () -> Strict_pipe.Writer.write restarts_w ())
         }
       in
-      O1trace.time_execution "in_gossip_net_snapshotting_peers" (fun () ->
-          Clock.every' peers_snapshot_max_staleness (fun () ->
+      Clock.every' peers_snapshot_max_staleness (fun () ->
+          O1trace.thread "snapshot_peers" (fun () ->
               let%map peers = peers t in
               Mina_metrics.(
                 Gauge.set Network.peers (List.length peers |> Int.to_float)) ;

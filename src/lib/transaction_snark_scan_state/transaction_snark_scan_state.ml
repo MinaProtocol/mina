@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Mina_base
 open Currency
-open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -305,17 +304,6 @@ struct
 
   let logger = lazy (Logger.create ())
 
-  let time label f =
-    let logger = Lazy.force logger in
-    let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
-    [%log debug]
-      ~metadata:
-        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
-        ]
-      "%s took $time_elapsed" label ;
-    x
-
   module Timer = struct
     module Info = struct
       module Time_span = struct
@@ -481,10 +469,7 @@ struct
     | Ok None ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-        match%map.Deferred
-          ksprintf time "verify:%s" __LOC__ (fun () ->
-              Verifier.verify ~verifier proofs)
-        with
+        match%map.Deferred Verifier.verify ~verifier proofs with
         | Ok true ->
             Ok res
         | Ok false ->
@@ -503,7 +488,7 @@ struct
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
     match%map
-      time "scan_statement" (fun () ->
+      O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
           scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->

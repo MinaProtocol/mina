@@ -1,28 +1,30 @@
 open Core_kernel
-
-include module type of Intf
+open Async
 
 module Thread : sig
-  val iter_threads : f:(string -> unit) -> unit
+  type t = Thread.t
 
-  val get_elapsed_time : string -> Time_ns.Span.t option
+  val name : t -> string
+
+  val load_state : t -> 'a Type_equal.Id.t -> 'a option
+
+  val set_state : t -> 'a Type_equal.Id.t -> 'a -> unit
+
+  val iter_threads : f:(t -> unit) -> unit
+
+  val dump_thread_graph : unit -> bytes
+
+  module Fiber : sig
+    type t = Thread.Fiber.t = { id : int; parent : t option; thread : Thread.t }
+  end
 end
 
-module No_trace : S_with_hooks
+module Plugins : module type of Plugins
 
-include S
+module Execution_timer : module type of Execution_timer
 
-(** Forget about the current tid and execute [f] with tid=0.
+val background_thread : string -> (unit -> unit Deferred.t) -> unit
 
-    This is useful, for example, when opening a writer. The writer will
-    internally do a lot of work that will show up in the trace when it
-    isn't necessarily desired.
-*)
-val forget_tid : (unit -> 'a) -> 'a
+val thread : string -> (unit -> 'a Deferred.t) -> 'a Deferred.t
 
-val time_execution' : string -> (unit -> 'a) -> 'a
-
-val time_execution : string -> (unit -> 'a) -> 'a
-
-(** Swap the tracing implementation for the one provided in the given module. *)
-val set_implementation : (module S_with_hooks) -> unit
+val sync_thread : string -> (unit -> 'a) -> 'a

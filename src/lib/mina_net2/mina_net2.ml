@@ -334,24 +334,24 @@ let handle_push_message t push_message =
   let open Libp2p_ipc.Reader in
   let open DaemonInterface in
   let open PushMessage in
+  let handle name f =
+    O1trace.sync_thread ("handle_libp2p_ipc_push_" ^ name) f
+  in
   match push_message with
   | PeerConnected m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_peer_connected" (fun () ->
+      handle "handle_libp2p_ipc_push_peer_connected" (fun () ->
           let peer_id =
             Libp2p_ipc.unsafe_parse_peer_id (PeerConnected.peer_id_get m)
           in
           t.peer_connected_callback peer_id)
   | PeerDisconnected m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_peer_disconnected" (fun () ->
+      handle "handle_libp2p_helper_subprocess_push_peer_disconnected" (fun () ->
           let peer_id =
             Libp2p_ipc.unsafe_parse_peer_id (PeerDisconnected.peer_id_get m)
           in
           t.peer_disconnected_callback peer_id)
   | GossipReceived m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_gossip_received" (fun () ->
+      handle "handle_libp2p_helper_subprocess_push_gossip_received" (fun () ->
           let open GossipReceived in
           let data = data_get m in
           let subscription_id = subscription_id_get m in
@@ -363,7 +363,7 @@ let handle_push_message t push_message =
           match Hashtbl.find t.subscriptions subscription_id with
           | Some (Subscription.E sub) ->
               upon
-                (O1trace.time_execution "validating_libp2p_gossip" (fun () ->
+                (O1trace.thread "validate_libp2p_gossip" (fun () ->
                      Subscription.handle_and_validate sub ~validation_expiration
                        ~sender ~data))
                 (function
@@ -396,8 +396,7 @@ let handle_push_message t push_message =
                   ])
   (* A new inbound stream was opened *)
   | IncomingStream m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_incoming_stream" (fun () ->
+      handle "handle_libp2p_helper_subprocess_push_incoming_stream" (fun () ->
           let open IncomingStream in
           let stream_id = stream_id_get m in
           let protocol = protocol_get m in
@@ -420,41 +419,40 @@ let handle_push_message t push_message =
                 Hashtbl.add_exn t.streams
                   ~key:(Libp2p_ipc.stream_id_to_string stream_id)
                   ~data:stream ;
-                O1trace.time_execution "dispatching_libp2p_stream_handler"
+                O1trace.background_thread "dispatch_libp2p_stream_handler"
                   (fun () ->
-                    don't_wait_for
-                      (let open Deferred.Let_syntax in
-                      (* Call the protocol handler. If it throws an exception,
-                          handle it according to [on_handler_error]. Mimics
-                          [Tcp.Server.create]. See [handle_protocol] doc comment.
-                      *)
-                      match%map
-                        Monitor.try_with ~here:[%here] ~extract_exn:true
-                          (fun () -> ph.handler stream)
-                      with
-                      | Ok () ->
-                          ()
-                      | Error e -> (
-                          try
-                            match ph.on_handler_error with
-                            | `Raise ->
-                                raise e
-                            | `Ignore ->
-                                ()
-                            | `Call f ->
-                                f stream e
-                          with handler_exn ->
-                            ph.closed <- true ;
-                            don't_wait_for
-                              (let%map result =
-                                 Libp2p_helper.do_rpc t.helper
-                                   (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
-                                   (Libp2p_ipc.Rpcs.RemoveStreamHandler
-                                    .create_request ~protocol)
-                               in
-                               if Or_error.is_ok result then
-                                 Hashtbl.remove t.protocol_handlers protocol) ;
-                            raise handler_exn ))) )
+                    let open Deferred.Let_syntax in
+                    (* Call the protocol handler. If it throws an exception,
+                        handle it according to [on_handler_error]. Mimics
+                        [Tcp.Server.create]. See [handle_protocol] doc comment.
+                    *)
+                    match%map
+                      Monitor.try_with ~here:[%here] ~extract_exn:true
+                        (fun () -> ph.handler stream)
+                    with
+                    | Ok () ->
+                        ()
+                    | Error e -> (
+                        try
+                          match ph.on_handler_error with
+                          | `Raise ->
+                              raise e
+                          | `Ignore ->
+                              ()
+                          | `Call f ->
+                              f stream e
+                        with handler_exn ->
+                          ph.closed <- true ;
+                          don't_wait_for
+                            (let%map result =
+                               Libp2p_helper.do_rpc t.helper
+                                 (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
+                                 (Libp2p_ipc.Rpcs.RemoveStreamHandler
+                                  .create_request ~protocol)
+                             in
+                             if Or_error.is_ok result then
+                               Hashtbl.remove t.protocol_handlers protocol) ;
+                          raise handler_exn )) )
               else
                 (* silently ignore new streams for closed protocol handlers.
                     these are buffered stream open RPCs that were enqueued before
@@ -469,8 +467,7 @@ let handle_push_message t push_message =
                 "incoming stream for protocol we don't know about?")
   (* Received a message on some stream *)
   | StreamMessageReceived m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_stream_message_received"
+      handle "handle_libp2p_helper_subprocess_push_stream_message_received"
         (fun () ->
           let open StreamMessageReceived in
           let open StreamMessage in
@@ -487,8 +484,7 @@ let handle_push_message t push_message =
                 "incoming stream message for stream we don't know about?")
   (* Stream was reset, either by the remote peer or an error on our end. *)
   | StreamLost m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_stream_lost" (fun () ->
+      handle "handle_libp2p_helper_subprocess_push_stream_lost" (fun () ->
           let open StreamLost in
           let stream_id = stream_id_get m in
           let reason = reason_get m in
@@ -510,8 +506,7 @@ let handle_push_message t push_message =
               ])
   (* The remote peer closed its write end of one of our streams *)
   | StreamComplete m ->
-      O1trace.time_execution'
-        "handling_libp2p_helper_subprocess_push_stream_complete" (fun () ->
+      handle "handle_libp2p_helper_subprocess_push_stream_complete" (fun () ->
           let open StreamComplete in
           let stream_id = stream_id_get m in
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
@@ -540,7 +535,7 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
           "received push message from libp2p_helper before handler was attached")
   in
   let%bind helper =
-    O1trace.time_execution "managing_libp2p_helper_subprocess" (fun () ->
+    O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
         Libp2p_helper.spawn ~logger ~pids ~conf_dir
           ~handle_push_message:(fun _helper msg ->
             Deferred.return (!push_message_handler msg)))

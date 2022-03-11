@@ -14,7 +14,6 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open O1trace
 open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
@@ -240,8 +239,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
       ~precomputed_values
   in
-  ignore
-    ( Reader.Merge.iter
+  O1trace.background_thread "process_blocks" (fun () ->
+      Reader.Merge.iter
         (* It is fine to skip the cache layer on blocks produced by this node
            * because it is extraordinarily unlikely we would write an internal bug
            * triggering this case, and the external case (where we received an
@@ -261,7 +260,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
-          trace_recurring "transition_handler_processor" (fun () ->
+          O1trace.thread "transition_handler_processor" (fun () ->
               match msg with
               | `Catchup_breadcrumbs
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -334,8 +333,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                     Gauge.dec_one
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition transition ->
-                  process_transition ~transition))
-      : unit Deferred.t )
+                  process_transition ~transition)))
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
