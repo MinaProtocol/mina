@@ -44,9 +44,12 @@ function deferred_bind(deferred, func) {
     promise: deferred.promise
       .then(func)
       .then(function (anotherDeferred) {
-        newDeferred.value = anotherDeferred.value;
+        return anotherDeferred.promise;
+      })
+      .then(function (value) {
+        newDeferred.value = value;
         newDeferred.isDetermined = true;
-        return anotherDeferred.value;
+        return value;
       })
       .catch(function (err) {
         newDeferred.error = err;
