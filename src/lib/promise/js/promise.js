@@ -69,6 +69,15 @@ function deferred_bind(deferred, func) {
 
 // Provides: deferred_upon
 function deferred_upon(deferred, func) {
+  deferred.promise
+    .then(function () {
+      func(deferred.value);
+    })
+    .catch(function () {});
+}
+
+// Provides: deferred_upon_exn
+function deferred_upon_exn(deferred, func) {
   deferred.promise.then(function () {
     func(deferred.value);
   });

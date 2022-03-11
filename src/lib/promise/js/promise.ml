@@ -11,6 +11,8 @@ external bind : 'a t -> f:('a -> 'b t) -> 'b t = "deferred_bind"
 
 external upon : 'a t -> ('a -> unit) -> unit = "deferred_upon"
 
+external upon_exn : 'a t -> ('a -> unit) -> unit = "deferred_upon_exn"
+
 external is_determined : 'a t -> bool = "deferred_is_determined"
 
 external peek : 'a t -> 'a option = "deferred_peek"
@@ -24,7 +26,7 @@ external create : (('a -> unit) -> unit) -> 'a t = "deferred_create"
 let to_deferred promise =
   let module Ivar = Async_kernel.Ivar in
   let ivar = Ivar.create () in
-  upon promise (fun x -> Ivar.fill ivar x) ;
+  upon_exn promise (fun x -> Ivar.fill ivar x) ;
   Ivar.read ivar
 
 include Base.Monad.Make (struct
