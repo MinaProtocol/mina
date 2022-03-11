@@ -697,7 +697,7 @@ macro_rules! impl_proof {
             }
 
             #[wasm_bindgen]
-            pub fn [<$name:snake batch_verify>](
+            pub fn [<$name:snake _batch_verify>](
                 lgr_comms: WasmVecVecPolyComm,
                 indexes: WasmVector<$WasmVerifierIndex>,
                 proofs: WasmVector<WasmProverProof>,
