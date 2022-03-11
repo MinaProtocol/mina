@@ -27,6 +27,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
+    TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "archive-node" dependsOn,
     TestExecutive.execute "snapps" dependsOn
