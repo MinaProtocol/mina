@@ -65,7 +65,9 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Promise.t
+  val verify : (statement * t) list -> bool Deferred.t
+
+  val verify_promise : (statement * t) list -> bool Promise.t
 end
 
 module Proof : sig

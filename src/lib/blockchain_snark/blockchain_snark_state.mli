@@ -30,14 +30,10 @@ val check :
   -> unit Or_error.t
 
 module type S = sig
-  module Proof : sig
-    include
-      Pickles.Proof_intf
-        with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
-         and type statement = Protocol_state.Value.t
-
-    val verify : (statement * t) list -> bool Async.Deferred.t
-  end
+  module Proof :
+    Pickles.Proof_intf
+      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+       and type statement = Protocol_state.Value.t
 
   val tag : tag
 
