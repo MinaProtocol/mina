@@ -1687,29 +1687,25 @@ let%test_module _ =
       let txns =
         Test.Resource_pool.transactions pool ~logger |> Sequence.to_list
       in
-      let fee_wu_sorted_txns =
-        List.stable_sort txns ~compare:(fun txn1 txn2 ->
-            let open Transaction_hash.User_command_with_valid_signature in
-            let cmd1 = command txn1 in
-            let cmd2 = command txn2 in
-            (* ascending order of nonces, if same fee payer *)
-            if
-              Account_id.equal
-                (User_command.fee_payer cmd1)
-                (User_command.fee_payer cmd2)
-            then
-              Account.Nonce.compare
-                (User_command.nonce_exn cmd1)
-                (User_command.nonce_exn cmd2)
-            else
-              let get_fee_wu cmd = User_command.fee_per_wu cmd in
-              (* descending order of fee/weight *)
-              Int.neg
-              @@ Currency.Fee_rate.compare (get_fee_wu cmd1) (get_fee_wu cmd2))
+      let compare txn1 txn2 =
+        let open Transaction_hash.User_command_with_valid_signature in
+        let cmd1 = command txn1 in
+        let cmd2 = command txn2 in
+        (* ascending order of nonces, if same fee payer *)
+        if
+          Account_id.equal
+            (User_command.fee_payer cmd1)
+            (User_command.fee_payer cmd2)
+        then
+          Account.Nonce.compare
+            (User_command.nonce_exn cmd1)
+            (User_command.nonce_exn cmd2)
+        else
+          let get_fee_wu cmd = User_command.fee_per_wu cmd in
+          (* descending order of fee/weight *)
+          Currency.Fee_rate.compare (get_fee_wu cmd2) (get_fee_wu cmd1)
       in
-      assert (
-        [%equal: Transaction_hash.User_command_with_valid_signature.t list] txns
-          fee_wu_sorted_txns )
+      assert (List.is_sorted txns ~compare)
 
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
