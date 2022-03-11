@@ -38,6 +38,9 @@ let parse_field_element_or_hash_string s ~f =
                 (%s, %s)"
                (Error.to_string_hum e1) (Error.to_string_hum e2)) )
 
+let `VK vk, `Prover snapp_prover =
+  Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+
 let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
@@ -50,7 +53,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
     |> Or_error.ok_exn
   in
   let _v =
-    Option.value_map snapp_account ~default:() ~f:(fun (pk, vk) ->
+    Option.value_map snapp_account ~default:() ~f:(fun pk ->
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_int 1000000000000)) with
@@ -338,16 +341,17 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -401,14 +405,15 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
@@ -434,16 +439,17 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -469,14 +475,15 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
@@ -502,16 +509,17 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -536,15 +544,16 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_states ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   (*Util.print_snapp_transaction parties ;*)
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
