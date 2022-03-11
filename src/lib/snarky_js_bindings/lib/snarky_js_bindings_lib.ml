@@ -1744,7 +1744,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let verify (statement_js : snapp_statement_js) (proof : proof) =
     let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
-    Proof.verify [ (statement, proof) ] |> Promise_js_helpers.to_js
+    Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
     val provers = provers |> to_js_provers |> Array.of_list |> Js.array
