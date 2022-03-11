@@ -7,6 +7,89 @@ open Core_kernel
    and update the code following it
 *)
 module Failure = struct
+  module Permission = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Balance
+          | Timing_existing_account
+          | Delegate
+          | App_state
+          | Verification_key
+          | Sequence_state
+          | Snapp_uri
+          | Token_symbol
+          | Permissions
+          | Nonce
+          | Voting_for
+        [@@deriving sexp, yojson, equal, compare, enum, hash, variants]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let all =
+      let add acc var = var.Variantslib.Variant.constructor :: acc in
+      Variants.fold ~init:[] ~balance:add ~timing_existing_account:add
+        ~delegate:add ~app_state:add ~verification_key:add ~sequence_state:add
+        ~snapp_uri:add ~token_symbol:add ~permissions:add ~nonce:add
+        ~voting_for:add
+
+    let to_string x = Variants.to_name x
+
+    let of_string = function
+      | "Balance" ->
+          Ok Balance
+      | "Timing_existing_account" ->
+          Ok Timing_existing_account
+      | "Delegate" ->
+          Ok Delegate
+      | "App_state" ->
+          Ok App_state
+      | "Verification_key" ->
+          Ok Verification_key
+      | "Sequence_state" ->
+          Ok Sequence_state
+      | "Snapp_uri" ->
+          Ok Snapp_uri
+      | "Token_symbol" ->
+          Ok Token_symbol
+      | "Permissions" ->
+          Ok Permissions
+      | "Nonce" ->
+          Ok Nonce
+      | "Voting_for" ->
+          Ok Voting_for
+      | _ ->
+          Error
+            "Signed_command_status.Failure.Permission.of_string: Unknown value"
+
+    let describe = function
+      | Balance ->
+          "balance"
+      | Timing_existing_account ->
+          "timing because the account already exists"
+      | Delegate ->
+          "delegate"
+      | App_state ->
+          "app state"
+      | Verification_key ->
+          "verification key"
+      | Sequence_state ->
+          "sequence state"
+      | Snapp_uri ->
+          "snapp URI"
+      | Token_symbol ->
+          "token symbol"
+      | Permissions ->
+          "permissions"
+      | Nonce ->
+          "nonce"
+      | Voting_for ->
+          "voted-for state hash"
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -24,22 +107,12 @@ module Failure = struct
         | Overflow
         | Signed_command_on_snapp_account
         | Snapp_account_not_present
-        | Update_not_permitted_balance
-        | Update_not_permitted_timing_existing_account
-        | Update_not_permitted_delegate
-        | Update_not_permitted_app_state
-        | Update_not_permitted_verification_key
-        | Update_not_permitted_sequence_state
-        | Update_not_permitted_snapp_uri
-        | Update_not_permitted_token_symbol
-        | Update_not_permitted_permissions
-        | Update_not_permitted_nonce
-        | Update_not_permitted_voting_for
+        | Update_not_permitted of Permission.Stable.V1.t
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Incorrect_nonce
         | Invalid_fee_excess
-      [@@deriving sexp, yojson, equal, compare, enum, hash]
+      [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
     end
@@ -51,73 +124,27 @@ module Failure = struct
 
   let failure_max = max
 
-  let failure_num_bits =
-    let num_values = failure_max - failure_min + 1 in
-    Int.ceil_log2 num_values
+  let all =
+    let add acc var = var.Variantslib.Variant.constructor :: acc in
+    Variants.fold ~init:[] ~predicate:add ~source_not_present:add
+      ~receiver_not_present:add ~amount_insufficient_to_create_account:add
+      ~cannot_pay_creation_fee_in_token:add ~source_insufficient_balance:add
+      ~source_minimum_balance_violation:add ~receiver_already_exists:add
+      ~not_token_owner:add ~mismatched_token_permissions:add ~overflow:add
+      ~signed_command_on_snapp_account:add ~snapp_account_not_present:add
+      ~update_not_permitted:(fun acc { Variantslib.Variant.constructor; _ } ->
+        List.rev_append (List.rev_map ~f:constructor Permission.all) acc)
+      ~parties_replay_check_failed:add ~fee_payer_nonce_must_increase:add
+      ~incorrect_nonce:add ~invalid_fee_excess:add
 
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%map ndx = Int.gen_uniform_incl failure_min failure_max in
-    (* bounds are checked, of_enum always returns Some *)
-    Option.value_exn (of_enum ndx)
+  let gen = Quickcheck.Generator.of_list all
 
-  let to_string = function
-    | Predicate ->
-        "Predicate"
-    | Source_not_present ->
-        "Source_not_present"
-    | Receiver_not_present ->
-        "Receiver_not_present"
-    | Amount_insufficient_to_create_account ->
-        "Amount_insufficient_to_create_account"
-    | Cannot_pay_creation_fee_in_token ->
-        "Cannot_pay_creation_fee_in_token"
-    | Source_insufficient_balance ->
-        "Source_insufficient_balance"
-    | Source_minimum_balance_violation ->
-        "Source_minimum_balance_violation"
-    | Receiver_already_exists ->
-        "Receiver_already_exists"
-    | Not_token_owner ->
-        "Not_token_owner"
-    | Mismatched_token_permissions ->
-        "Mismatched_token_permissions"
-    | Overflow ->
-        "Overflow"
-    | Signed_command_on_snapp_account ->
-        "Signed_command_on_snapp_account"
-    | Snapp_account_not_present ->
-        "Snapp_account_not_present"
-    | Update_not_permitted_balance ->
-        "Update_not_permitted_balance"
-    | Update_not_permitted_timing_existing_account ->
-        "Update_not_permitted_timing_existing_account"
-    | Update_not_permitted_delegate ->
-        "update_not_permitted_delegate"
-    | Update_not_permitted_app_state ->
-        "Update_not_permitted_app_state"
-    | Update_not_permitted_verification_key ->
-        "Update_not_permitted_verification_key"
-    | Update_not_permitted_sequence_state ->
-        "Update_not_permitted_sequence_state"
-    | Update_not_permitted_snapp_uri ->
-        "Update_not_permitted_snapp_uri"
-    | Update_not_permitted_token_symbol ->
-        "Update_not_permitted_token_symbol"
-    | Update_not_permitted_permissions ->
-        "Update_not_permitted_permissions"
-    | Update_not_permitted_nonce ->
-        "Update_not_permitted_nonce"
-    | Update_not_permitted_voting_for ->
-        "Update_not_permitted_voting_for"
-    | Parties_replay_check_failed ->
-        "Parties_replay_check_failed"
-    | Fee_payer_nonce_must_increase ->
-        "Fee_payer_nonce_must_increase"
-    | Incorrect_nonce ->
-        "Incorrect_nonce"
-    | Invalid_fee_excess ->
-        "Invalid_fee_excess"
+  let to_string x =
+    match x with
+    | Update_not_permitted permission ->
+        sprintf "Update_not_permitted(%s)" (Permission.to_string permission)
+    | _ ->
+        Variants.to_name x
 
   let of_string = function
     | "Predicate" ->
@@ -146,28 +173,6 @@ module Failure = struct
         Ok Signed_command_on_snapp_account
     | "Snapp_account_not_present" ->
         Ok Snapp_account_not_present
-    | "Update_not_permitted_balance" ->
-        Ok Update_not_permitted_balance
-    | "Update_not_permitted_timing_existing_account" ->
-        Ok Update_not_permitted_timing_existing_account
-    | "update_not_permitted_delegate" ->
-        Ok Update_not_permitted_delegate
-    | "Update_not_permitted_app_state" ->
-        Ok Update_not_permitted_app_state
-    | "Update_not_permitted_verification_key" ->
-        Ok Update_not_permitted_verification_key
-    | "Update_not_permitted_sequence_state" ->
-        Ok Update_not_permitted_sequence_state
-    | "Update_not_permitted_snapp_uri" ->
-        Ok Update_not_permitted_snapp_uri
-    | "Update_not_permitted_token_symbol" ->
-        Ok Update_not_permitted_token_symbol
-    | "Update_not_permitted_permissions" ->
-        Ok Update_not_permitted_permissions
-    | "Update_not_permitted_nonce" ->
-        Ok Update_not_permitted_nonce
-    | "Update_not_permitted_voting_for" ->
-        Ok Update_not_permitted_voting_for
     | "Parties_replay_check_failed" ->
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
@@ -176,16 +181,28 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
-    | _ ->
-        Error "Signed_command_status.Failure.of_string: Unknown value"
+    | s ->
+        let open Result.Let_syntax in
+        let failure =
+          Error "Signed_command_status.Failure.of_string: Unknown value"
+        in
+        let prefix = "Update_not_permitted(" in
+        if String.is_prefix s ~prefix then
+          let%bind permission =
+            Permission.of_string
+              (String.sub s ~pos:(String.length prefix)
+                 ~len:(String.length s - String.length prefix - 1))
+          in
+          if Char.equal s.[String.length s - 1] ')' then
+            Ok (Update_not_permitted permission)
+          else failure
+        else failure
 
   let%test_unit "of_string(to_string) roundtrip" =
-    for i = failure_min to failure_max do
-      let failure = Option.value_exn (of_enum i) in
-      [%test_eq: (t, string) Result.t]
-        (of_string (to_string failure))
-        (Ok failure)
-    done
+    List.iter all ~f:(fun failure ->
+        [%test_eq: (t, string) Result.t]
+          (of_string (to_string failure))
+          (Ok failure))
 
   let describe = function
     | Predicate ->
@@ -216,38 +233,11 @@ module Failure = struct
         "The source of a signed command cannot be a snapp account"
     | Snapp_account_not_present ->
         "A snapp account does not exist"
-    | Update_not_permitted_balance ->
-        "The authentication for an account didn't allow the requested update \
-         to its balance"
-    | Update_not_permitted_timing_existing_account ->
-        "The timing of an existing account cannot be updated"
-    | Update_not_permitted_delegate ->
-        "The authentication for an account didn't allow the requested update \
-         to its delegate"
-    | Update_not_permitted_app_state ->
-        "The authentication for an account didn't allow the requested update \
-         to its app state"
-    | Update_not_permitted_verification_key ->
-        "The authentication for an account didn't allow the requested update \
-         to its verification key"
-    | Update_not_permitted_sequence_state ->
-        "The authentication for an account didn't allow the requested update \
-         to its sequence state"
-    | Update_not_permitted_snapp_uri ->
-        "The authentication for an account didn't allow the requested update \
-         to its snapp URI"
-    | Update_not_permitted_token_symbol ->
-        "The authentication for an account didn't allow the requested update \
-         to its token symbol"
-    | Update_not_permitted_permissions ->
-        "The authentication for an account didn't allow the requested update \
-         to its permissions"
-    | Update_not_permitted_nonce ->
-        "The authentication for an account didn't allow the requested update \
-         to its nonce"
-    | Update_not_permitted_voting_for ->
-        "The authentication for an account didn't allow the requested update \
-         to its voted-for state hash"
+    | Update_not_permitted permission ->
+        sprintf
+          "The authentication for an account didn't allow the requested update \
+           to its %s"
+          (Permission.describe permission)
     | Parties_replay_check_failed ->
         "Check to avoid replays failed. The party must increment nonce or use \
          full commitment if the authorization is a signature"

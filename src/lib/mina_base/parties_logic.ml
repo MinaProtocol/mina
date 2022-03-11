@@ -901,7 +901,7 @@ module Make (Inputs : Inputs_intf) = struct
       let timing = Party.Update.timing party in
       let local_state =
         Local_state.add_check local_state
-          Update_not_permitted_timing_existing_account
+          (Update_not_permitted Timing_existing_account)
           Bool.(account_is_new ||| Set_or_keep.is_keep timing)
       in
       let timing =
@@ -946,7 +946,7 @@ module Make (Inputs : Inputs_intf) = struct
         let has_permission =
           Controller.check ~proof_verifies ~signature_verifies controller
         in
-        Local_state.add_check local_state Update_not_permitted_balance
+        Local_state.add_check local_state (Update_not_permitted Balance)
           Bool.(
             has_permission
             ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
@@ -1022,7 +1022,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.edit_state a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
+        Local_state.add_check local_state (Update_not_permitted App_state)
           Bool.(keeping_app_state ||| has_permission)
       in
       let app_state =
@@ -1040,7 +1040,8 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_verification_key a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
+        Local_state.add_check local_state
+          (Update_not_permitted Verification_key)
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
       let verification_key =
@@ -1078,7 +1079,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.edit_sequence_state a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_sequence_state
+        Local_state.add_check local_state (Update_not_permitted Sequence_state)
           Bool.(is_empty ||| has_permission)
       in
       let a =
@@ -1098,7 +1099,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_snapp_uri a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_snapp_uri
+        Local_state.add_check local_state (Update_not_permitted Snapp_uri)
           Bool.(Set_or_keep.is_keep snapp_uri ||| has_permission)
       in
       let snapp_uri =
@@ -1116,7 +1117,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_token_symbol a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_token_symbol
+        Local_state.add_check local_state (Update_not_permitted Token_symbol)
           Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
       in
       let token_symbol =
@@ -1146,7 +1147,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let local_state =
         (* Note: only accounts for the default token can delegate. *)
-        Local_state.add_check local_state Update_not_permitted_delegate
+        Local_state.add_check local_state (Update_not_permitted Delegate)
           Bool.(
             Set_or_keep.is_keep delegate
             ||| has_permission &&& party_token_is_default)
@@ -1169,7 +1170,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.increment_nonce a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_nonce
+        Local_state.add_check local_state (Update_not_permitted Nonce)
           Bool.((not increment_nonce) ||| has_permission)
       in
       let a = Account.set_nonce nonce a in
@@ -1183,7 +1184,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_voting_for a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_voting_for
+        Local_state.add_check local_state (Update_not_permitted Voting_for)
           Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
       in
       let voting_for =
@@ -1205,7 +1206,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_permissions a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_permissions
+        Local_state.add_check local_state (Update_not_permitted Permissions)
           Bool.(Set_or_keep.is_keep permissions ||| has_permission)
       in
       let permissions =
