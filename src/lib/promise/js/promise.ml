@@ -19,6 +19,17 @@ external value_exn : 'a t -> 'a = "deferred_value_exn"
 
 external return : 'a -> 'a t = "deferred_return"
 
+external create : (('a -> unit) -> unit) -> 'a t = "deferred_create"
+
+let to_deferred promise =
+  let module Ivar = Async_kernel.Ivar in
+  let ivar = Ivar.create () in
+  upon promise (fun x -> Ivar.fill ivar x) ;
+  Ivar.read ivar
+
+let of_deferred deferred =
+  create (fun resolve -> Async_kernel.Deferred.upon deferred resolve)
+
 include Base.Monad.Make (struct
   type nonrec 'a t = 'a t
 

@@ -267,8 +267,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let pi : Pickles.Side_loaded.Proof.t =
             (fun () ->
-              ringsig_prover ~handler [] tx_statement
-              |> Promise_native_helpers.to_deferred)
+              ringsig_prover ~handler [] tx_statement |> Promise.to_deferred)
             |> Async.Thread_safe.block_on_async_exn
           in
           let fee_payer =
