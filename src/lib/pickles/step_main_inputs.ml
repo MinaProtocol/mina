@@ -8,7 +8,7 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map pasta_p_3 ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_p_kimchi ~f:Impl.Field.Constant.of_string)
 
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (bits_random_oracle ~length s)

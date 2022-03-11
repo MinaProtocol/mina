@@ -30,43 +30,48 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
       n =
     let open Malleable_error.Let_syntax in
-    let rec go n =
-      if n = 0 then return ()
+    let rec go n noncelist =
+      if n = 0 then return noncelist
       else
-        let%bind () =
-          let%map () =
+        let%bind nonce =
+          let%map { nonce; _ } =
             Network.Node.must_send_payment ~logger ~sender_pub_key
               ~receiver_pub_key ~amount ~fee node
           in
-          [%log info] "gossip_consistency test: payment #%d sent." n ;
-          ()
+          [%log info] "gossip_consistency test: payment #%d sent with nonce %d."
+            n
+            (Mina_numbers.Account_nonce.to_int nonce) ;
+          nonce
         in
-        go (n - 1)
+        go (n - 1) (List.append noncelist [ nonce ])
     in
-    go n
+    go n []
 
-  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount n
-      =
+  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount
+      ~noncelist n =
     let open Malleable_error.Let_syntax in
-    let rec go n =
+    let rec go n noncelist =
       if n = 0 then return ()
       else
         (* confirm payment *)
         let%bind () =
+          let nonce = List.hd_exn noncelist in
           let%map () =
             wait_for dsl
-              (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-                 ~receiver_pub_key ~amount)
+              (Wait_condition.signed_command_to_be_included_in_frontier
+                 ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+                 ~command_type:Send_payment)
           in
           [%log info]
-            "gossip_consistency test: payment #%d successfully included in \
-             frontier."
-            n ;
+            "gossip_consistency test: payment #%d with nonce %d successfully \
+             included in frontier."
+            n
+            (Mina_numbers.Account_nonce.to_int nonce) ;
           ()
         in
-        go (n - 1)
+        go (n - 1) (List.tl_exn noncelist)
     in
-    go n
+    go n noncelist
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -88,7 +93,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
-    let%bind () =
+    let%bind noncelist =
       send_payments ~logger ~sender_pub_key ~receiver_pub_key ~node:sender_bp
         ~fee ~amount num_payments
     in
@@ -97,7 +102,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        payments" ;
     let%bind () =
       wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
-        num_payments
+        ~noncelist num_payments
     in
     [%log info] "gossip_consistency test: finished waiting for payments" ;
     let gossip_states = (network_state t).gossip_received in
