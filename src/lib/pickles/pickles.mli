@@ -217,7 +217,7 @@ end
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
-val compile :
+val compile_promise :
      ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
@@ -249,4 +249,41 @@ val compile :
        , 'heightss
        , 'a_value
        , ('max_branching, 'max_branching) Proof.t Promise.t )
+       H3_2.T(Prover).t
+
+(** This compiles a series of inductive rules defining a set into a proof
+    system for proving membership in that set, with a prover corresponding
+    to each inductive rule. *)
+val compile :
+     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> ?cache:Key_cache.Spec.t list
+  -> ?disk_keys:
+       (Cache.Step.Key.Verification.t, 'branches) Vector.t
+       * Cache.Wrap.Key.Verification.t
+  -> (module Statement_var_intf with type t = 'a_var)
+  -> (module Statement_value_intf with type t = 'a_value)
+  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> branches:(module Nat.Intf with type n = 'branches)
+  -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
+  -> name:string
+  -> constraint_constants:Snark_keys_header.Constraint_constants.t
+  -> choices:
+       (   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+        -> ( 'prev_varss
+           , 'prev_valuess
+           , 'widthss
+           , 'heightss
+           , 'a_var
+           , 'a_value )
+           H4_2.T(Inductive_rule).t)
+  -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     * Cache_handle.t
+     * (module Proof_intf
+          with type t = ('max_branching, 'max_branching) Proof.t
+           and type statement = 'a_value)
+     * ( 'prev_valuess
+       , 'widthss
+       , 'heightss
+       , 'a_value
+       , ('max_branching, 'max_branching) Proof.t Deferred.t )
        H3_2.T(Prover).t

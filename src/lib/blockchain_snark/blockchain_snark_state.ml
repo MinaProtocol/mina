@@ -428,8 +428,7 @@ end) : S = struct
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ])
 
-  let step witness ?handler prevs statement =
-    (with_handler step) witness ?handler prevs statement |> Promise.to_deferred
+  let step = with_handler step
 
   let constraint_system_digests =
     lazy (constraint_system_digests ~proof_level ~constraint_constants ())

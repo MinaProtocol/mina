@@ -899,7 +899,7 @@ module Side_loaded = struct
         |> Verify.verify_heterogenous)
 end
 
-let compile :
+let compile_promise :
     type a_var a_value prev_varss prev_valuess widthss heightss max_branching branches.
        ?self:(a_var, a_value, max_branching, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
@@ -982,6 +982,25 @@ let compile :
   end in
   (self, cache_handle, (module P), provers)
 
+let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches ~max_branching
+    ~name ~constraint_constants ~choices =
+  let self, cache_handle, proof_module, provers =
+    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
+      ~max_branching ~name ~constraint_constants ~choices
+  in
+  let rec adjust_provers :
+      type a1 a2 a3 s1 s2_inner.
+         (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+      -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+    | [] ->
+        []
+    | prover :: tl ->
+        (fun ?handler stmt_with_proof public_input ->
+          Promise.to_deferred (prover ?handler stmt_with_proof public_input))
+        :: adjust_provers tl
+  in
+  (self, cache_handle, proof_module, adjust_provers provers)
+
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
@@ -1012,7 +1031,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile
+            compile_promise
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ
