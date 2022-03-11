@@ -28,7 +28,6 @@
    precomputed_values
    consensus
    network_peer
-   base58_check
    mina_transition
    mina_ledger
    mina_base

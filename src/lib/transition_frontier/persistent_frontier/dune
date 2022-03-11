@@ -7,10 +7,8 @@
    result
    bin_prot.shape
    core_kernel
-   yojson
    async
    core
-   rpc_parallel
    async_kernel
    base.caml
    sexplib0
@@ -23,7 +21,6 @@
    data_hash_lib
    logger
    otp_lib
-   signature_lib
    consensus
    mina_ledger
    file_system
@@ -34,8 +31,6 @@
    transition_frontier_extensions
    mina_base
    rocksdb
-   mina_intf
-   storage
    mina_transition
    mina_state
    genesis_constants
