@@ -10,9 +10,9 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
 use kimchi::circuits::scalars::ProofEvaluations;
-use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::prover_index::Index;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
