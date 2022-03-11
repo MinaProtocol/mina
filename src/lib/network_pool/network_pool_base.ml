@@ -227,7 +227,7 @@ end)
     in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Deferred.don't_wait_for
-      (O1trace.thread (Printf.sprintf "in_%s" Resource_pool.label) (fun () ->
+      (O1trace.thread Resource_pool.label (fun () ->
            Strict_pipe.Reader.Merge.iter
              [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
                    `Transition_frontier_extension diff)
@@ -319,7 +319,7 @@ end)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
-    O1trace.background_thread Resource_pool.label (fun () ->
+    O1trace.background_thread ("rebroadcast_" ^ Resource_pool.label ^ "_diffs") (fun () ->
         rebroadcast_loop t logger) ;
     t
 end

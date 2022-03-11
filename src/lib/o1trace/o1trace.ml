@@ -4,6 +4,8 @@ module Execution_timer = Execution_timer
 module Plugins = Plugins
 module Thread = Thread
 
+let logger = Logger.create ()
+
 (* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
 let () = Plugins.enable_plugin (module Execution_timer)
 
@@ -25,17 +27,13 @@ let on_job_exit ctx elapsed_time =
 let current_sync_fiber = ref None
 
 (* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
-let grab_parent_fiber ?ctx () =
-  Writer.(
-    writef (Lazy.force stdout) "have sync fiber: %b, have context: %b\n"
-      (Option.is_some !current_sync_fiber)
-      (Option.is_some ctx)) ;
-  match (!current_sync_fiber, ctx) with
-  | None, None ->
-      None
-  | None, Some ctx ->
+let grab_parent_fiber () =
+  let ctx = Scheduler.current_execution_context () in
+  [%log debug] !"sync_fiber = %{sexp:string option}" (Option.map !current_sync_fiber ~f:(fun f -> f.Thread.Fiber.thread.name)) ;
+  match !current_sync_fiber with
+  | None ->
       Execution_context.find_local ctx Thread.Fiber.ctx_id
-  | Some fiber, _ ->
+  | Some fiber ->
       current_sync_fiber := None ;
       Some fiber
 
@@ -56,10 +54,9 @@ let rec find_recursive_fiber thread_name parent_thread_name
     Option.bind fiber.parent
       ~f:(find_recursive_fiber thread_name parent_thread_name)
 
-let exec_thread ?ctx ~exec_same_thread ~exec_new_thread name =
+let exec_thread ~exec_same_thread ~exec_new_thread name =
   let sync_fiber = !current_sync_fiber in
-  (* mistake is here *)
-  let parent = grab_parent_fiber ?ctx () in
+  let parent = grab_parent_fiber () in
   let parent_name = Option.map parent ~f:(fun p -> p.thread.name) in
   Writer.(
     writef (Lazy.force stdout)
@@ -69,8 +66,15 @@ let exec_thread ?ctx ~exec_same_thread ~exec_new_thread name =
     if
       Option.value_map parent ~default:false ~f:(fun p ->
           String.equal p.thread.name name)
-    then exec_same_thread ()
-    else
+    then (
+      Writer.(
+        writef (Lazy.force stdout)
+          !"execing same thread\n") ;
+      exec_same_thread ())
+    else (
+      Writer.(
+        writef (Lazy.force stdout)
+          !"execing new thread\n") ;
       let fiber =
         match Option.bind parent ~f:(find_recursive_fiber name parent_name) with
         | Some fiber ->
@@ -78,14 +82,14 @@ let exec_thread ?ctx ~exec_same_thread ~exec_new_thread name =
         | None ->
             Thread.Fiber.register name parent
       in
-      exec_new_thread fiber
+      exec_new_thread fiber )
   in
   current_sync_fiber := sync_fiber ;
   result
 
 let thread name f =
-  let ctx = Scheduler.current_execution_context () in
-  exec_thread name ~ctx ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+  exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+      let ctx = Scheduler.current_execution_context () in
       let ctx = Thread.Fiber.apply_to_context fiber ctx in
       match Scheduler.within_context ctx f with
       | Error () ->
@@ -123,9 +127,11 @@ let%test_module "thread tests" =
   ( module struct
     let child_of n =
       match
+        let prev_sync_fiber = !current_sync_fiber in
         let%bind.Option fiber =
-          grab_parent_fiber ~ctx:(Scheduler.current_execution_context ()) ()
+          grab_parent_fiber ()
         in
+        current_sync_fiber := prev_sync_fiber ;
         fiber.parent
       with
       | Some parent ->
@@ -166,13 +172,6 @@ let%test_module "thread tests" =
                       Deferred.unit)) ;
               Deferred.unit))
 
-    let%test_unit "sync_thread > sync_thread" =
-      test' (fun stop ->
-          sync_thread "a" (fun () ->
-              sync_thread "b" (fun () ->
-                  assert (child_of "a") ;
-                  stop ())))
-
     let%test_unit "thread > sync_thread" =
       test (fun stop ->
           thread "a" (fun () ->
@@ -180,6 +179,22 @@ let%test_module "thread tests" =
                   assert (child_of "a") ;
                   stop ()) ;
               Deferred.unit))
+
+    let%test_unit "sync_thread > sync_thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              sync_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop ())))
+
+    let%test_unit "sync_thread > background_thread" =
+      test (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ;
+                  Deferred.unit)) ;
+          Deferred.unit)
 
     let%test_unit "sync_thread > background_thread" =
       test' (fun stop ->
