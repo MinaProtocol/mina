@@ -1720,16 +1720,17 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         }
   in
   let module Proof = (val p) in
-  let to_js_prover prover public_input =
-    (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
-    let prevs = Obj.magic [] in
-    (* let prevs = Statement_with_proof.([]) in *)
-    prover ?handler:None prevs
-      Snapp_statement.(public_input |> of_js |> to_constant)
-    |> Promise_js_helpers.to_js
+  let to_js_prover prover =
+    let prove (statement_js : snapp_statement_js) =
+      (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
+      let prevs = Obj.magic [] in
+      (* let prevs = Statement_with_proof.([]) in *)
+      let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+      prover ?handler:None prevs statement |> Promise_js_helpers.to_js
+    in
+    prove
   in
-
-  (* TODO: would be nice to create a general map function that is used here *)
+  (* TODO: would be nice to have a general map function, which maps an H3_2 to something independent of all 3 heterogeneous type params *)
   let rec to_js_provers :
       type a b c.
          (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
@@ -1741,8 +1742,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     | p :: ps ->
         to_js_prover p :: to_js_provers ps
   in
+  let verify (statement_js : snapp_statement_js) (proof : proof) =
+    let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+    Proof.verify [ (statement, proof) ] |> Promise_js_helpers.to_js
+  in
   object%js
     val provers = provers |> to_js_provers |> Array.of_list |> Js.array
+
+    val verify = verify
 
     val getVerificationKeyArtifact =
       fun () ->
