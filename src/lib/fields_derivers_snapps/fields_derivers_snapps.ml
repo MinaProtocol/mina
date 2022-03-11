@@ -106,7 +106,14 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   exception
     Invalid_rich_scalar of
-      [ `Uint | `Field | `Public_key | `Amount | `Balance | `Unit ]
+      [ `Uint
+      | `Field
+      | `Public_key
+      | `Amount
+      | `Balance
+      | `Unit
+      | `Proof
+      | `Verification_key ]
 
   let except ~f v x = try f x with _ -> raise (Invalid_rich_scalar v)
 
@@ -420,7 +427,7 @@ let proof obj : _ Unified_input.t =
     | Ok proof ->
         proof
     | Error _err ->
-        failwith "error"
+        raise (Invalid_rich_scalar `Proof)
   in
   iso_string obj ~name:"SnappProof"
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
@@ -429,7 +436,7 @@ let verification_key_with_hash obj =
   let verification_key obj =
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
-        ~of_string:of_base58_check_exn
+        ~of_string:(except ~f:of_base58_check_exn `Verification_key)
         ~doc:"Verification key in Base58Check format")
   in
   With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
