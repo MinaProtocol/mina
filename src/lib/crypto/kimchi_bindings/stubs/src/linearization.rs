@@ -19,10 +19,10 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     // consistent when printing.
     index_terms.sort_by(|(x, _), (y, _)| x.cmp(y));
 
-    let constant = constant_term.to_string();
+    let constant = constant_term.ocaml_str();
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), format!("{}", expr)))
+        .map(|(col, expr)| (format!("{:?}", col), format!("{}", expr.ocaml_str())))
         .collect();
 
     (constant, other_terms)
