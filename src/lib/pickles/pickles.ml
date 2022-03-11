@@ -253,7 +253,9 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Promise.t
+  val verify : (statement * t) list -> bool Deferred.t
+
+  val verify_promise : (statement * t) list -> bool Promise.t
 end
 
 module Prover = struct
@@ -964,12 +966,14 @@ let compile :
 
     let verification_key = wrap_vk
 
-    let verify ts =
+    let verify_promise ts =
       verify
         (module Max_branching)
         (module A_value)
         (Lazy.force verification_key)
         ts
+
+    let verify ts = verify_promise ts |> Promise.to_deferred
 
     let statement (T p : t) = p.statement.pass_through.app_state
   end in
@@ -1060,7 +1064,8 @@ let%test_module "test no side-loaded" =
       in
       assert (
         Promise.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
+            Blockchain_snark.Proof.verify_promise [ (Field.Constant.zero, b0) ])
+      ) ;
       let b1 =
         Common.time "b1" (fun () ->
             Promise.block_on_async_exn (fun () ->
@@ -1072,8 +1077,8 @@ let%test_module "test no side-loaded" =
 
     let%test_unit "verify" =
       assert (
-        Promise.block_on_async_exn (fun () -> Blockchain_snark.Proof.verify xs)
-      )
+        Promise.block_on_async_exn (fun () ->
+            Blockchain_snark.Proof.verify_promise xs) )
   end )
 
 (*

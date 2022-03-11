@@ -4224,7 +4224,7 @@ struct
   let verification_key = Proof.verification_key
 
   let verify_against_digest { statement; proof } =
-    Proof.verify [ (statement, proof) ] |> Promise.to_deferred
+    Proof.verify [ (statement, proof) ]
 
   let verify ts =
     if
@@ -4233,7 +4233,6 @@ struct
     then
       Proof.verify
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-      |> Promise.to_deferred
     else Async.return false
 
   let of_parties_segment_exn ~statement ~snapp_statement ~witness
@@ -6680,8 +6679,7 @@ let%test_module "transaction_snark" =
                 |> Or_error.ok_exn
               in
               Async.Thread_safe.block_on_async (fun () ->
-                  Proof.verify [ (proof13.statement, proof13.proof) ]
-                  |> Promise.to_deferred)
+                  Proof.verify [ (proof13.statement, proof13.proof) ])
               |> Result.ok_exn))
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
