@@ -133,10 +133,10 @@ in {
       # sanity check, to make sure the fixed output drv doesn't keep working
       # when the inputs change
       if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-      == "e43f79b6fc1ed6ca6735b0dee4de58f448972d32646ff89450671e4b4f1bbd54"
+      == "4ce9e2efa7e35cce9b7b131bef15652830756f6f6da250afefd4751efa1d6565"
       && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-      == "fb0bbfb5aba9fa634bae3163f1e31447eae7f3bb488631b10472be3a9ddedc73" then
-        "sha256-W3p4OQoMehVT1jI2bBJouI2PPHYj94IUtdt55/NB0As="
+      == "8b90b3cee4be058eeca0bc9a5a2ee88d62cada9fb09785e0ced5e5cea7893192" then
+        "sha256-MXLfE122UCNizqvGUu6WlThh1rnZueTqirCzaEWmbno="
       else
         pkgs.lib.warn
         "Please update the hashes in ${__curPos.file}#${toString __curPos.line}"
