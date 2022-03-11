@@ -94,12 +94,19 @@ module Statement_with_proof : sig
   type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
 end
 
-val verify :
+val verify_promise :
      (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
   -> bool Promise.t
+
+val verify :
+     (module Nat.Intf with type n = 'n)
+  -> (module Statement_value_intf with type t = 'a)
+  -> Verification_key.t
+  -> ('a * ('n, 'n) Proof.t) list
+  -> bool Deferred.t
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =

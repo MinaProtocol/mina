@@ -3644,7 +3644,6 @@ let verify (ts : (t * _) list) ~key =
       (module Statement.With_sok)
       key
       (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-    |> Promise.to_deferred
   else Async.return false
 
 let constraint_system_digests ~constraint_constants () =

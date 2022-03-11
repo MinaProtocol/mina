@@ -34,7 +34,10 @@ module Pairing_main = Pairing_main
 
 let profile_constraints = false
 
-let verify = Verify.verify
+let verify_promise = Verify.verify
+
+let verify max_branching statement key proofs =
+  verify_promise max_branching statement key proofs |> Promise.to_deferred
 
 (* This file (as you can see from the mli) defines a compiler which turns an inductive
    definition of a set into an inductive SNARK system for proving using those rules.
@@ -967,7 +970,7 @@ let compile :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify
+      verify_promise
         (module Max_branching)
         (module A_value)
         (Lazy.force verification_key)

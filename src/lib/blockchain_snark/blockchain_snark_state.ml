@@ -386,9 +386,7 @@ module type S = sig
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
-let verify ts ~key =
-  Pickles.verify (module Nat.N2) (module Statement) key ts
-  |> Promise.to_deferred
+let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
