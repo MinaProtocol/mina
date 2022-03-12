@@ -1,25 +1,17 @@
 (library
-  (name transaction_snark_tests)
+  (name permissions_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
-   async
-   async_kernel
    async_unix
+   async
    core
    base
    core_kernel
-   base64
    yojson
    ;; local libraries
-   random_oracle_input
-   pickles.backend
    mina_base.import
-   crypto_params
-   kimchi_backend
-   with_hash
    pickles
-   consensus
    transaction_snark
    snark_params
    mina_ledger
@@ -27,17 +19,12 @@
    currency
    mina_state
    signature_lib
-   snarky.backendless
    genesis_constants
    transaction_protocol_state
-   coda_genesis_ledger
    pickles_types
-   kimchi_backend.pasta
-   cache_dir
-   data_hash_lib
    mina_numbers
-   random_oracle
    sgn
+   transaction_snark_tests
    )
   (library_flags -linkall)
   (inline_tests)

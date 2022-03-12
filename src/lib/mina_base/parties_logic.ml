@@ -27,6 +27,8 @@ module type Bool_intf = sig
 
   val ( &&& ) : t -> t -> t
 
+  val display : t -> label:string -> string
+
   val assert_ : t -> unit
 
   val all : t list -> t
@@ -658,6 +660,8 @@ module type Inputs_intf = sig
       Local_state.t
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
+
+    val update_failure_status : t -> Bool.failure_status -> Bool.t -> t
   end
 
   module Global_state : sig
@@ -1221,6 +1225,10 @@ module Make (Inputs : Inputs_intf) = struct
     let a', update_permitted, failure_status =
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
+    let local_state =
+      Local_state.update_failure_status local_state failure_status
+        update_permitted
+    in
     let success =
       Bool.(
         local_state.success &&& protocol_state_predicate_satisfied
@@ -1261,7 +1269,6 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with
         excess = new_local_fee_excess
       ; success = Bool.(local_state.success &&& not overflowed)
-      ; failure_status
       }
     in
 
