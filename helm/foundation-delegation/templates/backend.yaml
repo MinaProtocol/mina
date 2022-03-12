@@ -30,12 +30,16 @@ spec:
         livenessProbe:
           exec:
             command:
+            - sh
+            - -c
             - curl localhost:8080
           initialDelaySeconds: 120
           periodSeconds: 20
         readinessProbe:
           exec:
             command:
+            - sh
+            - -c
             - curl localhost:8080
           initialDelaySeconds: 120
           periodSeconds: 20
