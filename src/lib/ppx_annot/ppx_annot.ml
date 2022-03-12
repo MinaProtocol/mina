@@ -20,6 +20,8 @@ let extract_string_attrs (attributes : attributes) =
             }
           ] ->
           Some (attr.attr_name.txt, str)
+      | PStr [] ->
+          Some (attr.attr_name.txt, "")
       | _ ->
           None)
 
