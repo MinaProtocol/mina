@@ -20,7 +20,9 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~trust_system ~sender ~transition_with_hash ~delta
     (error : validation_error) =
   let open Trust_system.Actions in
-  let state_hash = With_hash.hash transition_with_hash in
+  let state_hash =
+    State_hash.With_state_hashes.state_hash transition_with_hash
+  in
   let transition = With_hash.data transition_with_hash in
   let punish action message =
     let message' =
@@ -99,24 +101,41 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       Deferred.unit
   | `Invalid_proof ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_proof) ;
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        ( state_hash
+        , sender
+        , time_received
+        , `Invalid_delta_transition_chain_proof ) ;
       punish Sent_invalid_transition_chain_merkle_proof None
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_early) ;
       punish Gossiped_future_transition None
   | `Invalid_genesis_protocol_state ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_genesis_protocol_state) ;
       punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_late) ;
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Too_late) ;
       punish
         (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
            , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ))
   | `Invalid_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_protocol_version) ;
       punish Sent_invalid_protocol_version None
   | `Mismatched_protocol_version ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Mismatched_protocol_version) ;
       punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
@@ -172,7 +191,9 @@ module Duplicate_block_detector = struct
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
       external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
-    let protocol_state_hash = external_transition_with_hash.hash in
+    let protocol_state_hash =
+      State_hash.With_state_hashes.state_hash external_transition_with_hash
+    in
     let open Consensus.Data.Consensus_state in
     let consensus_state =
       External_transition.consensus_state external_transition
@@ -215,7 +236,7 @@ end
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
-    Precomputed_values.genesis_state_hash precomputed_values
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
@@ -244,10 +265,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
            ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
              let transition_with_hash =
                Envelope.Incoming.data transition_env
-               |> With_hash.of_data
-                    ~hash_data:
-                      (Fn.compose Protocol_state.hash
-                         External_transition.protocol_state)
+               |> With_hash.of_data ~hash_data:External_transition.state_hashes
              in
              Duplicate_block_detector.check ~precomputed_values
                ~rejected_blocks_logger ~time_received duplicate_checker logger
@@ -273,7 +291,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                          (validate_genesis_protocol_state ~genesis_state_hash)
                    >>= (fun x ->
                          Interruptible.uninterruptible
-                           (validate_proofs ~verifier [ x ])
+                           (validate_proofs ~verifier ~genesis_state_hash [ x ])
                          >>| List.hd_exn)
                    >>= defer validate_delta_transition_chain
                    >>= defer validate_protocol_versions)
@@ -286,6 +304,11 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    |> Writer.write valid_transition_writer ;
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
+                   Queue.enqueue Transition_frontier.validated_blocks
+                     ( State_hash.With_state_hashes.state_hash
+                         transition_with_hash
+                     , sender
+                     , time_received ) ;
                    return ()
                | Error error ->
                    Mina_net2.Validation_callback.fire_if_not_already_fired
@@ -303,8 +326,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                ()
            | Error () ->
                let state_hash =
-                 Envelope.Incoming.data transition_env
-                 |> External_transition.state_hash
+                 ( Envelope.Incoming.data transition_env
+                 |> External_transition.state_hashes )
+                   .state_hash
                in
                let metadata =
                  [ ("state_hash", State_hash.to_yojson state_hash)

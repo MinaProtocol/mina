@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	gonet "net"
 	"time"
 
@@ -20,11 +21,17 @@ type codaPeerInfo struct {
 	PeerID     string
 }
 
+type ipcPushMessage = ipc.Libp2pHelperInterface_PushMessage
+type pushMessage interface {
+	handle(app *app)
+}
+type extractPushMessage = func(ipcPushMessage) (pushMessage, error)
+
 type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
-type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 type rpcRequest interface {
 	handle(app *app, seqno uint64) *capnp.Message
 }
+type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 	realIP := gonet.ParseIP(ip).To4()
@@ -63,7 +70,7 @@ func multiaddrListForeach(l ipc.Multiaddr_List, f func(string) error) error {
 	return nil
 }
 
-func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
+func peerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i).Id()
 		if err != nil {
@@ -77,7 +84,7 @@ func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	return nil
 }
 
-func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
+func textListForeach(l capnp.TextList, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i)
 		if err != nil {
@@ -91,7 +98,7 @@ func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
 	return nil
 }
 
-func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
+func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingConfig, error) {
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
 	if err != nil {
 		return nil, err
@@ -107,7 +114,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(bannedIps, func(ip string) error {
+	err = textListForeach(bannedIps, func(ip string) error {
 		return filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 	})
 	if err != nil {
@@ -121,7 +128,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(trustedIps, func(ip string) error {
+	err = textListForeach(trustedIps, func(ip string) error {
 		return filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
 	})
 	if err != nil {
@@ -133,7 +140,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	bannedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
+	err = peerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
 			bannedPeers.Add(id)
@@ -149,9 +156,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		return nil, err
 	}
 	trustedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
-		id := peer.ID(peerID)
-		trustedPeers.Add(id)
+	err = peerIdListForeach(trustedPeerIds, func(peerID string) error {
+		id, err := peer.Decode(peerID)
+		if err == nil {
+			trustedPeers.Add(id)
+		}
 		return nil
 	})
 	if err != nil {
@@ -161,7 +170,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 		trustedPeers.Add(peer.ID)
 	}
 
-	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
+	return &codanet.CodaGatingConfig{
+		BannedAddrFilters:  bannedAddrFilters,
+		TrustedAddrFilters: trustedAddrFilters,
+		BannedPeers:        bannedPeers,
+		TrustedPeers:       trustedPeers}, nil
 }
 
 func panicOnErr(err error) {
@@ -316,6 +329,7 @@ func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt t
 		subId.SetId(subIdx)
 
 		sn, err := gr.NewValidationId()
+		panicOnErr(err)
 		sn.SetId(seqno)
 		panicOnErr(gr.SetData(data))
 	})
@@ -352,5 +366,21 @@ func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message
 		panicOnErr(err)
 		sid.SetId(streamIdx)
 		panicOnErr(im.SetData(data))
+	})
+}
+
+func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []root) *capnp.Message {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
+		im, err := m.NewResourceUpdated()
+		panicOnErr(err)
+		if len(rootIds) > math.MaxInt32 {
+			panic("too many root ids in a single upcall")
+		}
+		im.SetType(type_)
+		mIds, err := im.NewIds(int32(len(rootIds)))
+		panicOnErr(err)
+		for i, rootId := range rootIds {
+			panicOnErr(mIds.At(i).SetBlake2bHash(rootId[:]))
+		}
 	})
 }

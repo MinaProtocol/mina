@@ -20,7 +20,7 @@ let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
   let root_consensus_state =
     Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.consensus_state_with_hash
+    |> Transition_frontier.Breadcrumb.consensus_state_with_hashes
   in
   let new_consensus_state =
     External_transition.Validation.forget_validation_with_hash new_transition
@@ -263,6 +263,9 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
       None
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
+  | Error `Snarked_ledger_mismatch ->
+      [%log warn] "Persistent database is out of sync with snarked_ledger" ;
+      None
 
 let wait_for_high_connectivity ~logger ~network ~is_seed =
   let connectivity_time_upperbound = 60.0 in

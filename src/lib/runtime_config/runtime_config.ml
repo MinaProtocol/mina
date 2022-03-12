@@ -74,7 +74,7 @@ module Json_layout = struct
 
       module Permissions = struct
         module Auth_required = struct
-          type t = None | Either | Proof | Signature | Both | Impossible
+          type t = None | Either | Proof | Signature | Impossible
           [@@deriving dhall_type, sexp, bin_io_unversioned]
 
           let to_yojson = function
@@ -86,8 +86,6 @@ module Json_layout = struct
                 `String "proof"
             | Signature ->
                 `String "signature"
-            | Both ->
-                `String "both"
             | Impossible ->
                 `String "impossible"
 
@@ -102,8 +100,6 @@ module Json_layout = struct
                     Ok Proof
                 | "signature" ->
                     Ok Signature
-                | "both" ->
-                    Ok Both
                 | "impossible" ->
                     Ok Impossible
                 | _ ->
@@ -114,8 +110,7 @@ module Json_layout = struct
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
@@ -125,12 +120,12 @@ module Json_layout = struct
           ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
+          ; set_voting_for : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
-          [| "stake"
-           ; "edit_state"
+          [| "edit_state"
            ; "send"
            ; "receive"
            ; "set_delegate"
@@ -140,6 +135,7 @@ module Json_layout = struct
            ; "edit_sequence_state"
            ; "set_token_symbol"
            ; "increment_nonce"
+           ; "set_voting_for"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -393,6 +389,7 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
+      ; transaction_expiry_hr : int option [@default None]
       }
     [@@deriving yojson, dhall_type]
 
@@ -841,7 +838,10 @@ end
 
 module Daemon = struct
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option; peer_list_url : string option }
+    { txpool_max_size : int option
+    ; peer_list_url : string option
+    ; transaction_expiry_hr : int option
+    }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -858,6 +858,9 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+    ; transaction_expiry_hr =
+        opt_fallthrough ~default:t1.transaction_expiry_hr
+          t2.transaction_expiry_hr
     }
 end
 

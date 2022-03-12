@@ -20,8 +20,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
-        Map.add_exn acc
-          ~key:(Protocol_state.hash protocol_state)
+        Map.add_exn acc ~key:(Protocol_state.hashes protocol_state).state_hash
           ~data:protocol_state)
   in
   let get_state hash =
@@ -39,7 +38,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     | Some protocol_state ->
         Ok protocol_state
   in
-  let mask = Ledger.of_database root_ledger in
+  let mask = Mina_ledger.Ledger.of_database root_ledger in
   let local_state =
     Blockchain_state.registers blockchain_state |> Registers.local_state
   in
@@ -111,13 +110,14 @@ module Instance = struct
     | Some sync ->
         f sync
 
-  let start_sync ~constraint_constants t =
+  let start_sync ~constraint_constants t ~persistent_root_instance =
     let open Result.Let_syntax in
     let%map () = assert_no_sync t in
     t.sync <-
       Some
         (Sync.create ~constraint_constants ~logger:t.factory.logger
-           ~time_controller:t.factory.time_controller ~db:t.db)
+           ~time_controller:t.factory.time_controller ~db:t.db
+           ~persistent_root_instance)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -178,7 +178,8 @@ module Instance = struct
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~precomputed_values =
+      ~ignore_consensus_local_state ~precomputed_values
+      ~persistent_root_instance =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -244,11 +245,15 @@ module Instance = struct
           { transition = root_transition
           ; staged_ledger = root_staged_ledger
           ; protocol_states =
-              (*TODO: store the hashes as well?*)
-              List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
+              List.map protocol_states
+                ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           }
-        ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
+        ~root_ledger:
+          (Mina_ledger.Ledger.Any_ledger.cast
+             (module Mina_ledger.Ledger.Db)
+             root_ledger)
         ~consensus_local_state ~max_length ~precomputed_values
+        ~persistent_root_instance
     in
     let%bind extensions =
       Deferred.map
@@ -339,11 +344,13 @@ let with_instance_exn t ~f =
 let reset_database_exn t ~root_data ~genesis_state_hash =
   let open Root_data.Limited in
   let open Deferred.Let_syntax in
+  let root_transition = transition root_data in
   [%log' info t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (External_transition.Validated.state_hash (transition root_data)) )
+          @@ (External_transition.Validated.state_hashes root_transition)
+               .state_hash )
       ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
@@ -351,14 +358,16 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
       Debug_assert.debug_assert (fun () ->
-          Database.check instance.db ~genesis_state_hash
-          |> Result.map_error ~f:(function
-               | `Invalid_version ->
-                   "invalid version"
-               | `Not_initialized ->
-                   "not initialized"
-               | `Genesis_state_mismatch _ ->
-                   "genesis state mismatch"
-               | `Corrupt err ->
-                   Database.Error.message err)
-          |> Result.ok_or_failwith))
+          ignore
+            ( Database.check instance.db ~genesis_state_hash
+              |> Result.map_error ~f:(function
+                   | `Invalid_version ->
+                       "invalid version"
+                   | `Not_initialized ->
+                       "not initialized"
+                   | `Genesis_state_mismatch _ ->
+                       "genesis state mismatch"
+                   | `Corrupt err ->
+                       Database.Error.message err)
+              |> Result.ok_or_failwith
+              : Frozen_ledger_hash.t )))

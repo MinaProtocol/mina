@@ -13,12 +13,6 @@ module type S = sig
 
       val to_latest : t -> t
     end
-
-    module V1 : sig
-      type t [@@deriving compare, equal, sexp, yojson, hash]
-
-      val to_latest : t -> V2.t
-    end
   end]
 
   val create :

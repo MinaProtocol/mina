@@ -8,11 +8,7 @@ open Mina_transition
 module Historical : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t
-    end
-
-    module V1 : sig
+    module V3 : sig
       type t
     end
   end]
@@ -33,33 +29,28 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving to_yojson]
-    end
-
-    module V1 : sig
-      type t
-
-      val to_latest : t -> V2.t
     end
   end]
 
   val transition : t -> External_transition.Validated.t
 
-  val hash : t -> State_hash.t
+  val hashes : t -> State_hash.State_hashes.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
   val protocol_states :
-    t -> (State_hash.t * Mina_state.Protocol_state.value) list
+    t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
   val create :
        transition:External_transition.Validated.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
-    -> protocol_states:(State_hash.t * Mina_state.Protocol_state.value) list
+    -> protocol_states:
+         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
     -> t
 end
 
@@ -72,10 +63,6 @@ module Minimal : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t
-    end
-
-    module V1 : sig
       type t
     end
   end]
@@ -106,7 +93,8 @@ type t =
   { transition : External_transition.Validated.t
   ; staged_ledger : Staged_ledger.t
   ; protocol_states :
-      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
+      Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      list
   }
 
 val minimize : t -> Minimal.t

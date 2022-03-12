@@ -3,7 +3,7 @@ open Async
 open Network_peer
 open O1trace
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -32,10 +32,12 @@ module Config = struct
     ; peer_exchange : bool
     ; mina_peer_exchange : bool
     ; seed_peer_list_url : Uri.t option
+    ; min_connections : int
     ; max_connections : int
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
+    ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
   [@@deriving make]
 end
@@ -57,7 +59,7 @@ let download_seed_peer_list uri =
   let%map contents = Cohttp_async.Body.to_string body in
   Mina_net2.Multiaddr.of_file_contents contents
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -92,7 +94,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       log_rate_limiter_occasionally rl ;
       let handler (peer : Network_peer.Peer.t) ~version q =
         Mina_metrics.(Counter.inc_one Network.rpc_requests_received) ;
-        Mina_metrics.(Counter.inc_one Impl.received_counter) ;
+        Mina_metrics.(Counter.inc_one @@ fst Impl.received_counter) ;
+        Mina_metrics.(Gauge.inc_one @@ snd Impl.received_counter) ;
         let score = cost q in
         match
           Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
@@ -241,8 +244,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~peer_exchange:config.peer_exchange
                 ~mina_peer_exchange:config.mina_peer_exchange
                 ~flooding:config.flooding
+                ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
+                ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
                     { banned_peers =
@@ -433,6 +438,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
+    let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
+
     let create (config : Config.t) ~pids rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
@@ -596,7 +603,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         type r q.
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
-        -> rpc_counter:Mina_metrics.Counter.t
+        -> rpc_counter:Mina_metrics.Counter.t * Mina_metrics.Gauge.t
         -> rpc_failed_counter:Mina_metrics.Counter.t
         -> rpc_name:string
         -> t
@@ -623,7 +630,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 Versioned_rpc.Connection_with_menu.create conn
                 >>=? fun conn' ->
                 Mina_metrics.(Counter.inc_one Network.rpc_requests_sent) ;
-                Mina_metrics.(Counter.inc_one rpc_counter) ;
+                Mina_metrics.(Counter.inc_one @@ fst rpc_counter) ;
+                Mina_metrics.(Gauge.inc_one @@ snd rpc_counter) ;
                 let d = dispatch conn' query in
                 match timeout with
                 | None ->

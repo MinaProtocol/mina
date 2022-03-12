@@ -34,33 +34,6 @@ module Transactions = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        { commands :
-            ( User_command.Stable.V1.t
-            , Transaction_hash.Stable.V1.t )
-            With_hash.Stable.V1.t
-            With_status.Stable.V1.t
-            list
-        ; fee_transfers :
-            (Fee_transfer.Single.Stable.V1.t * Fee_transfer_type.Stable.V1.t)
-            list
-        ; coinbase : Currency.Amount.Stable.V1.t
-        ; coinbase_receiver : Public_key.Compressed.Stable.V1.t option
-        }
-
-      let to_latest (t : t) : V2.t =
-        { commands =
-            List.map t.commands
-              ~f:
-                (With_status.map
-                   ~f:(With_hash.map ~f:User_command.Stable.V1.to_latest))
-        ; fee_transfers = t.fee_transfers
-        ; coinbase = t.coinbase
-        ; coinbase_receiver = t.coinbase_receiver
-        }
-    end
   end]
 end
 
@@ -104,32 +77,10 @@ module Stable = struct
       ; protocol_state : Protocol_state.Stable.V2.t
       ; transactions : Transactions.Stable.V2.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
-      ; proof : Proof.Stable.V1.t
+      ; proof : Proof.Stable.V2.t
       }
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { creator : Public_key.Compressed.Stable.V1.t
-      ; winner : Public_key.Compressed.Stable.V1.t
-      ; protocol_state : Protocol_state.Stable.V1.t
-      ; transactions : Transactions.Stable.V1.t
-      ; snark_jobs : Transaction_snark_work.Info.Stable.V1.t list
-      ; proof : Proof.Stable.V1.t
-      }
-
-    let to_latest (t : t) : V2.t =
-      { creator = t.creator
-      ; winner = t.winner
-      ; protocol_state = Protocol_state.Stable.V1.to_latest t.protocol_state
-      ; transactions = Transactions.Stable.V1.to_latest t.transactions
-      ; snark_jobs =
-          List.map ~f:Transaction_snark_work.Info.Stable.V1.to_latest
-            t.snark_jobs
-      ; proof = t.proof
-      }
   end
 end]
 

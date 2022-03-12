@@ -3,8 +3,35 @@
  (public_name vrf_lib_tests)
  (library_flags -linkall)
  (inline_tests)
- (libraries core snarky snarky_curves test_util signature_lib snark_params
-            vrf_lib mina_base random_oracle fold_lib)
+ (libraries
+   ;; opam libraries
+   core
+   core_kernel
+   ppx_inline_test.config
+   sexplib0
+   ppx_deriving.runtime
+   ;; local libraries
+   snark_params
+   signature_lib
+   snarky_curves
+   snarky
+   vrf_lib
+   mina_base
+   random_oracle
+   fold_lib
+   pickles
+   bignum.bigint
+   snarky.backendless
+   bitstring_lib
+   crypto_params
+   backend
+   kimchi_backend
+   kimchi
+   kimchi_pasta
+   snarky_field_extensions
+   tuple_lib
+   genesis_constants
+)
  (preprocess
   (pps
     h_list.ppx

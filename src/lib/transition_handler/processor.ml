@@ -78,7 +78,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
-    ~hash:(External_transition.Validated.state_hash transition)
+    ~hash:(External_transition.Validated.state_hashes transition).state_hash
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
@@ -96,8 +96,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
   let initially_validated_transition =
     Envelope.Incoming.data enveloped_initially_validated_transition
   in
-  let { With_hash.hash = transition_hash; data = transition }, _ =
-    initially_validated_transition
+  let transition_hash, transition =
+    let t, _ = initially_validated_transition in
+    (State_hash.With_state_hashes.state_hash t, With_hash.data t)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   Deferred.map ~f:(Fn.const ())
@@ -157,12 +158,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;
-              return (Error ())
-          | _ ->
-              failwith
-                "This is impossible since the transition just passed \
-                 initial_validation so delta_transition_chain_proof must be \
-                 true" )
+              return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
@@ -437,8 +433,9 @@ let%test_module "Transition_handler.Processor tests" =
                                [%test_eq: State_hash.t]
                                  (Transition_frontier.Breadcrumb.state_hash
                                     next_expected_breadcrumb)
-                                 (External_transition.Validated.state_hash
-                                    newly_added_transition) ;
+                                 (External_transition.Validated.state_hashes
+                                    newly_added_transition)
+                                   .state_hash ;
                                [%log info]
                                  ~metadata:
                                    [ ( "height"

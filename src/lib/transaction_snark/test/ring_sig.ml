@@ -15,7 +15,7 @@ open Snark_params.Tick.Let_syntax
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-  Schnorr.Checked.verifies (module S) sigma pk msg
+  Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
 let%snarkydef verify_sig pubkeys msg sigma =
@@ -32,18 +32,18 @@ let check_witness pubkeys msg witness =
   >>= fun () -> verify_sig pubkeys msg witness
 
 type _ Snarky_backendless.Request.t +=
-  | Sigma : Schnorr.Signature.t Snarky_backendless.Request.t
+  | Sigma : Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
-let ring_sig_rule (ring_member_pks : Schnorr.Public_key.t list) :
+let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
     _ Pickles.Inductive_rule.t =
   let ring_sig_main (tx_commitment : Snapp_statement.Checked.t) :
       (unit, _) Checked.t =
     let msg_var =
       Snapp_statement.Checked.to_field_elements tx_commitment
-      |> Random_oracle_input.field_elements
+      |> Random_oracle_input.Chunked.field_elements
     in
     let%bind sigma_var =
-      exists Schnorr.Signature.typ ~request:(As_prover.return Sigma)
+      exists Schnorr.Chunked.Signature.typ ~request:(As_prover.return Sigma)
     in
     check_witness ring_member_pks msg_var sigma_var
   in
@@ -65,14 +65,14 @@ let%test_unit "1-of-1" =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk = Private_key.gen and msg = Field.gen_uniform in
-    (sk, Random_oracle.Input.field_elements [| msg |])
+    (sk, Random_oracle.Input.Chunked.field_elements [| msg |])
   in
   Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
       let pk = Inner_curve.(scale one sk) in
-      (let sigma = Schnorr.sign sk msg in
+      (let sigma = Schnorr.Chunked.sign sk msg in
        let%bind sigma_var, msg_var =
          exists
-           Typ.(Schnorr.Signature.typ * Schnorr.message_typ ())
+           Typ.(Schnorr.Chunked.Signature.typ * Schnorr.chunked_message_typ ())
            ~compute:As_prover.(return (sigma, msg))
        in
        check_witness [ pk ] msg_var sigma_var)
@@ -85,16 +85,16 @@ let%test_unit "1-of-2" =
     let%map sk0 = Private_key.gen
     and sk1 = Private_key.gen
     and msg = Field.gen_uniform in
-    (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
+    (sk0, sk1, Random_oracle.Input.Chunked.field_elements [| msg |])
   in
   Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
       let pk0 = Inner_curve.(scale one sk0) in
       let pk1 = Inner_curve.(scale one sk1) in
-      (let sigma1 = Schnorr.sign sk1 msg in
+      (let sigma1 = Schnorr.Chunked.sign sk1 msg in
        let%bind sigma1_var =
-         exists Schnorr.Signature.typ ~compute:(As_prover.return sigma1)
+         exists Schnorr.Chunked.Signature.typ ~compute:(As_prover.return sigma1)
        and msg_var =
-         exists (Schnorr.message_typ ()) ~compute:(As_prover.return msg)
+         exists (Schnorr.chunked_message_typ ()) ~compute:(As_prover.return msg)
        in
        check_witness [ pk0; pk1 ] msg_var sigma1_var)
       |> Checked.map ~f:As_prover.return
@@ -139,7 +139,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then
-            Binable.to_string (module Side_loaded_verification_key.Stable.V1) vk
+            Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
@@ -235,12 +235,12 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let protocol_state = Snapp_predicate.Protocol_state.accept in
           let ps =
-            Parties.Party_or_stack.of_parties_list
+            Parties.Call_forest.of_parties_list
               ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
               [ sender_party_data; snapp_party_data ]
-            |> Parties.Party_or_stack.accumulate_hashes_predicated
+            |> Parties.Call_forest.accumulate_hashes_predicated
           in
-          let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+          let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
             Snapp_predicate.Protocol_state.digest protocol_state
           in
@@ -250,14 +250,14 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash ~memo_hash
           in
-          let at_party = Parties.Party_or_stack.stack_hash ps in
+          let at_party = Parties.Call_forest.hash ps in
           let tx_statement : Snapp_statement.t = { transaction; at_party } in
           let msg =
             tx_statement |> Snapp_statement.to_field_elements
-            |> Random_oracle_input.field_elements
+            |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in
-          let sigma = Schnorr.sign signing_sk msg in
+          let sigma = Schnorr.Chunked.sign signing_sk msg in
           let handler (Snarky_backendless.Request.With { request; respond }) =
             match request with
             | Sigma ->
@@ -277,14 +277,14 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             in
             { fee_payer with
               authorization =
-                Signature_lib.Schnorr.sign sender.private_key
-                  (Random_oracle.Input.field txn_comm)
+                Signature_lib.Schnorr.Chunked.sign sender.private_key
+                  (Random_oracle.Input.Chunked.field txn_comm)
             }
           in
           let sender =
             let sender_signature =
-              Signature_lib.Schnorr.sign sender.private_key
-                (Random_oracle.Input.field transaction)
+              Signature_lib.Schnorr.Chunked.sign sender.private_key
+                (Random_oracle.Input.Chunked.field transaction)
             in
             { Party.data = sender_party_data
             ; authorization = Signature sender_signature
@@ -312,7 +312,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 |> printf "other_party #%d data:\n%s\n\n" idx)
             |> fun () ->
             (* print other_party proof *)
-            Pickles.Side_loaded.Proof.Stable.V1.sexp_of_t pi
+            Pickles.Side_loaded.Proof.Stable.V2.sexp_of_t pi
             |> Sexp.to_string |> Base64.encode_exn
             |> printf "other_party_proof:\n%s\n\n"
             |> fun () ->

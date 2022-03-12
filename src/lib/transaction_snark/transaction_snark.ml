@@ -7,6 +7,9 @@ module Global_slot = Mina_numbers.Global_slot
 open Currency
 open Pickles_types
 module Impl = Pickles.Impls.Step
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
+module Transaction_validator = Transaction_validator
 
 let top_hash_logging_enabled = ref false
 
@@ -97,12 +100,12 @@ module Pending_coinbase_stack_state = struct
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
   let to_input ({ source; target } : t) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.to_input source)
       (Pending_coinbase.Stack.to_input target)
 
   let var_to_input ({ source; target } : var) =
-    Random_oracle.Input.append
+    Random_oracle.Input.Chunked.append
       (Pending_coinbase.Stack.var_to_input source)
       (Pending_coinbase.Stack.var_to_input target)
 
@@ -305,7 +308,7 @@ module Statement = struct
 
     let to_input { source; target; supply_increase; fee_excess; sok_digest } =
       let input =
-        Array.reduce_exn ~f:Random_oracle.Input.append
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| Sok_message.Digest.to_input sok_digest
            ; Registers.to_input source
            ; Registers.to_input target
@@ -315,8 +318,8 @@ module Statement = struct
       in
       if !top_hash_logging_enabled then
         Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
-            Random_oracle.Input.t}@."
+          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+            Random_oracle.Input.Chunked.t}@."
           input ;
       input
 
@@ -329,13 +332,10 @@ module Statement = struct
         let open Tick in
         let open Checked.Let_syntax in
         let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-        let%bind source =
-          make_checked (fun () -> Registers.Checked.to_input source)
-        and target =
-          make_checked (fun () -> Registers.Checked.to_input target)
-        in
+        let source = Registers.Checked.to_input source
+        and target = Registers.Checked.to_input target in
         let input =
-          Array.reduce_exn ~f:Random_oracle.Input.append
+          Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
              ; source
              ; target
@@ -347,23 +347,11 @@ module Statement = struct
           as_prover
             As_prover.(
               if !top_hash_logging_enabled then
-                let%bind field_elements =
-                  read
-                    (Typ.list ~length:0 Field.typ)
-                    (Array.to_list input.field_elements)
-                in
-                let%map bitstrings =
-                  read
-                    (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
-                    (Array.to_list input.bitstrings)
-                in
+                let%map input = Random_oracle.read_typ' input in
                 Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
-                    Random_oracle.Input.t}@."
-                  { Random_oracle.Input.field_elements =
-                      Array.of_list field_elements
-                  ; bitstrings = Array.of_list bitstrings
-                  }
+                  !"Generating checked top hash from:@.%{sexp: Field.t \
+                    Random_oracle.Input.Chunked.t}@."
+                  input
               else return ())
         in
         input
@@ -447,8 +435,8 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Pickles.Proof.Branching_2.Stable.V1.t
+    module V2 = struct
+      type t = Pickles.Proof.Branching_2.Stable.V2.t
       [@@deriving
         version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
 
@@ -461,21 +449,10 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V1.t }
+      { statement : Statement.With_sok.Stable.V2.t; proof : Proof.Stable.V2.t }
     [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      { statement : Statement.With_sok.Stable.V1.t; proof : Proof.Stable.V1.t }
-    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
-
-    let to_latest (t : t) : Latest.t =
-      { statement = Statement.With_sok.Stable.V1.to_latest t.statement
-      ; proof = t.proof
-      }
   end
 end]
 
@@ -586,14 +563,25 @@ let dummy_constraints () =
   make_checked
     Impl.(
       fun () ->
-        let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+        let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
         let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
         ignore
-          ( Pickles.Step_main_inputs.Ops.scale_fast g
-              (`Plus_two_to_len [| b; b |])
+          ( Pickles.Scalar_challenge.to_field_checked'
+              (module Impl)
+              ~num_bits:16
+              (Kimchi_backend_common.Scalar_challenge.create x)
+            : Field.t * Field.t * Field.t ) ;
+        ignore
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
+          ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5
+              (Shifted_value x)
+            : Pickles.Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+              (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
 module Base = struct
@@ -1101,9 +1089,11 @@ module Base = struct
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
-    let%bind input = Transaction_union_payload.Checked.to_input payload in
+    let%bind input =
+      Transaction_union_payload.Checked.to_input_legacy payload
+    in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Legacy.Checked.verifies shifted signature signer input
     in
     [%with_label "check signature"]
       (Boolean.Assert.any [ Boolean.not is_user_command; verifies ])
@@ -1122,41 +1112,33 @@ module Base = struct
         } =
       account.timing
     in
-    let int_of_field field =
-      Snarky_integer.Integer.constant ~m
-        (Bigint.of_field field |> Bigint.to_bignum_bigint)
-    in
-    let zero_int = int_of_field Field.zero in
-    let balance_to_int balance =
-      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
-    in
-    let txn_amount_int =
-      Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
-    in
-    let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
       Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind `Underflow underflow, proposed_balance_int =
-      make_checked (fun () ->
-          Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
-            txn_amount_int)
+    let%bind proposed_balance =
+      match txn_amount with
+      | Some txn_amount ->
+          let%bind proposed_balance, `Underflow underflow =
+            Balance.Checked.sub_amount_flagged account.balance txn_amount
+          in
+          (* underflow indicates insufficient balance *)
+          let%map () = balance_check (Boolean.not underflow) in
+          proposed_balance
+      | None ->
+          return account.balance
     in
-    (* underflow indicates insufficient balance *)
-    let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
-      make_checked (fun () ->
-          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance))
+      Balance.Checked.( >= ) proposed_balance curr_min_balance
     in
     let%bind () =
       let%bind ok = Boolean.(any [ not is_timed; sufficient_timed_balance ]) in
       timed_balance_check ok
     in
     let%bind is_timed_balance_zero =
-      make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m curr_min_balance zero_int)
+      Balance.Checked.equal curr_min_balance
+        (Balance.Checked.Unsafe.of_field Field.(Var.constant zero))
     in
     (* if current min balance is zero, then timing becomes untimed *)
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
@@ -1181,8 +1163,8 @@ module Base = struct
       Public_key.decompress_var pk
       (*           (Account_id.Checked.public_key fee_payer_id) *)
     in
-    Schnorr.Checked.verifies shifted signature pk
-      (Random_oracle.Input.field payload_digest)
+    Schnorr.Chunked.Checked.verifies shifted signature pk
+      (Random_oracle.Input.Chunked.field payload_digest)
 
   module Parties_snark = struct
     open Parties_segment
@@ -1231,28 +1213,26 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t) ?tag
-        ~txn_global_slot ~(add_check : ?label:string -> Boolean.var -> unit)
-        ~check_auth ~is_start
+    let apply_body ~is_start
         ({ body =
              { public_key
              ; token_id = _
              ; update =
-                 { app_state
-                 ; delegate
-                 ; verification_key
-                 ; permissions
-                 ; snapp_uri
-                 ; token_symbol
-                 ; timing
+                 { app_state = _
+                 ; delegate = _
+                 ; verification_key = _
+                 ; permissions = _
+                 ; snapp_uri = _
+                 ; token_symbol = _
+                 ; timing = _
+                 ; voting_for = _
                  }
-             ; balance_change
+             ; balance_change = _
              ; increment_nonce
              ; events = _ (* This is for the snapp to use, we don't need it. *)
              ; call_data =
                  _ (* This is for the snapp to use, we don't need it. *)
-             ; sequence_events
+             ; sequence_events = _
              ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
              ; protocol_state = _
              ; use_full_commitment
@@ -1263,241 +1243,7 @@ module Base = struct
         Account.Checked.Unhashed.t * _ =
       let open Impl in
       let r = ref [] in
-      let update_authorized (type a) perm ~is_keep
-          ~(updated : [ `Ok of a | `Flagged of a * Boolean.var ]) =
-        let speculative_success, `proof_must_verify x = check_auth perm in
-        r := lazy Boolean.((not is_keep) &&& x) :: !r ;
-        match updated with
-        | `Ok res ->
-            add_check ~label:__LOC__ Boolean.(speculative_success ||| is_keep) ;
-            res
-        | `Flagged (res, failed) ->
-            add_check ~label:__LOC__
-              Boolean.((not failed) &&& speculative_success ||| is_keep) ;
-            res
-      in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
-      let ( ! ) = run_checked in
-      let is_new =
-        !(Public_key.Compressed.Checked.equal a.public_key
-            Public_key.Compressed.(var_of_t empty))
-      in
-      with_label __LOC__ (fun () ->
-          Boolean.Assert.any
-            [ is_new
-            ; !(Public_key.Compressed.Checked.equal public_key a.public_key)
-            ]) ;
-      let is_receiver = Sgn.Checked.is_pos balance_change.sgn in
-      let timing =
-        let open Snapp_basic in
-        let new_timing =
-          let timing_info = Set_or_keep.Checked.data timing in
-          ( { is_timed = Set_or_keep.Checked.is_set timing
-            ; initial_minimum_balance = timing_info.initial_minimum_balance
-            ; cliff_time = timing_info.cliff_time
-            ; cliff_amount = timing_info.cliff_amount
-            ; vesting_period = timing_info.vesting_period
-            ; vesting_increment = timing_info.vesting_increment
-            }
-            : Account_timing.var )
-        in
-        add_check ~label:__LOC__
-          Boolean.(is_new || Set_or_keep.Checked.is_keep timing) ;
-        !(Account.Timing.if_
-            (Set_or_keep.Checked.is_set timing)
-            ~then_:new_timing ~else_:a.timing)
-      in
-      (* Check send/receive permissions *)
-      let balance =
-        with_label __LOC__ (fun () ->
-            update_authorized
-              (Permissions.Auth_required.Checked.if_ is_receiver
-                 ~then_:a.permissions.receive ~else_:a.permissions.send)
-              ~is_keep:
-                !Amount.Signed.(Checked.(equal (constant zero) balance_change))
-              ~updated:
-                (let balance, `Overflow failed1 =
-                   !(Balance.Checked.add_signed_amount_flagged a.balance
-                       balance_change)
-                 in
-                 let fee =
-                   Amount.Checked.of_fee
-                     (Fee.var_of_t constraint_constants.account_creation_fee)
-                 in
-                 let balance_when_new, `Underflow failed2 =
-                   !(Balance.Checked.sub_amount_flagged balance fee)
-                 in
-                 let res =
-                   !(Balance.Checked.if_ is_new ~then_:balance_when_new
-                       ~else_:balance)
-                 in
-                 let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
-                 `Flagged (res, failed)))
-      in
-      let `Min_balance _, timing =
-        !([%with_label "Check snapp timing"]
-            (let open Tick in
-            let balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            let timed_balance_check ok =
-              add_check ~label:__LOC__ !(Boolean.any [ ok; is_receiver ]) ;
-              return ()
-            in
-            (* NB: We perform the check here with the final balance and a zero
-               amount. This allows this to serve dual purposes:
-               * if the balance has decreased, this checks that it isn't below
-                 the minimum;
-               * if the account is new and this party has set its timing info,
-                 this checks that the timing is valid.
-               The balance and txn_amount are used only to find the resulting
-               balance, so using the result directly is equivalent.
-            *)
-            check_timing ~balance_check ~timed_balance_check
-              ~account:{ a with timing; balance }
-              ~txn_amount:Amount.(var_of_t zero)
-              ~txn_global_slot))
-      in
-      let open Snapp_basic in
-      let snapp : Snapp_account.Checked.t =
-        let keeping_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_keep)
-        in
-        let changing_app_state =
-          Boolean.all
-            (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_set)
-        in
-        let proved_state =
-          Boolean.if_ keeping_app_state ~then_:a.snapp.proved_state
-            ~else_:
-              ( if Option.is_none tag then (* No proof *)
-                Boolean.false_
-              else
-                (* Has a proof, set proved_state if entire state was set *)
-                Boolean.if_ changing_app_state ~then_:Boolean.true_
-                  ~else_:a.snapp.proved_state )
-        in
-        let app_state =
-          with_label __LOC__ (fun () ->
-              update_authorized a.permissions.edit_state
-                ~is_keep:keeping_app_state
-                ~updated:
-                  (`Ok
-                    (Vector.map2 app_state a.snapp.app_state
-                       ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_))))
-        in
-        Option.iter tag ~f:(fun t ->
-            Pickles.Side_loaded.in_circuit t
-              (Lazy.force a.snapp.verification_key.data)) ;
-        let verification_key =
-          update_authorized a.permissions.set_verification_key
-            ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
-            ~updated:
-              (`Ok
-                (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
-                   (Lazy.force a.snapp.verification_key.hash)))
-        in
-        let sequence_state, last_sequence_slot =
-          let [ s1'; s2'; s3'; s4'; s5' ] = a.snapp.sequence_state in
-          let last_sequence_slot = a.snapp.last_sequence_slot in
-          let is_this_slot =
-            !(Mina_numbers.Global_slot.Checked.equal txn_global_slot
-                last_sequence_slot)
-          in
-          (* Push events to s1 *)
-          let is_empty = !(Party.Events.is_empty_var sequence_events) in
-          let s1 =
-            Field.if_ is_empty ~then_:s1'
-              ~else_:
-                (Party.Sequence_events.push_events_checked s1' sequence_events)
-          in
-          (* Shift along if last update wasn't this slot *)
-          let is_full_and_different_slot =
-            Boolean.((not is_empty) && is_this_slot)
-          in
-          let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
-          let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
-          let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
-          let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
-          let new_global_slot =
-            !(Mina_numbers.Global_slot.Checked.if_ is_empty
-                ~then_:last_sequence_slot ~else_:txn_global_slot)
-          in
-          let new_sequence_state =
-            ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-            , new_global_slot )
-          in
-          update_authorized a.permissions.edit_sequence_state ~is_keep:is_empty
-            ~updated:(`Ok new_sequence_state)
-        in
-        let snapp_version =
-          (* Current snapp version. Upgrade mechanism should live here. *)
-          Mina_numbers.Snapp_version.(Checked.constant zero)
-        in
-        { Snapp_account.verification_key =
-            (* Big hack. This relies on the fact that the "data" is not
-               used for computing the hash of the snapp account. We can't
-               provide the verification key since it's not available here. *)
-            { With_hash.hash = lazy verification_key
-            ; data = lazy (failwith "unused")
-            }
-        ; app_state
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        ; proved_state
-        }
-      in
-      let snapp_uri =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep snapp_uri)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Data_as_hash.if_ snapp_uri
-                 a.snapp_uri))
-      in
-      let token_symbol =
-        update_authorized a.permissions.set_snapp_uri
-          ~is_keep:(Set_or_keep.Checked.is_keep token_symbol)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Account.Token_symbol.if_
-                 token_symbol a.token_symbol))
-      in
-      let delegate =
-        let base_delegate =
-          (* New accounts should have the delegate equal to the public key of the account. *)
-          !(Public_key.Compressed.Checked.if_ is_new ~then_:public_key
-              ~else_:a.delegate)
-        in
-        update_authorized a.permissions.set_delegate
-          ~is_keep:(Set_or_keep.Checked.is_keep delegate)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep
-                 ~if_:(fun b ~then_ ~else_ ->
-                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_))
-                 delegate base_delegate))
-      in
-      let permissions =
-        update_authorized a.permissions.set_permissions
-          ~is_keep:(Set_or_keep.Checked.is_keep permissions)
-          ~updated:
-            (`Ok
-              (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
-                 permissions a.permissions))
-      in
-      let nonce =
-        update_authorized a.permissions.increment_nonce
-          ~is_keep:(Boolean.not increment_nonce)
-          ~updated:
-            (`Ok
-              !(Account.Nonce.Checked.if_ increment_nonce
-                  ~then_:!(Account.Nonce.Checked.succ a.nonce)
-                  ~else_:a.nonce))
-      in
 
       (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
@@ -1518,30 +1264,8 @@ module Base = struct
             ; increment_nonce
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
-      let a : Account.Checked.Unhashed.t =
-        { a with
-          balance
-        ; snapp
-        ; delegate
-        ; permissions
-        ; timing
-        ; nonce
-        ; public_key
-        ; snapp_uri
-        ; token_symbol
-        }
-      in
+      let a : Account.Checked.Unhashed.t = { a with public_key } in
       (a, `proof_must_verify proof_must_verify)
-
-    let create_checker () =
-      let r = ref [] in
-      let finished = ref false in
-      ( (fun ?label:_ x ->
-          if finished.contents then failwith "finished"
-          else r := x :: r.contents)
-      , fun () ->
-          finished := true ;
-          Impl.Boolean.all r.contents )
 
     module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1559,7 +1283,7 @@ module Base = struct
     module Single (I : Single_inputs) = struct
       open I
 
-      let { auth_type; is_start } = spec
+      let { auth_type; is_start = _ } = spec
 
       module V = Prover_value
       open Impl
@@ -1571,6 +1295,19 @@ module Base = struct
           let if_ = Field.if_
 
           let empty = Field.constant Parties.Transaction_commitment.empty
+
+          let commitment ~party:{ party; _ }
+              ~other_parties:{ With_hash.hash = other_parties; _ } ~memo_hash =
+            Parties.Transaction_commitment.Checked.create
+              ~other_parties_hash:other_parties
+              ~protocol_state_predicate_hash:
+                (Snapp_predicate.Protocol_state.Checked.digest
+                   party.data.body.protocol_state)
+              ~memo_hash
+
+          let full_commitment ~party:{ party; _ } ~commitment =
+            Parties.Transaction_commitment.Checked.with_fee_payer commitment
+              ~fee_payer_hash:party.hash
         end
 
         module Bool = struct
@@ -1579,10 +1316,279 @@ module Base = struct
           type t = var
 
           let assert_ = Assert.is_true
+
+          let display _b ~label:_ = ""
+
+          type failure_status = unit
+
+          let assert_with_failure_status b _failure_status = Assert.is_true b
+        end
+
+        module Controller = struct
+          type t = Permissions.Auth_required.Checked.t
+
+          let if_ = Permissions.Auth_required.Checked.if_
+
+          let check =
+            match auth_type with
+            | Proof ->
+                fun ~proof_verifies:_ ~signature_verifies:_ perm ->
+                  Permissions.Auth_required.Checked.eval_proof perm
+            | Signature | None_given ->
+                fun ~proof_verifies:_ ~signature_verifies perm ->
+                  Permissions.Auth_required.Checked.eval_no_proof
+                    ~signature_verifies perm
+        end
+
+        module Global_slot = struct
+          include Global_slot.Checked
+
+          let ( > ) x y = run_checked (x > y)
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
+
+          let equal x y = run_checked (equal x y)
+        end
+
+        module Nonce = struct
+          type t = Account.Nonce.Checked.t
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Account.Nonce.Checked.if_ b ~then_ ~else_)
+
+          let succ t = run_checked (Account.Nonce.Checked.succ t)
+        end
+
+        module State_hash = struct
+          type t = State_hash.var
+
+          let if_ b ~then_ ~else_ = run_checked (State_hash.if_ b ~then_ ~else_)
+        end
+
+        module Timing = struct
+          type t = Account_timing.var
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Account_timing.if_ b ~then_ ~else_)
+
+          let vesting_period (t : t) = t.vesting_period
+        end
+
+        module Balance = struct
+          include Balance.Checked
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
+
+          let sub_amount_flagged x y = run_checked (sub_amount_flagged x y)
+
+          let add_signed_amount_flagged x y =
+            run_checked (add_signed_amount_flagged x y)
+        end
+
+        module Verification_key = struct
+          type t =
+            ( Boolean.var
+            , ( Side_loaded_verification_key.t option
+              , Field.Constant.t )
+              With_hash.t
+              Data_as_hash.t )
+            Snapp_basic.Flagged_option.t
+
+          let if_ b ~(then_ : t) ~(else_ : t) : t =
+            Snapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+        end
+
+        module Events = struct
+          type t = Snapp_account.Events.var
+
+          let is_empty x = run_checked (Party.Events.is_empty_var x)
+
+          let push_events = Party.Sequence_events.push_events_checked
+        end
+
+        module Snapp_uri = struct
+          type t = string Data_as_hash.t
+
+          let if_ = Data_as_hash.if_
+        end
+
+        module Token_symbol = struct
+          type t = Account.Token_symbol.var
+
+          let if_ = Account.Token_symbol.if_
+        end
+
+        module Account = struct
+          type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+
+          module Permissions = struct
+            let edit_state : t -> Controller.t =
+             fun a -> a.data.permissions.edit_state
+
+            let send : t -> Controller.t = fun a -> a.data.permissions.send
+
+            let receive : t -> Controller.t =
+             fun a -> a.data.permissions.receive
+
+            let set_delegate : t -> Controller.t =
+             fun a -> a.data.permissions.set_delegate
+
+            let set_permissions : t -> Controller.t =
+             fun a -> a.data.permissions.set_permissions
+
+            let set_verification_key : t -> Controller.t =
+             fun a -> a.data.permissions.set_verification_key
+
+            let set_snapp_uri : t -> Controller.t =
+             fun a -> a.data.permissions.set_snapp_uri
+
+            let edit_sequence_state : t -> Controller.t =
+             fun a -> a.data.permissions.edit_sequence_state
+
+            let set_token_symbol : t -> Controller.t =
+             fun a -> a.data.permissions.set_token_symbol
+
+            let increment_nonce : t -> Controller.t =
+             fun a -> a.data.permissions.increment_nonce
+
+            let set_voting_for : t -> Controller.t =
+             fun a -> a.data.permissions.set_voting_for
+
+            type t = Permissions.Checked.t
+
+            let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
+          end
+
+          let account_with_hash (account : Account.Checked.Unhashed.t) =
+            With_hash.of_data account ~hash_data:(fun a ->
+                let a =
+                  { a with
+                    snapp =
+                      ( Snapp_account.Checked.digest a.snapp
+                      , As_prover.Ref.create (fun () -> None) )
+                  }
+                in
+                run_checked (Account.Checked.digest a))
+
+          type timing = Account_timing.var
+
+          let timing (account : t) : timing = account.data.timing
+
+          let set_timing (timing : timing) (account : t) : t =
+            { account with data = { account.data with timing } }
+
+          let balance (a : t) : Balance.t = a.data.balance
+
+          let set_balance (balance : Balance.t) ({ data = a; hash } : t) : t =
+            { data = { a with balance }; hash }
+
+          let check_timing ~txn_global_slot ({ data = account; _ } : t) =
+            let invalid_timing = ref None in
+            let balance_check _ = failwith "Should not be called" in
+            let timed_balance_check b =
+              invalid_timing := Some (Boolean.not b) ;
+              return ()
+            in
+            let `Min_balance _, timing =
+              run_checked
+              @@ [%with_label "Check snapp timing"]
+                   (check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:None ~txn_global_slot)
+            in
+            (`Invalid_timing (Option.value_exn !invalid_timing), timing)
+
+          let make_snapp (a : t) = a
+
+          let unmake_snapp (a : t) = a
+
+          let proved_state (a : t) = a.data.snapp.proved_state
+
+          let set_proved_state proved_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with proved_state } }; hash }
+
+          let app_state (a : t) = a.data.snapp.app_state
+
+          let set_app_state app_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with app_state } }; hash }
+
+          let register_verification_key ({ data = a; _ } : t) =
+            Option.iter snapp_statement ~f:(fun (tag, _) ->
+                let vk =
+                  exists Side_loaded_verification_key.typ ~compute:(fun () ->
+                      Option.value_exn
+                        (As_prover.Ref.get
+                           (Data_as_hash.ref a.snapp.verification_key.data))
+                          .data)
+                in
+                let expected_hash =
+                  Data_as_hash.hash a.snapp.verification_key.data
+                in
+                let actual_hash = Snapp_account.Checked.digest_vk vk in
+                Field.Assert.equal expected_hash actual_hash ;
+                Pickles.Side_loaded.in_circuit (side_loaded tag) vk)
+
+          let verification_key (a : t) : Verification_key.t =
+            a.data.snapp.verification_key
+
+          let set_verification_key (verification_key : Verification_key.t)
+              ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with verification_key } }
+            ; hash
+            }
+
+          let last_sequence_slot (a : t) = a.data.snapp.last_sequence_slot
+
+          let set_last_sequence_slot last_sequence_slot ({ data = a; hash } : t)
+              : t =
+            { data = { a with snapp = { a.snapp with last_sequence_slot } }
+            ; hash
+            }
+
+          let sequence_state (a : t) = a.data.snapp.sequence_state
+
+          let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
+            { data = { a with snapp = { a.snapp with sequence_state } }; hash }
+
+          let snapp_uri (a : t) = a.data.snapp_uri
+
+          let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
+            { data = { a with snapp_uri }; hash }
+
+          let token_symbol (a : t) = a.data.token_symbol
+
+          let set_token_symbol token_symbol ({ data = a; hash } : t) : t =
+            { data = { a with token_symbol }; hash }
+
+          let public_key (a : t) = a.data.public_key
+
+          let set_public_key public_key ({ data = a; hash } : t) : t =
+            { data = { a with public_key }; hash }
+
+          let delegate (a : t) = a.data.delegate
+
+          let set_delegate delegate ({ data = a; hash } : t) : t =
+            { data = { a with delegate }; hash }
+
+          let nonce (a : t) = a.data.nonce
+
+          let set_nonce nonce ({ data = a; hash } : t) : t =
+            { data = { a with nonce }; hash }
+
+          let voting_for (a : t) = a.data.voting_for
+
+          let set_voting_for voting_for ({ data = a; hash } : t) : t =
+            { data = { a with voting_for }; hash }
+
+          let permissions (a : t) = a.data.permissions
+
+          let set_permissions permissions ({ data = a; hash } : t) : t =
+            { data = { a with permissions }; hash }
         end
 
         module Ledger = struct
           type t = Ledger_hash.var * Sparse_ledger.t V.t
+
+          type inclusion_proof = (Boolean.var * Field.t) list
 
           let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
             ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
@@ -1592,169 +1598,373 @@ module Base = struct
             let t = Sparse_ledger.empty ~depth () in
             ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
             , V.create (fun () -> t) )
+
+          let idx ledger id = Sparse_ledger.find_index_exn ledger id
+
+          let body_id (body : Party.Body.Checked.t) =
+            let open As_prover in
+            Account_id.create
+              (read Public_key.Compressed.typ body.public_key)
+              (read Token_id.typ body.token_id)
+
+          let get_account { party; _ } (_root, ledger) =
+            let idx =
+              V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
+            in
+            let account =
+              exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
+                  Sparse_ledger.get_exn (V.get ledger) (V.get idx))
+            in
+            let account = Account.account_with_hash account in
+            let incl =
+              exists
+                Typ.(
+                  list ~length:constraint_constants.ledger_depth
+                    (Boolean.typ * field))
+                ~compute:(fun () ->
+                  List.map
+                    (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
+                    ~f:(fun x ->
+                      match x with
+                      | `Left h ->
+                          (false, h)
+                      | `Right h ->
+                          (true, h)))
+            in
+            (account, incl)
+
+          let set_account (_root, ledger) (a, incl) =
+            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
+            , V.map ledger
+                ~f:
+                  As_prover.(
+                    fun ledger ->
+                      let a : Mina_base.Account.t =
+                        read Mina_base.Account.Checked.Unhashed.typ a.data
+                      in
+                      let idx = idx ledger (Mina_base.Account.identifier a) in
+                      Sparse_ledger.set_exn ledger idx a) )
+
+          let check_inclusion (root, _) (account, incl) =
+            with_label __LOC__
+              (fun () -> Field.Assert.equal (implied_root account incl))
+              (Ledger_hash.var_to_hash_packed root)
+
+          let check_account public_key token_id
+              (({ data = account; _ }, _) : Account.t * _) =
+            let is_new =
+              run_checked
+                (Public_key.Compressed.Checked.equal account.public_key
+                   Public_key.Compressed.(var_of_t empty))
+            in
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any
+                  [ is_new
+                  ; run_checked
+                      (Public_key.Compressed.Checked.equal public_key
+                         account.public_key)
+                  ]) ;
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any
+                  [ is_new
+                  ; run_checked
+                      (Token_id.Checked.equal token_id account.token_id)
+                  ]) ;
+            `Is_new is_new
         end
 
-        module Parties = struct
-          module Opt = struct
-            open Snapp_basic
+        module Opt = struct
+          open Snapp_basic
 
-            type 'a t = (Bool.t, 'a) Flagged_option.t
+          type 'a t = (Bool.t, 'a) Flagged_option.t
 
-            let is_some = Flagged_option.is_some
+          let is_some = Flagged_option.is_some
 
-            let map x ~f = Flagged_option.map ~f x
+          let map x ~f = Flagged_option.map ~f x
 
-            let or_default ~if_ x ~default =
-              if_ (is_some x) ~then_:(Flagged_option.data x) ~else_:default
+          let or_default ~if_ x ~default =
+            if_ (is_some x) ~then_:(Flagged_option.data x) ~else_:default
 
-            let or_exn x =
-              with_label "or_exn is_some" (fun () -> Bool.assert_ (is_some x)) ;
-              Flagged_option.data x
-          end
+          let or_exn x =
+            with_label "or_exn is_some" (fun () -> Bool.assert_ (is_some x)) ;
+            Flagged_option.data x
+        end
 
-          type party_or_stack =
-            Field.t
-            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t V.t
+        module Stack (Elt : sig
+          type t
+
+          val default : t
+
+          val hash : t -> Field.Constant.t
+
+          val push :
+               consed_hash:Field.Constant.t
+            -> t
+            -> (t, Field.Constant.t) With_stack_hash.t list
+            -> (t, Field.Constant.t) With_stack_hash.t list
+        end) :
+          Parties_logic.Stack_intf
+            with type elt = (Elt.t V.t, Field.t) With_hash.t
+             and type t =
+                  ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
+                  , Field.t )
+                  With_hash.t
+             and type bool := Bool.t
+             and module Opt := Opt = struct
+          type elt = (Elt.t V.t, Field.t) With_hash.t
 
           type t =
-            Field.t
-            * (Party.t * unit, Parties.Digest.t) Parties.Party_or_stack.t list
-              V.t
+            ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
+            , Field.t )
+            With_hash.t
 
-          let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
-            (Field.if_ b ~then_:xt ~else_:xe, V.if_ b ~then_:rt ~else_:re)
+          let if_ b ~then_:(t : t) ~else_:(e : t) : t =
+            { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+            ; data = V.if_ b ~then_:t.data ~else_:e.data
+            }
 
-          let empty = Field.constant Parties.Party_or_stack.With_hashes.empty
+          let empty_constant = Parties.Call_forest.With_hashes.empty
 
-          let is_empty (x, _) = Field.equal empty x
+          let empty = Field.constant empty_constant
 
-          let empty = (empty, V.create (fun () -> []))
+          let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+
+          let empty : t = { hash = empty; data = V.create (fun () -> []) }
 
           let hash_cons hash h_tl =
             Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
               [| hash; h_tl |]
 
-          let pop_exn ((h, r) : t) : party_or_stack * t =
-            let hd_r = V.create (fun () -> V.get r |> List.hd_exn) in
-            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
-            let party_or_stack, stack =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.hash
-                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  ))
-            in
-            let h' = hash_cons party_or_stack stack in
-            with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
-            ((party_or_stack, hd_r), (stack, tl_r))
+          let stack_hash (type a)
+              (xs : (a, Field.Constant.t) With_stack_hash.t list) :
+              Field.Constant.t =
+            match xs with [] -> empty_constant | e :: _ -> e.stack_hash
 
-          let as_stack ((h, r) : party_or_stack) : t Opt.t =
-            (* NB: Don't need to check here, since interpreting a stack as a
-               party or party as a stack implies a hash collision.
-            *)
-            let is_some =
-              exists Boolean.typ ~compute:(fun () ->
-                  match V.get r with Party _ -> false | Stack _ -> true)
-            in
-            let data =
-              ( h
-              , V.create (fun () ->
-                    match V.get r with Party _ -> [] | Stack (xs, _) -> xs) )
-            in
-            { Snapp_basic.Flagged_option.is_some; data }
-
-          let pop_party_exn ((h, r) : t) : party * t =
-            let first_party =
-              V.create (fun () ->
-                  match V.get r |> List.hd_exn with
-                  | Party ((party, ()), _) ->
-                      party
-                  | Stack _ ->
-                      failwith "pop_party_exn")
-            in
-            let body, tl =
-              exists
-                Typ.(Party.Body.typ () * field)
-                ~compute:(fun () ->
-                  let p = V.get first_party in
-                  let h =
-                    V.get r |> List.tl_exn
-                    |> Parties.Party_or_stack.With_hashes.stack_hash
-                  in
-                  (p.data.body, h))
-            in
-            let predicate : Party.Predicate.Checked.t =
-              exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                  (V.get first_party).data.predicate)
-            in
-            let auth =
-              V.(create (fun () -> (V.get first_party).authorization))
-            in
-            let party : Party.Predicated.Checked.t = { body; predicate } in
-            let party =
-              With_hash.of_data party ~hash_data:Party.Predicated.Checked.digest
-            in
-            let actual_h =
-              Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
-                [| party.hash; tl |]
-            in
-            with_label __LOC__ (fun () -> Field.Assert.equal h actual_h) ;
-            ( { party; control = auth }
-            , (tl, V.(create (fun () -> List.tl_exn (get r)))) )
-
-          let pop_stack ((h, r) : t) : (t * t) Opt.t =
+          let pop ({ hash = h; data = r } as t : t) : (elt * t) Opt.t =
+            let input_is_empty = is_empty t in
             let hd_r =
               V.create (fun () ->
-                  match V.get r |> List.hd with
-                  | Some (Stack (x, _)) ->
-                      x
-                  | _ ->
-                      [])
+                  V.get r |> List.hd
+                  |> Option.value_map ~default:Elt.default ~f:(fun x -> x.elt))
             in
             let tl_r =
               V.create (fun () ->
                   V.get r |> List.tl |> Option.value ~default:[])
             in
-            let party_or_stack, stack =
+            let elt, stack =
               exists
                 Typ.(Field.typ * Field.typ)
                 ~compute:(fun () ->
-                  ( V.get hd_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  , V.get tl_r |> Parties.Party_or_stack.With_hashes.stack_hash
-                  ))
+                  (V.get hd_r |> Elt.hash, stack_hash (V.get tl_r)))
             in
-            let h' = hash_cons party_or_stack stack in
-            (* NB: Don't need to check here, since interpreting a stack as a
-               party or party as a stack implies a hash collision.
-            *)
-            let is_some = Field.equal h h' in
-            let data = ((party_or_stack, hd_r), (stack, tl_r)) in
-            { Snapp_basic.Flagged_option.is_some; data }
+            let h' = hash_cons elt stack in
+            with_label __LOC__ (fun () ->
+                Boolean.Assert.any [ input_is_empty; Field.equal h h' ]) ;
+            { is_some = Boolean.not input_is_empty
+            ; data = ({ hash = elt; data = hd_r }, { hash = stack; data = tl_r })
+            }
 
-          let push_stack ((h_hd, r_hd) : t) ~onto:((h_tl, r_tl) : t) : t =
+          let pop_exn ({ hash = h; data = r } : t) : elt * t =
+            let hd_r = V.create (fun () -> (V.get r |> List.hd_exn).elt) in
+            let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
+            let elt, stack =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  (V.get hd_r |> Elt.hash, stack_hash (V.get tl_r)))
+            in
+            let h' = hash_cons elt stack in
+            with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
+            ({ hash = elt; data = hd_r }, { hash = stack; data = tl_r })
+
+          let push ({ hash = h_hd; data = r_hd } : elt)
+              ~onto:({ hash = h_tl; data = r_tl } : t) : t =
             let h = hash_cons h_hd h_tl in
             let r =
               V.create (fun () ->
-                  let hd_stack = V.get r_hd in
+                  let hd = V.get r_hd in
                   let tl = V.get r_tl in
-                  Parties.Party_or_stack.Stack
-                    (hd_stack, As_prover.read Field.typ h)
-                  :: tl)
+                  Elt.push ~consed_hash:(As_prover.read Field.typ h) hd tl)
             in
-            (h, r)
+            { hash = h; data = r }
         end
+
+        module Parties = struct
+          type t =
+            ( (Party.t * unit, Parties.Digest.t) Parties.Call_forest.t V.t
+            , Field.t )
+            With_hash.t
+
+          let if_ b ~then_:(t : t) ~else_:(e : t) : t =
+            { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+            ; data = V.if_ b ~then_:t.data ~else_:e.data
+            }
+
+          let empty = Field.constant Parties.Call_forest.With_hashes.empty
+
+          let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+
+          let empty : t = { hash = empty; data = V.create (fun () -> []) }
+
+          let hash_cons hash h_tl =
+            Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
+              [| hash; h_tl |]
+
+          let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
+            let hd_r =
+              V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
+            in
+            let party = V.create (fun () -> (V.get hd_r).party |> fst) in
+            let body =
+              exists (Party.Body.typ ()) ~compute:(fun () ->
+                  (V.get party).data.body)
+            in
+            let predicate : Party.Predicate.Checked.t =
+              exists (Party.Predicate.typ ()) ~compute:(fun () ->
+                  (V.get party).data.predicate)
+            in
+            let auth = V.(create (fun () -> (V.get party).authorization)) in
+            let party : Party.Predicated.Checked.t = { body; predicate } in
+            let party =
+              With_hash.of_data party ~hash_data:Party.Predicated.Checked.digest
+            in
+            let subforest : t =
+              let subforest = V.create (fun () -> (V.get hd_r).calls) in
+              let subforest_hash =
+                exists Field.typ ~compute:(fun () ->
+                    Parties.Call_forest.hash (V.get subforest))
+              in
+              { hash = subforest_hash; data = subforest }
+            in
+            let tl_hash =
+              exists Field.typ ~compute:(fun () ->
+                  V.get r |> List.tl_exn |> Parties.Call_forest.hash)
+            in
+            let tree_hash =
+              Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
+                [| party.hash; subforest.hash |]
+            in
+            Field.Assert.equal (hash_cons tree_hash tl_hash) h ;
+            ( ({ party; control = auth }, subforest)
+            , { hash = tl_hash
+              ; data = V.(create (fun () -> List.tl_exn (get r)))
+              } )
+        end
+
+        module Call_stack = Stack (struct
+          module Parties = Mina_base.Parties
+
+          type t =
+            (Party.t * unit, Parties.Digest.t) Mina_base.Parties.Call_forest.t
+
+          let default : t = []
+
+          let hash : t -> Field.Constant.t = Mina_base.Parties.Call_forest.hash
+
+          let push ~consed_hash (t : t) (xs : (t, _) With_stack_hash.t list) :
+              (t, _) With_stack_hash.t list =
+            { stack_hash = consed_hash; elt = t } :: xs
+        end)
 
         module Party = struct
           type t = party
 
+          type parties = Parties.t
+
+          type transaction_commitment = Transaction_commitment.t
+
           let balance_change (t : t) = t.party.data.body.balance_change
 
           let protocol_state (t : t) = t.party.data.body.protocol_state
+
+          let token_id (t : t) = t.party.data.body.token_id
+
+          let public_key (t : t) = t.party.data.body.public_key
+
+          let use_full_commitment (t : t) =
+            t.party.data.body.use_full_commitment
+
+          let increment_nonce (t : t) = t.party.data.body.increment_nonce
+
+          let check_authorization ~commitment
+              ~at_party:({ hash = at_party; _ } : Parties.t)
+              ({ party; control; _ } : t) =
+            let proof_verifies =
+              match (auth_type, snapp_statement) with
+              | Proof, Some (_i, s) ->
+                  with_label __LOC__ (fun () ->
+                      Snapp_statement.Checked.Assert.equal
+                        { transaction = commitment; at_party }
+                        s) ;
+                  Boolean.true_
+              | (Signature | None_given), None ->
+                  Boolean.false_
+              | Proof, None | (Signature | None_given), Some _ ->
+                  assert false
+            in
+            let signature_verifies =
+              match auth_type with
+              | None_given | Proof ->
+                  Boolean.false_
+              | Signature ->
+                  let signature =
+                    exists Signature_lib.Schnorr.Chunked.Signature.typ
+                      ~compute:(fun () ->
+                        match V.get control with
+                        | Signature s ->
+                            s
+                        | None_given ->
+                            Signature.dummy
+                        | Proof _ ->
+                            assert false)
+                  in
+                  run_checked
+                    (let%bind (module S) =
+                       Tick.Inner_curve.Checked.Shifted.create ()
+                     in
+                     signature_verifies
+                       ~shifted:(module S)
+                       ~payload_digest:commitment signature
+                       party.data.body.public_key)
+            in
+            ( `Proof_verifies proof_verifies
+            , `Signature_verifies signature_verifies )
+
+          module Update = struct
+            open Snapp_basic
+
+            type 'a set_or_keep = 'a Set_or_keep.Checked.t
+
+            let timing ({ party; _ } : t) : Account.timing set_or_keep =
+              Set_or_keep.Checked.map
+                ~f:Party.Update.Timing_info.Checked.to_account_timing
+                party.data.body.update.timing
+
+            let app_state ({ party; _ } : t) = party.data.body.update.app_state
+
+            let verification_key ({ party; _ } : t) =
+              party.data.body.update.verification_key
+
+            let sequence_events ({ party; _ } : t) =
+              party.data.body.sequence_events
+
+            let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
+
+            let token_symbol ({ party; _ } : t) =
+              party.data.body.update.token_symbol
+
+            let delegate ({ party; _ } : t) = party.data.body.update.delegate
+
+            let voting_for ({ party; _ } : t) =
+              party.data.body.update.voting_for
+
+            let permissions ({ party; _ } : t) =
+              party.data.body.update.permissions
+          end
         end
 
-        module Account = struct
-          type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+        module Set_or_keep = struct
+          include Snapp_basic.Set_or_keep.Checked
         end
 
         module Amount = struct
@@ -1770,7 +1980,9 @@ module Base = struct
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
-            let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
+            let is_pos (t : t) =
+              Sgn.Checked.is_pos
+                (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
             let negate = Amount.Signed.Checked.negate
 
@@ -1791,6 +2003,8 @@ module Base = struct
 
           let add_signed_flagged (x : t) (y : Signed.t) =
             run_checked (Amount.Checked.add_signed_flagged x y)
+
+          let of_constant_fee fee = Amount.var_of_t (Amount.of_fee fee)
         end
 
         module Token_id = struct
@@ -1806,8 +2020,62 @@ module Base = struct
           let invalid = Token_id.(var_of_t invalid)
         end
 
+        module Public_key = struct
+          type t = Public_key.Compressed.var
+
+          let if_ b ~then_ ~else_ =
+            run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
+        end
+
         module Protocol_state_predicate = struct
           type t = Snapp_predicate.Protocol_state.Checked.t
+        end
+
+        module Field = struct
+          type t = Field.t
+
+          let if_ = Field.if_
+        end
+
+        module Local_state = struct
+          type t =
+            ( Parties.t
+            , Call_stack.t
+            , Token_id.t
+            , Amount.t
+            , Ledger.t
+            , Bool.t
+            , Transaction_commitment.t
+            , Bool.failure_status )
+            Parties_logic.Local_state.t
+
+          let add_check (t : t) _failure b =
+            { t with success = Bool.(t.success &&& b) }
+
+          let update_failure_status (t : t) _failure_status b =
+            add_check (t : t) () b
+        end
+
+        module Global_state = struct
+          type t = Global_state.t =
+            { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+            ; fee_excess : Amount.Signed.t
+            ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
+            }
+
+          let fee_excess { fee_excess; _ } = fee_excess
+
+          let set_fee_excess t fee_excess = { t with fee_excess }
+
+          let ledger { ledger; _ } = ledger
+
+          let set_ledger ~should_update t ledger =
+            { t with
+              ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+            }
+
+          let global_slot_since_genesis { protocol_state; _ } =
+            protocol_state.global_slot_since_genesis
         end
       end
 
@@ -1827,6 +2095,7 @@ module Base = struct
           ; parties : Parties.t
           ; local_state :
               ( Parties.t
+              , Call_stack.t
               , Token_id.t
               , Amount.t
               , Ledger.t
@@ -1844,79 +2113,7 @@ module Base = struct
       include Parties_logic.Make (Inputs)
 
       let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
-        let body_id (body : Party.Body.Checked.t) =
-          let open As_prover in
-          Account_id.create
-            (read Public_key.Compressed.typ body.public_key)
-            (read Token_id.typ body.token_id)
-        in
-        let idx ledger id = Sparse_ledger.find_index_exn ledger id in
-        let account_with_hash (account : Account.Checked.Unhashed.t) =
-          With_hash.of_data account ~hash_data:(fun a ->
-              let a =
-                { a with
-                  snapp =
-                    ( Snapp_account.Checked.digest a.snapp
-                    , As_prover.Ref.create (fun () -> None) )
-                }
-              in
-              run_checked (Account.Checked.digest a))
-        in
         match eff with
-        | Get_global_ledger g ->
-            g.ledger
-        | Transaction_commitments_on_start
-            { other_parties = other_parties, _
-            ; protocol_state_predicate
-            ; memo_hash
-            ; party = { party; _ }
-            } -> (
-            match is_start with
-            | `No ->
-                assert false
-            | `Yes | `Compute_in_circuit ->
-                let transaction_commitment =
-                  Parties.Transaction_commitment.Checked.create
-                    ~other_parties_hash:other_parties
-                    ~protocol_state_predicate_hash:
-                      (Snapp_predicate.Protocol_state.Checked.digest
-                         protocol_state_predicate)
-                    ~memo_hash
-                in
-                let full_transaction_commitment =
-                  Parties.Transaction_commitment.Checked.with_fee_payer
-                    transaction_commitment ~fee_payer_hash:party.hash
-                in
-                (transaction_commitment, full_transaction_commitment) )
-        | Get_account ({ party; _ }, (_root, ledger)) ->
-            let idx =
-              V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
-            in
-            let account =
-              exists Account.Checked.Unhashed.typ ~compute:(fun () ->
-                  Sparse_ledger.get_exn (V.get ledger) (V.get idx))
-            in
-            let account = account_with_hash account in
-            let incl =
-              exists
-                Typ.(
-                  list ~length:constraint_constants.ledger_depth
-                    (Boolean.typ * field))
-                ~compute:(fun () ->
-                  List.map
-                    (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
-                    ~f:(fun x ->
-                      match x with
-                      | `Left h ->
-                          (false, h)
-                      | `Right h ->
-                          (true, h)))
-            in
-            (account, incl)
-        | Check_inclusion ((root, _), account, incl) ->
-            with_label __LOC__
-              (fun () -> Field.Assert.equal (implied_root account incl))
-              (Ledger_hash.var_to_hash_packed root)
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
             Snapp_predicate.Protocol_state.Checked.check
@@ -1924,165 +2121,22 @@ module Base = struct
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
             Snapp_predicate.Account.Checked.check party.data.predicate
               account.data
-        | Set_account ((_root, ledger), a, incl) ->
-            ( implied_root a incl |> Ledger_hash.var_of_hash_packed
-            , V.map ledger
-                ~f:
-                  As_prover.(
-                    let account_typ =
-                      let snapp :
-                          ( Snapp_account.Checked.t
-                          , Snapp_account.t option )
-                          Typ.t =
-                        let open Snapp_account.Poly in
-                        let vk :
-                            ( ( Pickles.Side_loaded.Verification_key.Checked.t
-                                Lazy.t
-                              , Pickles.Impls.Step.Field.t Lazy.t )
-                              With_hash.t
-                            , ( Side_loaded_verification_key.t
-                              , Field.Constant.t )
-                              With_hash.t
-                              option )
-                            Typ.t =
-                          { store = (fun _ -> failwith "unused")
-                          ; check = (fun _ -> failwith "unused")
-                          ; alloc = Free (Alloc (fun _ -> failwith "unused"))
-                          ; read =
-                              Snarky_backendless.Typ_monads.Read.(
-                                fun v ->
-                                  let%map h = read (Lazy.force v.hash) in
-                                  Some
-                                    { With_hash.data =
-                                        Pickles.Side_loaded.Verification_key
-                                        .dummy
-                                    ; hash = h
-                                    })
-                          }
-                        in
-                        (* TODO: Refactor. This hacking around the vk is a code smell *)
-                        Typ.of_hlistable
-                          [ Snapp_state.typ Field.typ
-                          ; vk
-                          ; Mina_numbers.Snapp_version.typ
-                          ; Pickles_types.Vector.typ Field.typ
-                              Pickles_types.Nat.N5.n
-                          ; Mina_numbers.Global_slot.typ
-                          ; Boolean.typ
-                          ]
-                          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-                          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-                        |> Typ.transport
-                             ~there:(fun x -> Option.value_exn x)
-                             ~back:(fun x -> Some x)
-                      in
-                      Account.typ' snapp
-                    in
-                    fun ledger ->
-                      let a : Account.t = read account_typ a.data in
-                      let idx = idx ledger (Account.identifier a) in
-                      Sparse_ledger.set_exn ledger idx a) )
-        | Check_fee_excess (valid_fee_excess, ()) ->
-            with_label __LOC__ (fun () ->
-                Boolean.Assert.is_true valid_fee_excess)
-        | Modify_global_excess (global, f) ->
-            { global with fee_excess = f global.fee_excess }
-        | Modify_global_ledger { global_state; ledger; should_update } ->
-            { global_state with
-              ledger =
-                Inputs.Ledger.if_ should_update ~then_:ledger
-                  ~else_:global_state.ledger
-            }
-        | Party_token_id { party; _ } ->
-            party.data.body.token_id
-        | Check_auth_and_update_account
-            { is_start
-            ; at_party = at_party, _
-            ; global_state
-            ; party = { party; control; _ }
-            ; account
-            ; transaction_commitment
-            ; full_transaction_commitment
-            ; inclusion_proof = _
-            } ->
-            let commitment =
-              Inputs.Transaction_commitment.if_
-                party.data.body.use_full_commitment
-                ~then_:full_transaction_commitment ~else_:transaction_commitment
-            in
-            ( match (auth_type, snapp_statement) with
-            | Proof, Some (i, s) ->
-                Pickles.Side_loaded.in_circuit (side_loaded i)
-                  (Lazy.force account.data.snapp.verification_key.data) ;
-                with_label __LOC__ (fun () ->
-                    Snapp_statement.Checked.Assert.equal
-                      { transaction = commitment; at_party }
-                      s)
-            | (Signature | None_given), None ->
-                ()
-            | Proof, None | (Signature | None_given), Some _ ->
-                assert false ) ;
-            let add_check, checks_succeeded = create_checker () in
-            let signature_verifies =
-              match auth_type with
-              | None_given | Proof ->
-                  Boolean.false_
-              | Signature ->
-                  let signature =
-                    exists Signature_lib.Schnorr.Signature.typ
-                      ~compute:(fun () ->
-                        match V.get control with
-                        | Signature s ->
-                            s
-                        | None_given ->
-                            Signature.dummy
-                        | Proof _ ->
-                            assert false)
-                  in
-                  run_checked
-                    (let%bind (module S) =
-                       Tick.Inner_curve.Checked.Shifted.create ()
-                     in
-                     signature_verifies
-                       ~shifted:(module S)
-                       ~payload_digest:commitment signature
-                       party.data.body.public_key)
-            in
-            (* The fee-payer must increment their nonce. *)
-            add_check Boolean.(party.data.body.increment_nonce ||| not is_start) ;
+        | Check_auth { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
-            add_check
-              Boolean.(
-                party.data.body.increment_nonce
-                ||| party.data.body.use_full_commitment
-                ||| not signature_verifies) ;
             let account', `proof_must_verify proof_must_verify =
-              let tag =
-                Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
-              in
-              apply_body ~constraint_constants ?tag
-                ~txn_global_slot:
-                  global_state.protocol_state.global_slot_since_hard_fork
-                ~add_check
-                ~check_auth:(fun t ->
-                  Permissions.Auth_required.Checked.spec_eval
-                    ~signature_verifies t)
-                ~is_start party.data account.data
+              apply_body ~is_start party.data account.data
             in
             let proof_must_verify = proof_must_verify () in
-            let checks_succeeded = checks_succeeded () in
             let success =
               match auth_type with
               | None_given | Signature ->
-                  Boolean.((not proof_must_verify) && checks_succeeded)
+                  Boolean.(not proof_must_verify)
               | Proof ->
                   (* We always assert that the proof verifies. *)
-                  checks_succeeded
+                  Boolean.true_
             in
             (* omit failure status here, unlike `Transaction_logic` *)
-            (account_with_hash account', success, ())
-        | Balance account ->
-            Balance.Checked.to_amount account.data.balance
+            (Inputs.Account.account_with_hash account', success, ())
     end
 
     let check_protocol_state ~pending_coinbase_stack_init
@@ -2141,11 +2195,13 @@ module Base = struct
         in
         let l : _ Parties_logic.Local_state.t =
           { parties =
-              ( statement.source.local_state.parties
-              , V.create (fun () -> !witness.local_state_init.parties) )
+              { With_hash.hash = statement.source.local_state.parties
+              ; data = V.create (fun () -> !witness.local_state_init.parties)
+              }
           ; call_stack =
-              ( statement.source.local_state.call_stack
-              , V.create (fun () -> !witness.local_state_init.call_stack) )
+              { With_hash.hash = statement.source.local_state.call_stack
+              ; data = V.create (fun () -> !witness.local_state_init.call_stack)
+              }
           ; transaction_commitment =
               statement.source.local_state.transaction_commitment
           ; full_transaction_commitment =
@@ -2195,14 +2251,15 @@ module Base = struct
                       Party.of_fee_payer p.parties.Parties.fee_payer
                       :: p.parties.Parties.other_parties
                       |> List.map ~f:(fun party -> (party, ()))
-                      |> Parties.Party_or_stack.With_hashes.of_parties_list)
+                      |> Parties.Call_forest.With_hashes.of_parties_list)
               in
               let h =
                 exists Field.typ ~compute:(fun () ->
-                    Parties.Party_or_stack.With_hashes.stack_hash (V.get ps))
+                    Parties.Call_forest.hash (V.get ps))
               in
               let start_data =
-                { Parties_logic.Start_data.parties = (h, ps)
+                { Parties_logic.Start_data.parties =
+                    { With_hash.hash = h; data = ps }
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
                         match V.get v with
@@ -2245,8 +2302,8 @@ module Base = struct
                           `Skip
                       | p :: ps ->
                           let should_pop =
-                            Field.Constant.equal Parties.Party_or_stack.empty
-                              (As_prover.read_var (fst local.parties))
+                            Field.Constant.equal Parties.Call_forest.empty
+                              (As_prover.read_var local.parties.hash)
                           in
                           if should_pop then (
                             As_prover.Ref.set start_parties ps ;
@@ -2258,8 +2315,8 @@ module Base = struct
                     As_prover.(
                       fun () ->
                         [%test_eq: Impl.Field.Constant.t]
-                          Parties.Party_or_stack.empty
-                          (read_var (fst local.parties))) ;
+                          Parties.Call_forest.empty
+                          (read_var local.parties.hash)) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
@@ -2279,14 +2336,14 @@ module Base = struct
            it will never be upgraded to the global ledger. If we have such a
            failure, we just pretend we achieved the target hash.
         *)
-        Field.if_ local.success ~then_:(fst local.parties)
+        Field.if_ local.success ~then_:local.parties.hash
           ~else_:statement.target.local_state.parties
       in
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
             { local with
               parties = local_state_ledger
-            ; call_stack = fst local.call_stack
+            ; call_stack = local.call_stack.hash
             ; ledger = fst local.ledger
             }) ;
       with_label __LOC__ (fun () ->
@@ -2636,10 +2693,7 @@ module Base = struct
       Amount.Checked.of_fee
         Fee.(var_of_t constraint_constants.account_creation_fee)
     in
-    let%bind is_zero_fee =
-      fee |> Fee.var_to_number |> Number.to_var
-      |> Field.(Checked.equal (Var.constant zero))
-    in
+    let%bind is_zero_fee = Fee.(equal_var fee (var_of_t zero)) in
     let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
@@ -2707,7 +2761,7 @@ module Base = struct
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
                     let sgn = Sgn.Checked.neg_if_true is_user_command in
-                    Amount.Signed.create
+                    Amount.Signed.create_var
                       ~magnitude:(Amount.Checked.of_fee fee)
                       ~sgn
                   in
@@ -2718,7 +2772,7 @@ module Base = struct
                         ~then_:account_creation_amount
                         ~else_:Amount.(var_of_t zero)
                     in
-                    Amount.Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+                    Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee))
@@ -2727,9 +2781,11 @@ module Base = struct
              let%bind `Min_balance _, timing =
                [%with_label "Check fee payer timing"]
                  (let%bind txn_amount =
-                    Amount.Checked.if_
-                      (Sgn.Checked.is_neg amount.sgn)
-                      ~then_:amount.magnitude
+                    let%bind sgn = Amount.Signed.Checked.sgn amount in
+                    let%bind magnitude =
+                      Amount.Signed.Checked.magnitude amount
+                    in
+                    Amount.Checked.if_ (Sgn.Checked.is_neg sgn) ~then_:magnitude
                       ~else_:Amount.(var_of_t zero)
                   in
                   let balance_check ok =
@@ -2741,7 +2797,7 @@ module Base = struct
                       (Boolean.Assert.is_true ok)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot)
+                    ~txn_amount:(Some txn_amount) ~txn_global_slot)
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -3045,7 +3101,7 @@ module Base = struct
                          user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:amount ~txn_global_slot)
+                    ~txn_amount:(Some amount) ~txn_global_slot)
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -3140,7 +3196,7 @@ module Base = struct
                Checked.(
                  add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+             (Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
            in
            let%bind () =
              (* TODO: Reject this in txn pool before fees-in-tokens. *)
@@ -3219,7 +3275,8 @@ module Base = struct
          particular fee tokens used.
       *)
       let%bind fee_excess_zero =
-        Amount.equal_var fee_excess.magnitude Amount.(var_of_t zero)
+        Amount.Signed.Checked.equal fee_excess
+          Amount.Signed.(Checked.constant zero)
       in
       let%map fee_token_l =
         Token_id.Checked.if_ fee_excess_zero
@@ -3227,7 +3284,7 @@ module Base = struct
           ~else_:t.payload.common.fee_token
       in
       { Fee_excess.fee_token_l
-      ; fee_excess_l = Signed_poly.map ~f:Amount.Checked.to_fee fee_excess
+      ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
       ; fee_token_r = Token_id.(var_of_t default)
       ; fee_excess_r = Fee.Signed.(Checked.constant zero)
       }
@@ -3611,6 +3668,31 @@ let constraint_system_digests ~constraint_constants () =
             (main ~constraint_constants)) )
   ]
 
+type local_state =
+  ( (Party.t, unit) Parties.Call_forest.t
+  , (Party.t, unit) Parties.Call_forest.t list
+  , Token_id.t
+  , Currency.Amount.t
+  , Sparse_ledger.t
+  , bool
+  , unit
+  , Transaction_status.Failure.t option )
+  Parties_logic.Local_state.t
+
+type global_state = Sparse_ledger.Global_state.t
+
+module Parties_intermediate_state = struct
+  type state = { global : global_state; local : local_state }
+
+  type t =
+    { kind : [ `Same | `New | `Two_new ]
+    ; spec : Parties_segment.Basic.t
+    ; state_before : state
+    ; state_after : state
+    ; use_full_commitment : [ `Others | `Proved_use_full_commitment of bool ]
+    }
+end
+
 (** [group_by_parties_rev partiess stmtss] identifies before/after pairs of
     statements, corresponding to parties in [partiess] which minimize the
     number of snark proofs needed to prove all of the parties.
@@ -3632,66 +3714,102 @@ let constraint_system_digests ~constraint_constants () =
     will need to be passed as part of the snark witness while applying that
     pair.
 *)
-let group_by_parties_rev partiess stmtss =
+let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
+  let use_full_commitment (p : Party.t) =
+    match p.authorization with
+    | Proof _ ->
+        `Proved_use_full_commitment p.data.body.use_full_commitment
+    | _ ->
+        `Others
+  in
+  let intermediate_state p ~kind ~spec ~before ~after =
+    { Parties_intermediate_state.kind
+    ; spec
+    ; state_before = { global = fst before; local = snd before }
+    ; state_after = { global = fst after; local = snd after }
+    ; use_full_commitment = use_full_commitment p
+    }
+  in
   let rec group_by_parties_rev partiess stmtss acc =
     match (partiess, stmtss) with
     | ([] | [ [] ]), [ _ ] ->
         (* We've associated statements with all given parties. *)
         acc
-    | [ [ { Party.authorization = a1; _ } ] ], [ [ before; after ] ] ->
+    | [ [ ({ Party.authorization = a1; _ } as p) ] ], [ [ before; after ] ] ->
         (* There are no later parties to pair this one with. Prove it on its
            own.
         *)
-        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | [ []; [ { Party.authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ]
-      ->
+        intermediate_state p ~kind:`Same
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
+        :: acc
+    | ( [ []; [ ({ Party.authorization = a1; _ } as p) ] ]
+      , [ [ _ ]; [ before; after ] ] ) ->
         (* This party is part of a new transaction, and there are no later
            parties to pair it with. Prove it on its own.
         *)
-        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | ( ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
+        intermediate_state p ~kind:`New
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
+        :: acc
+    | ( (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
+        :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party contains a proof, don't pair it with other parties. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
-    | ( [] :: ({ Party.authorization = Proof _ as a1; _ } :: parties) :: partiess
+    | ( []
+        :: (({ Party.authorization = Proof _ as a1; _ } as p) :: parties)
+           :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is part of a new transaction, and contains a proof, don't
            pair it with other parties.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
-    | ( ({ Party.authorization = a1; _ }
+    | ( (({ Party.authorization = a1; _ } as p)
         :: ({ Party.authorization = Proof _; _ } :: _ as parties))
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
-    | ( ({ Party.authorization = a1; _ } :: ([] as parties))
+    | ( (({ Party.authorization = a1; _ } as p) :: ([] as parties))
         :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party is in the next transaction and contains a proof,
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
-    | ( ({ Party.authorization = a1; _ }
+    | ( (({ Party.authorization = a1; _ } as p)
         :: { Party.authorization = a2; _ } :: parties)
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`Same, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( intermediate_state p ~kind:`Same
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ }
+        :: (({ Party.authorization = a1; _ } as p)
            :: ({ Party.authorization = Proof _; _ } :: _ as parties))
            :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -3699,41 +3817,53 @@ let group_by_parties_rev partiess stmtss =
            proof, don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ }
+        :: (({ Party.authorization = a1; _ } as p)
            :: { Party.authorization = a2; _ } :: parties)
            :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            new transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
-    | ( [ { Party.authorization = a1; _ } ]
+    | ( [ ({ Party.authorization = a1; _ } as p) ]
         :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
            a new transaction. Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1; a2 ], before, after)
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
     | ( []
-        :: ({ Party.authorization = a1; _ } :: parties)
+        :: (({ Party.authorization = a1; _ } as p) :: parties)
            :: (({ Party.authorization = Proof _; _ } :: _) :: _ as partiess)
       , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
         (* The next transaction contains a proof, and this party is in a new
            transaction, don't pair it with the next party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( (`New, Parties_segment.Basic.of_controls [ a1 ], before, after)
+          ( intermediate_state p ~kind:`New
+              ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+              ~before ~after
           :: acc )
     | ( []
-        :: [ { Party.authorization = a1; _ } ]
+        :: [ ({ Party.authorization = a1; _ } as p) ]
            :: ({ Party.authorization = a2; _ } :: parties) :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
@@ -3741,22 +3871,30 @@ let group_by_parties_rev partiess stmtss =
         (* The next two parties do not contain proofs, the first is within a
            new transaction, and the second is within another new transaction.
            Pair them.
+           Ok to get "use_full_commitment" of [a1] because neither of them
+           contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( ( `Two_new
-            , Parties_segment.Basic.of_controls [ a1; a2 ]
-            , before
-            , after )
+          ( intermediate_state p ~kind:`Two_new
+              ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
+              ~before ~after
           :: acc )
-    | [ [ { Party.authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
+    | ( [ [ ({ Party.authorization = a1; _ } as p) ] ]
+      , (before :: after :: _) :: _ ) ->
         (* This party is the final party given. Prove it on its own. *)
-        (`Same, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
-    | ( [] :: [ { Party.authorization = a1; _ } ] :: [] :: _
+        intermediate_state p ~kind:`Same
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
+        :: acc
+    | ( [] :: [ ({ Party.authorization = a1; _ } as p) ] :: [] :: _
       , [ _ ] :: (before :: after :: _) :: _ ) ->
         (* This party is the final party given, in a new transaction. Prove it
            on its own.
         *)
-        (`New, Parties_segment.Basic.of_controls [ a1 ], before, after) :: acc
+        intermediate_state p ~kind:`New
+          ~spec:(Parties_segment.Basic.of_controls [ a1 ])
+          ~before ~after
+        :: acc
     | _, [] ->
         failwith "group_by_parties_rev: No statements remaining"
     | ([] | [ [] ]), _ ->
@@ -3801,6 +3939,19 @@ let group_by_parties_rev partiess stmtss =
   in
   group_by_parties_rev partiess stmtss []
 
+let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
+    (frames : 'frame list) : ('frame, field) With_stack_hash.t list =
+  match frames with
+  | [] ->
+      []
+  | f :: fs ->
+      let h_f = hash_frame f in
+      let tl = accumulate_call_stack_hashes ~hash_frame fs in
+      let h_tl =
+        match tl with [] -> Parties.Call_forest.empty | t :: _ -> t.stack_hash
+      in
+      { stack_hash = Parties.Call_forest.hash_cons h_f h_tl; elt = f } :: tl
+
 let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger partiess =
   let sparse_ledger =
@@ -3830,11 +3981,18 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       ([] :: List.map ~f:Parties.parties partiess)
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
-  let tx_statement transaction
-      (remaining_parties : (Party.t, _) Parties.Party_or_stack.t list) :
+  let tx_statement commitment full_commitment use_full_commitment
+      (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
       Snapp_statement.t =
     let at_party =
-      Parties.Party_or_stack.(stack_hash (accumulate_hashes' remaining_parties))
+      Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
+    in
+    let transaction =
+      match use_full_commitment with
+      | `Proved_use_full_commitment b ->
+          if b then full_commitment else commitment
+      | _ ->
+          failwith "Expected `Proof for party that has a proof"
     in
     { transaction; at_party }
   in
@@ -3849,10 +4007,12 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   in
   List.fold_right states_rev ~init:[]
     ~f:(fun
-         ( kind
-         , spec
-         , (source_global, source_local)
-         , (target_global, target_local) )
+         { Parties_intermediate_state.kind
+         ; spec
+         ; state_before = { global = source_global; local = source_local }
+         ; state_after = { global = target_global; local = target_local }
+         ; use_full_commitment
+         }
          witnesses
        ->
       let current_commitment = !commitment in
@@ -3863,7 +4023,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             (* NB: This is only correct if we assume that a proved party will
                never appear first in a transaction.
             *)
-            Some (0, tx_statement current_commitment source_local.parties)
+            Some
+              ( 0
+              , tx_statement current_commitment current_full_commitment
+                  use_full_commitment source_local.parties )
         | _ ->
             None
       in
@@ -3924,12 +4087,26 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       in
       let hash_local_state (local : _ Parties_logic.Local_state.t) =
         let hash_parties_stack ps =
-          ps |> Parties.Party_or_stack.accumulate_hashes'
-          |> List.map ~f:(Parties.Party_or_stack.map ~f:(fun p -> (p, ())))
+          ps |> Parties.Call_forest.accumulate_hashes'
+          |> Parties.Call_forest.map ~f:(fun p -> (p, ()))
+        in
+        let call_stack : (Party.t, unit) Parties.Call_forest.t list =
+          local.call_stack
+        in
+        let call_stack :
+            (unit Parties.Call_forest.With_hashes.t, field) With_stack_hash.t
+            list =
+          accumulate_call_stack_hashes
+            (List.map call_stack ~f:Parties.Call_forest.accumulate_hashes')
+            ~hash_frame:Parties.Call_forest.hash
+          |> List.map
+               ~f:
+                 (With_stack_hash.map
+                    ~f:(Parties.Call_forest.map ~f:(fun p -> (p, ()))))
         in
         { local with
           Parties_logic.Local_state.parties = hash_parties_stack local.parties
-        ; call_stack = hash_parties_stack local.call_stack
+        ; call_stack
         }
       in
       let source_local =
@@ -3974,6 +4151,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         ; fee_excess_r = Fee.Signed.zero
         }
       in
+      let call_stack_hash s =
+        List.hd s
+        |> Option.value_map ~default:Parties.Call_forest.empty
+             ~f:With_stack_hash.stack_hash
+      in
       let statement : Statement.With_sok.t =
         (* empty ledger hash in the local state at the beginning of each
            transaction
@@ -3990,10 +4172,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
-                  parties =
-                    Parties.Party_or_stack.stack_hash source_local.parties
-                ; call_stack =
-                    Parties.Party_or_stack.stack_hash source_local.call_stack
+                  parties = Parties.Call_forest.hash source_local.parties
+                ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
             }
@@ -4006,10 +4186,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   pending_coinbase_init_stack
             ; local_state =
                 { target_local with
-                  parties =
-                    Parties.Party_or_stack.stack_hash target_local.parties
-                ; call_stack =
-                    Parties.Party_or_stack.stack_hash target_local.call_stack
+                  parties = Parties.Call_forest.hash target_local.parties
+                ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
             }
@@ -4088,7 +4266,7 @@ struct
                   List.concat_map witness.start_parties ~f:(fun s ->
                       s.parties.other_parties)
               | xs ->
-                  Parties.Party_or_stack.to_parties_list xs |> List.map ~f:fst
+                  Parties.Call_forest.to_parties_list xs |> List.map ~f:fst
             in
             List.filter_map parties ~f:(fun p ->
                 let%bind tag, snapp_statement = snapp_statement in
@@ -4201,12 +4379,12 @@ module For_tests = struct
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; snapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
+            (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
-            (*Authorization for the update being performed*)
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -4215,26 +4393,11 @@ module For_tests = struct
   end
 
   let create_trivial_snapp ~constraint_constants () =
-    let local_dummy_constraints () =
-      let open Run in
-      let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
-      let g =
-        exists Pickles.Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-            Tick.Inner_curve.(to_affine_exn one))
-      in
-      let (_ : _) =
-        Pickles.Step_main_inputs.Ops.scale_fast g (`Plus_two_to_len [| b; b |])
-      in
-      let (_ : _) =
-        Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [ b ])
-      in
-      ()
-    in
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
             (unit, _) Checked.t =
-          local_dummy_constraints ()
+          Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
           |> return
@@ -4270,7 +4433,7 @@ module For_tests = struct
             ; main_value = (fun [ _; _ ] _ -> [ true; true ])
             ; main =
                 (fun [ _; _ ] _ ->
-                  local_dummy_constraints ()
+                  Impl.run_checked (dummy_constraints ())
                   |> fun () ->
                   (* Unsatisfiable. *)
                   Run.exists Field.typ ~compute:(fun () ->
@@ -4297,7 +4460,7 @@ module For_tests = struct
         ; receivers
         ; amount
         ; new_snapp_account
-        ; snapp_account_keypair
+        ; snapp_account_keypairs
         ; memo
         ; sequence_events
         ; events
@@ -4353,13 +4516,42 @@ module For_tests = struct
             Control.Signature Signature.dummy (*To be updated later*)
         }
     in
-    let snapp_party : Party.t option =
-      Option.map snapp_account_keypair ~f:(fun snapp_account_keypair ->
+    let snapp_parties : Party.t list =
+      let num_keypairs = List.length snapp_account_keypairs in
+      let account_creation_fee =
+        Amount.of_fee
+          Genesis_constants.Constraint_constants.compiled.account_creation_fee
+      in
+      (* if creating new snapp accounts, amount must be enough for account creation fees for each *)
+      assert (
+        (not new_snapp_account) || num_keypairs = 0
+        ||
+        match Currency.Amount.scale account_creation_fee num_keypairs with
+        | None ->
+            false
+        | Some product ->
+            Currency.Amount.( >= ) amount product ) ;
+      (* "fudge factor" so that balances sum to zero *)
+      let zeroing_allotment =
+        if new_snapp_account then
+          (* value doesn't matter when num_keypairs = 0 *)
+          if num_keypairs <= 1 then amount
+          else
+            let otherwise_allotted =
+              Option.value_exn
+                (Currency.Amount.scale account_creation_fee (num_keypairs - 1))
+            in
+            Option.value_exn (Currency.Amount.sub amount otherwise_allotted)
+        else Currency.Amount.zero
+      in
+      List.mapi snapp_account_keypairs ~f:(fun ndx snapp_account_keypair ->
           let public_key =
             Signature_lib.Public_key.compress snapp_account_keypair.public_key
           in
           let delta =
-            if new_snapp_account then Amount.Signed.(of_unsigned amount)
+            if new_snapp_account then
+              if ndx = 0 then Amount.Signed.(of_unsigned zeroing_allotment)
+              else Amount.Signed.(of_unsigned account_creation_fee)
             else Amount.Signed.zero
           in
           { Party.data =
@@ -4406,20 +4598,19 @@ module For_tests = struct
     let protocol_state = Snapp_predicate.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
-      @ Option.value_map snapp_party ~default:[] ~f:(fun snapp_party ->
-            [ snapp_party.data ])
+      @ List.map snapp_parties ~f:(fun p -> p.data)
       @ List.map other_receivers ~f:(fun p -> p.data)
     in
     let protocol_state_predicate_hash =
       Snapp_predicate.Protocol_state.digest protocol_state
     in
     let ps =
-      Parties.Party_or_stack.of_parties_list
+      Parties.Call_forest.of_parties_list
         ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         other_parties_data
-      |> Parties.Party_or_stack.accumulate_hashes_predicated
+      |> Parties.Call_forest.accumulate_hashes_predicated
     in
-    let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+    let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
       Parties.Transaction_commitment.create ~other_parties_hash
         ~protocol_state_predicate_hash
@@ -4431,8 +4622,8 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.sign sender.private_key
-          (Random_oracle.Input.field full_commitment)
+        Signature_lib.Schnorr.Chunked.sign sender.private_key
+          (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
@@ -4443,8 +4634,8 @@ module For_tests = struct
             else commitment
           in
           let sender_signature_auth =
-            Signature_lib.Schnorr.sign sender.private_key
-              (Random_oracle.Input.field commitment)
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field commitment)
           in
           { Party.data = s.data
           ; authorization = Signature sender_signature_auth
@@ -4452,7 +4643,7 @@ module For_tests = struct
     in
     ( `Parties { Parties.fee_payer; other_parties = other_receivers; memo }
     , `Sender_party sender_party
-    , `Proof_party snapp_party
+    , `Proof_parties snapp_parties
     , `Txn_commitment commitment
     , `Full_txn_commitment full_commitment )
 
@@ -4460,6 +4651,13 @@ module For_tests = struct
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
+    (* only allow timing on a single new snapp account
+       balance changes for other new snapp accounts are just the account creation fee
+    *)
+    assert (
+      Snapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
+      || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
+    ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
@@ -4474,39 +4672,36 @@ module For_tests = struct
     in
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
-        , `Proof_party snapp_party
+        , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:update_vk ~predicate:Party.Predicate.Accept
     in
     assert (List.is_empty other_parties) ;
-    let snapp_party =
-      Option.value_map ~default:[] snapp_party ~f:(fun snapp_party ->
+    (* invariant: same number of keypairs, snapp_parties *)
+    let snapp_parties_keypairs =
+      List.zip_exn snapp_parties spec.snapp_account_keypairs
+    in
+    let snapp_parties =
+      List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
           let commitment =
             if snapp_party.data.body.use_full_commitment then full_commitment
             else commitment
           in
           let signature =
-            Signature_lib.Schnorr.sign
-              (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
+            Signature_lib.Schnorr.Chunked.sign keypair.private_key
+              (Random_oracle.Input.Chunked.field commitment)
           in
-          [ { Party.data = snapp_party.data
-            ; authorization = Signature signature
-            }
-          ])
+          { Party.data = snapp_party.data; authorization = Signature signature })
     in
-    let other_parties = [ Option.value_exn sender_party ] @ snapp_party in
+    let other_parties = [ Option.value_exn sender_party ] @ snapp_parties in
     let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 
-  let update_state ~constraint_constants (spec : Spec.t) =
-    let `VK vk, `Prover trivial_prover =
-      create_trivial_snapp ~constraint_constants ()
-    in
+  let update_states ?snapp_prover ~constraint_constants (spec : Spec.t) =
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
-        , `Proof_party snapp_party
+        , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:spec.snapp_update
@@ -4514,90 +4709,128 @@ module For_tests = struct
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
-    assert (Option.is_some snapp_party) ;
-    let snapp_party = Option.value_exn snapp_party in
-    let%map.Async.Deferred snapp_party =
-      match spec.current_auth with
-      | Permissions.Auth_required.Proof ->
-          let proof_party =
-            let ps =
-              Parties.Party_or_stack.of_parties_list
-                ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-                [ snapp_party.data ]
-              |> Parties.Party_or_stack.accumulate_hashes_predicated
-            in
-            Parties.Party_or_stack.stack_hash ps
-          in
-          let tx_statement : Snapp_statement.t =
-            { transaction = commitment; at_party = proof_party }
-          in
-          let handler (Snarky_backendless.Request.With { request; respond }) =
-            match request with _ -> respond Unhandled
-          in
-          let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
-            trivial_prover ~handler [] tx_statement
-          in
-          { Party.data = snapp_party.data; authorization = Proof pi }
-      | Signature ->
-          let commitment =
-            if snapp_party.data.body.use_full_commitment then full_commitment
-            else commitment
-          in
-          let signature =
-            Signature_lib.Schnorr.sign
-              (Option.value_exn spec.snapp_account_keypair).private_key
-              (Random_oracle.Input.field commitment)
-          in
-          Async.Deferred.return
-            { Party.data = snapp_party.data
-            ; authorization = Signature signature
-            }
-      | None ->
-          Async.Deferred.return
-            { Party.data = snapp_party.data; authorization = None_given }
-      | _ ->
-          failwith "Current authorization not Proof or Signature or None_given"
+    assert (not @@ List.is_empty snapp_parties) ;
+    let snapp_parties_keypairs =
+      List.zip_exn snapp_parties spec.snapp_account_keypairs
     in
-    let other_parties = [ snapp_party ] in
+    let%map.Async.Deferred snapp_parties =
+      Async.Deferred.List.mapi snapp_parties_keypairs
+        ~f:(fun ndx (snapp_party, snapp_keypair) ->
+          match spec.current_auth with
+          | Permissions.Auth_required.Proof ->
+              let proof_party =
+                let ps =
+                  Parties.Call_forest.of_parties_list
+                    ~party_depth:(fun (p : Party.Predicated.t) ->
+                      p.body.call_depth)
+                    (List.map (List.drop snapp_parties ndx) ~f:(fun p -> p.data))
+                  |> Parties.Call_forest.accumulate_hashes_predicated
+                in
+                Parties.Call_forest.hash ps
+              in
+              let tx_statement : Snapp_statement.t =
+                let commitment =
+                  if snapp_party.data.body.use_full_commitment then
+                    full_commitment
+                  else commitment
+                in
+                { transaction = commitment; at_party = proof_party }
+              in
+              let handler (Snarky_backendless.Request.With { request; respond })
+                  =
+                match request with _ -> respond Unhandled
+              in
+              let prover =
+                match snapp_prover with
+                | Some prover ->
+                    prover
+                | None ->
+                    let _, `Prover p =
+                      create_trivial_snapp ~constraint_constants ()
+                    in
+                    p
+              in
+              let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+                prover ~handler [] tx_statement
+              in
+              { Party.data = snapp_party.data; authorization = Proof pi }
+          | Signature ->
+              let commitment =
+                if snapp_party.data.body.use_full_commitment then
+                  full_commitment
+                else commitment
+              in
+              let signature =
+                Signature_lib.Schnorr.Chunked.sign snapp_keypair.private_key
+                  (Random_oracle.Input.Chunked.field commitment)
+              in
+              Async.Deferred.return
+                { Party.data = snapp_party.data
+                ; authorization = Signature signature
+                }
+          | None ->
+              Async.Deferred.return
+                { Party.data = snapp_party.data; authorization = None_given }
+          | _ ->
+              failwith
+                "Current authorization not Proof or Signature or None_given")
+    in
+    let other_parties = snapp_parties in
     let parties : Parties.t = { fee_payer; other_parties; memo } in
-    (parties, vk)
+    parties
 
   let multiple_transfers (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
-        , `Proof_party snapp_party
+        , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
       create_parties spec ~update:spec.snapp_update
         ~predicate:Party.Predicate.Accept
     in
     assert (Option.is_some sender_party) ;
-    assert (Option.is_none snapp_party) ;
+    assert (List.is_empty snapp_parties) ;
     let other_parties =
       Option.value_exn sender_party :: parties.other_parties
     in
     { parties with other_parties }
 
-  let create_trivial_predicate_snapp ~constraint_constants spec ledger =
-    let { Transaction_logic.For_tests.Transaction_spec.fee
-        ; sender = sender, sender_nonce
-        ; receiver = trivial_account_pk
-        ; amount
-        } =
-      spec
-    in
-    let `VK vk, `Prover trivial_prover =
-      create_trivial_snapp ~constraint_constants ()
-    in
-    let set_or_create ledger id account =
+  let create_trivial_snapp_account ?(permissions = Permissions.user_default) ~vk
+      ~ledger pk =
+    let create ledger id account =
       match Ledger.location_of_account ledger id with
-      | Some loc ->
-          Ledger.set ledger loc account
+      | Some _loc ->
+          failwith "Account already present"
       | None ->
           let _loc, _new =
             Ledger.get_or_create_account ledger id account |> Or_error.ok_exn
           in
           ()
+    in
+    let id = Account_id.create pk Token_id.default in
+    let account : Account.t =
+      { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
+        permissions
+      ; snapp = Some { Snapp_account.default with verification_key = Some vk }
+      }
+    in
+    create ledger id account
+
+  let create_trivial_predicate_snapp ~constraint_constants
+      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept)
+      ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
+    let { Transaction_logic.For_tests.Transaction_spec.fee
+        ; sender = sender, sender_nonce
+        ; receiver = _
+        ; amount
+        } =
+      spec
+    in
+    let trivial_account_pk =
+      Signature_lib.Public_key.compress snapp_kp.public_key
+    in
+    let `VK vk, `Prover trivial_prover =
+      create_trivial_snapp ~constraint_constants ()
     in
     let _v =
       let id =
@@ -4609,15 +4842,8 @@ module For_tests = struct
       |> Or_error.ok_exn
     in
     let () =
-      let id = Account_id.create trivial_account_pk Token_id.default in
-      let account : Account.t =
-        { (Account.create id Balance.(of_int 0)) with
-          permissions =
-            { Permissions.user_default with set_permissions = Proof }
-        ; snapp = Some { Snapp_account.default with verification_key = Some vk }
-        }
-      in
-      set_or_create ledger id account
+      create_trivial_snapp_account trivial_account_pk ~ledger ~vk
+        ~permissions:{ Permissions.user_default with set_permissions = Proof }
     in
     let update_empty_permissions =
       let permissions =
@@ -4639,7 +4865,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; protocol_state = protocol_state_predicate
               ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
@@ -4659,7 +4885,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -4676,24 +4902,23 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; predicate = Full Snapp_predicate.Account.accept
       }
     in
-    let protocol_state = Snapp_predicate.Protocol_state.accept in
     let memo = Signed_command_memo.empty in
     let ps =
-      Parties.Party_or_stack.of_parties_list
+      Parties.Call_forest.of_parties_list
         ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
         [ sender_party_data; snapp_party_data ]
-      |> Parties.Party_or_stack.accumulate_hashes_predicated
+      |> Parties.Call_forest.accumulate_hashes_predicated
     in
-    let other_parties_hash = Parties.Party_or_stack.stack_hash ps in
+    let other_parties_hash = Parties.Call_forest.hash ps in
     let protocol_state_predicate_hash =
       (*FIXME: is this ok? *)
-      Snapp_predicate.Protocol_state.digest protocol_state
+      Snapp_predicate.Protocol_state.digest protocol_state_predicate
     in
     let transaction : Parties.Transaction_commitment.t =
       (*FIXME: is this correct? *)
@@ -4703,12 +4928,12 @@ module For_tests = struct
     in
     let proof_party =
       let ps =
-        Parties.Party_or_stack.of_parties_list
+        Parties.Call_forest.of_parties_list
           ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
           [ snapp_party_data ]
-        |> Parties.Party_or_stack.accumulate_hashes_predicated
+        |> Parties.Call_forest.accumulate_hashes_predicated
       in
-      Parties.Party_or_stack.stack_hash ps
+      Parties.Call_forest.hash ps
     in
     let tx_statement : Snapp_statement.t =
       { transaction; at_party = proof_party }
@@ -4725,15 +4950,15 @@ module For_tests = struct
           ~fee_payer_hash:
             Party.Predicated.(digest (of_fee_payer fee_payer.data))
       in
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field txn_comm)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field txn_comm)
     in
     let fee_payer =
       { fee_payer with authorization = fee_payer_signature_auth }
     in
     let sender_signature_auth =
-      Signature_lib.Schnorr.sign sender.private_key
-        (Random_oracle.Input.field transaction)
+      Signature_lib.Schnorr.Chunked.sign sender.private_key
+        (Random_oracle.Input.Chunked.field transaction)
     in
     let sender =
       { Party.data = sender_party_data
@@ -4968,12 +5193,12 @@ let%test_module "transaction_snark" =
             Sparse_ledger.of_ledger_subset_exn ledger
               [ producer_id; receiver_id; other_id ]
           in
-          let sparse_ledger_after =
-            Sparse_ledger.apply_transaction_exn ~constraint_constants
-              sparse_ledger
+          let sparse_ledger_after, _ =
+            Sparse_ledger.apply_transaction ~constraint_constants sparse_ledger
               ~txn_state_view:
                 (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
               txn_in_block.transaction
+            |> Or_error.ok_exn
           in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -5086,6 +5311,7 @@ let%test_module "transaction_snark" =
                       ; snapp_uri = Keep
                       ; token_symbol = Keep
                       ; timing = Keep
+                      ; voting_for = Keep
                       }
                   ; token_id = ()
                   ; balance_change = Fee.of_int full_amount
@@ -5170,9 +5396,18 @@ let%test_module "transaction_snark" =
 
     let apply_parties_with_proof ledger parties =
       let witnesses =
-        parties_witnesses_exn ~constraint_constants ~state_body
-          ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-          (`Ledger ledger) parties
+        match
+          Or_error.try_with (fun () ->
+              parties_witnesses_exn ~constraint_constants ~state_body
+                ~fee_excess:Amount.Signed.zero
+                ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties)
+        with
+        | Ok a ->
+            a
+        | Error e ->
+            failwith
+              (sprintf "parties_witnesses_exn failed with %s"
+                 (Error.to_string_hum e))
       in
       let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
@@ -5208,7 +5443,7 @@ let%test_module "transaction_snark" =
             p
       in
       let _p = Or_error.ok_exn p in
-      ((), ())
+      ()
 
     let apply_parties ledger parties =
       let witnesses =
@@ -5317,7 +5552,7 @@ let%test_module "transaction_snark" =
     let%test_module "multisig_account" =
       ( module struct
         module M_of_n_predicate = struct
-          type _witness = (Schnorr.Signature.t * Public_key.t) list
+          type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
           (* check that two public keys are equal *)
           let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
@@ -5345,7 +5580,7 @@ let%test_module "transaction_snark" =
           (* check a signature on msg against a public key *)
           let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
             let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-            Schnorr.Checked.verifies (module S) sigma pk msg
+            Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
           (* verify witness signatures against public keys *)
           let%snarkydef verify_sigs pubkeys commitment witness =
@@ -5375,20 +5610,21 @@ let%test_module "transaction_snark" =
             let gen =
               let open Quickcheck.Generator.Let_syntax in
               let%map sk = Private_key.gen and msg = Field.gen_uniform in
-              (sk, Random_oracle.Input.field_elements [| msg |])
+              (sk, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
                 let pk = Inner_curve.(scale one sk) in
                 (let%bind pk_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk)
                  in
-                 let sigma = Schnorr.sign sk msg in
+                 let sigma = Schnorr.Chunked.sign sk msg in
                  let%bind sigma_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness = [ (sigma_var, pk_var) ] in
@@ -5402,7 +5638,7 @@ let%test_module "transaction_snark" =
               let%map sk0 = Private_key.gen
               and sk1 = Private_key.gen
               and msg = Field.gen_uniform in
-              (sk0, sk1, Random_oracle.Input.field_elements [| msg |])
+              (sk0, sk1, Random_oracle.Input.Chunked.field_elements [| msg |])
             in
             Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
                 let pk0 = Inner_curve.(scale one sk0) in
@@ -5413,18 +5649,19 @@ let%test_module "transaction_snark" =
                  let%bind pk1_var =
                    exists Inner_curve.typ ~compute:(As_prover.return pk1)
                  in
-                 let sigma0 = Schnorr.sign sk0 msg in
-                 let sigma1 = Schnorr.sign sk1 msg in
+                 let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                 let sigma1 = Schnorr.Chunked.sign sk1 msg in
                  let%bind sigma0_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma0)
                  in
                  let%bind sigma1_var =
-                   exists Schnorr.Signature.typ
+                   exists Schnorr.Chunked.Signature.typ
                      ~compute:(As_prover.return sigma1)
                  in
                  let%bind msg_var =
-                   exists (Schnorr.message_typ ())
+                   exists
+                     (Schnorr.chunked_message_typ ())
                      ~compute:(As_prover.return msg)
                  in
                  let witness =
@@ -5435,15 +5672,28 @@ let%test_module "transaction_snark" =
                 |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
         end
 
+        let gen_snapp_ledger =
+          let open Transaction_logic.For_tests in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind test_spec = Test_spec.gen in
+          let pks =
+            Signature_lib.Public_key.Compressed.Set.of_list
+              (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+                   Public_key.compress (fst s).public_key))
+          in
+          let%map kp =
+            Quickcheck.Generator.filter Signature_lib.Keypair.gen ~f:(fun kp ->
+                not
+                  (Signature_lib.Public_key.Compressed.Set.mem pks
+                     (Signature_lib.Public_key.compress kp.public_key)))
+          in
+          (test_spec, kp)
+
         (* test with a trivial predicate *)
         let%test_unit "trivial snapp predicate" =
           let open Transaction_logic.For_tests in
-          let gen =
-            let open Quickcheck.Generator.Let_syntax in
-            let%map test_spec = Test_spec.gen in
-            test_spec
-          in
-          Quickcheck.test ~trials:1 gen ~f:(fun { init_ledger; specs } ->
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -5451,19 +5701,55 @@ let%test_module "transaction_snark" =
                   let parties =
                     (fun () ->
                       create_trivial_predicate_snapp ~constraint_constants
-                        (List.hd_exn specs) ledger)
+                        (List.hd_exn specs) ledger ~snapp_kp:new_kp)
                     |> Async.Thread_safe.block_on_async_exn
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
                   (fun () -> apply_parties_with_proof ledger [ parties ])
-                  |> Async.Thread_safe.block_on_async_exn)
-              |> fun ((), ()) -> ())
+                  |> Async.Thread_safe.block_on_async_exn))
+
+        let%test_unit "create snapp account" =
+          let open Transaction_logic.For_tests in
+          Quickcheck.test ~trials:1 gen_snapp_ledger
+            ~f:(fun ({ init_ledger; specs }, new_kp) ->
+              Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+                  let spec = List.hd_exn specs in
+                  let fee = Currency.Fee.of_int 1_000_000 in
+                  let amount = Currency.Amount.of_int 10_000_000_000 in
+                  let memo =
+                    Signed_command_memo.create_from_string_exn
+                      "Snapp create account"
+                  in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; receivers = []
+                    ; amount
+                    ; snapp_account_keypairs = [ new_kp ]
+                    ; memo
+                    ; new_snapp_account = true
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    }
+                  in
+                  let parties = deploy_snapp test_spec ~constraint_constants in
+                  (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    apply_parties_with_proof ledger [ parties ])
+                  |> Async.Thread_safe.block_on_async_exn))
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
-          | Sigma : int -> Schnorr.Signature.t Snarky_backendless.Request.t
+          | Sigma :
+              int
+              -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
         (* test with a 2-of-3 multisig *)
         let%test_unit "snapps-based proved transaction" =
@@ -5509,16 +5795,16 @@ let%test_module "transaction_snark" =
                         let msg_var =
                           tx_commitment
                           |> Snapp_statement.Checked.to_field_elements
-                          |> Random_oracle_input.field_elements
+                          |> Random_oracle_input.Chunked.field_elements
                         in
                         let%bind sigma0_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 0)
                         and sigma1_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 1)
                         and sigma2_var =
-                          exists Schnorr.Signature.typ
+                          exists Schnorr.Chunked.Signature.typ
                             ~request:(As_prover.return @@ Sigma 2)
                         in
                         let witness =
@@ -5564,29 +5850,7 @@ let%test_module "transaction_snark" =
                           ; main_value = (fun [ _; _ ] _ -> [ true; true ])
                           ; main =
                               (fun [ _; _ ] _ ->
-                                let dummy_constraints () =
-                                  let open Run in
-                                  let b =
-                                    exists Boolean.typ_unchecked
-                                      ~compute:(fun _ -> true)
-                                  in
-                                  let g =
-                                    exists
-                                      Pickles.Step_main_inputs.Inner_curve.typ
-                                      ~compute:(fun _ ->
-                                        Tick.Inner_curve.(to_affine_exn one))
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Step_main_inputs.Ops.scale_fast g
-                                      (`Plus_two_to_len [| b; b |])
-                                  in
-                                  let (_ : _) =
-                                    Pickles.Pairing_main.Scalar_challenge.endo g
-                                      (Scalar_challenge [ b ])
-                                  in
-                                  ()
-                                in
-                                dummy_constraints ()
+                                Impl.run_checked (dummy_constraints ())
                                 |> fun () ->
                                 (* Unsatisfiable. *)
                                 Run.exists Field.typ ~compute:(fun () ->
@@ -5718,15 +5982,13 @@ let%test_module "transaction_snark" =
                   let protocol_state = Snapp_predicate.Protocol_state.accept in
                   let memo = Signed_command_memo.empty in
                   let ps =
-                    Parties.Party_or_stack.of_parties_list
+                    Parties.Call_forest.of_parties_list
                       ~party_depth:(fun (p : Party.Predicated.t) ->
                         p.body.call_depth)
                       [ sender_party_data; snapp_party_data ]
-                    |> Parties.Party_or_stack.accumulate_hashes_predicated
+                    |> Parties.Call_forest.accumulate_hashes_predicated
                   in
-                  let other_parties_hash =
-                    Parties.Party_or_stack.stack_hash ps
-                  in
+                  let other_parties_hash = Parties.Call_forest.hash ps in
                   let protocol_state_predicate_hash =
                     (*FIXME: is this ok? *)
                     Snapp_predicate.Protocol_state.digest protocol_state
@@ -5737,17 +5999,17 @@ let%test_module "transaction_snark" =
                       ~protocol_state_predicate_hash
                       ~memo_hash:(Signed_command_memo.hash memo)
                   in
-                  let at_party = Parties.Party_or_stack.stack_hash ps in
+                  let at_party = Parties.Call_forest.hash ps in
                   let tx_statement : Snapp_statement.t =
                     { transaction; at_party }
                   in
                   let msg =
                     tx_statement |> Snapp_statement.to_field_elements
-                    |> Random_oracle_input.field_elements
+                    |> Random_oracle_input.Chunked.field_elements
                   in
-                  let sigma0 = Schnorr.sign sk0 msg in
-                  let sigma1 = Schnorr.sign sk1 msg in
-                  let sigma2 = Schnorr.sign sk2 msg in
+                  let sigma0 = Schnorr.Chunked.sign sk0 msg in
+                  let sigma1 = Schnorr.Chunked.sign sk1 msg in
+                  let sigma2 = Schnorr.Chunked.sign sk2 msg in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with
@@ -5779,16 +6041,16 @@ let%test_module "transaction_snark" =
                     in
                     { fee_payer with
                       authorization =
-                        Signature_lib.Schnorr.sign sender.private_key
-                          (Random_oracle.Input.field txn_comm)
+                        Signature_lib.Schnorr.Chunked.sign sender.private_key
+                          (Random_oracle.Input.Chunked.field txn_comm)
                     }
                   in
                   let sender =
                     { Party.data = sender_party_data
                     ; authorization =
                         Signature
-                          (Signature_lib.Schnorr.sign sender.private_key
-                             (Random_oracle.Input.field transaction))
+                          (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                             (Random_oracle.Input.Chunked.field transaction))
                     }
                   in
                   let parties : Parties.t =
@@ -6117,10 +6379,10 @@ let%test_module "transaction_snark" =
                 Mina_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  ~txn_global_slot:current_global_slot sparse_ledger
-                  (t1 :> Signed_command.t)
+              let sparse_ledger, _ =
+                Sparse_ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger t1
+                |> Or_error.ok_exn
               in
               let pending_coinbase_stack_state2, state_body2 =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
@@ -6171,16 +6433,17 @@ let%test_module "transaction_snark" =
                 Mina_state.Protocol_state.Body.consensus_state state_body2
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  ~txn_global_slot:current_global_slot sparse_ledger
-                  (t2 :> Signed_command.t)
+              let sparse_ledger, _ =
+                Sparse_ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger t2
+                |> Or_error.ok_exn
               in
               ignore
                 ( Ledger.apply_user_command ledger ~constraint_constants
                     ~txn_global_slot:current_global_slot t2
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Transaction_logic.Transaction_applied.Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -7687,8 +7950,8 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
       let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
-          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
-          ~txn_global_slot
+          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
+          ~txn_amount:(Some txn_amount) ~txn_global_slot
       in
       (min_balance, timing)
 
@@ -7704,17 +7967,6 @@ let%test_module "account timing check" =
         checked_min_balance_and_timing account txn_amount txn_global_slot
       in
       min_balance
-
-    let snarky_integer_of_bools bools =
-      let snarky_bools =
-        List.map bools ~f:(fun b ->
-            let open Tick.Boolean in
-            if b then true_ else false_)
-      in
-      let bitstring_lsb =
-        Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
-      in
-      Snarky_integer.Integer.of_bits ~m:Tick.m bitstring_lsb
 
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
@@ -7734,14 +7986,9 @@ let%test_module "account timing check" =
           make_checked_min_balance_computation account txn_amount
             txn_global_slot
         in
-        let%bind unchecked_min_balance_as_snarky_integer =
-          Run.make_checked (fun () ->
-              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance))
-        in
         let%map equal_balances_checked =
-          Run.make_checked (fun () ->
-              Snarky_integer.Integer.equal ~m checked_min_balance
-                unchecked_min_balance_as_snarky_integer)
+          Balance.Checked.equal checked_min_balance
+            (Balance.var_of_t unchecked_min_balance)
         in
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked
@@ -8040,7 +8287,7 @@ let%test_module "transaction_undos" =
         List.map (List.zip_exn source_accounts new_keys)
           ~f:(fun ((s, _, nonce, _), r) ->
             let sender_pk = Public_key.compress s.public_key in
-            let reciever_pk = Public_key.compress r.public_key in
+            let receiver_pk = Public_key.compress r.public_key in
             let fee = Currency.Fee.of_int 10 in
             let payload : Signed_command.Payload.t =
               Signed_command.Payload.create ~fee ~fee_token:Token_id.default
@@ -8049,7 +8296,7 @@ let%test_module "transaction_undos" =
                 ~body:
                   (Payment
                      { source_pk = sender_pk
-                     ; receiver_pk = reciever_pk
+                     ; receiver_pk
                      ; token_id = Token_id.default
                      ; amount
                      })

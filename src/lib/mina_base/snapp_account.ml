@@ -1,23 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Snapp_basic
 
 module Events = struct
@@ -48,7 +32,7 @@ module Events = struct
 
   let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
-  let to_input (x : t) = Random_oracle_input.field (hash x)
+  let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 
   [%%ifdef consensus_mechanism]
 
@@ -155,7 +139,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option
@@ -168,28 +152,6 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
-
-  module V1 = struct
-    type t =
-      ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V1.t
-        , F.Stable.V1.t )
-        With_hash.Stable.V1.t
-        option )
-      Poly.Stable.V1.t
-    [@@deriving sexp, equal, compare, hash, yojson]
-
-    let to_latest ({ app_state; verification_key } : t) : V2.t =
-      { app_state
-      ; verification_key
-      ; snapp_version = Mina_numbers.Snapp_version.zero
-      ; sequence_state =
-          (let empty = Lazy.force Sequence_events.empty_hash in
-           [ empty; empty; empty; empty; empty ])
-      ; last_sequence_slot = Mina_numbers.Global_slot.zero
-      ; proved_state = false
-      }
-  end
 end]
 
 open Pickles_types
@@ -199,14 +161,18 @@ let digest_vk (t : Side_loaded_verification_key.t) =
     hash ~init:Hash_prefix_states.side_loaded_vk
       (pack_input (Side_loaded_verification_key.to_input t)))
 
+let dummy_vk_hash =
+  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Snapp_state.V.t
-    , ( Pickles.Side_loaded.Verification_key.Checked.t Lazy.t
-      , Pickles.Impls.Step.Field.t Lazy.t )
-      With_hash.t
+    , ( Boolean.var
+      , (Side_loaded_verification_key.t option, Field.t) With_hash.t
+        Data_as_hash.t )
+      Flagged_option.t
     , Mina_numbers.Snapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
     , Mina_numbers.Global_slot.Checked.t
@@ -214,23 +180,26 @@ module Checked = struct
     Poly.t
 
   let to_input' (t : _ Poly.t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
       ~snapp_version:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
+        (f (fun x -> Mina_numbers.Snapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
-        (f (fun x ->
-             Run.run_checked (Mina_numbers.Global_slot.Checked.to_input x)))
-      ~proved_state:(f (fun b -> bitstring [ b ]))
+        (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
+      ~proved_state:
+        (f (fun (b : Boolean.var) ->
+             Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input' { t with verification_key = Lazy.force t.verification_key.hash }
+    to_input'
+      { t with verification_key = Data_as_hash.hash t.verification_key.data }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -250,19 +219,13 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Snapp_state.typ Field.typ
-    ; Typ.transport Pickles.Side_loaded.Verification_key.typ
-        ~there:(function
-          | None ->
-              Pickles.Side_loaded.Verification_key.dummy
-          | Some x ->
-              With_hash.data x)
-        ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
-      |> Typ.transport_var
-           ~there:(fun wh -> Lazy.force (With_hash.data wh))
-           ~back:(fun x ->
-             With_hash.of_data
-               (lazy x)
-               ~hash_data:(fun _ -> lazy (Checked.digest_vk x)))
+    ; Flagged_option.option_typ
+        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
+        (Data_as_hash.typ ~hash:With_hash.hash)
+      |> Typ.transport
+           ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
+           ~back:
+             (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
     ; Mina_numbers.Snapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot.typ
@@ -273,13 +236,12 @@ let typ : (Checked.t, t) Typ.t =
 
 [%%endif]
 
-let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
-
 let to_input (t : t) =
-  let open Random_oracle.Input in
+  let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
+  let app_state v =
+    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+  in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
       (f
@@ -288,7 +250,8 @@ let to_input (t : t) =
     ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
-    ~proved_state:(f (fun b -> bitstring [ b ]))
+    ~proved_state:
+      (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

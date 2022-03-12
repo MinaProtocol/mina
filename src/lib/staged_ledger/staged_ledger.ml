@@ -8,6 +8,8 @@ open Mina_base
 open Currency
 open O1trace
 open Signature_lib
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -248,15 +250,12 @@ module T = struct
       }
     in
     let statement_check = `Partial in
-    match Scan_state.latest_ledger_proof scan_state with
-    | None ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~statement_check ~verifier:() ~error_prefix ~registers_end
-          ~registers_begin:None
-    | Some proof ->
-        Statement_scanner.check_invariants ~constraint_constants scan_state
-          ~statement_check ~verifier:() ~error_prefix ~registers_end
-          ~registers_begin:(Some (get_target proof))
+    let registers_begin =
+      Option.map ~f:get_target (Scan_state.latest_ledger_proof scan_state)
+    in
+    Statement_scanner.check_invariants ~constraint_constants scan_state
+      ~statement_check ~verifier:() ~error_prefix ~registers_end
+      ~registers_begin
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
       ~constraint_constants ~pending_coinbase_collection =
@@ -1833,6 +1832,8 @@ module T = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) ~supercharge_coinbase =
     let open Result.Let_syntax in
+    let module Transaction_validator = Transaction_snark.Transaction_validator
+    in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     let is_new_account pk =
@@ -2412,28 +2413,27 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps_at_capacity :
+    let gen_snapps ~iters ~num_snapps :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
-      let num_snapps = transaction_capacity * iters in
       let%bind parties_and_fee_payer_keypairs, ledger =
-        User_command_generators.sequence_parties_with_ledger ~length:num_snapps
-          ()
+        Mina_generators.User_command_generators.sequence_parties_with_ledger
+          ~length:num_snapps ()
       in
       let snapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
+              let fee_payer_hash =
+                Party.Predicated.of_fee_payer parties.fee_payer.data
+                |> Party.Predicated.digest
+              in
               let fee_payer_signature =
-                Signature_lib.Schnorr.sign fee_payer_keypair.private_key
-                  (Random_oracle.Input.field
+                Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
+                  (Random_oracle.Input.Chunked.field
                      ( Parties.commitment parties
                      |> Parties.Transaction_commitment.with_fee_payer
-                          ~fee_payer_hash:
-                            (Party.Predicated.digest
-                               (Party.Predicated.of_fee_payer
-                                  parties.fee_payer.data)) ))
+                          ~fee_payer_hash ))
               in
               (* replace fee payer signature, because new protocol state invalidates the old *)
               let fee_payer_with_valid_signature =
@@ -2441,17 +2441,27 @@ let%test_module "staged ledger tests" =
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
               let other_parties_hash =
-                Parties.Party_or_stack.With_hashes.other_parties_hash
+                Parties.Call_forest.With_hashes.other_parties_hash
                   parties.other_parties
               in
-              let sign_for_other_party sk protocol_state =
+              let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
                   Snapp_predicate.Protocol_state.digest protocol_state
                 in
-                Signature_lib.Schnorr.sign sk
-                  (Random_oracle.Input.field
-                     (Parties.Transaction_commitment.create ~memo_hash
-                        ~other_parties_hash ~protocol_state_predicate_hash))
+                let tx_commitment =
+                  Parties.Transaction_commitment.create ~other_parties_hash
+                    ~protocol_state_predicate_hash ~memo_hash
+                in
+                let full_tx_commitment =
+                  Parties.Transaction_commitment.with_fee_payer tx_commitment
+                    ~fee_payer_hash
+                in
+                let commitment =
+                  if use_full_commitment then full_tx_commitment
+                  else tx_commitment
+                in
+                Signature_lib.Schnorr.Chunked.sign sk
+                  (Random_oracle.Input.Chunked.field commitment)
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
@@ -2476,8 +2486,12 @@ let%test_module "staged ledger tests" =
                                    .to_base58_check pk)
                                   ()
                           in
+                          let use_full_commitment =
+                            data.body.use_full_commitment
+                          in
                           let signature =
-                            sign_for_other_party sk data.body.protocol_state
+                            sign_for_other_party ~use_full_commitment sk
+                              data.body.protocol_state
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->
@@ -2499,6 +2513,30 @@ let%test_module "staged ledger tests" =
       in
       assert (List.length snapps = num_snapps) ;
       return (ledger, snapps, List.init iters ~f:(Fn.const None))
+
+    let gen_snapps_at_capacity :
+        (Ledger.t * User_command.Valid.t list * int option list)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
+      let num_snapps = transaction_capacity * iters in
+      gen_snapps ~num_snapps ~iters
+
+    let gen_snapps_below_capacity ?(extra_blocks = false) () :
+        (Ledger.t * User_command.Valid.t list * int option list)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let iters_max =
+        max_blocks_for_coverage 0 * if extra_blocks then 4 else 2
+      in
+      let%bind iters = Int.gen_incl 1 iters_max in
+      (* see comment in gen_below_capacity for rationale *)
+      let%bind snapps_per_iter =
+        Quickcheck.Generator.list_with_length iters
+          (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
+      in
+      let num_snapps = List.fold snapps_per_iter ~init:0 ~f:( + ) in
+      gen_snapps ~num_snapps ~iters
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2533,7 +2571,7 @@ let%test_module "staged ledger tests" =
         Quickcheck.Generator.list_with_length iters
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
-      let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
+      let total_cmds = List.fold cmds_per_iter ~init:0 ~f:( + ) in
       let%bind cmds =
         User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
           ledger_init_state
@@ -2588,6 +2626,16 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
+    let%test_unit "Be able to include random number of commands (snapps)" =
+      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, snapps, iters) ->
+          async_with_given_ledger ledger (fun sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple account_ids snapps iters sl test_mask `Many_provers
+                stmt_to_work_random_prover))
+
     let%test_unit "Be able to include random number of commands (One prover)" =
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
@@ -2595,6 +2643,17 @@ let%test_module "staged ledger tests" =
               test_simple
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `One_prover stmt_to_work_one_prover))
+
+    let%test_unit "Be able to include random number of commands (One prover, \
+                   snapps)" =
+      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, snapps, iters) ->
+          async_with_given_ledger ledger (fun sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple account_ids snapps iters sl test_mask `One_prover
+                stmt_to_work_one_prover))
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let stmt_to_work_zero_fee stmts =
@@ -2615,11 +2674,14 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Mina_base.Ledger.location_of_account test_mask
+                  (Ledger.location_of_account test_mask
                      (Account_id.create snark_worker_pk Token_id.default)) )))
 
     let compute_statuses ~ledger ~coinbase_amount diff =
       let generate_status =
+        let module Transaction_validator =
+          Transaction_snark.Transaction_validator
+        in
         let status_ledger = Transaction_validator.create ledger in
         fun txn ->
           O1trace.measure "get txn status" (fun () ->
@@ -3492,4 +3554,179 @@ let%test_module "staged ledger tests" =
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               supercharge_coinbase_test ~self:locked_self
                 ~delegator:locked_delegator ~block_count f_expected_balance sl))
+
+    let command_insufficient_funds =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map ledger_init_state = Ledger.gen_initial_ledger_state in
+      let kp, balance, nonce, _ = ledger_init_state.(0) in
+      let receiver_pk =
+        Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
+          Public_key.Compressed.gen
+      in
+      let insufficient_account_creation_fee =
+        Currency.Fee.to_int constraint_constants.account_creation_fee / 2
+        |> Currency.Amount.of_int
+      in
+      let source_pk = Public_key.compress kp.public_key in
+      let body =
+        Signed_command_payload.Body.Payment
+          Payment_payload.Poly.
+            { source_pk
+            ; receiver_pk
+            ; token_id = Token_id.default
+            ; amount = insufficient_account_creation_fee
+            }
+      in
+      let fee = Currency.Amount.to_fee balance in
+      let payload =
+        Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
+          ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
+          ~valid_until:None ~body
+      in
+      let signed_command =
+        User_command.Signed_command (Signed_command.sign kp payload)
+      in
+      (ledger_init_state, signed_command)
+
+    let%test_unit "Commands with Insufficient funds are not included" =
+      let logger = Logger.null () in
+      Quickcheck.test command_insufficient_funds ~trials:1
+        ~f:(fun (ledger_init_state, invalid_command) ->
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              let diff =
+                Sl.create_diff ~constraint_constants !sl ~logger
+                  ~current_state_view:(dummy_state_view ())
+                  ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
+                  ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+                  ~coinbase_receiver ~supercharge_coinbase:false
+              in
+              ( match diff with
+              | Ok x ->
+                  assert (
+                    List.is_empty
+                      (Staged_ledger_diff.With_valid_signatures_and_proofs
+                       .commands x) )
+              | Error e ->
+                  Error.raise (Pre_diff_info.Error.to_error e) ) ;
+              Deferred.unit))
+
+    let%test_unit "Blocks having commands with insufficient funds are rejected"
+        =
+      let logger = Logger.create () in
+      let g =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map ledger_init_state = Ledger.gen_initial_ledger_state in
+        let command (kp : Keypair.t) (balance : Currency.Amount.t)
+            (nonce : Account.Nonce.t) (validity : [ `Valid | `Invalid ]) =
+          let receiver_pk =
+            Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
+              Public_key.Compressed.gen
+          in
+          let account_creation_fee, fee =
+            match validity with
+            | `Valid ->
+                let account_creation_fee =
+                  constraint_constants.account_creation_fee
+                  |> Currency.Amount.of_fee
+                in
+                ( account_creation_fee
+                , Currency.Amount.to_fee
+                    ( Currency.Amount.sub balance account_creation_fee
+                    |> Option.value_exn ) )
+            | `Invalid ->
+                (* Not enough account creation fee and using full balance for fee*)
+                ( Currency.Fee.to_int constraint_constants.account_creation_fee
+                  / 2
+                  |> Currency.Amount.of_int
+                , Currency.Amount.to_fee balance )
+          in
+          let source_pk = Public_key.compress kp.public_key in
+          let body =
+            Signed_command_payload.Body.Payment
+              Payment_payload.Poly.
+                { source_pk
+                ; receiver_pk
+                ; token_id = Token_id.default
+                ; amount = account_creation_fee
+                }
+          in
+          let payload =
+            Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
+              ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
+              ~valid_until:None ~body
+          in
+          User_command.Signed_command (Signed_command.sign kp payload)
+        in
+        let signed_command =
+          let kp, balance, nonce, _ = ledger_init_state.(0) in
+          command kp balance nonce `Valid
+        in
+        let invalid_command =
+          let kp, balance, nonce, _ = ledger_init_state.(1) in
+          command kp balance nonce `Invalid
+        in
+        (ledger_init_state, signed_command, invalid_command)
+      in
+      Quickcheck.test g ~trials:1
+        ~f:(fun (ledger_init_state, valid_command, invalid_command) ->
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              let diff =
+                Sl.create_diff ~constraint_constants !sl ~logger
+                  ~current_state_view:(dummy_state_view ())
+                  ~transactions_by_fee:(Sequence.of_list [ valid_command ])
+                  ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
+                  ~coinbase_receiver ~supercharge_coinbase:false
+              in
+              match diff with
+              | Error e ->
+                  Error.raise (Pre_diff_info.Error.to_error e)
+              | Ok x -> (
+                  assert (
+                    List.length
+                      (Staged_ledger_diff.With_valid_signatures_and_proofs
+                       .commands x)
+                    = 1 ) ;
+                  let f, s = x.diff in
+                  [%log info] "Diff %s"
+                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .to_yojson x
+                    |> Yojson.Safe.to_string ) ;
+                  let failed_command =
+                    With_status.
+                      { data = invalid_command
+                      ; status =
+                          Transaction_status.Failed
+                            ( Transaction_status.Failure
+                              .Amount_insufficient_to_create_account
+                            , Transaction_status.Balance_data.
+                                { fee_payer_balance = None
+                                ; source_balance = None
+                                ; receiver_balance = None
+                                } )
+                      }
+                  in
+                  (*Replace the valid command with an invalid command)*)
+                  let diff =
+                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
+                        ({ f with commands = [ failed_command ] }, s)
+                    }
+                  in
+                  let%map res =
+                    Sl.apply ~constraint_constants !sl
+                      (Staged_ledger_diff.forget diff)
+                      ~logger ~verifier
+                      ~current_state_view:(dummy_state_view ())
+                      ~state_and_body_hash:
+                        (State_hash.dummy, State_body_hash.dummy)
+                      ~coinbase_receiver ~supercharge_coinbase:false
+                  in
+                  match res with
+                  | Ok _x ->
+                      assert false
+                  (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
+                  | Error (Staged_ledger_error.Unexpected _ as e) ->
+                      [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                      assert true
+                  | Error _ ->
+                      assert false )))
   end )

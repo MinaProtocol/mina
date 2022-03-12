@@ -31,7 +31,7 @@ module Stable = struct
     module T = struct
       type t =
         { protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
+        ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
         ; delta_transition_chain_proof :
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
@@ -105,32 +105,6 @@ module Stable = struct
 
           include Sexpable.S with type t := T.t
         end )
-  end
-
-  module V1 = struct
-    type t =
-      { protocol_state : Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
-      ; delta_transition_chain_proof :
-          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-      ; current_protocol_version : Protocol_version.Stable.V1.t
-      ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
-      ; mutable validation_callback : Validate_content.t
-      }
-    [@@deriving compare, sexp, fields]
-
-    let to_latest (t : t) : V2.t =
-      { protocol_state =
-          Protocol_state.Value.Stable.V1.to_latest t.protocol_state
-      ; protocol_state_proof = t.protocol_state_proof
-      ; staged_ledger_diff =
-          Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
-      ; delta_transition_chain_proof = t.delta_transition_chain_proof
-      ; current_protocol_version = t.current_protocol_version
-      ; proposed_protocol_version_opt = t.proposed_protocol_version_opt
-      ; validation_callback = t.validation_callback
-      }
   end
 end]
 
@@ -228,7 +202,7 @@ module Precomputed_block = struct
       type t = T.t =
         { scheduled_time : Block_time.Stable.V1.t
         ; protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+        ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
         ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
               (* TODO: Delete this or find out why it is here. *)
         ; delta_transition_chain_proof :
@@ -236,27 +210,6 @@ module Precomputed_block = struct
         }
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { scheduled_time : Block_time.Stable.V1.t
-        ; protocol_state : Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-        ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
-        ; delta_transition_chain_proof :
-            Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
-        }
-
-      let to_latest (t : t) : V2.t =
-        { scheduled_time = t.scheduled_time
-        ; protocol_state =
-            Protocol_state.Value.Stable.V1.to_latest t.protocol_state
-        ; protocol_state_proof = t.protocol_state_proof
-        ; staged_ledger_diff =
-            Staged_ledger_diff.Stable.V1.to_latest t.staged_ledger_diff
-        ; delta_transition_chain_proof = t.delta_transition_chain_proof
-        }
     end
   end]
 
@@ -319,7 +272,7 @@ let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
 let blockchain_state = Fn.compose Protocol_state.blockchain_state protocol_state
 
-let state_hash = Fn.compose Protocol_state.hash protocol_state
+let state_hashes = Fn.compose Protocol_state.hashes protocol_state
 
 let parent_hash = Fn.compose Protocol_state.previous_state_hash protocol_state
 
@@ -478,7 +431,7 @@ module Validation = struct
        , 'staged_ledger_diff
        , 'protocol_versions )
        with_transition =
-    (external_transition, State_hash.t) With_hash.t
+    external_transition State_hash.With_state_hashes.t
     * ( 'time_received
       , 'genesis_state
       , 'proof
@@ -608,8 +561,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -642,8 +593,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_genesis_state :
            ( 'time_received
@@ -676,8 +625,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_delta_transition_chain :
            ( 'time_received
@@ -715,8 +662,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -749,8 +694,6 @@ module Validation = struct
           , (`Frontier_dependencies, Truth.True ())
           , staged_ledger_diff
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -783,8 +726,6 @@ module Validation = struct
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True ())
           , protocol_versions )
-      | _ ->
-          failwith "why can't this be refuted?"
 
     let set_valid_protocol_versions :
            ( 'time_received
@@ -817,8 +758,6 @@ module Validation = struct
           , frontier_dependencies
           , staged_ledger_diff
           , (`Protocol_versions, Truth.True ()) )
-      | _ ->
-          failwith "why can't this be refuted?"
   end
 end
 
@@ -868,15 +807,33 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proofs tvs ~verifier =
+let validate_proofs tvs ~verifier ~genesis_state_hash =
   let open Deferred.Let_syntax in
+  let to_verify =
+    List.filter_map tvs ~f:(fun (t, _validation) ->
+        if
+          State_hash.equal
+            (State_hash.With_state_hashes.state_hash t)
+            genesis_state_hash
+        then
+          (* Don't require a valid proof for the genesis block, since the
+             peer may not have one.
+          *)
+          None
+        else
+          let transition = With_hash.data t in
+          Some
+            (Blockchain_snark.Blockchain.create
+               ~state:(protocol_state transition)
+               ~proof:(protocol_state_proof transition)))
+  in
   match%map
-    Verifier.verify_blockchain_snarks verifier
-      (List.map tvs ~f:(fun (t, _validation) ->
-           let transition = With_hash.data t in
-           Blockchain_snark.Blockchain.create
-             ~state:(protocol_state transition)
-             ~proof:(protocol_state_proof transition)))
+    match to_verify with
+    | [] ->
+        (* Skip calling the verifier, nothing here to verify. *)
+        return (Ok true)
+    | _ ->
+        Verifier.verify_blockchain_snarks verifier to_verify
   with
   | Ok verified ->
       if verified then
@@ -933,7 +890,7 @@ let skip_protocol_versions_validation
 module With_validation = struct
   let compare (t1, _) (t2, _) = compare (With_hash.data t1) (With_hash.data t2)
 
-  let state_hash (t, _) = With_hash.hash t
+  let state_hashes (t, _) = With_hash.hash t
 
   let lift f (t, _) = With_hash.data t |> f
 
@@ -989,7 +946,9 @@ module With_validation = struct
   let handle_dropped_transition ?pipe_name ~logger t =
     [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
       ~metadata:
-        [ ("state_hash", State_hash.to_yojson (state_hash t))
+        [ ( "state_hash"
+          , State_hash.to_yojson
+              (state_hashes t).State_hash.State_hashes.state_hash )
         ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
         ] ;
     reject t
@@ -997,7 +956,8 @@ end
 
 module Initial_validated = struct
   type t =
-    (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
+    external_transition State_hash.With_state_hashes.t
+    * Validation.initial_valid
 
   type nonrec protocol_version_status = protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -1007,7 +967,7 @@ end
 
 module Almost_validated = struct
   type t =
-    (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+    external_transition State_hash.With_state_hashes.t * Validation.almost_valid
 
   type nonrec protocol_version_status = protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -1022,31 +982,22 @@ module Validated = struct
     *)
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          (Stable.V2.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+          Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
           * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-        [@@deriving sexp]
-
-        let to_latest (x, y) = (With_hash.map ~f:Stable.V1.to_latest x, y)
       end
     end]
   end
 
   [%%versioned_binable
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        (Stable.V2.t, State_hash.t) With_hash.t
+        Stable.V2.t State_hash.With_state_hashes.t
         * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
           , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
           , [ `Proof ] * (unit, Truth.True.t) Truth.t
@@ -1057,9 +1008,11 @@ module Validated = struct
           , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
           Validation.t
 
+      let equal (a, _) (b, _) = State_hash.With_state_hashes.equal equal a b
+
       let to_latest = Fn.id
 
-      let erase (transition_with_hash, validation) =
+      let erase ((transition_with_hash, validation) : t) =
         ( transition_with_hash
         , Validation.extract_delta_transition_chain_witness validation )
 
@@ -1074,7 +1027,7 @@ module Validated = struct
           , (`Protocol_versions, Truth.True ()) ) )
 
       include Sexpable.Of_sexpable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1084,7 +1037,7 @@ module Validated = struct
                 end)
 
       include Binable.Of_binable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1094,7 +1047,7 @@ module Validated = struct
                 end)
 
       let to_yojson (transition_with_hash, _) =
-        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
+        State_hash.With_state_hashes.to_yojson to_yojson transition_with_hash
 
       let create_unsafe_pre_hashed t =
         `I_swear_this_is_safe_see_my_comment
@@ -1114,59 +1067,7 @@ module Validated = struct
                `This_transition_has_valid_protocol_versions )
 
       let create_unsafe t =
-        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
-
-      include With_validation
-    end
-
-    module V1 = struct
-      type t =
-        (Stable.V1.t, State_hash.t) With_hash.t
-        * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
-          , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
-          , [ `Proof ] * (unit, Truth.True.t) Truth.t
-          , [ `Delta_transition_chain ]
-            * (State_hash.t Non_empty_list.t, Truth.True.t) Truth.t
-          , [ `Frontier_dependencies ] * (unit, Truth.True.t) Truth.t
-          , [ `Staged_ledger_diff ] * (unit, Truth.True.t) Truth.t
-          , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
-          Validation.t
-
-      let to_latest (x, y) = (With_hash.map ~f:Stable.V1.to_latest x, y)
-
-      let erase (transition_with_hash, validation) =
-        ( transition_with_hash
-        , Validation.extract_delta_transition_chain_witness validation )
-
-      let elaborate (transition_with_hash, delta_transition_chain_witness) =
-        ( transition_with_hash
-        , ( (`Time_received, Truth.True ())
-          , (`Genesis_state, Truth.True ())
-          , (`Proof, Truth.True ())
-          , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
-          , (`Frontier_dependencies, Truth.True ())
-          , (`Staged_ledger_diff, Truth.True ())
-          , (`Protocol_versions, Truth.True ()) ) )
-
-      include Sexpable.Of_sexpable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_sexpable = elaborate
-
-                  let to_sexpable = erase
-                end)
-
-      include Binable.Of_binable
-                (Erased.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = elaborate
-
-                  let to_binable = erase
-                end)
+        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hashes)
 
       include With_validation
     end
@@ -1194,7 +1095,7 @@ module Validated = struct
     , blockchain_length
     , staged_ledger_diff
     , consensus_state
-    , state_hash
+    , state_hashes
     , parent_hash
     , consensus_time_produced_at
     , block_producer
@@ -1216,6 +1117,10 @@ module Validated = struct
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
 
+  let state_body_hash ((transition, _) : t) =
+    State_hash.With_state_hashes.state_body_hash transition
+      ~compute_hashes:(Fn.compose Protocol_state.hashes T.protocol_state)
+
   let commands (t : t) =
     List.map (commands t) ~f:(fun x ->
         (* This is safe because at this point the stage ledger diff has been
@@ -1228,7 +1133,7 @@ end
 
 let genesis ~precomputed_values =
   let genesis_protocol_state =
-    Precomputed_values.genesis_state_with_hash precomputed_values
+    Precomputed_values.genesis_state_with_hashes precomputed_values
   in
   let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
@@ -1283,7 +1188,7 @@ struct
   let validate_frontier_dependencies (t, validation) ~consensus_constants
       ~logger ~frontier =
     let open Result.Let_syntax in
-    let hash = With_hash.hash t in
+    let hash = State_hash.With_state_hashes.state_hash t in
     let root_transition =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
@@ -1387,7 +1292,8 @@ module Staged_ledger_validation = struct
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)
            in
-           ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
+           ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
+               .state_hash
            , body_hash ))
         ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
@@ -1407,7 +1313,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               ( Precomputed_values.genesis_ledger precomputed_values
-              |> Lazy.force |> Ledger.merkle_root
+              |> Lazy.force |> Mina_ledger.Ledger.merkle_root
               |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof

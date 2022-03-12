@@ -389,25 +389,25 @@ module T = struct
                 List.nth_exn (Lazy.force Genesis_ledger.accounts) i
                 |> Genesis_ledger.keypair_of_account_record_exn)
           in
-          let initial_block_production_keypairs =
-            Keypair.Set.of_list (block_production_keypair |> Option.to_list)
+          let block_production_keypairs =
+            block_production_keypair
+            |> Option.map ~f:(fun kp ->
+                   (kp, Public_key.compress kp.Keypair.public_key))
+            |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
-          let initial_block_production_keys =
-            Public_key.Compressed.Set.of_list
-              ( Option.map block_production_keypair ~f:(fun keypair ->
-                    let open Keypair in
-                    Public_key.compress keypair.public_key)
-              |> Option.to_list )
+          let block_production_pubkeys =
+            block_production_keypairs |> Keypair.And_compressed_pk.Set.to_list
+            |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
-            Consensus.Data.Local_state.create initial_block_production_keys
+            Consensus.Data.Local_state.create block_production_pubkeys
               ~genesis_ledger:Genesis_ledger.t
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
-                (With_hash.hash precomputed_values.protocol_state_with_hash)
+                precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -425,12 +425,14 @@ module T = struct
               ; trust_system
               ; flooding = false
               ; direct_peers = []
+              ; min_connections = 20
               ; max_connections = 50
               ; validation_queue_size = 150
               ; peer_exchange = true
               ; mina_peer_exchange = true
               ; keypair = Some libp2p_keypair
               ; all_peers_seen_metric = false
+              ; known_private_ip_nets = []
               }
           in
           let net_config =
@@ -440,7 +442,7 @@ module T = struct
             ; consensus_local_state
             ; is_seed = List.is_empty peers
             ; genesis_ledger_hash =
-                Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+                Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
             ; log_gossip_heard =
                 { snark_pool_diff = true
@@ -481,19 +483,19 @@ module T = struct
                  ~epoch_ledger_location
                  ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~initial_block_production_keypairs ~monitor
-                 ~consensus_local_state ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
-                 ~upload_blocks_to_gcloud:false
+                 ~block_production_keypairs ~monitor ~consensus_local_state
+                 ~is_archive_rocksdb ~work_reassignment_wait:420000
+                 ~precomputed_values ~start_time ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           { name = "dummy"; value = host_and_port }))
-                 ~log_precomputed_blocks:false ())
+                 ~log_precomputed_blocks:false ~stop_time:48 ())
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger coda_ref ;
+            ~child_pids:pids ~top_logger:logger ~node_error_url:None
+            ~contact_info:None coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
@@ -579,7 +581,7 @@ module T = struct
                      External_transition.Validated.parent_hash t
                    in
                    let state_hash =
-                     External_transition.Validated.state_hash t
+                     (External_transition.Validated.state_hashes t).state_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in

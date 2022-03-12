@@ -317,7 +317,9 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
 let verify_against_hashes transitions hashes =
   List.length transitions = List.length hashes
   && List.for_all2_exn transitions hashes ~f:(fun transition hash ->
-         State_hash.equal (External_transition.state_hash transition) hash)
+         State_hash.equal
+           (State_hash.With_state_hashes.state_hash transition)
+           hash)
 
 let rec partition size = function
   | [] ->
@@ -426,7 +428,13 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                       ; ("peer", Peer.to_yojson peer)
                       ]
                     "downloaded $n blocks from $peer" ;
-                  if not @@ verify_against_hashes transitions hashes then (
+                  let hashed_transitions =
+                    List.map transitions
+                      ~f:
+                        (With_hash.of_data
+                           ~hash_data:External_transition.state_hashes)
+                  in
+                  if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
                       sprintf
                         !"Peer %{sexp:Network_peer.Peer.t} returned a list \
@@ -440,14 +448,8 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     Deferred.Or_error.error_string error_msg )
                   else
                     Deferred.Or_error.return
-                    @@ List.map2_exn hashes transitions
-                         ~f:(fun hash transition ->
-                           let transition_with_hash =
-                             With_hash.of_data transition
-                               ~hash_data:(Fn.const hash)
-                           in
-                           Envelope.Incoming.wrap_peer
-                             ~data:transition_with_hash ~sender:peer))
+                    @@ List.map hashed_transitions ~f:(fun data ->
+                           Envelope.Incoming.wrap_peer ~data ~sender:peer))
             in
             Hash_set.remove busy peer ;
             match res with
@@ -467,8 +469,12 @@ let verify_transitions_and_build_breadcrumbs ~logger
   let%bind transitions_with_initial_validation, initial_hash =
     let%bind tvs =
       let open Deferred.Let_syntax in
+      let genesis_state_hash =
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+        |> State_hash.With_state_hashes.state_hash
+      in
       match%bind
-        External_transition.validate_proofs ~verifier
+        External_transition.validate_proofs ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                External_transition.Validation.wrap (Envelope.Incoming.data t)))
       with
@@ -707,10 +713,11 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                               let children_state_hashes =
                                 List.map children_transitions
                                   ~f:(fun cached_transition ->
-                                    Cached.peek cached_transition
+                                    ( Cached.peek cached_transition
                                     |> Envelope.Incoming.data
                                     |> External_transition.Initial_validated
-                                       .state_hash)
+                                       .state_hashes )
+                                      .state_hash)
                               in
                               [%log error]
                                 ~metadata:
@@ -720,8 +727,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                            ~f:State_hash.to_yojson) )
                                   ; ( "state_hash"
                                     , State_hash.to_yojson
-                                      @@ External_transition.Initial_validated
-                                         .state_hash transition )
+                                        (External_transition.Initial_validated
+                                         .state_hashes transition)
+                                          .state_hash )
                                   ; ( "reason"
                                     , `String
                                         "no common ancestor with our \

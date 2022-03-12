@@ -177,11 +177,22 @@ let list_peers t =
         ~metadata:[ ("error", Error_json.error_to_yojson error) ] ;
       []
 
+let bandwidth_info t =
+  Deferred.Or_error.map ~f:(fun response ->
+      let open Libp2p_ipc.Reader.Libp2pHelperInterface.BandwidthInfo.Response in
+      let input_bandwidth = input_bandwidth_get response
+      and output_bandwidth = output_bandwidth_get response
+      and cpu_usage = cpu_usage_get response in
+      (`Input input_bandwidth, `Output output_bandwidth, `Cpu_usage cpu_usage))
+  @@ Libp2p_helper.do_rpc t.helper
+       (module Libp2p_ipc.Rpcs.BandwidthInfo)
+       (Libp2p_ipc.Rpcs.BandwidthInfo.create_request ())
+
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~mina_peer_exchange ~seed_peers ~initial_gating_config ~max_connections
-    ~validation_queue_size =
+    ~mina_peer_exchange ~seed_peers ~initial_gating_config ~min_connections
+    ~max_connections ~validation_queue_size ~known_private_ip_nets =
   let open Deferred.Or_error.Let_syntax in
   let libp2p_config =
     Libp2p_ipc.create_libp2p_config ~private_key:(Keypair.secret me)
@@ -192,7 +203,10 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~network_id ~unsafe_no_trust_ip ~flood:flooding
       ~direct_peers:(List.map ~f:Multiaddr.to_libp2p_ipc direct_peers)
       ~seed_peers:(List.map ~f:Multiaddr.to_libp2p_ipc seed_peers)
-      ~peer_exchange ~mina_peer_exchange ~max_connections ~validation_queue_size
+      ~known_private_ip_nets:
+        (List.map ~f:Core.Unix.Cidr.to_string known_private_ip_nets)
+      ~peer_exchange ~mina_peer_exchange ~min_connections ~max_connections
+      ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
   in
   let%map _ =
@@ -489,6 +503,8 @@ let handle_push_message t push_message =
           [%log' error t.logger]
             "streamReadComplete for stream we don't know about $stream_id"
             ~metadata:[ ("stream_id", `String stream_id_str) ] )
+  | ResourceUpdated _ ->
+      [%log' error t.logger] "resourceUpdated upcall not supported yet"
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 

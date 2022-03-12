@@ -4,18 +4,8 @@ open Core_kernel
 open Fold_lib
 open Tuple_lib
 open Unsigned
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
+open Snark_params.Tick
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -62,7 +52,9 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
-  val to_input : t -> (_, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
+
+  val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -73,7 +65,6 @@ module type S_checked = sig
   type unchecked
 
   open Snark_params.Tick
-  open Bitstring_lib
 
   type var
 
@@ -86,6 +77,8 @@ module type S_checked = sig
   val succ : t -> (t, _) Checked.t
 
   val add : t -> t -> (t, _) Checked.t
+
+  val mul : t -> t -> (t, _) Checked.t
 
   (** [sub_or_zero x y] computes [x - y].
 
@@ -103,13 +96,10 @@ module type S_checked = sig
 
   val min : t -> t -> (t, _) Checked.t
 
-  val of_bits : Boolean.var Bitstring.Lsb_first.t -> t
+  val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
 
-  val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
-
-  val to_input : t -> ((_, Boolean.var) Random_oracle.Input.t, _) Checked.t
-
-  val to_integer : t -> field Snarky_integer.Integer.t
+  val to_input_legacy :
+    t -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
 
   val succ_if : t -> Boolean.var -> (t, _) Checked.t
 
@@ -119,6 +109,8 @@ module type S_checked = sig
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
+
+  val div_mod : t -> t -> (t * t, _) Checked.t
 
   val ( = ) : t -> t -> (Boolean.var, _) Checked.t
 
@@ -130,8 +122,14 @@ module type S_checked = sig
 
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
+  module Assert : sig
+    val equal : t -> t -> (unit, _) Checked.t
+  end
+
+  val to_field : t -> Field.Var.t
+
   module Unsafe : sig
-    val of_integer : field Snarky_integer.Integer.t -> t
+    val of_field : Field.Var.t -> t
   end
 end
 
@@ -142,15 +140,10 @@ module type S = sig
 
   [%%ifdef consensus_mechanism]
 
-  open Snark_params.Tick
-  open Bitstring_lib
-
   module Checked : S_checked with type unchecked := t
 
   (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
-
-  val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
 
   [%%endif]
 end

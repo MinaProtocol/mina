@@ -2,6 +2,36 @@
  (name transaction_inclusion_status)
  (public_name transaction_inclusion_status)
  (inline_tests)
- (libraries core_kernel mina_base transition_frontier network_pool)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core
+   base.caml
+   bin_prot.shape
+   sexplib0
+   core_kernel
+   ppx_inline_test.config
+   async
+   async_unix
+   ;; local libraries
+   signature_lib
+   child_processes
+   verifier
+   precomputed_values
+   block_time
+   logger
+   mina_numbers
+   pipe_lib
+   mina_base
+   transition_frontier
+   network_pool
+   transition_frontier_base
+   coda_genesis_ledger
+   trust_system
+   genesis_constants
+   non_empty_list
+   inline_test_quiet_logs
+   mina_base.import
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version)))

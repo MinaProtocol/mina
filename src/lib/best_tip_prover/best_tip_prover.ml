@@ -20,9 +20,7 @@ module Make (Inputs : Inputs_intf) :
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem external_transition =
-      external_transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+    let to_proof_elem = External_transition.Validated.state_body_hash
 
     let get_previous ~context transition =
       let parent_hash =
@@ -40,8 +38,9 @@ module Make (Inputs : Inputs_intf) :
     type proof_elem = State_body_hash.t
 
     let hash acc body_hash =
-      Protocol_state.hash_abstract ~hash_body:Fn.id
-        { previous_state_hash = acc; body = body_hash }
+      (Protocol_state.hashes_abstract ~hash_body:Fn.id
+         { previous_state_hash = acc; body = body_hash })
+        .state_hash
   end)
 
   let prove ~logger frontier =
@@ -87,7 +86,7 @@ module Make (Inputs : Inputs_intf) :
           (merkle_list, root |> External_transition.Validation.forget_validation)
       }
 
-  let validate_proof ~verifier transition_with_hash =
+  let validate_proof ~genesis_state_hash ~verifier transition_with_hash =
     let open Deferred.Result.Monad_infix in
     External_transition.(
       Validation.wrap transition_with_hash
@@ -97,7 +96,8 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> (fun x -> validate_proofs ~verifier [ x ] >>| List.hd_exn)
+      |> (fun x ->
+           validate_proofs ~genesis_state_hash ~verifier [ x ] >>| List.hd_exn)
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
                `This_transition_was_not_received_via_gossip)
@@ -110,10 +110,12 @@ module Make (Inputs : Inputs_intf) :
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
     let genesis_protocol_state =
-      Precomputed_values.genesis_state_with_hash precomputed_values
+      Precomputed_values.genesis_state_with_hashes precomputed_values
     in
-    let genesis_state_hash = With_hash.hash genesis_protocol_state in
-    let root_state_hash = External_transition.state_hash root in
+    let genesis_state_hash =
+      State_hash.With_state_hashes.state_hash genesis_protocol_state
+    in
+    let root_state_hash = (External_transition.state_hashes root).state_hash in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =
       Deferred.return
@@ -126,16 +128,20 @@ module Make (Inputs : Inputs_intf) :
            (Int.equal max_length merkle_list_length || root_is_genesis))
     in
     let best_tip_with_hash =
-      With_hash.of_data best_tip ~hash_data:External_transition.state_hash
+      With_hash.of_data best_tip ~hash_data:External_transition.state_hashes
     in
     let root_transition_with_hash =
-      With_hash.of_data root ~hash_data:External_transition.state_hash
+      With_hash.of_data root ~hash_data:External_transition.state_hashes
     in
     let%bind (_ : State_hash.t Non_empty_list.t) =
       Deferred.return
         (Result.of_option
-           (Merkle_list_verifier.verify ~init:root_transition_with_hash.hash
-              merkle_list best_tip_with_hash.hash)
+           (Merkle_list_verifier.verify
+              ~init:
+                (State_hash.With_state_hashes.state_hash
+                   root_transition_with_hash)
+              merkle_list
+              (State_hash.With_state_hashes.state_hash best_tip_with_hash))
            ~error:
              (Error.of_string
                 "Peer should have given a valid merkle list proof for their \
@@ -143,8 +149,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%map root, best_tip =
       Deferred.Or_error.both
-        (validate_proof ~verifier root_transition_with_hash)
-        (validate_proof ~verifier best_tip_with_hash)
+        (validate_proof ~genesis_state_hash ~verifier root_transition_with_hash)
+        (validate_proof ~genesis_state_hash ~verifier best_tip_with_hash)
     in
     (`Root root, `Best_tip best_tip)
 end

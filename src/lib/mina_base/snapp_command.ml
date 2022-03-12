@@ -5,18 +5,10 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
 open Currency
@@ -55,15 +47,15 @@ module Party = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( F.Stable.V1.t Set_or_keep.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-          , ( Pickles.Side_loaded.Verification_key.Stable.V1.t
+          , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
             , F.Stable.V1.t )
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
-          , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
+          , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -83,7 +75,7 @@ module Party = struct
 
       let to_input ({ app_state; delegate; verification_key; permissions } : t)
           =
-        let open Random_oracle_input in
+        let open Random_oracle_input.Chunked in
         List.reduce_exn ~f:append
           [ Snapp_state.to_input app_state
               ~f:(Set_or_keep.Checked.to_input ~f:field)
@@ -105,7 +97,7 @@ module Party = struct
       }
 
     let to_input ({ app_state; delegate; verification_key; permissions } : t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
             ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
@@ -150,10 +142,10 @@ module Party = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( Public_key.Compressed.Stable.V1.t
-          , Update.Stable.V1.t
+          , Update.Stable.V2.t
           , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -167,10 +159,10 @@ module Party = struct
         (Public_key.Compressed.var, Update.Checked.t, Amount.Signed.var) Poly.t
 
       let to_input ({ pk; update; delta } : t) =
-        List.reduce_exn ~f:Random_oracle_input.append
+        List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Public_key.Compressed.Checked.to_input pk
           ; Update.Checked.to_input update
-          ; Amount.Signed.Checked.to_input delta
+          ; Impl.run_checked (Amount.Signed.Checked.to_input delta)
           ]
 
       let digest (t : t) =
@@ -192,7 +184,7 @@ module Party = struct
       }
 
     let to_input ({ pk; update; delta } : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.to_input pk
         ; Update.to_input update
         ; Amount.Signed.to_input delta
@@ -231,21 +223,10 @@ module Party = struct
       module Stable = struct
         module V2 = struct
           type t =
-            (Body.Stable.V1.t, Snapp_predicate.Stable.V2.t) Poly.Stable.V1.t
+            (Body.Stable.V2.t, Snapp_predicate.Stable.V2.t) Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest = Fn.id
-        end
-
-        module V1 = struct
-          type t =
-            (Body.Stable.V1.t, Snapp_predicate.Stable.V1.t) Poly.Stable.V1.t
-          [@@deriving sexp, equal, yojson, hash, compare]
-
-          let to_latest (t : t) : V2.t =
-            { body = t.body
-            ; predicate = Snapp_predicate.Stable.V1.to_latest t.predicate
-            }
         end
       end]
 
@@ -261,9 +242,9 @@ module Party = struct
     module Signed = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t =
-            ( Body.Stable.V1.t
+            ( Body.Stable.V2.t
               (* It's really more natural for this to be a predicate. Consider doing this
                  if predicates are not too expensive. *)
             , Account_nonce.Stable.V1.t )
@@ -295,8 +276,8 @@ module Party = struct
     module Empty = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t = (Body.Stable.V1.t, unit) Poly.Stable.V1.t
+        module V2 = struct
+          type t = (Body.Stable.V2.t, unit) Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest = Fn.id
@@ -326,24 +307,11 @@ module Party = struct
         module V2 = struct
           type t =
             ( Predicated.Proved.Stable.V2.t
-            , Control.Stable.V1.t )
+            , Control.Stable.V2.t )
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest = Fn.id
-        end
-
-        module V1 = struct
-          type t =
-            ( Predicated.Proved.Stable.V1.t
-            , Control.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, equal, yojson, hash, compare]
-
-          let to_latest (t : t) : V2.t =
-            { data = Predicated.Proved.Stable.V1.to_latest t.data
-            ; authorization = t.authorization
-            }
         end
       end]
     end
@@ -351,9 +319,9 @@ module Party = struct
     module Signed = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t =
-            ( Predicated.Signed.Stable.V1.t
+            ( Predicated.Signed.Stable.V2.t
             , Signature.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
@@ -366,8 +334,8 @@ module Party = struct
     module Empty = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t = (Predicated.Empty.Stable.V1.t, unit) Poly.Stable.V1.t
+        module V2 = struct
+          type t = (Predicated.Empty.Stable.V2.t, unit) Poly.Stable.V1.t
           [@@deriving sexp, equal, yojson, hash, compare]
 
           let to_latest = Fn.id
@@ -406,23 +374,23 @@ module Binable_arg = struct
       type t =
         | Proved_empty of
             ( Party.Authorized.Proved.Stable.V2.t
-            , Party.Authorized.Empty.Stable.V1.t option )
+            , Party.Authorized.Empty.Stable.V2.t option )
             Inner.Stable.V1.t
         | Proved_signed of
             ( Party.Authorized.Proved.Stable.V2.t
-            , Party.Authorized.Signed.Stable.V1.t )
+            , Party.Authorized.Signed.Stable.V2.t )
             Inner.Stable.V1.t
         | Proved_proved of
             ( Party.Authorized.Proved.Stable.V2.t
             , Party.Authorized.Proved.Stable.V2.t )
             Inner.Stable.V1.t
         | Signed_signed of
-            ( Party.Authorized.Signed.Stable.V1.t
-            , Party.Authorized.Signed.Stable.V1.t )
+            ( Party.Authorized.Signed.Stable.V2.t
+            , Party.Authorized.Signed.Stable.V2.t )
             Inner.Stable.V1.t
         | Signed_empty of
-            ( Party.Authorized.Signed.Stable.V1.t
-            , Party.Authorized.Empty.Stable.V1.t option )
+            ( Party.Authorized.Signed.Stable.V2.t
+            , Party.Authorized.Empty.Stable.V2.t option )
             Inner.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -431,58 +399,6 @@ module Binable_arg = struct
       let description = "Snapp command"
 
       let version_byte = Base58_check.Version_bytes.snapp_command
-    end
-
-    module V1 = struct
-      type t =
-        | Proved_empty of
-            ( Party.Authorized.Proved.Stable.V1.t
-            , Party.Authorized.Empty.Stable.V1.t option )
-            Inner.Stable.V1.t
-        | Proved_signed of
-            ( Party.Authorized.Proved.Stable.V1.t
-            , Party.Authorized.Signed.Stable.V1.t )
-            Inner.Stable.V1.t
-        | Proved_proved of
-            ( Party.Authorized.Proved.Stable.V1.t
-            , Party.Authorized.Proved.Stable.V1.t )
-            Inner.Stable.V1.t
-        | Signed_signed of
-            ( Party.Authorized.Signed.Stable.V1.t
-            , Party.Authorized.Signed.Stable.V1.t )
-            Inner.Stable.V1.t
-        | Signed_empty of
-            ( Party.Authorized.Signed.Stable.V1.t
-            , Party.Authorized.Empty.Stable.V1.t option )
-            Inner.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest : t -> V2.t = function
-        | Proved_empty { token_id; fee_payment; one; two } ->
-            Proved_empty
-              { token_id
-              ; fee_payment
-              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
-              ; two
-              }
-        | Proved_signed { token_id; fee_payment; one; two } ->
-            Proved_signed
-              { token_id
-              ; fee_payment
-              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
-              ; two
-              }
-        | Proved_proved { token_id; fee_payment; one; two } ->
-            Proved_proved
-              { token_id
-              ; fee_payment
-              ; one = Party.Authorized.Proved.Stable.V1.to_latest one
-              ; two = Party.Authorized.Proved.Stable.V1.to_latest two
-              }
-        | Signed_signed { token_id; fee_payment; one; two } ->
-            Signed_signed { token_id; fee_payment; one; two }
-        | Signed_empty { token_id; fee_payment; one; two } ->
-            Signed_empty { token_id; fee_payment; one; two }
     end
   end]
 end
@@ -499,23 +415,23 @@ module Stable = struct
     type t = Binable_arg.Stable.V2.t =
       | Proved_empty of
           ( Party.Authorized.Proved.Stable.V2.t
-          , Party.Authorized.Empty.Stable.V1.t option )
+          , Party.Authorized.Empty.Stable.V2.t option )
           Inner.Stable.V1.t
       | Proved_signed of
           ( Party.Authorized.Proved.Stable.V2.t
-          , Party.Authorized.Signed.Stable.V1.t )
+          , Party.Authorized.Signed.Stable.V2.t )
           Inner.Stable.V1.t
       | Proved_proved of
           ( Party.Authorized.Proved.Stable.V2.t
           , Party.Authorized.Proved.Stable.V2.t )
           Inner.Stable.V1.t
       | Signed_signed of
-          ( Party.Authorized.Signed.Stable.V1.t
-          , Party.Authorized.Signed.Stable.V1.t )
+          ( Party.Authorized.Signed.Stable.V2.t
+          , Party.Authorized.Signed.Stable.V2.t )
           Inner.Stable.V1.t
       | Signed_empty of
-          ( Party.Authorized.Signed.Stable.V1.t
-          , Party.Authorized.Empty.Stable.V1.t option )
+          ( Party.Authorized.Signed.Stable.V2.t
+          , Party.Authorized.Empty.Stable.V2.t option )
           Inner.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -530,47 +446,6 @@ module Stable = struct
               end)
 
     let to_latest = Fn.id
-
-    let description = "Snapp command"
-
-    let version_byte = Base58_check.Version_bytes.snapp_command
-  end
-
-  module V1 = struct
-    type t = Binable_arg.Stable.V1.t =
-      | Proved_empty of
-          ( Party.Authorized.Proved.Stable.V1.t
-          , Party.Authorized.Empty.Stable.V1.t option )
-          Inner.Stable.V1.t
-      | Proved_signed of
-          ( Party.Authorized.Proved.Stable.V1.t
-          , Party.Authorized.Signed.Stable.V1.t )
-          Inner.Stable.V1.t
-      | Proved_proved of
-          ( Party.Authorized.Proved.Stable.V1.t
-          , Party.Authorized.Proved.Stable.V1.t )
-          Inner.Stable.V1.t
-      | Signed_signed of
-          ( Party.Authorized.Signed.Stable.V1.t
-          , Party.Authorized.Signed.Stable.V1.t )
-          Inner.Stable.V1.t
-      | Signed_empty of
-          ( Party.Authorized.Signed.Stable.V1.t
-          , Party.Authorized.Empty.Stable.V1.t option )
-          Inner.Stable.V1.t
-    [@@deriving sexp, equal, yojson, hash, compare]
-
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
-
-                let to_binable _ = failwith "Snapps disabled"
-
-                let of_binable _ = failwith "Snapps disabled"
-              end)
-
-    let to_latest = Binable_arg.Stable.V1.to_latest
 
     let description = "Snapp command"
 
@@ -826,8 +701,8 @@ let next_available_token (_ : t) (next_available : Token_id.t) =
 module Valid = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Stable.V1.t [@@deriving sexp, equal, yojson, hash, compare]
+    module V2 = struct
+      type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -868,13 +743,13 @@ module Payload = struct
   module Zero_proved = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( bool
           , Token_id.Stable.V1.t
           , Other_fee_payer.Payload.Stable.V1.t option
-          , Party.Predicated.Signed.Stable.V1.t
-          , Party.Predicated.Signed.Stable.V1.t )
+          , Party.Predicated.Signed.Stable.V2.t
+          , Party.Predicated.Signed.Stable.V2.t )
           Inner.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -943,31 +818,11 @@ module Payload = struct
           , Token_id.Stable.V1.t
           , Other_fee_payer.Payload.Stable.V1.t option
           , Party.Predicated.Proved.Stable.V2.t
-          , Party.Predicated.Signed.Stable.V1.t )
+          , Party.Predicated.Signed.Stable.V2.t )
           Inner.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          ( bool
-          , Token_id.Stable.V1.t
-          , Other_fee_payer.Payload.Stable.V1.t option
-          , Party.Predicated.Proved.Stable.V1.t
-          , Party.Predicated.Signed.Stable.V1.t )
-          Inner.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest (t : t) : V2.t =
-          { second_starts_empty = t.second_starts_empty
-          ; second_ends_empty = t.second_ends_empty
-          ; token_id = t.token_id
-          ; other_fee_payer_opt = t.other_fee_payer_opt
-          ; one = Party.Predicated.Proved.Stable.V1.to_latest t.one
-          ; two = t.two
-          }
       end
     end]
 
@@ -1006,26 +861,6 @@ module Payload = struct
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          ( bool
-          , Token_id.Stable.V1.t
-          , Other_fee_payer.Payload.Stable.V1.t option
-          , Party.Predicated.Proved.Stable.V1.t
-          , Party.Predicated.Proved.Stable.V1.t )
-          Inner.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest (t : t) : V2.t =
-          { second_starts_empty = t.second_starts_empty
-          ; second_ends_empty = t.second_ends_empty
-          ; token_id = t.token_id
-          ; other_fee_payer_opt = t.other_fee_payer_opt
-          ; one = Party.Predicated.Proved.Stable.V1.to_latest t.one
-          ; two = Party.Predicated.Proved.Stable.V1.to_latest t.two
-          }
       end
     end]
 
@@ -1070,30 +905,13 @@ module Payload = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Zero_proved.Stable.V1.t
+        ( Zero_proved.Stable.V2.t
         , One_proved.Stable.V2.t
         , Two_proved.Stable.V2.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        ( Zero_proved.Stable.V1.t
-        , One_proved.Stable.V1.t
-        , Two_proved.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest : t -> V2.t = function
-        | Zero_proved zero ->
-            Zero_proved zero
-        | One_proved one ->
-            One_proved (One_proved.Stable.V1.to_latest one)
-        | Two_proved two ->
-            Two_proved (Two_proved.Stable.V1.to_latest two)
     end
   end]
 
@@ -1111,79 +929,14 @@ module Payload = struct
         , Two_proved.Digested.Checked.t )
         Poly.t
 
-      let to_input (t : t) =
-        let open Random_oracle_input in
-        let b = field in
-        let ( ! ) = Impl.run_checked in
-        let inner
-            ({ second_starts_empty
-             ; second_ends_empty
-             ; token_id
-             ; other_fee_payer_opt
-             ; one
-             ; two
-             } :
-              _ Inner.t) ~f1 ~f2 =
-          let p f { Party.Predicated.Poly.body; predicate } =
-            List.reduce_exn ~f:append [ b body; f predicate ]
-          in
-          List.reduce_exn ~f:append
-            [ bitstring [ second_starts_empty; second_ends_empty ]
-            ; !(Token_id.Checked.to_input token_id)
-            ; Snapp_basic.Flagged_option.(
-                to_input' ~f:Other_fee_payer.Payload.Checked.to_input
-                  other_fee_payer_opt)
-            ; p f1 one
-            ; p f2 two
-            ]
-        in
-        let nonce x = !(Account_nonce.Checked.to_input x) in
-        match t with
-        | Zero_proved r ->
-            inner r ~f1:nonce ~f2:nonce
-        | One_proved r ->
-            inner r ~f1:field ~f2:nonce
-        | Two_proved r ->
-            inner r ~f1:field ~f2:field
+      let to_input (_ : t) = failwith "unused"
 
       let digest (t : t) =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.snapp_payload (pack_input (to_input t)))
     end
 
-    let to_input (t : t) =
-      let open Random_oracle_input in
-      let b = field in
-      let inner
-          ({ second_starts_empty
-           ; second_ends_empty
-           ; token_id
-           ; other_fee_payer_opt
-           ; one
-           ; two
-           } :
-            _ Inner.t) ~f1 ~f2 =
-        let p f { Party.Predicated.Poly.body; predicate } =
-          List.reduce_exn ~f:append [ b body; f predicate ]
-        in
-        List.reduce_exn ~f:append
-          [ bitstring [ second_starts_empty; second_ends_empty ]
-          ; Token_id.to_input token_id
-          ; Snapp_basic.Flagged_option.(
-              to_input' ~f:Other_fee_payer.Payload.to_input
-                (of_option ~default:Other_fee_payer.Payload.dummy
-                   other_fee_payer_opt))
-          ; p f1 one
-          ; p f2 two
-          ]
-      in
-      match t with
-      | Zero_proved r ->
-          inner r ~f1:Account_nonce.to_input ~f2:Account_nonce.to_input
-      | One_proved r ->
-          inner r ~f1:field ~f2:Account_nonce.to_input
-      | Two_proved r ->
-          inner r ~f1:field ~f2:field
+    let to_input (_ : t) = failwith "unused"
 
     let digest (t : t) =
       Random_oracle.(
@@ -1453,9 +1206,9 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
     let msg =
       to_payload (Signed_signed r)
       |> Payload.digested |> Payload.Digested.digest
-      |> Random_oracle_input.field
+      |> Random_oracle_input.Chunked.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.Chunked.sign sk msg
   in
   Signed_signed
     { r with
@@ -1483,9 +1236,9 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
     let msg =
       to_payload (Signed_empty r)
       |> Payload.digested |> Payload.Digested.digest
-      |> Random_oracle_input.field
+      |> Random_oracle_input.Chunked.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.Chunked.sign sk msg
   in
   Signed_empty
     { r with

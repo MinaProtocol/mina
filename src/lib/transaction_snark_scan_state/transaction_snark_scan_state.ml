@@ -3,6 +3,8 @@ open Async
 open Mina_base
 open Currency
 open O1trace
+module Ledger = Mina_ledger.Ledger
+module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -43,38 +45,11 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V1.t
-        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-        ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
-        ; statement : Transaction_snark.Statement.Stable.V1.t
-        ; init_stack :
-            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
-            .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque]
-        }
-      [@@deriving sexp]
-
-      let to_latest (t : t) : V2.t =
-        { transaction_with_info =
-            Transaction_logic.Transaction_applied.Stable.V1.to_latest
-              t.transaction_with_info
-        ; state_hash = t.state_hash
-        ; statement =
-            Transaction_snark.Statement.Stable.V1.to_latest t.statement
-        ; init_stack = t.init_stack
-        ; ledger_witness =
-            Mina_base.Sparse_ledger.Stable.V1.to_latest t.ledger_witness
-        }
     end
   end]
 end
@@ -87,13 +62,6 @@ module Ledger_proof_with_sok_message = struct
       [@@deriving sexp]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-      [@@deriving sexp]
-
-      let to_latest ((x, y) : t) : V2.t = (Ledger_proof.Stable.V1.to_latest x, y)
     end
   end]
 end
@@ -200,32 +168,6 @@ module Stable = struct
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
   end
-
-  module V1 = struct
-    type t =
-      ( Ledger_proof_with_sok_message.Stable.V1.t
-      , Transaction_with_witness.Stable.V1.t )
-      Parallel_scan.State.Stable.V1.t
-    [@@deriving sexp]
-
-    let to_latest (t : t) : V2.t =
-      Parallel_scan.State.map t
-        ~f1:Ledger_proof_with_sok_message.Stable.V1.to_latest
-        ~f2:Transaction_with_witness.Stable.V1.to_latest
-
-    (* TODO: Review this. The version bytes for the underlying types are
-       included in the hash, so it can never be stable between versions.
-    *)
-
-    let hash t =
-      let state_hash =
-        Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V1))
-      in
-      Staged_ledger_hash.Aux_hash.of_bytes
-        (state_hash |> Digestif.SHA256.to_raw_string)
-  end
 end]
 
 [%%define_locally Stable.Latest.(hash)]
@@ -254,10 +196,11 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty in
-  let%bind after =
+  let%bind after, _ =
     Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn ~constraint_constants
+        Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)
+    |> Or_error.join
   in
   let next_available_token_after = Sparse_ledger.next_available_token after in
   let target_merkle_root =
@@ -533,12 +476,16 @@ struct
               let%bind expected_statement =
                 match statement_check with
                 | `Full get_state ->
-                    Timer.time timer
-                      (sprintf "create_expected_statement:%s" __LOC__)
-                      (fun () ->
-                        Deferred.return
-                          (create_expected_statement ~constraint_constants
-                             ~get_state transaction))
+                    let%bind result =
+                      Timer.time timer
+                        (sprintf "create_expected_statement:%s" __LOC__)
+                        (fun () ->
+                          Deferred.return
+                            (create_expected_statement ~constraint_constants
+                               ~get_state transaction))
+                    in
+                    let%map () = yield_always () in
+                    result
                 | `Partial ->
                     return transaction.statement
               in
@@ -642,7 +589,7 @@ struct
     in
     match%map
       time "scan_statement" (fun () ->
-          scan_statement ~constraint_constants ~statement_check ~verifier t)
+          scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
         Error e
@@ -849,7 +796,8 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Ledger.Transaction_applied.transaction transaction_with_info
+            Transaction_logic.Transaction_applied.transaction_with_status
+              transaction_with_info
           in
           let%bind protocol_state_body =
             let%map state = get_state (fst state_hash) in
@@ -958,14 +906,14 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m ~key:(Mina_state.Protocol_state.hash ps) ~data:ps)
+        State_hash.Map.set m
+          ~key:(State_hash.With_state_hashes.state_hash ps)
+          ~data:ps)
   in
   let protocol_states_assoc =
-    List.filter_map (State_hash.Set.to_list required_state_hashes)
-      ~f:(fun hash ->
-        let open Option.Let_syntax in
-        let%map state = State_hash.Map.find received_state_map hash in
-        (hash, state))
+    List.filter_map
+      (State_hash.Set.to_list required_state_hashes)
+      ~f:(State_hash.Map.find received_state_map)
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc

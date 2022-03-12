@@ -992,7 +992,7 @@ let hash_ledger =
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
-           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+           (Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
        in
        Deferred.return
        @@
@@ -1188,14 +1188,16 @@ let pooled_snapp_commands =
          let graphql =
            Graphql_queries.Pooled_snapp_commands.make ~public_key ()
          in
-         let%map response = Graphql_client.query_exn graphql graphql_endpoint in
-         let json_response : Yojson.Safe.t =
-           `List
-             ( List.map
-                 ~f:
-                   (Fn.compose Graphql_client.Snapp_command.to_yojson
-                      Graphql_client.Snapp_command.of_obj)
-             @@ Array.to_list response#pooledSnappCommands )
+         let%bind raw_response =
+           Graphql_client.query_json_exn graphql graphql_endpoint
+         in
+         let%map json_response =
+           try
+             let kvs = Yojson.Safe.Util.to_assoc raw_response in
+             List.hd_exn kvs |> snd |> return
+           with _ ->
+             eprintf "Failed to read result of pooled snapp commands" ;
+             exit 1
          in
          print_string (Yojson.Safe.to_string json_response)))
 
@@ -1267,39 +1269,6 @@ let stop_tracing =
              printf "Daemon stopped printing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e))
-
-let set_staking_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let open Graphql_lib in
-  let pk_flag =
-    flag "--public-key" ~aliases:[ "public-key" ]
-      ~doc:"PUBLICKEY Public key of account with which to produce blocks"
-      (required public_key_compressed)
-  in
-  Command.async ~summary:"Start producing blocks"
-    (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun graphql_endpoint public_key ->
-         let print_message msg arr =
-           if not (Array.is_empty arr) then
-             printf "%s: %s\n" msg
-               (String.concat_array ~sep:", "
-                  (Array.map ~f:Public_key.Compressed.to_base58_check arr))
-         in
-         let%map result =
-           Graphql_client.query_exn
-             (Graphql_queries.Set_staking.make
-                ~public_key:(Encoders.public_key public_key)
-                ())
-             graphql_endpoint
-         in
-         print_message "Stopped staking with" result#setStaking#lastStaking ;
-         print_message
-           "❌ Failed to start staking with keys (try `mina accounts unlock` \
-            first)"
-           result#setStaking#lockedPublicKeys ;
-         print_message "Started staking with"
-           result#setStaking#currentStakingKeys))
 
 let set_coinbase_receiver_graphql =
   let open Command.Param in
@@ -1572,6 +1541,13 @@ let export_key =
                     !"wrong password provided for account \
                       %{Public_key.Compressed.to_base58_check}"
                     pk)
+           | Error (`Key_read_error e) ->
+               Error
+                 (sprintf
+                    !"Error reading the secret key file for account \
+                      %{Public_key.Compressed.to_base58_check}: %s"
+                    pk
+                    (Secrets.Privkey_error.to_string e))
            | Error `Not_found ->
                Error
                  (sprintf
@@ -2425,7 +2401,6 @@ let client =
     ; ("create-token-account", create_new_account_graphql)
     ; ("mint-tokens", mint_tokens_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
     ; ("export-logs", Export_logs.export_via_graphql)

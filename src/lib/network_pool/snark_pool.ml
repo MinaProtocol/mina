@@ -20,25 +20,6 @@ module Snark_tables = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-          * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
-            | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V1.Table.t
-        [@@deriving sexp]
-
-        let to_latest (t : t) : V2.t =
-          Transaction_snark_work.Statement.Stable.V1.Table.to_alist t
-          |> List.map ~f:(fun (k, (p, x)) ->
-                 ( Transaction_snark_work.Statement.Stable.V1.to_latest k
-                 , ( Priced_proof.map p
-                       ~f:(One_or_two.map ~f:Ledger_proof.Stable.V1.to_latest)
-                   , x ) ))
-          |> Transaction_snark_work.Statement.Table.of_alist_exn
-      end
     end]
   end
 
@@ -123,6 +104,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> incoming_diffs:
          ( Resource_pool.Diff.t Envelope.Incoming.t
          * Mina_net2.Validation_callback.t )
@@ -427,7 +409,8 @@ struct
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+          ~expiry_ns:_ ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer
+          =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -690,7 +673,8 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
+      ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
+      ~frontier_broadcast_pipe =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -718,7 +702,7 @@ struct
           network_pool
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~incoming_diffs ~local_diffs
+            ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
             ~frontier_broadcast_pipe
     in
     store_periodically (resource_pool res) ;
@@ -726,7 +710,7 @@ struct
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
-include Make (Mina_base.Ledger) (Staged_ledger)
+include Make (Mina_ledger.Ledger) (Staged_ledger)
           (struct
             include Transition_frontier
 
@@ -755,26 +739,6 @@ module Diff_versioned = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-        | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
-
-      let to_latest (t : t) : V2.t =
-        match t with
-        | Empty ->
-            Empty
-        | Add_solved_work (s, p) ->
-            Add_solved_work
-              ( Transaction_snark_work.Statement.Stable.V1.to_latest s
-              , Priced_proof.map p
-                  ~f:(One_or_two.map ~f:Ledger_proof.Stable.V1.to_latest) )
-    end
   end]
 
   type t = Stable.Latest.t =
@@ -784,6 +748,9 @@ module Diff_versioned = struct
     | Empty
   [@@deriving compare, sexp, to_yojson, hash]
 end
+
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 
 let%test_module "random set test" =
   ( module struct
@@ -808,6 +775,11 @@ let%test_module "random set test" =
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int
+           precomputed_values.genesis_constants.transaction_expiry_hr)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -865,7 +837,7 @@ let%test_module "random set test" =
         let open Deferred.Let_syntax in
         let resource_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller
+            ~consensus_constants ~time_controller ~expiry_ns
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -1049,8 +1021,8 @@ let%test_module "random set test" =
           in
           let network_pool =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader ~logger
+              ~consensus_constants ~time_controller ~expiry_ns
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -1139,7 +1111,7 @@ let%test_module "random set test" =
             in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+                ~consensus_constants ~time_controller ~expiry_ns
                 ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
@@ -1217,7 +1189,7 @@ let%test_module "random set test" =
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~expiry_ns ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

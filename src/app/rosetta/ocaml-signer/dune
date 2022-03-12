@@ -11,6 +11,7 @@
    lib
    ppx_deriving_yojson.runtime
    yojson
+   string_sign
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

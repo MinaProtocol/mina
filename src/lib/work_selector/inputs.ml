@@ -86,7 +86,8 @@ module Test_inputs = struct
 
     let get_protocol_state _t _hash =
       Ok
-        (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hash
+        (Lazy.force Precomputed_values.for_unit_tests)
+          .protocol_state_with_hashes
           .data
   end
 end
@@ -94,7 +95,7 @@ end
 module Implementation_inputs = struct
   open Mina_base
   module Ledger_hash = Ledger_hash
-  module Sparse_ledger = Sparse_ledger
+  module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction
   module Transaction_witness = Transaction_witness
   module Ledger_proof = Ledger_proof

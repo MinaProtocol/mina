@@ -1,8 +1,8 @@
-Run Instructions
+GossipQA testnet deployment Instructions
 
 0: Before starting, make sure that no pre-existing gossipqa deployment exists, and also make sure one is working within us-central-1 by running 
 
-`gcloud container clusters get-credentials --region us-central1 coda-infra-central1`
+`gcloud container clusters get-credentials --region northamerica-northeast1 mina-infra-canada`
 
 1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the terraform for-loops to make this process less copy-pasty
 
@@ -18,4 +18,64 @@ Run Instructions
 
 
 when you're all done, clean up with either `terraform destroy`, or `kubectl delete namespace gossipqa`
+
+------------------------------------------------
+
+Metrics Deployment Instructions
+
+1: create a separate namspace so that all the metrics stuff is isolated in one place.  technically it doesn't matter what namespace this is deployed in.
+
+kubectl create namespace gossipqa-metrics
+kubectl config set-context --current --namespace=gossipqa-metrics
+
+2: create prometheus with helm
+
+2.1: make the permanent volume claim.  if you don't do this then you'll lose all of the data that prometheus gathers when promtheus goes down.  
+
+```
+# make the permanent volume claim
+kubectl apply -f automation/terraform/testnets/gossipqa/gossipqa-prom-pvc.yaml
+```
+
+2.2: use helm to install prometheus
+```
+helm install gossipqa-prom prometheus-community/prometheus -f automation/terraform/testnets/gossipqa/values.yaml
+```
+
+3: create grafana using helm
+
+3.1: make a config map with all the configs which create for us a useful dashboard on grafana.
+
+```
+# upload the config map which gives us a useful dashboard in grafana.  the label is necessary for the grafana sidecar that monitors the config maps and installs them.
+kubectl create configmap simplified-mainnet-dashboard --namespace gossipqa-metrics --from-file automation/terraform/testnets/gossipqa/Grafana_Export_Simplified_Mainnet_Overview-1634935128244.json
+kubectl label configmap simplified-mainnet-dashboard grafana_dashboard=1
+```
+
+2.2: install grafana using a the stack deployer `kube-prometheus-stack`.  this stack theoretically could give us both prometheus and grafana, but we've turned off prometheus and are only deploying grafana since we are deploying prometheus separately
+
+```
+#install grafana
+helm install gossipqa-metrics-stack prometheus-community/kube-prometheus-stack -f automation/terraform/testnets/gossipqa/values-stack.yaml
+```
+
+3: In order access grafana
+
+#get the login credentials if you don't already have it.  the username is "admin"
+kubectl get secret gossipqa-metrics-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+#run kubectl get pods and find the grafana pod, then do a port forward
+kubectl port-forward pod/gossipqa-metrics-stack-grafana-7f6df7b44d-lcstl 3000:3000
+
+3.1: you may have to manually configure graphana to use the datasource deployed in step 2.
+
+4: uninstall
+```helm uninstall gossipqa-prom
+
+helm uninstall gossipqa-metrics-stack
+```
+
+#if you really want to nuke everything, you can delete the entire namespace.  however this will delete the permanent volume claim, and thus delete all the data you've gathered
+kubectl delete namespace gossipqa-prom
+kubectl delete namespace gossipqa-metrics
 

@@ -2,7 +2,7 @@ open Async
 open Core_kernel
 open Network_peer
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
 [@@deriving fields]
@@ -17,6 +17,11 @@ module type Gossip_net_intf = sig
   val restart_helper : t -> unit
 
   val peers : t -> Peer.t list Deferred.t
+
+  val bandwidth_info :
+       t
+    -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+       Deferred.Or_error.t
 
   val set_node_status : t -> string -> unit Deferred.Or_error.t
 

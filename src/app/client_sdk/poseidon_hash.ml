@@ -6,7 +6,7 @@ open Js_of_ocaml
  * *************** *)
 
 module Field = struct
-  include Snark_params_nonconsensus.Field
+  include Snark_params.Tick.Field
 
   (* Converts a byterray into a [Field.t], raises an exception if the number obtained is larger than the order *)
   let of_bytes bytearray =
@@ -82,18 +82,18 @@ module Hash = struct
   include Sponge.Make_hash (Sponge.Poseidon (Config))
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
 
   let update ~state = update ~state params
 
   let hash ?init = hash ?init params
 
   let pack_input =
-    Random_oracle_input.pack_to_fields ~size_in_bits:Field.size_in_bits
+    Random_oracle_input.Legacy.pack_to_fields ~size_in_bits:Field.size_in_bits
       ~pack:Field.project
 end
 
-module String_sign = String_sign_nonconsensus.String_sign
+module String_sign = String_sign
 
 (* ************************ *
  *   javascript interface   *
@@ -108,9 +108,9 @@ type string_js = Js.js_string Js.t
 (* input is a raw string of bytes *)
 let hash_bytearray (bytearray : u8_array_js) : string_js =
   let string_to_bitstring s =
-    let char_bits = String_sign.Message.char_bits in
+    let char_bits = String_sign.char_bits in
     let x = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s))) in
-    Random_oracle_input.bitstrings x
+    Random_oracle_input.Legacy.bitstrings x
   in
   let input = Js_of_ocaml.Typed_array.String.of_uint8Array bytearray in
   let input =

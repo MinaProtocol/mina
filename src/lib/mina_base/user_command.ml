@@ -75,16 +75,6 @@ module Valid = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V1.t
-        , Snapp_command.Valid.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Poly.Stable.V1.to_latest
-    end
   end]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
@@ -97,14 +87,6 @@ module Stable = struct
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, compare, equal, hash, yojson]
-
-    let to_latest : t -> V2.t = Poly.Stable.V1.to_latest
   end
 end]
 
@@ -151,19 +133,6 @@ module Verifiable = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Signed_command.Stable.V1.t
-        , Snapp_command.Stable.V1.t
-          * (* TODO: Should be Mina_base.Side_loaded_verification_key *)
-          Pickles.Side_loaded.Verification_key.Stable.V1.t
-          Zero_one_or_two.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Poly.Stable.V1.to_latest
-    end
   end]
 
   let fee_payer (t : t) =
@@ -193,7 +162,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         ; other_parties =
             other_parties
             |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Party_or_stack.With_hashes.of_parties_list
+            |> Parties.Call_forest.With_hashes.of_parties_list
         ; memo
         }
 

@@ -78,12 +78,6 @@ module Stable : sig
   module V2 : sig
     type t [@@deriving sexp, compare, bin_io, yojson, version]
   end
-
-  module V1 : sig
-    type t [@@deriving sexp, compare, bin_io, yojson, version]
-
-    val to_latest : t -> V2.t
-  end
 end
 with type V2.t = t
 

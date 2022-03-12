@@ -1,20 +1,8 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Import
-
-[%%ifdef consensus_mechanism]
-
+open Mina_base_import
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module Body : sig
   type t =
@@ -80,7 +68,7 @@ module Common : sig
     end
   end]
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
   val gen : ?fee_token_id:Token_id.t -> unit -> t Quickcheck.Generator.t
 
@@ -98,9 +86,9 @@ module Common : sig
   val typ : (var, t) Typ.t
 
   module Checked : sig
-    val to_input :
+    val to_input_legacy :
          var
-      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.t
+      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
          , _ )
          Snark_params.Tick.Checked.t
 

@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Mina_base_import
 
 module Single : sig
   module Stable : sig

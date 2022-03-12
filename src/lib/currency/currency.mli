@@ -7,6 +7,14 @@ open Intf
 
 open Snark_params.Tick
 
+module Signed_var : sig
+  type 'mag repr = ('mag, Sgn.var) Signed_poly.t
+
+  (* Invariant: At least one of these is Some *)
+  type nonrec 'mag t =
+    { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
+end
+
 [%%endif]
 
 type uint64 = Unsigned.uint64
@@ -38,7 +46,7 @@ module Fee : sig
       with type magnitude := t
        and type magnitude_var := var
        and type signed_fee := (t, Sgn.t) Signed_poly.t
-       and type Checked.signed_fee_var := (var, Sgn.var) Signed_poly.t
+       and type Checked.signed_fee_var := Field.Var.t Signed_var.t
 
   [%%else]
 
@@ -121,7 +129,9 @@ module Amount : sig
 
     val to_fee : var -> Fee.var
 
-    val add_fee : var -> Fee.var -> (var, _) Checked.t
+    module Unsafe : sig
+      val of_field : Field.Var.t -> t
+    end
   end
 
   [%%endif]
@@ -145,7 +155,14 @@ module Balance : sig
 
   val add_amount : t -> Amount.t -> t option
 
+  val add_amount_flagged : t -> Amount.t -> t * [ `Overflow of bool ]
+
   val sub_amount : t -> Amount.t -> t option
+
+  val sub_amount_flagged : t -> Amount.t -> t * [ `Underflow of bool ]
+
+  val add_signed_amount_flagged :
+    t -> Amount.Signed.t -> t * [ `Overflow of bool ]
 
   val ( + ) : t -> Amount.t -> t option
 
@@ -175,6 +192,8 @@ module Balance : sig
       -> Amount.Signed.var
       -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
+    val sub_or_zero : var -> var -> (var, _) Checked.t
+
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
@@ -192,6 +211,10 @@ module Balance : sig
     val ( >= ) : var -> var -> (Boolean.var, _) Checked.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
+    module Unsafe : sig
+      val of_field : Field.Var.t -> var
+    end
   end
 
   [%%endif]

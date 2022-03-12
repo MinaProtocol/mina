@@ -111,6 +111,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
   let timestamp = Block_time.of_int64 block.timestamp in
+  let chain_status = Chain_status.of_string block.chain_status in
   (* commands to be filled in later *)
   return
     { Extensional.Block.state_hash
@@ -130,6 +131,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; timestamp
     ; user_cmds = []
     ; internal_cmds = []
+    ; chain_status
     }
 
 let fill_in_user_commands pool block_state_hash =
@@ -139,7 +141,7 @@ let fill_in_user_commands pool block_state_hash =
     Public_key.Compressed.of_base58_check_exn pk_str
   in
   let balance_of_id id ~item =
-    let%map _pk_id, balance =
+    let%map { balance; _ } =
       query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
     in
     balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
@@ -187,7 +189,7 @@ let fill_in_user_commands pool block_state_hash =
         Option.map user_cmd.valid_until ~f:(fun valid ->
             Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32)
       in
-      let memo = user_cmd.memo |> Signed_command_memo.of_string in
+      let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
         query_db ~item:"block user commands" ~f:(fun db ->
@@ -281,7 +283,7 @@ let fill_in_internal_commands pool block_state_hash =
          ; receiver_balance_id
          }
        ->
-      let%bind _pubkey, receiver_balance_int64 =
+      let%bind { balance = receiver_balance_int64; _ } =
         query_db ~item:"receiver balance" ~f:(fun db ->
             Processor.Balance.load db ~id:receiver_balance_id)
       in

@@ -4,17 +4,7 @@
 
 open Core_kernel
 module B58_lib = Base58_check
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module Elt = struct
   type t =
@@ -56,14 +46,14 @@ module Chain_hash = struct
   let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
 
   let cons (e : Elt.t) (t : t) =
-    let open Random_oracle in
+    let open Random_oracle.Legacy in
     let init, x =
       let open Hash_prefix in
       match e with
       | Signed_command payload ->
           ( receipt_chain_user_command
           , Transaction_union_payload.(
-              to_input (of_user_command_payload payload)) )
+              to_input_legacy (of_user_command_payload payload)) )
       | Parties s ->
           (receipt_chain_snapp, Input.field s)
     in
@@ -87,21 +77,22 @@ module Chain_hash = struct
     let if_ = if_
 
     let cons (e : Elt.t) t =
-      let open Random_oracle in
+      let open Random_oracle.Legacy in
       let open Checked in
       let open Hash_prefix in
       let%bind init, x =
         match e with
         | Signed_command payload ->
             let%map payload =
-              Transaction_union_payload.Checked.to_input payload
+              Transaction_union_payload.Checked.to_input_legacy payload
             in
             (receipt_chain_user_command, payload)
         | Parties s ->
             Let_syntax.return (receipt_chain_snapp, Input.field s)
       in
       make_checked (fun () ->
-          hash ~init (pack_input Input.(append x (var_to_input t)))
+          hash ~init
+            (pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed)
   end
 

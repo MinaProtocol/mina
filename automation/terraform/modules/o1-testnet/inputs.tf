@@ -45,6 +45,11 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
@@ -63,6 +68,11 @@ variable "mina_bots_image" {
 variable "mina_points_image" {
   type    = string
   default = ""
+}
+
+variable "use_embedded_runtime_config" {
+  type    = bool
+  default = false
 }
 
 variable "watchdog_image" {
@@ -121,6 +131,11 @@ variable "whales" {
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
   default = null
+}
+
+variable "nodes_with_user_agent" {
+  type = list(string)
+  default = []
 }
 
 variable "seed_count" {

@@ -5,18 +5,10 @@ open Core_kernel
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-open Signature_lib_nonconsensus
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+open Signature_lib
 module A = Account
 open Mina_numbers
 open Currency
@@ -29,7 +21,7 @@ module Closed_interval = struct
   module Stable = struct
     module V1 = struct
       type 'a t = { lower : 'a; upper : 'a }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -41,11 +33,36 @@ module Closed_interval = struct
     else { lower = a2; upper = a1 }
 
   let to_input { lower; upper } ~f =
-    Random_oracle_input.append (f lower) (f upper)
+    Random_oracle_input.Chunked.append (f lower) (f upper)
 
   let typ x =
     Typ.of_hlistable [ x; x ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let deriver ~name inner obj =
+    let open Fields_derivers_snapps.Derivers in
+    Fields.make_creator obj ~lower:!.inner ~upper:!.inner
+    |> finish ~name:(name ^ "Interval")
+
+  let%test_module "ClosedInterval" =
+    ( module struct
+      module IntClosedInterval = struct
+        type t_ = int t [@@deriving sexp, equal, compare]
+
+        (* Note: nonrec doesn't work with ppx-deriving *)
+        type t = t_ [@@deriving sexp, equal, compare]
+
+        let v = { lower = 10; upper = 100 }
+      end
+
+      let%test_unit "roundtrip json" =
+        let open Fields_derivers_snapps.Derivers in
+        let full = o () in
+        let _a : _ Unified_input.t = deriver ~name:"Int" int full in
+        [%test_eq: IntClosedInterval.t]
+          (!(full#of_json) (!(full#to_json) IntClosedInterval.v))
+          IntClosedInterval.v
+    end )
 end
 
 let assert_ b e = if b then Ok () else Or_error.error_string e
@@ -61,13 +78,14 @@ module Numeric = struct
       ; compare : 'a -> 'a -> int
       ; equal : 'a -> 'a -> bool
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> (F.t, bool) Random_oracle_input.t
-      ; to_input_checked :
-          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
       }
 
     let run f x y = Impl.run_checked (f x y)
+
+    let ( !! ) f = Fn.compose Impl.run_checked f
 
     let length =
       Length.
@@ -78,7 +96,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let amount =
@@ -114,7 +132,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let global_slot =
@@ -126,7 +144,7 @@ module Numeric = struct
         ; equal
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let token_id =
@@ -138,7 +156,7 @@ module Numeric = struct
         ; lte_checked = run Checked.( <= )
         ; typ
         ; to_input
-        ; to_input_checked = Fn.compose Impl.run_checked Checked.to_input
+        ; to_input_checked = Checked.to_input
         }
 
     let time =
@@ -148,12 +166,9 @@ module Numeric = struct
         ; lte_checked = run Checked.( <= )
         ; zero
         ; max_value
-        ; typ = Unpacked.typ
-        ; to_input = Fn.compose Random_oracle_input.bitstring Bits.to_bits
-        ; to_input_checked =
-            (fun x ->
-              Random_oracle_input.bitstring
-                (Unpacked.var_to_bits x :> Boolean.var list))
+        ; typ = Checked.typ
+        ; to_input
+        ; to_input_checked = Checked.to_input
         }
   end
 
@@ -166,6 +181,64 @@ module Numeric = struct
       [@@deriving sexp, equal, yojson, hash, compare]
     end
   end]
+
+  let deriver name inner obj =
+    let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
+    Or_ignore.deriver closed_interval obj
+
+  module Derivers = struct
+    open Fields_derivers_snapps.Derivers
+
+    let token_id_inner obj =
+      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
+        ~of_string:Token_id.of_string
+
+    let block_time_inner obj =
+      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
+        ~to_string:Block_time.to_string obj
+
+    let nonce obj = deriver "Nonce" uint32 obj
+
+    let balance obj = deriver "Balance" balance obj
+
+    let amount obj = deriver "CurrencyAmount" amount obj
+
+    let length obj = deriver "Length" uint32 obj
+
+    let global_slot obj = deriver "GlobalSlot" uint32 obj
+
+    let token_id obj = deriver "TokenId" token_id_inner obj
+
+    let block_time obj = deriver "BlockTime" block_time_inner obj
+  end
+
+  let%test_module "Numeric" =
+    ( module struct
+      module Int_numeric = struct
+        type t_ = int t [@@deriving sexp, equal, compare]
+
+        (* Note: nonrec doesn't work with ppx-deriving *)
+        type t = t_ [@@deriving sexp, equal, compare]
+      end
+
+      module T = struct
+        type t = { foo : Int_numeric.t }
+        [@@deriving sexp, equal, compare, fields]
+
+        let v : t =
+          { foo = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 } }
+
+        let deriver obj =
+          let open Fields_derivers_snapps.Derivers in
+          Fields.make_creator obj ~foo:!.(deriver "Int" int) |> finish ~name:"T"
+      end
+
+      let%test_unit "roundtrip json" =
+        let open Fields_derivers_snapps.Derivers in
+        let full = o () in
+        let _a : _ Unified_input.t = T.deriver full in
+        [%test_eq: T.t] (of_json full (to_json full T.v)) T.v
+    end )
 
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 
@@ -214,15 +287,14 @@ module Eq_data = struct
       ; equal_checked : 'var -> 'var -> Boolean.var
       ; default : 'a
       ; typ : ('var, 'a) Typ.t
-      ; to_input : 'a -> (F.t, bool) Random_oracle_input.t
-      ; to_input_checked :
-          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t
+      ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
+      ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       }
 
     let run f x y = Impl.run_checked (f x y)
 
     let field =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Field.
         { typ
         ; equal
@@ -233,7 +305,7 @@ module Eq_data = struct
         }
 
     let sequence_state =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       lazy
         Field.
           { typ
@@ -245,14 +317,15 @@ module Eq_data = struct
           }
 
     let boolean =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       Boolean.
         { typ
         ; equal = Bool.equal
         ; equal_checked = run equal
         ; default = false
-        ; to_input = (fun b -> bitstring [ b ])
-        ; to_input_checked = (fun b -> bitstring [ b ])
+        ; to_input = (fun b -> packed (field_of_bool b, 1))
+        ; to_input_checked =
+            (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1))
         }
 
     let receipt_chain_hash =
@@ -313,7 +386,7 @@ module Eq_data = struct
 
   let to_input ~explicit { Tc.default; to_input; _ } (t : _ t) =
     if explicit then
-      Flagged_option.to_input' ~f:to_input
+      Flagged_option.to_input' ~f:to_input ~field_of_bool
         ( match t with
         | Ignore ->
             { is_some = false; data = default }
@@ -400,7 +473,7 @@ module Account = struct
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
       end
 
       module V1 = struct
@@ -479,16 +552,15 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
-    Poly.
-      { balance
-      ; nonce
-      ; receipt_chain_hash
-      ; public_key
-      ; delegate
-      ; state
-      ; sequence_state
-      ; proved_state
-      }
+    { Poly.balance
+    ; nonce
+    ; receipt_chain_hash
+    ; public_key
+    ; delegate
+    ; state
+    ; sequence_state
+    ; proved_state
+    }
 
   let accept : t =
     { balance = Ignore
@@ -504,6 +576,32 @@ module Account = struct
 
   let is_accept : t -> bool = equal accept
 
+  let deriver obj =
+    let open Fields_derivers_snapps in
+    Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
+      ~nonce:!.Numeric.Derivers.nonce
+      ~receipt_chain_hash:!.(Or_ignore.deriver field)
+      ~public_key:!.(Or_ignore.deriver public_key)
+      ~delegate:!.(Or_ignore.deriver public_key)
+      ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver field)
+      ~proved_state:!.(Or_ignore.deriver bool)
+    |> finish ~name:"AccountPredicate"
+
+  let%test_unit "json roundtrip" =
+    let b = Balance.of_int 1000 in
+    let predicate : t =
+      { accept with
+        balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
+      ; public_key = Or_ignore.Check Public_key.Compressed.empty
+      ; sequence_state = Or_ignore.Check (Field.of_int 99)
+      ; proved_state = Or_ignore.Check true
+      }
+    in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
   let to_input
       ({ balance
        ; nonce
@@ -515,7 +613,7 @@ module Account = struct
        ; proved_state
        } :
         t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
@@ -554,7 +652,7 @@ module Account = struct
          ; proved_state
          } :
           t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Numeric.(Checked.to_input Tc.balance balance)
         ; Numeric.(Checked.to_input Tc.nonce nonce)
@@ -732,6 +830,42 @@ module Protocol_state = struct
       end
     end]
 
+    let deriver obj =
+      let open Fields_derivers_snapps.Derivers in
+      let ledger obj' =
+        Epoch_ledger.Poly.Fields.make_creator obj'
+          ~hash:!.(Or_ignore.deriver field)
+          ~total_currency:!.Numeric.Derivers.amount
+        |> finish ~name:"EpochLedgerPredicate"
+      in
+      Poly.Fields.make_creator obj ~ledger:!.ledger
+        ~seed:!.(Or_ignore.deriver field)
+        ~start_checkpoint:!.(Or_ignore.deriver field)
+        ~lock_checkpoint:!.(Or_ignore.deriver field)
+        ~epoch_length:!.Numeric.Derivers.length
+      |> finish ~name:"EpochDataPredicate"
+
+    let%test_unit "json roundtrip" =
+      let f = Or_ignore.Check Field.one in
+      let u = Length.zero in
+      let a = Amount.zero in
+      let predicate : t =
+        { Poly.ledger =
+            { Epoch_ledger.Poly.hash = f
+            ; total_currency =
+                Or_ignore.Check { Closed_interval.lower = a; upper = a }
+            }
+        ; seed = f
+        ; start_checkpoint = f
+        ; lock_checkpoint = f
+        ; epoch_length =
+            Or_ignore.Check { Closed_interval.lower = u; upper = u }
+        }
+      in
+      let module Fd = Fields_derivers_snapps.Derivers in
+      let full = deriver (Fd.o ()) in
+      [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Let_syntax in
       let%bind ledger =
@@ -761,7 +895,7 @@ module Protocol_state = struct
          ; epoch_length
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
@@ -790,7 +924,7 @@ module Protocol_state = struct
            ; epoch_length
            } :
             t) =
-        let open Random_oracle.Input in
+        let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
           ; Numeric.(Checked.to_input Tc.amount total_currency)
@@ -863,6 +997,21 @@ module Protocol_state = struct
     end
   end]
 
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    Poly.Fields.make_creator obj
+      ~snarked_ledger_hash:!.(Or_ignore.deriver field)
+      ~snarked_next_available_token:!.Numeric.Derivers.token_id
+      ~timestamp:!.Numeric.Derivers.block_time
+      ~blockchain_length:!.Numeric.Derivers.length
+      ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output:!.unit
+      ~total_currency:!.Numeric.Derivers.amount
+      ~global_slot_since_hard_fork:!.Numeric.Derivers.global_slot
+      ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
+      ~staking_epoch_data:!.Epoch_data.deriver
+      ~next_epoch_data:!.Epoch_data.deriver
+    |> finish ~name:"ProtocolStatePredicate"
+
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     (* TODO: pass in ledger hash, next available token *)
@@ -921,7 +1070,7 @@ module Protocol_state = struct
        ; next_epoch_data
        } :
         t) =
-    let open Random_oracle.Input in
+    let open Random_oracle.Input.Chunked in
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
@@ -973,7 +1122,7 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.var
         , Token_id.var
-        , Block_time.Unpacked.var
+        , Block_time.Checked.t
         , Length.Checked.t
         , unit (* TODO *)
         , Global_slot.Checked.t
@@ -992,7 +1141,7 @@ module Protocol_state = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
       , Token_id.var Numeric.Checked.t
-      , Block_time.Unpacked.var Numeric.Checked.t
+      , Block_time.Checked.t Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
       , Global_slot.Checked.t Numeric.Checked.t
@@ -1014,7 +1163,7 @@ module Protocol_state = struct
          ; next_epoch_data
          } :
           t) =
-      let open Random_oracle.Input in
+      let open Random_oracle.Input.Chunked in
       let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
@@ -1150,6 +1299,12 @@ module Protocol_state = struct
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
+
+  let%test_unit "json roundtrip" =
+    let predicate : t = accept in
+    let module Fd = Fields_derivers_snapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
@@ -1291,12 +1446,19 @@ module Account_type = struct
     | _ ->
         assert false
 
-  let to_input x = Random_oracle_input.bitstring (to_bits x)
+  let to_input x =
+    let open Random_oracle_input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map (to_bits x) ~f:(fun b -> packed (field_of_bool b, 1)))
 
   module Checked = struct
     type t = { user : Boolean.var; snapp : Boolean.var } [@@deriving hlist]
 
-    let to_input { user; snapp } = Random_oracle_input.bitstring [ user; snapp ]
+    let to_input { user; snapp } =
+      let open Random_oracle_input.Chunked in
+      Array.reduce_exn ~f:append
+        (Array.map [| user; snapp |] ~f:(fun b ->
+             packed ((b :> Field.Var.t), 1)))
 
     let constant =
       let open Boolean in
@@ -1394,7 +1556,7 @@ module Other = struct
       Poly.Stable.Latest.t
 
     let to_input ({ predicate; account_transition; account_vk } : t) =
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Account.Checked.to_input predicate
         ; Transition.to_input ~f:Account_state.Checked.to_input
@@ -1404,7 +1566,7 @@ module Other = struct
   end
 
   let to_input ({ predicate; account_transition; account_vk } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.to_input predicate
       ; Transition.to_input ~f:Account_state.to_input account_transition
@@ -1485,7 +1647,7 @@ module Digested = F
 
 let to_input
     ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-  let open Random_oracle_input in
+  let open Random_oracle_input.Chunked in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
     ; Other.to_input other
@@ -1551,7 +1713,7 @@ module Checked = struct
 
   let to_input
       ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Account.Checked.to_input self_predicate
       ; Other.Checked.to_input other

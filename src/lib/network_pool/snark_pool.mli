@@ -45,6 +45,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> incoming_diffs:
          ( Resource_pool.Diff.t Envelope.Incoming.t
          * Mina_net2.Validation_callback.t )
@@ -105,12 +106,6 @@ module Diff_versioned : sig
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, hash]
-    end
-
-    module V1 : sig
-      type t [@@deriving compare, sexp, hash]
-
-      val to_latest : t -> V2.t
     end
   end]
 end

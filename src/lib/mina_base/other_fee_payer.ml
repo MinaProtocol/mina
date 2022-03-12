@@ -1,17 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Signature_lib
-
-[%%else]
-
-open Signature_lib_nonconsensus
-
-[%%endif]
-
 module Impl = Pickles.Impls.Step
 
 module Payload = struct
@@ -50,12 +38,11 @@ module Payload = struct
       Poly.t
 
     let to_input ({ pk; token_id; nonce; fee } : t) =
-      let ( ! ) = Impl.run_checked in
-      let open Random_oracle_input in
+      let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input pk
-        ; !(Token_id.Checked.to_input token_id)
-        ; !(Mina_numbers.Account_nonce.Checked.to_input nonce)
+        ; Token_id.Checked.to_input token_id
+        ; Mina_numbers.Account_nonce.Checked.to_input nonce
         ; Currency.Fee.var_to_input fee
         ]
   end
@@ -81,7 +68,7 @@ module Payload = struct
     }
 
   let to_input ({ pk; token_id; nonce; fee } : t) =
-    let open Random_oracle_input in
+    let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Public_key.Compressed.to_input pk
       ; Token_id.to_input token_id
