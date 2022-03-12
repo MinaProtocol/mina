@@ -38,10 +38,18 @@ let ann_str :
     -> rec_flag * type_declaration list
     -> structure =
  fun ~loc ~path:_ (_rec_flag, type_decls) ->
+  let lift_string_tuples ~loc xs =
+    List.map xs ~f:(fun (a, b) ->
+        Ppxlib.Ast_builder.Default.pexp_tuple ~loc
+          [ Ppxlib.Ast_builder.Default.estring ~loc a
+          ; Ppxlib.Ast_builder.Default.estring ~loc b
+          ])
+  in
   let type_decl = expect_single_decl ~loc type_decls in
   let loc = type_decl.ptype_loc in
   let name = type_decl.ptype_name.txt ^ "_annots" in
   let fields = get_record_fields_exn type_decl in
+  let top_attributes = extract_string_attrs type_decl.ptype_attributes in
   let field_branches =
     List.map fields ~f:(fun (field : label_declaration) ->
         let string_attributes = extract_string_attrs field.pld_attributes in
@@ -50,11 +58,7 @@ let ann_str :
           ~guard:None
           ~rhs:
             (Ppxlib.Ast_builder.Default.elist ~loc
-               (List.map string_attributes ~f:(fun (attr_name, attr_value) ->
-                    Ppxlib.Ast_builder.Default.pexp_tuple ~loc
-                      [ Ppxlib.Ast_builder.Default.estring ~loc attr_name
-                      ; Ppxlib.Ast_builder.Default.estring ~loc attr_value
-                      ]))))
+               (lift_string_tuples string_attributes ~loc)))
   in
   let field_branches =
     field_branches
@@ -63,10 +67,20 @@ let ann_str :
           ~guard:None ~rhs:[%expr failwith "unknown field"]
       ]
   in
+  let lid s ~loc = Loc.make ~loc (Longident.Lident s) in
   [%str
     let [%p Ppxlib.Ast_builder.Default.pvar ~loc name] =
-     fun str ->
-      [%e Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str] field_branches]]
+      Ppxlib.Ast_builder.Default.pexp_record
+        [ ( lid "top"
+          , Ppxlib.Ast_builder.Default.elist ~loc
+              (lift_string_tuples top_attributes ~loc) )
+        ; ( lid "fields"
+          , fun str ->
+              [%e
+                Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str]
+                  field_branches] )
+        ]
+        None]
 
 let ann_sig :
        loc:Location.t
