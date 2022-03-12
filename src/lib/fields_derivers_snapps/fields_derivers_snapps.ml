@@ -124,7 +124,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | `String x ->
             of_string x
         | _ ->
-            raise (Of_yojson.Invalid_json_scalar `String))
+            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String))
       ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
