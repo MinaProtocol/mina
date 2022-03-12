@@ -32,3 +32,15 @@ spec:
             name: {{ template "foundation-delegation.fullname" . }}-backend
             port:
               number: {{ .Values.backend.port }}
+
+---
+apiVersion: v1
+kind: BackendConfig
+metadata:
+  name: http-hc-config
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    port: 8080
+    type: HTTPS
+    requestPath: /
