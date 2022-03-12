@@ -87,15 +87,24 @@ module Of_yojson = struct
       constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
+  exception Field_not_found of string
+
   let add_field : ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
     let creator finished_obj =
       let map = !(finished_obj#of_json_creator) in
       !(t_field#map)
         (!(t_field#of_json)
-           (Map.find_exn map (Fields_derivers.name_under_to_camel field)))
+           (let name = Fields_derivers.name_under_to_camel field in
+            match Map.find map name with
+            | None ->
+                raise (Field_not_found name)
+            | Some x ->
+                x))
     in
     (creator, acc_obj)
+
+  exception Json_not_object
 
   let finish (creator, obj) =
     let of_json json =
@@ -104,31 +113,40 @@ module Of_yojson = struct
           obj#of_json_creator := String.Map.of_alist_exn pairs ;
           creator obj
       | _ ->
-          failwith "todo"
+          raise Json_not_object
     in
     obj#map := Fn.id ;
     obj#of_json := of_json ;
     obj
 
+  exception Invalid_json_scalar of [ `Int | `String | `Bool | `List ]
+
   (* TODO: Replace failwith's exception *)
   let int obj =
-    (obj#of_json := function `Int x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `Int x -> x | _ -> raise (Invalid_json_scalar `Int)) ;
     obj#map := Fn.id ;
     obj
 
   let string obj =
-    (obj#of_json := function `String x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `String x -> x | _ -> raise (Invalid_json_scalar `String)) ;
     obj#map := Fn.id ;
     obj
 
   let bool obj =
-    (obj#of_json := function `Bool x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `Bool x -> x | _ -> raise (Invalid_json_scalar `Bool)) ;
     obj#map := Fn.id ;
     obj
 
   let list x obj =
     (obj#of_json :=
-       function `List xs -> List.map xs ~f:!(x#of_json) | _ -> failwith "todo") ;
+       function
+       | `List xs ->
+           List.map xs ~f:!(x#of_json)
+       | _ ->
+           raise (Invalid_json_scalar `List)) ;
     obj#map := List.map ~f:!(x#map) ;
     obj
 

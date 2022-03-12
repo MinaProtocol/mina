@@ -104,33 +104,53 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     Fields_derivers_graphql.Graphql_query.scalar obj
 
+  exception
+    Invalid_rich_scalar of
+      [ `Uint
+      | `Field
+      | `Public_key
+      | `Amount
+      | `Balance
+      | `Unit
+      | `Proof
+      | `Verification_key ]
+
+  let except ~f v x = try f x with _ -> raise (Invalid_rich_scalar v)
+
   let iso_string ?doc obj ~(to_string : 'a -> string)
       ~(of_string : string -> 'a) ~name =
     yojson obj ?doc ~name
-      ~map:(function `String x -> of_string x | _ -> failwith "unsupported")
+      ~map:(function
+        | `String x ->
+            of_string x
+        | _ ->
+            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String))
       ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 64-bit integer represented as a string in base10"
       ~name:"UInt64" ~to_string:Unsigned.UInt64.to_string
-      ~of_string:Unsigned.UInt64.of_string
+      ~of_string:(except ~f:Unsigned.UInt64.of_string `Uint)
 
   let uint32 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 32-bit integer represented as a string in base10"
       ~name:"UInt32" ~to_string:Unsigned.UInt32.to_string
-      ~of_string:Unsigned.UInt32.of_string
+      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let field obj : _ Unified_input.t =
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
-      ~to_string:Field.to_string ~of_string:Field.of_string
+      ~to_string:Field.to_string
+      ~of_string:(except ~f:Field.of_string `Field)
 
   let public_key obj : _ Unified_input.t =
     iso_string obj ~name:"Field"
       ~doc:"String representing a public key in base58"
       ~to_string:Signature_lib.Public_key.Compressed.to_string
-      ~of_string:Signature_lib.Public_key.Compressed.of_base58_check_exn
+      ~of_string:
+        (except ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+           `Public_key)
 
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
@@ -155,20 +175,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let unit obj : _ Unified_input.t =
     yojson obj ?doc:None ~name:"Unit"
-      ~map:(function `String "Unit" -> () | _ -> failwith "unsupported")
+      ~map:(function
+        | `String "Unit" -> () | _ -> raise (Invalid_rich_scalar `Unit))
       ~contramap:(fun () -> `String "Unit")
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
-      ~of_string:Unsigned.UInt32.of_string
+      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let amount obj =
     iso_string obj ~name:"CurrencyAmount" ~to_string:Currency.Amount.to_string
-      ~of_string:Currency.Amount.of_string
+      ~of_string:(except ~f:Currency.Amount.of_string `Amount)
 
   let balance obj =
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
-      ~of_string:Currency.Balance.of_string
+      ~of_string:(except ~f:Currency.Balance.of_string `Balance)
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Graphql.Fields.option x obj in
@@ -406,7 +427,7 @@ let proof obj : _ Unified_input.t =
     | Ok proof ->
         proof
     | Error _err ->
-        failwith "error"
+        raise (Invalid_rich_scalar `Proof)
   in
   iso_string obj ~name:"SnappProof"
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
@@ -415,7 +436,7 @@ let verification_key_with_hash obj =
   let verification_key obj =
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
-        ~of_string:of_base58_check_exn
+        ~of_string:(except ~f:of_base58_check_exn `Verification_key)
         ~doc:"Verification key in Base58Check format")
   in
   With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
