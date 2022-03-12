@@ -34,7 +34,7 @@ spec:
               number: {{ .Values.backend.port }}
 
 ---
-apiVersion: v1
+apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
   name: http-hc-config
