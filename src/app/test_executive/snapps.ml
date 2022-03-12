@@ -192,6 +192,56 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (snapp_update, parties_update_all)
     in
+    let%bind ( parties_create_account_with_timing
+             , timing_account_id
+             , timing_update ) =
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let amount = Currency.Amount.of_int 10_000_000_000 in
+      let nonce = Account.Nonce.of_int 4 in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "Snapp create account with timing"
+      in
+      let snapp_keypair = Signature_lib.Keypair.create () in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (keypair, nonce)
+        ; fee
+        ; receivers = []
+        ; amount
+        ; snapp_account_keypairs = [ snapp_keypair ]
+        ; memo
+        ; new_snapp_account = true
+        ; snapp_update =
+            (let timing =
+               Snapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance =
+                       Currency.Balance.of_int 1_000_000_000
+                   ; cliff_time = Mina_numbers.Global_slot.of_int 100
+                   ; cliff_amount = Currency.Amount.of_int 10_000
+                   ; vesting_period = Mina_numbers.Global_slot.of_int 2
+                   ; vesting_increment = Currency.Amount.of_int 1_000
+                   }
+                   : Party.Update.Timing_info.value )
+             in
+             { Party.Update.dummy with timing })
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      let timing_account_id =
+        Account_id.create
+          (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
+          Token_id.default
+      in
+      return
+        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+            parties_spec
+        , timing_account_id
+        , parties_spec.snapp_update )
+    in
     let parties_invalid_nonce =
       let p = parties_update_all in
       { p with
@@ -210,7 +260,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { data =
               { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 4
+                predicate = Mina_base.Account.Nonce.of_int 6
               }
           ; authorization = Mina_base.Signature.dummy
           }
@@ -451,6 +501,40 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.hard_error
                  (Error.of_string
                     "Ledger update and requested update are incompatible") )))
+    in
+    let%bind () =
+      section "Send a snapp to create a snapp account with timing"
+        (send_snapp parties_create_account_with_timing)
+    in
+    let%bind () =
+      section
+        "Wait for snapp to create account with timing to be included in \
+         transition frontier"
+        (wait_for_snapp parties_create_account_with_timing)
+    in
+    let%bind () =
+      section "Verify snapp timing in ledger"
+        (let%bind ledger_update = get_account_update timing_account_id in
+         if compatible_updates ~ledger_update ~requested_update:timing_update
+         then (
+           [%log info]
+             "Ledger timing and requested timing update are compatible" ;
+           return () )
+         else (
+           [%log error]
+             "Ledger update and requested update are incompatible, possibly \
+              because of the timing"
+             ~metadata:
+               [ ( "ledger_update"
+                 , Mina_base.Party.Update.to_yojson ledger_update )
+               ; ( "requested_update"
+                 , Mina_base.Party.Update.to_yojson timing_update )
+               ] ;
+
+           Malleable_error.hard_error
+             (Error.of_string
+                "Ledger update and requested update with timing are \
+                 incompatible") ))
     in
     let%bind () =
       section "Send a snapp with an invalid nonce"

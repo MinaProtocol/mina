@@ -4383,8 +4383,8 @@ module For_tests = struct
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
+            (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
-            (*Authorization for the update being performed*)
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
@@ -4651,6 +4651,13 @@ module For_tests = struct
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
+    (* only allow timing on a single new snapp account
+       balance changes for other new snapp accounts are just the account creation fee
+    *)
+    assert (
+      Snapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
+      || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
+    ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
