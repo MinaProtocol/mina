@@ -19,9 +19,9 @@ let extract_string_attrs (attributes : attributes) =
             ; _
             }
           ] ->
-          Some (attr.attr_name.txt, str)
+          Some (attr.attr_name.txt, Some str)
       | PStr [] ->
-          Some (attr.attr_name.txt, "")
+          Some (attr.attr_name.txt, None)
       | _ ->
           None)
 
@@ -38,11 +38,17 @@ let annot_str :
     -> rec_flag * type_declaration list
     -> structure =
  fun ~loc ~path:_ (_rec_flag, type_decls) ->
+  let lift_optional_string ~loc = function
+    | None ->
+        [%expr None]
+    | Some str ->
+        [%expr Some [%e Ppxlib.Ast_builder.Default.estring ~loc str]]
+  in
   let lift_string_tuples ~loc xs =
     List.map xs ~f:(fun (a, b) ->
         Ppxlib.Ast_builder.Default.pexp_tuple ~loc
           [ Ppxlib.Ast_builder.Default.estring ~loc a
-          ; Ppxlib.Ast_builder.Default.estring ~loc b
+          ; lift_optional_string ~loc b
           ])
   in
   let type_decl = expect_single_decl ~loc type_decls in
@@ -69,10 +75,14 @@ let annot_str :
       ]
   in
   [%str
-    let [%p Ppxlib.Ast_builder.Default.pvar ~loc fields_name] = fun str ->
+    let ([%p Ppxlib.Ast_builder.Default.pvar ~loc fields_name] :
+          string -> (string * string option) list) =
+     fun str ->
       [%e Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str] field_branches]
 
-    let [%p Ppxlib.Ast_builder.Default.pvar ~loc toplevel_name] =
+    let ([%p Ppxlib.Ast_builder.Default.pvar ~loc toplevel_name] :
+          unit -> (string * string option) list) =
+     fun () ->
       [%e
         Ppxlib.Ast_builder.Default.elist ~loc
           (lift_string_tuples top_attributes ~loc)]]
@@ -85,10 +95,16 @@ let annot_sig :
  fun ~loc ~path:_ (_rec_flag, type_decls) ->
   let type_decl = expect_single_decl ~loc type_decls in
   let loc = type_decl.ptype_loc in
-  let name = type_decl.ptype_name.txt ^ "_annots" in
-  let type_ = [%type: string -> string] in
+  let fields_name = type_decl.ptype_name.txt ^ "_fields_annots" in
+  let toplevel_name = type_decl.ptype_name.txt ^ "_toplevel_annots" in
   [ psig_value ~loc
-      (value_description ~loc ~name:(Located.mk ~loc name) ~type_ ~prim:[])
+      (value_description ~loc
+         ~name:(Located.mk ~loc fields_name)
+         ~type_:[%type: string -> (string * string option) list] ~prim:[])
+  ; psig_value ~loc
+      (value_description ~loc
+         ~name:(Located.mk ~loc toplevel_name)
+         ~type_:[%type: unit -> (string * string option) list] ~prim:[])
   ]
 
 let ann =
