@@ -7,12 +7,13 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
+use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
 use kimchi::circuits::scalars::ProofEvaluations;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
-use kimchi::prover_index::Index;
+use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
@@ -70,7 +71,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
-    let index: &Index<GAffine> = &index.as_ref().0;
+    let index: &ProverIndex<GAffine> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch

@@ -1,7 +1,7 @@
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
-use kimchi::{linearization::expr_linearization, prover_index::Index};
+use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -11,7 +11,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFpPlonkIndex(pub Box<Index<GAffine>>);
+pub struct CamlPastaFpPlonkIndex(pub Box<ProverIndex<GAffine>>);
 pub type CamlPastaFpPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkIndex>;
 
 extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
@@ -79,7 +79,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     }
 
     // create index
-    Ok(CamlPastaFpPlonkIndex(Box::new(Index::<GAffine>::create(
+    Ok(CamlPastaFpPlonkIndex(Box::new(ProverIndex::<GAffine>::create(
         cs,
         oracle::pasta::fq_kimchi::params(),
         endo_q,
@@ -143,7 +143,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = Index::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
+    let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.cs.fr_sponge_params = oracle::pasta::fp_kimchi::params();
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
