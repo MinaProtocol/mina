@@ -70,17 +70,16 @@ let ann_str :
   let lid s ~loc = Loc.make ~loc (Longident.Lident s) in
   [%str
     let [%p Ppxlib.Ast_builder.Default.pvar ~loc name] =
-      Ppxlib.Ast_builder.Default.pexp_record
-        [ ( lid "top"
-          , Ppxlib.Ast_builder.Default.elist ~loc
-              (lift_string_tuples top_attributes ~loc) )
-        ; ( lid "fields"
-          , fun str ->
-              [%e
-                Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str]
-                  field_branches] )
-        ]
-        None]
+      [%e
+        Ppxlib.Ast_builder.Default.pexp_record ~loc
+          [ ( lid ~loc "top"
+            , Ppxlib.Ast_builder.Default.elist ~loc
+                (lift_string_tuples top_attributes ~loc) )
+          ; ( lid ~loc "fields"
+            , Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str]
+                field_branches )
+          ]
+          None]]
 
 let ann_sig :
        loc:Location.t

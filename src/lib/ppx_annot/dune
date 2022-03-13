@@ -2,6 +2,6 @@
  (name ppx_annot)
  (public_name ppx_annot)
  (kind ppx_deriver)
- (libraries ppxlib core_kernel)
+ (libraries ppxlib core_kernel base compiler-libs)
  (ppx_runtime_libraries graphql)
  (preprocess (pps ppx_version ppxlib.metaquot)))
