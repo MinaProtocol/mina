@@ -47,7 +47,8 @@ let annot_str :
   in
   let type_decl = expect_single_decl ~loc type_decls in
   let loc = type_decl.ptype_loc in
-  let name = type_decl.ptype_name.txt ^ "_annots" in
+  let fields_name = type_decl.ptype_name.txt ^ "_fields_annots" in
+  let toplevel_name = type_decl.ptype_name.txt ^ "_toplevel_annots" in
   let fields = get_record_fields_exn type_decl in
   let top_attributes = extract_string_attrs type_decl.ptype_attributes in
   let field_branches =
@@ -67,19 +68,14 @@ let annot_str :
           ~guard:None ~rhs:[%expr failwith "unknown field"]
       ]
   in
-  let lid s ~loc = Loc.make ~loc (Longident.Lident s) in
   [%str
-    let [%p Ppxlib.Ast_builder.Default.pvar ~loc name] =
+    let [%p Ppxlib.Ast_builder.Default.pvar ~loc fields_name] = fun str ->
+      [%e Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str] field_branches]
+
+    let [%p Ppxlib.Ast_builder.Default.pvar ~loc toplevel_name] =
       [%e
-        Ppxlib.Ast_builder.Default.pexp_record ~loc
-          [ ( lid ~loc "top"
-            , Ppxlib.Ast_builder.Default.elist ~loc
-                (lift_string_tuples top_attributes ~loc) )
-          ; ( lid ~loc "fields"
-            , Ppxlib.Ast_builder.Default.pexp_match ~loc [%expr str]
-                field_branches )
-          ]
-          None]]
+        Ppxlib.Ast_builder.Default.elist ~loc
+          (lift_string_tuples top_attributes ~loc)]]
 
 let annot_sig :
        loc:Location.t
