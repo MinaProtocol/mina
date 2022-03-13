@@ -32,7 +32,7 @@ let get_record_fields_exn (type_decl : type_declaration) =
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc "Expected a record type."
 
-let ann_str :
+let annot_str :
        loc:Location.t
     -> path:string
     -> rec_flag * type_declaration list
@@ -81,7 +81,7 @@ let ann_str :
           ]
           None]]
 
-let ann_sig :
+let annot_sig :
        loc:Location.t
     -> path:string
     -> rec_flag * type_declaration list
@@ -96,6 +96,6 @@ let ann_sig :
   ]
 
 let ann =
-  Deriving.add "ann"
-    ~str_type_decl:(Deriving.Generator.make_noarg ann_str)
-    ~sig_type_decl:(Deriving.Generator.make_noarg ann_sig)
+  Deriving.add "annot"
+    ~str_type_decl:(Deriving.Generator.make_noarg annot_str)
+    ~sig_type_decl:(Deriving.Generator.make_noarg annot_sig)
