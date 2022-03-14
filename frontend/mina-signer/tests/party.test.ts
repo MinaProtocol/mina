@@ -163,7 +163,7 @@ let PARTY = `
     }
   ]
 }
-`
+`;
 
 describe("Party", () => {
   let client: Client;
@@ -175,14 +175,17 @@ describe("Party", () => {
   it("tests party", () => {
     const keypair = client.genKeys();
     const partyPayload = {
-          feePayer: keypair.publicKey,
-          fee: "1",
-          nonce: "0",
-          memo: "test memo",
-        };
-    const parties = client.signTransaction(PARTY, partyPayload, keypair.privateKey)
-    console.log("DEBUG", parties,)
+      feePayer: keypair.publicKey,
+      fee: "1",
+      nonce: "0",
+      memo: "test memo",
+    };
+    const parties = client.signTransaction(
+      PARTY,
+      partyPayload,
+      keypair.privateKey
+    );
+    console.log("DEBUG", parties);
     expect(true).toBeTruthy();
   });
 });
-

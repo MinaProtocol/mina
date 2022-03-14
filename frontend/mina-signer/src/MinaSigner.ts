@@ -11,25 +11,15 @@ import {
   Payment,
   StakeDelegation,
   Message,
-  Party
+  Party,
 } from "./TSTypes";
 
 const defaultValidUntil = "4294967295";
 
-let didShutdown = false;
-// @ts-ignore
-function shutdown() {
-  if (globalThis.wasm_rayon_poolbuilder && !didShutdown) {
-    didShutdown = true;
-    globalThis.wasm_rayon_poolbuilder.free();
-    return Promise.all(
-      globalThis.wasm_workers.map(async (worker) => worker.terminate())
-    );
-  }
-}
-
 class Client {
   private network: Network;
+
+  private didShutdown: Boolean = false;
 
   constructor(options: { network: Network }) {
     if (!options?.network) {
@@ -42,6 +32,17 @@ class Client {
     this.network = specifiedNetwork;
   }
 
+  // @ts-ignore
+  public shutdown() {
+    if (globalThis.wasm_rayon_poolbuilder && !this.didShutdown) {
+      this.didShutdown = true;
+      globalThis.wasm_rayon_poolbuilder.free();
+      return Promise.all(
+        globalThis.wasm_workers.map(async (worker) => worker.terminate())
+      );
+    }
+  }
+
   /**
    * Generates a public/private key pair
    *
@@ -51,8 +52,18 @@ class Client {
     return minaSDK.genKeys();
   }
 
-  public signTransaction(parties: string, party: Party, privateKey: PrivateKey): String {
-    return minaSDK.signTransaction(parties, party, privateKey);
+  public signTransaction(
+    parties: string,
+    party: Party,
+    privateKey: PrivateKey
+  ): String {
+    const partyTransaction = minaSDK.signTransaction(
+      parties,
+      party,
+      privateKey
+    );
+    this.shutdown();
+    return partyTransaction;
   }
 
   /**
@@ -64,7 +75,9 @@ class Client {
    * @returns True if the `keypair` is a verifiable key pair, otherwise throw an exception
    */
   public verifyKeypair(keypair: Keypair): boolean {
-    return minaSDK.validKeypair(keypair);
+    const newKeypair = minaSDK.validKeypair(keypair);
+    this.shutdown();
+    return newKeypair;
   }
 
   /**
@@ -85,13 +98,15 @@ class Client {
    * @returns A signed message
    */
   public signMessage(message: string, key: Keypair): Signed<Message> {
-    return {
+    const signedMessage = {
       signature: minaSDK.signString(this.network, key.privateKey, message),
       data: {
         publicKey: key.publicKey,
         message,
       },
     };
+    this.shutdown();
+    return signedMessage;
   }
 
   /**
@@ -129,7 +144,7 @@ class Client {
     const nonce = String(payment.nonce);
     const amount = String(payment.amount);
     const validUntil = String(payment.validUntil ?? defaultValidUntil);
-    return {
+    const signedPayment = {
       signature: minaSDK.signPayment(this.network, privateKey, {
         common: {
           fee,
@@ -154,6 +169,8 @@ class Client {
         validUntil,
       },
     };
+    this.shutdown();
+    return signedPayment;
   }
 
   /**
@@ -209,7 +226,7 @@ class Client {
     const fee = String(stakeDelegation.fee);
     const nonce = String(stakeDelegation.nonce);
     const validUntil = String(stakeDelegation.validUntil ?? defaultValidUntil);
-    return {
+    const signedDelegation = {
       signature: minaSDK.signStakeDelegation(this.network, privateKey, {
         common: {
           fee,
@@ -232,6 +249,8 @@ class Client {
         validUntil,
       },
     };
+    this.shutdown();
+    return signedDelegation;
   }
 
   /**
@@ -344,7 +363,10 @@ class Client {
   public signedRosettaTransactionToSignedCommand(
     signedRosettaTxn: string
   ): string {
-    return minaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxn);
+    const signedRosetta =
+      minaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxn);
+    this.shutdown();
+    return signedRosetta;
   }
 
   /**
