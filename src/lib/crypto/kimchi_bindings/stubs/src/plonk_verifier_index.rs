@@ -34,7 +34,7 @@ pub struct CamlLookupVerifierIndex<PolyComm> {
     pub lookup_table: Vec<PolyComm>,
     pub lookup_selectors: Vec<PolyComm>,
     pub table_ids: Option<PolyComm>,
-    pub max_joint_size: ocaml::Int
+    pub max_joint_size: ocaml::Int,
 }
 
 impl<G, CamlPolyComm> From<LookupVerifierIndex<G>> for CamlLookupVerifierIndex<CamlPolyComm>
