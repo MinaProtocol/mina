@@ -241,6 +241,7 @@ let fill_in_user_commands pool block_state_hash =
         ; fee_payer_balance
         ; receiver_account_creation_fee_paid
         ; receiver_balance
+        ; created_token = None (* TODO: remove dummy *)
         })
 
 let fill_in_internal_commands pool block_state_hash =
