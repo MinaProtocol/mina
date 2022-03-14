@@ -2081,7 +2081,6 @@ module Block_and_signed_command = struct
     ; failure_reason : string option
     ; fee_payer_account_creation_fee_paid : int64 option
     ; receiver_account_creation_fee_paid : int64 option
-    ; created_token : int64 option
     ; fee_payer_balance_id : int
     ; source_balance_id : int option
     ; receiver_balance_id : int option
@@ -2098,7 +2097,6 @@ module Block_and_signed_command = struct
         ; option string
         ; option int64
         ; option int64
-        ; option int64
         ; int
         ; option int
         ; option int
@@ -2106,7 +2104,7 @@ module Block_and_signed_command = struct
 
   let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no
       ~status ~failure_reason ~fee_payer_account_creation_fee_paid
-      ~receiver_account_creation_fee_paid ~created_token ~fee_payer_balance_id
+      ~receiver_account_creation_fee_paid ~fee_payer_balance_id
       ~source_balance_id ~receiver_balance_id =
     let failure_reason =
       Option.map ~f:Transaction_status.Failure.to_string failure_reason
@@ -2120,10 +2118,6 @@ module Block_and_signed_command = struct
     let receiver_account_creation_fee_paid =
       Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
     in
-    let created_token =
-      Option.map created_token ~f:(fun tid ->
-          Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid))
-    in
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_user_commands
@@ -2134,7 +2128,6 @@ module Block_and_signed_command = struct
                  failure_reason,
                  fee_payer_account_creation_fee_paid,
                  receiver_account_creation_fee_paid,
-                 created_token,
                  fee_payer_balance,
                  source_balance,
                  receiver_balance)
@@ -2147,7 +2140,6 @@ module Block_and_signed_command = struct
       ; failure_reason
       ; fee_payer_account_creation_fee_paid
       ; receiver_account_creation_fee_paid
-      ; created_token
       ; fee_payer_balance_id
       ; source_balance_id
       ; receiver_balance_id
@@ -2161,7 +2153,6 @@ module Block_and_signed_command = struct
         , failure_reason
         , fee_payer_account_creation_fee_paid
         , receiver_account_creation_fee_paid
-        , created_token
         , { Transaction_status.Balance_data.fee_payer_balance
           ; source_balance
           ; receiver_balance
@@ -2170,17 +2161,16 @@ module Block_and_signed_command = struct
       | Applied
           ( { fee_payer_account_creation_fee_paid
             ; receiver_account_creation_fee_paid
-            ; created_token
+            ; created_token = _
             }
           , balances ) ->
           ( "applied"
           , None
           , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token
           , balances )
       | Failed (failure, balances) ->
-          ("failed", Some failure, None, None, None, balances)
+          ("failed", Some failure, None, None, balances)
     in
     let pk_of_id id =
       let%map pk_str = Public_key.find_by_id (module Conn) id in
@@ -2236,14 +2226,12 @@ module Block_and_signed_command = struct
       (module Conn)
       ~block_id ~user_command_id ~sequence_no ~status:status_str ~failure_reason
       ~fee_payer_account_creation_fee_paid ~receiver_account_creation_fee_paid
-      ~created_token ~fee_payer_balance_id ~source_balance_id
-      ~receiver_balance_id
+      ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id ~user_command_id
       ~sequence_no ~(status : string) ~failure_reason
       ~fee_payer_account_creation_fee_paid ~receiver_account_creation_fee_paid
-      ~created_token ~fee_payer_balance_id ~source_balance_id
-      ~receiver_balance_id =
+      ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
@@ -2264,8 +2252,8 @@ module Block_and_signed_command = struct
           (module Conn)
           ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
           ~fee_payer_account_creation_fee_paid
-          ~receiver_account_creation_fee_paid ~created_token
-          ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id
+          ~receiver_account_creation_fee_paid ~fee_payer_balance_id
+          ~source_balance_id ~receiver_balance_id
 
   let load (module Conn : CONNECTION) ~block_id ~user_command_id =
     Conn.find
@@ -2277,7 +2265,6 @@ module Block_and_signed_command = struct
                status,failure_reason,
                fee_payer_account_creation_fee_paid,
                receiver_account_creation_fee_paid,
-               created_token,
                fee_payer_balance,
                source_balance,
                receiver_balance
@@ -2951,8 +2938,7 @@ module Block = struct
               user_command.fee_payer_account_creation_fee_paid
             ~receiver_account_creation_fee_paid:
               user_command.receiver_account_creation_fee_paid
-            ~created_token:user_command.created_token ~fee_payer_balance_id
-            ~source_balance_id ~receiver_balance_id)
+            ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id)
     in
     (* add internal commands *)
     let%bind internal_cmds_ids_and_seq_nos =

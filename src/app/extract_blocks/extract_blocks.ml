@@ -228,10 +228,6 @@ let fill_in_user_commands pool block_state_hash =
         balance_of_id_opt block_user_cmd.receiver_balance_id
           ~item:"receiver balance"
       in
-      let created_token =
-        Option.map block_user_cmd.created_token ~f:(fun tok ->
-            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64)
-      in
       return
         { Extensional.User_command.sequence_no
         ; typ
@@ -253,7 +249,6 @@ let fill_in_user_commands pool block_state_hash =
         ; fee_payer_balance
         ; receiver_account_creation_fee_paid
         ; receiver_balance
-        ; created_token
         })
 
 let fill_in_internal_commands pool block_state_hash =

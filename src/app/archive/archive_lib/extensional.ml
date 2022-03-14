@@ -43,7 +43,6 @@ module User_command = struct
     ; receiver_account_creation_fee_paid :
         Currency.Amount.Stable.Latest.t option
     ; receiver_balance : Currency.Balance.Stable.Latest.t option
-    ; created_token : Token_id.Stable.Latest.t option
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
