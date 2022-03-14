@@ -38,8 +38,8 @@ class Client {
     return minaSDK.genKeys();
   }
 
-  public signTransaction(parties: string, keypair: Keypair): Number {
-    return minaSDK.signTransaction(parties, keypair.privateKey);
+  public signTransaction(parties: string, memo: string, privateKey: PrivateKey) {
+    return minaSDK.signTransaction(parties, memo, privateKey);
   }
 
   /**

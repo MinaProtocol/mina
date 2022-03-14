@@ -8,6 +8,7 @@ open Mina_base
 open Rosetta_lib
 open Rosetta_coding
 open Js_util
+open Fields_derivers_snapps
 
 let _ =
   Js.export "minaSDK"
@@ -32,25 +33,23 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       method signTransaction (parties_js : string_js)
+       method signTransaction (parties_js : string_js) (memo_js : string_js)
            (sk_base58_check_js : string_js) =
-         let parties = parties_js |> Js.to_string in
-         let parties_json = Yojson.Safe.from_string parties in
-         let deriver = Parties.deriver in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
          in
-         let parties =
-           Fields_derivers_snapps.of_json
-             (deriver @@ Fields_derivers_snapps.derivers ())
-             parties_json
+         let pk = Public_key.of_private_key_exn sk |> Public_key.compress in
+         let fee = Currency.Fee.of_int 1_000_000 in
+         let parties_json =
+           parties_js |> Js.to_string |> Yojson.Safe.from_string
          in
-         let other_parties = parties.other_parties in
-         let fee_payer = parties.fee_payer in
-         let memo = parties.memo in
-         let protocol_state = parties.fee_payer.data.body.protocol_state in
+         let other_parties =
+           of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()) parties_json
+         in
+         let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
          let protocol_state_predicate_hash =
-           Snapp_predicate.Protocol_state.digest protocol_state
+           Snapp_predicate.Protocol_state.digest
+             Snapp_predicate.Protocol_state.accept
          in
          let other_parties_data =
            List.map (fun (party : Party.t) -> party.data) other_parties
@@ -67,6 +66,26 @@ let _ =
              ~protocol_state_predicate_hash
              ~memo_hash:(Signed_command_memo.hash memo)
          in
+         let fee_payer =
+           { Party.Fee_payer.data =
+               { body =
+                   { public_key = pk
+                   ; update = Party.Update.noop
+                   ; token_id = ()
+                   ; balance_change = fee
+                   ; increment_nonce = ()
+                   ; events = []
+                   ; sequence_events = []
+                   ; call_data = Field.zero
+                   ; call_depth = 0
+                   ; protocol_state = Snapp_predicate.Protocol_state.accept
+                   ; use_full_commitment = ()
+                   }
+               ; predicate = Mina_base.Account.Nonce.zero
+               }
+           ; authorization = Signature.dummy
+           }
+         in
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
@@ -81,11 +100,8 @@ let _ =
          in
          let new_parties = { Parties.fee_payer; other_parties; memo } in
          let parties_json =
-           Fields_derivers_snapps.to_json
-             (deriver @@ Fields_derivers_snapps.derivers ())
-             new_parties
+           to_json (Parties.deriver @@ derivers ()) new_parties
          in
-         (* Return JSON to inspect in mina-signer *)
          Yojson.Safe.to_string parties_json
 
        (** return public key associated with private key in raw hex format for Rosetta *)

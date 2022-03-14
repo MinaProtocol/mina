@@ -427,14 +427,10 @@ let weight (parties : t) : int =
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
-  let a =
-    Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
-      ~other_parties:!.(list @@ Party.deriver @@ o ())
-      ~memo:!.Signed_command_memo.deriver
-    |> finish ~name:"SendSnappInput"
-  in
-  Printf.printf "END OF PARTIES DERIVER\n" ;
-  a
+  Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
+    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~memo:!.Signed_command_memo.deriver
+  |> finish ~name:"SendSnappInput"
 
 let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
 

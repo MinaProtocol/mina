@@ -2,67 +2,6 @@ import Client from "../src/MinaSigner";
 
 let PARTY = `
 {
-  "feePayer": {
-    "data": {
-      "body": {
-        "publicKey": "B62qiTKpEPjGTSHZrtM8uXiKgn8So916pLmNJKDhKeyBQL9TDb3nvBG",
-        "update": {
-          "appState": [null, null, null, null, null, null, null, null],
-          "delegate": null,
-          "verificationKey": null,
-          "permissions": null,
-          "snappUri": null,
-          "tokenSymbol": null,
-          "timing": null,
-          "votingFor": null
-        },
-        "tokenId": "Unit",
-        "balanceChange": "0",
-        "incrementNonce": "Unit",
-        "events": [],
-        "sequenceEvents": [],
-        "callData": "0",
-        "callDepth": 0,
-        "protocolState": {
-          "snarkedLedgerHash": null,
-          "snarkedNextAvailableToken": {
-            "lower": "0",
-            "upper": "18446744073709551615"
-          },
-          "timestamp": { "lower": "0", "upper": "18446744073709551615" },
-          "blockchainLength": { "lower": "0", "upper": "4294967295" },
-          "minWindowDensity": { "lower": "0", "upper": "4294967295" },
-          "lastVrfOutput": "Unit",
-          "totalCurrency": { "lower": "0", "upper": "18446744073709551615" },
-          "globalSlotSinceHardFork": { "lower": "0", "upper": "4294967295" },
-          "globalSlotSinceGenesis": { "lower": "0", "upper": "4294967295" },
-          "stakingEpochData": {
-            "ledger": {
-              "hash": null,
-              "totalCurrency": { "lower": "0", "upper": "18446744073709551615" }
-            },
-            "seed": null,
-            "startCheckpoint": null,
-            "lockCheckpoint": null,
-            "epochLength": { "lower": "0", "upper": "4294967295" }
-          },
-          "nextEpochData": {
-            "ledger": {
-              "hash": null,
-              "totalCurrency": { "lower": "0", "upper": "18446744073709551615" }
-            },
-            "seed": null,
-            "startCheckpoint": null,
-            "lockCheckpoint": null,
-            "epochLength": { "lower": "0", "upper": "4294967295" }
-          }
-        },
-        "useFullCommitment": "Unit"
-      },
-      "predicate": "0"
-    },
-    "authorization": "7mWxjLYgbJUkZNcGouvhVj5tJ8yu9hoexb9ntvPK8t5LHqzmrL6QJjjKtf5SgmxB4QWkDw7qoMMbbNGtHVpsbJHPyTy2EzRQ"
-  },
   "otherParties": [
     {
       "data": {
@@ -143,8 +82,7 @@ let PARTY = `
       },
       "authorization": { "proof": null, "signature": null }
     }
-  ],
-  "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+  ]
 }
 `
 
@@ -157,7 +95,7 @@ describe("Party", () => {
 
   it("tests party", () => {
     const keypair = client.genKeys();
-    const party = client.signTransaction(PARTY, keypair)
+    const party = client.signTransaction(PARTY, "test memo", keypair.privateKey)
     console.log("DEBUG", party,)
     expect(true).toBeTruthy();
   });
