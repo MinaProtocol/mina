@@ -32,7 +32,6 @@
    random_oracle
    kimchi_backend.pasta
    data_hash_lib
-   promise
    )
  (inline_tests)
  (preprocess

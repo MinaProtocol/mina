@@ -37,7 +37,6 @@
    mina_numbers
    random_oracle
    sgn
-   promise
    )
   (library_flags -linkall)
   (inline_tests)
