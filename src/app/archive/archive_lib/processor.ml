@@ -979,7 +979,6 @@ end
 module Snapp_predicate_protocol_states = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; snarked_next_available_token_id : int option
     ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
@@ -1001,7 +1000,6 @@ module Snapp_predicate_protocol_states = struct
         ; option int
         ; option int
         ; option int
-        ; option int
         ; int
         ; int
         ]
@@ -1015,12 +1013,6 @@ module Snapp_predicate_protocol_states = struct
       Mina_caqti.add_if_snapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
-    in
-    let%bind snarked_next_available_token_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_token_id_bounds.add_if_doesn't_exist (module Conn))
-        (* TODO: dummy value, remove this column from the DB *)
-        Ignore
     in
     let%bind timestamp_id =
       Mina_caqti.add_if_snapp_check
@@ -1060,7 +1052,6 @@ module Snapp_predicate_protocol_states = struct
     in
     let value =
       { snarked_ledger_hash_id
-      ; snarked_next_available_token_id
       ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
