@@ -56,28 +56,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
          ~hard_timeout:(Slots 10)
 
-  (* Call [f] [n] times in parallel *)
-  let repeat_par ~n ~f =
-    Malleable_error.all_unit (List.init n ~f:(fun _ -> f ()))
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
 
   let send_padding_transactions ~fee ~logger ~n nodes =
-    let num_per_node =
-      let num_nodes = List.length nodes in
-      (n + num_nodes - 1) / num_nodes
-    in
-    [%log error] "num_per_node = %d" num_per_node ;
-    [%log error] "num_nodes = %d" (List.length nodes) ;
+    let sender = List.nth_exn nodes 1 in
+    let receiver = List.nth_exn nodes 2 in
     let open Malleable_error.Let_syntax in
-    List.map2_exn nodes
-      (List.tl_exn nodes @ [ List.hd_exn nodes ])
-      ~f:(fun sender receiver ->
-        let%bind sender_pub_key = Util.pub_key_of_node sender in
-        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-        repeat_par ~n:num_per_node ~f:(fun () ->
-            Network.Node.must_send_payment ~logger sender ~sender_pub_key
-              ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-            >>| ignore))
-    |> Malleable_error.all_unit
+    let%bind sender_pub_key = Util.pub_key_of_node sender in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    repeat_seq ~n ~f:(fun () ->
+        Network.Node.must_send_payment ~logger sender ~sender_pub_key
+          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        >>| ignore)
 
   let run network t =
     let open Malleable_error.Let_syntax in
