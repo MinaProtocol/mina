@@ -60,7 +60,6 @@ CREATE TYPE snapp_auth_required_type AS ENUM ('none', 'either', 'proof', 'signat
 
 CREATE TABLE snapp_permissions
 ( id                       serial                PRIMARY KEY
-, stake                    boolean               NOT NULL
 , edit_state               snapp_auth_required_type    NOT NULL
 , send                     snapp_auth_required_type    NOT NULL
 , receive                  snapp_auth_required_type    NOT NULL

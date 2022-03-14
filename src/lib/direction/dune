@@ -2,7 +2,7 @@
  (name direction)
  (public_name direction)
  (library_flags -linkall)
- (libraries core_kernel)
+ (libraries core_kernel sexplib0)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

@@ -112,10 +112,13 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
               let%bind state, sequence_state, proved_state =
                 match snapp with
                 | None ->
+                    let len =
+                      Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+                    in
                     (* won't raise, correct length given *)
                     let state =
                       Snapp_state.V.of_list_exn
-                        (List.init 8 ~f:(fun _ -> Or_ignore.Ignore))
+                        (List.init len ~f:(fun _ -> Or_ignore.Ignore))
                     in
                     let sequence_state = Or_ignore.Ignore in
                     let proved_state = Or_ignore.Ignore in
@@ -268,11 +271,11 @@ let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
       (* if positive, the account balance does not impose a constraint on the magnitude; but
          to avoid overflow over several Party.t, we'll limit the value
       *)
-      let%map magnitude =
+      let%map (magnitude : Currency.Amount.t) =
         Currency.Amount.gen_incl Currency.Amount.zero
           (Currency.Amount.of_int 100_000_000_000)
       in
-      Currency.Signed_poly.{ magnitude; sgn = Sgn.Pos }
+      ({ magnitude; sgn = Sgn.Pos } : Currency.Amount.Signed.t)
   | Neg ->
       (* if negative, magnitude constrained to balance in account
          the effective balance is either what's in the balances table,
@@ -293,7 +296,7 @@ let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
         Currency.Amount.gen_incl Currency.Amount.zero
           (Currency.Balance.to_amount effective_balance)
       in
-      Currency.Signed_poly.{ magnitude; sgn = Sgn.Neg }
+      ({ magnitude; sgn = Sgn.Neg } : Currency.Amount.Signed.t)
 
 let gen_use_full_commitment ~increment_nonce () :
     bool Base_quickcheck.Generator.t =
@@ -326,7 +329,7 @@ let gen_epoch_data_predicate
       closed_interval_exact epoch_data.ledger.total_currency
       |> return |> Snapp_basic.Or_ignore.gen
     in
-    Epoch_ledger.Poly.{ hash; total_currency }
+    { Epoch_ledger.Poly.hash; total_currency }
   in
   let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =
@@ -641,7 +644,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
       body.Party.Body.Poly.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(snapp_account = false) ?account_id ?permissions_auth
@@ -701,7 +704,7 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
             account )
   in
   let predicate = account.nonce in
-  Party.Predicated.Poly.{ body; predicate }
+  { Party.Predicated.Poly.body; predicate }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =
@@ -712,7 +715,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  Party.Fee_payer.{ data; authorization }
+  { Party.Fee_payer.data; authorization }
 
 (* keep max_other_parties small, so snapp integration tests don't need lots
    of block producers

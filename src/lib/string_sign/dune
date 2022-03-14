@@ -2,7 +2,21 @@
  (name string_sign)
  (public_name string_sign)
  (inline_tests)
- (libraries signature_lib)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ppx_inline_test.config
+   ;; local libraries
+   kimchi_backend
+   pickles.backend
+   kimchi_backend.pasta
+   random_oracle_input
+   signature_lib
+   snark_params
+   random_oracle
+   pickles
+   mina_signature_kind
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_inline_test))

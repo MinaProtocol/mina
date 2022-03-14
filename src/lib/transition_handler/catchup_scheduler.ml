@@ -153,8 +153,9 @@ let cancel_timeout t hash =
   remaining_time
 
 let rec extract_subtree t cached_transition =
-  let { With_hash.hash; _ }, _ =
-    Envelope.Incoming.data (Cached.peek cached_transition)
+  let hash =
+    let t, _ = Envelope.Incoming.data (Cached.peek cached_transition) in
+    State_hash.With_state_hashes.state_hash t
   in
   let successors =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
@@ -176,16 +177,14 @@ let rec remove_tree t parent_hash =
     Gauge.dec_one
       Transition_frontier_controller.transitions_in_catchup_scheduler) ;
   List.iter children ~f:(fun child ->
-      let { With_hash.hash; _ }, _ =
-        Envelope.Incoming.data (Cached.peek child)
-      in
-      remove_tree t hash)
+      let transition, _ = Envelope.Incoming.data (Cached.peek child) in
+      remove_tree t (State_hash.With_state_hashes.state_hash transition))
 
 let watch t ~timeout_duration ~cached_transition =
   let transition_with_hash, _ =
     Envelope.Incoming.data (Cached.peek cached_transition)
   in
-  let hash = With_hash.hash transition_with_hash in
+  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
   let parent_hash =
     With_hash.data transition_with_hash |> External_transition.parent_hash
   in
@@ -235,10 +234,11 @@ let watch t ~timeout_duration ~cached_transition =
       if
         List.exists cached_sibling_transitions
           ~f:(fun cached_sibling_transition ->
-            let { With_hash.hash = sibling_hash; _ }, _ =
+            let sibling, _ =
               Envelope.Incoming.data (Cached.peek cached_sibling_transition)
             in
-            State_hash.equal hash sibling_hash)
+            State_hash.equal hash
+              (State_hash.With_state_hashes.state_hash sibling))
       then
         [%log' debug t.logger]
           ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]

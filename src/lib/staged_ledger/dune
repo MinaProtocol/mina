@@ -3,8 +3,61 @@
  (public_name staged_ledger)
  (library_flags -linkall)
  (inline_tests)
- (libraries core lens transaction_snark_scan_state sgn transaction_snark mina_base mina_ledger mina_generators merkle_mask pipe_lib logger
-            async ledger_proof verifier transaction_snark_work staged_ledger_diff inline_test_quiet_logs)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   ppx_hash.runtime-lib
+   async_kernel
+   base.caml
+   base
+   sexplib0
+   core_kernel
+   core
+   lens
+   async
+   async_unix
+   base.base_internalhash_types
+   ;; local libraries
+   kimchi_backend.pasta
+   random_oracle_input
+   mina_base.import
+   mina_ledger
+   quickcheck_lib
+   mina_metrics
+   coda_genesis_ledger
+   error_json
+   transaction_witness
+   mina_numbers
+   data_hash_lib
+   inline_test_quiet_logs
+   transaction_snark_work
+   ledger_proof
+   logger
+   transaction_snark
+   transaction_snark_scan_state
+   sgn
+   mina_base
+   verifier
+   staged_ledger_diff
+   signature_lib
+   currency
+   genesis_constants
+   one_or_two
+   o1trace
+   mina_state
+   non_empty_list
+   snark_work_lib
+   child_processes
+   consensus
+   merkle_ledger
+   pickles
+   snark_params
+   with_hash
+   mina_generators
+   random_oracle
+   kimchi_backend
+   pickles.backend
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

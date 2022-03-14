@@ -2,10 +2,49 @@
  (name mina_networking)
  (public_name mina_networking)
  (library_flags -linkall)
- (libraries core o1trace async mina_intf
-            gossip_net mina_base mina_ledger unix_timestamp perf_histograms proof_carrying_data
-            consensus network_pool mina_transition transition_frontier staged_ledger
-            sync_status)
+ (libraries
+   ;; opam libraries
+   base.caml
+   async_rpc_kernel
+   result
+   core
+   async
+   core_kernel
+   sexplib0
+   base
+   bin_prot.shape
+   async_unix
+   async_kernel
+   base.base_internalhash_types
+   ;; local libraries
+   merkle_ledger
+   downloader
+   protocol_version
+   error_json
+   mina_net2
+   block_time
+   trust_system
+   signature_lib
+   with_hash
+   mina_state
+   pipe_lib
+   staged_ledger
+   mina_transition
+   consensus
+   perf_histograms
+   mina_base
+   gossip_net
+   proof_carrying_data
+   network_pool
+   sync_status
+   network_peer
+   data_hash_lib
+   logger
+   genesis_constants
+   mina_metrics
+   syncable_ledger
+   mina_ledger
+ )
  (inline_tests)
  (preprocess
   (pps ppx_coda ppx_compare ppx_hash ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_register_event ppx_custom_printf))

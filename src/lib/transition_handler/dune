@@ -2,6 +2,45 @@
  (name transition_handler)
  (public_name transition_handler)
  (inline_tests)
- (libraries mina_metrics perf_histograms core_kernel transition_frontier consensus mina_intf rose_tree pipe_lib otp_lib mina_base cache_lib)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   sexplib0
+   core_kernel
+   core
+   async
+   async_unix
+   base.base_internalhash_types
+   async_kernel
+   integers
+   ;; local libraries
+   error_json
+   data_hash_lib
+   inline_test_quiet_logs
+   block_time
+   trust_system
+   o1trace
+   transition_frontier_base
+   cache_lib
+   mina_base
+   otp_lib
+   pipe_lib
+   rose_tree
+   consensus
+   transition_frontier
+   perf_histograms
+   mina_metrics
+   mina_transition
+   network_peer
+   with_hash
+   logger
+   truth
+   mina_state
+   precomputed_values
+   child_processes
+   verifier
+   genesis_constants
+   non_empty_list
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane)))

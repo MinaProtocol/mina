@@ -1361,7 +1361,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let ( &&& ) = ( && )
 
+      let display b ~label = sprintf "%s: %b" label b
+
       let all = List.for_all ~f:Fn.id
+
+      type failure_status = Transaction_status.Failure.t option
+
+      let assert_with_failure_status b failure_status =
+        match (b, failure_status) with
+        | false, Some failure ->
+            (* Raise a more useful error message if we have a failure
+               description.
+            *)
+            Error.raise
+              (Error.of_string @@ Transaction_status.Failure.to_string failure)
+        | _ ->
+            assert b
     end
 
     module Ledger = struct
@@ -1699,7 +1714,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let check_authorization ~account:_ ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1809,8 +1824,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Call_stack = Stack (Parties)
 
     module Local_state = struct
-      type failure_status = Transaction_status.Failure.t option
-
       type t =
         ( Parties.t
         , Call_stack.t
@@ -1819,7 +1832,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
-        , failure_status )
+        , Bool.failure_status )
         Parties_logic.Local_state.t
 
       let add_check (t : t) failure b =
@@ -1831,6 +1844,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               old_failure_status
         in
         { t with failure_status; success = t.success && b }
+
+      let update_failure_status (t : t) failure_status b =
+        match failure_status with
+        | None ->
+            { t with success = t.success && b }
+        | Some failure ->
+            add_check (t : t) failure b
     end
   end
 
@@ -1896,6 +1916,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(f : user_acc -> _ -> user_acc) ?(fee_excess = Amount.Signed.zero)
       (ledger : L.t) (c : Parties.t) :
       (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
+    let open Or_error.Let_syntax in
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
           ( id
@@ -1910,15 +1931,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
       if List.is_empty l_state.parties then Ok user_acc
       else
-        match M.step ~constraint_constants { perform } (g_state, l_state) with
-        | exception exn ->
-            Error (Error.of_exn ~backtrace:`Get exn)
-        | ( _global_state
-          , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
-            Error
-              (Error.of_string @@ Transaction_status.Failure.to_string failure)
-        | states ->
-            step_all (f user_acc states) states
+        let%bind states =
+          Or_error.try_with (fun () ->
+              M.step ~constraint_constants { perform } (g_state, l_state))
+        in
+        step_all (f user_acc states) states
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
@@ -1934,7 +1951,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         } )
     in
     let user_acc = f init initial_state in
-    let start : Inputs.Global_state.t * _ =
+    let%bind (start : Inputs.Global_state.t * _) =
       let parties =
         let p = Party.Fee_payer.to_signed c.fee_payer in
         { Party.authorization = Control.Signature p.authorization
@@ -1943,11 +1960,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         }
         :: c.other_parties
       in
-      M.start ~constraint_constants
-        { parties = Inputs.Parties.of_parties_list parties
-        ; memo_hash = Signed_command_memo.hash c.memo
-        }
-        { perform } initial_state
+      Or_error.try_with (fun () ->
+          M.start ~constraint_constants
+            { parties = Inputs.Parties.of_parties_list parties
+            ; memo_hash = Signed_command_memo.hash c.memo
+            }
+            { perform } initial_state)
     in
     let accounts () =
       List.map original_account_states
@@ -1958,7 +1976,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Error e
     | Ok s ->
         Ok
-          ( { accounts = accounts ()
+          ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =

@@ -4,8 +4,25 @@
  (modules syncable_ledger)
  (library_flags -linkall)
  (flags :standard -short-paths)
- (libraries core_kernel async_kernel pipe_lib merkle_ledger logger trust_system
-            interruptible)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   core
+   async
+   ;; local libraries
+   trust_system
+   logger
+   merkle_ledger
+   pipe_lib
+   network_peer
+   merkle_address
+   direction
+   error_json
+)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving_yojson ppx_register_event))
  (instrumentation (backend bisect_ppx))
@@ -15,7 +32,35 @@
  (name test)
  (modules test)
  (inline_tests)
- (libraries core async merkle_ledger merkle_ledger_tests syncable_ledger)
+ (libraries
+   ;; opam libraries
+   result
+   base.base_internalhash_types
+   bin_prot.shape
+   async_unix
+   async_kernel
+   core_kernel
+   core
+   async
+   sexplib0
+   ppx_inline_test.config
+   base.caml
+   ;; local libraries
+   mina_numbers
+   mina_base
+   merkle_address
+   logger
+   pipe_lib
+   merkle_ledger_tests
+   merkle_ledger
+   syncable_ledger
+   network_peer
+   trust_system
+   currency
+   data_hash_lib
+   mina_base.import
+   signature_lib
+   )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx)))

@@ -1188,14 +1188,16 @@ let pooled_snapp_commands =
          let graphql =
            Graphql_queries.Pooled_snapp_commands.make ~public_key ()
          in
-         let%map response = Graphql_client.query_exn graphql graphql_endpoint in
-         let json_response : Yojson.Safe.t =
-           `List
-             ( List.map
-                 ~f:
-                   (Fn.compose Graphql_client.Snapp_command.to_yojson
-                      Graphql_client.Snapp_command.of_obj)
-             @@ Array.to_list response#pooledSnappCommands )
+         let%bind raw_response =
+           Graphql_client.query_json_exn graphql graphql_endpoint
+         in
+         let%map json_response =
+           try
+             let kvs = Yojson.Safe.Util.to_assoc raw_response in
+             List.hd_exn kvs |> snd |> return
+           with _ ->
+             eprintf "Failed to read result of pooled snapp commands" ;
+             exit 1
          in
          print_string (Yojson.Safe.to_string json_response)))
 

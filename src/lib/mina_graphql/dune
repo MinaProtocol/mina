@@ -2,10 +2,83 @@
  (name mina_graphql)
  (public_name mina_graphql)
  (libraries
-   ; opam deps
-   async node_addrs_and_ports network_peer core cohttp graphql-async graphql-cohttp re2
-   ; libs
-   ppx_deriving_yojson.runtime filtered_external_transition
-   mina_base mina_ledger mina_state mina_transition mina_commands user_command_input mina_lib)
+   ;; opam libraries
+   archive_lib
+   integers
+   bignum
+   async_kernel
+   base.caml
+   base.base_internalhash_types
+   re2
+   graphql-async
+   core
+   async
+   core_kernel
+   async_unix
+   result
+   sexplib0
+   ppx_deriving_yojson.runtime
+   graphql_parser
+   ;; local libraries
+   network_pool
+   kimchi_backend.pasta
+   mina_base.util
+   mina_ledger
+   pickles
+   mina_incremental
+   coda_genesis_ledger
+   work_selector
+   error_json
+   mina_networking
+   consensus.vrf
+   trust_system
+   with_hash
+   data_hash_lib
+   staged_ledger
+   genesis_constants
+   pipe_lib
+   sgn
+   transaction_snark_work
+   unsigned_extended
+   precomputed_values
+   transaction_inclusion_status
+   graphql_lib
+   block_time
+   currency
+   mina_lib
+   mina_commands
+   mina_state
+   filtered_external_transition
+   node_addrs_and_ports
+   network_peer
+   mina_base
+   mina_transition
+   user_command_input
+   signature_lib
+   transition_frontier
+   sync_status
+   consensus
+   daemon_rpcs
+   mina_numbers
+   perf_histograms
+   one_or_two
+   transaction_snark
+   transition_frontier_base
+   participating_state
+   secrets
+   logger
+   base58_check
+   mina_net2
+   snark_params
+   rosetta_lib
+   random_oracle
+   coda_genesis_proof
+   mina_version
+   coda_runtime_config
+   mina_base.import
+   pickles.backend
+   pickles_types
+   graphql
+   fields_derivers.graphql)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

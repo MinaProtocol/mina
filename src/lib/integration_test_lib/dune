@@ -4,4 +4,41 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_base ppx_fields_conv ppx_coda ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf ppx_deriving.std ppx_sexp_conv ppx_compare ppx_assert lens.ppx_deriving ppx_pipebang))
- (libraries core async mina_base key_gen runtime_config genesis_constants transition_frontier transition_router block_producer user_command_input cmdliner lens graph_algorithms ))
+ (libraries
+   ;; opam libraries
+   result
+   base.base_internalhash_types
+   base.caml
+   base
+   sexplib0
+   cmdliner
+   async
+   core
+   lens
+   core_kernel
+   async_kernel
+   ppx_inline_test.config
+   async_unix
+   stdio
+   extlib
+   ;; local libraries
+   key_gen
+   visualization
+   timeout_lib
+   pipe_lib
+   mina_networking
+   logger
+   graph_algorithms
+   block_producer
+   transition_frontier
+   coda_runtime_config
+   mina_base
+   genesis_constants
+   transition_router
+   signature_lib
+   secrets
+   network_pool
+   currency
+   mina_base.import
+   mina_numbers
+))

@@ -1,6 +1,18 @@
 (library
  (public_name key_cache.async)
  (name key_cache_async)
- (libraries async core key_cache)
+ (libraries
+   ;; opam libraries
+   async
+   core
+   async_kernel
+   async_unix
+   core_kernel
+   base
+   base.caml
+   ;; local libraries
+   key_cache
+   logger
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_base ppx_here ppx_let)))

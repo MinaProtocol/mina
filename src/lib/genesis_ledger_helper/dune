@@ -2,6 +2,44 @@
  (public_name genesis_ledger_helper)
  (name genesis_ledger_helper)
  (inline_tests)
- (libraries core_kernel mina_base mina_ledger signature_lib genesis_constants runtime_config cache_dir genesis_ledger genesis_proof precomputed_values mina_user_error genesis_ledger_helper_lib)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   core_kernel.uuid
+   async_unix
+   async
+   core_kernel
+   core
+   async_kernel
+   core.uuid
+   base.caml
+   ;; local libraries
+   mina_ledger
+   with_hash
+   blockchain_snark
+   error_json
+   mina_state
+   random_oracle
+   blake2
+   mina_numbers
+   genesis_ledger_helper.lib
+   precomputed_values
+   coda_genesis_ledger
+   coda_runtime_config
+   signature_lib
+   mina_base
+   genesis_constants
+   cache_dir
+   coda_genesis_proof
+   currency
+   data_hash_lib
+   snark_params
+   unsigned_extended
+   consensus
+   mina_compile_config
+   pickles
+   logger
+   mina_base.import
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))
