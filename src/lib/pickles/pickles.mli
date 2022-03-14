@@ -66,6 +66,8 @@ module type Proof_intf = sig
   val id : Verification_key.Id.t Lazy.t
 
   val verify : (statement * t) list -> bool Deferred.t
+
+  val verify_promise : (statement * t) list -> bool Promise.t
 end
 
 module Proof : sig
@@ -91,6 +93,13 @@ end
 module Statement_with_proof : sig
   type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
 end
+
+val verify_promise :
+     (module Nat.Intf with type n = 'n)
+  -> (module Statement_value_intf with type t = 'a)
+  -> Verification_key.t
+  -> ('a * ('n, 'n) Proof.t) list
+  -> bool Promise.t
 
 val verify :
      (module Nat.Intf with type n = 'n)
@@ -190,6 +199,11 @@ module Side_loaded : sig
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
+  val verify_promise :
+       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+    -> (Verification_key.t * 'value * Proof.t) list
+    -> bool Promise.t
+
   val verify :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> (Verification_key.t * 'value * Proof.t) list
@@ -204,6 +218,43 @@ module Side_loaded : sig
      for which this tag is used as a predecessor. *)
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
 end
+
+(** This compiles a series of inductive rules defining a set into a proof
+    system for proving membership in that set, with a prover corresponding
+    to each inductive rule. *)
+val compile_promise :
+     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> ?cache:Key_cache.Spec.t list
+  -> ?disk_keys:
+       (Cache.Step.Key.Verification.t, 'branches) Vector.t
+       * Cache.Wrap.Key.Verification.t
+  -> (module Statement_var_intf with type t = 'a_var)
+  -> (module Statement_value_intf with type t = 'a_value)
+  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> branches:(module Nat.Intf with type n = 'branches)
+  -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
+  -> name:string
+  -> constraint_constants:Snark_keys_header.Constraint_constants.t
+  -> choices:
+       (   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+        -> ( 'prev_varss
+           , 'prev_valuess
+           , 'widthss
+           , 'heightss
+           , 'a_var
+           , 'a_value )
+           H4_2.T(Inductive_rule).t)
+  -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     * Cache_handle.t
+     * (module Proof_intf
+          with type t = ('max_branching, 'max_branching) Proof.t
+           and type statement = 'a_value)
+     * ( 'prev_valuess
+       , 'widthss
+       , 'heightss
+       , 'a_value
+       , ('max_branching, 'max_branching) Proof.t Promise.t )
+       H3_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding

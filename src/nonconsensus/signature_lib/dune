@@ -4,16 +4,29 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   bignum_bigint
-   blake2
+   ;;opam libraries
+   bignum.bigint
+   ppx_inline_test.config
+   bin_prot.shape
+   base
+   sexplib0
    core_kernel
+   js_of_ocaml
+   base.caml
+   result
+   ;;local libraries
+   base58_check
+   blake2
+   mina_signature_kind
+   random_oracle_input
+   fold_lib
+   snarkette
+   codable
+   snark_params_nonconsensus
+   random_oracle_nonconsensus
    hash_prefix_states_nonconsensus
    non_zero_curve_point_nonconsensus
-   random_oracle_nonconsensus
-   mina_signature_kind
-   snark_params_nonconsensus
-   js_of_ocaml
-   yojson)
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_sexp_conv
