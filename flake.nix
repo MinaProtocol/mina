@@ -42,6 +42,12 @@
           (nixpkgs.lib.composeManyExtensions [
             (import nixpkgs-mozilla)
             (import ./nix/overlay.nix)
+            (final: prev: {
+              ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
+                inherit inputs pkgs;
+                static = final.stdenv.hostPlatform.isStatic;
+              });
+            })
           ]);
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
@@ -62,13 +68,8 @@
 
         checks = import ./nix/checks.nix inputs pkgs;
 
-        ocamlPackages_static = requireSubmodules (import ./nix/ocaml.nix {
-          inherit inputs pkgs;
-          static = true;
-        });
-
-        ocamlPackages =
-          requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
+        ocamlPackages = pkgs.ocamlPackages_mina;
+        ocamlPackages_static = pkgs.pkgsStatic.ocamlPackages_mina;
       in {
 
         # Jobs/Lint/Rust.dhall
