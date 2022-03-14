@@ -2,8 +2,6 @@ import Client from "../src/MinaSigner";
 
 let PARTY = `
 {
-  "otherParties": [
-    {
       "data": {
         "body": {
           "publicKey": "B62qoErctNMXBGKCF8WfNkSoGuuGnmLHDYjsnybDjdBq7h66GMNRNo3",
@@ -81,8 +79,6 @@ let PARTY = `
         }
       },
       "authorization": { "proof": null, "signature": null }
-    }
-  ]
 }
 `
 
@@ -95,8 +91,14 @@ describe("Party", () => {
 
   it("tests party", () => {
     const keypair = client.genKeys();
-    const party = client.signTransaction(PARTY, "test memo", keypair.privateKey)
-    console.log("DEBUG", party,)
+    const partyPayload = {
+          feePayer: keypair.publicKey,
+          fee: "1",
+          nonce: "0",
+          memo: "test memo",
+        };
+    const parties = client.signTransaction(PARTY, partyPayload, keypair.privateKey)
+    console.log("DEBUG", parties,)
     expect(true).toBeTruthy();
   });
 });

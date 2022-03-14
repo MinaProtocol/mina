@@ -39,6 +39,13 @@ export type Payment = {
   readonly validUntil?: UInt32;
 };
 
+export type Party = {
+  readonly feePayer: PublicKey;
+  readonly fee: UInt64;
+  readonly nonce: UInt32;
+  readonly memo?: string;
+}
+
 export type SignableData = Message | StakeDelegation | Payment;
 
 export type Signed<SignableData> = {

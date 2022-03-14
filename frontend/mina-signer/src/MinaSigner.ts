@@ -11,6 +11,7 @@ import {
   Payment,
   StakeDelegation,
   Message,
+  Party
 } from "./TSTypes";
 
 const defaultValidUntil = "4294967295";
@@ -38,8 +39,8 @@ class Client {
     return minaSDK.genKeys();
   }
 
-  public signTransaction(parties: string, memo: string, privateKey: PrivateKey) {
-    return minaSDK.signTransaction(parties, memo, privateKey);
+  public signTransaction(parties: string, party: Party, privateKey: PrivateKey): String {
+    return minaSDK.signTransaction(parties, party, privateKey);
   }
 
   /**

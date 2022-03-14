@@ -33,23 +33,16 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       method signTransaction (parties_js : string_js) (memo_js : string_js)
+       (* TODO: Make this function be able to sign all transactions *)
+       method signTransaction (parties_js : string_js)
+           (payload_party_js : payload_party_js)
            (sk_base58_check_js : string_js) =
-         let sk =
-           Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
-         in
-         let pk = Public_key.of_private_key_exn sk |> Public_key.compress in
-         let fee = Currency.Fee.of_int 1_000_000 in
-         let parties_json =
-           parties_js |> Js.to_string |> Yojson.Safe.from_string
-         in
+         (* TODO: Fix deriver to use a list Party.deriver *)
          let other_parties =
-           of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()) parties_json
-         in
-         let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
-         let protocol_state_predicate_hash =
-           Snapp_predicate.Protocol_state.digest
-             Snapp_predicate.Protocol_state.accept
+           [ of_json
+               (Party.deriver @@ derivers ())
+               (parties_js |> Js.to_string |> Yojson.Safe.from_string)
+           ]
          in
          let other_parties_data =
            List.map (fun (party : Party.t) -> party.data) other_parties
@@ -61,35 +54,25 @@ let _ =
            |> Parties.Call_forest.accumulate_hashes_predicated
          in
          let other_parties_hash = Parties.Call_forest.hash ps in
+         let protocol_state_predicate_hash =
+           Snapp_predicate.Protocol_state.digest
+             Snapp_predicate.Protocol_state.accept
+         in
+         let memo_js = payload_party_js##.memo in
+         let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
          let commitment : Parties.Transaction_commitment.t =
            Parties.Transaction_commitment.create ~other_parties_hash
              ~protocol_state_predicate_hash
              ~memo_hash:(Signed_command_memo.hash memo)
          in
-         let fee_payer =
-           { Party.Fee_payer.data =
-               { body =
-                   { public_key = pk
-                   ; update = Party.Update.noop
-                   ; token_id = ()
-                   ; balance_change = fee
-                   ; increment_nonce = ()
-                   ; events = []
-                   ; sequence_events = []
-                   ; call_data = Field.zero
-                   ; call_depth = 0
-                   ; protocol_state = Snapp_predicate.Protocol_state.accept
-                   ; use_full_commitment = ()
-                   }
-               ; predicate = Mina_base.Account.Nonce.zero
-               }
-           ; authorization = Signature.dummy
-           }
-         in
+         let fee_payer = party_payload_of_js payload_party_js in
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
                Party.Predicated.(digest (of_fee_payer fee_payer.data))
+         in
+         let sk =
+           Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
          in
          let fee_payer =
            let fee_payer_signature_auth =
@@ -98,11 +81,9 @@ let _ =
            in
            { fee_payer with authorization = fee_payer_signature_auth }
          in
-         let new_parties = { Parties.fee_payer; other_parties; memo } in
-         let parties_json =
-           to_json (Parties.deriver @@ derivers ()) new_parties
-         in
-         Yojson.Safe.to_string parties_json
+         let parties = { Parties.fee_payer; other_parties; memo } in
+         to_json (Parties.deriver @@ derivers ()) parties
+         |> Yojson.Safe.to_string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =
