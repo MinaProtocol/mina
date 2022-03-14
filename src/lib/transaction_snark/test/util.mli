@@ -7,6 +7,8 @@ val proof_level : Genesis_constants.Proof_level.t
 
 val consensus_constants : Consensus.Constants.t
 
+val constraint_constants : Genesis_constants.Constraint_constants.t
+
 (* For tests, monkey patch ledger and sparse ledger to freeze their 
    ledger_hashes.
    The nominal type prevents using this in non-test code. *)
@@ -18,7 +20,7 @@ val ledger_depth : Ledger.index
 
 module T : Transaction_snark.S
 
-val state_body : Transaction_protocol_state.Block_data.t
+val genesis_state_body : Transaction_protocol_state.Block_data.t
 
 val init_stack : Pending_coinbase.Stack_versioned.t
 
@@ -75,3 +77,9 @@ val permissions_from_update :
      Party.Update.t
   -> auth:Permissions.Auth_required.t
   -> Permissions.Auth_required.t Permissions.Poly.t
+
+module Wallet : sig
+  type t = { private_key : Signature_lib.Private_key.t; account : Account.t }
+
+  val random_wallets : ?n:int -> unit -> t array
+end
