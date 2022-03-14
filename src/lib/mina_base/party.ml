@@ -1111,7 +1111,6 @@ module Fee_payer = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    Printf.printf "FEE_PAYER_DERIVER\n" ;
     Fields.make_creator obj
       ~data:!.Predicated.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
