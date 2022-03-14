@@ -2,6 +2,8 @@ import Client from "../src/MinaSigner";
 
 let PARTY = `
 {
+  "otherParties": [
+    {
       "data": {
         "body": {
           "publicKey": "B62qoErctNMXBGKCF8WfNkSoGuuGnmLHDYjsnybDjdBq7h66GMNRNo3",
@@ -79,6 +81,8 @@ let PARTY = `
         }
       },
       "authorization": { "proof": null, "signature": null }
+    }
+  ]
 }
 `
 

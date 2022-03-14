@@ -37,12 +37,14 @@ let _ =
        method signTransaction (parties_js : string_js)
            (payload_party_js : payload_party_js)
            (sk_base58_check_js : string_js) =
-         (* TODO: Fix deriver to use a list Party.deriver *)
+         let other_parties_json =
+           parties_js |> Js.to_string |> Yojson.Safe.from_string
+           |> Yojson.Safe.Util.member "otherParties"
+         in
          let other_parties =
-           [ of_json
-               (Party.deriver @@ derivers ())
-               (parties_js |> Js.to_string |> Yojson.Safe.from_string)
-           ]
+           of_json
+             ((list @@ Party.deriver @@ o ()) @@ derivers ())
+             other_parties_json
          in
          let other_parties_data =
            List.map (fun (party : Party.t) -> party.data) other_parties
