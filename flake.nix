@@ -2,11 +2,9 @@
   description = "A very basic flake";
   nixConfig = {
     allow-import-from-derivation = "true";
-    substituters = [ "https://mina-demo.cachix.org" "https://cache.nixos.org" ];
-    trusted-public-keys = [
-      "mina-demo.cachix.org-1:6Rttr65zJT5Fzndtu71WdInF6FnxKCU7KLtcQdWU4Ok="
-      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-    ];
+    extra-substituters = [ "https://mina-demo.cachix.org" ];
+    extra-trusted-public-keys =
+      [ "mina-demo.cachix.org-1:PpQXDRNR3QkXI0487WY3TDTk5+7bsOImKj5+A79aMg8=" ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
