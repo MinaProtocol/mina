@@ -16,6 +16,18 @@ import {
 
 const defaultValidUntil = "4294967295";
 
+let didShutdown = false;
+// @ts-ignore
+function shutdown() {
+  if (globalThis.wasm_rayon_poolbuilder && !didShutdown) {
+    didShutdown = true;
+    globalThis.wasm_rayon_poolbuilder.free();
+    return Promise.all(
+      globalThis.wasm_workers.map(async (worker) => worker.terminate())
+    );
+  }
+}
+
 class Client {
   private network: Network;
 
