@@ -12,7 +12,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     lookup_configuration: Option<&LookupConfiguration<F>>,
 ) -> (String, Vec<(String, String)>) {
     let d1 = ark_poly::EvaluationDomain::<F>::new(1).unwrap();
-    let evaluated_cols = linearization_columns::<F>(None);
+    let evaluated_cols = linearization_columns::<F>(lookup_configuration);
     let (linearization, _powers_of_alpha) = constraints_expr(d1, false, lookup_configuration);
 
     let Linearization {
