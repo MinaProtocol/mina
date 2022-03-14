@@ -4990,8 +4990,6 @@ let%test_module "transaction_snark" =
       let proof_level = proof_level
     end)
 
-    open For_tests
-
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
      * real code. *)
@@ -5393,57 +5391,6 @@ let%test_module "transaction_snark" =
               in
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
-
-    let apply_parties_with_proof ledger parties =
-      let witnesses =
-        match
-          Or_error.try_with (fun () ->
-              parties_witnesses_exn ~constraint_constants ~state_body
-                ~fee_excess:Amount.Signed.zero
-                ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties)
-        with
-        | Ok a ->
-            a
-        | Error e ->
-            failwith
-              (sprintf "parties_witnesses_exn failed with %s"
-                 (Error.to_string_hum e))
-      in
-      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
-      let open Async.Deferred.Let_syntax in
-      let%map p =
-        match List.rev witnesses with
-        | [] ->
-            failwith "no witnesses generated"
-        | (witness, spec, stmt, snapp_statement) :: rest ->
-            let open Async.Deferred.Or_error.Let_syntax in
-            let%bind p1 =
-              of_parties_segment_exn ~statement:stmt ~witness ~spec
-                ~snapp_statement
-              |> deferred_or_error
-            in
-            let%map _ =
-              Async.Deferred.List.fold ~init:(Ok p1) rest
-                ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
-                  let%bind prev = Async.Deferred.return acc in
-                  let%bind curr =
-                    of_parties_segment_exn ~statement:stmt ~witness ~spec
-                      ~snapp_statement
-                    |> deferred_or_error
-                  in
-                  let sok_digest =
-                    Sok_message.create ~fee:Fee.zero
-                      ~prover:
-                        (Quickcheck.random_value
-                           Signature_lib.Public_key.Compressed.gen)
-                    |> Sok_message.digest
-                  in
-                  merge ~sok_digest prev curr)
-            in
-            p
-      in
-      let _p = Or_error.ok_exn p in
-      ()
 
     let apply_parties ledger parties =
       let witnesses =
