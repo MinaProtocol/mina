@@ -199,10 +199,15 @@ module Side_loaded : sig
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
-  val verify :
+  val verify_promise :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Promise.t
+
+  val verify :
+       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+    -> (Verification_key.t * 'value * Proof.t) list
+    -> bool Deferred.t
 
   (* Must be called in the inductive rule snarky function defining a
      rule for which this tag is used as a predecessor. *)

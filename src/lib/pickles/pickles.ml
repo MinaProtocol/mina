@@ -854,7 +854,7 @@ module Side_loaded = struct
 
   module Proof = Proof.Branching_max
 
-  let verify (type t) ~(value_to_field_elements : t -> _)
+  let verify_promise (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =
     let m =
       ( module struct
@@ -897,6 +897,9 @@ module Side_loaded = struct
             in
             Verify.Instance.T (max_branching, m, vk, x, p))
         |> Verify.verify_heterogenous)
+
+  let verify ~value_to_field_elements ts =
+    verify_promise ~value_to_field_elements ts |> Promise.to_deferred
 end
 
 let compile_promise :
