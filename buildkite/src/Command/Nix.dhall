@@ -17,7 +17,11 @@ let runWithNix
           [ Mina.fixPermissionsCommand ]
         # [ Cmd.runInDocker
               Cmd.Docker::{ image = Images.nix, extraEnv = environment, privileged = True }
-              innerScript
+              ''
+              mkdir -p ~/.config/nix
+              printf "experimental-features = nix-command flakes\\nsandbox = true\\n" > ~/.config/nix/nix.conf
+              ${innerScript}
+              ''
           ]
 
 let nixBuild
@@ -25,6 +29,6 @@ let nixBuild
     = \(attr : Text) ->
         runWithNix
           ([] : List Text)
-          ("nix build --sandbox --extra-experimental-features nix-command --extra-experimental-features flakes --accept-flake-config -L \"git+file://\$(pwd)?submodules=1#${attr}\"")
+          ("nix shell nixpkgs#cachix -c cachix watch-exec mina-demo -- nix build --accept-flake-config -L \"git+file://\$(pwd)?submodules=1#${attr}\"")
 
 in  { runWithNix = runWithNix, nixBuild = nixBuild }
