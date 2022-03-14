@@ -43,6 +43,7 @@ module User_command = struct
     ; receiver_account_creation_fee_paid :
         Currency.Amount.Stable.Latest.t option
     ; receiver_balance : Currency.Balance.Stable.Latest.t option
+    ; created_token : Token_id.Stable.Latest.t option
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
@@ -79,6 +80,7 @@ module Block = struct
     ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
     ; min_window_density : Mina_numbers.Length.Stable.Latest.t
     ; total_currency : Currency.Amount.Stable.Latest.t
+    ; next_available_token : Token_id.Stable.Latest.t
     ; ledger_hash : Ledger_hash.Stable.Latest.t
     ; height : Unsigned_extended.UInt32.Stable.Latest.t
     ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.Latest.t

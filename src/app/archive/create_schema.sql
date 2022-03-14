@@ -34,7 +34,7 @@ CREATE INDEX idx_public_keys_value ON public_keys(value);
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , public_key_id           int       NOT NULL REFERENCES public_keys(id)
-, token                   text      NOT NULL
+, token                   bigint    NOT NULL
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
@@ -52,7 +52,7 @@ CREATE TABLE snarked_ledger_hashes
 
 CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 
-CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
+CREATE TYPE user_command_type AS ENUM ('payment', 'delegation', 'create_token', 'create_account', 'mint_tokens');
 
 CREATE TYPE user_command_status AS ENUM ('applied', 'failed');
 
@@ -62,8 +62,8 @@ CREATE TABLE user_commands
 , fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token      text                NOT NULL
-, token          text                NOT NULL
+, fee_token      bigint              NOT NULL
+, token          bigint              NOT NULL
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -79,7 +79,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, token       text                  NOT NULL
+, token       bigint                NOT NULL
 , hash        text                  NOT NULL
 , UNIQUE (hash,type)
 );
@@ -127,6 +127,7 @@ CREATE TABLE blocks
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
 , min_window_density           bigint NOT NULL
 , total_currency               bigint NOT NULL
+, next_available_token         bigint NOT NULL
 , ledger_hash                  text   NOT NULL
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL
@@ -176,6 +177,7 @@ CREATE TABLE blocks_user_commands
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
+, created_token     bigint
 , fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
 , receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE

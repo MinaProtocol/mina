@@ -134,6 +134,12 @@ CREATE TABLE snapp_predicate
 
 CREATE TYPE snapp_authorization_kind_type AS ENUM ('proof','signature','none_given');
 
+CREATE TABLE snapp_token_id_bounds
+( id                       serial           PRIMARY KEY
+, token_id_lower_bound     bigint           NOT NULL
+, token_id_upper_bound     bigint           NOT NULL
+);
+
 CREATE TABLE snapp_timestamp_bounds
 ( id                        serial          PRIMARY KEY
 , timestamp_lower_bound     bigint          NOT NULL
@@ -179,6 +185,7 @@ CREATE TABLE snapp_epoch_data
 CREATE TABLE snapp_predicate_protocol_states
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
+, snarked_next_available_token_id  int                            REFERENCES snapp_token_id_bounds(id)
 , timestamp_id                     int                            REFERENCES snapp_timestamp_bounds(id)
 , blockchain_length_id             int                            REFERENCES snapp_length_bounds(id)
 , min_window_density_id            int                            REFERENCES snapp_length_bounds(id)
@@ -196,7 +203,7 @@ CREATE TABLE snapp_party_body
 ( id                                    serial     PRIMARY KEY
 , public_key_id                         int        NOT NULL REFERENCES public_keys(id)
 , update_id                             int        NOT NULL REFERENCES snapp_updates(id)
-, token_id                              text       NOT NULL
+, token_id                              bigint     NOT NULL
 , balance_change                        bigint     NOT NULL
 , increment_nonce                       boolean    NOT NULL
 , events_ids                            int[]      NOT NULL
