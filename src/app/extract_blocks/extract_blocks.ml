@@ -99,9 +99,6 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let total_currency =
     Unsigned.UInt64.of_int64 block.total_currency |> Currency.Amount.of_uint64
   in
-  let next_available_token =
-    Unsigned.UInt64.of_int64 block.next_available_token |> Token_id.of_uint64
-  in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
@@ -123,7 +120,6 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; next_epoch_data
     ; min_window_density
     ; total_currency
-    ; next_available_token
     ; ledger_hash
     ; height
     ; global_slot_since_hard_fork

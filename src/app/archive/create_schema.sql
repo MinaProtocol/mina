@@ -127,7 +127,6 @@ CREATE TABLE blocks
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
 , min_window_density           bigint NOT NULL
 , total_currency               bigint NOT NULL
-, next_available_token         bigint NOT NULL
 , ledger_hash                  text   NOT NULL
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL

@@ -185,7 +185,6 @@ CREATE TABLE snapp_epoch_data
 CREATE TABLE snapp_predicate_protocol_states
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
-, snarked_next_available_token_id  int                            REFERENCES snapp_token_id_bounds(id)
 , timestamp_id                     int                            REFERENCES snapp_timestamp_bounds(id)
 , blockchain_length_id             int                            REFERENCES snapp_length_bounds(id)
 , min_window_density_id            int                            REFERENCES snapp_length_bounds(id)
