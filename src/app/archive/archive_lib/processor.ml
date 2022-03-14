@@ -608,12 +608,8 @@ module Snapp_token_id_bounds = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (token_id_bounds : Token_id.t Mina_base.Snapp_predicate.Closed_interval.t)
       =
-    let token_id_lower_bound =
-      token_id_bounds.lower |> Token_id.to_string
-    in
-    let token_id_upper_bound =
-      token_id_bounds.upper |> Token_id.to_string
-    in
+    let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
+    let token_id_upper_bound = token_id_bounds.upper |> Token_id.to_string in
     let value = { token_id_lower_bound; token_id_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -815,9 +811,7 @@ module Timing_info = struct
         return id
     | None ->
         let values =
-          let token =
-            Token_id.to_string (Account.token acc)
-          in
+          let token = Token_id.to_string (Account.token acc) in
           match acc.timing with
           | Timed timing ->
               { public_key_id
@@ -1150,9 +1144,7 @@ module Snapp_party_body = struct
         (module Conn)
         body.protocol_state
     in
-    let token_id =
-      Token_id.to_string body.token_id
-    in
+    let token_id = Token_id.to_string body.token_id in
     let balance_change =
       let magnitude =
         Currency.Amount.to_uint64 body.balance_change.magnitude
@@ -1467,10 +1459,8 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; fee_token =
-                Signed_command.fee_token t |> Token_id.to_string
-            ; token =
-                Signed_command.token t |> Token_id.to_string
+            ; fee_token = Signed_command.fee_token t |> Token_id.to_string
+            ; token = Signed_command.token t |> Token_id.to_string
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount =
                 Signed_command.amount t
@@ -1591,8 +1581,7 @@ module User_command = struct
       ; fee_payer_id
       ; source_id
       ; receiver_id
-      ; fee_token =
-          user_cmd.fee_token |> Token_id.to_string
+      ; fee_token = user_cmd.fee_token |> Token_id.to_string
       ; token = user_cmd.token |> Token_id.to_string
       ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
       ; amount = user_cmd.amount |> amount_opt_to_int64_opt
@@ -1682,8 +1671,7 @@ module Internal_command = struct
           ; fee =
               internal_cmd.fee |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token =
-              internal_cmd.token |> Token_id.to_string
+          ; token = internal_cmd.token |> Token_id.to_string
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -2119,8 +2107,7 @@ module Block_and_signed_command = struct
       Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
     in
     let created_token =
-      Option.map created_token ~f:(fun tid ->
-          (Token_id.to_string tid))
+      Option.map created_token ~f:(fun tid -> Token_id.to_string tid)
     in
     Conn.exec
       (Caqti_request.exec typ
