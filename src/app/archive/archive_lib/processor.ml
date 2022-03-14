@@ -2275,7 +2275,6 @@ module Block = struct
     ; next_epoch_data_id : int
     ; min_window_density : int64
     ; total_currency : int64
-    ; next_available_token : string
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
@@ -2298,7 +2297,6 @@ module Block = struct
         ; int
         ; int64
         ; int64
-        ; string
         ; string
         ; int64
         ; int64
@@ -2412,10 +2410,10 @@ module Block = struct
                {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
                |sql})
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -2435,9 +2433,6 @@ module Block = struct
                 Protocol_state.consensus_state protocol_state
                 |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                (* dummy. remove this column *)
-                Token_id.(to_string default)
             ; ledger_hash =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
@@ -2822,10 +2817,10 @@ module Block = struct
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql})
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -2842,8 +2837,6 @@ module Block = struct
             ; total_currency =
                 block.total_currency |> Currency.Amount.to_uint64
                 |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                block.next_available_token |> Token_id.to_string
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =
