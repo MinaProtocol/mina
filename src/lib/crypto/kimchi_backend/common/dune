@@ -36,6 +36,7 @@
    sponge
    allocation_functor
    snarky.intf
+   promise
 ))
 
 (rule
