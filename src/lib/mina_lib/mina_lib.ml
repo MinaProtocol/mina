@@ -759,51 +759,55 @@ let root_diff t =
     Strict_pipe.create ~name:"root diff"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  let open Root_diff.Stable.Latest in
-  let length_of_breadcrumb =
-    Fn.compose Unsigned.UInt32.to_int
-      Transition_frontier.Breadcrumb.blockchain_length
-  in
-  don't_wait_for
-    (Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
-      | None ->
-          Deferred.unit
-      | Some frontier ->
-          let root = Transition_frontier.root frontier in
-          Strict_pipe.Writer.write root_diff_writer
-            { commands =
-                List.map
-                  (Transition_frontier.Breadcrumb.commands root)
-                  ~f:(With_status.map ~f:User_command.forget_check)
-            ; root_length = length_of_breadcrumb root
-            } ;
-          Broadcast_pipe.Reader.iter
-            Transition_frontier.(
-              Extensions.(get_view_pipe (extensions frontier) Identity))
-            ~f:
-              (Deferred.List.iter ~f:(function
-                | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _) ->
-                    Deferred.unit
-                | Transition_frontier.Diff.Full.With_mutant.E
-                    (Best_tip_changed _, _) ->
-                    Deferred.unit
-                | Transition_frontier.Diff.Full.With_mutant.E
-                    (Root_transitioned { new_root; _ }, _) ->
-                    let root_hash =
-                      Transition_frontier.Root_data.Limited.hash new_root
-                    in
-                    let new_root_breadcrumb =
-                      Transition_frontier.(find_exn frontier root_hash)
-                    in
-                    Strict_pipe.Writer.write root_diff_writer
-                      { commands =
-                          Transition_frontier.Breadcrumb.commands
-                            new_root_breadcrumb
-                          |> List.map
-                               ~f:(With_status.map ~f:User_command.forget_check)
-                      ; root_length = length_of_breadcrumb new_root_breadcrumb
-                      } ;
-                    Deferred.unit)))) ;
+  O1trace.background_thread "read_root_diffs" (fun () ->
+      let open Root_diff.Stable.Latest in
+      let length_of_breadcrumb =
+        Fn.compose Unsigned.UInt32.to_int
+          Transition_frontier.Breadcrumb.blockchain_length
+      in
+      Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
+        | None ->
+            Deferred.unit
+        | Some frontier ->
+            let root = Transition_frontier.root frontier in
+            Strict_pipe.Writer.write root_diff_writer
+              { commands =
+                  List.map
+                    (Transition_frontier.Breadcrumb.commands root)
+                    ~f:(With_status.map ~f:User_command.forget_check)
+              ; root_length = length_of_breadcrumb root
+              } ;
+            Broadcast_pipe.Reader.iter
+              Transition_frontier.(
+                Extensions.(get_view_pipe (extensions frontier) Identity))
+              ~f:
+                (Deferred.List.iter ~f:(function
+                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
+                    ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Best_tip_changed _, _) ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Root_transitioned { new_root; _ }, _) ->
+                      let root_hash =
+                        (Transition_frontier.Root_data.Limited.hashes new_root)
+                          .state_hash
+                      in
+                      let new_root_breadcrumb =
+                        Transition_frontier.(find_exn frontier root_hash)
+                      in
+                      Strict_pipe.Writer.write root_diff_writer
+                        { commands =
+                            Transition_frontier.Breadcrumb.commands
+                              new_root_breadcrumb
+                            |> List.map
+                                 ~f:
+                                   (With_status.map
+                                      ~f:User_command.forget_check)
+                        ; root_length = length_of_breadcrumb new_root_breadcrumb
+                        } ;
+                      Deferred.unit)))) ;
   root_diff_reader
 
 let dump_tf t =
@@ -1466,18 +1470,16 @@ let create ?wallets (config : Config.t) =
                           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                         with
                         | None ->
-                            ( config.precomputed_values.protocol_state_with_hash
+                            ( config.precomputed_values
+                                .protocol_state_with_hashes
                                 .hash
+                                .state_hash
                             , None
                             , [] )
                         | Some frontier ->
                             let tip = Transition_frontier.best_tip frontier in
                             let protocol_state_hash =
-                              let state =
-                                Transition_frontier.Breadcrumb.protocol_state
-                                  tip
-                              in
-                              Mina_state.Protocol_state.hash state
+                              Transition_frontier.Breadcrumb.state_hash tip
                             in
                             let k_breadcrumbs =
                               Transition_frontier.root frontier
@@ -1633,10 +1635,14 @@ let create ?wallets (config : Config.t) =
                                        Mina_networking
                                        .refused_answer_query_string ledger_hash))))
                   ~get_ancestry:
-                    (handle_request "get_ancestry"
-                       ~f:
-                         (Sync_handler.Root.prove ~consensus_constants
-                            ~logger:config.logger))
+                    (handle_request "get_ancestry" ~f:(fun ~frontier s ->
+                         s
+                         |> With_hash.map_hash ~f:(fun state_hash ->
+                                { State_hash.State_hashes.state_hash
+                                ; state_body_hash = None
+                                })
+                         |> Sync_handler.Root.prove ~consensus_constants
+                              ~logger:config.logger ~frontier))
                   ~get_best_tip:
                     (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                          let open Option.Let_syntax in
@@ -1831,7 +1837,8 @@ let create ?wallets (config : Config.t) =
                 valid_transitions_for_network
                 ~f:(fun (`Transition transition, `Source source) ->
                   let hash =
-                    External_transition.Validated.state_hash transition
+                    (External_transition.Validated.state_hashes transition)
+                      .state_hash
                   in
                   let consensus_state =
                     transition |> External_transition.Validated.consensus_state

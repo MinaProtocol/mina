@@ -319,7 +319,8 @@ end)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
-    O1trace.background_thread ("rebroadcast_" ^ Resource_pool.label ^ "_diffs") (fun () ->
-        rebroadcast_loop t logger) ;
+    O1trace.background_thread
+      ("rebroadcast_" ^ Resource_pool.label ^ "_diffs")
+      (fun () -> rebroadcast_loop t logger) ;
     t
 end

@@ -20,7 +20,9 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~trust_system ~sender ~transition_with_hash ~delta
     (error : validation_error) =
   let open Trust_system.Actions in
-  let state_hash = With_hash.hash transition_with_hash in
+  let state_hash =
+    State_hash.With_state_hashes.state_hash transition_with_hash
+  in
   let transition = With_hash.data transition_with_hash in
   let punish action message =
     let message' =
@@ -189,7 +191,9 @@ module Duplicate_block_detector = struct
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
       external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
-    let protocol_state_hash = external_transition_with_hash.hash in
+    let protocol_state_hash =
+      State_hash.With_state_hashes.state_hash external_transition_with_hash
+    in
     let open Consensus.Data.Consensus_state in
     let consensus_state =
       External_transition.consensus_state external_transition
@@ -232,7 +236,7 @@ end
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
-    Precomputed_values.genesis_state_hash precomputed_values
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
@@ -261,10 +265,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
             ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
               let transition_with_hash =
                 Envelope.Incoming.data transition_env
-                |> With_hash.of_data
-                     ~hash_data:
-                       (Fn.compose Protocol_state.hash
-                          External_transition.protocol_state)
+                |> With_hash.of_data ~hash_data:External_transition.state_hashes
               in
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
@@ -305,7 +306,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     Mina_metrics.Transition_frontier
                     .update_max_blocklength_observed blockchain_length ;
                     Queue.enqueue Transition_frontier.validated_blocks
-                      ( With_hash.hash transition_with_hash
+                      ( State_hash.With_state_hashes.state_hash
+                          transition_with_hash
                       , sender
                       , time_received ) ;
                     return ()
@@ -325,8 +327,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 ()
             | Error () ->
                 let state_hash =
-                  Envelope.Incoming.data transition_env
-                  |> External_transition.state_hash
+                  ( Envelope.Incoming.data transition_env
+                  |> External_transition.state_hashes )
+                    .state_hash
                 in
                 let metadata =
                   [ ("state_hash", State_hash.to_yojson state_hash)

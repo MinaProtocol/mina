@@ -2,6 +2,7 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
+open Mina_transition
 open Frontier_base
 
 type input = Diff.Lite.E.t list
@@ -69,7 +70,7 @@ module Worker = struct
     match diff with
     | New_node (Lite transition) -> (
         let r =
-          ( Database.add t.db ~transition
+          ( Database.add t.db ~transition:(External_transition.Validated.Stable.V1.to_latest transition)
             :> (mutant, apply_diff_error_internal) Result.t )
         in
         match r with
@@ -83,8 +84,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (Mina_transition.External_transition.Validated
-                          .state_hash transition)) )
+                         (External_transition.Validated.Stable.V1.state_hash transition)) )
                 ; ("parent", `String (State_hash.to_base58_check h)) ] ;
             Ok ()
         | _ ->

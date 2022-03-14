@@ -154,15 +154,20 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
 
 let lift f breadcrumb = f (validated_transition breadcrumb)
 
-let state_hash = lift External_transition.Validated.state_hash
+let state_hash = lift (fun t -> (External_transition.Validated.state_hashes t).state_hash)
 
 let parent_hash = lift External_transition.Validated.parent_hash
 
 let protocol_state = lift External_transition.Validated.protocol_state
 
+let protocol_state_with_hashes breadcrumb =
+  breadcrumb |> validated_transition
+  |> External_transition.Validation.forget_validation_with_hash
+  |> With_hash.map ~f:External_transition.protocol_state
+
 let consensus_state = lift External_transition.Validated.consensus_state
 
-let consensus_state_with_hash breadcrumb =
+let consensus_state_with_hashes breadcrumb =
   breadcrumb |> validated_transition
   |> External_transition.Validation.forget_validation_with_hash
   |> With_hash.map ~f:External_transition.consensus_state
@@ -324,14 +329,12 @@ module For_tests = struct
           validated_transition parent_breadcrumb
           |> External_transition.Validated.protocol_state
         in
+        let prev_state_hashes = Protocol_state.hashes prev_state in
         let current_state_view =
           Protocol_state.body prev_state |> Protocol_state.Body.view
         in
-        let body_hash =
-          Protocol_state.body prev_state |> Protocol_state.Body.hash
-        in
         ( current_state_view
-        , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
+        , (prev_state_hashes.state_hash, Option.value_exn prev_state_hashes.state_body_hash) )
       in
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff =
@@ -389,20 +392,20 @@ module For_tests = struct
           ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
           ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
       in
-      let previous_state_hash = Protocol_state.hash previous_protocol_state in
+      let previous_state_hashes = Protocol_state.hashes previous_protocol_state in
       let consensus_state =
         make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
           ~previous_protocol_state:
             With_hash.
-              {data= previous_protocol_state; hash= previous_state_hash}
+              {data= previous_protocol_state; hash= previous_state_hashes}
           ~coinbase_receiver ~supercharge_coinbase
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
-          ~state_hash:(Some previous_state_hash) previous_protocol_state
+          ~state_hash:(Some previous_state_hashes.state_hash) previous_protocol_state
       in
       let protocol_state =
-        Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
+        Protocol_state.create_value ~genesis_state_hash ~previous_state_hash:previous_state_hashes.state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
@@ -413,7 +416,7 @@ module For_tests = struct
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:
             (Mina_net2.Validation_callback.create_without_expiration ())
-          ~delta_transition_chain_proof:(previous_state_hash, []) ()
+          ~delta_transition_chain_proof:(previous_state_hashes.state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment

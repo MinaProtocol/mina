@@ -265,46 +265,39 @@ let create_push_message ~validation_id ~validation_result =
                 reader_op validation_id_set_reader validation_id
                 *> op result_set validation_result)))
 
-(* TODO: carefully think about the scheduling implications of this. *)
-(* TODO: maybe IPC delay metrics should go here instead? *)
-let stream_messages pipe =
-  let open Capnp.Codecs in
-  let stream = FramedStream.empty compression in
-  let complete = ref false in
-  let r, w = Strict_pipe.(create Synchronous) in
-  let rec read_frames () =
-    match FramedStream.get_next_frame stream with
-    | Ok msg ->
-        let%bind () = Strict_pipe.Writer.write w (Ok msg) in
-        read_frames ()
-    | Error FramingError.Unsupported ->
-        complete := true ;
-        Strict_pipe.Writer.write w
-          (Or_error.error_string "unsupported capnp frame header")
-    | Error FramingError.Incomplete ->
-        Deferred.unit
+let read_and_decode_message =
+  let open Incremental_parsing in
+  let open Let_syntax in
+  let open Decoders in
+  let%bind segment_count = parse uint32 >>| Uint32.(( + ) one) in
+  let%bind segment_sizes =
+    parse (monomorphic_list uint32 (Uint32.to_int segment_count))
   in
-  let rec scheduler_loop () =
-    let%bind () = Scheduler.yield () in
-    if !complete then Deferred.unit
-    else
-      let%bind () = read_frames () in
-      scheduler_loop ()
+  let%map segments =
+    parse
+      (polymorphic_list
+         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))))
   in
-  O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
-      let%map () =
-        Strict_pipe.Reader.iter pipe
-          ~f:(Fn.compose Deferred.return (FramedStream.add_fragment stream))
-      in
-      complete := true) ;
-  O1trace.background_thread "parse_libp2p_ipc_message_frames" scheduler_loop ;
-  r
+  Capnp.BytesMessage.Message.of_storage segments
+
+let rec stream_messages frag_stream w =
+  let%bind () =
+    read_and_decode_message frag_stream
+    >>| Reader.DaemonInterface.Message.of_message >>| Or_error.return
+    >>= Strict_pipe.Writer.write w
+  in
+  stream_messages frag_stream w
 
 let read_incoming_messages reader =
-  Strict_pipe.Reader.map (stream_messages reader)
-    ~f:
-      (Or_error.map ~f:(fun msg ->
-           Reader.DaemonInterface.Message.of_message msg))
+  let r, w = Strict_pipe.create Strict_pipe.Synchronous in
+  let fragment_stream = Incremental_parsing.Fragment_stream.create () in
+  O1trace.background_thread "stream_libp2p_ipc_messages" (fun () ->
+      stream_messages fragment_stream w) ;
+  O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
+      Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
+          Incremental_parsing.Fragment_stream.add_fragment fragment_stream
+            (Stdlib.Bytes.unsafe_of_string fragment))) ;
+  r
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message

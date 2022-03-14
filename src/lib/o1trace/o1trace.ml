@@ -29,7 +29,9 @@ let current_sync_fiber = ref None
 (* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
 let grab_parent_fiber () =
   let ctx = Scheduler.current_execution_context () in
-  [%log debug] !"sync_fiber = %{sexp:string option}" (Option.map !current_sync_fiber ~f:(fun f -> f.Thread.Fiber.thread.name)) ;
+  [%log debug]
+    !"sync_fiber = %{sexp:string option}"
+    (Option.map !current_sync_fiber ~f:(fun f -> f.Thread.Fiber.thread.name)) ;
   match !current_sync_fiber with
   | None ->
       Execution_context.find_local ctx Thread.Fiber.ctx_id
@@ -67,14 +69,10 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
       Option.value_map parent ~default:false ~f:(fun p ->
           String.equal p.thread.name name)
     then (
-      Writer.(
-        writef (Lazy.force stdout)
-          !"execing same thread\n") ;
-      exec_same_thread ())
+      Writer.(writef (Lazy.force stdout) !"execing same thread\n") ;
+      exec_same_thread () )
     else (
-      Writer.(
-        writef (Lazy.force stdout)
-          !"execing new thread\n") ;
+      Writer.(writef (Lazy.force stdout) !"execing new thread\n") ;
       let fiber =
         match Option.bind parent ~f:(find_recursive_fiber name parent_name) with
         | Some fiber ->
@@ -128,9 +126,7 @@ let%test_module "thread tests" =
     let child_of n =
       match
         let prev_sync_fiber = !current_sync_fiber in
-        let%bind.Option fiber =
-          grab_parent_fiber ()
-        in
+        let%bind.Option fiber = grab_parent_fiber () in
         current_sync_fiber := prev_sync_fiber ;
         fiber.parent
       with

@@ -40,7 +40,8 @@ let register name =
   | Some thread ->
       thread
   | None ->
-      [%log debug] "Registering thread $thread" ~metadata:[("thread", `String name)];
+      [%log debug] "Registering thread $thread"
+        ~metadata:[ ("thread", `String name) ] ;
       let thread = { name; state = Univ_map.empty } in
       Hashtbl.set threads ~key:name ~data:thread ;
       Graph.add_vertex graph name ;
@@ -56,7 +57,11 @@ let set_state thread id value =
 let iter_threads ~f = Hashtbl.iter threads ~f
 
 let dump_thread_graph () =
-  [%log debug] "Dumping graph: [%s]" (String.concat ~sep:", " @@ Graph.fold_edges (fun a b acc -> Printf.sprintf "%s -> %s" a b :: acc) graph []);
+  [%log debug] "Dumping graph: [%s]"
+    ( String.concat ~sep:", "
+    @@ Graph.fold_edges
+         (fun a b acc -> Printf.sprintf "%s -> %s" a b :: acc)
+         graph [] ) ;
   let buf = Buffer.create 1024 in
   Graph.fprint_graph (Format.formatter_of_buffer buf) graph ;
   Stdlib.Buffer.to_bytes buf
@@ -86,13 +91,15 @@ module Fiber = struct
         fiber
     | None ->
         let thread = register name in
-        [%log debug] "Registering fiber $fiber" ~metadata:[("fiber", `String (String.concat ~sep:":" key))];
+        [%log debug] "Registering fiber $fiber"
+          ~metadata:[ ("fiber", `String (String.concat ~sep:":" key)) ] ;
         let fiber = { id = !next_id; parent; thread } in
         incr next_id ;
         Hashtbl.set fibers ~key ~data:fiber ;
         Option.iter parent ~f:(fun p ->
-          [%log debug] "Adding edge $a -> $b" ~metadata:[("a", `String p.thread.name); ("b", `String name)];
-          Graph.add_edge graph p.thread.name name) ;
+            [%log debug] "Adding edge $a -> $b"
+              ~metadata:[ ("a", `String p.thread.name); ("b", `String name) ] ;
+            Graph.add_edge graph p.thread.name name) ;
         fiber
 
   let apply_to_context t ctx =

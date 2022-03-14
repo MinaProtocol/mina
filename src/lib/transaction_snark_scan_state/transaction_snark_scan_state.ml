@@ -862,14 +862,14 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m ~key:(Mina_state.Protocol_state.hash ps) ~data:ps)
+        State_hash.Map.set m
+          ~key:(State_hash.With_state_hashes.state_hash ps)
+          ~data:ps)
   in
   let protocol_states_assoc =
-    List.filter_map (State_hash.Set.to_list required_state_hashes)
-      ~f:(fun hash ->
-        let open Option.Let_syntax in
-        let%map state = State_hash.Map.find received_state_map hash in
-        (hash, state))
+    List.filter_map
+      (State_hash.Set.to_list required_state_hashes)
+      ~f:(State_hash.Map.find received_state_map)
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc

@@ -397,6 +397,21 @@ let setup_daemon logger =
   and node_status_url =
     flag "--node-status-url" ~aliases:[ "node-status-url" ] (optional string)
       ~doc:"URL of the node status collection service"
+  and node_error_url =
+    flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
+      ~doc:"URL of the node error collection service"
+  and contact_info =
+    flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
+      ~doc:
+        "contact info used in node error report service (it could be either \
+         email address or discord username), it should be less than 200 \
+         characters"
+    |> Command.Param.map ~f:(fun opt ->
+           Option.value_map opt ~default:None ~f:(fun s ->
+               if String.length s < 200 then Some s
+               else
+                 Mina_user_error.raisef
+                   "The length of contact info exceeds 200 characters:\n %s" s))
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -760,7 +775,6 @@ let setup_daemon logger =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
               node_status_url
           in
-
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
             (*if
@@ -996,7 +1010,8 @@ let setup_daemon logger =
           let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let genesis_state_hash =
-            Precomputed_values.genesis_state_hash precomputed_values
+            (Precomputed_values.genesis_state_hashes precomputed_values)
+              .state_hash
           in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
@@ -1021,7 +1036,7 @@ let setup_daemon logger =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
-                (With_hash.hash precomputed_values.protocol_state_with_hash)
+                precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;
@@ -1256,7 +1271,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         (* Breaks a dependency cycle with monitor initilization and coda *)
         let coda_ref : Mina_lib.t option ref = ref None in
         Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-          ~child_pids:pids ~top_logger:logger coda_ref ;
+          ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info
+          coda_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
         let%bind { Coda_initialization.coda

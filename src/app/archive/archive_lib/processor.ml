@@ -1574,7 +1574,7 @@ module Block = struct
       (t : External_transition.Precomputed_block.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
-      ~hash:(Protocol_state.hash t.protocol_state)
+      ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
@@ -2070,8 +2070,8 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hash )
+      (block.External_transition.Precomputed_block.protocol_state
+      |> Protocol_state.hashes).state_hash )
 
 let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
@@ -2255,7 +2255,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 "Precomputed block $block could not be archived: $error"
                 ~metadata:
                   [ ( "block"
-                    , Protocol_state.hash precomputed_block.protocol_state
+                    , (Protocol_state.hashes precomputed_block.protocol_state).state_hash
                       |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e)) ]
           | Ok () ->
