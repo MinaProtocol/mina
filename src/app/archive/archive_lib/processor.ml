@@ -596,12 +596,12 @@ module Snapp_predicate = struct
 end
 
 module Snapp_token_id_bounds = struct
-  type t = { token_id_lower_bound : int64; token_id_upper_bound : int64 }
+  type t = { token_id_lower_bound : string; token_id_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
   let table_name = "snapp_token_id_bounds"
 
@@ -609,10 +609,10 @@ module Snapp_token_id_bounds = struct
       (token_id_bounds : Token_id.t Mina_base.Snapp_predicate.Closed_interval.t)
       =
     let token_id_lower_bound =
-      token_id_bounds.lower |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      token_id_bounds.lower |> Token_id.to_string
     in
     let token_id_upper_bound =
-      token_id_bounds.upper |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      token_id_bounds.upper |> Token_id.to_string
     in
     let value = { token_id_lower_bound; token_id_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -753,7 +753,7 @@ end
 module Timing_info = struct
   type t =
     { public_key_id : int
-    ; token : int64
+    ; token : string
     ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
@@ -765,7 +765,7 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; string; int64; int64; int64; int64; int64; int64 ]
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -816,7 +816,7 @@ module Timing_info = struct
     | None ->
         let values =
           let token =
-            Token_id.to_uint64 (Account.token acc) |> Unsigned.UInt64.to_int64
+            Token_id.to_string (Account.token acc)
           in
           match acc.timing with
           | Timed timing ->
@@ -1025,7 +1025,8 @@ module Snapp_predicate_protocol_states = struct
     let%bind snarked_next_available_token_id =
       Mina_caqti.add_if_snapp_check
         (Snapp_token_id_bounds.add_if_doesn't_exist (module Conn))
-        ps.snarked_next_available_token
+        (* TODO: dummy value, remove this column from the DB *)
+        Ignore
     in
     let%bind timestamp_id =
       Mina_caqti.add_if_snapp_check
@@ -1092,7 +1093,7 @@ module Snapp_party_body = struct
   type t =
     { public_key_id : int
     ; update_id : int
-    ; token_id : int64
+    ; token_id : string
     ; balance_change : int64
     ; increment_nonce : bool
     ; events_ids : int array
@@ -1109,7 +1110,7 @@ module Snapp_party_body = struct
       Caqti_type.
         [ int
         ; int
-        ; int64
+        ; string
         ; int64
         ; bool
         ; Mina_caqti.array_int_typ
@@ -1150,7 +1151,7 @@ module Snapp_party_body = struct
         body.protocol_state
     in
     let token_id =
-      Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
+      Token_id.to_string body.token_id
     in
     let balance_change =
       let magnitude =
@@ -1360,8 +1361,8 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; fee_token : int64
-      ; token : int64
+      ; fee_token : string
+      ; token : string
       ; nonce : int
       ; amount : int64 option
       ; fee : int64
@@ -1378,8 +1379,8 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; int64
-          ; int64
+          ; string
+          ; string
           ; int
           ; option int64
           ; int64
@@ -1467,11 +1468,9 @@ module User_command = struct
             ; source_id
             ; receiver_id
             ; fee_token =
-                Signed_command.fee_token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
+                Signed_command.fee_token t |> Token_id.to_string
             ; token =
-                Signed_command.token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
+                Signed_command.token t |> Token_id.to_string
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount =
                 Signed_command.amount t
@@ -1593,8 +1592,8 @@ module User_command = struct
       ; source_id
       ; receiver_id
       ; fee_token =
-          user_cmd.fee_token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-      ; token = user_cmd.token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+          user_cmd.fee_token |> Token_id.to_string
+      ; token = user_cmd.token |> Token_id.to_string
       ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
       ; amount = user_cmd.amount |> amount_opt_to_int64_opt
       ; fee =
@@ -1626,7 +1625,7 @@ module Internal_command = struct
     { typ : string
     ; receiver_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; hash : string
     }
 
@@ -1635,7 +1634,7 @@ module Internal_command = struct
     let decode ((typ, receiver_id, fee, token), hash) =
       Ok { typ; receiver_id; fee; token; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -1684,8 +1683,7 @@ module Internal_command = struct
               internal_cmd.fee |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
           ; token =
-              internal_cmd.token |> Token_id.to_uint64
-              |> Unsigned.UInt64.to_int64
+              internal_cmd.token |> Token_id.to_string
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -2081,7 +2079,7 @@ module Block_and_signed_command = struct
     ; failure_reason : string option
     ; fee_payer_account_creation_fee_paid : int64 option
     ; receiver_account_creation_fee_paid : int64 option
-    ; created_token : int64 option
+    ; created_token : string option
     ; fee_payer_balance_id : int
     ; source_balance_id : int option
     ; receiver_balance_id : int option
@@ -2098,7 +2096,7 @@ module Block_and_signed_command = struct
         ; option string
         ; option int64
         ; option int64
-        ; option int64
+        ; option string
         ; int
         ; option int
         ; option int
@@ -2122,7 +2120,7 @@ module Block_and_signed_command = struct
     in
     let created_token =
       Option.map created_token ~f:(fun tid ->
-          Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid))
+          (Token_id.to_string tid))
     in
     Conn.exec
       (Caqti_request.exec typ
@@ -2170,14 +2168,13 @@ module Block_and_signed_command = struct
       | Applied
           ( { fee_payer_account_creation_fee_paid
             ; receiver_account_creation_fee_paid
-            ; created_token
             }
           , balances ) ->
           ( "applied"
           , None
           , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token
+          , None
           , balances )
       | Failed (failure, balances) ->
           ("failed", Some failure, None, None, None, balances)
@@ -2300,7 +2297,7 @@ module Block = struct
     ; next_epoch_data_id : int
     ; min_window_density : int64
     ; total_currency : int64
-    ; next_available_token : int64
+    ; next_available_token : string
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
@@ -2323,7 +2320,7 @@ module Block = struct
         ; int
         ; int64
         ; int64
-        ; int64
+        ; string
         ; string
         ; int64
         ; int64
@@ -2461,9 +2458,8 @@ module Block = struct
                 |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
             ; next_available_token =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.registers |> Registers.next_available_token
-                |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+                (* dummy. remove this column *)
+                Token_id.(to_string default)
             ; ledger_hash =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
@@ -2869,8 +2865,7 @@ module Block = struct
                 block.total_currency |> Currency.Amount.to_uint64
                 |> Unsigned.UInt64.to_int64
             ; next_available_token =
-                block.next_available_token |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
+                block.next_available_token |> Token_id.to_string
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =

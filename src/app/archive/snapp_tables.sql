@@ -136,8 +136,8 @@ CREATE TYPE snapp_authorization_kind_type AS ENUM ('proof','signature','none_giv
 
 CREATE TABLE snapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
-, token_id_lower_bound     bigint           NOT NULL
-, token_id_upper_bound     bigint           NOT NULL
+, token_id_lower_bound     text             NOT NULL
+, token_id_upper_bound     text             NOT NULL
 );
 
 CREATE TABLE snapp_timestamp_bounds
@@ -203,7 +203,7 @@ CREATE TABLE snapp_party_body
 ( id                                    serial     PRIMARY KEY
 , public_key_id                         int        NOT NULL REFERENCES public_keys(id)
 , update_id                             int        NOT NULL REFERENCES snapp_updates(id)
-, token_id                              bigint     NOT NULL
+, token_id                              text       NOT NULL
 , balance_change                        bigint     NOT NULL
 , increment_nonce                       boolean    NOT NULL
 , events_ids                            int[]      NOT NULL
