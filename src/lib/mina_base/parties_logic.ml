@@ -865,13 +865,21 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let predicate_satisfied : Bool.t =
+    let predicate_satisfied =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
-    let protocol_state_predicate_satisfied : Bool.t =
+    let local_state =
+      Local_state.add_check local_state Account_precondition_unsatisfied
+        predicate_satisfied
+    in
+    let protocol_state_predicate_satisfied =
       h.perform
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
+    in
+    let local_state =
+      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
+        protocol_state_predicate_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
