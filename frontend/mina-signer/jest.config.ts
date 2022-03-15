@@ -3,6 +3,7 @@ const config: Config.InitialOptions = {
   verbose: true,
   preset: "ts-jest",
   modulePathIgnorePatterns: ["<rootDir>/dist/"],
+  setupFilesAfterEnv: ["<rootDir>/tests/setupTests.ts"],
   globals: {
     "ts-jest": {
       transform: {

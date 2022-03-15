@@ -1,11 +1,7 @@
-import Client from "../src/MinaSigner";
+import { Client } from "../src/MinaSigner";
 
 describe("Client Class Initialization", () => {
   let client;
-
-  afterEach(() => {
-    client.shutdown();
-  });
 
   it("should accept `mainnet` as a valid network parameter", () => {
     client = new Client({ network: "mainnet" });

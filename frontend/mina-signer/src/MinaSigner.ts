@@ -15,11 +15,21 @@ import {
 } from "./TSTypes";
 
 const defaultValidUntil = "4294967295";
+let didShutdown: Boolean = false;
 
-class Client {
+// @ts-ignore
+export function shutdown() {
+  if (globalThis.wasm_rayon_poolbuilder && !didShutdown) {
+    didShutdown = true;
+    globalThis.wasm_rayon_poolbuilder.free();
+    return Promise.all(
+      globalThis.wasm_workers.map(async (worker) => worker.terminate())
+    );
+  }
+}
+
+export class Client {
   private network: Network;
-
-  private didShutdown: Boolean = false;
 
   constructor(options: { network: Network }) {
     if (!options?.network) {
@@ -30,17 +40,6 @@ class Client {
       throw "Invalid Specified Network";
     }
     this.network = specifiedNetwork;
-  }
-
-  // @ts-ignore
-  public shutdown() {
-    if (globalThis.wasm_rayon_poolbuilder && !this.didShutdown) {
-      this.didShutdown = true;
-      globalThis.wasm_rayon_poolbuilder.free();
-      return Promise.all(
-        globalThis.wasm_workers.map(async (worker) => worker.terminate())
-      );
-    }
   }
 
   /**
@@ -62,7 +61,6 @@ class Client {
       party,
       privateKey
     );
-    this.shutdown();
     return partyTransaction;
   }
 
@@ -76,7 +74,6 @@ class Client {
    */
   public verifyKeypair(keypair: Keypair): boolean {
     const newKeypair = minaSDK.validKeypair(keypair);
-    this.shutdown();
     return newKeypair;
   }
 
@@ -105,7 +102,6 @@ class Client {
         message,
       },
     };
-    this.shutdown();
     return signedMessage;
   }
 
@@ -169,7 +165,6 @@ class Client {
         validUntil,
       },
     };
-    this.shutdown();
     return signedPayment;
   }
 
@@ -249,7 +244,6 @@ class Client {
         validUntil,
       },
     };
-    this.shutdown();
     return signedDelegation;
   }
 
@@ -365,7 +359,6 @@ class Client {
   ): string {
     const signedRosetta =
       minaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxn);
-    this.shutdown();
     return signedRosetta;
   }
 
@@ -380,5 +373,3 @@ class Client {
     return minaSDK.rawPublicKeyOfPublicKey(publicKey);
   }
 }
-
-export = Client;
