@@ -21,7 +21,6 @@ metadata:
   name: {{ template "foundation-delegation.fullname" . }}-ingress
   annotations: 
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   tls:
   - secretName: {{ .Values.backend.tlsSecret }}
