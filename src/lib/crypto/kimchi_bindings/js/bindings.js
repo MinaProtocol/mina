@@ -987,11 +987,11 @@ var caml_fp_srs_b_poly_commitment = function (srs, chals) {
 
 // Provides: caml_fp_srs_batch_accumulator_check
 // Requires: plonk_wasm, rust_affine_of_caml_affine, caml_array_to_rust_vector, caml_fp_vector_to_rust
-var caml_fp_srs_batch_accumulator_check = function (t, affines, fields) {
-    var rust_affines =
-      caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
-    var rust_fields = caml_fp_vector_to_rust(fields);
-    return plonk_wasm.caml_fp_srs_batch_accumulator_check(t, rust_affines, rust_fields);
+var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
+    var rust_comms = caml_array_to_rust_vector(comms, rust_affine_of_caml_affine, plonk_wasm.caml_vesta_affine_one);
+    var rust_chals = caml_fp_vector_to_rust(chals);
+    var ok = plonk_wasm.caml_fp_srs_batch_accumulator_check(srs, rust_comms, rust_chals);
+    return ok;
 };
 
 // Provides: caml_fp_srs_h
@@ -1060,11 +1060,11 @@ var caml_fq_srs_b_poly_commitment = function (srs, chals) {
 
 // Provides: caml_fq_srs_batch_accumulator_check
 // Requires: plonk_wasm, rust_affine_of_caml_affine, caml_array_to_rust_vector, caml_fq_vector_to_rust
-var caml_fq_srs_batch_accumulator_check = function (t, affines, fields) {
-    var rust_affines =
-      caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
-    var rust_fields = caml_fq_vector_to_rust(fields);
-    return plonk_wasm.caml_fq_srs_batch_accumulator_check(t, rust_affines, rust_fields);
+var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
+    var rust_comms = caml_array_to_rust_vector(comms, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
+    var rust_chals = caml_fq_vector_to_rust(chals);
+    var ok = plonk_wasm.caml_fq_srs_batch_accumulator_check(srs, rust_comms, rust_chals);
+    return ok;
 };
 
 // Provides: caml_fq_srs_h
