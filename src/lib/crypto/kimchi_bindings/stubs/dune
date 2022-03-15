@@ -5,10 +5,17 @@
 ;; Ignore target if it exists locally
 
 (rule
- (targets libwires_15_stubs.a target)
+ (targets cargo-target-path)
+ (action
+  (with-stdout-to cargo-target-path
+   (pipe-stdout
+    (run cargo metadata)
+    (run cargo_target_dir/cargo_target_dir.exe)))))
+
+(rule
+ (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
-  rust-toolchain.toml
   (source_tree src)
   (source_tree ../../proof-systems))
  (action
@@ -17,7 +24,7 @@
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (run cp target/release/libwires_15_stubs.a .))))
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
 
 ;; library
 
@@ -39,7 +46,6 @@
  (mode promote)
  (deps
   Cargo.toml
-  rust-toolchain.toml
   ../../../../.ocamlformat
   (source_tree src)
   (source_tree binding_generation)

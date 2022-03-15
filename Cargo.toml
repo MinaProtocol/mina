@@ -1,0 +1,15 @@
+# This file serves to capture the rust build artifacts generated from dune.
+# These artifacts are stored in target/, outside of the _build directory,
+# allowing them to be reused between multiple builds. This allows us to use
+# cargo's incremental builds, resulting in significant speed-ups.
+[workspace]
+members = [
+    "_build/default/src/lib/crypto/kimchi_bindings/stubs",
+    "_build/default/src/lib/crypto/kimchi_bindings/stubs/binding_generation",
+]
+exclude = [
+    "_build/default/src/lib/crypto/proof-systems",
+]
+
+[profile.release]
+debug = true

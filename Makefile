@@ -58,6 +58,7 @@ all: clean build
 clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
+	@rm -rf Cargo.lock target
 	@rm -rf src/$(COVERAGE_DIR)
 	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
