@@ -49,6 +49,8 @@ let tests : test list =
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ; ("snapps", (module Snapps.Make : Intf.Test.Functor_intf))
+  ; ( "opt-block-prod"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
