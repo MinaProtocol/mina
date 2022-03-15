@@ -19,8 +19,15 @@ import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
 
 const defaultValidUntil = "4294967295";
 
+// A variable to check if we have cleaned up any wasm workers ran by jsoo
 let didShutdown: Boolean = false;
 
+/**
+ * Checks the 'didShtudown' variable and performs a clean up on any
+ * wasm workers that were ran by the jsoo. This should only be called when
+ * the signer is no longer used. Intended for node environments, this is a noop
+ * for browsers.
+ */
 // @ts-ignore
 export function shutdown() {
   if (globalThis.wasm_rayon_poolbuilder && !didShutdown) {
@@ -53,35 +60,6 @@ export class Client {
    */
   public genKeys(): Keypair {
     return minaSDK.genKeys();
-  }
-
-  public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
-    const memo = party.feePayer.memo ?? "";
-    const fee = String(party.feePayer.fee);
-    const nonce = String(party.feePayer.nonce);
-    const feePayer = String(party.feePayer.feePayer);
-    const signedParties = minaSDK.signParty(
-      party.parties,
-      {
-        feePayer,
-        fee,
-        nonce,
-        memo,
-      },
-      privateKey
-    );
-    return {
-      signature: JSON.parse(signedParties).feePayer.authorization,
-      data: {
-        parties: signedParties,
-        feePayer: {
-          feePayer,
-          fee,
-          nonce,
-          memo,
-        },
-      },
-    };
   }
 
   /**
@@ -364,6 +342,45 @@ export class Client {
   }
 
   /**
+   * Sign a parties transaction using a private key.
+   *
+   * This type of transaction allows a user to update state on a given
+   * Smart Contract running on Mina.
+   *
+   * @param party A string containing other parties
+   * @param privateKey The fee payer private key
+   * @returns Signed parties
+   */
+  public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
+    const memo = party.feePayer.memo ?? "";
+    const fee = String(party.feePayer.fee);
+    const nonce = String(party.feePayer.nonce);
+    const feePayer = String(party.feePayer.feePayer);
+    const signedParties = minaSDK.signParty(
+      party.parties,
+      {
+        feePayer,
+        fee,
+        nonce,
+        memo,
+      },
+      privateKey
+    );
+    return {
+      signature: JSON.parse(signedParties).feePayer.authorization,
+      data: {
+        parties: signedParties,
+        feePayer: {
+          feePayer,
+          fee,
+          nonce,
+          memo,
+        },
+      },
+    };
+  }
+
+  /**
    * Converts a Rosetta signed transaction to a JSON string that is
    * compatible with GraphQL. The JSON string is a representation of
    * a `Signed_command` which is what our GraphQL expects.
@@ -390,6 +407,15 @@ export class Client {
     return minaSDK.rawPublicKeyOfPublicKey(publicKey);
   }
 
+  /**
+   * Signs an arbitrary payload using a private key. This function can sign messages,
+   * payments, stake delegations, and parties. If the payload is unrecognized, an Error
+   * is thrown.
+   *
+   * @param payload A signable payload
+   * @param key A valid keypair
+   * @returns A signed payload
+   */
   public signTransaction(
     payload: SignableData,
     key: Keypair

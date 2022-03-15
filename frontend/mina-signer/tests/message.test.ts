@@ -70,7 +70,6 @@ describe("Message", () => {
         "hello",
         keypair
       ) as Signed<Message>;
-      console.log(message);
       expect(message.data).toBeDefined();
       expect(message.signature).toBeDefined();
     });
