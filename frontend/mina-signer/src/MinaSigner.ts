@@ -12,9 +12,13 @@ import {
   StakeDelegation,
   Message,
   Party,
+  SignableData,
 } from "./TSTypes";
 
+import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
+
 const defaultValidUntil = "4294967295";
+
 let didShutdown: Boolean = false;
 
 // @ts-ignore
@@ -51,17 +55,33 @@ export class Client {
     return minaSDK.genKeys();
   }
 
-  public signTransaction(
-    parties: string,
-    party: Party,
-    privateKey: PrivateKey
-  ): String {
-    const partyTransaction = minaSDK.signTransaction(
-      parties,
-      party,
+  public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
+    const memo = party.feePayer.memo ?? "";
+    const fee = String(party.feePayer.fee);
+    const nonce = String(party.feePayer.nonce);
+    const feePayer = String(party.feePayer.feePayer);
+    const signedParties = minaSDK.signParty(
+      party.parties,
+      {
+        feePayer,
+        fee,
+        nonce,
+        memo,
+      },
       privateKey
     );
-    return partyTransaction;
+    return {
+      signature: JSON.parse(signedParties).feePayer.authorization,
+      data: {
+        parties: signedParties,
+        feePayer: {
+          feePayer,
+          fee,
+          nonce,
+          memo,
+        },
+      },
+    };
   }
 
   /**
@@ -97,10 +117,7 @@ export class Client {
   public signMessage(message: string, key: Keypair): Signed<Message> {
     const signedMessage = {
       signature: minaSDK.signString(this.network, key.privateKey, message),
-      data: {
-        publicKey: key.publicKey,
-        message,
-      },
+      data: message,
     };
     return signedMessage;
   }
@@ -116,7 +133,7 @@ export class Client {
     return minaSDK.verifyStringSignature(
       this.network,
       signedMessage.signature,
-      signedMessage.data.publicKey,
+      signedMessage.signature.signer,
       signedMessage.data
     );
   }
@@ -371,5 +388,25 @@ export class Client {
    */
   public publicKeyToRaw(publicKey: string): string {
     return minaSDK.rawPublicKeyOfPublicKey(publicKey);
+  }
+
+  public signTransaction(
+    payload: SignableData,
+    key: Keypair
+  ): Signed<SignableData> | string {
+    if (isMessage(payload)) {
+      return this.signMessage(payload, key);
+    }
+    if (isPayment(payload)) {
+      return this.signPayment(payload, key.privateKey);
+    }
+    if (isStakeDelegation(payload)) {
+      return this.signStakeDelegation(payload, key.privateKey);
+    }
+    if (isParty(payload)) {
+      return this.signParty(payload, key.privateKey);
+    } else {
+      throw new Error(`Expected signable payload, got '${payload}'.`);
+    }
   }
 }

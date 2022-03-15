@@ -10,14 +10,12 @@ export type Keypair = {
   readonly publicKey: PublicKey;
 };
 
-export type Message = {
-  publicKey: PublicKey;
-  message: string;
-};
+export type Message = string;
 
 export type Signature = {
   readonly field: string;
   readonly scalar: string;
+  readonly signer?: string;
 };
 
 export type StakeDelegation = {
@@ -40,13 +38,16 @@ export type Payment = {
 };
 
 export type Party = {
-  readonly feePayer: PublicKey;
-  readonly fee: UInt64;
-  readonly nonce: UInt32;
-  readonly memo?: string;
-}
+  readonly parties: string;
+  readonly feePayer: {
+    readonly feePayer: PublicKey;
+    readonly fee: UInt64;
+    readonly nonce: UInt32;
+    readonly memo?: string;
+  };
+};
 
-export type SignableData = Message | StakeDelegation | Payment;
+export type SignableData = Message | StakeDelegation | Payment | Party;
 
 export type Signed<SignableData> = {
   readonly signature: Signature;

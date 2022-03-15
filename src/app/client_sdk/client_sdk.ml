@@ -33,8 +33,8 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       (* TODO: Make this function be able to sign all transactions *)
-       method signTransaction (parties_js : string_js)
+       (** generate a parties fee payer and sign other parties with the fee payer account *)
+       method signParty (parties_js : string_js)
            (payload_party_js : payload_party_js)
            (sk_base58_check_js : string_js) =
          let other_parties_json =
