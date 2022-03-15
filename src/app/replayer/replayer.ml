@@ -925,10 +925,8 @@ module Snapp_helpers = struct
     let snarked_ledger_hash =
       Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
     in
-    let snarked_next_available_token =
-      parent_block.next_available_token |> Unsigned.UInt64.of_int64
-      |> Token_id.of_uint64
-    in
+    (* Dummy value. Should be removed. *)
+    let snarked_next_available_token = Token_id.default in
     let timestamp = parent_block.timestamp |> Block_time.of_int64 in
     let blockchain_length =
       parent_block.height |> Unsigned.UInt32.of_int64
@@ -1217,21 +1215,7 @@ module Snapp_helpers = struct
             (Frozen_ledger_hash.of_base58_check_exn hash_str)
     in
     let%bind snarked_next_available_token =
-      match protocol_state_data.snarked_next_available_token_id with
-      | None ->
           return Snapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp token id bounds" ~f:(fun db ->
-                Processor.Snapp_token_id_bounds.load db id)
-          in
-          let to_token_id i64 =
-            i64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-          in
-          let lower = to_token_id bounds.token_id_lower_bound in
-          let upper = to_token_id bounds.token_id_upper_bound in
-          Snapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind timestamp =
       match protocol_state_data.timestamp_id with
