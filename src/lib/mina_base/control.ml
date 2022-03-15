@@ -100,14 +100,15 @@ module As_record = struct
     { proof : Pickles.Side_loaded.Proof.t option
     ; signature : Signature.t option
     }
-  [@@deriving fields]
+  [@@deriving annot, fields]
 
   let deriver obj =
     let open Fields_derivers_snapps in
+    let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
       ~proof:!.(option @@ proof @@ o ())
       ~signature:!.(option @@ signature_deriver @@ o ())
-    |> finish ~name:"Control"
+    |> finish "Control" ~t_toplevel_annots
 end
 
 let to_record = function
