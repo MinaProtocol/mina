@@ -304,6 +304,45 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
     in
+    let%bind.Deferred parties_update_timing =
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let amount = Currency.Amount.zero in
+      let nonce = Account.Nonce.of_int 6 in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "Snapp, invalid update timing"
+      in
+      let snapp_update : Party.Update.t =
+        { Party.Update.dummy with
+          timing =
+            Snapp_basic.Set_or_keep.Set
+              { initial_minimum_balance = Currency.Balance.of_int 9_000_000_000
+              ; cliff_time = Mina_numbers.Global_slot.of_int 4000
+              ; cliff_amount = Currency.Amount.of_int 100_000
+              ; vesting_period = Mina_numbers.Global_slot.of_int 8
+              ; vesting_increment = Currency.Amount.of_int 2_000
+              }
+        }
+      in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (keypair, nonce)
+        ; fee
+        ; receivers = []
+        ; amount
+        ; snapp_account_keypairs = [ timed_account_keypair ]
+        ; memo
+        ; new_snapp_account = false
+        ; snapp_update
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      Transaction_snark.For_tests.update_states ~constraint_constants
+        parties_spec
+    in
     let parties_invalid_nonce =
       let p = parties_update_all in
       { p with
@@ -322,7 +361,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { data =
               { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 6
+                predicate = Mina_base.Account.Nonce.of_int 7
               }
           ; authorization = Mina_base.Signature.dummy
           }
@@ -434,6 +473,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.hard_error (Error.of_string err_str)
     in
+    let compatible req_item ledg_item ~equal =
+      match (req_item, ledg_item) with
+      | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+          true
+      | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+          equal v1 v2
+      | Set _, Keep ->
+          false
+    in
     let compatible_updates ~(ledger_update : Mina_base.Party.Update.t)
         ~(requested_update : Mina_base.Party.Update.t) : bool =
       (* the "update" in the ledger is derived from the account
@@ -446,16 +494,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
          for the app state, we apply this principle element-wise
       *)
-      let open Mina_base.Snapp_basic.Set_or_keep in
-      let compat req_item ledg_item ~equal =
-        match (req_item, ledg_item) with
-        | Keep, _ ->
-            true
-        | Set v1, Set v2 ->
-            equal v1 v2
-        | Set _, Keep ->
-            false
-      in
       let app_states_compat =
         let fs_requested =
           Pickles_types.Vector.Vector_8.to_list requested_update.app_state
@@ -464,14 +502,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
         in
         List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
-            compat req ledg ~equal:Pickles.Backend.Tick.Field.equal)
+            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal)
       in
       let delegates_compat =
-        compat requested_update.delegate ledger_update.delegate
+        compatible requested_update.delegate ledger_update.delegate
           ~equal:Signature_lib.Public_key.Compressed.equal
       in
       let verification_keys_compat =
-        compat requested_update.verification_key ledger_update.verification_key
+        compatible requested_update.verification_key
+          ledger_update.verification_key
           ~equal:
             [%equal:
               ( Pickles.Side_loaded.Verification_key.t
@@ -479,23 +518,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               With_hash.t]
       in
       let permissions_compat =
-        compat requested_update.permissions ledger_update.permissions
+        compatible requested_update.permissions ledger_update.permissions
           ~equal:Mina_base.Permissions.equal
       in
       let snapp_uris_compat =
-        compat requested_update.snapp_uri ledger_update.snapp_uri
+        compatible requested_update.snapp_uri ledger_update.snapp_uri
           ~equal:String.equal
       in
       let token_symbols_compat =
-        compat requested_update.token_symbol ledger_update.token_symbol
+        compatible requested_update.token_symbol ledger_update.token_symbol
           ~equal:String.equal
       in
       let timings_compat =
-        compat requested_update.timing ledger_update.timing
+        compatible requested_update.timing ledger_update.timing
           ~equal:Mina_base.Party.Update.Timing_info.equal
       in
       let voting_fors_compat =
-        compat requested_update.voting_for ledger_update.voting_for
+        compatible requested_update.voting_for ledger_update.voting_for
           ~equal:Mina_base.State_hash.equal
       in
       List.for_all
@@ -759,6 +798,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 (Currency.Balance.to_string after_invalid_balance)
                 (Currency.Amount.to_string
                    expected_after_invalid_balance_as_amount)))
+    in
+    let%bind () =
+      section "Send a snapp with invalid timing update"
+        (send_snapp parties_update_timing)
+    in
+    let%bind () =
+      section "Wait for snapp with invalid timing update"
+        (wait_for_snapp parties_update_timing)
+    in
+    let%bind () =
+      section "Verify timing has not changed"
+        (let%bind ledger_update = get_account_update timing_account_id in
+         if
+           compatible ledger_update.timing timing_update.timing
+             ~equal:Mina_base.Party.Update.Timing_info.equal
+         then (
+           [%log info]
+             "Ledger update contains original timing, updated timing was not \
+              applied, as desired" ;
+           return () )
+         else (
+           [%log error]
+             "Ledger update contains new timing, which should not have been \
+              applied" ;
+           Malleable_error.hard_error
+             (Error.of_string "Ledger update contains a timing update") ))
     in
     let%bind () =
       section "Send a snapp with an invalid nonce"
