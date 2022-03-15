@@ -1,6 +1,7 @@
 import { Client } from "../src/MinaSigner";
+import type { Party, Signed } from "../src/TSTypes";
 
-let PARTY = `
+let otherParties = `
 {
   "otherParties": [
     {
@@ -172,20 +173,39 @@ describe("Party", () => {
     client = new Client({ network: "mainnet" });
   });
 
-  it("tests party", () => {
+  it("generates a signed party", () => {
     const keypair = client.genKeys();
-    const partyPayload = {
-      feePayer: keypair.publicKey,
-      fee: "1",
-      nonce: "0",
-      memo: "test memo",
-    };
-    const parties = client.signTransaction(
-      PARTY,
-      partyPayload,
+    const parties = client.signParty(
+      {
+        parties: otherParties,
+        feePayer: {
+          feePayer: keypair.publicKey,
+          fee: "1",
+          nonce: "0",
+          memo: "test memo",
+        },
+      },
       keypair.privateKey
     );
-    console.log("DEBUG", parties);
-    expect(true).toBeTruthy();
+    expect(parties.data).toBeDefined();
+    expect(parties.signature).toBeDefined();
+  });
+
+  it("generates a signed party by using signTransaction", () => {
+    const keypair = client.genKeys();
+    const parties = client.signTransaction(
+      {
+        parties: otherParties,
+        feePayer: {
+          feePayer: keypair.publicKey,
+          fee: "1",
+          nonce: "0",
+          memo: "test memo",
+        },
+      },
+      keypair
+    ) as Signed<Party>;
+    expect(parties.data).toBeDefined();
+    expect(parties.signature).toBeDefined();
   });
 });
