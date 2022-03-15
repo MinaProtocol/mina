@@ -19,14 +19,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ template "foundation-delegation.fullname" . }}-ingress
+  annotations: 
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   tls:
   - secretName: {{ .Values.backend.tlsSecret }}
   rules:
   - http:
       paths:
-      - path: /*
-        pathType: ImplementationSpecific
+      - path: /
+        pathType: Prefix
         backend:
           service:
             name: {{ template "foundation-delegation.fullname" . }}-backend
