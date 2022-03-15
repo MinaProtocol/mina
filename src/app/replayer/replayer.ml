@@ -1215,7 +1215,7 @@ module Snapp_helpers = struct
             (Frozen_ledger_hash.of_base58_check_exn hash_str)
     in
     let%bind snarked_next_available_token =
-          return Snapp_basic.Or_ignore.Ignore
+      return Snapp_basic.Or_ignore.Ignore
     in
     let%bind timestamp =
       match protocol_state_data.timestamp_id with
