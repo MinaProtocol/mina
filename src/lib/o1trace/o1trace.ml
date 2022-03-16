@@ -4,8 +4,6 @@ module Execution_timer = Execution_timer
 module Plugins = Plugins
 module Thread = Thread
 
-let logger = Logger.create ()
-
 (* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
 let () = Plugins.enable_plugin (module Execution_timer)
 
@@ -29,9 +27,6 @@ let current_sync_fiber = ref None
 (* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
 let grab_parent_fiber () =
   let ctx = Scheduler.current_execution_context () in
-  [%log debug]
-    !"sync_fiber = %{sexp:string option}"
-    (Option.map !current_sync_fiber ~f:(fun f -> f.Thread.Fiber.thread.name)) ;
   match !current_sync_fiber with
   | None ->
       Execution_context.find_local ctx Thread.Fiber.ctx_id
@@ -60,19 +55,12 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
   let sync_fiber = !current_sync_fiber in
   let parent = grab_parent_fiber () in
   let parent_name = Option.map parent ~f:(fun p -> p.thread.name) in
-  Writer.(
-    writef (Lazy.force stdout)
-      !"grabbed parent name: %{sexp:string option}\n"
-      parent_name) ;
   let result =
     if
       Option.value_map parent ~default:false ~f:(fun p ->
           String.equal p.thread.name name)
-    then (
-      Writer.(writef (Lazy.force stdout) !"execing same thread\n") ;
-      exec_same_thread () )
-    else (
-      Writer.(writef (Lazy.force stdout) !"execing new thread\n") ;
+    then exec_same_thread ()
+    else
       let fiber =
         match Option.bind parent ~f:(find_recursive_fiber name parent_name) with
         | Some fiber ->
@@ -80,7 +68,7 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
         | None ->
             Thread.Fiber.register name parent
       in
-      exec_new_thread fiber )
+      exec_new_thread fiber
   in
   current_sync_fiber := sync_fiber ;
   result
@@ -131,10 +119,8 @@ let%test_module "thread tests" =
         fiber.parent
       with
       | Some parent ->
-          Writer.(writef (Lazy.force stdout) "parent = %s\n" parent.thread.name) ;
           String.equal parent.thread.name n
       | None ->
-          Writer.(write (Lazy.force stdout) "no parent found\n") ;
           false
 
     let test' f =

@@ -26,6 +26,4 @@ let on_job_enter _fiber = ()
 
 let on_job_exit fiber elapsed_time = record_elapsed_time fiber elapsed_time
 
-let elapsed_time_of_thread thread =
-  let%map.Option r = Thread.load_state thread state_id in
-  !r
+let elapsed_time_of_thread thread = !(Plugins.plugin_state (module T) thread)

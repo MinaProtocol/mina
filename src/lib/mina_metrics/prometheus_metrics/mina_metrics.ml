@@ -1475,9 +1475,7 @@ module Execution_times = struct
       }
     in
     let collect () =
-      let elapsed =
-        Option.value_exn (O1trace.Execution_timer.elapsed_time_of_thread thread)
-      in
+      let elapsed = O1trace.Execution_timer.elapsed_time_of_thread thread in
       LabelSetMap.singleton []
         [ Sample_set.sample (Time_ns.Span.to_ms elapsed) ]
     in
