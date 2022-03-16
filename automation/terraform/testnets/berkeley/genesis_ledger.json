@@ -1,9 +1,9 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-02-18T00:33:07Z"
+    "genesis_state_timestamp": "2022-03-02T20:13:09Z"
   },
   "ledger": {
-    "name": "test-snapps",
+    "name": "berkeley",
     "accounts": [
       {
         "pk": "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e",

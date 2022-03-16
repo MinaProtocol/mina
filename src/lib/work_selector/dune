@@ -3,8 +3,43 @@
  (public_name work_selector)
  (library_flags -linkall)
  (inline_tests)
- (libraries core debug_assert logger mina_intf async mina_ledger
-            unix_timestamp staged_ledger network_pool)
+ (libraries
+   ;; opam libraries
+   bin_prot.shape
+   sexplib0
+   core
+   async
+   core_kernel
+   base
+   base.caml
+   base.base_internalhash_types
+   async_kernel
+   ppx_inline_test.config
+   async_unix
+   ;; local libraries
+   transaction_protocol_state
+   transaction_snark_work
+   transition_frontier_base
+   error_json
+   ledger_proof
+   precomputed_values
+   transaction_witness
+   snark_work_lib
+   mina_state
+   mina_base
+   network_pool
+   staged_ledger
+   logger
+   currency
+   one_or_two
+   transaction_snark
+   pipe_lib
+   transition_frontier
+   with_hash
+   mina_metrics
+   transition_frontier_extensions
+   mina_ledger
+   )
  (preprocess
   (pps ppx_coda ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
        ppx_custom_printf ppx_inline_test ppx_optcomp))

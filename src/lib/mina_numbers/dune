@@ -3,8 +3,35 @@
  (public_name mina_numbers)
  (inline_tests)
  (library_flags -linkall)
- (libraries fold_lib tuple_lib snark_bits snark_params unsigned_extended
-            core_kernel snarky.backendless snarky_integer ppx_dhall_type codable test_util)
+ (libraries
+   ;; opam libraries
+   result
+   base.caml
+   bin_prot.shape
+   bignum.bigint
+   core_kernel
+   integers
+   sexplib0
+   base
+   base.base_internalhash_types
+   ppx_inline_test.config
+   ;; local libraries
+   bignum_bigint
+   pickles
+   codable
+   ppx_dhall_type
+   snarky.backendless
+   fold_lib
+   tuple_lib
+   snark_bits
+   snark_params
+   unsigned_extended
+   random_oracle
+   random_oracle_input
+   bitstring_lib
+   test_util
+   kimchi_backend.common
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash

@@ -2,9 +2,41 @@
  (name transaction_snark_scan_state)
  (public_name transaction_snark_scan_state)
  (library_flags -linkall)
- (libraries pipe_lib core async sgn parallel_scan
-            transaction_snark mina_base mina_ledger ledger_proof transaction_snark_work transaction_witness snark_work_lib snark_params logger mina_state ppx_deriving_yojson.runtime
-            yojson)
+ (libraries
+   ;; opam libraries
+   base.base_internalhash_types
+   async_kernel
+   core
+   ppx_deriving_yojson.runtime
+   sexplib0
+   base.caml
+   digestif
+   base
+   core_kernel
+   async
+   yojson
+   bin_prot.shape
+   async_unix
+   ;; local libraries
+   mina_base.import
+   data_hash_lib
+   mina_state
+   transaction_witness
+   transaction_snark
+   mina_base
+   snark_work_lib
+   one_or_two
+   mina_ledger
+   currency
+   logger
+   transaction_snark_work
+   parallel_scan
+   sgn
+   ledger_proof
+   genesis_constants
+   o1trace
+   with_hash
+   )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_base ppx_coda ppx_version ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf

@@ -650,7 +650,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   Core.print_string message
 
 let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
-    coda_ref =
+    ~node_error_url ~contact_info coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -698,6 +698,15 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
                  ~child_pids ~top_logger coda_ref
            | _exn ->
+               let error = Error.of_exn ~backtrace:`Get exn in
+               let%bind () =
+                 match node_error_url with
+                 | Some node_error_url ->
+                     Node_error_service.send_report ~logger:top_logger
+                       ~node_error_url ~mina_ref:coda_ref ~error ~contact_info
+                 | None ->
+                     Deferred.unit
+               in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
          in

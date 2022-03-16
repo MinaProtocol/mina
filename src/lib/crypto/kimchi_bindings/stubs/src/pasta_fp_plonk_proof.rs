@@ -7,27 +7,27 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
+use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::circuits::polynomial::COLUMNS;
 use kimchi::circuits::scalars::ProofEvaluations;
-use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::prover_index::ProverIndex;
+use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
     vesta::{Affine as GAffine, VestaParameters},
 };
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use std::convert::TryInto;
 
-type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>;
-type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstants15W>;
+type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
+type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -71,7 +71,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
-    let index: &Index<GAffine> = &index.as_ref().0;
+    let index: &ProverIndex<GAffine> = &index.as_ref().0;
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
@@ -90,43 +90,37 @@ pub fn caml_pasta_fp_plonk_proof_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
-    lgr_comm: Vec<CamlPolyComm<CamlGVesta>>,
     index: CamlPastaFpPlonkVerifierIndex,
     proof: CamlProverProof<CamlGVesta, CamlFp>,
 ) -> bool {
-    let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
-
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    ProverProof::verify::<
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
-    >(
-        &group_map,
-        &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
-    )
+    batch_verify::<
+        GAffine,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
+    >(&group_map, &[(&index.into(), &proof.into())].to_vec())
     .is_ok()
 }
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlPolyComm<CamlGVesta>>>,
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
     proofs: Vec<CamlProverProof<CamlGVesta, CamlFp>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
-        .zip(lgr_comms.into_iter())
         .zip(proofs.into_iter())
-        .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
+        .map(|(i, p)| (i.into(), p.into()))
         .collect();
-    let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
+    let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
     let group_map = GroupMap::<Fq>::setup();
 
-    ProverProof::<GAffine>::verify::<
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fp, PlonkSpongeConstants15W>,
+    batch_verify::<
+        GAffine,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
     .is_ok()
 }

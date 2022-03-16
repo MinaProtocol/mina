@@ -118,39 +118,36 @@ module Node = struct
           {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
             payment {
               id
+              nonce
+              hash
+            }
+          }
+      }
+    |}]
+
+    module Send_delegation =
+    [%graphql
+    {|
+      mutation ($sender: PublicKey!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $token: UInt64,
+      $fee: UInt64!,
+      $nonce: UInt32,
+      $memo: String) {
+        sendDelegation(input:
+          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+            delegation {
+              id
+              nonce
+              hash
             }
           }
       }
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp =
-    [%graphql
-    {|
-         mutation ($parties: SendTestSnappInput!) {
-          sendTestSnapp(parties: $parties) {
-               snapp { id
-                       hash
-                       nonce
-                       failureReason
-                     }
-             }
-         }
-       |}]
-
-    module Send_snapp =
-    [%graphql
-    {|
-      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
-       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
-            snapp { id
-                    hash
-                    nonce
-                    failureReason
-                  }
-          }
-      }
-    |}]
+    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
 
     module Get_balance =
     [%graphql
@@ -212,7 +209,6 @@ module Node = struct
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
-                        stake
                       }
           sequenceEvents
           snappState
@@ -388,8 +384,7 @@ module Node = struct
       | `Signature ->
           Signature
     in
-    { stake = account_permissions#stake
-    ; edit_sequence_state =
+    { edit_sequence_state =
         to_auth_required account_permissions#editSequenceState
     ; edit_state = to_auth_required account_permissions#editState
     ; increment_nonce = to_auth_required account_permissions#incrementNonce
@@ -598,6 +593,9 @@ module Node = struct
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
+  type signed_command_result =
+    { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
+
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment" ~metadata:(logger_metadata t) ;
@@ -630,11 +628,20 @@ module Node = struct
         send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
-    let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
-    let user_cmd_id = id_obj#id in
+    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
+      }
+    in
     [%log info] "Sent payment"
-      ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
-    ()
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
+        ] ;
+    res
 
   let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =
@@ -665,7 +672,7 @@ module Node = struct
     in
     let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let parties_json =
-      Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
+      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
     let send_snapp_graphql () =
       let send_snapp_obj =
@@ -676,15 +683,66 @@ module Node = struct
     in
     let%bind sent_snapp_obj = send_snapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#sendTestSnapp#snapp#failureReason with
+      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
       | None ->
           return ()
       | Some s ->
           Deferred.Or_error.errorf "Snapp failed, reason: %s" s
     in
-    let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
+    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
     [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
     return snapp_id
+
+  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+    [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
+    [%log info] "send_delegation: unlocking account"
+      ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
+    let unlock_sender_account_graphql () =
+      let unlock_account_obj =
+        Graphql.Unlock_account.make ~password:"naughty blue worm"
+          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"unlock_sender_account_graphql" unlock_account_obj
+    in
+    let%bind _ = unlock_sender_account_graphql () in
+    let send_delegation_graphql () =
+      let send_delegation_obj =
+        Graphql.Send_delegation.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t ~query_name:"send_delegation_graphql"
+        send_delegation_obj
+    in
+    let%map result_obj = send_delegation_graphql () in
+    let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
+      }
+    in
+    [%log info] "stake delegation sent"
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
+        ] ;
+    res
+
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
+      ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if t doesn't happen to be an archive node *)

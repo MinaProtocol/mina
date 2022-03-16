@@ -544,7 +544,7 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; snapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
@@ -561,11 +561,17 @@ module For_tests : sig
     -> Spec.t
     -> Parties.t
 
-  val update_state :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+  val update_states :
+       ?snapp_prover:
+         ( unit
+         , unit
+         , unit
+         , Snapp_statement.t
+         , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+         Pickles.Prover.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
-    -> (Parties.t * (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t)
-       Async.Deferred.t
+    -> Parties.t Async.Deferred.t
 
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -574,6 +580,25 @@ module For_tests : sig
     -> Transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
+
+  val create_trivial_snapp_account :
+       ?permissions:Permissions.t
+    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> ledger:Mina_ledger.Ledger.t
+    -> Account.key
+    -> unit
+
+  val create_trivial_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> unit
+    -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+       * [> `Prover of
+            ( unit
+            , unit
+            , unit
+            , Snapp_statement.t
+            , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+            Pickles.Prover.t ]
 
   val multiple_transfers : Spec.t -> Parties.t
 end

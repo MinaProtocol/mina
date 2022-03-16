@@ -201,7 +201,7 @@ module Stable = struct
       ; other_parties : Party.Stable.V1.t list
       ; memo : Signed_command_memo.Stable.V1.t
       }
-    [@@deriving sexp, compare, equal, hash, yojson, fields]
+    [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
     let to_latest = Fn.id
 
@@ -427,10 +427,38 @@ let weight (parties : t) : int =
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
     ~other_parties:!.(list @@ Party.deriver @@ o ())
     ~memo:!.Signed_command_memo.deriver
-  |> finish ~name:"SendSnappInput"
+  |> finish "Parties" ~t_toplevel_annots
+
+let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
+
+let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
+
+let to_json x = Fields_derivers_snapps.(to_json (deriver @@ Derivers.o ())) x
+
+let of_json x = Fields_derivers_snapps.(of_json (deriver @@ Derivers.o ())) x
+
+let arg_query_string x =
+  Fields_derivers_snapps.Test.Loop.json_to_string_gql @@ to_json x
+
+let dummy =
+  let party : Party.t =
+    { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let fee_payer : Party.Fee_payer.t =
+    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+  in
+  { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
+
+let inner_query =
+  lazy
+    (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
+       Fields_derivers_snapps.(inner_query (deriver @@ Derivers.o ())))
 
 let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
 
@@ -444,19 +472,6 @@ let parties_deriver_to_json other_parties =
 
 let%test_module "Test" =
   ( module struct
-    let dummy =
-      let party : Party.t =
-        { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
-        ; authorization = Control.dummy_of_tag Signature
-        }
-      in
-      let fee_payer : Party.Fee_payer.t =
-        { data = Party.Predicated.Fee_payer.dummy
-        ; authorization = Signature.dummy
-        }
-      in
-      { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
-
     module Fd = Fields_derivers_snapps.Derivers
 
     let full = deriver @@ Fd.o ()
@@ -465,5 +480,6 @@ let%test_module "Test" =
       [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
 
     let%test_unit "full circuit" =
-      Fields_derivers_snapps.Test.Loop.run full dummy |> ignore
+      Run_in_thread.block_on_async_exn
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
   end )

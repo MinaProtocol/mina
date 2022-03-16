@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -135,8 +136,7 @@ module Network_config = struct
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
             Some
-              { stake = false
-              ; edit_state = None
+              { edit_state = None
               ; send = None
               ; receive = None
               ; set_delegate = None
@@ -244,8 +244,11 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_schema_aux_files =
+      [ "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+      ; "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+      ]
     in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
@@ -269,6 +272,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee

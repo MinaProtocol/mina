@@ -5,19 +5,59 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane))
  (libraries
+   ;; opam libraries
+   integers
+   base.base_internalhash_types
+   async
+   core
+   core_kernel
    ocamlgraph
    async_kernel
+   sexplib0
+   ppx_inline_test.config
+   async_unix
+   ;; local libraries
+   mina_base.import
+   pickles.backend
+   one_or_two
+   transition_frontier_extensions
+   child_processes
+   block_time
+   unsigned_extended
+   downloader
+   mina_state
+   protocol_version
+   verifier
+   with_hash
+   data_hash_lib
+   precomputed_values
+   mina_numbers
+   inline_test_quiet_logs
+   mina_networking
+   mina_metrics
+   pipe_lib
+   transition_handler
    non_empty_list
    transition_frontier
-   transition_handler
    consensus
-   core_kernel
-   mina_intf
-   pipe_lib
-   syncable_ledger
-   merkle_address
    mina_base
-   mina_metrics
    transition_chain_verifier
-   mina_networking
-   fake_network))
+   fake_network
+   mina_transition
+   proof_carrying_data
+   cache_lib
+   network_peer
+   logger
+   trust_system
+   truth
+   error_json
+   rose_tree
+   transition_frontier_base
+   network_pool
+   staged_ledger_diff
+   gadt_lib
+   transaction_snark_work
+   pickles
+   snark_params
+   kimchi_backend.pasta
+))

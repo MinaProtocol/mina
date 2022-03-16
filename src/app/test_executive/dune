@@ -1,8 +1,42 @@
 (executable
  (name test_executive)
  (libraries
-   core_kernel yojson cmdliner file_system currency mina_base
-   runtime_config signature_lib secrets integration_test_lib
-   integration_test_cloud_engine bash_colors mina_generators)
+   ;; opam libraries
+   async_kernel
+   async
+   core
+   yojson
+   core_kernel
+   cmdliner
+   base.caml
+   async_unix
+   ;; local libraries
+   with_hash
+   data_hash_lib
+   kimchi_backend
+   kimchi_backend.pasta
+   pickles
+   pickles_types
+   random_oracle_input
+   genesis_constants
+   bash_colors
+   integration_test_lib
+   signature_lib
+   mina_base
+   file_system
+   currency
+   coda_runtime_config
+   secrets
+   integration_test_cloud_engine
+   mina_generators
+   logger
+   random_oracle
+   mina_numbers
+   transaction_snark
+   snark_params
+   pickles.backend
+   pipe_lib
+   mina_base.import
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))

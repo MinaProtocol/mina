@@ -1,6 +1,17 @@
 (library
  (name ledger_proof)
  (public_name ledger_proof)
- (libraries core_kernel mina_base transaction_snark)
+ (libraries
+   ;; opam libraries
+   base
+   sexplib0
+   core_kernel
+   bin_prot.shape
+   base.caml
+   ;; local libraries
+   transaction_snark
+   mina_base
+   mina_state
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare ppx_version ppx_deriving_yojson)))

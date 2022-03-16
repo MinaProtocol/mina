@@ -4,4 +4,31 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane))
- (libraries async_kernel core_kernel mina_intf mina_base mina_ledger transition_frontier syncable_ledger merkle_address consensus best_tip_prover))
+ (libraries
+   ;; opam libraries
+   sexplib0
+   core
+   async
+   core_kernel
+   async_kernel
+   ;; local libraries
+   with_hash
+   data_hash_lib
+   trust_system
+   transition_frontier_extensions
+   transition_frontier_base
+   consensus
+   syncable_ledger
+   mina_base
+   mina_intf
+   transition_frontier
+   best_tip_prover
+   mina_transition
+   network_peer
+   logger
+   merkle_ledger
+   staged_ledger
+   truth
+   proof_carrying_data
+   mina_ledger
+))

@@ -911,8 +911,12 @@ let remove_lowest_fee :
 let get_highest_fee :
     t -> Transaction_hash.User_command_with_valid_signature.t option =
  fun t ->
-  Option.map ~f:(Fn.compose Set.min_elt_exn Tuple2.get2)
-  @@ Map.max_elt t.applicable_by_fee
+  Option.map
+    ~f:
+      (Fn.compose
+         Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
+         Tuple2.get2)
+  @@ Currency.Fee_rate.Map.max_elt t.applicable_by_fee
 
 (* Add a command that came in from gossip, or return an error. We need to check
    a whole bunch of conditions here and return the appropriate errors.
@@ -1739,54 +1743,6 @@ let%test_module _ =
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds")
-
-    let%test_unit "applicable_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.applicable_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
-
-    let%test_unit "all_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.all_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
 
     let%test_unit "remove_lowest_fee" =
       let cmds =

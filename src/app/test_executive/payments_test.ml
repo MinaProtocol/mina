@@ -69,13 +69,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = untimed_node_b in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let%bind () =
+         let%bind { nonce; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+              ~command_type:Send_payment))
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
@@ -84,13 +85,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_a in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let%bind () =
+         let%bind { nonce; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-              ~receiver_pub_key ~amount))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+              ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 6_900_000_000_000 in
@@ -104,7 +106,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
            ~amount ~fee
        with
-       | Ok () ->
+       | Ok _ ->
            Malleable_error.soft_error_string ~value:()
              "Payment succeeded, but expected it to fail because of a minimum \
               balance violation"

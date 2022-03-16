@@ -4,30 +4,44 @@
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries
-  core_kernel
-  snark_params
-  rosetta_lib
-  mina_base
-  mina_numbers
-  data_hash_lib
-  random_oracle
-  signature_lib
-  string_sign
-  zarith_stubs_js
-  integers
-  integers_stubs_js
-  js_of_ocaml
-  digestif.ocaml
-  cache_dir.fake
-  run_in_thread.fake
-  mina_metrics.none
-  bindings_js
-  node_backend
-  sponge
-  hex)
-  (link_deps
- ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
- ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
+   ;; opam libraries
+   js_of_ocaml
+   integers
+   core_kernel
+   zarith_stubs_js
+   digestif.ocaml
+   base
+   yojson
+   ppx_deriving.runtime
+   result
+   ppx_deriving_yojson.runtime
+   ;; local libraries
+   sponge
+   integers_stubs_js
+   snark_params
+   rosetta_lib
+   mina_base
+   mina_base.import
+   mina_numbers
+   data_hash_lib
+   random_oracle
+   signature_lib
+   string_sign
+   hex
+   mina_signature_kind
+   random_oracle_input
+   snarkette
+   currency
+   rosetta_coding
+   cache_dir.fake
+   run_in_thread.fake
+   mina_metrics.none
+   bindings_js
+   node_backend
+ )
+ (link_deps
+   ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+   ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))

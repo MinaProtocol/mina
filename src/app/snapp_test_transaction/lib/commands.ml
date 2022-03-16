@@ -9,155 +9,15 @@ let proof_level = Genesis_constants.Proof_level.Full
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
-(* transform JSON into a string for a Javascript object,
-   some special handling of cases where the GraphQL schema
-   differs from OCaml code
-*)
-let jsobj_of_json ?(fee_payer = false) (json : Yojson.Safe.t) : string =
-  let indent n = String.make n ' ' in
-  let rec go json level =
-    match json with
-    | `Tuple _ | `Variant _ ->
-        failwith
-          (sprintf "JSON not generated from OCaml: %s"
-             (Yojson.Safe.to_string json))
-    | `Intlit i ->
-        i
-    | `Bool b ->
-        if b then "true" else "false"
-    | `Null ->
-        "null"
-    | `Assoc pairs ->
-        sprintf "{%s}"
-          ( List.filter_map pairs ~f:(fun (s, json) ->
-                let cameled_names () =
-                  let cameled, value =
-                    (* special handling for balance_change in Party.Fee_payer.t *)
-                    if fee_payer && String.equal s "balance_change" then
-                      (*yojson prints decimal formatted but graphql accepts unsigned int*)
-                      ( "fee"
-                      , go
-                          (`String
-                            ( Currency.Fee.of_yojson json
-                            |> Result.ok_or_failwith |> Currency.Fee.to_string
-                            ))
-                          (level + 2) )
-                    else (underToCamel s, go json (level + 2))
-                  in
-                  Some (sprintf "%s:%s" cameled value)
-                in
-                (* Special handling of fee payer party and verification key field names*)
-                match (s, fee_payer) with
-                | "use_full_commitment", true | "token_id", true ->
-                    None
-                | "increment_nonce", true -> (
-                    (*Increment_nonce permission should be in fee payer*)
-                    match Permissions.Auth_required.of_yojson json with
-                    | Ok _auth ->
-                        cameled_names ()
-                    | _ ->
-                        None )
-                | "sgn", _ ->
-                    Some (sprintf "%s:%s" "sign" (go json level))
-                | "verification_key", _ -> (
-                    let vk_camel = underToCamel s in
-                    match json with
-                    | `List [ `String "Keep" ] ->
-                        Some (sprintf "%s:%s" vk_camel "null")
-                    | `List
-                        [ `String "Set"
-                        ; `Assoc [ ("data", vk); ("hash", vk_hash) ]
-                        ] ->
-                        let vk_with_hash =
-                          sprintf "{%s:%s, %s:%s}" vk_camel
-                            (go vk (level + 2))
-                            "hash"
-                            (go vk_hash (level + 2))
-                        in
-                        Some (sprintf "%s:%s" vk_camel vk_with_hash)
-                    | _ ->
-                        failwith "invalid verification key" )
-                | "state", _ ->
-                    (*states in account predicate is a `Assoc with "elements" field name*)
-                    Some
-                      (sprintf "%s:{elements: %s}" "state"
-                         (go json (level + 2)))
-                | "authorization", false -> (
-                    match json with
-                    | `List [ `String "None_given" ] ->
-                        Some "authorization:{signature:null, proof:null}"
-                    | _ ->
-                        Some
-                          (sprintf "%s:%s" "authorization"
-                             (go json (level + 2))) )
-                | _, _ ->
-                    cameled_names ())
-          |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
-    (* Set_or_keep *)
-    | `List [ `String "Set"; v ] ->
-        go v level
-    | `List [ `String "Keep" ] ->
-        "null"
-    (* Check_or_ignore *)
-    | `List [ `String "Check"; v ] ->
-        go v level
-    | `List [ `String "Ignore" ] ->
-        "null"
-        (* special handling of sign in Currency.Amount.Signed.t as Enums*)
-    | `List [ `String "Neg" ] ->
-        "MINUS"
-    | `List [ `String "Pos" ] ->
-        "PLUS"
-    (*Special handling of permissions as Enums*)
-    | `List [ `String "Proof" ] ->
-        "Proof"
-    | `List [ `String "Signature" ] ->
-        "Signature"
-    | `List [ `String "None" ] ->
-        "None"
-    | `List [ `String "Either" ] ->
-        "Either"
-    | `List [ `String "Impossible" ] ->
-        "Impossible"
-    (* Predicate special handling *)
-    | `List [ `String "Accept" ] ->
-        go (`Assoc [ ("account", `Null); ("nonce", `Null) ]) level
-    | `List [ `String "Nonce"; n ] ->
-        go (`Assoc [ ("nonce", n) ]) level
-    | `List [ `String "Full"; account ] ->
-        go (`Assoc [ ("account", account) ]) level
-    (* other constructors *)
-    | `List [ `String name; value ]
-      when not (String.equal (String.prefix name 2) "0x") ->
-        go (`Assoc [ (underToCamel name, value) ]) level
-    | `List jsons ->
-        sprintf "[%s]"
-          ( List.map jsons ~f:(fun json -> sprintf "%s" (go json (level + 2)))
-          |> String.concat ~sep:(sprintf ",\n%s" (indent level)) )
-    | `Int n ->
-        sprintf "%d" n
-    | `Float f ->
-        sprintf "%f" f
-    | `String s ->
-        sprintf "\"%s\"" s
-  in
-  go json 4
-
 let graphql_snapp_command (parties : Parties.t) =
   sprintf
     {|
 mutation MyMutation {
   __typename
-  sendSnapp(input: {
-    feePayer:%s,
-    otherParties:[%s] })
+  sendSnapp(input: { parties: %s })
 }
     |}
-    ( jsobj_of_json ~fee_payer:true
-    @@ Party.Fee_payer.to_yojson parties.fee_payer )
-    ( List.map parties.other_parties ~f:(fun party ->
-          Party.to_yojson party |> jsobj_of_json)
-    |> String.concat ~sep:",\n    " )
+    (Parties.arg_query_string parties)
 
 let parse_field_element_or_hash_string s ~f =
   match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
@@ -178,6 +38,9 @@ let parse_field_element_or_hash_string s ~f =
                 (%s, %s)"
                (Error.to_string_hum e1) (Error.to_string_hum e2)) )
 
+let `VK vk, `Prover snapp_prover =
+  Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+
 let gen_proof ?(snapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
@@ -190,7 +53,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
     |> Or_error.ok_exn
   in
   let _v =
-    Option.value_map snapp_account ~default:() ~f:(fun (pk, vk) ->
+    Option.value_map snapp_account ~default:() ~f:(fun pk ->
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_int 1000000000000)) with
@@ -435,7 +298,7 @@ let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ; fee
     ; receivers = []
     ; amount
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = true
     ; snapp_update = Party.Update.dummy
@@ -468,7 +331,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with verification_key; snapp_uri }
@@ -478,16 +341,17 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -505,7 +369,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; fee
     ; receivers
     ; amount
-    ; snapp_account_keypair = None
+    ; snapp_account_keypairs = []
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = Party.Update.dummy
@@ -531,7 +395,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with app_state }
@@ -541,14 +405,15 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
@@ -564,7 +429,7 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with snapp_uri }
@@ -574,16 +439,17 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -599,7 +465,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = Party.Update.dummy
@@ -609,14 +475,15 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
@@ -632,7 +499,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_account_keypair
+    ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with token_symbol }
@@ -642,16 +509,17 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
           (Some
-             ( Signature_lib.Public_key.compress snapp_account_keypair.public_key
-             , vk ))
+             (Signature_lib.Public_key.compress
+                snapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -666,7 +534,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypair = Some snapp_keypair
+    ; snapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
     ; snapp_update = { Party.Update.dummy with permissions }
@@ -676,15 +544,16 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; sequence_events = []
     }
   in
-  let%bind parties, vk =
-    Transaction_snark.For_tests.update_state ~constraint_constants spec
+  let%bind parties =
+    Transaction_snark.For_tests.update_states ~snapp_prover
+      ~constraint_constants spec
   in
   (*Util.print_snapp_transaction parties ;*)
   let%map () =
     if debug then
       gen_proof parties
         ~snapp_account:
-          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key, vk))
+          (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
   parties
@@ -706,25 +575,7 @@ let%test_module "Snapps test transaction" =
           io_field "sendSnapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
-            ~resolve:
-              (fun _ () (fee_payer_result, other_parties_results, memo) ->
-              let parties_result =
-                let open Result.Let_syntax in
-                let other_parties_result = Result.all other_parties_results in
-                let%bind fee_payer = fee_payer_result in
-                let%bind other_parties = other_parties_result in
-                let result_of_exn f v ~error =
-                  try Ok (f v) with _ -> Error error
-                in
-                let%map memo =
-                  Option.value_map memo ~default:(Ok Signed_command_memo.empty)
-                    ~f:(fun memo ->
-                      result_of_exn Signed_command_memo.create_from_string_exn
-                        memo ~error:"Invalid `memo` provided.")
-                in
-                { Parties.fee_payer; other_parties; memo }
-              in
-              let parties_result = Result.ok_or_failwith parties_result in
+            ~resolve:(fun _ () (parties' : Parties.t) ->
               let failed = ref false in
               let printf_diff ~label expected got =
                 if String.equal expected got then ()
@@ -735,9 +586,9 @@ let%test_module "Snapps test transaction" =
               printf_diff ~label:"fee payer"
                 ( Party.Fee_payer.to_yojson parties.fee_payer
                 |> Yojson.Safe.to_string )
-                ( Party.Fee_payer.to_yojson parties_result.fee_payer
+                ( Party.Fee_payer.to_yojson parties'.fee_payer
                 |> Yojson.Safe.to_string ) ;
-              List.iter2_exn parties.other_parties parties_result.other_parties
+              List.iter2_exn parties.other_parties parties'.other_parties
                 ~f:(fun expected got ->
                   printf_diff ~label:"party"
                     (Party.to_yojson expected |> Yojson.Safe.to_string)

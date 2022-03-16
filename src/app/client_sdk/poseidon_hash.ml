@@ -82,7 +82,7 @@ module Hash = struct
   include Sponge.Make_hash (Sponge.Poseidon (Config))
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
 
   let update ~state = update ~state params
 

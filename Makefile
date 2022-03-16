@@ -58,6 +58,7 @@ all: clean build
 clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
+	@rm -rf Cargo.lock target
 	@rm -rf src/$(COVERAGE_DIR)
 	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
@@ -111,7 +112,7 @@ build_rosetta_all_sigs: ocaml_checks
 
 build_intgtest: ocaml_checks
 	$(info Starting Build)
-	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
 client_sdk: ocaml_checks
