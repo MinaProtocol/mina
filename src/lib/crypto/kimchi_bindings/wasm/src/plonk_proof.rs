@@ -23,7 +23,7 @@ use groupmap::GroupMap;
 use kimchi::index::Index;
 use kimchi::prover::{ProverCommitments, ProverProof};
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 
@@ -647,8 +647,8 @@ macro_rules! impl_proof {
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
                 let maybe_proof = ProverProof::create::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, index, prev);
                 return match maybe_proof {
                     Ok(proof) => proof.into(),
@@ -670,8 +670,8 @@ macro_rules! impl_proof {
                 let group_map = <$G as CommitmentCurve>::Map::setup();
 
                 ProverProof::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
                     &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
@@ -712,8 +712,8 @@ macro_rules! impl_proof {
                 let group_map = GroupMap::<_>::setup();
 
                 ProverProof::<$G>::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, &ts)
                 .is_ok()
             }
@@ -797,8 +797,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_3,
-        oracle::pasta::fq_3,
+        oracle::pasta::fp_kimchi,
+        oracle::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -823,8 +823,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_3,
-        oracle::pasta::fp_3,
+        oracle::pasta::fq_kimchi,
+        oracle::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
@@ -885,7 +885,8 @@ pub mod to_test {
 
         // witness
         let witness = {
-            let mut sponge = ArithmeticSponge::<Fp, PlonkSpongeConstants15W>::new(fp_sponge_params);
+            let mut sponge =
+                ArithmeticSponge::<Fp, PlonkSpongeConstantsKimchi>::new(fp_sponge_params);
 
             let POS_ROWS_PER_HASH = 11;
             let ROUNDS_PER_ROW = 5;
@@ -925,7 +926,7 @@ pub mod to_test {
 
                     // apply the sponge and record the result in the witness
                     // (this won't work if the circuit has an INITIAL_ARK)
-                    assert!(!PlonkSpongeConstants15W::INITIAL_ARK);
+                    assert!(!PlonkSpongeConstantsKimchi::INITIAL_ARK);
                     sponge.full_round(abs_round);
 
                     // apply the sponge and record the result in the witness
@@ -956,8 +957,8 @@ pub mod to_test {
 
         // proof
         ProverProof::create::<
-            DefaultFqSponge<_, PlonkSpongeConstants15W>,
-            DefaultFrSponge<_, PlonkSpongeConstants15W>,
+            DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+            DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &index, vec![prev]);
     }
 }
