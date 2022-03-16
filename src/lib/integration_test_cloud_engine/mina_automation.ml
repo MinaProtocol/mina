@@ -246,8 +246,8 @@ module Network_config = struct
     in
     let mina_archive_schema = "create_schema.sql" in
     let mina_archive_schema_aux_files =
-      [ "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-      ; "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+      [ "https://raw.githubusercontent.com/MinaProtocol/mina/feature/token-id-overhaul/src/app/archive/create_schema.sql"
+      ; "https://raw.githubusercontent.com/MinaProtocol/mina/feature/token-id-overhaul/src/app/archive/snapp_tables.sql"
       ]
     in
     (* NETWORK CONFIG *)
