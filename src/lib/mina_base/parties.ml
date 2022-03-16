@@ -460,8 +460,6 @@ let inner_query =
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_snapps.(inner_query (deriver @@ Derivers.o ())))
 
-let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
-
 let other_parties_deriver_from_json json =
   Fields_derivers_snapps.(
     of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()))
