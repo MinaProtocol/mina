@@ -35,10 +35,11 @@ let party_payload_of_js (payload_party_js : payload_party_js) =
     payload_party_js##.feePayer
     |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
-  let fee_js = payload_party_js##.fee in
-  let fee = Js.to_string fee_js |> Currency.Fee.of_string in
-  let nonce_js = payload_party_js##.nonce in
-  let nonce = Js.to_string nonce_js |> Mina_numbers.Account_nonce.of_string in
+  let fee = payload_party_js##.fee |> Js.to_string |> Currency.Fee.of_string in
+  let nonce =
+    payload_party_js##.nonce |> Js.to_string
+    |> Mina_numbers.Account_nonce.of_string
+  in
   { Party.Fee_payer.data =
       { body =
           { public_key = fee_payer_pk

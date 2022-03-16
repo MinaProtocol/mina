@@ -57,8 +57,10 @@ let _ =
            Snapp_predicate.Protocol_state.digest
              Snapp_predicate.Protocol_state.accept
          in
-         let memo_js = payload_party_js##.memo in
-         let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
+         let memo =
+           payload_party_js##.memo |> Js.to_string
+           |> Memo.create_from_string_exn
+         in
          let commitment : Parties.Transaction_commitment.t =
            Parties.Transaction_commitment.create ~other_parties_hash
              ~protocol_state_predicate_hash
