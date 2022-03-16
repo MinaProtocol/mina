@@ -22,7 +22,7 @@ use kimchi::index::Index;
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover::{ProverCommitments, ProverProof};
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use std::convert::TryInto;
@@ -80,8 +80,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fp>::setup();
         let proof = ProverProof::create::<
-            DefaultFqSponge<PallasParameters, PlonkSpongeConstants15W>,
-            DefaultFrSponge<Fq, PlonkSpongeConstants15W>,
+            DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+            DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, index, prev)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
@@ -100,8 +100,8 @@ pub fn caml_pasta_fq_plonk_proof_verify(
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
     ProverProof::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants15W>,
+        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(
         &group_map,
         &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
@@ -126,8 +126,8 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     let group_map = GroupMap::<Fp>::setup();
 
     ProverProof::<GAffine>::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants15W>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants15W>,
+        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts)
     .is_ok()
 }
