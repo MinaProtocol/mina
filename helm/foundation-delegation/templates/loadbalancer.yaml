@@ -25,9 +25,9 @@ spec:
   tls:
   - secretName: {{ .Values.backend.tlsSecret }}
     hosts:
-      - uptime.minaprotocol.com
+      - uptime-backend.minaprotocol.com
   rules:
-  - host: uptime.minaprotocol.com
+  - host: uptime-backend.minaprotocol.com
     http:
       paths:
       - path: /
