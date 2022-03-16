@@ -1361,6 +1361,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let ( &&& ) = ( && )
 
+      let display b ~label = sprintf "%s: %b" label b
+
       let all = List.for_all ~f:Fn.id
 
       type failure_status = Transaction_status.Failure.t option
@@ -1842,6 +1844,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               old_failure_status
         in
         { t with failure_status; success = t.success && b }
+
+      let update_failure_status (t : t) failure_status b =
+        match failure_status with
+        | None ->
+            { t with success = t.success && b }
+        | Some failure ->
+            add_check (t : t) failure b
     end
   end
 

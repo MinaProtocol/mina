@@ -10,6 +10,7 @@
    ; opam deps
    async cohttp core
    ; libs
+   generated_graphql_queries
    snarky_log
    cli_lib
    mina_base mina_graphql mina_lib mina_state mina_ledger

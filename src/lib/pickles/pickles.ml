@@ -34,7 +34,10 @@ module Pairing_main = Pairing_main
 
 let profile_constraints = false
 
-let verify = Verify.verify
+let verify_promise = Verify.verify
+
+let verify max_branching statement key proofs =
+  verify_promise max_branching statement key proofs |> Promise.to_deferred
 
 (* This file (as you can see from the mli) defines a compiler which turns an inductive
    definition of a set into an inductive SNARK system for proving using those rules.
@@ -254,6 +257,8 @@ module type Proof_intf = sig
   val id : Verification_key.Id.t Lazy.t
 
   val verify : (statement * t) list -> bool Deferred.t
+
+  val verify_promise : (statement * t) list -> bool Promise.t
 end
 
 module Prover = struct
@@ -420,7 +425,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          , widthss
          , heightss
          , A_value.t
-         , (max_branching, max_branching) Proof.t Deferred.t )
+         , (max_branching, max_branching) Proof.t Promise.t )
          H3_2.T(Prover).t
          * _
          * _
@@ -707,7 +712,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
              , local_heights )
              H3.T(Statement_with_proof).t
           -> A_value.t
-          -> (Max_branching.n, Max_branching.n) Proof.t Deferred.t =
+          -> (Max_branching.n, Max_branching.n) Proof.t Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.branching in
@@ -738,7 +743,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             in
             M.f prevs
           in
-          let%bind.Deferred proof =
+          let%bind.Promise proof =
             step handler ~maxes:(module Maxes) prevs next_state
           in
           let proof =
@@ -752,7 +757,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 }
             }
           in
-          let%map.Deferred proof =
+          let%map.Promise proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
@@ -779,7 +784,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
              , xs3
              , xs4
              , A_value.t
-             , (max_branching, max_branching) Proof.t Deferred.t )
+             , (max_branching, max_branching) Proof.t Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -849,7 +854,7 @@ module Side_loaded = struct
 
   module Proof = Proof.Branching_max
 
-  let verify (type t) ~(value_to_field_elements : t -> _)
+  let verify_promise (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =
     let m =
       ( module struct
@@ -882,7 +887,7 @@ module Side_loaded = struct
               ; index =
                   ( match vk.wrap_vk with
                   | None ->
-                      return (Deferred.return false)
+                      return (Promise.return false)
                   | Some x ->
                       x )
               ; data =
@@ -892,9 +897,12 @@ module Side_loaded = struct
             in
             Verify.Instance.T (max_branching, m, vk, x, p))
         |> Verify.verify_heterogenous)
+
+  let verify ~value_to_field_elements ts =
+    verify_promise ~value_to_field_elements ts |> Promise.to_deferred
 end
 
-let compile :
+let compile_promise :
     type a_var a_value prev_varss prev_valuess widthss heightss max_branching branches.
        ?self:(a_var, a_value, max_branching, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
@@ -926,7 +934,7 @@ let compile :
          , widthss
          , heightss
          , a_value
-         , (max_branching, max_branching) Proof.t Deferred.t )
+         , (max_branching, max_branching) Proof.t Promise.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
      ~branches ~max_branching ~name ~constraint_constants ~choices ->
@@ -964,16 +972,37 @@ let compile :
 
     let verification_key = wrap_vk
 
-    let verify ts =
-      verify
+    let verify_promise ts =
+      verify_promise
         (module Max_branching)
         (module A_value)
         (Lazy.force verification_key)
         ts
 
+    let verify ts = verify_promise ts |> Promise.to_deferred
+
     let statement (T p : t) = p.statement.pass_through.app_state
   end in
   (self, cache_handle, (module P), provers)
+
+let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches ~max_branching
+    ~name ~constraint_constants ~choices =
+  let self, cache_handle, proof_module, provers =
+    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
+      ~max_branching ~name ~constraint_constants ~choices
+  in
+  let rec adjust_provers :
+      type a1 a2 a3 s1 s2_inner.
+         (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+      -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+    | [] ->
+        []
+    | prover :: tl ->
+        (fun ?handler stmt_with_proof public_input ->
+          Promise.to_deferred (prover ?handler stmt_with_proof public_input))
+        :: adjust_provers tl
+  in
+  (self, cache_handle, proof_module, adjust_provers provers)
 
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
@@ -1005,7 +1034,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile
+            compile_promise
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ
@@ -1053,17 +1082,18 @@ let%test_module "test no side-loaded" =
       in
       let b0 =
         Common.time "b0" (fun () ->
-            Run_in_thread.block_on_async_exn (fun () ->
+            Promise.block_on_async_exn (fun () ->
                 Blockchain_snark.step
                   [ (s_neg_one, b_neg_one); (s_neg_one, b_neg_one) ]
                   Field.Constant.zero))
       in
       assert (
-        Run_in_thread.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify [ (Field.Constant.zero, b0) ]) ) ;
+        Promise.block_on_async_exn (fun () ->
+            Blockchain_snark.Proof.verify_promise [ (Field.Constant.zero, b0) ])
+      ) ;
       let b1 =
         Common.time "b1" (fun () ->
-            Run_in_thread.block_on_async_exn (fun () ->
+            Promise.block_on_async_exn (fun () ->
                 Blockchain_snark.step
                   [ (Field.Constant.zero, b0); (Field.Constant.zero, b0) ]
                   Field.Constant.one))
@@ -1072,8 +1102,8 @@ let%test_module "test no side-loaded" =
 
     let%test_unit "verify" =
       assert (
-        Run_in_thread.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify xs) )
+        Promise.block_on_async_exn (fun () ->
+            Blockchain_snark.Proof.verify_promise xs) )
   end )
 
 (*

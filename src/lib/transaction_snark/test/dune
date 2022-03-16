@@ -3,8 +3,9 @@
  (libraries
    ;; opam libraries
    ppx_inline_test.config
-   async_unix
    async
+   async_kernel
+   async_unix
    core
    base
    core_kernel

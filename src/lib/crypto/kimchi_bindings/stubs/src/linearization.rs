@@ -1,6 +1,6 @@
 use kimchi::{
     circuits::expr::Linearization,
-    index::{constraints_expr, linearization_columns},
+    linearization::{constraints_expr, linearization_columns},
 };
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.

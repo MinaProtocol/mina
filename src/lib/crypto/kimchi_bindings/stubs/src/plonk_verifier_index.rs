@@ -1,7 +1,7 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
 use kimchi::circuits::gate::LookupsUsed;
-use kimchi::index::LookupVerifierIndex;
+use kimchi::verifier_index::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {

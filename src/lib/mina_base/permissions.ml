@@ -320,7 +320,7 @@ module Poly = struct
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
         }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -494,13 +494,14 @@ let auth_required =
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
     ~set_snapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
     ~set_voting_for:!.auth_required
-  |> finish ~name:"Permissions"
+  |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 let%test_unit "json roundtrip" =
   let open Fields_derivers_snapps.Derivers in
