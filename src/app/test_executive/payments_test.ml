@@ -138,23 +138,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
               ~command_type:Send_payment))
     in
-    let%bind () =
-      section "send a single payment between 2 untimed accounts"
-        (let amount = Currency.Amount.of_int 2_000_000_000 in
-         let fee = Currency.Fee.of_int 10_000_000 in
-         let receiver = untimed_node_a in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let sender = untimed_node_b in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let%bind { nonce; _ } =
-           Network.Node.must_send_payment ~logger sender ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee
-         in
-         wait_for t
-           (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-              ~command_type:Send_payment))
-    in
+    (* let%bind () =
+         section "send a single payment between 2 untimed accounts"
+           (let amount = Currency.Amount.of_int 2_000_000_000 in
+            let fee = Currency.Fee.of_int 10_000_000 in
+            let receiver = untimed_node_a in
+            let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+            let sender = untimed_node_b in
+            let%bind sender_pub_key = Util.pub_key_of_node sender in
+            let%bind { nonce; _ } =
+              Network.Node.must_send_payment ~logger sender ~sender_pub_key
+                ~receiver_pub_key ~amount ~fee
+            in
+            wait_for t
+              (Wait_condition.signed_command_to_be_included_in_frontier
+                 ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+                 ~command_type:Send_payment))
+       in *)
     let%bind () =
       section "send a single payment from timed account using available liquid"
         (let amount = Currency.Amount.of_int 3_000_000_000_000 in
