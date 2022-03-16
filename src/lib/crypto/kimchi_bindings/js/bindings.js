@@ -979,7 +979,7 @@ var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
 };
 
 // Provides: caml_fp_srs_b_poly_commitment
-// Requires: plonk_wasm, caml_vesta_poly_comm_of_rust
+// Requires: plonk_wasm, caml_vesta_poly_comm_of_rust, caml_u8array_vector_to_rust_flat_vector
 var caml_fp_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fp_srs_b_poly_commitment(srs, caml_u8array_vector_to_rust_flat_vector(chals));
     return caml_vesta_poly_comm_of_rust(res);
@@ -1052,7 +1052,7 @@ var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
 };
 
 // Provides: caml_fq_srs_b_poly_commitment
-// Requires: plonk_wasm, caml_pallas_poly_comm_of_rust
+// Requires: plonk_wasm, caml_pallas_poly_comm_of_rust, caml_u8array_vector_to_rust_flat_vector
 var caml_fq_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fq_srs_b_poly_commitment(srs, caml_u8array_vector_to_rust_flat_vector(chals));
     return caml_pallas_poly_comm_of_rust(res);
@@ -1522,10 +1522,11 @@ function linearization_of_rust(linearization, affine_class) {
     return [0, constant_term, index_terms];
 }
 
+// Provides: None
 var None = 0;
 
 // Provides: caml_plonk_verifier_index_of_rust
-// Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize
+// Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize, None
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     var domain = caml_plonk_domain_of_rust(x.domain);
     var max_poly_size = x.max_poly_size;
