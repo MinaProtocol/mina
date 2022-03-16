@@ -45,7 +45,8 @@ module Graphql_raw = struct
             ('row, 'c, 'ty, 'nullable) Input.t
       end
 
-      let add_field (type f f' ty ty' nullable1 nullable2) ~t_fields_annots :
+      let add_field (type f f' ty ty' nullable1 nullable2) ?skip_data
+          ~t_fields_annots :
              ('f_row, f', f, nullable1) Input.t
           -> ([< `Read | `Set_and_create ], _, _) Field.t_with_perm
           -> ('row, ty', ty, nullable2) Acc.t
@@ -57,47 +58,61 @@ module Graphql_raw = struct
             (Field.name field)
         in
         let ref_as_pipe = ref None in
+        let name =
+          Option.value annotations.name
+            ~default:(Fields_derivers.name_under_to_camel field)
+        in
         let arg =
-          Schema.Arg.arg
-            (Option.value annotations.name
-               ~default:(Fields_derivers.name_under_to_camel field))
-            ?doc:annotations.doc
+          Schema.Arg.arg name ?doc:annotations.doc
             ~typ:(!(f_input#graphql_arg) ())
         in
         let () =
           let inner_acc = acc#graphql_arg_accumulator in
-          match !inner_acc with
-          | Init ->
-              inner_acc :=
-                Acc
-                  { graphql_arg_coerce =
-                      (fun x ->
-                        ref_as_pipe := Some x ;
-                        !(acc#graphql_creator) acc)
-                  ; graphql_arg_fields = [ arg ]
-                  }
-          | Acc { graphql_arg_fields; graphql_arg_coerce } -> (
-              match graphql_arg_fields with
-              | [] ->
-                  inner_acc :=
-                    Acc
-                      { graphql_arg_coerce =
-                          (fun x ->
-                            ref_as_pipe := Some x ;
-                            !(acc#graphql_creator) acc)
-                      ; graphql_arg_fields = [ arg ]
-                      }
-              | _ ->
-                  inner_acc :=
-                    Acc
-                      { graphql_arg_coerce =
-                          (fun x ->
-                            ref_as_pipe := Some x ;
-                            graphql_arg_coerce)
-                      ; graphql_arg_fields = arg :: graphql_arg_fields
-                      } )
+          if annotations.skip then ()
+          else
+            match !inner_acc with
+            | Init ->
+                inner_acc :=
+                  Acc
+                    { graphql_arg_coerce =
+                        (fun x ->
+                          ref_as_pipe := Some x ;
+                          !(acc#graphql_creator) acc)
+                    ; graphql_arg_fields = [ arg ]
+                    }
+            | Acc { graphql_arg_fields; graphql_arg_coerce } -> (
+                match graphql_arg_fields with
+                | [] ->
+                    inner_acc :=
+                      Acc
+                        { graphql_arg_coerce =
+                            (fun x ->
+                              ref_as_pipe := Some x ;
+                              !(acc#graphql_creator) acc)
+                        ; graphql_arg_fields = [ arg ]
+                        }
+                | _ ->
+                    inner_acc :=
+                      Acc
+                        { graphql_arg_coerce =
+                            (fun x ->
+                              ref_as_pipe := Some x ;
+                              graphql_arg_coerce)
+                        ; graphql_arg_fields = arg :: graphql_arg_fields
+                        } )
         in
-        ( (fun _creator_input -> !(f_input#map) @@ Option.value_exn !ref_as_pipe)
+        ( (fun _creator_input ->
+            !(f_input#map)
+            @@
+            if annotations.skip then
+              match skip_data with
+              | Some data ->
+                  data
+              | None ->
+                  failwith
+                    "If you are skipping a field but intend on building this \
+                     field, you must provide skip_data to add_field!"
+            else Option.value_exn !ref_as_pipe)
         , acc )
 
       let finish name ~t_toplevel_annots (type ty result nullable) :
@@ -202,7 +217,7 @@ module Graphql_raw = struct
       module Accumulator = struct
         module T = struct
           type 'input_type t =
-            { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field }
+            { run : 'ctx. unit -> ('ctx, 'input_type) Schema.field option }
         end
 
         (** thunks generating the schema in reverse *)
@@ -228,17 +243,21 @@ module Graphql_raw = struct
         acc#graphql_fields_accumulator :=
           { Accumulator.T.run =
               (fun () ->
-                Schema.field
-                  (Option.value annotations.name
-                     ~default:(Fields_derivers.name_under_to_camel field))
-                  ~args:Schema.Arg.[]
-                  ?doc:annotations.doc
-                  ~deprecated:
-                    ( Option.map annotations.deprecated ~f:(fun msg ->
-                          Schema.Deprecated (Some msg))
-                    |> Option.value ~default:Schema.NotDeprecated )
-                  ~typ:(!(t_field#graphql_fields).Input.T.run ())
-                  ~resolve:(fun _ x -> !(t_field#contramap) (Field.get field x)))
+                if annotations.skip then None
+                else
+                  Schema.field
+                    (Option.value annotations.name
+                       ~default:(Fields_derivers.name_under_to_camel field))
+                    ~args:Schema.Arg.[]
+                    ?doc:annotations.doc
+                    ~deprecated:
+                      ( Option.map annotations.deprecated ~f:(fun msg ->
+                            Schema.Deprecated (Some msg))
+                      |> Option.value ~default:Schema.NotDeprecated )
+                    ~typ:(!(t_field#graphql_fields).Input.T.run ())
+                    ~resolve:(fun _ x ->
+                      !(t_field#contramap) (Field.get field x))
+                  |> Option.return)
           }
           :: rest ;
         ((fun _ -> failwith "Unused"), acc)
@@ -255,7 +274,7 @@ module Graphql_raw = struct
                 Schema.obj annotations.name ?doc:annotations.doc
                   ~fields:(fun _ ->
                     List.rev
-                    @@ List.map graphql_fields_accumulator ~f:(fun g ->
+                    @@ List.filter_map graphql_fields_accumulator ~f:(fun g ->
                            g.Accumulator.T.run ()))
                 |> Schema.non_null)
           }
@@ -266,7 +285,7 @@ module Graphql_raw = struct
                 Schema.obj annotations.name ?doc:annotations.doc
                   ~fields:(fun _ ->
                     List.rev
-                    @@ List.map graphql_fields_accumulator ~f:(fun g ->
+                    @@ List.filter_map graphql_fields_accumulator ~f:(fun g ->
                            g.Accumulator.T.run ())))
           }
         in
@@ -366,7 +385,8 @@ module Graphql_query = struct
 
   module Accumulator = struct
     type 'a t =
-      < graphql_query_accumulator : (string * string option) list ref ; .. >
+      < graphql_query_accumulator : (string * string option) option list ref
+      ; .. >
       as
       'a
       constraint 'a t = 'a Input.t
@@ -381,9 +401,12 @@ module Graphql_query = struct
     in
     let rest = !(acc_obj#graphql_query_accumulator) in
     acc_obj#graphql_query_accumulator :=
-      ( Option.value annotations.name
-          ~default:(Fields_derivers.name_under_to_camel field)
-      , !(t_field#graphql_query) )
+      ( if annotations.skip then None
+      else
+        Some
+          ( Option.value annotations.name
+              ~default:(Fields_derivers.name_under_to_camel field)
+          , !(t_field#graphql_query) ) )
       :: rest ;
     ((fun _ -> failwith "unused"), acc_obj)
 
@@ -392,8 +415,10 @@ module Graphql_query = struct
     obj#graphql_query :=
       Some
         (sprintf "{\n%s\n}"
-           ( List.map graphql_query_accumulator ~f:(fun (k, v) ->
-                 match v with None -> k | Some v -> sprintf "%s %s" k v)
+           ( List.filter_map graphql_query_accumulator
+               ~f:
+                 (Option.map ~f:(fun (k, v) ->
+                      match v with None -> k | Some v -> sprintf "%s %s" k v))
            |> List.rev |> String.concat ~sep:"\n" )) ;
     obj
 
@@ -558,7 +583,7 @@ let%test_module "Test" =
       hit_server (query_schema typ v)
 
     let hit_server_args (arg_typ : 'a Schema.Arg.arg_typ) =
-      hit_server
+      hit_server ~print:true
         Schema.(
           field "args" ~typ:(non_null int)
             ~args:Arg.[ arg "input" ~typ:arg_typ ]
@@ -567,10 +592,14 @@ let%test_module "Test" =
 
     module T1 = struct
       (** T1 is foo *)
-      type t = { foo_hello : int option; bar : string list [@name "bar1"] }
+      type t =
+        { foo_hello : int option
+        ; skipped : int [@skip]
+        ; bar : string list [@name "bar1"]
+        }
       [@@deriving annot, fields]
 
-      let _v = { foo_hello = Some 1; bar = [ "baz1"; "baz2" ] }
+      let _v = { foo_hello = Some 1; skipped = 0; bar = [ "baz1"; "baz2" ] }
 
       let doc = "T1 is foo"
 
@@ -592,6 +621,7 @@ let%test_module "Test" =
         let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
         Fields.make_creator init
           ~foo_hello:!.(option @@ int @@ o ())
+          ~skipped:!.int
           ~bar:!.(list @@ string @@ o ())
         |> finish "T1" ~t_toplevel_annots
 
@@ -603,13 +633,16 @@ let%test_module "Test" =
                 [ arg "bar1" ~typ:(non_null (list (non_null string)))
                 ; arg "fooHello" ~typ:int
                 ]
-              ~coerce:(fun bar foo_hello -> { bar; foo_hello }))
+              ~coerce:(fun bar foo_hello -> { bar; skipped = 0; foo_hello }))
 
         let derived init =
           let open Graphql_args in
-          let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
+          let ( !. ) ?skip_data x fd acc =
+            add_field ?skip_data ~t_fields_annots (x (o ())) fd acc
+          in
           Fields.make_creator init
             ~foo_hello:!.(option @@ int @@ o ())
+            ~skipped:(( !. ) ~skip_data:0 int)
             ~bar:!.(list @@ string @@ o ())
           |> finish "T1" ~t_toplevel_annots
       end
@@ -620,6 +653,7 @@ let%test_module "Test" =
           let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
           Fields.make_creator init
             ~foo_hello:!.(option @@ int @@ o ())
+            ~skipped:!.int
             ~bar:!.(list @@ string @@ o ())
           |> finish
       end
@@ -657,7 +691,10 @@ let%test_module "Test" =
       type t = { foo : T1.t Or_ignore_test.t } [@@deriving annot, fields]
 
       let v1 =
-        { foo = Check { T1.foo_hello = Some 1; bar = [ "baz1"; "baz2" ] } }
+        { foo =
+            Check
+              { T1.foo_hello = Some 1; skipped = 0; bar = [ "baz1"; "baz2" ] }
+        }
 
       let v2 = { foo = Ignore }
 
