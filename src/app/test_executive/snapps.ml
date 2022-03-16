@@ -517,7 +517,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            send_padding_transactions block_producer_nodes ~fee ~logger
              ~n:padding_payments
          in
-         wait_for t (ledger_proofs_emitted ~logger ~num_proofs:2))
+         wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()
 end
