@@ -25,5 +25,5 @@
    (setenv
      RUSTFLAGS
      "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-    (run rustup run nightly-2021-10-31 wasm-pack build --target web --out-dir ../js/chrome ../../wasm -- -Z build-std=panic_abort,std))
+    (run rustup run nightly-2021-11-16 wasm-pack build --target web --out-dir ../js/chrome ../../wasm -- -Z build-std=panic_abort,std))
    (write-file flags.sexp "()"))))
