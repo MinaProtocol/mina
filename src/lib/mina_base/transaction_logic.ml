@@ -363,7 +363,7 @@ module type S = sig
            , ledger
            , bool
            , unit
-           , Transaction_status.Failure.t option )
+           , Transaction_status.Failure.Table.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
@@ -396,7 +396,7 @@ module type S = sig
                , ledger
                , bool
                , unit
-               , Transaction_status.Failure.t option )
+               , Transaction_status.Failure.Table.t )
                Parties_logic.Local_state.t
           -> 'acc)
     -> ?fee_excess:Amount.Signed.t
@@ -1365,18 +1365,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let all = List.for_all ~f:Fn.id
 
-      type failure_status = Transaction_status.Failure.t option
+      type single_failure_status = Transaction_status.Failure.t option
+
+      type failure_status = Transaction_status.Failure.Table.t
 
       let assert_with_failure_status b failure_status =
-        match (b, failure_status) with
-        | false, Some failure ->
-            (* Raise a more useful error message if we have a failure
-               description.
-            *)
-            Error.raise
-              (Error.of_string @@ Transaction_status.Failure.to_string failure)
-        | _ ->
-            assert b
+        if b && (not @@ Hashtbl.is_empty failure_status) then failwith ""
+          (* Raise a more useful error message if we have a failure
+                description. *)
+        else assert b
     end
 
     module Ledger = struct
@@ -1835,22 +1832,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , Bool.failure_status )
         Parties_logic.Local_state.t
 
-      let add_check (t : t) failure b =
-        let failure_status =
-          match t.failure_status with
-          | None when not b ->
-              Some failure
-          | old_failure_status ->
-              old_failure_status
-        in
-        { t with failure_status; success = t.success && b }
+      let add_check (t : t) public_key failure b =
+        if not b then
+          Hashtbl.add_multi t.failure_status ~key:public_key ~data:failure
+        else () ;
+        t
 
-      let update_failure_status (t : t) failure_status b =
+      let update_failure_status (t : t) public_key failure_status b =
         match failure_status with
         | None ->
             { t with success = t.success && b }
         | Some failure ->
-            add_check (t : t) failure b
+            add_check t public_key failure b
     end
   end
 
@@ -1947,7 +1940,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; excess = Currency.Amount.zero
         ; ledger
         ; success = true
-        ; failure_status = None
+        ; failure_status = Signature_lib.Public_key.Compressed.Table.create ()
         } )
     in
     let user_acc = f init initial_state in

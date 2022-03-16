@@ -45,6 +45,57 @@ module Failure = struct
     end
   end]
 
+  module Assoc = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          (Signature_lib.Public_key.Compressed.Stable.V1.t * Stable.V1.t list)
+          list
+        [@@deriving equal, compare, to_yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Table = struct
+    [%%versioned_binable
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Signature_lib.Public_key.Compressed.Stable.V1.t
+          , Stable.V1.t list )
+          Hashtbl.t
+
+        let to_latest = Fn.id
+
+        let to_assoc = Hashtbl.to_alist
+
+        let of_assoc =
+          Hashtbl.of_alist_exn (module Signature_lib.Public_key.Compressed)
+
+        let to_yojson t = to_assoc t |> Assoc.to_yojson
+
+        let equal t u = Assoc.equal (to_assoc t) (to_assoc u)
+
+        let compare t u = Assoc.compare (to_assoc t) (to_assoc u)
+
+        include Binable.Of_binable
+                  (Assoc.Stable.V1)
+                  (struct
+                    type nonrec t = t
+
+                    let to_binable = to_assoc
+
+                    let of_binable = of_assoc
+                  end)
+      end
+    end]
+
+    [%%define_locally Stable.Latest.(to_yojson, equal, compare)]
+  end
+
   type failure = t
 
   let failure_min = min

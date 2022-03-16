@@ -43,8 +43,8 @@ let display
       @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
   ; failure_status =
-      Option.value_map failure_status ~default:"<no failure>"
-        ~f:Transaction_status.Failure.to_string
+      Transaction_status.Failure.Table.to_yojson failure_status
+      |> Yojson.Safe.to_string
   }
 
 let dummy : t =
@@ -56,7 +56,7 @@ let dummy : t =
   ; excess = Amount.zero
   ; ledger = Frozen_ledger_hash.empty_hash
   ; success = true
-  ; failure_status = None
+  ; failure_status = Signature_lib.Public_key.Compressed.Table.create ()
   }
 
 let empty = dummy
@@ -69,10 +69,13 @@ let gen : t Quickcheck.Generator.t =
   and parties = Impl.Field.Constant.gen
   and call_stack = Impl.Field.Constant.gen
   and token_id = Token_id.gen
-  and success = Bool.quickcheck_generator
+  and success =
+    Bool.quickcheck_generator
+    (*
   and failure_status =
     let%bind failure = Transaction_status.Failure.gen in
     Quickcheck.Generator.of_list [ None; Some failure ]
+  *)
   in
   { Parties_logic.Local_state.parties
   ; call_stack
@@ -82,7 +85,7 @@ let gen : t Quickcheck.Generator.t =
   ; ledger
   ; excess
   ; success
-  ; failure_status
+  ; failure_status = Signature_lib.Public_key.Compressed.Table.create ()
   }
 
 let to_input
@@ -171,11 +174,10 @@ end
    (an alternative would be to fail, since we intend never to do that,
    and it would make debugging difficult if we ever did that)
 *)
-let failure_status_typ : (unit, Transaction_status.Failure.t option) Impl.Typ.t
-    =
+let failure_status_typ : (unit, Transaction_status.Failure.Table.t) Impl.Typ.t =
   Impl.Typ.transport Impl.Typ.unit
     ~there:(fun _failure_status -> ())
-    ~back:(fun () -> None)
+    ~back:(fun () -> Signature_lib.Public_key.Compressed.Table.create ())
 
 let typ : (Checked.t, t) Impl.Typ.t =
   let open Parties_logic.Local_state in

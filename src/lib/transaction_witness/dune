@@ -11,6 +11,7 @@
    core
    ;; local libraries
    currency
+   signature_lib
    mina_ledger
    mina_state
    mina_base

@@ -230,7 +230,7 @@ val apply_parties_unchecked :
          , t
          , bool
          , unit
-         , Transaction_status.Failure.t option )
+         , Transaction_status.Failure.Table.t )
          Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t

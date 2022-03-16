@@ -94,7 +94,7 @@ val apply_parties_unchecked_with_states :
          , t
          , bool
          , unit
-         , Transaction_status.Failure.t option )
+         , Transaction_status.Failure.Table.t )
          Parties_logic.Local_state.t )
        list )
      Or_error.t

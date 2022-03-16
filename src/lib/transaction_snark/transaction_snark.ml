@@ -1319,6 +1319,8 @@ module Base = struct
 
           let display _b ~label:_ = ""
 
+          type single_failure_status = unit
+
           type failure_status = unit
 
           let assert_with_failure_status b _failure_status = Assert.is_true b
@@ -2049,11 +2051,11 @@ module Base = struct
             , Bool.failure_status )
             Parties_logic.Local_state.t
 
-          let add_check (t : t) _failure b =
+          let add_check (t : t) _public_key _failure b =
             { t with success = Bool.(t.success &&& b) }
 
-          let update_failure_status (t : t) _failure_status b =
-            add_check (t : t) () b
+          let update_failure_status (t : t) _public_key _failure_status b =
+            add_check (t : t) _public_key () b
         end
 
         module Global_state = struct
@@ -3676,7 +3678,7 @@ type local_state =
   , Sparse_ledger.t
   , bool
   , unit
-  , Transaction_status.Failure.t option )
+  , Transaction_status.Failure.Table.t )
   Parties_logic.Local_state.t
 
 type global_state = Sparse_ledger.Global_state.t

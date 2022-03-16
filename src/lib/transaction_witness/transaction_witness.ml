@@ -21,7 +21,7 @@ module Parties_segment_witness = struct
             , Sparse_ledger.Stable.V2.t
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-            , Transaction_status.Failure.Stable.V1.t option )
+            , Transaction_status.Failure.Table.Stable.V1.t )
             Parties_logic.Local_state.Stable.V1.t
         ; start_parties :
             ( Parties.Stable.V1.t
