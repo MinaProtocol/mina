@@ -60,6 +60,26 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> raw_signature:string
+        -> signed_command_result Deferred.Or_error.t
+
+      val must_send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> raw_signature:string
+        -> signed_command_result Malleable_error.t
+
       val send_delegation :
            logger:Logger.t
         -> t
