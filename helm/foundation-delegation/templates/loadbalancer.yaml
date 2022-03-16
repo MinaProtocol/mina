@@ -20,12 +20,15 @@ kind: Ingress
 metadata:
   name: {{ template "foundation-delegation.fullname" . }}-ingress
   annotations: 
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: "nginx"
 spec:
   tls:
   - secretName: {{ .Values.backend.tlsSecret }}
+    hosts:
+      - uptime.minaprotocol.com
   rules:
-  - http:
+  - host: uptime.minaprotocol.com
+    http:
       paths:
       - path: /
         pathType: Prefix
