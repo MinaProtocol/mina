@@ -406,15 +406,14 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
    The type `b` is associated with the `use_full_commitment` field, which is
    `unit` for the fee payer, and `bool` for other parties.
 *)
-let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
+let gen_party_body ?account_id ?balances_tbl ?(new_account = false)
     ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option)
+    ?permissions_auth ?(required_balance_change : _ option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
-    ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
-    ~(gen_use_full_commitment : b Quickcheck.Generator.t)
-    ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
-    ~ledger () :
-    (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
+    ~(gen_balance_change : Account.t -> _ Quickcheck.Generator.t)
+    ~(gen_use_full_commitment : _ Quickcheck.Generator.t)
+    ~(f_balance_change : _ -> Currency.Amount.Signed.t) ~increment_nonce ~ledger
+    () : Party.Body.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
@@ -612,7 +611,7 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
       ~default:(return Snapp_predicate.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
-  { Party.Body.Poly.public_key
+  { Party.Body.public_key
   ; update
   ; token_id
   ; balance_change
@@ -640,8 +639,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
       ?protocol_state_view
   in
   let account_id =
-    Account_id.create body.Party.Body.Poly.public_key
-      body.Party.Body.Poly.token_id
+    Account_id.create body.Party.Body.public_key body.Party.Body.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   { Party.Predicated.Poly.body; predicate }
