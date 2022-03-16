@@ -2,7 +2,7 @@ use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::prover::ProverProof;
-use kimchi::{index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof};
+use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use oracle::{
     self,
     poseidon::PlonkSpongeConstantsKimchi,
@@ -30,7 +30,7 @@ macro_rules! impl_oracles {
                 index: $index,
                 proof: CamlProverProof<$CamlG, $CamlF>,
             ) -> CamlOracles<$CamlF> {
-                let index: DlogVerifierIndex<$G> = index.into();
+                let index: VerifierIndex<$G> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()

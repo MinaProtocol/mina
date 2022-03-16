@@ -147,33 +147,7 @@ module Node = struct
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp =
-    [%graphql
-    {|
-         mutation ($parties: SendTestSnappInput!) {
-          sendTestSnapp(parties: $parties) {
-               snapp { id
-                       hash
-                       nonce
-                       failureReason
-                     }
-             }
-         }
-       |}]
-
-    module Send_snapp =
-    [%graphql
-    {|
-      mutation ($feePayer: SnappPartyFeePayer!,$otherParties : [SnappParty!]!, $memo : String!) {
-       sendSnapp(input: {feePayer: $feePayer, otherParties: $otherParties, memo : $memo}) {
-            snapp { id
-                    hash
-                    nonce
-                    failureReason
-                  }
-          }
-      }
-    |}]
+    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
 
     module Get_balance =
     [%graphql
@@ -182,6 +156,8 @@ module Node = struct
         account(publicKey: $public_key, token: $token) {
           balance {
             total @bsDecoder(fn: "Decoders.balance")
+            liquid @bsDecoder(fn: "Decoders.optional_balance")
+            locked @bsDecoder(fn: "Decoders.optional_balance")
           }
         }
       }
@@ -349,7 +325,7 @@ module Node = struct
   let must_get_best_chain ~logger t =
     get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let get_balance ~logger t ~account_id =
+  let make_get_balance ~f ~logger t ~account_id =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
@@ -373,10 +349,24 @@ module Node = struct
           !"Account with %{sexp:Mina_base.Account_id.t} not found"
           account_id
     | Some acc ->
-        return acc#balance#total
+        return (f acc#balance)
 
-  let must_get_balance ~logger t ~account_id =
-    get_balance ~logger t ~account_id
+  let get_balance_total = make_get_balance ~f:(fun balance -> balance#total)
+
+  let must_get_balance_total ~logger t ~account_id =
+    get_balance_total ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_balance_liquid = make_get_balance ~f:(fun balance -> balance#liquid)
+
+  let must_get_balance_liquid ~logger t ~account_id =
+    get_balance_liquid ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_balance_locked = make_get_balance ~f:(fun balance -> balance#locked)
+
+  let must_get_balance_locked ~logger t ~account_id =
+    get_balance_locked ~logger t ~account_id
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_account ~logger t ~account_id =
@@ -674,7 +664,8 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+  let send_snapp ~logger ?(unlock = true) (t : t)
+      ~(parties : Mina_base.Parties.t) =
     [%log info] "Sending a snapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
@@ -687,18 +678,23 @@ module Node = struct
     in
     [%log info] "send_snapp: unlocking fee payer account"
       ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
-    let unlock_sender_account_graphql () =
-      let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:node_password
-          ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
-          ()
+    let%bind _unlock_acct_obj =
+      let unlock_sender_account_graphql () =
+        let unlock_account_obj =
+          Graphql.Unlock_account.make ~password:node_password
+            ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
+            ()
+        in
+        exec_graphql_request ~logger ~node:t
+          ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
       in
-      exec_graphql_request ~logger ~node:t
-        ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
+      if unlock then
+        let%map _result = unlock_sender_account_graphql () in
+        ()
+      else return ()
     in
-    let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let parties_json =
-      Mina_base.Parties.to_yojson parties |> Yojson.Safe.to_basic
+      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
     let send_snapp_graphql () =
       let send_snapp_obj =
@@ -709,13 +705,13 @@ module Node = struct
     in
     let%bind sent_snapp_obj = send_snapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#sendTestSnapp#snapp#failureReason with
+      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
       | None ->
           return ()
       | Some s ->
           Deferred.Or_error.errorf "Snapp failed, reason: %s" s
     in
-    let snapp_id = sent_snapp_obj#sendTestSnapp#snapp#id in
+    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
     [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
     return snapp_id
 

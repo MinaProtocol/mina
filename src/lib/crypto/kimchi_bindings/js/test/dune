@@ -1,0 +1,8 @@
+(library
+ (name bindings_js_test)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+; (libraries zexe_backend.js marlin_plonk_bindings js_of_ocaml bindings_js node_backend integers_stubs_js)
+; (link_deps ../node_js/plonk_wasm.js ../node_js/plonk_wasm.wasm)
+ (libraries zexe_backend zexe_backend.js marlin_plonk_bindings js_of_ocaml bindings_js integers_stubs_js)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))

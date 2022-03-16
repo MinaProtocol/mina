@@ -21,7 +21,7 @@ module Closed_interval = struct
   module Stable = struct
     module V1 = struct
       type 'a t = { lower : 'a; upper : 'a }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -41,8 +41,9 @@ module Closed_interval = struct
 
   let deriver ~name inner obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~lower:!.inner ~upper:!.inner
-    |> finish ~name:(name ^ "Interval")
+    |> finish (name ^ "Interval") ~t_toplevel_annots
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -223,14 +224,16 @@ module Numeric = struct
 
       module T = struct
         type t = { foo : Int_numeric.t }
-        [@@deriving sexp, equal, compare, fields]
+        [@@deriving annot, sexp, equal, compare, fields]
 
         let v : t =
           { foo = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 } }
 
         let deriver obj =
           let open Fields_derivers_snapps.Derivers in
-          Fields.make_creator obj ~foo:!.(deriver "Int" int) |> finish ~name:"T"
+          let ( !. ) = ( !. ) ~t_fields_annots in
+          Fields.make_creator obj ~foo:!.(deriver "Int" int)
+          |> finish "T" ~t_toplevel_annots
       end
 
       let%test_unit "roundtrip json" =
@@ -473,7 +476,7 @@ module Account = struct
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
 
       module V1 = struct
@@ -485,7 +488,7 @@ module Account = struct
           ; delegate : 'pk
           ; state : 'field Snapp_state.V.Stable.V1.t
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare]
       end
     end]
   end
@@ -578,6 +581,7 @@ module Account = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
@@ -586,7 +590,7 @@ module Account = struct
       ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish ~name:"AccountPredicate"
+    |> finish "AccountPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
@@ -833,17 +837,22 @@ module Protocol_state = struct
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
       let ledger obj' =
+        let ( !. ) =
+          ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
+        in
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.Numeric.Derivers.amount
-        |> finish ~name:"EpochLedgerPredicate"
+        |> finish "EpochLedgerPredicate"
+             ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
+      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~ledger:!.ledger
         ~seed:!.(Or_ignore.deriver field)
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
         ~epoch_length:!.Numeric.Derivers.length
-      |> finish ~name:"EpochDataPredicate"
+      |> finish "EpochDataPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let f = Or_ignore.Check Field.one in
@@ -973,7 +982,7 @@ module Protocol_state = struct
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -999,6 +1008,7 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
       ~snarked_next_available_token:!.Numeric.Derivers.token_id
@@ -1010,7 +1020,7 @@ module Protocol_state = struct
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
-    |> finish ~name:"ProtocolStatePredicate"
+    |> finish "ProtocolStatePredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in

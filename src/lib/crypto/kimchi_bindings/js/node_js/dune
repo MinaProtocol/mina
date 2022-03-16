@@ -1,0 +1,28 @@
+(library
+ (name node_backend)
+ (js_of_ocaml
+  (flags (:include flags.sexp))
+  (javascript_files node_backend.js))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets
+   plonk_wasm_bg.wasm.d.ts
+   plonk_wasm_bg.wasm
+   plonk_wasm.d.ts
+   plonk_wasm.js
+   flags.sexp)
+ (deps
+  (source_tree ../../wasm)
+  (source_tree ../../wasm/.cargo/config)
+  (source_tree ../../../../../external/wasm-bindgen-rayon)
+  (source_tree ../../../proof-systems) )
+ (action
+  (progn
+   (run chmod -R +w ../../wasm)
+   (setenv
+     RUSTFLAGS
+     "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+    (run rustup run nightly-2021-10-31 wasm-pack build --target nodejs --out-dir ../js/node_js ../../wasm -- -Z build-std=panic_abort,std --features nodejs))
+   (write-file flags.sexp "()"))))
