@@ -13,7 +13,8 @@ module To_yojson = struct
 
   module Accumulator = struct
     type ('input_type, 'a, 'c) t =
-      < to_json_accumulator : (string * ('input_type -> Yojson.Safe.t)) list ref
+      < to_json_accumulator :
+          (string * ('input_type -> Yojson.Safe.t)) option list ref
       ; .. >
       as
       'a
@@ -27,10 +28,13 @@ module To_yojson = struct
     in
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
-      ( Option.value annotations.name
-          ~default:(Fields_derivers.name_under_to_camel field)
-      , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
-      )
+      ( if annotations.skip then None
+      else
+        ( Option.value annotations.name
+            ~default:(Fields_derivers.name_under_to_camel field)
+        , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
+        )
+        |> Option.return )
       :: rest ;
     ((fun _ -> failwith "Unused"), acc)
 
@@ -40,7 +44,8 @@ module To_yojson = struct
     (obj#to_json :=
        fun t ->
          `Assoc
-           ( List.map to_json_accumulator ~f:(fun (name, f) -> (name, f t))
+           ( List.filter_map to_json_accumulator
+               ~f:(Option.map ~f:(fun (name, f) -> (name, f t)))
            |> List.rev )) ;
     obj
 
@@ -94,7 +99,7 @@ module Of_yojson = struct
 
   exception Field_not_found of string
 
-  let add_field ~t_fields_annots :
+  let add_field ?skip_data ~t_fields_annots :
       ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
     let annotations =
@@ -109,10 +114,10 @@ module Of_yojson = struct
               Option.value annotations.name
                 ~default:(Fields_derivers.name_under_to_camel field)
             in
-            match Map.find map name with
-            | None ->
+            match (Map.find map name, skip_data) with
+            | None, None ->
                 raise (Field_not_found name)
-            | Some x ->
+            | Some x, _ | _, Some x ->
                 x))
     in
     (creator, acc_obj)
