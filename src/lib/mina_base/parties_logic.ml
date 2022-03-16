@@ -184,7 +184,7 @@ module Local_state = struct
           , Parties.Transaction_commitment.Stable.V1.t
           , Transaction_status.Failure.Table.Stable.V1.t )
           Stable.V1.t
-        [@@deriving equal, compare, to_yojson]
+        [@@deriving equal, compare, hash, yojson, sexp]
 
         let to_latest = Fn.id
       end

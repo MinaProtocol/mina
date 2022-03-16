@@ -52,7 +52,7 @@ module Failure = struct
         type t =
           (Signature_lib.Public_key.Compressed.Stable.V1.t * Stable.V1.t list)
           list
-        [@@deriving equal, compare, to_yojson]
+        [@@deriving equal, compare, yojson, sexp, hash]
 
         let to_latest = Fn.id
       end
@@ -77,9 +77,19 @@ module Failure = struct
 
         let to_yojson t = to_assoc t |> Assoc.to_yojson
 
+        let of_yojson t = Assoc.of_yojson t |> Result.map ~f:of_assoc
+
+        let sexp_of_t t = to_assoc t |> Assoc.sexp_of_t
+
+        let t_of_sexp t = Assoc.t_of_sexp t |> of_assoc
+
         let equal t u = Assoc.equal (to_assoc t) (to_assoc u)
 
         let compare t u = Assoc.compare (to_assoc t) (to_assoc u)
+
+        let hash t = to_assoc t |> Assoc.hash
+
+        let hash_fold_t state t = to_assoc t |> Assoc.hash_fold_t state
 
         include Binable.Of_binable
                   (Assoc.Stable.V1)
@@ -93,7 +103,9 @@ module Failure = struct
       end
     end]
 
-    [%%define_locally Stable.Latest.(to_yojson, equal, compare)]
+    [%%define_locally
+    Stable.Latest.
+      (to_yojson, of_yojson, sexp_of_t, t_of_sexp, equal, compare, hash)]
   end
 
   type failure = t

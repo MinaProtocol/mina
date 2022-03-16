@@ -1370,9 +1370,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type failure_status = Transaction_status.Failure.Table.t
 
       let assert_with_failure_status b failure_status =
-        if b && (not @@ Hashtbl.is_empty failure_status) then failwith ""
+        if b && (not @@ Hashtbl.is_empty failure_status) then
           (* Raise a more useful error message if we have a failure
                 description. *)
+          Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
+          @@ Transaction_status.Failure.Table.to_yojson failure_status
         else assert b
     end
 
