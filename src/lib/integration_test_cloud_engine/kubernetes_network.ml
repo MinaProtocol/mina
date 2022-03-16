@@ -142,16 +142,17 @@ module Node = struct
     module Send_payment_with_raw_sig =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64!,
-      $fee: UInt64!,
-      $nonce: UInt32!,
-      $memo: String!,
-      $validUntil: UInt32!,
-      $rawSignature: String!
-      ) 
+      mutation (
+        $sender: PublicKey!,
+        $receiver: PublicKey!,
+        $amount: UInt64!,
+        $token: UInt64!,
+        $fee: UInt64!,
+        $nonce: UInt32!,
+        $memo: String!,
+        $validUntil: UInt32!,
+        $rawSignature: String!
+      )
       {
         sendPayment(
           input:
@@ -161,7 +162,6 @@ module Node = struct
           signature: {rawSignature: $rawSignature}
         )
         {
-          
           payment {
             id
             nonce
