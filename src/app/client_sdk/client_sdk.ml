@@ -8,7 +8,6 @@ open Mina_base
 open Rosetta_lib
 open Rosetta_coding
 open Js_util
-open Fields_derivers_snapps
 
 let _ =
   Js.export "minaSDK"
@@ -42,9 +41,7 @@ let _ =
            |> Yojson.Safe.Util.member "otherParties"
          in
          let other_parties =
-           of_json
-             ((list @@ Party.deriver @@ o ()) @@ derivers ())
-             other_parties_json
+           Parties.other_parties_deriver_from_json other_parties_json
          in
          let other_parties_data =
            List.map (fun (party : Party.t) -> party.data) other_parties
@@ -83,9 +80,8 @@ let _ =
            in
            { fee_payer with authorization = fee_payer_signature_auth }
          in
-         let parties = { Parties.fee_payer; other_parties; memo } in
-         to_json (Parties.deriver @@ derivers ()) parties
-         |> Yojson.Safe.to_string
+         { Parties.fee_payer; other_parties; memo }
+         |> Parties.parties_deriver_to_json |> Yojson.Safe.to_string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =

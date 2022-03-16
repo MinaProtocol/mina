@@ -434,6 +434,14 @@ let deriver obj =
 
 let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
 
+let other_parties_deriver_from_json json =
+  Fields_derivers_snapps.(
+    of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()))
+    json
+
+let parties_deriver_to_json other_parties =
+  Fields_derivers_snapps.(to_json (deriver @@ derivers ())) other_parties
+
 let%test_module "Test" =
   ( module struct
     let dummy =

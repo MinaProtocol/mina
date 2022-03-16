@@ -2,7 +2,7 @@
 const JSOfOCaml_SDK = require("./client_sdk.bc.js");
 const minaSDK = JSOfOCaml_SDK.minaSDK;
 
-import {
+import type {
   Network,
   PublicKey,
   Keypair,

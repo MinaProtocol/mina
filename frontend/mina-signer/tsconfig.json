@@ -2,11 +2,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "es5",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "declaration": true,
     "noImplicitAny": false,
     "noEmitOnError": true,
@@ -22,17 +18,11 @@
     "noImplicitThis": true,
     "noImplicitReturns": true,
     "strictNullChecks": true,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "strictPropertyInitialization": true,
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/*.bc.js"
-  ]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/*.bc.js"]
 }
