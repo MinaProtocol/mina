@@ -681,7 +681,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBodyInput",
-          "description": "Body component of a snapp Fee Payer Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -1070,9 +1070,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedFeePayerInput",
-          "description":
-            "A party to a snapp transaction with a nonce predicate",
+          "name": "ZkappPartyPredicatedFeePayerInput",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -1143,9 +1142,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyFeePayerInput",
-          "description":
-            "A party to a snapp transaction with a signature authorization",
+          "name": "ZkappPartyFeePayerInput",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -1156,7 +1154,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPredicatedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1189,7 +1187,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPredicatedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1217,7 +1215,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "VerificationKeyWithHashInput",
-          "description": "Verification key with hash",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -1972,7 +1970,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "Balance ChangeInput",
+          "name": "BalanceChangeInput",
           "description": null,
           "fields": [
             {
@@ -2735,7 +2733,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBodyInput",
-          "description": "Body component of a snapp Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -2794,7 +2792,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Balance ChangeInput",
+                  "name": "BalanceChangeInput",
                   "ofType": null
                 }
               },
@@ -2993,7 +2991,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Balance ChangeInput",
+                  "name": "BalanceChangeInput",
                   "ofType": null
                 }
               },
@@ -3568,8 +3566,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyInput",
-          "description": "A party to a snapp transaction",
+          "name": "ZkappPartyInput",
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "data",
@@ -3652,7 +3650,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyFeePayerInput",
+                  "name": "ZkappPartyFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3674,7 +3672,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SnappPartyInput",
+                      "name": "ZkappPartyInput",
                       "ofType": null
                     }
                   }
@@ -3709,7 +3707,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyFeePayerInput",
+                  "name": "ZkappPartyFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3729,7 +3727,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SnappPartyInput",
+                      "name": "ZkappPartyInput",
                       "ofType": null
                     }
                   }
@@ -6962,7 +6960,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Balance Change",
+          "name": "BalanceChange",
           "description": null,
           "fields": [
             {
@@ -7006,7 +7004,7 @@
         {
           "kind": "OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a snapp Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -7065,7 +7063,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Balance Change",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -7263,8 +7261,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappParty",
-          "description": "A party to a snapp transaction",
+          "name": "ZkappParty",
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "data",
@@ -8080,7 +8078,7 @@
         {
           "kind": "OBJECT",
           "name": "VerificationKeyWithHash",
-          "description": "Verification key with hash",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -8242,7 +8240,7 @@
         {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a snapp Fee Payer Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -8452,9 +8450,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyPredicatedFeePayer",
-          "description":
-            "A party to a snapp transaction with a nonce predicate",
+          "name": "ZkappPartyPredicatedFeePayer",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -8496,9 +8493,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyFeePayer",
-          "description":
-            "A party to a snapp transaction with a signature authorization",
+          "name": "ZkappPartyFeePayer",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -8509,7 +8505,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyPredicatedFeePayer",
+                  "name": "ZkappPartyPredicatedFeePayer",
                   "ofType": null
                 }
               },
@@ -8552,7 +8548,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyFeePayer",
+                  "name": "ZkappPartyFeePayer",
                   "ofType": null
                 }
               },
@@ -8574,7 +8570,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappParty",
+                      "name": "ZkappParty",
                       "ofType": null
                     }
                   }

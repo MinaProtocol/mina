@@ -220,21 +220,30 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ((list @@ inner @@ o ()) (o ()))
       obj
 
-  let add_field (x : _ Unified_input.t) fd acc =
-    let _, acc' = Graphql.Fields.add_field x fd acc in
-    let c1, acc'' = Graphql.Args.add_field x fd acc' in
-    let _, acc''' = Fields_derivers_json.To_yojson.add_field x fd acc'' in
-    let c2, acc'''' = Fields_derivers_json.Of_yojson.add_field x fd acc''' in
+  let add_field ~t_fields_annots (x : _ Unified_input.t) fd acc =
+    let _, acc' = Graphql.Fields.add_field ~t_fields_annots x fd acc in
+    let c1, acc'' = Graphql.Args.add_field ~t_fields_annots x fd acc' in
+    let _, acc''' =
+      Fields_derivers_json.To_yojson.add_field ~t_fields_annots x fd acc''
+    in
+    let c2, acc'''' =
+      Fields_derivers_json.Of_yojson.add_field ~t_fields_annots x fd acc'''
+    in
     let _, acc''''' =
-      Fields_derivers_graphql.Graphql_query.add_field x fd acc''''
+      Fields_derivers_graphql.Graphql_query.add_field ~t_fields_annots x fd
+        acc''''
     in
     ((function `Left x -> c1 x | `Right x -> c2 x), acc''''')
 
   let ( !. ) x fd acc = add_field (x @@ o ()) fd acc
 
-  let finish ~name ?doc (f, acc) =
-    let _a = Graphql.Fields.finish ~name ?doc ((fun x -> f (`Left x)), acc) in
-    let _b = Graphql.Args.finish ~name ?doc ((fun x -> f (`Left x)), acc) in
+  let finish name ~t_toplevel_annots (f, acc) =
+    let _a =
+      Graphql.Fields.finish name ~t_toplevel_annots ((fun x -> f (`Left x)), acc)
+    in
+    let _b =
+      Graphql.Args.finish name ~t_toplevel_annots ((fun x -> f (`Left x)), acc)
+    in
     let _c =
       Fields_derivers_json.To_yojson.finish ((fun x -> f (`Right x)), acc)
     in
@@ -439,9 +448,13 @@ let verification_key_with_hash obj =
         ~of_string:(except ~f:of_base58_check_exn `Verification_key)
         ~doc:"Verification key in Base58Check format")
   in
+  let ( !. ) =
+    ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
+  in
   With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
     ~hash:!.field obj
-  |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
+  |> finish "VerificationKeyWithHash"
+       ~t_toplevel_annots:With_hash.Stable.Latest.t_toplevel_annots
 
 let%test_unit "verification key with hash, roundtrip json" =
   let open Pickles.Side_loaded.Verification_key in
@@ -502,7 +515,7 @@ let%test_module "Test" =
         ; bar : Unsigned_extended.UInt64.t Or_ignore_test.t
         ; baz : Unsigned_extended.UInt32.t list
         }
-      [@@deriving compare, sexp, equal, fields, yojson]
+      [@@deriving annot, compare, sexp, equal, fields, yojson]
 
       let v =
         { foo = 1
@@ -511,11 +524,13 @@ let%test_module "Test" =
         ; baz = Unsigned.UInt32.[ of_int 11; of_int 12 ]
         }
 
+      let ( !. ) = ( !. ) ~t_fields_annots
+
       let derivers obj =
         Fields.make_creator obj ~foo:!.int ~foo1:!.uint64
           ~bar:!.(Or_ignore_test.derived uint64)
           ~baz:!.(list @@ uint32 @@ o ())
-        |> finish ~name:"V"
+        |> finish "V" ~t_toplevel_annots
     end
 
     let v1 = V.derivers @@ o ()
@@ -524,14 +539,15 @@ let%test_module "Test" =
 
     module V2 = struct
       type t = { field : Field.t; nothing : unit }
-      [@@deriving compare, sexp, equal, fields]
+      [@@deriving annot, compare, sexp, equal, fields]
 
       let v = { field = Field.of_int 10; nothing = () }
 
       let derivers obj =
         let open Derivers in
+        let ( !. ) = ( !. ) ~t_fields_annots in
         Fields.make_creator obj ~field:!.field ~nothing:!.unit
-        |> finish ~name:"V2"
+        |> finish "V2" ~t_toplevel_annots
     end
 
     let v2 = V2.derivers @@ Derivers.o ()
@@ -548,7 +564,7 @@ let%test_module "Test" =
 
     module V3 = struct
       type t = { public_key : Public_key.t }
-      [@@deriving compare, sexp, equal, fields]
+      [@@deriving annot, compare, sexp, equal, fields]
 
       let v =
         { public_key =
@@ -558,7 +574,9 @@ let%test_module "Test" =
 
       let derivers obj =
         let open Derivers in
-        Fields.make_creator obj ~public_key:!.public_key |> finish ~name:"V3"
+        let ( !. ) = ( !. ) ~t_fields_annots in
+        Fields.make_creator obj ~public_key:!.public_key
+        |> finish "V3" ~t_toplevel_annots
     end
 
     let v3 = V3.derivers @@ Derivers.o ()
