@@ -1,6 +1,5 @@
 open Kimchi
 open Js_of_ocaml
-
 module Bigint_256 = Foundations.BigInt256
 module Pasta_fp = Foundations.Fp
 module Pasta_fq = Foundations.Fq
@@ -14,7 +13,6 @@ module Pasta_fp_index = Protocol.Index.Fp
 module Pasta_fq_index = Protocol.Index.Fq
 module Pasta_fp_verifier_index = Protocol.VerifierIndex.Fp
 module Pasta_fq_verifier_index = Protocol.VerifierIndex.Fq
-
 
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
 imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
@@ -687,10 +685,7 @@ let _ =
           let inputs =
             time "inputs" (fun () -> Array.init n (fun i -> Pasta_fp.of_int i))
           in
-          let _ =
-            time "commit" (fun () ->
-                commit_evaluations urs n inputs)
-          in
+          let _ = time "commit" (fun () -> commit_evaluations urs n inputs) in
           let _ =
             let xs = Array.init log_n (fun _ -> Pasta_fp.random ()) in
             time "b_poly" (fun () -> b_poly_commitment urs xs)
@@ -758,13 +753,13 @@ let _ =
 let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ Protocol.circuit_gate =
   { typ
   ; wires =
-      ({ row = r1; col = c1 }
-      ,{ row = r2; col = c2 }
-      ,{ row = r3; col = c3 }
+      ( { row = r1; col = c1 }
+      , { row = r2; col = c2 }
+      , { row = r3; col = c3 }
       , { row = i; col = 3 }
       , { row = i; col = 4 }
       , { row = i; col = 5 }
-      , { row = i; col = 6 })
+      , { row = i; col = 6 } )
   ; coeffs
   }
 
@@ -775,8 +770,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs= c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs= c2 } =
+         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
+             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fp.equal c1 c2 with _ -> false
          in
@@ -794,11 +789,21 @@ let _ =
          let generic =
            mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
          in
-         let add1 = mk_wires CompleteAdd 1 (1, 0) (1, 1) (1, 2) (rand_fields 2) in
-         let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3) in
-         let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5) in
-         let vbmul2 = mk_wires VarBaseMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10) in
-         let vbmul3 = mk_wires VarBaseMul 5 (5, 0) (5, 1) (5, 2) (rand_fields 20) in
+         let add1 =
+           mk_wires CompleteAdd 1 (1, 0) (1, 1) (1, 2) (rand_fields 2)
+         in
+         let add2 =
+           mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+         in
+         let vbmul1 =
+           mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+         in
+         let vbmul2 =
+           mk_wires VarBaseMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+         in
+         let vbmul3 =
+           mk_wires VarBaseMul 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+         in
          let endomul1 =
            mk_wires EndoMul 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
          in
@@ -834,7 +839,7 @@ let _ =
            List.iteri
              (fun i x -> assert_eq_or_log ~extra:i ~loc:__LOC__ x (get vec i))
              all ;
-           let (l, r, o, _, _, _, _) = zero.wires in
+           let l, r, o, _, _, _, _ = zero.wires in
            wrap vec l r ;
            assert_eq_or_log ~loc:__LOC__ (get vec 0)
              (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs) ;
@@ -852,8 +857,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs= c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs= c2 } =
+         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
+             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fq.equal c1 c2 with _ -> false
          in
@@ -863,10 +868,18 @@ let _ =
            mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
          in
          let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (rand_fields 2) in
-         let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3) in
-         let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5) in
-         let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10) in
-         let vbmul3 = mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20) in
+         let add2 =
+           mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+         in
+         let vbmul1 =
+           mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+         in
+         let vbmul2 =
+           mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+         in
+         let vbmul3 =
+           mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+         in
          let endomul1 =
            mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
          in
@@ -896,11 +909,15 @@ let _ =
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
-           let (l, r, o, _, _, _, _) = zero.wires in
+           let l, r, o, _, _, _, _ = zero.wires in
            wrap vec l r ;
-           assert (eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs)) ;
+           assert (
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs)
+           ) ;
            wrap vec o l ;
-           assert (eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs))
+           assert (
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
+           )
          in
          test_vec vec1 ; test_vec vec2
     end)
@@ -920,20 +937,17 @@ let _ =
                (fields [| 0; 0; 0; 0; 0 |])
            in
            let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
-           let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||]) in
-           let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||]) in
-           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
-           let vbmul3 = mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||]) in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ]
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
+           in
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
+           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
@@ -965,11 +979,21 @@ let _ =
            let generic =
              mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
            in
-           let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (rand_fields 2) in
-           let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3) in
-           let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5) in
-           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10) in
-           let vbmul3 = mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20) in
+           let add1 =
+             mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (rand_fields 2)
+           in
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+           in
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+           in
+           let vbmul2 =
+             mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+           in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+           in
            let endomul1 =
              mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
            in
@@ -1014,25 +1038,24 @@ let _ =
          assert (domain_d8_size index2 = 128)
     end)
 
-let eq_verification_shifts ~field_equal l r =
-    Array.for_all2 field_equal  l r
+let eq_verification_shifts ~field_equal l r = Array.for_all2 field_equal l r
 
 let verification_evals_to_list
-      { Protocol.VerifierIndex.sigma_comm : 'PolyComm array
-      ; coefficients_comm : 'PolyComm array
-      ; generic_comm : 'PolyComm
-      ; psm_comm : 'PolyComm
-      ; complete_add_comm : 'PolyComm
-      ; mul_comm : 'PolyComm
-      ; emul_comm : 'PolyComm
-      ; endomul_scalar_comm : 'PolyComm
-      ; chacha_comm : 'PolyComm array option
-      }
-     =
-  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm :: endomul_scalar_comm ::
-  (Array.append sigma_comm coefficients_comm
-  |> Array.append (Option.value ~default:[||] chacha_comm)
-  |> Array.to_list)
+    { Protocol.VerifierIndex.sigma_comm : 'PolyComm array
+    ; coefficients_comm : 'PolyComm array
+    ; generic_comm : 'PolyComm
+    ; psm_comm : 'PolyComm
+    ; complete_add_comm : 'PolyComm
+    ; mul_comm : 'PolyComm
+    ; emul_comm : 'PolyComm
+    ; endomul_scalar_comm : 'PolyComm
+    ; chacha_comm : 'PolyComm array option
+    } =
+  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
+  :: endomul_scalar_comm
+  :: ( Array.append sigma_comm coefficients_comm
+     |> Array.append (Option.value ~default:[||] chacha_comm)
+     |> Array.to_list )
 
 let eq_verifier_index ~field_equal ~other_field_equal
     { Protocol.VerifierIndex.domain =
@@ -1075,20 +1098,17 @@ let _ =
                (fields [| 0; 0; 0; 0; 0 |])
            in
            let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
-           let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||]) in
-           let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||]) in
-           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
-           let vbmul3 = mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||]) in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ]
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
+           in
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
+           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
@@ -1128,20 +1148,17 @@ let _ =
                (fields [| 0; 0; 0; 0; 0 |])
            in
            let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
-           let add2 = mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||]) in
-           let vbmul1 = mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||]) in
-           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
-           let vbmul3 = mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||]) in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ]
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
+           in
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
+           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
