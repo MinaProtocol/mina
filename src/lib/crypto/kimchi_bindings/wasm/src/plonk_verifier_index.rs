@@ -10,7 +10,7 @@ use kimchi::circuits::{
     constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
-use kimchi::prover_index::expr_linearization;
+use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use paste::paste;
 use std::convert::TryInto;

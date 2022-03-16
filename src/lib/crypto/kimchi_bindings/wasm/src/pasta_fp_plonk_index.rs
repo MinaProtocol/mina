@@ -3,7 +3,8 @@ use ark_poly::EvaluationDomain;
 use crate::gate_vector::fp::WasmGateVector;
 use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
-use kimchi::prover_index::{expr_linearization, ProverIndex as DlogIndex};
+use kimchi::linearization::expr_linearization;
+use kimchi::prover_index::ProverIndex as DlogIndex;
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{

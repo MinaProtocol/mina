@@ -18,7 +18,8 @@ use kimchi::circuits::{
     wires::COLUMNS,
 };
 // use std::path::Path;
-use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
+use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
 use kimchi::prover::{ProverCommitments, ProverProof};
 use kimchi::prover_index::ProverIndex;
