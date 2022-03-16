@@ -96,11 +96,8 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     include Kimchi.Protocol.Proof.Fp
 
-    let verify = with_lagrange verify
-
-    let batch_verify =
-      with_lagranges (fun lgrs vks ts ->
-          Promise.run_in_thread (fun () -> batch_verify lgrs vks ts))
+    let batch_verify vks ts =
+      Promise.run_in_thread (fun () -> batch_verify vks ts)
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =

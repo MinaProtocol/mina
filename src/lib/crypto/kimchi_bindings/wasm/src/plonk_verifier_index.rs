@@ -608,19 +608,24 @@ pub mod fp {
     use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 
     impl_verification_key!(
-        caml_pasta_fp_plonk_verifier_index,
-        WasmGVesta,
-        GAffine,
-        WasmPastaFp,
-        Fp,
-        WasmPolyComm,
-        WasmFpSrs,
-        GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
-        WasmPastaFpPlonkIndex,
-        Fp
-    );
+            caml_pasta_fp_plonk_verifier_index,
+            WasmGVesta,
+            GAffine,
+            WasmPastaFp,
+            Fp,
+            WasmPolyComm,
+            WasmFpSrs,
+            GAffineOther,
+    <<<<<<< HEAD
+            oracle::pasta::fp_kimchi,
+            oracle::pasta::fq_kimchi,
+    =======
+            oracle::pasta::fp_3,
+            oracle::pasta::fq_3,
+    >>>>>>> develop
+            WasmPastaFpPlonkIndex,
+            Fp
+        );
 }
 
 pub mod fq {
@@ -632,17 +637,22 @@ pub mod fq {
     use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 
     impl_verification_key!(
-        caml_pasta_fq_plonk_verifier_index,
-        WasmGPallas,
-        GAffine,
-        WasmPastaFq,
-        Fq,
-        WasmPolyComm,
-        WasmFqSrs,
-        GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
-        WasmPastaFqPlonkIndex,
-        Fq
-    );
+            caml_pasta_fq_plonk_verifier_index,
+            WasmGPallas,
+            GAffine,
+            WasmPastaFq,
+            Fq,
+            WasmPolyComm,
+            WasmFqSrs,
+            GAffineOther,
+    <<<<<<< HEAD
+            oracle::pasta::fq_kimchi,
+            oracle::pasta::fp_kimchi,
+    =======
+            oracle::pasta::fq_3,
+            oracle::pasta::fp_3,
+    >>>>>>> develop
+            WasmPastaFqPlonkIndex,
+            Fq
+        );
 }

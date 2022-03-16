@@ -34,7 +34,10 @@ module Pairing_main = Pairing_main
 
 let profile_constraints = false
 
-let verify = Verify.verify
+let verify_promise = Verify.verify
+
+let verify max_branching statement key proofs =
+  verify_promise max_branching statement key proofs |> Promise.to_deferred
 
 (* This file (as you can see from the mli) defines a compiler which turns an inductive
    definition of a set into an inductive SNARK system for proving using those rules.
@@ -851,7 +854,7 @@ module Side_loaded = struct
 
   module Proof = Proof.Branching_max
 
-  let verify (type t) ~(value_to_field_elements : t -> _)
+  let verify_promise (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =
     let m =
       ( module struct
@@ -894,9 +897,12 @@ module Side_loaded = struct
             in
             Verify.Instance.T (max_branching, m, vk, x, p))
         |> Verify.verify_heterogenous)
+
+  let verify ~value_to_field_elements ts =
+    verify_promise ~value_to_field_elements ts |> Promise.to_deferred
 end
 
-let compile :
+let compile_promise :
     type a_var a_value prev_varss prev_valuess widthss heightss max_branching branches.
        ?self:(a_var, a_value, max_branching, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
@@ -967,7 +973,7 @@ let compile :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify
+      verify_promise
         (module Max_branching)
         (module A_value)
         (Lazy.force verification_key)
@@ -978,6 +984,25 @@ let compile :
     let statement (T p : t) = p.statement.pass_through.app_state
   end in
   (self, cache_handle, (module P), provers)
+
+let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches ~max_branching
+    ~name ~constraint_constants ~choices =
+  let self, cache_handle, proof_module, provers =
+    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
+      ~max_branching ~name ~constraint_constants ~choices
+  in
+  let rec adjust_provers :
+      type a1 a2 a3 s1 s2_inner.
+         (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+      -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+    | [] ->
+        []
+    | prover :: tl ->
+        (fun ?handler stmt_with_proof public_input ->
+          Promise.to_deferred (prover ?handler stmt_with_proof public_input))
+        :: adjust_provers tl
+  in
+  (self, cache_handle, proof_module, adjust_provers provers)
 
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
@@ -1009,7 +1034,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile
+            compile_promise
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ

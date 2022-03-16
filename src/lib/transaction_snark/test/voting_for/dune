@@ -1,0 +1,37 @@
+(library
+  (name voting_for_tests)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async_unix
+   async
+   core
+   base
+   core_kernel
+   yojson
+   ;; local libraries
+   mina_base.import
+   pickles.backend
+   kimchi_backend.pasta
+   pickles
+   transaction_snark
+   snark_params
+   mina_ledger
+   mina_base
+   currency
+   mina_state
+   signature_lib
+   genesis_constants
+   transaction_protocol_state
+   pickles_types
+   mina_numbers
+   sgn
+   transaction_snark_tests
+   with_hash
+   random_oracle
+   )
+  (library_flags -linkall)
+  (inline_tests)
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))

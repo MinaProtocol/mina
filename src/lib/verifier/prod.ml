@@ -84,7 +84,6 @@ module Worker_state = struct
                  Pickles.Side_loaded.verify
                    ~value_to_field_elements:Snapp_statement.to_field_elements
                    to_verify
-                 |> Promise.to_deferred
                in
                List.map cs ~f:(function
                  | `Valid c ->

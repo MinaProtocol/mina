@@ -16,7 +16,8 @@
  (deps
   (source_tree ../../wasm)
   (source_tree ../../wasm/.cargo/config)
-  (source_tree ../../../../../external/wasm-bindgen-rayon) )
+  (source_tree ../../../../../external/wasm-bindgen-rayon)
+  (source_tree ../../../proof-systems) )
  (action
   (progn
    (run chmod -R +w ../../wasm)
