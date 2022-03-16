@@ -17,8 +17,8 @@ module Global_slot = Mina_numbers.Global_slot
 *)
 module Legacy_token_id = struct
   let default : (Field.t, bool) Random_oracle_input.Legacy.t =
-    Random_oracle_input.Legacy.bitstring
-      (Snark_bits.Bits.UInt64.to_bits Unsigned.UInt64.one)
+    let one = true :: List.init 63 ~f:(fun _ -> false) in
+    Random_oracle_input.Legacy.bitstring one
 
   [%%ifdef consensus_mechanism]
 
