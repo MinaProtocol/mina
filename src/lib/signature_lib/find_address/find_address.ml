@@ -129,7 +129,7 @@ let print_values prefix =
         if String.equal actual_prefix prefix then (
           match Public_key.decompress pk with
           | Some _ ->
-              (* Format.printf "%s (valid)@." pk_string ; *)
+              Format.printf "%s (valid)@." pk_string ;
               false
           | None ->
               Format.printf "%s@." pk_string ;
