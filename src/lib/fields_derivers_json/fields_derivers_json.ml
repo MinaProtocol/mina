@@ -20,10 +20,15 @@ module To_yojson = struct
       constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
-  let add_field t_field field acc =
+  let add_field ~t_fields_annots t_field field acc =
+    let annotations =
+      Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+        (Field.name field)
+    in
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
-      ( Fields_derivers.name_under_to_camel field
+      ( Option.value annotations.name
+          ~default:(Fields_derivers.name_under_to_camel field)
       , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
       )
       :: rest ;
@@ -89,13 +94,21 @@ module Of_yojson = struct
 
   exception Field_not_found of string
 
-  let add_field : ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
+  let add_field ~t_fields_annots :
+      ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
+    let annotations =
+      Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+        (Field.name field)
+    in
     let creator finished_obj =
       let map = !(finished_obj#of_json_creator) in
       !(t_field#map)
         (!(t_field#of_json)
-           (let name = Fields_derivers.name_under_to_camel field in
+           (let name =
+              Option.value annotations.name
+                ~default:(Fields_derivers.name_under_to_camel field)
+            in
             match Map.find map name with
             | None ->
                 raise (Field_not_found name)
@@ -164,7 +177,7 @@ end
 
 let%test_module "Test" =
   ( module struct
-    type t = { foo_hello : int; bar : string list } [@@deriving fields]
+    type t = { foo_hello : int; bar : string list } [@@deriving annot, fields]
 
     let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
 
@@ -218,13 +231,13 @@ let%test_module "Test" =
 
     let to_json obj =
       let open To_yojson in
-      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
+      let ( !. ) x fd acc = add_field ~t_fields_annots (x @@ o ()) fd acc in
       Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
       |> finish
 
     let of_json obj =
       let open Of_yojson in
-      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
+      let ( !. ) x fd acc = add_field ~t_fields_annots (x @@ o ()) fd acc in
       Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
       |> finish
 

@@ -92,6 +92,7 @@ module Engine = struct
       (** returned string is the transaction id *)
       val send_snapp :
            logger:Logger.t
+        -> ?unlock:bool
         -> t
         -> parties:Mina_base.Parties.t
         -> string Deferred.Or_error.t
@@ -107,17 +108,41 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val get_balance :
+      val get_balance_total :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Deferred.Or_error.t
 
-      val must_get_balance :
+      val must_get_balance_total :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
+
+      val get_balance_liquid :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Deferred.Or_error.t
+
+      val must_get_balance_liquid :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Malleable_error.t
+
+      val get_balance_locked :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Deferred.Or_error.t
+
+      val must_get_balance_locked :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Malleable_error.t
 
       val get_account_permissions :
            logger:Logger.t
