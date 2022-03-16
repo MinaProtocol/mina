@@ -10,7 +10,7 @@
     "copy-wasm": "cp ../../_build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js src && cp ../../_build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm src && npm run chmod-wasm",
     "make-jsoo": "make -C ../.. client_sdk && npm run copy-jsoo",
     "test": "jest",
-    "prepublishOnly": "yarn make-jsoo && yarn build && yarn test"
+    "prepublishOnly": "yarn make-jsoo && copy-wasm && yarn build && yarn test"
   },
   "keywords": [
     "mina",
