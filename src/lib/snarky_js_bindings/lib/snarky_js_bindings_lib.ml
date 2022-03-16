@@ -1698,7 +1698,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
   let tag, _cache, p, provers =
-    Pickles.compile ~choices
+    Pickles.compile_promise ~choices
       (module Snapp_statement)
       (module Snapp_statement.Constant)
       ~typ:snapp_statement_typ
