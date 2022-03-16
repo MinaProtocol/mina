@@ -5,6 +5,7 @@ members = [
 ]
 exclude = [
     "proof-systems",
+    "wasm"
 ]
 
 [profile.release]
