@@ -18,12 +18,16 @@ use kimchi::circuits::{
     wires::COLUMNS,
 };
 // use std::path::Path;
-use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use commitment_dlog::{
+    commitment::{CommitmentCurve, PolyComm},
+    evaluation_proof::OpeningProof,
+};
 use groupmap::GroupMap;
-use kimchi::index::Index;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::prover_index::ProverIndex;
+use kimchi::verifier::batch_verify;
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 
@@ -625,7 +629,7 @@ macro_rules! impl_proof {
                     .try_into()
                     .expect("the witness should be a column of 15 vectors");
 
-                let index: &Index<$G> = &index.0.as_ref();
+                let index: &ProverIndex<$G> = &index.0.as_ref();
 
 
                 // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
@@ -647,8 +651,8 @@ macro_rules! impl_proof {
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
                 let maybe_proof = ProverProof::create::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, index, prev);
                 return match maybe_proof {
                     Ok(proof) => proof.into(),
@@ -661,27 +665,22 @@ macro_rules! impl_proof {
 
             #[wasm_bindgen]
             pub fn [<$name:snake _verify>](
-                lgr_comm: WasmVector<$WasmPolyComm>,
                 index: $WasmVerifierIndex,
                 proof: WasmProverProof,
             ) -> bool {
-                let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
-
                 let group_map = <$G as CommitmentCurve>::Map::setup();
-
-                ProverProof::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                batch_verify::<
+                    $G,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
-                    &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
-                )
-                .is_ok()
+                    &[(&index.into(), &proof.into())]
+                ).is_ok()
             }
 
             #[wasm_bindgen]
             pub struct [<WasmVecVec $field_name:camel PolyComm>](Vec<Vec<PolyComm<$G>>>);
-            type WasmVecVecPolyComm = [<WasmVecVec $field_name:camel PolyComm>];
 
             #[wasm_bindgen]
             impl [<WasmVecVec $field_name:camel PolyComm>] {
@@ -698,22 +697,21 @@ macro_rules! impl_proof {
 
             #[wasm_bindgen]
             pub fn [<$name:snake _batch_verify>](
-                lgr_comms: WasmVecVecPolyComm,
                 indexes: WasmVector<$WasmVerifierIndex>,
                 proofs: WasmVector<WasmProverProof>,
             ) -> bool {
                 let ts: Vec<_> = indexes
                     .into_iter()
-                    .zip(lgr_comms.0.into_iter())
                     .zip(proofs.into_iter())
-                    .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
+                    .map(|(i, p)| (i.into(), p.into()))
                     .collect();
-                let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
+                let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
                 let group_map = GroupMap::<_>::setup();
 
-                ProverProof::<$G>::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                batch_verify::<
+                    $G,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, &ts)
                 .is_ok()
             }
@@ -797,8 +795,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_3,
-        oracle::pasta::fq_3,
+        oracle::pasta::fp_kimchi,
+        oracle::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -823,8 +821,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_3,
-        oracle::pasta::fp_3,
+        oracle::pasta::fq_kimchi,
+        oracle::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
