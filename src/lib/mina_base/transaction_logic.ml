@@ -43,7 +43,7 @@ module Transaction_applied = struct
       module Stable = struct
         module V2 = struct
           type t =
-            { user_command : Signed_command.Stable.V1.t With_status.Stable.V2.t
+            { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t
             ; previous_receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
             ; fee_payer_timing : Account.Timing.Stable.V1.t
             ; source_timing : Account.Timing.Stable.V1.t option

@@ -19,7 +19,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
@@ -301,14 +301,14 @@ end
 module With_valid_signature = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Stable.V1.t [@@deriving sexp, equal, yojson, hash]
+    module V2 = struct
+      type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash]
 
-      let to_latest = Stable.V1.to_latest
+      let to_latest = Stable.V2.to_latest
 
-      let compare = Stable.V1.compare
+      let compare = Stable.V2.compare
 
-      let equal = Stable.V1.equal
+      let equal = Stable.V2.equal
 
       module Gen = Gen
     end

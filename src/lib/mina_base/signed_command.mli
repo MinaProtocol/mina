@@ -17,7 +17,7 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type t =
       ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
