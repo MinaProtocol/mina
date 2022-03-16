@@ -979,7 +979,7 @@ var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
 };
 
 // Provides: caml_fp_srs_b_poly_commitment
-// Requires: plonk_wasm, caml_vesta_poly_comm_of_rust
+// Requires: plonk_wasm, caml_vesta_poly_comm_of_rust, caml_u8array_vector_to_rust_flat_vector
 var caml_fp_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fp_srs_b_poly_commitment(srs, caml_u8array_vector_to_rust_flat_vector(chals));
     return caml_vesta_poly_comm_of_rust(res);
@@ -987,11 +987,11 @@ var caml_fp_srs_b_poly_commitment = function (srs, chals) {
 
 // Provides: caml_fp_srs_batch_accumulator_check
 // Requires: plonk_wasm, rust_affine_of_caml_affine, caml_array_to_rust_vector, caml_fp_vector_to_rust
-var caml_fp_srs_batch_accumulator_check = function (t, affines, fields) {
-    var rust_affines =
-      caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
-    var rust_fields = caml_fp_vector_to_rust(fields);
-    return plonk_wasm.caml_fp_srs_batch_accumulator_check(t, rust_affines, rust_fields);
+var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
+    var rust_comms = caml_array_to_rust_vector(comms, rust_affine_of_caml_affine, plonk_wasm.caml_vesta_affine_one);
+    var rust_chals = caml_fp_vector_to_rust(chals);
+    var ok = plonk_wasm.caml_fp_srs_batch_accumulator_check(srs, rust_comms, rust_chals);
+    return ok;
 };
 
 // Provides: caml_fp_srs_h
@@ -1052,7 +1052,7 @@ var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
 };
 
 // Provides: caml_fq_srs_b_poly_commitment
-// Requires: plonk_wasm, caml_pallas_poly_comm_of_rust
+// Requires: plonk_wasm, caml_pallas_poly_comm_of_rust, caml_u8array_vector_to_rust_flat_vector
 var caml_fq_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fq_srs_b_poly_commitment(srs, caml_u8array_vector_to_rust_flat_vector(chals));
     return caml_pallas_poly_comm_of_rust(res);
@@ -1060,11 +1060,11 @@ var caml_fq_srs_b_poly_commitment = function (srs, chals) {
 
 // Provides: caml_fq_srs_batch_accumulator_check
 // Requires: plonk_wasm, rust_affine_of_caml_affine, caml_array_to_rust_vector, caml_fq_vector_to_rust
-var caml_fq_srs_batch_accumulator_check = function (t, affines, fields) {
-    var rust_affines =
-      caml_array_to_rust_vector(affines, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
-    var rust_fields = caml_fq_vector_to_rust(fields);
-    return plonk_wasm.caml_fq_srs_batch_accumulator_check(t, rust_affines, rust_fields);
+var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
+    var rust_comms = caml_array_to_rust_vector(comms, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
+    var rust_chals = caml_fq_vector_to_rust(chals);
+    var ok = plonk_wasm.caml_fq_srs_batch_accumulator_check(srs, rust_comms, rust_chals);
+    return ok;
 };
 
 // Provides: caml_fq_srs_h
@@ -1522,10 +1522,11 @@ function linearization_of_rust(linearization, affine_class) {
     return [0, constant_term, index_terms];
 }
 
+// Provides: None
 var None = 0;
 
 // Provides: caml_plonk_verifier_index_of_rust
-// Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize
+// Requires: linearization_of_rust, caml_plonk_domain_of_rust, caml_plonk_verification_evals_of_rust, caml_plonk_verification_shifts_of_rust, free_on_finalize, None
 var caml_plonk_verifier_index_of_rust = function(x, affine_class) {
     var domain = caml_plonk_domain_of_rust(x.domain);
     var max_poly_size = x.max_poly_size;
@@ -1880,24 +1881,18 @@ var caml_pasta_fp_plonk_proof_create = function(index, witness_cols, prev_challe
 
 // Provides: caml_pasta_fp_plonk_proof_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_vesta_poly_comm_to_rust, caml_pasta_fp_plonk_verifier_index_to_rust, caml_pasta_fp_proof_to_rust
-var caml_pasta_fp_plonk_proof_verify = function(lgr_comm, index, proof) {
-    lgr_comm = caml_array_to_rust_vector(lgr_comm, caml_vesta_poly_comm_to_rust);
+var caml_pasta_fp_plonk_proof_verify = function(index, proof) {
     index = caml_pasta_fp_plonk_verifier_index_to_rust(index);
     proof = caml_pasta_fp_proof_to_rust(proof);
-    return plonk_wasm.caml_pasta_fp_plonk_proof_verify(lgr_comm, index, proof);
+    return plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_batch_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_vesta_poly_comm_to_rust, caml_pasta_fp_plonk_verifier_index_to_rust, caml_pasta_fp_proof_to_rust
-var caml_pasta_fp_plonk_proof_batch_verify = function(lgr_comm, indexes, proofs) {
-    var lgr_len = lgr_comm.length;
-    var rust_lgr_comm = new plonk_wasm.WasmVecVecFpPolyComm(lgr_len-1);
-    for (var i = 1; i < lgr_len; i++) {
-        rust_lgr_comm.push(caml_array_to_rust_vector(lgr_comm[i], caml_vesta_poly_comm_to_rust));
-    }
+var caml_pasta_fp_plonk_proof_batch_verify = function(indexes, proofs) {
     indexes = caml_array_to_rust_vector(indexes, caml_pasta_fp_plonk_verifier_index_to_rust);
     proofs = caml_array_to_rust_vector(proofs, caml_pasta_fp_proof_to_rust);
-    return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(rust_lgr_comm, indexes, proofs);
+    return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_dummy
@@ -2109,24 +2104,18 @@ var caml_pasta_fq_plonk_proof_create = function(index, witness_cols, prev_challe
 
 // Provides: caml_pasta_fq_plonk_proof_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_pallas_poly_comm_to_rust, caml_pasta_fq_plonk_verifier_index_to_rust, caml_pasta_fq_proof_to_rust
-var caml_pasta_fq_plonk_proof_verify = function(lgr_comm, index, proof) {
-    lgr_comm = caml_array_to_rust_vector(lgr_comm, caml_pallas_poly_comm_to_rust);
+var caml_pasta_fq_plonk_proof_verify = function(index, proof) {
     index = caml_pasta_fq_plonk_verifier_index_to_rust(index);
     proof = caml_pasta_fq_proof_to_rust(proof);
-    return plonk_wasm.caml_pasta_fq_plonk_proof_verify(lgr_comm, index, proof);
+    return plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_batch_verify
 // Requires: plonk_wasm, caml_array_to_rust_vector, caml_pallas_poly_comm_to_rust, caml_pasta_fq_plonk_verifier_index_to_rust, caml_pasta_fq_proof_to_rust
-var caml_pasta_fq_plonk_proof_batch_verify = function(lgr_comm, indexes, proofs) {
-    var lgr_len = lgr_comm.length;
-    var rust_lgr_comm = new plonk_wasm.WasmVecVecFqPolyComm(lgr_len-1);
-    for (var i = 1; i < lgr_len; i++) {
-        rust_lgr_comm.push(caml_array_to_rust_vector(lgr_comm[i], caml_pallas_poly_comm_to_rust));
-    }
+var caml_pasta_fq_plonk_proof_batch_verify = function(indexes, proofs) {
     indexes = caml_array_to_rust_vector(indexes, caml_pasta_fq_plonk_verifier_index_to_rust);
     proofs = caml_array_to_rust_vector(proofs, caml_pasta_fq_proof_to_rust);
-    return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(rust_lgr_comm, indexes, proofs);
+    return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_dummy

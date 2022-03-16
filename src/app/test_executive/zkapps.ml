@@ -194,7 +194,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind ( parties_create_account_with_timing
              , timing_account_id
-             , timing_update ) =
+             , timing_update
+             , timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.of_int 10_000_000_000 in
@@ -216,8 +217,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (let timing =
                Snapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance =
-                       Currency.Balance.of_int 1_000_000_000
-                   ; cliff_time = Mina_numbers.Global_slot.of_int 100
+                       Currency.Balance.of_int 5_000_000_000
+                   ; cliff_time = Mina_numbers.Global_slot.of_int 10000
                    ; cliff_amount = Currency.Amount.of_int 10_000
                    ; vesting_period = Mina_numbers.Global_slot.of_int 2
                    ; vesting_increment = Currency.Amount.of_int 1_000
@@ -240,7 +241,68 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
             parties_spec
         , timing_account_id
-        , parties_spec.snapp_update )
+        , parties_spec.snapp_update
+        , snapp_keypair )
+    in
+    let%bind parties_transfer_from_timed_account =
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let amount = Currency.Amount.of_int 1_500_000 in
+      let nonce = Account.Nonce.zero in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "Snapp transfer, timed account"
+      in
+      let sender_keypair = timed_account_keypair in
+      let receiver_key =
+        keypair.public_key |> Signature_lib.Public_key.compress
+      in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (sender_keypair, nonce)
+        ; fee
+        ; receivers = [ (receiver_key, amount) ]
+        ; amount
+        ; snapp_account_keypairs = []
+        ; memo
+        ; new_snapp_account = false
+        ; snapp_update = Party.Update.dummy
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
+    in
+    let%bind parties_invalid_transfer_from_timed_account =
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let amount = Currency.Amount.of_int 7_000_000_000 in
+      let nonce = Account.Nonce.of_int 2 in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "Invalid transfer, timed account"
+      in
+      let sender_keypair = timed_account_keypair in
+      let receiver_key =
+        keypair.public_key |> Signature_lib.Public_key.compress
+      in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (sender_keypair, nonce)
+        ; fee
+        ; receivers = [ (receiver_key, amount) ]
+        ; amount
+        ; snapp_account_keypairs = []
+        ; memo
+        ; new_snapp_account = false
+        ; snapp_update = Party.Update.dummy
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
     in
     let parties_invalid_nonce =
       let p = parties_update_all in
@@ -272,10 +334,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
-    let send_snapp parties =
+    let send_snapp ?(unlock = true) parties =
       [%log info] "Sending snapp"
         ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
-      match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
+      match%bind.Deferred
+        Network.Node.send_snapp ~unlock ~logger node ~parties
+      with
       | Ok _snapp_id ->
           [%log info] "Snapps transaction sent" ;
           Malleable_error.return ()
@@ -286,9 +350,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
             err_str
     in
-    let send_invalid_snapp parties substring =
+    let send_invalid_snapp ?(unlock = true) parties substring =
       [%log info] "Sending snapp, expected to fail" ;
-      match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
+      match%bind.Deferred
+        Network.Node.send_snapp ~unlock ~logger node ~parties
+      with
       | Ok _snapp_id ->
           [%log error] "Snapps transaction succeeded, expected error \"%s\""
             substring ;
@@ -335,6 +401,36 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       | Error err ->
           let err_str = Error.to_string_mach err in
           [%log error] "Error getting account update"
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.hard_error (Error.of_string err_str)
+    in
+    let get_account_balance account_id =
+      [%log info] "Getting balance for account"
+        ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+      match%bind.Deferred
+        Network.Node.get_balance_total ~logger node ~account_id
+      with
+      | Ok balance ->
+          [%log info] "Got account balance" ;
+          Malleable_error.return balance
+      | Error err ->
+          let err_str = Error.to_string_mach err in
+          [%log error] "Error getting account balance"
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.hard_error (Error.of_string err_str)
+    in
+    let get_account_balance_locked account_id =
+      [%log info] "Getting locked balance for account"
+        ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+      match%bind.Deferred
+        Network.Node.get_balance_locked ~logger node ~account_id
+      with
+      | Ok balance ->
+          [%log info] "Got account balance" ;
+          Malleable_error.return balance
+      | Error err ->
+          let err_str = Error.to_string_mach err in
+          [%log error] "Error getting account balance"
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.hard_error (Error.of_string err_str)
     in
@@ -535,6 +631,134 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Error.of_string
                 "Ledger update and requested update with timing are \
                  incompatible") ))
+    in
+    let%bind before_balance = get_account_balance timing_account_id in
+    let%bind () =
+      section "Send a snapp with transfer from timed account that succeeds"
+        (send_snapp ~unlock:false parties_transfer_from_timed_account)
+    in
+    let%bind () =
+      section "Waiting for snapp with transfer from timed account that succeeds"
+        (wait_for_snapp parties_transfer_from_timed_account)
+    in
+    let%bind after_balance = get_account_balance timing_account_id in
+    let%bind () =
+      section "Verifying balance change"
+        ( match
+            Currency.Amount.( - )
+              (Currency.Balance.to_amount before_balance)
+              (Currency.Balance.to_amount after_balance)
+          with
+        | None ->
+            Malleable_error.hard_error
+              (Error.of_string
+                 "Unexpected underflow when taking balance difference")
+        | Some diff ->
+            let sender_party =
+              List.hd_exn parties_transfer_from_timed_account.other_parties
+            in
+            let amount_to_send =
+              Currency.Amount.Signed.magnitude
+                (Mina_base.Party.balance_change sender_party)
+            in
+            let fee =
+              Currency.Amount.of_fee
+                (Mina_base.Parties.fee parties_transfer_from_timed_account)
+            in
+            let total_debited =
+              Option.value_exn (Currency.Amount.( + ) amount_to_send fee)
+            in
+            if Currency.Amount.equal diff total_debited then (
+              [%log info] "Debited expected amount from timed account" ;
+              return () )
+            else
+              Malleable_error.hard_error
+                (Error.createf
+                   "Expect to debit %s Mina from timed account (amount sent = \
+                    %s, fee = %s), actually debited: %s Mina"
+                   (Currency.Amount.to_string total_debited)
+                   (Currency.Amount.to_string amount_to_send)
+                   (Currency.Amount.to_string fee)
+                   (Currency.Amount.to_string diff)) )
+    in
+    let%bind () =
+      section
+        "Send a snapp with transfer from timed account that fails due to min \
+         balance"
+        (let sender_party =
+           List.hd_exn parties_invalid_transfer_from_timed_account.other_parties
+         in
+         let amount_to_send =
+           Currency.Amount.Signed.magnitude
+             (Mina_base.Party.balance_change sender_party)
+         in
+         let fee =
+           Currency.Amount.of_fee
+             (Mina_base.Parties.fee parties_invalid_transfer_from_timed_account)
+         in
+         let total_to_debit =
+           Option.value_exn (Currency.Amount.( + ) amount_to_send fee)
+         in
+         (* we have enough in account, disregarding min balance *)
+         let proposed_balance =
+           match
+             Currency.Amount.( - )
+               (Currency.Balance.to_amount after_balance)
+               total_to_debit
+           with
+           | Some bal ->
+               bal
+           | None ->
+               failwith "Amount to debit more than timed account balance"
+         in
+         let%bind locked_balance =
+           get_account_balance_locked timing_account_id
+         in
+         (* but proposed balance is less than min ("locked") balance *)
+         assert (
+           Currency.Amount.( < ) proposed_balance
+             (Option.value_exn locked_balance |> Currency.Balance.to_amount) ) ;
+         send_snapp ~unlock:false parties_invalid_transfer_from_timed_account)
+    in
+    let%bind () =
+      section
+        "Waiting for snapp with transfer from timed account that fails due to \
+         min balance"
+        (wait_for_snapp parties_invalid_transfer_from_timed_account)
+    in
+    (* TODO: use transaction status to see that the transaction failed
+       as things are, we examine the balance of the sender to see that no funds were transferred
+    *)
+    let%bind () =
+      section "Invalid transfer from timed account did not transfer funds"
+        (let%bind after_invalid_balance =
+           get_account_balance timing_account_id
+         in
+         let after_invalid_balance_as_amount =
+           Currency.Balance.to_amount after_invalid_balance
+         in
+         let expected_after_invalid_balance_as_amount =
+           Currency.Amount.( - )
+             (Currency.Balance.to_amount after_balance)
+             (Currency.Amount.of_fee
+                (Mina_base.Parties.fee
+                   parties_invalid_transfer_from_timed_account))
+           |> Option.value_exn
+         in
+         (* the invalid transfer should result in a fee deduction only *)
+         if
+           Currency.Amount.equal after_invalid_balance_as_amount
+             expected_after_invalid_balance_as_amount
+         then return ()
+         else
+           Malleable_error.hard_error
+             (Error.createf
+                "The zkApp transaction should have failed because of the \
+                 minimum balance constraint, got an actual balance of %s, \
+                 expected a balance of %s"
+                (Currency.Balance.to_string after_invalid_balance)
+                (Currency.Amount.to_string
+                   expected_after_invalid_balance_as_amount)))
     in
     let%bind () =
       section "Send a snapp with an invalid nonce"
