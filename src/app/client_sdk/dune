@@ -15,7 +15,9 @@
    ppx_deriving.runtime
    result
    ppx_deriving_yojson.runtime
+   bignum.bigint
    ;; local libraries
+   bignum_bigint
    sponge
    integers_stubs_js
    snark_params
@@ -24,6 +26,11 @@
    mina_base.import
    mina_numbers
    data_hash_lib
+   pickles
+   pickles.backend
+   kimchi_backend
+   kimchi_backend.pasta
+   snarky.backendless
    random_oracle
    signature_lib
    string_sign
@@ -45,6 +52,6 @@
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
- (forbidden_libraries async core re2)
+ (forbidden_libraries async core re2 ctypes)
  (preprocess
   (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))
