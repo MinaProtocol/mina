@@ -665,7 +665,6 @@ macro_rules! impl_proof {
 
             #[wasm_bindgen]
             pub fn [<$name:snake _verify>](
-                lgr_comm: WasmVector<$WasmPolyComm>,
                 index: $WasmVerifierIndex,
                 proof: WasmProverProof,
             ) -> bool {
@@ -682,7 +681,6 @@ macro_rules! impl_proof {
 
             #[wasm_bindgen]
             pub struct [<WasmVecVec $field_name:camel PolyComm>](Vec<Vec<PolyComm<$G>>>);
-            type WasmVecVecPolyComm = [<WasmVecVec $field_name:camel PolyComm>];
 
             #[wasm_bindgen]
             impl [<WasmVecVec $field_name:camel PolyComm>] {
@@ -699,7 +697,6 @@ macro_rules! impl_proof {
 
             #[wasm_bindgen]
             pub fn [<$name:snake _batch_verify>](
-                lgr_comms: WasmVecVecPolyComm,
                 indexes: WasmVector<$WasmVerifierIndex>,
                 proofs: WasmVector<WasmProverProof>,
             ) -> bool {
