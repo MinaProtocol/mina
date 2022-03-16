@@ -20,8 +20,8 @@ use kimchi::circuits::{
 // use std::path::Path;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
-use kimchi::index::Index;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::prover_index::ProverIndex;
 use oracle::{
     poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
