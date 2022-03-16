@@ -1395,7 +1395,8 @@ struct
         t.pool <- pool ;
         Mina_metrics.(
           Gauge.set Transaction_pool.pool_size
-            (Float.of_int (Indexed_pool.size pool))) ;
+            (Float.of_int (Indexed_pool.size pool)) ;
+          Counter.inc_one Transaction_pool.transactions_added_to_pool) ;
         let trust_record =
           Trust_system.record_envelope_sender t.config.trust_system t.logger
             sender
