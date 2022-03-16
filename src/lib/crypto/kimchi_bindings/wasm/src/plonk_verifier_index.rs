@@ -10,7 +10,8 @@ use kimchi::circuits::{
     constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
-use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
+use kimchi::prover_index::expr_linearization;
+use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use paste::paste;
 use std::convert::TryInto;
 use std::path::Path;

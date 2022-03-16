@@ -20,8 +20,9 @@ use kimchi::circuits::{
 // use std::path::Path;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
-use kimchi::index::Index;
 use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::prover_index::ProverIndex;
+use kimchi::verifier::batch_verify;
 use oracle::{
     poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -625,7 +626,7 @@ macro_rules! impl_proof {
                     .try_into()
                     .expect("the witness should be a column of 15 vectors");
 
-                let index: &Index<$G> = &index.0.as_ref();
+                let index: &ProverIndex<$G> = &index.0.as_ref();
 
 
                 // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
@@ -665,18 +666,15 @@ macro_rules! impl_proof {
                 index: $WasmVerifierIndex,
                 proof: WasmProverProof,
             ) -> bool {
-                let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
-
                 let group_map = <$G as CommitmentCurve>::Map::setup();
-
-                ProverProof::verify::<
+                batch_verify::<
+                    $G,
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
-                    &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
-                )
-                .is_ok()
+                    &[(&index.into(), &proof.into())]
+                ).is_ok()
             }
 
             #[wasm_bindgen]
@@ -704,14 +702,14 @@ macro_rules! impl_proof {
             ) -> bool {
                 let ts: Vec<_> = indexes
                     .into_iter()
-                    .zip(lgr_comms.0.into_iter())
                     .zip(proofs.into_iter())
-                    .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
+                    .map(|(i, p)| (i.into(), p.into()))
                     .collect();
-                let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
+                let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
                 let group_map = GroupMap::<_>::setup();
 
-                ProverProof::<$G>::verify::<
+                batch_verify::<
+                    $G,
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, &ts)
