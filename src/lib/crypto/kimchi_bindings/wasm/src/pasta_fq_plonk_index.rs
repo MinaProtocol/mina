@@ -52,7 +52,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     let cs = match ConstraintSystem::<Fq>::create(
         gates,
         vec![],
-        oracle::pasta::fq_3::params(),
+        oracle::pasta::fq_kimchi::params(),
         public_ as usize,
     ) {
         None => {
@@ -75,7 +75,12 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // create index
     Ok(WasmPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fp_3::params(), endo_q, srs.0.clone()),
+        DlogIndex::<GAffine>::create(
+            cs,
+            oracle::pasta::fp_kimchi::params(),
+            endo_q,
+            srs.0.clone(),
+        ),
     )))
 }
 
@@ -127,9 +132,9 @@ pub fn caml_pasta_fq_plonk_index_read(
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {}", err)))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
+    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.0.clone();
-    t.fq_sponge_params = oracle::pasta::fp_3::params();
+    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
     let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;

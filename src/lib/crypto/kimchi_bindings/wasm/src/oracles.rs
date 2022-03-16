@@ -4,7 +4,7 @@ use kimchi::index::VerifierIndex as DlogVerifierIndex;
 use kimchi::prover::ProverProof;
 use oracle::{
     self,
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
@@ -192,7 +192,7 @@ macro_rules! impl_oracles {
                 let proof: ProverProof<$G> = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstants15W>, DefaultFrSponge<$F, PlonkSpongeConstants15W>>(&index, &p_comm);
+                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm);
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,

@@ -23,7 +23,7 @@ use groupmap::GroupMap;
 use kimchi::index::Index;
 use kimchi::prover::{ProverCommitments, ProverProof};
 use oracle::{
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 
@@ -647,8 +647,8 @@ macro_rules! impl_proof {
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
                 let maybe_proof = ProverProof::create::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, index, prev);
                 return match maybe_proof {
                     Ok(proof) => proof.into(),
@@ -670,8 +670,8 @@ macro_rules! impl_proof {
                 let group_map = <$G as CommitmentCurve>::Map::setup();
 
                 ProverProof::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
                     &[(&index.into(), &lgr_comm, &proof.into())].to_vec(),
@@ -712,8 +712,8 @@ macro_rules! impl_proof {
                 let group_map = GroupMap::<_>::setup();
 
                 ProverProof::<$G>::verify::<
-                    DefaultFqSponge<_, PlonkSpongeConstants15W>,
-                    DefaultFrSponge<_, PlonkSpongeConstants15W>,
+                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, &ts)
                 .is_ok()
             }
@@ -797,8 +797,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_3,
-        oracle::pasta::fq_3,
+        oracle::pasta::fp_kimchi,
+        oracle::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -823,8 +823,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_3,
-        oracle::pasta::fp_3,
+        oracle::pasta::fq_kimchi,
+        oracle::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
