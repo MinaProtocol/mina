@@ -29,6 +29,7 @@
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
+   ppx_annot
    ppx_deriving_yojson
    ppx_optcomp
    ppx_base
