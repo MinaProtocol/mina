@@ -76,6 +76,13 @@ module Call_forest = struct
     in
     List.rev (collect xs [])
 
+  let hd_party (xs : _ t) =
+    match xs with
+    | [] ->
+        None
+    | { elt = { party; calls = _; party_digest = _ }; stack_hash = _ } :: _ ->
+        Some party
+
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
     let node i calls =
