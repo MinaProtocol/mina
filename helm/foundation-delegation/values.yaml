@@ -1,6 +1,7 @@
 ---
 backend:
   image: gcr.io/mina-mainnet-303900/delegation-backend@sha256:05504d9f8c4e27f622765dab86a3a0e653d5ab68aeeabf073fc0d0b775b35b63
+  host: uptime-backend.minaprotocol.com
   port: 80
   secret: foundation-delegation-creds
   tlsSecret: minaprotocol-uptime-backend-cert
