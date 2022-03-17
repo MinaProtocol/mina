@@ -111,28 +111,6 @@ module Statement : sig
           ; sok_digest : 'sok_digest
           }
         [@@deriving compare, equal, hash, sexp, yojson]
-
-        (*val to_latest :
-             ('ledger_hash -> 'ledger_hash')
-          -> ('amount -> 'amount')
-          -> ('pending_coinbase -> 'pending_coinbase')
-          -> ('fee_excess -> 'fee_excess')
-          -> ('token_id -> 'token_id')
-          -> ('sok_digest -> 'sok_digest')
-          -> ( 'ledger_hash
-             , 'amount
-             , 'pending_coinbase
-             , 'fee_excess
-             , 'token_id
-             , 'sok_digest )
-             t
-          -> ( 'ledger_hash'
-             , 'amount'
-             , 'pending_coinbase'
-             , 'fee_excess'
-             , 'token_id'
-             , 'sok_digest' )
-             t *)
       end
     end]
   end
