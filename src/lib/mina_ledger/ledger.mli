@@ -102,7 +102,7 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 val commit : Mask.Attached.t -> unit
 
 module Transaction_applied : sig
-  open Transaction_logic
+  open Mina_transaction_logic
 
   module Signed_command_applied : sig
     module Common : sig
@@ -285,4 +285,4 @@ type init_state =
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
+module Ledger_inner : Ledger_intf.S with type t = t

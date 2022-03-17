@@ -124,7 +124,7 @@ let%test_module "Fee payer tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key))
 
     let%test_unit "snapp transaction with non-existent fee payer account" =
-      let open Mina_base.Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
