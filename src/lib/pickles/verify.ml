@@ -207,7 +207,7 @@ let verify_heterogenous (ts : Instance.t list) =
         plonk)
   in
   let open Backend.Tock.Proof in
-  let open Deferred.Let_syntax in
+  let open Promise.Let_syntax in
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
       (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->

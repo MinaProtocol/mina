@@ -5,9 +5,6 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
   let genesis_ledger_hash =
     Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
   in
-  let snarked_next_available_token =
-    Mina_ledger.Ledger.next_available_token (Lazy.force genesis_ledger)
-  in
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants
   in
@@ -32,7 +29,7 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
            ~f:(fun { previous_state_hash; _ } -> previous_state_hash))
       ~blockchain_state:
         (Blockchain_state.genesis ~constraint_constants ~consensus_constants
-           ~genesis_ledger_hash ~snarked_next_available_token)
+           ~genesis_ledger_hash)
       ~consensus_state:genesis_consensus_state ~constants:protocol_constants
   in
   With_hash.of_data ~hash_data:Protocol_state.hashes state

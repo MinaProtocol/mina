@@ -69,6 +69,7 @@
    cli_lib
    signature_lib
    mina_base
+   mina_transaction
    mina_transition
    transition_frontier_extensions
    block_time

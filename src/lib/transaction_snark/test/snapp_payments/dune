@@ -29,6 +29,7 @@
    sgn
    transaction_snark_tests
    test_util
+   mina_transaction_logic
    )
   (library_flags -linkall)
   (inline_tests)

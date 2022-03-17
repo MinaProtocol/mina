@@ -155,7 +155,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   }
 
 let gen_snapp_ledger =
-  let open Mina_base.Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let open Quickcheck.Generator.Let_syntax in
   let%bind test_spec = Test_spec.gen in
   let pks =
@@ -173,7 +173,7 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
     ~init_ledger ~snapp_pk =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
@@ -240,19 +240,12 @@ module Wallet = struct
     in
     Array.init n ~f:(fun _ -> random_wallet ())
 
-  let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt fee
-      nonce memo =
+  let user_command ~fee_payer ~source_pk ~receiver_pk amt fee nonce memo =
     let payload : Signed_command.Payload.t =
-      Signed_command.Payload.create ~fee ~fee_token
+      Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:
-          (Payment
-             { source_pk
-             ; receiver_pk
-             ; token_id = token
-             ; amount = Amount.of_int amt
-             })
+        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -263,14 +256,14 @@ module Wallet = struct
         }
     |> Option.value_exn
 
-  let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee ~fee_token
-      ~token nonce memo =
+  let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee nonce memo
+      =
     let fee_payer = wallets.(i) in
     let receiver = wallets.(j) in
     user_command ~fee_payer
       ~source_pk:(Account.public_key fee_payer.account)
       ~receiver_pk:(Account.public_key receiver.account)
-      ~fee_token ~token amt fee nonce memo
+      amt fee nonce memo
 end
 
 let genesis_state_body_hash =
@@ -283,8 +276,8 @@ let pending_coinbase_state_update state_body_hash stack =
 
 (** Push protocol state and coinbase if it is a coinbase transaction to the
       pending coinbase stacks (coinbase stack and state stack)*)
-let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
-    stack =
+let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
+    state_body_hash stack =
   let stack_with_state = pending_coinbase_state_update state_body_hash stack in
   match t with
   | Coinbase c ->

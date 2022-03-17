@@ -18,6 +18,7 @@
    mina_base
    currency
    mina_state
+   mina_transaction_logic
    signature_lib
    genesis_constants
    transaction_protocol_state

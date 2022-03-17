@@ -25,6 +25,7 @@
    transaction_protocol_state
    pickles_types
    mina_numbers
+   mina_transaction_logic
    sgn
    transaction_snark_tests
    with_hash

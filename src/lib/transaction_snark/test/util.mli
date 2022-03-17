@@ -56,7 +56,7 @@ val trivial_snapp :
   Lazy.t
 
 val gen_snapp_ledger :
-  (Transaction_logic.For_tests.Test_spec.t * Signature_lib.Keypair.t)
+  (Mina_transaction_logic.For_tests.Test_spec.t * Signature_lib.Keypair.t)
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
@@ -71,7 +71,7 @@ val test_snapp_update :
          Async.Deferred.t )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Spec.t
-  -> init_ledger:Transaction_logic.For_tests.Init_ledger.t
+  -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
   -> snapp_pk:Account.key
   -> unit
 
@@ -81,7 +81,7 @@ val permissions_from_update :
   -> Permissions.Auth_required.t Permissions.Poly.t
 
 val pending_coinbase_stack_target :
-     Transaction.Valid.t
+     Mina_transaction.Transaction.Valid.t
   -> State_hash.t
   -> Pending_coinbase.Stack.t
   -> Pending_coinbase.Stack.t
@@ -97,8 +97,6 @@ module Wallet : sig
     -> receiver:int
     -> int
     -> Currency.Fee.t
-    -> fee_token:Token_id.t
-    -> token:Token_id.t
     -> Mina_numbers.Account_nonce.t
     -> Signed_command_memo.t
     -> Signed_command.With_valid_signature.t
@@ -107,8 +105,6 @@ module Wallet : sig
        fee_payer:t
     -> source_pk:Signature_lib.Public_key.Compressed.t
     -> receiver_pk:Signature_lib.Public_key.Compressed.t
-    -> fee_token:Mina_numbers.Token_id.t
-    -> token:Mina_numbers.Token_id.t
     -> int
     -> Currency.Fee.t
     -> Mina_numbers.Account_nonce.t

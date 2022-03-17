@@ -1,5 +1,6 @@
 open Core
 open Mina_base
+open Mina_transaction
 open Signature_lib
 
 module type S = sig
@@ -17,18 +18,6 @@ module type S = sig
     val to_error : t -> Error.t
   end
 
-  (*
-  val get :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Staged_ledger_diff.t
-    -> ( Transaction.t With_status.t list
-         * Transaction_snark_work.t list
-         * int
-         * Currency.Amount.t list
-       , Error.t )
-       result
-
-*)
   val get_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t

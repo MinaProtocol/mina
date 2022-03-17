@@ -35,6 +35,8 @@
    genesis_ledger
    sexplib0
    quickcheck_lib
+   mina_transaction
+   mina_transaction_logic
    )
   (library_flags -linkall)
   (inline_tests)
