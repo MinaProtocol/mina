@@ -23,21 +23,24 @@ type payload_common_js =
   ; memo : string_js Js.prop >
   Js.t
 
-type payload_party_js =
+type payload_fee_payer_party_js =
   < fee : string_js Js.prop
   ; feePayer : string_js Js.prop
   ; nonce : string_js Js.prop
   ; memo : string_js Js.prop >
   Js.t
 
-let party_payload_of_js (payload_party_js : payload_party_js) =
+let payload_of_fee_payer_party_js
+    (fee_payer_party_js : payload_fee_payer_party_js) =
   let fee_payer_pk =
-    payload_party_js##.feePayer
+    fee_payer_party_js##.feePayer
     |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
-  let fee = payload_party_js##.fee |> Js.to_string |> Currency.Fee.of_string in
+  let fee =
+    fee_payer_party_js##.fee |> Js.to_string |> Currency.Fee.of_string
+  in
   let nonce =
-    payload_party_js##.nonce |> Js.to_string
+    fee_payer_party_js##.nonce |> Js.to_string
     |> Mina_numbers.Account_nonce.of_string
   in
   { Party.Fee_payer.data =

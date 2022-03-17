@@ -34,7 +34,7 @@ let _ =
 
        (** generate a parties fee payer and sign other parties with the fee payer account *)
        method signParty (parties_js : string_js)
-           (payload_party_js : payload_party_js)
+           (fee_payer_party_js : payload_fee_payer_party_js)
            (sk_base58_check_js : string_js) =
          let other_parties_json =
            parties_js |> Js.to_string |> Yojson.Safe.from_string
@@ -55,7 +55,7 @@ let _ =
              Snapp_predicate.Protocol_state.accept
          in
          let memo =
-           payload_party_js##.memo |> Js.to_string
+           fee_payer_party_js##.memo |> Js.to_string
            |> Memo.create_from_string_exn
          in
          let commitment : Parties.Transaction_commitment.t =
@@ -63,7 +63,7 @@ let _ =
              ~protocol_state_predicate_hash
              ~memo_hash:(Signed_command_memo.hash memo)
          in
-         let fee_payer = party_payload_of_js payload_party_js in
+         let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
