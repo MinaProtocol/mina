@@ -4,9 +4,9 @@ import snarkyjs from "./snarkyjs.js";
 await snarkyjs.snarky_ready;
 let { Poseidon, Circuit, Field } = snarkyjs;
 
-export { basicCircuitTest };
+export { basicCircuit };
 
-let FieldTyp = (size) => ({
+let FieldArrayTyp = (size) => ({
   sizeInFields: () => size,
   toFields: (f) => f,
   ofFields: (f) => f,
@@ -15,11 +15,11 @@ class Main extends Circuit {
   static snarkyMain(preimage, [hash]) {
     Poseidon.hash(preimage).assertEquals(hash);
   }
-  static snarkyWitnessTyp = FieldTyp(4);
-  static snarkyPublicTyp = FieldTyp(1);
+  static snarkyWitnessTyp = FieldArrayTyp(4);
+  static snarkyPublicTyp = FieldArrayTyp(1);
 }
 
-function basicCircuitTest() {
+function basicCircuit() {
   let name = "basic circuit test";
   console.log(name);
   let preimage = [

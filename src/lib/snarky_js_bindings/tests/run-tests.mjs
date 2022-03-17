@@ -1,5 +1,7 @@
 import { shutdown } from "./snarkyjs.js";
-import { basicCircuitTest } from "./basic-circuit.mjs";
+import { basicCircuit } from "./basic-circuit.mjs";
+import { picklesProof } from "./pickles-proof.mjs";
 
-basicCircuitTest();
+await basicCircuit();
+await picklesProof();
 shutdown();
