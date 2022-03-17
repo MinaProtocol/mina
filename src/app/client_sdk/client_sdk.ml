@@ -40,9 +40,7 @@ let _ =
            parties_js |> Js.to_string |> Yojson.Safe.from_string
            |> Yojson.Safe.Util.member "otherParties"
          in
-         let other_parties =
-           Parties.other_parties_deriver_from_json other_parties_json
-         in
+         let other_parties = Parties.other_parties_of_json other_parties_json in
          let other_parties_data =
            List.map (fun (party : Party.t) -> party.data) other_parties
          in
@@ -83,7 +81,7 @@ let _ =
            { fee_payer with authorization = fee_payer_signature_auth }
          in
          { Parties.fee_payer; other_parties; memo }
-         |> Parties.parties_deriver_to_json |> Yojson.Safe.to_string
+         |> Parties.parties_to_json |> Yojson.Safe.to_string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =
