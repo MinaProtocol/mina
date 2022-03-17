@@ -52,7 +52,7 @@ val trivial_snapp :
   Lazy.t
 
 val gen_snapp_ledger :
-  (Transaction_logic.For_tests.Test_spec.t * Signature_lib.Keypair.t)
+  (Mina_transaction_logic.For_tests.Test_spec.t * Signature_lib.Keypair.t)
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
@@ -67,7 +67,7 @@ val test_snapp_update :
          Async.Deferred.t )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Spec.t
-  -> init_ledger:Transaction_logic.For_tests.Init_ledger.t
+  -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
   -> snapp_pk:Account.key
   -> unit
 

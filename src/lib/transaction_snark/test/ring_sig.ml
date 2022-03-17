@@ -102,7 +102,7 @@ let%test_unit "1-of-2" =
 
 (* test a snapp tx with a 3-party ring *)
 let%test_unit "ring-signature snapp tx with 3 parties" =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     (* secret keys of ring participants*)
@@ -143,7 +143,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
-          let Transaction_logic.For_tests.Transaction_spec.
+          let Mina_transaction_logic.For_tests.Transaction_spec.
                 { sender = sender, sender_nonce
                 ; receiver = ringsig_account_pk
                 ; amount

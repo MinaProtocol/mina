@@ -65,6 +65,7 @@
    mina_signature_kind
    mina_base.util
    kimchi_backend
+   snark_bits
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
