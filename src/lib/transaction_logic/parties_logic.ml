@@ -179,7 +179,7 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Transaction_status.Failure.Stable.V1.t option )
+          , Transaction_status.Failure.Stable.V2.t option )
           Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
 

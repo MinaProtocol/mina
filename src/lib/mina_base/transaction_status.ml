@@ -9,7 +9,7 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Predicate [@value 1]
         | Source_not_present
@@ -417,7 +417,7 @@ module Stable = struct
   module V2 = struct
     type t =
       | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Stable.V2.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
