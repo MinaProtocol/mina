@@ -153,7 +153,7 @@ let%test_module "Snapp payments tests" =
               U.apply_parties ledger partiess |> fun _ -> ()))
 
     let%test_unit "multiple transfers from one account" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
