@@ -149,7 +149,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
     module V2 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
-        , User_command.Stable.V2.t With_status.Stable.V1.t )
+        , User_command.Stable.V2.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V1.t
       [@@deriving compare, sexp, yojson]
 
@@ -168,7 +168,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
     module V2 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
-        , User_command.Stable.V2.t With_status.Stable.V1.t )
+        , User_command.Stable.V2.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V1.t
       [@@deriving compare, sexp, yojson]
 

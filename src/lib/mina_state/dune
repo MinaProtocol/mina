@@ -41,5 +41,6 @@
    kimchi_backend
    mina_base.util
    mina_ledger
+   unsigned_extended
    )
 )

@@ -4,10 +4,7 @@ module Ledger = Mina_ledger.Ledger
 
 module Hashless_ledger = struct
   type t =
-    { base : Ledger.t
-    ; overlay : (Account.Identifier.t, Account.t) Hashtbl.t
-    ; mutable next_available_token : Token_id.t
-    }
+    { base : Ledger.t; overlay : (Account.Identifier.t, Account.t) Hashtbl.t }
 
   type location = Ours of Account.Identifier.t | Theirs of Ledger.Location.t
 
@@ -39,8 +36,6 @@ module Hashless_ledger = struct
           (Ledger.location_of_account t.base key)
 
   let set t loc acct =
-    if Token_id.(t.next_available_token <= Account.token acct) then
-      t.next_available_token <- Token_id.next (Account.token acct) ;
     match loc with
     | Ours key ->
         Hashtbl.set t.overlay ~key ~data:acct
@@ -85,20 +80,12 @@ module Hashless_ledger = struct
   (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
   let merkle_root _t = Ledger_hash.empty_hash
 
-  let create l =
-    { base = l
-    ; overlay = Hashtbl.create (module Account_id)
-    ; next_available_token = Ledger.next_available_token l
-    }
+  let create l = { base = l; overlay = Hashtbl.create (module Account_id) }
 
   let with_ledger ~depth ~f =
     Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
         f t)
-
-  let next_available_token { next_available_token; _ } = next_available_token
-
-  let set_next_available_token t tid = t.next_available_token <- tid
 
   (** Create a new ledger mask 'on top of' the given ledger.
 
@@ -107,11 +94,7 @@ module Hashless_ledger = struct
       [apply_mask parent_ledger ~masked:this_ledger] to update the parent
       ledger as necessary.
   *)
-  let create_masked t =
-    { base = t.base
-    ; overlay = Hashtbl.copy t.overlay
-    ; next_available_token = t.next_available_token
-    }
+  let create_masked t = { base = t.base; overlay = Hashtbl.copy t.overlay }
 
   (** [apply_mask ledger ~masked] applies any updates in [masked] to the ledger
       [ledger]. [masked] should be created by calling [create_masked ledger].
@@ -122,8 +105,7 @@ module Hashless_ledger = struct
   *)
   let apply_mask t ~masked =
     Hashtbl.merge_into ~src:masked.overlay ~dst:t.overlay
-      ~f:(fun ~key:_ src _dst -> Set_to src) ;
-    t.next_available_token <- masked.next_available_token
+      ~f:(fun ~key:_ src _dst -> Set_to src)
 
   (** Create a new 'empty' ledger. *)
   let empty ~depth () =

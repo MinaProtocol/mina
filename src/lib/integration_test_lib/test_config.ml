@@ -35,6 +35,7 @@ type t =
   ; snark_worker_public_key : string
   ; transaction_capacity :
       Runtime_config.Proof_keys.Transaction_capacity.t option
+  ; aux_account_balance : string option
   }
 
 let default =
@@ -54,4 +55,5 @@ let default =
       (let pk, _ = (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
   ; transaction_capacity = None
+  ; aux_account_balance = None
   }

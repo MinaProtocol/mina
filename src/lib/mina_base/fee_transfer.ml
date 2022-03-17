@@ -4,7 +4,7 @@ open Mina_base_import
 module Single = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { receiver_pk : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
@@ -53,8 +53,8 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t = Single.Stable.V1.t One_or_two.Stable.V1.t
+  module V2 = struct
+    type t = Single.Stable.V2.t One_or_two.Stable.V1.t
     [@@deriving sexp, compare, equal, yojson, hash]
 
     let to_latest = Fn.id
