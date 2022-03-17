@@ -100,40 +100,39 @@ module Statement : sig
              , 'fee_excess
              , 'token_id
              , 'sok_digest )
+             t =
+          { source : 'ledger_hash
+          ; target : 'ledger_hash
+          ; supply_increase : 'amount
+          ; pending_coinbase_stack_state : 'pending_coinbase
+          ; fee_excess : 'fee_excess
+          ; next_available_token_before : 'token_id
+          ; next_available_token_after : 'token_id
+          ; sok_digest : 'sok_digest
+          }
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        (*val to_latest :
+             ('ledger_hash -> 'ledger_hash')
+          -> ('amount -> 'amount')
+          -> ('pending_coinbase -> 'pending_coinbase')
+          -> ('fee_excess -> 'fee_excess')
+          -> ('token_id -> 'token_id')
+          -> ('sok_digest -> 'sok_digest')
+          -> ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'token_id
+             , 'sok_digest )
              t
-
-        (* =
-             { source: 'ledger_hash
-             ; target: 'ledger_hash
-             ; supply_increase: 'amount
-             ; pending_coinbase_stack_state: 'pending_coinbase
-             ; fee_excess: 'fee_excess
-             ; next_available_token_before: 'token_id
-             ; next_available_token_after: 'token_id
-             ; sok_digest: 'sok_digest }
-           [@@deriving compare, equal, hash, sexp, yojson]
-
-           val to_latest :
-                ('ledger_hash -> 'ledger_hash')
-             -> ('amount -> 'amount')
-             -> ('pending_coinbase -> 'pending_coinbase')
-             -> ('fee_excess -> 'fee_excess')
-             -> ('token_id -> 'token_id')
-             -> ('sok_digest -> 'sok_digest')
-             -> ( 'ledger_hash
-                , 'amount
-                , 'pending_coinbase
-                , 'fee_excess
-                , 'token_id
-                , 'sok_digest )
-                t
-             -> ( 'ledger_hash'
-                , 'amount'
-                , 'pending_coinbase'
-                , 'fee_excess'
-                , 'token_id'
-                , 'sok_digest' )
-                t *)
+          -> ( 'ledger_hash'
+             , 'amount'
+             , 'pending_coinbase'
+             , 'fee_excess'
+             , 'token_id'
+             , 'sok_digest' )
+             t *)
       end
     end]
   end
@@ -220,6 +219,8 @@ module Statement : sig
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
+
+        val to_latest : t -> V2.t
       end
     end]
 
@@ -525,6 +526,39 @@ val constraint_system_digests :
 val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
 
 module Base : sig
+  val check_timing :
+       balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> timed_balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> account:
+         ( 'b
+         , 'c
+         , 'd
+         , 'e
+         , Currency.Balance.var
+         , 'f
+         , 'g
+         , 'h
+         , 'i
+         , ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+         , 'j
+         , 'k
+         , 'l )
+         Account.Poly.t
+    -> txn_amount:Currency.Amount.var option
+    -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+    -> ( [> `Min_balance of Currency.Balance.var ]
+         * ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+       , 'a )
+       Tick.Checked.t
+
   module Parties_snark : sig
     val main :
          ?witness:Parties_segment.Witness.t
