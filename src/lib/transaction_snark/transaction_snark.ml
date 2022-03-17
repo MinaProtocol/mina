@@ -4647,13 +4647,6 @@ let%test_module "transaction_snark" =
 
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
-      let merkle_root_after_parties_exn t ~txn_state_view txn =
-        let hash =
-          merkle_root_after_parties_exn ~constraint_constants ~txn_state_view t
-            txn
-        in
-        Frozen_ledger_hash.of_ledger_hash hash
-
       let merkle_root_after_user_command_exn t ~txn_global_slot txn =
         let hash =
           merkle_root_after_user_command_exn ~constraint_constants
@@ -4730,8 +4723,6 @@ let%test_module "transaction_snark" =
     the transaction) to the pending coinbase stack of protocol states*)
     let pending_coinbase_state_update state_body_hash stack =
       Pending_coinbase.Stack.(push_state state_body_hash stack)
-
-    let init_stack = Pending_coinbase.Stack.empty
 
     (** Push protocol state and coinbase if it is a coinbase transaction to the
       pending coinbase stacks (coinbase stack and state stack)*)
@@ -4908,167 +4899,6 @@ let%test_module "transaction_snark" =
                 ~pending_coinbase_stack_state
                 { transaction = t1; block_data = state_body }
                 (unstage @@ Sparse_ledger.handler sparse_ledger)))
-
-    let signed_signed ~wallets i j : Parties.t =
-      let full_amount = 8_000_000_000 in
-      let fee = Fee.of_int (Random.int full_amount) in
-      let receiver_amount =
-        Amount.sub (Amount.of_int full_amount) (Amount.of_fee fee)
-        |> Option.value_exn
-      in
-      let acct1 = wallets.(i) in
-      let acct2 = wallets.(j) in
-      let new_state : _ Snapp_state.V.t =
-        Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
-      in
-      { fee_payer =
-          { Party.Fee_payer.data =
-              { body =
-                  { public_key = acct1.account.public_key
-                  ; update =
-                      { app_state =
-                          Vector.map new_state ~f:(fun x ->
-                              Snapp_basic.Set_or_keep.Set x)
-                      ; delegate = Keep
-                      ; verification_key = Keep
-                      ; permissions = Keep
-                      ; snapp_uri = Keep
-                      ; token_symbol = Keep
-                      ; timing = Keep
-                      ; voting_for = Keep
-                      }
-                  ; token_id = ()
-                  ; balance_change = Fee.of_int full_amount
-                  ; increment_nonce = ()
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Field.zero
-                  ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
-                  ; use_full_commitment = ()
-                  }
-              ; predicate = acct1.account.nonce
-              }
-          ; authorization = Signature.dummy
-          }
-      ; other_parties =
-          [ { data =
-                { body =
-                    { public_key = acct1.account.public_key
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change =
-                        Amount.Signed.(of_unsigned receiver_amount |> negate)
-                    ; increment_nonce = true
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = false
-                    }
-                ; predicate = Accept
-                }
-            ; authorization = Signature Signature.dummy
-            }
-          ; { data =
-                { body =
-                    { public_key = acct2.account.public_key
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change =
-                        Amount.Signed.(of_unsigned receiver_amount)
-                    ; increment_nonce = false
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = false
-                    }
-                ; predicate = Accept
-                }
-            ; authorization = None_given
-            }
-          ]
-      ; memo = Signed_command_memo.empty
-      }
-
-    let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
-      Test_util.with_randomness 123456789 (fun () ->
-          let wallets = random_wallets () in
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              Array.iter
-                (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
-                ~f:(fun { account; private_key = _ } ->
-                  Ledger.create_new_account_exn ledger
-                    (Account.identifier account)
-                    account) ;
-              let t1 =
-                let i, j = (1, 2) in
-                signed_signed ~wallets i j
-              in
-              let hash_pre = Ledger.merkle_root ledger in
-              let _target =
-                let txn_state_view =
-                  Mina_state.Protocol_state.Body.view state_body
-                in
-                Ledger.merkle_root_after_parties_exn ledger ~txn_state_view t1
-              in
-              let hash_post = Ledger.merkle_root ledger in
-              [%test_eq: Field.t] hash_pre hash_post))
-
-    let apply_parties ledger parties =
-      let witnesses =
-        parties_witnesses_exn ~constraint_constants ~state_body
-          ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-          (`Ledger ledger) parties
-      in
-      let open Impl in
-      List.fold ~init:((), ()) witnesses
-        ~f:(fun _ (witness, spec, statement, snapp_stmt) ->
-          run_and_check
-            (fun () ->
-              let s =
-                exists Statement.With_sok.typ ~compute:(fun () -> statement)
-              in
-              let snapp_stmt =
-                Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                    [ (i, exists Snapp_statement.typ ~compute:(fun () -> stmt))
-                    ])
-              in
-              Base.Parties_snark.main ~constraint_constants
-                (Parties_segment.Basic.to_single_list spec)
-                snapp_stmt s ~witness ;
-              fun () -> ())
-            ()
-          |> Or_error.ok_exn)
-
-    let%test_unit "snapps-based payment" =
-      let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let parties = party_send (List.hd_exn specs) in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger [ parties ])
-          |> fun ((), ()) -> ())
-
-    let%test_unit "Consecutive snapps-based payments" =
-      let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let partiess =
-                List.map
-                  ~f:(fun s ->
-                    let use_full_commitment =
-                      Quickcheck.random_value Bool.quickcheck_generator
-                    in
-                    party_send ~use_full_commitment s)
-                  specs
-              in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              apply_parties ledger partiess)
-          |> fun ((), ()) -> ())
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
 

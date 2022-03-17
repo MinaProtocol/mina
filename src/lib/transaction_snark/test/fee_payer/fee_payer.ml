@@ -158,7 +158,7 @@ let%test_module "Fee payer tests" =
                   let ledger0 = Ledger.register_mask ledger mask in
                   Ledger.apply_transaction ledger0 ~constraint_constants
                     ~txn_state_view:
-                      (Mina_state.Protocol_state.Body.view U.state_body)
+                      (Mina_state.Protocol_state.Body.view U.genesis_state_body)
                     (Transaction.Command (Parties parties))
                 with
               | Error _ ->
@@ -169,7 +169,7 @@ let%test_module "Fee payer tests" =
               match
                 Or_error.try_with (fun () ->
                     Transaction_snark.parties_witnesses_exn
-                      ~constraint_constants ~state_body:U.state_body
+                      ~constraint_constants ~state_body:U.genesis_state_body
                       ~fee_excess:Amount.Signed.zero
                       ~pending_coinbase_init_stack:U.init_stack (`Ledger ledger)
                       [ parties ])
