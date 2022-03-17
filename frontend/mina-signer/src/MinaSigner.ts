@@ -59,8 +59,7 @@ export class Client {
    * @returns True if the `keypair` is a verifiable key pair, otherwise throw an exception
    */
   public verifyKeypair(keypair: Keypair): boolean {
-    const newKeypair = minaSDK.validKeypair(keypair);
-    return newKeypair;
+    return minaSDK.validKeypair(keypair);
   }
 
   /**
@@ -81,11 +80,10 @@ export class Client {
    * @returns A signed message
    */
   public signMessage(message: string, key: Keypair): Signed<Message> {
-    const signedMessage = {
+    return {
       signature: minaSDK.signString(this.network, key.privateKey, message),
       data: message,
     };
-    return signedMessage;
   }
 
   /**
@@ -123,7 +121,7 @@ export class Client {
     const nonce = String(payment.nonce);
     const amount = String(payment.amount);
     const validUntil = String(payment.validUntil ?? defaultValidUntil);
-    const signedPayment = {
+    return {
       signature: minaSDK.signPayment(this.network, privateKey, {
         common: {
           fee,
@@ -148,7 +146,6 @@ export class Client {
         validUntil,
       },
     };
-    return signedPayment;
   }
 
   /**
@@ -204,7 +201,7 @@ export class Client {
     const fee = String(stakeDelegation.fee);
     const nonce = String(stakeDelegation.nonce);
     const validUntil = String(stakeDelegation.validUntil ?? defaultValidUntil);
-    const signedDelegation = {
+    return {
       signature: minaSDK.signStakeDelegation(this.network, privateKey, {
         common: {
           fee,
@@ -227,7 +224,6 @@ export class Client {
         validUntil,
       },
     };
-    return signedDelegation;
   }
 
   /**
@@ -379,9 +375,7 @@ export class Client {
   public signedRosettaTransactionToSignedCommand(
     signedRosettaTxn: string
   ): string {
-    const signedRosetta =
-      minaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxn);
-    return signedRosetta;
+    return minaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTxn);
   }
 
   /**
