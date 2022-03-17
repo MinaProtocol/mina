@@ -8,6 +8,7 @@ open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Signature_lib
 open Network_peer
