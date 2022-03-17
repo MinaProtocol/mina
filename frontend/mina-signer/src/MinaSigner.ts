@@ -27,7 +27,7 @@ if (globalThis.wasm_rayon_poolbuilder) {
   }
 }
 
-export class Client {
+class Client {
   private network: Network;
 
   constructor(options: { network: Network }) {
@@ -419,3 +419,5 @@ export class Client {
     }
   }
 }
+
+export = Client;

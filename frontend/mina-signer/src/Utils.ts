@@ -16,10 +16,7 @@ function hasCommonProperties(data: SignableData) {
 }
 
 export function isParty(p: Party): p is Party {
-  const partyJson = JSON.parse(p.parties);
-  return (
-    partyJson.hasOwnProperty("otherParties") && p.hasOwnProperty("feePayer")
-  );
+  return p.hasOwnProperty("parties") && p.hasOwnProperty("feePayer");
 }
 
 export function isPayment(p: SignableData): p is Payment {

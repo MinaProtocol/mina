@@ -1,4 +1,4 @@
-import { Client } from "../src/MinaSigner";
+import Client from "../src/MinaSigner";
 import type { Keypair, Signed, Payment } from "../src/TSTypes";
 
 describe("Payment", () => {

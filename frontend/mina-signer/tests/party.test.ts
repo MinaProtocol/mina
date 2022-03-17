@@ -1,4 +1,4 @@
-import { Client } from "../src/MinaSigner";
+import Client from "../src/MinaSigner";
 import type { Party, Signed } from "../src/TSTypes";
 
 /**
