@@ -73,9 +73,9 @@ module Ledger_inner = struct
 
         let balance Account.Poly.{ balance; _ } = balance
 
-        let token Account.Poly.{ token_id; _ } = token_id
-
         let empty = Account.empty
+
+        let token = Account.Poly.token_id
 
         let token_owner ({ token_permissions; _ } : t) =
           match token_permissions with

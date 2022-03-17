@@ -459,8 +459,8 @@ module Sequence_events = Snapp_account.Sequence_events
 module Body = struct
   module Poly
       (Public_key : Type)
-      (Update : Type)
       (Token_id : Type)
+      (Update : Type)
       (Amount : Type)
       (Events : Type)
       (Call_data : Type)
@@ -471,8 +471,8 @@ module Body = struct
     (** Body component of a party *)
     type t =
       { public_key : Public_key.t
-      ; update : Update.t
       ; token_id : Token_id.t
+      ; update : Update.t
       ; balance_change : Amount.t
       ; increment_nonce : Bool.t
       ; events : Events.t
@@ -533,8 +533,8 @@ module Body = struct
   module Stable = struct
     module V1 = struct
       type t =
-            Poly(Public_key.Compressed.Stable.V1)(Update.Stable.V1)
-              (Token_id.Stable.V1)
+            Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
+              (Update.Stable.V1)
               (Amount_sgn_signed_poly.Stable.V1)
               (Events'.Stable.V1)
               (Pickles.Backend.Tick.Field.Stable.V1)
@@ -544,8 +544,8 @@ module Body = struct
             .t
             (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
-        ; update : Update.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
+        ; update : Update.Stable.V1.t
         ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
@@ -574,7 +574,7 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-              Poly(Public_key.Compressed.Stable.V1)(Update.Stable.V1)(Unit)
+              Poly(Public_key.Compressed.Stable.V1)(Unit)(Update.Stable.V1)
                 (Fee.Stable.V1)
                 (Events'.Stable.V1)
                 (Pickles.Backend.Tick.Field.Stable.V1)
@@ -584,8 +584,8 @@ module Body = struct
               .t
               (* Opaque to txn logic *) =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; update : Update.Stable.V1.t
           ; token_id : unit [@skip]
+          ; update : Update.Stable.V1.t
           ; balance_change : Fee.Stable.V1.t
           ; increment_nonce : unit [@skip]
           ; events : Events'.Stable.V1.t
@@ -603,8 +603,8 @@ module Body = struct
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; update = Update.dummy
       ; token_id = ()
+      ; update = Update.dummy
       ; balance_change = Fee.zero
       ; increment_nonce = ()
       ; events = []
@@ -641,8 +641,8 @@ module Body = struct
 
   let of_fee_payer (t : Fee_payer.t) : t =
     { public_key = t.public_key
-    ; update = t.update
     ; token_id = Token_id.default
+    ; update = t.update
     ; balance_change =
         { Signed_poly.sgn = Sgn.Neg
         ; magnitude = Amount.of_fee t.balance_change
@@ -669,8 +669,8 @@ module Body = struct
     end
 
     type t =
-          Poly(Type_of_var(Public_key.Compressed))(Update.Checked)
-            (Token_id.Checked)
+          Poly(Type_of_var(Public_key.Compressed))(Token_id.Checked)
+            (Update.Checked)
             (Type_of_var(Amount.Signed))
             (Type_of_var(Events))
             (Field.Var)
@@ -679,8 +679,8 @@ module Body = struct
             (Snapp_predicate.Protocol_state.Checked)
           .t =
       { public_key : Public_key.Compressed.var
-      ; update : Update.Checked.t
       ; token_id : Token_id.Checked.t
+      ; update : Update.Checked.t
       ; balance_change : Amount.Signed.var
       ; increment_nonce : Boolean.var
       ; events : Events.var
@@ -694,8 +694,8 @@ module Body = struct
 
     let to_input
         ({ public_key
-         ; update
          ; token_id
+         ; update
          ; balance_change
          ; increment_nonce
          ; events
@@ -730,8 +730,8 @@ module Body = struct
   let typ () : (Checked.t, t) Typ.t =
     Typ.of_hlistable
       [ Public_key.Compressed.typ
-      ; Update.typ ()
       ; Token_id.typ
+      ; Update.typ ()
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ

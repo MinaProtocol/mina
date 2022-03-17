@@ -4,187 +4,16 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
-use kimchi::circuits::expr::{Column, PolishToken, Variable};
-use kimchi::circuits::gate::{CurrOrNext, GateType};
 use kimchi::circuits::{
     constraints::{zk_polynomial, zk_w3, Shifts},
     wires::{COLUMNS, PERMUTS},
 };
-use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
+use kimchi::linearization::expr_linearization;
+use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use paste::paste;
-use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-#[derive(Clone, Copy)]
-pub enum WasmColumnTag {
-    Witness,
-    Z,
-    LookupSorted,
-    LookupAggreg,
-    LookupTable,
-    LookupKindIndex,
-    Index,
-    Coefficient,
-}
-
-#[wasm_bindgen]
-#[derive(Clone, Copy)]
-pub struct WasmColumn {
-    pub tag: WasmColumnTag,
-    pub gate_type: GateType,
-    pub i: i32,
-}
-
-impl WasmColumn {
-    fn zero() -> Self {
-        Self {
-            tag: WasmColumnTag::Witness,
-            gate_type: GateType::Zero,
-            i: 0,
-        }
-    }
-}
-
-impl From<Column> for WasmColumn {
-    fn from(c: Column) -> Self {
-        let tag_i = |tag, i: usize| Self {
-            tag,
-            gate_type: GateType::Zero,
-            i: i.try_into().expect("usize -> isize"),
-        };
-        let tag = |tag| tag_i(tag, 0);
-
-        match c {
-            Column::Witness(x) => tag_i(WasmColumnTag::Witness, x),
-            Column::Z => tag(WasmColumnTag::Z),
-            Column::LookupSorted(x) => tag_i(WasmColumnTag::LookupSorted, x),
-            Column::LookupAggreg => tag(WasmColumnTag::LookupAggreg),
-            Column::LookupTable => tag(WasmColumnTag::LookupTable),
-            Column::LookupKindIndex(x) => tag_i(WasmColumnTag::LookupKindIndex, x),
-            Column::Index(x) => Self {
-                tag: WasmColumnTag::Index,
-                gate_type: x,
-                i: 0,
-            },
-            Column::Coefficient(x) => tag_i(WasmColumnTag::Coefficient, x),
-        }
-    }
-}
-
-impl From<&Column> for WasmColumn {
-    fn from(c: &Column) -> Self {
-        let tag_i = |tag, i: &usize| Self {
-            tag,
-            gate_type: GateType::Zero,
-            i: (*i).try_into().expect("usize -> isize"),
-        };
-        let tag = |tag| tag_i(tag, &0);
-
-        match c {
-            Column::Witness(x) => tag_i(WasmColumnTag::Witness, x),
-            Column::Z => tag(WasmColumnTag::Z),
-            Column::LookupSorted(x) => tag_i(WasmColumnTag::LookupSorted, x),
-            Column::LookupAggreg => tag(WasmColumnTag::LookupAggreg),
-            Column::LookupTable => tag(WasmColumnTag::LookupTable),
-            Column::LookupKindIndex(x) => tag_i(WasmColumnTag::LookupKindIndex, x),
-            Column::Index(x) => Self {
-                tag: WasmColumnTag::Index,
-                gate_type: *x,
-                i: 0,
-            },
-            Column::Coefficient(x) => tag_i(WasmColumnTag::Coefficient, x),
-        }
-    }
-}
-
-impl From<WasmColumn> for Column {
-    fn from(c: WasmColumn) -> Column {
-        match c.tag {
-            WasmColumnTag::Witness => Column::Witness(c.i.try_into().expect("usize -> isize")),
-            WasmColumnTag::Z => Column::Z,
-            WasmColumnTag::LookupSorted => {
-                Column::LookupSorted(c.i.try_into().expect("usize -> isize"))
-            }
-            WasmColumnTag::LookupAggreg => Column::LookupAggreg,
-            WasmColumnTag::LookupTable => Column::LookupTable,
-            WasmColumnTag::LookupKindIndex => {
-                Column::LookupKindIndex(c.i.try_into().expect("usize -> isize"))
-            }
-            WasmColumnTag::Index => Column::Index(c.gate_type),
-            WasmColumnTag::Coefficient => {
-                Column::Coefficient(c.i.try_into().expect("usize -> isize"))
-            }
-        }
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Clone, Copy)]
-pub struct WasmVariable {
-    pub col: WasmColumn,
-    pub row: CurrOrNext,
-}
-
-impl WasmVariable {
-    fn zero() -> Self {
-        Self {
-            col: WasmColumn::zero(),
-            row: CurrOrNext::Curr,
-        }
-    }
-}
-
-impl From<Variable> for WasmVariable {
-    fn from(c: Variable) -> WasmVariable {
-        WasmVariable {
-            col: c.col.into(),
-            row: c.row,
-        }
-    }
-}
-
-impl From<&Variable> for WasmVariable {
-    fn from(c: &Variable) -> WasmVariable {
-        WasmVariable {
-            col: c.col.into(),
-            row: c.row,
-        }
-    }
-}
-
-impl From<WasmVariable> for Variable {
-    fn from(c: WasmVariable) -> Variable {
-        Variable {
-            col: c.col.into(),
-            row: c.row,
-        }
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Clone, Copy)]
-pub enum WasmPolishTokenTag {
-    Alpha,
-    Beta,
-    Gamma,
-    JointCombiner,
-    EndoCoefficient,
-    Mds,
-    Literal,
-    Cell,
-    Dup,
-    Pow,
-    Add,
-    Mul,
-    Sub,
-    VanishesOnLast4Rows,
-    UnnormalizedLagrangeBasis,
-    Store,
-    Load,
-}
 
 macro_rules! impl_verification_key {
     (
@@ -385,181 +214,6 @@ macro_rules! impl_verification_key {
                     s6: $WasmF
                 ) -> Self {
                     Self { s0, s1, s2, s3, s4, s5, s6}
-                }
-            }
-
-            /* #[wasm_bindgen]
-            #[derive(Clone)]
-            pub struct [<Wasm $field_name:camel Linearization>](
-                #[wasm_bindgen(skip)]
-                pub Box<Linearization<Vec<PolishToken<$F>>>>);
-            type WasmLinearization = [<Wasm $field_name:camel Linearization>]; */
-
-
-
-            #[derive(Clone, Copy)]
-            #[wasm_bindgen]
-            pub struct [<Wasm $field_name:camel PolishToken>] {
-                pub tag: WasmPolishTokenTag,
-                pub i0: i32,
-                pub i1: i32,
-                pub f: $WasmF,
-                pub v: WasmVariable,
-            }
-            type WasmPolishToken = [<Wasm $field_name:camel PolishToken>];
-
-            #[wasm_bindgen]
-            impl [<Wasm $field_name:camel PolishToken>] {
-                #[wasm_bindgen(constructor)]
-                pub fn new(tag: WasmPolishTokenTag, i0: i32, i1: i32, f: $WasmF, v: WasmVariable) -> Self {
-                    Self {tag, i0, i1, f, v}
-                }
-            }
-
-            fn token(tag: WasmPolishTokenTag) -> WasmPolishToken {
-                WasmPolishToken { tag, i0: 0, i1: 0, f: ($F::from(0 as i64)).into(), v: WasmVariable::zero() }
-            }
-            fn token_with_i32(tag: WasmPolishTokenTag, i0: usize) -> WasmPolishToken {
-                WasmPolishToken { tag, i0: (i0 as i32), i1: 0, f: ($F::from(0 as i64)).into(), v: WasmVariable::zero() }
-            }
-            fn token_with_2xi32(tag: WasmPolishTokenTag, i0: usize, i1: usize) -> WasmPolishToken {
-                WasmPolishToken { tag, i0: (i0 as i32), i1: (i1 as i32), f: ($F::from(0 as i64)).into(), v: WasmVariable::zero() }
-            }
-            fn token_with_variable(tag: WasmPolishTokenTag, variable: Variable) -> WasmPolishToken {
-                WasmPolishToken { tag, i0: 0, i1: 0, f: ($F::from(0 as i64)).into(), v: variable.into() }
-            }
-            fn token_with_field(tag: WasmPolishTokenTag, field: $F) -> WasmPolishToken {
-                WasmPolishToken { tag, i0: 0, i1: 0, f: field.into(), v: WasmVariable::zero() }
-            }
-
-            impl From<PolishToken<$F>> for WasmPolishToken {
-                fn from(x: PolishToken<$F>) -> WasmPolishToken {
-                    match x {
-                        PolishToken::Alpha => token(WasmPolishTokenTag::Alpha),
-                        PolishToken::Beta => token(WasmPolishTokenTag::Beta),
-                        PolishToken::Gamma => token(WasmPolishTokenTag::Gamma),
-                        PolishToken::JointCombiner => token(WasmPolishTokenTag::JointCombiner),
-                        PolishToken::EndoCoefficient => token(WasmPolishTokenTag::EndoCoefficient),
-                        PolishToken::Mds {row, col} => token_with_2xi32(WasmPolishTokenTag::Mds, row, col),
-                        PolishToken::Literal(f) => token_with_field(WasmPolishTokenTag::Literal, f),
-                        PolishToken::Cell(variable) => token_with_variable(WasmPolishTokenTag::Cell, variable),
-                        PolishToken::Dup => token(WasmPolishTokenTag::Dup),
-                        PolishToken::Pow(size) => token_with_i32(WasmPolishTokenTag::Pow, size),
-                        PolishToken::Add => token(WasmPolishTokenTag::Add),
-                        PolishToken::Mul => token(WasmPolishTokenTag::Mul),
-                        PolishToken::Sub => token(WasmPolishTokenTag::Sub),
-                        PolishToken::VanishesOnLast4Rows => token(WasmPolishTokenTag::VanishesOnLast4Rows),
-                        PolishToken::UnnormalizedLagrangeBasis(size) => token_with_i32(WasmPolishTokenTag::UnnormalizedLagrangeBasis, size),
-                        PolishToken::Store => token(WasmPolishTokenTag::Store),
-                        PolishToken::Load(size) => token_with_i32(WasmPolishTokenTag::Load, size),
-                    }
-                }
-            }
-            impl From<WasmPolishToken> for PolishToken<$F> {
-                fn from(x: WasmPolishToken) -> PolishToken<$F> {
-                    match x.tag {
-                        WasmPolishTokenTag::Alpha => PolishToken::Alpha,
-                        WasmPolishTokenTag::Beta => PolishToken::Beta,
-                        WasmPolishTokenTag::Gamma => PolishToken::Gamma,
-                        WasmPolishTokenTag::JointCombiner => PolishToken::JointCombiner,
-                        WasmPolishTokenTag::EndoCoefficient => PolishToken::EndoCoefficient,
-                        WasmPolishTokenTag::Mds => PolishToken::Mds {row: x.i0 as usize, col: x.i1 as usize},
-                        WasmPolishTokenTag::Literal => PolishToken::Literal(x.f.into()),
-                        WasmPolishTokenTag::Cell => PolishToken::Cell(x.v.into()),
-                        WasmPolishTokenTag::Dup => PolishToken::Dup,
-                        WasmPolishTokenTag::Pow => PolishToken::Pow(x.i0 as usize),
-                        WasmPolishTokenTag::Add => PolishToken::Add,
-                        WasmPolishTokenTag::Mul => PolishToken::Mul,
-                        WasmPolishTokenTag::Sub => PolishToken::Sub,
-                        WasmPolishTokenTag::VanishesOnLast4Rows => PolishToken::VanishesOnLast4Rows,
-                        WasmPolishTokenTag::UnnormalizedLagrangeBasis => PolishToken::UnnormalizedLagrangeBasis(x.i0 as usize),
-                        WasmPolishTokenTag::Store => PolishToken::Store,
-                        WasmPolishTokenTag::Load => PolishToken::Load(x.i0 as usize)
-                    }
-                }
-            }
-
-            #[wasm_bindgen]
-            #[derive(Clone)]
-            pub struct [<Wasm $field_name:camel IndexTerm>] {
-                pub column: WasmColumn,
-                #[wasm_bindgen(skip)]
-                pub coefficient: WasmVector<WasmPolishToken>,
-            }
-            type WasmIndexTerm = [<Wasm $field_name:camel IndexTerm>];
-
-            #[wasm_bindgen]
-            impl [<Wasm $field_name:camel IndexTerm>] {
-                #[wasm_bindgen(getter)]
-                pub fn coefficient(&self) -> WasmVector<WasmPolishToken> {
-                    self.coefficient.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_coefficient(&mut self, x: WasmVector<WasmPolishToken>) {
-                    self.coefficient = x;
-                }
-            }
-
-            impl From<(Column, Vec<PolishToken<$F>>)> for WasmIndexTerm {
-                fn from(x: (Column, Vec<PolishToken<$F>>)) -> WasmIndexTerm {
-                    WasmIndexTerm {
-                        column: x.0.into(),
-                        coefficient: IntoIterator::into_iter(x.1).map(From::from).collect()
-                    }
-                }
-            }
-            impl From<WasmIndexTerm> for (Column, Vec<PolishToken<$F>>) {
-                fn from(x: WasmIndexTerm) -> (Column, Vec<PolishToken<$F>>) {
-                    (x.column.into(), x.coefficient.into_iter().map(From::from).collect())
-                }
-            }
-
-            #[wasm_bindgen]
-            #[derive(Clone)]
-            pub struct [<Wasm $field_name:camel Linearization>] {
-                #[wasm_bindgen(skip)]
-                pub constant_term: WasmVector<WasmPolishToken>,
-                #[wasm_bindgen(skip)]
-                pub index_terms: WasmVector<WasmIndexTerm>,
-            }
-            type WasmLinearization = [<Wasm $field_name:camel Linearization>];
-
-            #[wasm_bindgen]
-            impl [<Wasm $field_name:camel Linearization>] {
-                #[wasm_bindgen(constructor)]
-                pub fn new(
-                    constant_term: WasmVector<WasmPolishToken>,
-                    index_terms: WasmVector<WasmIndexTerm>,
-                ) -> Self {
-                    WasmLinearization {
-                        constant_term: constant_term.clone(),
-                        index_terms: index_terms.clone(),
-                    }
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn constant_term(&self) -> WasmVector<WasmPolishToken> {
-                    self.constant_term.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_constant_term(&mut self, x: WasmVector<WasmPolishToken>) {
-                    self.constant_term = x;
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn index_terms(&self) -> WasmVector<WasmIndexTerm> {
-                    self.index_terms.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_index_terms(&mut self, x: WasmVector<WasmIndexTerm>) {
-                    self.index_terms = x;
-                }
-
-                pub fn dummy() -> Self {
-                    Self { constant_term: vec![].into(), index_terms: vec![].into() }
                 }
             }
 
@@ -960,8 +614,8 @@ pub mod fp {
         WasmPolyComm,
         WasmFpSrs,
         GAffineOther,
-        oracle::pasta::fp_3,
-        oracle::pasta::fq_3,
+        oracle::pasta::fp_kimchi,
+        oracle::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         Fp
     );
@@ -984,8 +638,8 @@ pub mod fq {
         WasmPolyComm,
         WasmFqSrs,
         GAffineOther,
-        oracle::pasta::fq_3,
-        oracle::pasta::fp_3,
+        oracle::pasta::fq_kimchi,
+        oracle::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         Fq
     );

@@ -69,7 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map all_nodes ~f:(fun node ->
              let%map chain = Network.Node.must_get_best_chain ~logger node in
-             (Node.id node, chain))
+             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain))
        in
        let (chains : string list list) =
          List.map labeled_chains ~f:(fun (_, chain) -> chain)

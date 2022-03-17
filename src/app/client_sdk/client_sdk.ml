@@ -288,9 +288,6 @@ let _ =
              ; signer_input = _
              ; payment = Some payment
              ; stake_delegation = None
-             ; create_token = None
-             ; create_token_account = None
-             ; mint_tokens = None
              } ->
              let command = Transaction.Unsigned.of_rendered_payment payment in
              make_signed_transaction command payment.nonce
@@ -299,9 +296,6 @@ let _ =
              ; signer_input = _
              ; payment = None
              ; stake_delegation = Some delegation
-             ; create_token = None
-             ; create_token_account = None
-             ; mint_tokens = None
              } ->
              let command =
                Transaction.Unsigned.of_rendered_delegation delegation
