@@ -1,3 +1,66 @@
+(** Auxiliary information exposed by zkApp smart contract execution.
+
+    The format of this data is opaque to the Mina protocol, and is defined by
+    each individual smart contract. A smart contract may emit zero or more
+    'events', which are communicated with the transaction when it is broadcast
+    over the Mina network.
+
+    These 'events' are collapsed into a single hash for the purposes of the
+    zero-knowledge proofs, and this hash is unused by the transaction logic.
+
+    An event may be used to expose information that is useful or important to
+    make publically available, but without storing the data in accounts
+    on-chain.
+
+    Nodes may make this data available for transactions in their pool or from
+    within blocks. Archive nodes and similar services may make older historical
+    event data available.
+
+    # Example
+
+    A zkApp smart contract could use a
+    [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) to store more data
+    than it can fit in its 8 general purpose registers. Usually, when a snap
+    account updates the root of its merkle tree, there will be no way to know
+    what the new contents of the merkle tree are; only the cryptographic 'root
+    hash' is publically available.
+
+    In order to update the merkle tree while making the new contents publically
+    known, a zkApp developer can emit an event containing the new data and its
+    position as an event, and any other member of the network can look at this
+    event to discover the new contents.
+
+    Consider for example the tree containing 8 values `A, B, C, D, E, F, G, H`.
+    ```text
+                                H7=Hash(H5, H6)
+                               /               \
+                H5=Hash(H1, H2)                 H6=Hash(H3, H4)
+               /               \               /               \
+      H1=Hash(A, B)     H2=Hash(C, D)     H3=Hash(E, F)     H4=Hash(G, H)
+     /             \   /             \   /             \   /             \
+    A               B C               D E               F G               H
+    ```
+    `H7` is used as the 'root hash' of the tree.
+
+    A zkApp might update the tree at the 5th position (0-indexed, replacing `F`
+    with `I`), generating the resulting tree
+    ```text
+                               H7'=Hash(H5, H6')
+                               /               \
+                H5=Hash(H1, H2)                 H6'=Hash(H3', H4)
+               /               \               /                 \
+      H1=Hash(A, B)     H2=Hash(C, D)     H3'=Hash(E, I)     H4=Hash(G, H)
+     /             \   /             \   /             \   /             \
+    A               B C               D E               I G               H
+    ```
+    and storing its new 'root hash' `H7'` in its `app_state`.
+
+    The zkApp can emit an event that encodes the new data to be placed in the
+    tree, for example as `{data: I, position: 5}`, and then any user who
+    previously knew the contents of the tree can update their local copy to
+    match, and can continue to interact with the zkApp's data by
+    querying/updating the new tree.
+*)
 [%%import "/src/config.mlh"]
 
 open Core_kernel
