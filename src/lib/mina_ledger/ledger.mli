@@ -120,9 +120,6 @@ module Transaction_applied : sig
         | Payment of { previous_empty_accounts : Account_id.t list }
         | Stake_delegation of
             { previous_delegate : Public_key.Compressed.t option }
-        | Create_new_token of { created_token : Token_id.t }
-        | Create_token_account
-        | Mint_tokens
         | Failed
       [@@deriving sexp]
     end
@@ -252,14 +249,14 @@ val merkle_root_after_parties_exn :
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Parties.Valid.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Ledger_hash.t
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Ledger_hash.t
 
 (** Raises if the ledger is full. *)
 val create_empty_exn : t -> Account_id.t -> Path.t * Account.t

@@ -355,10 +355,6 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
   let%bind snarked_ledger_hash =
     Snapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
-  let%bind snarked_next_available_token =
-    Snapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.snarked_next_available_token)
-  in
   let%bind timestamp =
     Snapp_predicate.Closed_interval.
       { lower = psv.timestamp; upper = Block_time.max_value }
@@ -389,7 +385,6 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
   in
   let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
   { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
-  ; snarked_next_available_token
   ; timestamp
   ; blockchain_length
   ; min_window_density
@@ -577,7 +572,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
           | None ->
               failwithf
                 "gen_party_body: could not find account location for passed \
-                 account id with public key %s and token id %s"
+                 account id with public key %s and token_id %s"
                 (Signature_lib.Public_key.Compressed.to_base58_check
                    (Account_id.public_key account_id))
                 (Account_id.token_id account_id |> Token_id.to_string)

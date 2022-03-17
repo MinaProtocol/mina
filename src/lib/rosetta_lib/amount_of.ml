@@ -2,22 +2,23 @@ open Core_kernel
 open Rosetta_models
 
 module Token_id = struct
-  let default = Unsigned.UInt64.one
+  let default : string = Mina_base.Token_id.(to_string default)
 
-  let is_default token_id = Unsigned.UInt64.equal default token_id
+  let is_default token_id = String.equal default token_id
 
-  let encode token_id =
-    `Assoc [ ("token_id", `String (Unsigned.UInt64.to_string token_id)) ]
+  let encode (token_id : string) = `Assoc [ ("token_id", `String token_id) ]
 
   module T (M : Monad_fail.S) = struct
     let decode metadata =
       match metadata with
       | Some (`Assoc [ ("token_id", `String token_id) ])
         when try
-               let _ = Unsigned.UInt64.of_string token_id in
+               let (_ : Mina_base.Token_id.t) =
+                 Mina_base.Token_id.of_string token_id
+               in
                true
              with Failure _ -> false ->
-          M.return (Some (Unsigned.UInt64.of_string token_id))
+          M.return (Some token_id)
       | Some bad ->
           M.fail
             (Errors.create
@@ -25,7 +26,7 @@ module Token_id = struct
                  (sprintf
                     "When metadata is provided for account identifiers, \
                      acceptable format is exactly { \"token_id\": \
-                     <string-encoded-uint64> }. You provided %s"
+                     <base58-encoded-field-element> }. You provided %s"
                     (Yojson.Safe.pretty_to_string bad))
                (`Json_parse None))
       | None ->
@@ -42,9 +43,8 @@ let mina total =
   ; metadata = None
   }
 
-let token token_id total =
-  (* TODO: Should we depend on mina_base so we can refer to Token_id.default instead? *)
-  if Unsigned.UInt64.equal token_id (Unsigned.UInt64.of_int 1) then mina total
+let token (`Token_id (token_id : string)) total =
+  if Token_id.is_default token_id then mina total
   else
     { Amount.value = Unsigned.UInt64.to_string total
     ; currency =

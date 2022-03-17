@@ -54,6 +54,8 @@ let snapp_command : t = '\x1A'
 
 let verification_key : t = '\x1B'
 
+let token_id_key : t = '\x1C'
+
 (** used for testing only *)
 
 let ledger_test_hash : t = '\x30'
