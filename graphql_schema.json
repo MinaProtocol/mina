@@ -681,7 +681,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBodyInput",
-          "description": "Body component of a snapp Fee Payer Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -700,22 +700,6 @@
               "deprecationReason": null
             },
             {
-              "name": "update",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "tokenId",
               "description": null,
               "args": [],
@@ -725,6 +709,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Unit",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "update",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdateInput",
                   "ofType": null
                 }
               },
@@ -900,20 +900,6 @@
               "defaultValue": null
             },
             {
-              "name": "update",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "tokenId",
               "description": null,
               "type": {
@@ -922,6 +908,20 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Unit",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "update",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdateInput",
                   "ofType": null
                 }
               },
@@ -1070,9 +1070,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedFeePayerInput",
-          "description":
-            "A party to a snapp transaction with a nonce predicate",
+          "name": "ZkappPartyPredicatedFeePayerInput",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -1143,9 +1142,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyFeePayerInput",
-          "description":
-            "A party to a snapp transaction with a signature authorization",
+          "name": "ZkappPartyFeePayerInput",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -1156,7 +1154,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPredicatedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1189,7 +1187,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPredicatedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1217,7 +1215,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "VerificationKeyWithHashInput",
-          "description": "Verification key with hash",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -1972,7 +1970,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "Balance ChangeInput",
+          "name": "BalanceChangeInput",
           "description": null,
           "fields": [
             {
@@ -2032,78 +2030,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Sign",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "TokenIdIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -2570,18 +2496,6 @@
               "deprecationReason": null
             },
             {
-              "name": "snarkedNextAvailableToken",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "TokenIdIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "timestamp",
               "description": null,
               "args": [],
@@ -2710,16 +2624,6 @@
               "defaultValue": null
             },
             {
-              "name": "snarkedNextAvailableToken",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "TokenIdIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
               "name": "timestamp",
               "description": null,
               "type": {
@@ -2829,7 +2733,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBodyInput",
-          "description": "Body component of a snapp Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -2841,22 +2745,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "update",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
                   "ofType": null
                 }
               },
@@ -2880,6 +2768,22 @@
               "deprecationReason": null
             },
             {
+              "name": "update",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdateInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "balanceChange",
               "description": null,
               "args": [],
@@ -2888,7 +2792,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Balance ChangeInput",
+                  "name": "BalanceChangeInput",
                   "ofType": null
                 }
               },
@@ -3052,20 +2956,6 @@
               "defaultValue": null
             },
             {
-              "name": "update",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "tokenId",
               "description": null,
               "type": {
@@ -3080,6 +2970,20 @@
               "defaultValue": null
             },
             {
+              "name": "update",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PartyUpdateInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
               "name": "balanceChange",
               "description": null,
               "type": {
@@ -3087,7 +2991,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Balance ChangeInput",
+                  "name": "BalanceChangeInput",
                   "ofType": null
                 }
               },
@@ -3662,8 +3566,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyInput",
-          "description": "A party to a snapp transaction",
+          "name": "ZkappPartyInput",
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "data",
@@ -3746,7 +3650,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyFeePayerInput",
+                  "name": "ZkappPartyFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3768,7 +3672,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SnappPartyInput",
+                      "name": "ZkappPartyInput",
                       "ofType": null
                     }
                   }
@@ -3803,7 +3707,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyFeePayerInput",
+                  "name": "ZkappPartyFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3823,7 +3727,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SnappPartyInput",
+                      "name": "ZkappPartyInput",
                       "ofType": null
                     }
                   }
@@ -3907,635 +3811,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SnappCommand",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SendMintTokensInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to mint tokens",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "amount",
-              "description":
-                "Amount of token to create in the receiver's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiver",
-              "description":
-                "Public key to mint the new tokens for (defaults to token owner's account)",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "token",
-              "description": "Token to mint more of",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key of the token's owner",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to mint tokens",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "amount",
-              "description":
-                "Amount of token to create in the receiver's account",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "receiver",
-              "description":
-                "Public key to mint the new tokens for (defaults to token owner's account)",
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "token",
-              "description": "Token to mint more of",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key of the token's owner",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SendMintTokensPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "mintTokens",
-              "description": "Token minting command that was sent",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "UserCommandMintTokens",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SendCreateTokenAccountInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description":
-                "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to create a token account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiver",
-              "description": "Public key to create the account for",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "token",
-              "description": "Token to create an account for",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key of the token's owner",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "feePayer",
-              "description":
-                "Public key to pay the fees from and sign the transaction with (defaults to the receiver)",
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to create a token account",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "receiver",
-              "description": "Public key to create the account for",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "token",
-              "description": "Token to create an account for",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key of the token's owner",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SendCreateTokenAccountPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "createNewTokenAccount",
-              "description": "Token account creation command that was sent",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "UserCommandNewAccount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SendCreateTokenInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to create a token",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key to create the token for",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description":
-                "Public key to pay the fee from (defaults to the tokenOwner)",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "nonce",
-              "description":
-                "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot since genesis after which this transaction cannot be applied",
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "fee",
-              "description": "Fee amount in order to create a token",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "tokenOwner",
-              "description": "Public key to create the token for",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "feePayer",
-              "description":
-                "Public key to pay the fee from (defaults to the tokenOwner)",
-              "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SendCreateTokenPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "createNewToken",
-              "description": "Token creation command that was sent",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "UserCommandNewToken",
                   "ofType": null
                 }
               },
@@ -4720,6 +3995,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "PrivateKey",
+          "description": "Base58Check-encoded private key",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -5646,6 +4931,114 @@
               "deprecationReason": null
             },
             {
+              "name": "sendTestPayments",
+              "description": "Send a series of test payments",
+              "args": [
+                {
+                  "name": "repeat_delay_ms",
+                  "description":
+                    "Delay with which a transaction shall be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "repeat_count",
+                  "description":
+                    "How many times shall transaction be repeated",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "fee",
+                  "description": "The fee of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "amount",
+                  "description": "The amount of each payment",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt64",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "receiver",
+                  "description": "The receiver of the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "senders",
+                  "description":
+                    "The private keys from which to sign the payments",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "PrivateKey",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "sendDelegation",
               "description": "Change your delegate by sending a transaction",
               "args": [
@@ -5681,132 +5074,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SendDelegationPayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "createToken",
-              "description": "Create a new token",
-              "args": [
-                {
-                  "name": "signature",
-                  "description":
-                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "SignatureInput",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SendCreateTokenInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SendCreateTokenPayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "createTokenAccount",
-              "description": "Create a new account for a token",
-              "args": [
-                {
-                  "name": "signature",
-                  "description":
-                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "SignatureInput",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SendCreateTokenAccountInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SendCreateTokenAccountPayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "mintTokens",
-              "description": "Mint more of a token",
-              "args": [
-                {
-                  "name": "signature",
-                  "description":
-                    "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "SignatureInput",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SendMintTokensInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SendMintTokensPayload",
                   "ofType": null
                 }
               },
@@ -6982,14 +6249,6 @@
               "deprecationReason": null
             },
             {
-              "name": "token",
-              "description": "Token to send",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "to",
               "description": "Public key of recipient of payment",
               "args": [],
@@ -7069,12 +6328,6 @@
                   "ofType": null
                 }
               },
-              "defaultValue": null
-            },
-            {
-              "name": "token",
-              "description": "Token to send",
-              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
               "defaultValue": null
             },
             {
@@ -7825,7 +7078,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Balance Change",
+          "name": "BalanceChange",
           "description": null,
           "fields": [
             {
@@ -7869,7 +7122,7 @@
         {
           "kind": "OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a snapp Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -7881,22 +7134,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "update",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "PartyUpdate",
                   "ofType": null
                 }
               },
@@ -7920,6 +7157,22 @@
               "deprecationReason": null
             },
             {
+              "name": "update",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "PartyUpdate",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "balanceChange",
               "description": null,
               "args": [],
@@ -7928,7 +7181,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Balance Change",
+                  "name": "BalanceChange",
                   "ofType": null
                 }
               },
@@ -8126,8 +7379,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappParty",
-          "description": "A party to a snapp transaction",
+          "name": "ZkappParty",
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "data",
@@ -8455,49 +7708,6 @@
         },
         {
           "kind": "OBJECT",
-          "name": "TokenIdInterval",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
           "name": "ProtocolStatePredicate",
           "description": null,
           "fields": [
@@ -8506,18 +7716,6 @@
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "snarkedNextAvailableToken",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "TokenIdInterval",
-                "ofType": null
-              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8650,16 +7848,6 @@
         {
           "kind": "SCALAR",
           "name": "Fee",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Unit",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -9008,7 +8196,7 @@
         {
           "kind": "OBJECT",
           "name": "VerificationKeyWithHash",
-          "description": "Verification key with hash",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -9149,6 +8337,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "Unit",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "Field",
           "description": "String representing a public key in base58",
           "fields": null,
@@ -9160,7 +8358,7 @@
         {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a snapp Fee Payer Party",
+          "description": "Body component of a party",
           "fields": [
             {
               "name": "publicKey",
@@ -9179,22 +8377,6 @@
               "deprecationReason": null
             },
             {
-              "name": "update",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "PartyUpdate",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "tokenId",
               "description": null,
               "args": [],
@@ -9204,6 +8386,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Unit",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "update",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "PartyUpdate",
                   "ofType": null
                 }
               },
@@ -9370,9 +8568,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyPredicatedFeePayer",
-          "description":
-            "A party to a snapp transaction with a nonce predicate",
+          "name": "ZkappPartyPredicatedFeePayer",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -9414,9 +8611,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyFeePayer",
-          "description":
-            "A party to a snapp transaction with a signature authorization",
+          "name": "ZkappPartyFeePayer",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -9427,7 +8623,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyPredicatedFeePayer",
+                  "name": "ZkappPartyPredicatedFeePayer",
                   "ofType": null
                 }
               },
@@ -9470,7 +8666,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyFeePayer",
+                  "name": "ZkappPartyFeePayer",
                   "ofType": null
                 }
               },
@@ -9492,7 +8688,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappParty",
+                      "name": "ZkappParty",
                       "ofType": null
                     }
                   }
@@ -9896,6 +9092,26 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "UserCommandKind",
+          "description": "The kind of user command",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "ID",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "UserCommandDelegation",
           "description": null,
@@ -9919,1034 +9135,6 @@
             {
               "name": "delegatee",
               "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "kind",
-              "description": "String describing the kind of user command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UserCommandKind",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description":
-                "Sequence number of command for the fee-payer's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "source",
-              "description": "Account that the command is sent from",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiver",
-              "description": "Account that the command applies to",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description": "Account that pays the fees for the command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot number after which this transaction cannot be applied",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "token",
-              "description": "Token used for the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "amount",
-              "description":
-                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeToken",
-              "description": "Token used to pay the fee",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description":
-                "Fee that the fee-payer is willing to pay for making the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description":
-                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDelegation",
-              "description":
-                "If true, this command represents a delegation of stake",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use kind field instead"
-            },
-            {
-              "name": "from",
-              "description": "Public key of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "fromAccount",
-              "description": "Account of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "to",
-              "description": "Public key of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "toAccount",
-              "description": "Account of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "failureReason",
-              "description":
-                "null is no failure or status unknown, reason for failure otherwise.",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [
-            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
-          ],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "UserCommandNewToken",
-          "description": null,
-          "fields": [
-            {
-              "name": "tokenOwner",
-              "description":
-                "Public key to set as the owner of the new token",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "newAccountsDisabled",
-              "description":
-                "Whether new accounts created in this token are disabled",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "kind",
-              "description": "String describing the kind of user command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UserCommandKind",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description":
-                "Sequence number of command for the fee-payer's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "source",
-              "description": "Account that the command is sent from",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiver",
-              "description": "Account that the command applies to",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description": "Account that pays the fees for the command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot number after which this transaction cannot be applied",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "token",
-              "description": "Token used for the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "amount",
-              "description":
-                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeToken",
-              "description": "Token used to pay the fee",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description":
-                "Fee that the fee-payer is willing to pay for making the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description":
-                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDelegation",
-              "description":
-                "If true, this command represents a delegation of stake",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use kind field instead"
-            },
-            {
-              "name": "from",
-              "description": "Public key of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "fromAccount",
-              "description": "Account of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "to",
-              "description": "Public key of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "toAccount",
-              "description": "Account of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "failureReason",
-              "description":
-                "null is no failure or status unknown, reason for failure otherwise.",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [
-            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
-          ],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "UserCommandNewAccount",
-          "description": null,
-          "fields": [
-            {
-              "name": "tokenOwner",
-              "description":
-                "The account that owns the token for the new account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "disabled",
-              "description":
-                "Whether this account should be disabled upon creation. If this command was not issued by the token owner, it should match the 'newAccountsDisabled' property set in the token owner's account.",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "id",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "kind",
-              "description": "String describing the kind of user command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UserCommandKind",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description":
-                "Sequence number of command for the fee-payer's account",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "source",
-              "description": "Account that the command is sent from",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiver",
-              "description": "Account that the command applies to",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feePayer",
-              "description": "Account that pays the fees for the command",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "validUntil",
-              "description":
-                "The global slot number after which this transaction cannot be applied",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "token",
-              "description": "Token used for the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "amount",
-              "description":
-                "Amount that the source is sending to receiver; 0 for commands without an associated amount",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeToken",
-              "description": "Token used to pay the fee",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "fee",
-              "description":
-                "Fee that the fee-payer is willing to pay for making the transaction",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "memo",
-              "description":
-                "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDelegation",
-              "description":
-                "If true, this command represents a delegation of stake",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use kind field instead"
-            },
-            {
-              "name": "from",
-              "description": "Public key of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "fromAccount",
-              "description": "Account of the sender",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use feePayer field instead"
-            },
-            {
-              "name": "to",
-              "description": "Public key of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "toAccount",
-              "description": "Account of the receiver",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use receiver field instead"
-            },
-            {
-              "name": "failureReason",
-              "description":
-                "null is no failure or status unknown, reason for failure otherwise.",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [
-            { "kind": "INTERFACE", "name": "UserCommand", "ofType": null }
-          ],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "UserCommandKind",
-          "description": "The kind of user command",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "ID",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "UserCommandMintTokens",
-          "description": null,
-          "fields": [
-            {
-              "name": "tokenOwner",
-              "description": "The account that owns the token to mint",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11567,21 +9755,6 @@
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": [
-            {
-              "kind": "OBJECT",
-              "name": "UserCommandMintTokens",
-              "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "UserCommandNewAccount",
-              "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "UserCommandNewToken",
-              "ofType": null
-            },
             {
               "kind": "OBJECT",
               "name": "UserCommandDelegation",
@@ -12434,6 +10607,19 @@
               "deprecationReason": null
             },
             {
+              "name": "commandTransactionCount",
+              "description":
+                "Count of user command transactions in the block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "snarkJobs",
               "description": null,
               "args": [],
@@ -12511,6 +10697,49 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AccountId",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "tokenId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -13095,7 +11324,7 @@
           "kind": "SCALAR",
           "name": "TokenId",
           "description":
-            "String representation of a token's UInt64 identifier",
+            "String representation of a token's base58 identifier",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -13436,6 +11665,89 @@
                     "ofType": null
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Metrics",
+          "description": null,
+          "fields": [
+            {
+              "name": "blockProductionDelay",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffReceived",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolDiffBroadcasted",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionsAddedToPool",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolSize",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -14609,6 +12921,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "metrics",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Metrics",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -14873,7 +13201,7 @@
             },
             {
               "name": "tokenOwner",
-              "description": "Find the public key that owns a given token",
+              "description": "Find the account ID that owns a given token",
               "args": [
                 {
                   "name": "token",
@@ -14891,8 +13219,8 @@
                 }
               ],
               "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
+                "kind": "OBJECT",
+                "name": "AccountId",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -15350,23 +13678,6 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nextAvailableToken",
-              "description":
-                "The next token ID that has not been allocated. Token IDs are allocated sequentially, so all lower token IDs have been allocated",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null

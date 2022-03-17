@@ -102,7 +102,7 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 val commit : Mask.Attached.t -> unit
 
 module Transaction_applied : sig
-  open Transaction_logic
+  open Mina_transaction_logic
 
   module Signed_command_applied : sig
     module Common : sig
@@ -120,9 +120,6 @@ module Transaction_applied : sig
         | Payment of { previous_empty_accounts : Account_id.t list }
         | Stake_delegation of
             { previous_delegate : Public_key.Compressed.t option }
-        | Create_new_token of { created_token : Token_id.t }
-        | Create_token_account
-        | Mint_tokens
         | Failed
       [@@deriving sexp]
     end
@@ -231,7 +228,7 @@ val apply_parties_unchecked :
          , bool
          , unit
          , Transaction_status.Failure.Table.t )
-         Parties_logic.Local_state.t
+         Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
 
@@ -252,14 +249,14 @@ val merkle_root_after_parties_exn :
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Parties.Valid.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Ledger_hash.t
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Ledger_hash.t
 
 (** Raises if the ledger is full. *)
 val create_empty_exn : t -> Account_id.t -> Path.t * Account.t
@@ -288,4 +285,4 @@ type init_state =
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
+module Ledger_inner : Ledger_intf.S with type t = t

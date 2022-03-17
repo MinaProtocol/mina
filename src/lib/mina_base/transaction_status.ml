@@ -442,13 +442,12 @@ end
 module Auxiliary_data = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
         ; receiver_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
@@ -459,15 +458,14 @@ module Auxiliary_data = struct
   let empty =
     { fee_payer_account_creation_fee_paid = None
     ; receiver_account_creation_fee_paid = None
-    ; created_token = None
     }
 end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
+      | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
       | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
