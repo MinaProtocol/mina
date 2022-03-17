@@ -120,7 +120,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
   in
   let spec =
-    { Transaction_logic.For_tests.Transaction_spec.sender =
+    { Mina_transaction_logic.For_tests.Transaction_spec.sender =
         (keypair, Account.Nonce.zero)
     ; fee = Currency.Fee.of_int 10000000000 (*1 Mina*)
     ; receiver

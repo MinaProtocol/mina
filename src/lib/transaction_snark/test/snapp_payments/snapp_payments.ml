@@ -12,11 +12,11 @@ let%test_module "Snapp payments tests" =
     let memo = Signed_command_memo.create_from_string_exn "Snapp payments tests"
 
     let merkle_root_after_parties_exn t ~txn_state_view txn =
-      let hash, `Next_available_token tid =
+      let hash =
         Ledger.merkle_root_after_parties_exn
           ~constraint_constants:U.constraint_constants ~txn_state_view t txn
       in
-      (Frozen_ledger_hash.of_ledger_hash hash, `Next_available_token tid)
+      Frozen_ledger_hash.of_ledger_hash hash
 
     let signed_signed ~(wallets : U.Wallet.t array) i j : Parties.t =
       let full_amount = 8_000_000_000 in
@@ -118,7 +118,7 @@ let%test_module "Snapp payments tests" =
                 signed_signed ~wallets i j
               in
               let hash_pre = Ledger.merkle_root ledger in
-              let _target, `Next_available_token _next_available_token_after =
+              let _target =
                 let txn_state_view =
                   Mina_state.Protocol_state.Body.view U.genesis_state_body
                 in
@@ -128,7 +128,7 @@ let%test_module "Snapp payments tests" =
               [%test_eq: Field.t] hash_pre hash_post))
 
     let%test_unit "snapps-based payment" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
@@ -137,7 +137,7 @@ let%test_module "Snapp payments tests" =
           |> fun _ -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let partiess =

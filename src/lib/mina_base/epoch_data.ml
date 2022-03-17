@@ -19,7 +19,7 @@ module Poly = struct
         ; lock_checkpoint : 'lock_checkpoint
         ; epoch_length : 'length
         }
-      [@@deriving hlist, sexp, equal, compare, hash, yojson, fields]
+      [@@deriving annot, hlist, sexp, equal, compare, hash, yojson, fields]
     end
   end]
 end

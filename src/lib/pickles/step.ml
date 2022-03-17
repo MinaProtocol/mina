@@ -62,7 +62,7 @@ struct
       , _
       , (_, Max_branching.n) Vector.t )
       P.Base.Pairing_based.t
-      Deferred.t =
+      Promise.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -569,7 +569,7 @@ struct
             })
         |> to_list)
     in
-    let%map.Async_kernel.Deferred (next_proof : Tick.Proof.t) =
+    let%map.Promise (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in

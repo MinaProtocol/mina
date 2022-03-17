@@ -26,6 +26,7 @@
    random_oracle_nonconsensus
    mina_base_nonconsensus
    mina_base_nonconsensus.import
+   mina_transaction_nonconsensus
    snark_params_nonconsensus
    hex_nonconsensus
    mina_signature_kind

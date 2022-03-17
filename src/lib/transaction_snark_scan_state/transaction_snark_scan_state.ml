@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
 open O1trace
 module Ledger = Mina_ledger.Ledger
@@ -39,7 +40,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
@@ -85,7 +86,6 @@ module Job_view = struct
       type t =
         ( Frozen_ledger_hash.t
         , Pending_coinbase.Stack_versioned.t
-        , Token_id.t
         , Mina_state.Local_state.t )
         Mina_state.Registers.t
       [@@deriving to_yojson]
@@ -187,9 +187,6 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root ledger_witness
   in
-  let next_available_token_before =
-    Sparse_ledger.next_available_token ledger_witness
-  in
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
@@ -202,7 +199,6 @@ let create_expected_statement ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction)
     |> Or_error.join
   in
-  let next_available_token_after = Sparse_ledger.next_available_token after in
   let target_merkle_root =
     Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
   in
@@ -231,13 +227,11 @@ let create_expected_statement ~constraint_constants
   { Transaction_snark.Statement.source =
       { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
-      ; next_available_token = next_available_token_before
       ; local_state = empty_local_state
       }
   ; target =
       { ledger = target_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
-      ; next_available_token = next_available_token_after
       ; local_state = empty_local_state
       }
   ; fee_excess
@@ -274,14 +268,6 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             s'.source.pending_coinbase_stack
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
-      and () =
-        if
-          Token_id.equal s.target.next_available_token
-            s'.source.next_available_token
-        then Ok ()
-        else
-          Or_error.error_string
-            "Statements have incompatible next_available_token state"
       in
       let statement : Transaction_snark.Statement.t =
         { source = s.source
@@ -550,14 +536,12 @@ struct
       ~(registers_begin :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
-         , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t
          option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
-         , Token_id.t
          , Mina_state.Local_state.t )
          Mina_state.Registers.t) =
     let clarify_error cond err =
@@ -572,17 +556,13 @@ struct
           "did not connect with snarked ledger hash"
       and () =
         clarify_error
-          (Token_id.equal reg1.next_available_token reg2.next_available_token)
-          "did not connect with next available token"
-      and () =
-        clarify_error
           (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack
              ~second:reg2.pending_coinbase_stack ())
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
-          (Parties_logic.Local_state.Value.equal reg1.local_state
-             reg2.local_state)
+          (Mina_transaction_logic.Parties_logic.Local_state.Value.equal
+             reg1.local_state reg2.local_state)
           "did not connect with local state"
       in
       ()
@@ -796,7 +776,7 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Transaction_logic.Transaction_applied.transaction_with_status
+            Mina_transaction_logic.Transaction_applied.transaction_with_status
               transaction_with_info
           in
           let%bind protocol_state_body =

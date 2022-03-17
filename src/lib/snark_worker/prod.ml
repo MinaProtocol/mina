@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+open Mina_transaction
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
