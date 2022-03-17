@@ -2,6 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Mina_base
+open Mina_transaction
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
