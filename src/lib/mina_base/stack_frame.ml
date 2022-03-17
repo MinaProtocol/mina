@@ -9,19 +9,14 @@ module Stable = struct
   end
 end]
 
-type value =
-  ( (Account_id.t, bool) Caller.t
-  , (Party.t, Parties.Digest.t) Parties.Call_forest.t )
-  t
+type value = (Token_id.t, (Party.t, Parties.Digest.t) Parties.Call_forest.t) t
 
 let to_input (type p)
     ({ caller; caller_caller; calls } :
-      ( (Account_id.t, bool) Caller.t
-      , (p, Parties.Digest.t) Parties.Call_forest.t )
-      t) =
+      (Token_id.t, (p, Parties.Digest.t) Parties.Call_forest.t) t) =
   List.reduce_exn ~f:Random_oracle.Input.Chunked.append
-    [ Caller.to_input caller
-    ; Caller.to_input caller_caller
+    [ Token_id.to_input caller
+    ; Token_id.to_input caller_caller
     ; Random_oracle.Input.Chunked.field (Parties.Call_forest.hash calls)
     ]
 
@@ -30,12 +25,12 @@ let hash frame =
     (Random_oracle.pack_input (to_input frame))
 
 module Checked = struct
-  type nonrec 'parties t = (Caller.Checked.t, 'parties) t
+  type nonrec 'parties t = (Token_id.Checked.t, 'parties) t
 
-  let if_ f b ~then_ ~else_ =
-    { caller = Caller.Checked.if_ b ~then_:then_.caller ~else_:else_.caller
+  let if_ f b ~then_ ~else_ : _ t =
+    { caller = Token_id.Checked.if_ b ~then_:then_.caller ~else_:else_.caller
     ; caller_caller =
-        Caller.Checked.if_ b ~then_:then_.caller_caller
+        Token_id.Checked.if_ b ~then_:then_.caller_caller
           ~else_:else_.caller_caller
     ; calls = f b ~then_:then_.calls ~else_:else_.calls
     }

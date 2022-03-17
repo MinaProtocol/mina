@@ -1,0 +1,70 @@
+[package]
+name = "plonk_wasm"
+version = "0.1.0"
+authors = ["opensource@o1labs.org"]
+description = "WASM stubs for plonk proof systems"
+repository = "https://github.com/MinaProtocol/mina"
+license = "MIT/Apache-2.0"
+edition = "2018"
+
+[lib]
+name = "plonk_wasm"
+crate-type = ["cdylib"]
+
+################################# Dependencies ################################
+
+[dependencies]
+#wasm-bindgen-rayon = { version = "1.0", features = ["no-bundler"] }
+wasm-bindgen-rayon = { path = "../../../../external/wasm-bindgen-rayon", features = ["no-bundler"] }
+wasm-bindgen = { version = "0.2.78" }
+console_error_panic_hook = { version = "0.1.6" }
+web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
+
+libc = { version = "0.2.0" }
+
+# arkworks
+ark-ff = { version = "0.3.0", features = ["parallel"] }
+ark-serialize = "0.3.0"
+ark-ec = { version = "0.3.0", features = ["parallel"] }
+ark-poly = { version = "0.3.0", features = ["parallel"] }
+
+# proof-systems
+commitment_dlog = { path = "../../proof-systems/poly-commitment" }
+groupmap = { path = "../../proof-systems/groupmap" }
+mina-curves = { path = "../../proof-systems/curves" }
+o1-utils = { path = "../../proof-systems/utils" }
+oracle = { path = "../../proof-systems/oracle" }
+kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
+
+rand = { version = "0.8.0" }
+getrandom = { version = "0.2", features = ["js"] }
+#num-bigint = { version = "0.2.3" }
+#sprs = { version = "0.7.1" }
+
+#rand = { version = "0.8.0", features = [ "wasm-bindgen" ] }
+num-bigint = { version = "0.4.0" }
+paste = "1.0.5"
+sprs = { version = "0.11.0" }
+rayon = { version = "1" }
+array-init = "2.0.0"
+
+serde = "1.0.130"
+rmp-serde = "1.0.0"
+serde_json = "1.0"
+
+[profile.release]
+debug = true
+
+[features]
+nodejs = ["wasm-bindgen-rayon/no-modules"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+#wasm-opt = ["-O4", "--detect-features", "--enable-mutable-globals" ]
+#wasm-opt = ["-O4", "--enable-mutable-globals"]
+
+[build]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]

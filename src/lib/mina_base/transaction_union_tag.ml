@@ -10,7 +10,7 @@ open Snark_params.Tick
 
 [%%else]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 

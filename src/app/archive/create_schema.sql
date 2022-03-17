@@ -25,6 +25,7 @@ CREATE TABLE public_keys
 , value text   NOT NULL UNIQUE
 );
 
+CREATE INDEX idx_public_keys_id ON public_keys(id);
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
 /* the initial balance is the balance at genesis, whether the account is timed or not
@@ -33,7 +34,7 @@ CREATE INDEX idx_public_keys_value ON public_keys(value);
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , public_key_id           int       NOT NULL REFERENCES public_keys(id)
-, token                   bigint    NOT NULL
+, token                   text      NOT NULL
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
@@ -61,8 +62,8 @@ CREATE TABLE user_commands
 , fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token      bigint              NOT NULL
-, token          bigint              NOT NULL
+, fee_token      text                NOT NULL
+, token          text                NOT NULL
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -78,7 +79,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, token       bigint                NOT NULL
+, token       text                  NOT NULL
 , hash        text                  NOT NULL
 , UNIQUE (hash,type)
 );
@@ -126,7 +127,6 @@ CREATE TABLE blocks
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
 , min_window_density           bigint NOT NULL
 , total_currency               bigint NOT NULL
-, next_available_token         bigint NOT NULL
 , ledger_hash                  text   NOT NULL
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL
@@ -142,20 +142,32 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
-/* a balance is associated with a public key after a particular transaction
-   the token id is given by the transaction, but implicit in this table
+/* the block_* columns refer to the block containing a user command or internal command that
+    results in a balance
+   for a balance resulting from a user command, the secondary sequence no is always 0
+   these columns duplicate information available in the
+    blocks_user_commands and blocks_internal_commands tables
+   they are included here to allow Rosetta account queries to consume
+    fewer Postgresql resources
+   TODO: nonce column is NULLable until we can establish valid nonces for all rows
 */
+
 CREATE TABLE balances
-( id            serial PRIMARY KEY
-, public_key_id int    NOT NULL REFERENCES public_keys(id)
-, balance       bigint NOT NULL
+( id                           serial PRIMARY KEY
+, public_key_id                int    NOT NULL REFERENCES public_keys(id)
+, balance                      bigint NOT NULL
+, block_id                     int    NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
+, block_height                 int    NOT NULL
+, block_sequence_no            int    NOT NULL
+, block_secondary_sequence_no  int    NOT NULL
+, nonce                        bigint
+, UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
 );
 
-/* a join table between blocks and user_commands, with some additional information
-   sequence_no gives the order within all transactions in the block
+CREATE INDEX idx_balances_id ON balances(id);
+CREATE INDEX idx_balances_public_key_id ON balances(public_key_id);
+CREATE INDEX idx_balances_height_seq_nos ON balances(block_height,block_sequence_no,block_secondary_sequence_no);
 
-   Blocks command convention
-*/
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
@@ -164,7 +176,7 @@ CREATE TABLE blocks_user_commands
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
-, created_token     bigint
+, created_token     text
 , fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
 , receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE
@@ -173,6 +185,9 @@ CREATE TABLE blocks_user_commands
 
 CREATE INDEX idx_blocks_user_commands_block_id ON blocks_user_commands(block_id);
 CREATE INDEX idx_blocks_user_commands_user_command_id ON blocks_user_commands(user_command_id);
+CREATE INDEX idx_blocks_user_commands_fee_payer_balance ON blocks_user_commands(fee_payer_balance);
+CREATE INDEX idx_blocks_user_commands_source_balance ON blocks_user_commands(source_balance);
+CREATE INDEX idx_blocks_user_commands_receiver_balance ON blocks_user_commands(receiver_balance);
 
 /* a join table between blocks and internal_commands, with some additional information
    the pair sequence_no, secondary_sequence_no gives the order within all transactions in the block
@@ -191,6 +206,7 @@ CREATE TABLE blocks_internal_commands
 
 CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(block_id);
 CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
+CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
 
 /* in this file because reference to balances doesn't work if in snapp_tables.sql */
 CREATE TABLE snapp_party_balances

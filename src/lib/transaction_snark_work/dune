@@ -1,6 +1,20 @@
 (library
  (name transaction_snark_work)
  (public_name transaction_snark_work)
- (libraries core_kernel mina_base ledger_proof one_or_two transaction_snark)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   sexplib0
+   bin_prot.shape
+   base.caml
+   base.base_internalhash_types
+   core
+   ;; local libraries
+   currency
+   transaction_snark
+   one_or_two
+   ledger_proof
+   signature_lib
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

@@ -3,12 +3,27 @@
  (name archive_blocks)
  (public_name archive_blocks)
  (libraries
+   ;; opam libraries
+   async_unix
+   core
+   result
+   async_kernel
+   uri
+   stdio
+   caqti-driver-postgresql
+   caqti
    async
    core_kernel
-   caqti
    caqti-async
-   caqti-driver-postgresql
-   archive_lib)
+   base
+   base.caml
+   async.async_command
+   ;; local libraries
+   logger
+   mina_transition
+   genesis_constants
+   archive_lib
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

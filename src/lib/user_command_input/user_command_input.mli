@@ -9,7 +9,7 @@ module Payload : sig
   module Common : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         type t [@@deriving sexp, to_yojson]
       end
     end]
@@ -19,7 +19,7 @@ module Payload : sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
@@ -42,9 +42,9 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
       Signed_command.Poly.Stable.V1.t
@@ -57,7 +57,6 @@ val fee_payer : t -> Account_id.t
 val create :
      ?nonce:Account.Nonce.t
   -> fee:Currency.Fee.t
-  -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> valid_until:Global_slot.t option
   -> memo:Signed_command_memo.t

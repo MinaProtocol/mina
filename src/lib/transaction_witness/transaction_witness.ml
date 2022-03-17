@@ -2,6 +2,7 @@ open Core_kernel
 
 module Parties_segment_witness = struct
   open Mina_base
+  open Mina_ledger
   open Currency
 
   (* TODO: Don't serialize all the hashes in here. *)
@@ -49,10 +50,10 @@ module Stable = struct
   module V2 = struct
     type t =
       { transaction : Mina_base.Transaction.Stable.V2.t
-      ; ledger : Mina_base.Sparse_ledger.Stable.V2.t
+      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-      ; status : Mina_base.Transaction_status.Stable.V1.t
+      ; status : Mina_base.Transaction_status.Stable.V2.t
       }
     [@@deriving sexp, to_yojson]
 

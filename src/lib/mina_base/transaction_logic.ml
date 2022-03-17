@@ -27,10 +27,6 @@ module type Ledger_intf = sig
 
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
-  val next_available_token : t -> Token_id.t
-
-  val set_next_available_token : t -> Token_id.t -> unit
-
   val empty : depth:int -> unit -> t
 
   val create_masked : t -> t
@@ -45,9 +41,9 @@ module Transaction_applied = struct
     module Common = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t =
-            { user_command : Signed_command.Stable.V1.t With_status.Stable.V1.t
+            { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t
             ; previous_receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
             ; fee_payer_timing : Account.Timing.Stable.V1.t
             ; source_timing : Account.Timing.Stable.V1.t option
@@ -62,15 +58,12 @@ module Transaction_applied = struct
     module Body = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t =
             | Payment of
-                { previous_empty_accounts : Account_id.Stable.V1.t list }
+                { previous_empty_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
                 { previous_delegate : Public_key.Compressed.Stable.V1.t option }
-            | Create_new_token of { created_token : Token_id.Stable.V1.t }
-            | Create_token_account
-            | Mint_tokens
             | Failed
           [@@deriving sexp]
 
@@ -81,24 +74,8 @@ module Transaction_applied = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = { common : Common.Stable.V1.t; body : Body.Stable.V1.t }
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  module Snapp_command_applied = struct
-    [%%versioned
-    module Stable = struct
       module V2 = struct
-        type t =
-          { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Snapp_command.Stable.V2.t With_status.Stable.V1.t
-          }
+        type t = { common : Common.Stable.V2.t; body : Body.Stable.V2.t }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -112,8 +89,8 @@ module Transaction_applied = struct
       module V1 = struct
         type t =
           { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
-          ; command : Parties.Stable.V1.t With_status.Stable.V1.t
+              (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
+          ; command : Parties.Stable.V1.t With_status.Stable.V2.t
           }
         [@@deriving sexp]
 
@@ -127,7 +104,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          | Signed_command of Signed_command_applied.Stable.V1.t
+          | Signed_command of Signed_command_applied.Stable.V2.t
           | Parties of Parties_applied.Stable.V1.t
         [@@deriving sexp]
 
@@ -139,10 +116,10 @@ module Transaction_applied = struct
   module Fee_transfer_applied = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          { fee_transfer : Fee_transfer.Stable.V1.t
-          ; previous_empty_accounts : Account_id.Stable.V1.t list
+          { fee_transfer : Fee_transfer.Stable.V2.t
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
           ; balances : Transaction_status.Fee_transfer_balance_data.Stable.V1.t
           }
@@ -156,10 +133,10 @@ module Transaction_applied = struct
   module Coinbase_applied = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { coinbase : Coinbase.Stable.V1.t
-          ; previous_empty_accounts : Account_id.Stable.V1.t list
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
           ; balances : Transaction_status.Coinbase_balance_data.Stable.V1.t
           }
@@ -176,8 +153,8 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           | Command of Command_applied.Stable.V2.t
-          | Fee_transfer of Fee_transfer_applied.Stable.V1.t
-          | Coinbase of Coinbase_applied.Stable.V1.t
+          | Fee_transfer of Fee_transfer_applied.Stable.V2.t
+          | Coinbase of Coinbase_applied.Stable.V2.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -264,9 +241,6 @@ module type S = sig
           | Payment of { previous_empty_accounts : Account_id.t list }
           | Stake_delegation of
               { previous_delegate : Public_key.Compressed.t option }
-          | Create_new_token of { created_token : Token_id.t }
-          | Create_token_account
-          | Mint_tokens
           | Failed
         [@@deriving sexp]
       end
@@ -430,14 +404,14 @@ module type S = sig
     -> txn_state_view:Snapp_predicate.Protocol_state.View.t
     -> ledger
     -> Parties.Valid.t
-    -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+    -> Ledger_hash.t
 
   val merkle_root_after_user_command_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
     -> ledger
     -> Signed_command.With_valid_signature.t
-    -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+    -> Ledger_hash.t
 
   val undo :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -480,25 +454,33 @@ let timing_error_to_user_command_status err =
   | _ ->
       failwith "Unexpected timed account validation error"
 
-let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
+(** [validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot]
+    returns a tuple of 3 values:
+    * [[`Insufficient_balance of bool | `Invalid_timing of bool]] encodes
+      possible errors, with the invariant that the return value is always
+      [`Invalid_timing false] if there was no error.
+      - [`Insufficient_balance true] results if [txn_amount] is larger than the
+        balance held in [account].
+      - [`Invalid_timing true] results if [txn_amount] is larger than the
+        balance available in [account] at global slot [txn_global_slot].
+    * [Timing.t], the new timing for [account] calculated at [txn_global_slot].
+    * [[`Min_balance of Balance.t]] returns the computed available balance at
+      [txn_global_slot].
+      - NOTE: We skip this calculation if the error is
+        [`Insufficient_balance true].  In this scenario, this value MUST NOT be
+        used, as it contains an incorrect placeholder value.
+*)
+let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
-  let nsf_error kind =
-    Or_error.errorf
-      !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
-        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
-        is insufficient"
-      kind txn_amount txn_global_slot account.balance
-    |> Or_error.tag ~tag:nsf_tag
-  in
   match account.timing with
   | Untimed -> (
       (* no time restrictions *)
       match Balance.(account.balance - txn_amount) with
       | None ->
-          nsf_error "untimed"
+          (`Insufficient_balance true, Untimed, `Min_balance Balance.zero)
       | _ ->
-          Or_error.return (Untimed, `Min_balance Balance.zero) )
+          (`Invalid_timing false, Untimed, `Min_balance Balance.zero) )
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -506,25 +488,16 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       ; vesting_period
       ; vesting_increment
       } ->
-      let open Or_error.Let_syntax in
-      let%map curr_min_balance =
+      let invalid_balance, invalid_timing, curr_min_balance =
         let account_balance = account.balance in
-        let min_balance_error min_balance =
-          Or_error.errorf
-            !"For timed account, the requested transaction for amount %{sexp: \
-              Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
-              transaction would put the balance below the calculated minimum \
-              balance of %{sexp: Balance.t}"
-            txn_amount txn_global_slot min_balance
-          |> Or_error.tag ~tag:min_balance_tag
-        in
         match Balance.(account_balance - txn_amount) with
         | None ->
-            (* checking for sufficient funds may be redundant with a check elsewhere
-               regardless, the transaction would put the account below any calculated minimum balance
-               so don't bother with the remaining computations
+            (* NB: The [initial_minimum_balance] here is the incorrect value,
+               but:
+               * we don't use it anywhere in this error case; and
+               * we don't want to waste time computing it if it will be unused.
             *)
-            nsf_error "timed"
+            (true, false, initial_minimum_balance)
         | Some proposed_new_balance ->
             let curr_min_balance =
               Account.min_balance_at_slot ~global_slot:txn_global_slot
@@ -532,13 +505,49 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
                 ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
-              min_balance_error curr_min_balance
-            else Or_error.return curr_min_balance
+              (false, true, curr_min_balance)
+            else (false, false, curr_min_balance)
       in
       (* once the calculated minimum balance becomes zero, the account becomes untimed *)
+      let possibly_error =
+        if invalid_balance then `Insufficient_balance invalid_balance
+        else `Invalid_timing invalid_timing
+      in
       if Balance.(curr_min_balance > zero) then
-        (account.timing, `Min_balance curr_min_balance)
-      else (Untimed, `Min_balance Balance.zero)
+        (possibly_error, account.timing, `Min_balance curr_min_balance)
+      else (possibly_error, Untimed, `Min_balance Balance.zero)
+
+let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
+  let open Or_error.Let_syntax in
+  let nsf_error kind =
+    Or_error.errorf
+      !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
+        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
+        is insufficient"
+      kind txn_amount txn_global_slot account.Account.Poly.balance
+    |> Or_error.tag ~tag:nsf_tag
+  in
+  let min_balance_error min_balance =
+    Or_error.errorf
+      !"For timed account, the requested transaction for amount %{sexp: \
+        Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
+        transaction would put the balance below the calculated minimum balance \
+        of %{sexp: Balance.t}"
+      txn_amount txn_global_slot min_balance
+    |> Or_error.tag ~tag:min_balance_tag
+  in
+  let possibly_error, timing, (`Min_balance curr_min_balance as min_balance) =
+    validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot
+  in
+  match possibly_error with
+  | `Insufficient_balance true ->
+      nsf_error "timed"
+  | `Invalid_timing true ->
+      min_balance_error curr_min_balance
+  | `Insufficient_balance false ->
+      failwith "Broken invariant in validate_timing_with_min_balance'"
+  | `Invalid_timing false ->
+      return (timing, min_balance)
 
 let validate_timing ~account ~txn_amount ~txn_global_slot =
   let open Result.Let_syntax in
@@ -805,56 +814,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind () =
       set_with_location ledger fee_payer_location fee_payer_account
     in
-    let next_available_token = next_available_token ledger in
-    let source = Signed_command.source ~next_available_token user_command in
-    let receiver = Signed_command.receiver ~next_available_token user_command in
+    let source = Signed_command.source user_command in
+    let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
     let ok_or_reject = function Ok x -> x | Error err -> raise (Reject err) in
-    let charge_account_creation_fee_exn (account : Account.t) =
-      let balance =
-        Option.value_exn
-          (Balance.sub_amount account.balance
-             (Amount.of_fee constraint_constants.account_creation_fee))
-      in
-      let account = { account with balance } in
-      let timing =
-        Or_error.ok_exn
-          (validate_timing ~txn_amount:Amount.zero
-             ~txn_global_slot:current_global_slot ~account)
-      in
-      { account with timing }
-    in
     let compute_updates () =
       let open Result.Let_syntax in
       (* Compute the necessary changes to apply the command, failing if any of
          the conditions are not met.
       *)
-      let%bind predicate_passed =
-        if
-          Public_key.Compressed.equal
-            (Signed_command.fee_payer_pk user_command)
-            (Signed_command.source_pk user_command)
-        then return true
-        else
-          match payload.body with
-          | Create_new_token _ ->
-              (* Any account is allowed to create a new token associated with a
-                 public key.
-              *)
-              return true
-          | Create_token_account _ ->
-              (* Predicate failure is deferred here. It will be checked later. *)
-              let predicate_result =
-                (* TODO(#4554): Hook predicate evaluation in here once
-                   implemented.
-                *)
-                false
-              in
-              return predicate_result
-          | Payment _ | Stake_delegation _ | Mint_tokens _ ->
-              (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
-              Result.fail Transaction_status.Failure.Predicate
-      in
       match payload.body with
       | Stake_delegation _ ->
           let receiver_location, _receiver_account =
@@ -894,7 +862,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Transaction_status.Auxiliary_data.empty
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
-      | Payment { amount; token_id = token; _ } ->
+      | Payment { amount; _ } ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
@@ -960,15 +928,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `Existing _ ->
                 return amount
             | `New ->
-                if Token_id.(equal default) token then
-                  (* Subtract the creation fee from the transaction amount. *)
-                  sub_account_creation_fee ~constraint_constants `Added amount
-                  |> Result.map_error ~f:(fun _ ->
-                         Transaction_status.Failure
-                         .Amount_insufficient_to_create_account)
-                else
-                  Result.fail
-                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
+                (* Subtract the creation fee from the transaction amount. *)
+                sub_account_creation_fee ~constraint_constants `Added amount
+                |> Result.map_error ~f:(fun _ ->
+                       Transaction_status.Failure
+                       .Amount_insufficient_to_create_account)
           in
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
@@ -993,181 +957,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , auxiliary_data
           , Transaction_applied.Signed_command_applied.Body.Payment
               { previous_empty_accounts } )
-      | Create_new_token { disable_new_accounts; _ } ->
-          (* NOTE: source and receiver are definitionally equal here. *)
-          let fee_payer_account =
-            Or_error.try_with (fun () ->
-                charge_account_creation_fee_exn fee_payer_account)
-            |> ok_or_reject
-          in
-          let receiver_location, receiver_account =
-            get_with_location ledger receiver |> ok_or_reject
-          in
-          ( match receiver_location with
-          | `New ->
-              ()
-          | _ ->
-              failwith
-                "Token owner account for newly created token already exists?!?!"
-          ) ;
-          let receiver_account =
-            { receiver_account with
-              token_permissions =
-                Token_permissions.Token_owned { disable_new_accounts }
-            }
-          in
-          return
-            ( [ (fee_payer_location, fee_payer_account)
-              ; (receiver_location, receiver_account)
-              ]
-            , `Source_timing receiver_account.timing
-            , { Transaction_status.Auxiliary_data.empty with
-                fee_payer_account_creation_fee_paid =
-                  Some (Amount.of_fee constraint_constants.account_creation_fee)
-              ; created_token = Some next_available_token
-              }
-            , Transaction_applied.Signed_command_applied.Body.Create_new_token
-                { created_token = next_available_token } )
-      | Create_token_account { account_disabled; _ } ->
-          if
-            account_disabled
-            && Token_id.(equal default) (Account_id.token_id receiver)
-          then
-            raise
-              (Reject
-                 (Error.createf
-                    "Cannot open a disabled account in the default token")) ;
-          let fee_payer_account =
-            Or_error.try_with (fun () ->
-                charge_account_creation_fee_exn fee_payer_account)
-            |> ok_or_reject
-          in
-          let receiver_location, receiver_account =
-            get_with_location ledger receiver |> ok_or_reject
-          in
-          let%bind () =
-            match receiver_location with
-            | `New ->
-                return ()
-            | `Existing _ ->
-                Result.fail Transaction_status.Failure.Receiver_already_exists
-          in
-          let receiver_account =
-            { receiver_account with
-              token_permissions =
-                Token_permissions.Not_owned { account_disabled }
-            }
-          in
-          let source_location, source_account =
-            get_with_location ledger source |> ok_or_reject
-          in
-          let%bind source_account =
-            if Account_id.equal source receiver then return receiver_account
-            else if Account_id.equal source fee_payer then
-              return fee_payer_account
-            else
-              match source_location with
-              | `New ->
-                  Result.fail Transaction_status.Failure.Source_not_present
-              | `Existing _ ->
-                  return source_account
-          in
-          let%bind () =
-            match source_account.token_permissions with
-            | Token_owned { disable_new_accounts } ->
-                if
-                  not
-                    ( Bool.equal account_disabled disable_new_accounts
-                    || predicate_passed )
-                then
-                  Result.fail
-                    Transaction_status.Failure.Mismatched_token_permissions
-                else return ()
-            | Not_owned _ ->
-                if Token_id.(equal default) (Account_id.token_id receiver) then
-                  return ()
-                else Result.fail Transaction_status.Failure.Not_token_owner
-          in
-          let source_timing = source_account.timing in
-          let%map source_account =
-            let%map timing =
-              validate_timing ~txn_amount:Amount.zero
-                ~txn_global_slot:current_global_slot ~account:source_account
-              |> Result.map_error ~f:timing_error_to_user_command_status
-            in
-            { source_account with timing }
-          in
-          let located_accounts =
-            if Account_id.equal source receiver then
-              (* For token_id= default, we allow this *)
-              [ (fee_payer_location, fee_payer_account)
-              ; (source_location, source_account)
-              ]
-            else
-              [ (receiver_location, receiver_account)
-              ; (fee_payer_location, fee_payer_account)
-              ; (source_location, source_account)
-              ]
-          in
-          ( located_accounts
-          , `Source_timing source_timing
-          , { Transaction_status.Auxiliary_data.empty with
-              fee_payer_account_creation_fee_paid =
-                Some (Amount.of_fee constraint_constants.account_creation_fee)
-            }
-          , Transaction_applied.Signed_command_applied.Body.Create_token_account
-          )
-      | Mint_tokens { token_id = token; amount; _ } ->
-          let%bind () =
-            if Token_id.(equal default) token then
-              Result.fail Transaction_status.Failure.Not_token_owner
-            else return ()
-          in
-          let receiver_location, receiver_account =
-            get_with_location ledger receiver |> ok_or_reject
-          in
-          let%bind () =
-            match receiver_location with
-            | `Existing _ ->
-                return ()
-            | `New ->
-                Result.fail Transaction_status.Failure.Receiver_not_present
-          in
-          let%bind receiver_account = incr_balance receiver_account amount in
-          let%map source_location, source_timing, source_account =
-            let location, account =
-              if Account_id.equal source receiver then
-                (receiver_location, receiver_account)
-              else get_with_location ledger source |> ok_or_reject
-            in
-            let%bind () =
-              match location with
-              | `Existing _ ->
-                  return ()
-              | `New ->
-                  Result.fail Transaction_status.Failure.Source_not_present
-            in
-            let%bind () =
-              match account.token_permissions with
-              | Token_owned _ ->
-                  return ()
-              | Not_owned _ ->
-                  Result.fail Transaction_status.Failure.Not_token_owner
-            in
-            let source_timing = account.timing in
-            let%map timing =
-              validate_timing ~txn_amount:Amount.zero
-                ~txn_global_slot:current_global_slot ~account
-              |> Result.map_error ~f:timing_error_to_user_command_status
-            in
-            (location, source_timing, { account with timing })
-          in
-          ( [ (receiver_location, receiver_account)
-            ; (source_location, source_account)
-            ]
-          , `Source_timing source_timing
-          , Transaction_status.Auxiliary_data.empty
-          , Transaction_applied.Signed_command_applied.Body.Mint_tokens )
     in
     let compute_balances () =
       let compute_balance account_id =
@@ -1232,41 +1021,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (Signed_command.forget_check user_command)
 
-  let opt_fail e = function Some x -> Ok x | None -> Error (failure e)
-
-  let add_signed_amount b (a : Amount.Signed.t) =
-    ( match a.sgn with
-    | Pos ->
-        Balance.add_amount b a.magnitude
-    | Neg ->
-        Balance.sub_amount b a.magnitude )
-    |> opt_fail Overflow
-
-  let check e b = if b then Ok () else Error (failure e)
-
-  open Pickles_types
-
-  let apply_body
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth
-      ~has_proof ~is_new ~global_slot_since_genesis ~is_start
+  let apply_body ~is_start
       ({ body =
            { public_key = _
-           ; token_id
+           ; token_id = _
            ; update =
-               { app_state
-               ; delegate
-               ; verification_key
-               ; permissions
-               ; snapp_uri
-               ; token_symbol
+               { app_state = _
+               ; delegate = _
+               ; verification_key = _
+               ; permissions = _
+               ; snapp_uri = _
+               ; token_symbol = _
                ; timing = _
+               ; voting_for = _
                }
-           ; balance_change
+           ; balance_change = _
            ; increment_nonce
            ; events = _ (* This is for the snapp to use, we don't need it. *)
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-           ; sequence_events
+           ; sequence_events = _
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
            ; protocol_state = _
            ; use_full_commitment
@@ -1275,159 +1048,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        ; predicate
        } :
         Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
-    let open Snapp_basic in
     let open Result.Let_syntax in
-    let%bind balance =
-      let%bind b = add_signed_amount a.balance balance_change in
-      let fee = constraint_constants.account_creation_fee in
-      let%bind () =
-        (* TODO: Fix when we want to enable tokens. The trickiness here is we need to subtract
-           the account creation fee from somewhere (like the fee excess in the local state) *)
-        if Token_id.(equal default) token_id then Ok ()
-        else Error Transaction_status.Failure.Cannot_pay_creation_fee_in_token
-      in
-      if is_new then
-        Balance.sub_amount b (Amount.of_fee fee)
-        |> opt_fail Amount_insufficient_to_create_account
-      else Ok b
-    in
-    (* Check send/receive permissions *)
-    let%bind () =
-      if Amount.(equal zero) balance_change.magnitude then Ok ()
-      else
-        check Update_not_permitted_balance
-          (check_auth
-             ( match balance_change.sgn with
-             | Pos ->
-                 a.permissions.receive
-             | Neg ->
-                 a.permissions.send ))
-    in
-    (* Check timing. *)
-    let%bind timing =
-      match balance_change.sgn with
-      | Pos when not is_new ->
-          Ok a.timing
-      | _ ->
-          let txn_amount =
-            match balance_change.sgn with
-            | Pos ->
-                Amount.zero
-            | Neg ->
-                balance_change.magnitude
-          in
-          validate_timing ~txn_amount
-            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
-          |> Result.map_error ~f:timing_error_to_user_command_status
-    in
-    let init =
-      match a.snapp with None -> Snapp_account.default | Some a -> a
-    in
-    let update perm u curr ~is_keep ~update ~error =
-      match check_auth perm with
-      | false ->
-          let%map () = check error (is_keep u) in
-          curr
-      | true ->
-          Ok (update u curr)
-    in
-    let%bind delegate =
-      if Token_id.(equal default) a.token_id then
-        update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
-          ~error:Update_not_permitted_delegate
-      else return a.delegate
-    in
-    let%bind snapp =
-      let proved_state =
-        let is_keep = Vector.for_all ~f:Set_or_keep.is_keep app_state in
-        if is_keep then init.proved_state
-        else if not has_proof then false
-        else if Vector.for_all ~f:Set_or_keep.is_set app_state then true
-        else init.proved_state
-      in
-      let%map app_state =
-        update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
-          ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
-          ~error:Update_not_permitted_app_state
-      and verification_key =
-        update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x ->
-            match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
-          ~error:Update_not_permitted_verification_key
-      and sequence_state, last_sequence_slot =
-        let [ s1; s2; s3; s4; s5 ] = init.sequence_state in
-        let last_sequence_slot = init.last_sequence_slot in
-        let is_this_slot =
-          Mina_numbers.Global_slot.equal global_slot_since_genesis
-            last_sequence_slot
-        in
-        (* Shift along if last update wasn't this slot *)
-        let s5 = if is_this_slot then s5 else s4 in
-        let s4 = if is_this_slot then s4 else s3 in
-        let s3 = if is_this_slot then s3 else s2 in
-        let s2 = if is_this_slot then s2 else s1 in
-        (* Push events to s1 *)
-        let is_empty = List.is_empty sequence_events in
-        let s1 =
-          if is_empty then s1
-          else Party.Sequence_events.push_events s1 sequence_events
-        in
-        let new_sequence_state =
-          if is_empty then Set_or_keep.Keep
-          else
-            Set_or_keep.Set
-              ( ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-              , global_slot_since_genesis )
-        in
-        update a.permissions.edit_sequence_state new_sequence_state
-          (init.sequence_state, init.last_sequence_slot)
-          ~is_keep:Set_or_keep.is_keep
-          ~update:(fun u x -> match u with Keep -> x | Set x -> x)
-          ~error:Update_not_permitted_sequence_state
-      in
-      let snapp_version =
-        (* Current snapp version. Upgrade mechanism should live here. *)
-        Mina_numbers.Snapp_version.zero
-      in
-      let t : Snapp_account.t =
-        { app_state
-        ; verification_key
-        ; snapp_version
-        ; sequence_state
-        ; last_sequence_slot
-        ; proved_state
-        }
-      in
-      if Snapp_account.(equal default t) then None else Some t
-    in
-    let%bind snapp_uri =
-      update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_snapp_uri
-    in
-    let%bind token_symbol =
-      update a.permissions.set_token_symbol token_symbol a.token_symbol
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_token_symbol
-    in
-    let%bind permissions =
-      update a.permissions.set_permissions permissions a.permissions
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_permissions
-    in
-    let%bind nonce =
-      let update_nonce =
-        if increment_nonce then Set_or_keep.Set (Account.Nonce.succ a.nonce)
-        else Set_or_keep.Keep
-      in
-      update a.permissions.increment_nonce update_nonce a.nonce
-        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
-        ~error:Update_not_permitted_nonce
-    in
     (* enforce that either the predicate is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
@@ -1443,16 +1064,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Result.ok_if_true
            ~error:Transaction_status.Failure.Parties_replay_check_failed
     in
-    { a with
-      balance
-    ; snapp
-    ; delegate
-    ; permissions
-    ; timing
-    ; nonce
-    ; snapp_uri
-    ; token_symbol
-    }
+    a
 
   module Global_state = struct
     type t =
@@ -1470,6 +1082,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let fee_excess { fee_excess; _ } = fee_excess
 
     let set_fee_excess t fee_excess = { t with fee_excess }
+
+    let global_slot_since_genesis { protocol_state; _ } =
+      protocol_state.global_slot_since_genesis
   end
 
   module Inputs = struct
@@ -1478,6 +1093,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
+
+      let if_ = Parties.value_if
     end
 
     module Bool = struct
@@ -1502,6 +1119,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let ( ||| ) = ( || )
 
       let ( &&& ) = ( && )
+
+      let display b ~label = sprintf "%s: %b" label b
+
+      let all = List.for_all ~f:Fn.id
+
+      type failure_status = Transaction_status.Failure.t option
+
+      let assert_with_failure_status b failure_status =
+        match (b, failure_status) with
+        | false, Some failure ->
+            (* Raise a more useful error message if we have a failure
+               description.
+            *)
+            Error.raise
+              (Error.of_string @@ Transaction_status.Failure.to_string failure)
+        | _ ->
+            assert b
     end
 
     module Account_id = struct
@@ -1552,9 +1186,45 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     module Public_key = struct
       type t = Public_key.Compressed.t
+
+      let if_ = Parties.value_if
     end
 
-    module Global_slot = Mina_numbers.Global_slot
+    module Controller = struct
+      type t = Permissions.Auth_required.t
+
+      let if_ = Parties.value_if
+
+      let check ~proof_verifies ~signature_verifies perm =
+        (* Invariant: We either have a proof, a signature, or neither. *)
+        assert (not (proof_verifies && signature_verifies)) ;
+        let tag =
+          if proof_verifies then Control.Tag.Proof
+          else if signature_verifies then Control.Tag.Signature
+          else Control.Tag.None_given
+        in
+        Permissions.Auth_required.check perm tag
+    end
+
+    module Global_slot = struct
+      include Mina_numbers.Global_slot
+
+      let if_ = Parties.value_if
+    end
+
+    module Nonce = struct
+      type t = Account.Nonce.t
+
+      let if_ = Parties.value_if
+
+      let succ = Account.Nonce.succ
+    end
+
+    module State_hash = struct
+      include State_hash
+
+      let if_ = Parties.value_if
+    end
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
@@ -1569,11 +1239,76 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (Account_timing.to_record Untimed).vesting_period
     end
 
+    module Balance = struct
+      include Balance
+
+      let if_ = Parties.value_if
+    end
+
+    module Verification_key = struct
+      type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+
+      let if_ = Parties.value_if
+    end
+
+    module Events = struct
+      type t = Field.t array list
+
+      let is_empty = List.is_empty
+
+      let push_events = Party.Sequence_events.push_events
+    end
+
+    module Snapp_uri = struct
+      type t = string
+
+      let if_ = Parties.value_if
+    end
+
+    module Token_symbol = struct
+      type t = Account.Token_symbol.t
+
+      let if_ = Parties.value_if
+    end
+
     module Account = struct
       include Account
 
-      let token_owner (a : t) =
-        match a.token_permissions with Token_owned _ -> true | _ -> false
+      module Permissions = struct
+        let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
+
+        let send : t -> Controller.t = fun a -> a.permissions.send
+
+        let receive : t -> Controller.t = fun a -> a.permissions.receive
+
+        let set_delegate : t -> Controller.t =
+         fun a -> a.permissions.set_delegate
+
+        let set_permissions : t -> Controller.t =
+         fun a -> a.permissions.set_permissions
+
+        let set_verification_key : t -> Controller.t =
+         fun a -> a.permissions.set_verification_key
+
+        let set_snapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_snapp_uri
+
+        let edit_sequence_state : t -> Controller.t =
+         fun a -> a.permissions.edit_sequence_state
+
+        let set_token_symbol : t -> Controller.t =
+         fun a -> a.permissions.set_token_symbol
+
+        let increment_nonce : t -> Controller.t =
+         fun a -> a.permissions.increment_nonce
+
+        let set_voting_for : t -> Controller.t =
+         fun a -> a.permissions.set_voting_for
+
+        type t = Permissions.t
+
+        let if_ = Parties.value_if
+      end
 
       type timing = Party.Update.Timing_info.t option
 
@@ -1586,6 +1321,102 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Option.value_map ~default:Account_timing.Untimed
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
+
+      let balance (a : t) : Balance.t = a.balance
+
+      let set_balance (balance : Balance.t) (a : t) : t = { a with balance }
+
+      let check_timing ~txn_global_slot account =
+        let invalid_timing, timing, _ =
+          validate_timing_with_min_balance' ~txn_amount:Amount.zero
+            ~txn_global_slot ~account
+        in
+        (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+
+      let make_snapp (a : t) =
+        let snapp =
+          match a.snapp with
+          | None ->
+              Some Snapp_account.default
+          | Some _ as snapp ->
+              snapp
+        in
+        { a with snapp }
+
+      let unmake_snapp (a : t) : t =
+        let snapp =
+          match a.snapp with
+          | None ->
+              None
+          | Some snapp ->
+              if Snapp_account.(equal default snapp) then None else Some snapp
+        in
+        { a with snapp }
+
+      let get_snapp (a : t) = Option.value_exn a.snapp
+
+      let set_snapp (a : t) ~f : t = { a with snapp = Option.map a.snapp ~f }
+
+      let proved_state (a : t) = (get_snapp a).proved_state
+
+      let set_proved_state proved_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with proved_state })
+
+      let app_state (a : t) = (get_snapp a).app_state
+
+      let set_app_state app_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with app_state })
+
+      let register_verification_key (_ : t) = ()
+
+      let verification_key (a : t) = (get_snapp a).verification_key
+
+      let set_verification_key verification_key (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with verification_key })
+
+      let last_sequence_slot (a : t) = (get_snapp a).last_sequence_slot
+
+      let set_last_sequence_slot last_sequence_slot (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with last_sequence_slot })
+
+      let sequence_state (a : t) = (get_snapp a).sequence_state
+
+      let set_sequence_state sequence_state (a : t) =
+        set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
+
+      let snapp_uri (a : t) = a.snapp_uri
+
+      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+
+      let token_symbol (a : t) = a.token_symbol
+
+      let set_token_symbol token_symbol (a : t) = { a with token_symbol }
+
+      let public_key (a : t) = a.public_key
+
+      let set_public_key public_key (a : t) = { a with public_key }
+
+      let delegate (a : t) = Account.delegate_opt a.delegate
+
+      let set_delegate delegate (a : t) =
+        let delegate =
+          if Signature_lib.Public_key.Compressed.(equal empty) delegate then
+            None
+          else Some delegate
+        in
+        { a with delegate }
+
+      let nonce (a : t) = a.nonce
+
+      let set_nonce nonce (a : t) = { a with nonce }
+
+      let voting_for (a : t) = a.voting_for
+
+      let set_voting_for voting_for (a : t) = { a with voting_for }
+
+      let permissions (a : t) = a.permissions
+
+      let set_permissions permissions (a : t) = { a with permissions }
     end
 
     module Amount = struct
@@ -1627,6 +1458,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               |> Amount.of_uint64
             in
             (magnitude, `Overflow true)
+
+      let of_constant_fee = of_fee
     end
 
     module Token_id = struct
@@ -1646,9 +1479,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let caller _ = Account_id.invalid
+      let caller (p : t) = p.data.caller
 
-      let check_authorization ~account:_ ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1667,6 +1500,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
+
+        let app_state (party : t) = party.data.body.update.app_state
+
+        let verification_key (party : t) =
+          Snapp_basic.Set_or_keep.map ~f:Option.some
+            party.data.body.update.verification_key
+
+        let sequence_events (party : t) = party.data.body.sequence_events
+
+        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+
+        let token_symbol (party : t) = party.data.body.update.token_symbol
+
+        let delegate (party : t) = party.data.body.update.delegate
+
+        let voting_for (party : t) = party.data.body.update.voting_for
+
+        let permissions (party : t) = party.data.body.update.permissions
       end
     end
 
@@ -1745,8 +1596,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Call_stack = Stack (Stack_frame)
 
     module Local_state = struct
-      type failure_status = Transaction_status.Failure.t option
-
       type t =
         ( Stack_frame.t
         , Call_stack.t
@@ -1755,7 +1604,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
-        , failure_status )
+        , Bool.failure_status )
         Parties_logic.Local_state.t
 
       let add_check (t : t) failure b =
@@ -1767,6 +1616,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               old_failure_status
         in
         { t with failure_status; success = t.success && b }
+
+      let update_failure_status (t : t) failure_status b =
+        match failure_status with
+        | None ->
+            { t with success = t.success && b }
+        | Some failure ->
+            add_check (t : t) failure b
     end
   end
 
@@ -1800,7 +1656,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
-    let perform ~constraint_constants ~state_view (type r)
+    let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
       | Check_protocol_state_predicate (pred, global_state) -> (
@@ -1814,27 +1670,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Snapp_predicate.Account.check p account) )
-      | Check_auth_and_update_account
-          { is_start
-          ; global_state
-          ; party = p
-          ; account = a
-          ; account_is_new
-          ; signature_verifies = _
-          } -> (
+      | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
-          match
-            apply_body ~constraint_constants ~state_view
-              ~check_auth:
-                (Fn.flip Permissions.Auth_required.check
-                   (Control.tag p.authorization))
-              ~has_proof:(Control.Tag.equal (Control.tag p.authorization) Proof)
-              ~is_new:account_is_new
-              ~global_slot_since_genesis:
-                global_state.protocol_state.global_slot_since_genesis ~is_start
-              p.data a
-          with
+          match apply_body ~is_start p.data a with
           | Error failure ->
               (a, false, Some failure)
           | Ok a ->
@@ -1849,6 +1688,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(f : user_acc -> _ -> user_acc) ?(fee_excess = Amount.Signed.zero)
       (ledger : L.t) (c : Parties.t) :
       (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
+    let open Or_error.Let_syntax in
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
           ( id
@@ -1857,28 +1697,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map a = L.get ledger loc in
               (loc, a)) ))
     in
-    let perform eff = Env.perform ~constraint_constants ~state_view eff in
+    let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
       if List.is_empty l_state.frame.Stack_frame.calls then Ok user_acc
       else
-        match M.step ~constraint_constants { perform } (g_state, l_state) with
-        | exception exn ->
-            Error (Error.of_exn ~backtrace:`Get exn)
-        | ( _global_state
-          , { Parties_logic.Local_state.failure_status = Some failure; _ } ) ->
-            Error
-              (Error.of_string @@ Transaction_status.Failure.to_string failure)
-        | states ->
-            step_all (f user_acc states) states
+        let%bind states =
+          Or_error.try_with (fun () ->
+              M.step ~constraint_constants { perform } (g_state, l_state))
+        in
+        step_all (f user_acc states) states
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
       , { frame =
             ({ calls = []
-             ; caller = { id = Account_id.invalid; token_owner = false }
-             ; caller_caller = { id = Account_id.invalid; token_owner = false }
+             ; caller = Token_id.invalid
+             ; caller_caller = Token_id.invalid
              } : Inputs.Stack_frame.t)
         ; call_stack = []
         ; transaction_commitment = ()
@@ -1891,11 +1727,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         } )
     in
     let user_acc = f init initial_state in
+    (*
+<<<<<<< HEAD
     let start : Inputs.Global_state.t * _ =
       let parties = Parties.parties c in
       M.start ~constraint_constants
         { parties; memo_hash = Signed_command_memo.hash c.memo }
-        { perform } initial_state
+        { perform } 
+        initial_state
+======= *)
+    let%bind (start : Inputs.Global_state.t * _) =
+      let parties = Parties.parties c in
+      Or_error.try_with (fun () ->
+          M.start ~constraint_constants
+            { parties; memo_hash = Signed_command_memo.hash c.memo }
+            { perform } initial_state)
     in
     let accounts () =
       List.map original_account_states
@@ -1906,7 +1752,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Error e
     | Ok s ->
         Ok
-          ( { accounts = accounts ()
+          ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
@@ -1914,7 +1760,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                     Applied
                       ( { fee_payer_account_creation_fee_paid = None
                         ; receiver_account_creation_fee_paid = None
-                        ; created_token = None
                         }
                       , { fee_payer_balance = None
                         ; source_balance = None
@@ -2212,8 +2057,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       { receiver_account with balance = receiver_balance; timing } ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_user_command
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ledger
+  let undo_user_command ledger
       { Transaction_applied.Signed_command_applied.common =
           { user_command =
               { data = { payload; signer = _; signature = _ } as user_command
@@ -2249,14 +2093,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Update the fee-payer's account. *)
     set ledger fee_payer_location fee_payer_account ;
-    let next_available_token =
-      match body with
-      | Create_new_token { created_token } ->
-          created_token
-      | _ ->
-          next_available_token ledger
-    in
-    let source = Signed_command.source ~next_available_token user_command in
+    let source = Signed_command.source user_command in
     let source_timing =
       (* Prefer fee-payer original timing when applicable, since it is the
          'true' original.
@@ -2281,9 +2118,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; timing = Option.value ~default:source_account.timing source_timing
           }
     | Payment { amount; _ }, Payment { previous_empty_accounts } ->
-        let receiver =
-          Signed_command.receiver ~next_available_token user_command
-        in
+        let receiver = Signed_command.receiver user_command in
         let%bind receiver_location, receiver_account =
           let%bind location = location_of_account' ledger "receiver" receiver in
           let%map account = get' ledger "receiver" location in
@@ -2316,67 +2151,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
-    | Create_new_token _, Create_new_token _
-    | Create_token_account _, Create_token_account ->
-        (* We group these commands together because their undo behaviour is
-           identical: remove the created account, and un-charge the fee payer
-           for creating the account. *)
-        let fee_payer_account =
-          let balance =
-            Option.value_exn
-              (Balance.add_amount fee_payer_account.balance
-                 (Amount.of_fee constraint_constants.account_creation_fee))
-          in
-          { fee_payer_account with balance }
-        in
-        let%bind source_location =
-          location_of_account' ledger "source" source
-        in
-        let%map source_account =
-          if Account_id.equal fee_payer source then return fee_payer_account
-          else get' ledger "source" source_location
-        in
-        let receiver =
-          Signed_command.receiver ~next_available_token user_command
-        in
-        set ledger fee_payer_location fee_payer_account ;
-        set ledger source_location
-          { source_account with
-            timing = Option.value ~default:source_account.timing source_timing
-          } ;
-        remove_accounts_exn ledger [ receiver ] ;
-        (* Restore to the previous [next_available_token]. This is a no-op if
-           the [next_available_token] did not change.
-        *)
-        set_next_available_token ledger next_available_token
-    | Mint_tokens { amount; _ }, Mint_tokens ->
-        let receiver =
-          Signed_command.receiver ~next_available_token user_command
-        in
-        let%bind receiver_location, receiver_account =
-          let%bind location = location_of_account' ledger "receiver" receiver in
-          let%map account = get' ledger "receiver" location in
-          let balance =
-            Option.value_exn (Balance.sub_amount account.balance amount)
-          in
-          (location, { account with balance })
-        in
-        let%map source_location, source_account =
-          let%map location, account =
-            if Account_id.equal source receiver then
-              return (receiver_location, receiver_account)
-            else
-              let%bind location = location_of_account' ledger "source" source in
-              let%map account = get' ledger "source" location in
-              (location, account)
-          in
-          ( location
-          , { account with
-              timing = Option.value ~default:account.timing source_timing
-            } )
-        in
-        set ledger receiver_location receiver_account ;
-        set ledger source_location source_account
     | _, _ ->
         failwith "Transaction_applied/command mismatch"
 
@@ -2416,7 +2190,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
       | Command (Signed_command u) ->
-          undo_user_command ~constraint_constants ledger u
+          undo_user_command ledger u
       | Command (Parties p) ->
           undo_parties ~constraint_constants ledger p
       | Coinbase c ->
@@ -2465,9 +2239,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ~state_view:txn_state_view ledger payment)
     in
     let root = merkle_root ledger in
-    let next_available_token = next_available_token ledger in
     Or_error.ok_exn (undo_parties ~constraint_constants ledger applied) ;
-    (root, `Next_available_token next_available_token)
+    root
 
   let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
       ledger payment =
@@ -2477,9 +2250,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            payment)
     in
     let root = merkle_root ledger in
-    let next_available_token = next_available_token ledger in
-    Or_error.ok_exn (undo_user_command ~constraint_constants ledger applied) ;
-    (root, `Next_available_token next_available_token)
+    Or_error.ok_exn (undo_user_command ledger applied) ;
+    root
 
   module For_tests = struct
     let validate_timing_with_min_balance = validate_timing_with_min_balance
@@ -2634,19 +2406,12 @@ module For_tests = struct
     Signed_command.sign sender
       { common =
           { fee
-          ; fee_token = Token_id.default
           ; fee_payer_pk = sender_pk
           ; nonce = sender_nonce
           ; valid_until = Global_slot.max_value
           ; memo = Signed_command_memo.dummy
           }
-      ; body =
-          Payment
-            { source_pk = sender_pk
-            ; receiver_pk = receiver
-            ; token_id = Token_id.default
-            ; amount
-            }
+      ; body = Payment { source_pk = sender_pk; receiver_pk = receiver; amount }
       }
     |> Signed_command.forget_check
 
@@ -2822,7 +2587,6 @@ module For_tests = struct
       }
     in
     { snarked_ledger_hash = h
-    ; snarked_next_available_token = Token_id.(next default)
     ; timestamp = Block_time.zero
     ; blockchain_length = len
     ; min_window_density = len

@@ -208,7 +208,9 @@ spec:
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
+          {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
@@ -246,10 +248,8 @@ spec:
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
         {{- end }}
-        - name: CODA_CLIENT_TRUSTLIST
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
         ports:
         - name: client-port
           protocol: TCP

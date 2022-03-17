@@ -29,6 +29,7 @@ module type Resource_pool_base_intf = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier Option.t Broadcast_pipe.Reader.t
     -> config:Config.t
@@ -151,6 +152,7 @@ module type Network_pool_base_intf = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> incoming_diffs:
          ( resource_pool_diff Envelope.Incoming.t
          * Mina_net2.Validation_callback.t )

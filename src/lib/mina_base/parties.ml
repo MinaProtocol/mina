@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 module Digest = Kimchi_backend.Pasta.Basic.Fp
 
 let add_caller (p : _ Party.t_) (caller : 'c) : 'c Party.t_ =
@@ -218,9 +218,11 @@ module Call_forest = struct
       (Party.Predicated.t, h) t =
     add_callers ps
       ~call_type:(fun p -> p.caller)
-      ~add_caller:(fun p (caller : Account_id.t) -> { p with caller })
-      ~null_id:Account_id.invalid
-      ~party_id:(fun p -> Account_id.create p.body.public_key p.body.token_id)
+      ~add_caller:(fun p (caller : Token_id.t) -> { p with caller })
+      ~null_id:Token_id.invalid
+      ~party_id:(fun p ->
+        Account_id.(
+          derive_token_id ~owner:(create p.body.public_key p.body.token_id)))
 
   let remove_callers (type party_with_caller party_without_sender digest id)
       (ps : (party_with_caller, digest) t) ~(equal_id : id -> id -> bool)
@@ -274,16 +276,18 @@ module Call_forest = struct
         ~party_depth:(fun ((p : Party.Wire.t), _) -> p.data.body.call_depth)
         xs
       |> add_callers
-           ~call_type:(fun (p, _) -> p.data.caller)
-           ~add_caller:(fun (p, vk) (caller : Account_id.t) ->
+           ~call_type:(fun ((p : Party.Wire.t), _) -> p.data.caller)
+           ~add_caller:(fun (p, vk) (caller : Token_id.t) ->
              ( ( { authorization = p.authorization
                  ; data = { p.data with caller }
                  }
                  : Party.t )
              , vk ))
-           ~null_id:Account_id.invalid
+           ~null_id:Token_id.invalid
            ~party_id:(fun (p, _) ->
-             Account_id.create p.data.body.public_key p.data.body.token_id)
+             Account_id.(
+               derive_token_id
+                 ~owner:(create p.data.body.public_key p.data.body.token_id)))
       |> accumulate_hashes
 
     let to_parties_list (x : _ t) = to_parties_list x
@@ -353,7 +357,7 @@ module Stable = struct
           (Party.Stable.V1.t, Digest.Stable.V1.t) Call_forest.Stable.V1.t
       ; memo : Signed_command_memo.Stable.V1.t
       }
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
     let to_latest = Fn.id
 
@@ -370,9 +374,11 @@ module Stable = struct
                  p.data.body.call_depth)
           |> Call_forest.add_callers
                ~call_type:(fun (p : _ Party.t_) -> p.data.caller)
-               ~add_caller ~null_id:Account_id.invalid
+               ~add_caller ~null_id:Token_id.invalid
                ~party_id:(fun (p : _ Party.t_) ->
-                 Account_id.create p.data.body.public_key p.data.body.token_id)
+                 Account_id.(
+                   derive_token_id
+                     ~owner:(create p.data.body.public_key p.data.body.token_id)))
           |> Call_forest.accumulate_hashes ~hash_party:(fun (p : _ Party.t_) ->
                  Party.Predicated.digest p.data)
       }
@@ -382,8 +388,8 @@ module Stable = struct
       ; memo = t.memo
       ; other_parties =
           Call_forest.to_parties_list
-            (Call_forest.remove_callers ~equal_id:Account_id.equal
-               ~add_call_type:add_caller ~null_id:Account_id.invalid
+            (Call_forest.remove_callers ~equal_id:Token_id.equal
+               ~add_call_type:add_caller ~null_id:Token_id.invalid
                ~party_caller:(fun p -> p.data.caller)
                t.other_parties)
       }
@@ -411,7 +417,7 @@ let parties (t : t) : _ Call_forest.t =
     ; data =
         { body
         ; predicate = Party.Predicate.Nonce p.data.predicate
-        ; caller = Account_id.invalid
+        ; caller = Token_id.invalid
         }
     }
   in
@@ -624,3 +630,63 @@ include Codable.Make_base58_check (Stable.Latest)
 
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
+
+(* TODO: Ask gregor or brandon *)
+let deriver _obj = failwith "TODO"
+
+(*
+  let open Fields_derivers_snapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots in
+  Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
+    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~memo:!.Signed_command_memo.deriver
+  |> finish "Parties" ~t_toplevel_annots
+       *)
+
+let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
+
+let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
+
+let to_json x = Fields_derivers_snapps.(to_json (deriver @@ Derivers.o ())) x
+
+let of_json x = Fields_derivers_snapps.(of_json (deriver @@ Derivers.o ())) x
+
+let arg_query_string x =
+  Fields_derivers_snapps.Test.Loop.json_to_string_gql @@ to_json x
+
+let dummy =
+  let party : Party.t =
+    { data =
+        { body = Party.Body.dummy
+        ; predicate = Party.Predicate.Accept
+        ; caller = Token_id.invalid
+        }
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let fee_payer : Party.Fee_payer.t =
+    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+  in
+  { fee_payer
+  ; other_parties = Call_forest.cons party []
+  ; memo = Signed_command_memo.empty
+  }
+
+let inner_query =
+  lazy
+    (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
+       Fields_derivers_snapps.(inner_query (deriver @@ Derivers.o ())))
+
+let%test_module "Test" =
+  ( module struct
+    module Fd = Fields_derivers_snapps.Derivers
+
+    let full = deriver @@ Fd.o ()
+
+    let%test_unit "json roundtrip dummy" =
+      [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+
+    let%test_unit "full circuit" =
+      Run_in_thread.block_on_async_exn
+      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
+  end )

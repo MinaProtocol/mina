@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_transition
 open Pipe_lib
 open Strict_pipe
@@ -744,7 +745,7 @@ module Root_diff = struct
   module Stable = struct
     module V2 = struct
       type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
 
@@ -797,7 +798,8 @@ let root_diff t =
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned { new_root; _ }, _) ->
                       let root_hash =
-                        Transition_frontier.Root_data.Limited.hash new_root
+                        (Transition_frontier.Root_data.Limited.hashes new_root)
+                          .state_hash
                       in
                       let new_root_breadcrumb =
                         Transition_frontier.(find_exn frontier root_hash)
@@ -889,6 +891,8 @@ let get_current_nonce t aid =
     |> Option.join
   with
   | None ->
+      (* IMPORTANT! Do not change the content of this error without
+       * updating Rosetta's construction API to handle the changes *)
       Error
         "Couldn't infer nonce for transaction from specified `sender` since \
          `sender` is not in the ledger or sent a transaction in transaction \
@@ -1489,18 +1493,16 @@ let create ?wallets (config : Config.t) =
                           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                         with
                         | None ->
-                            ( config.precomputed_values.protocol_state_with_hash
+                            ( config.precomputed_values
+                                .protocol_state_with_hashes
                                 .hash
+                                .state_hash
                             , None
                             , [] )
                         | Some frontier ->
                             let tip = Transition_frontier.best_tip frontier in
                             let protocol_state_hash =
-                              let state =
-                                Transition_frontier.Breadcrumb.protocol_state
-                                  tip
-                              in
-                              Mina_state.Protocol_state.hash state
+                              Transition_frontier.Breadcrumb.state_hash tip
                             in
                             let k_breadcrumbs =
                               Transition_frontier.root frontier
@@ -1650,10 +1652,14 @@ let create ?wallets (config : Config.t) =
                                    Mina_networking.refused_answer_query_string
                                    ledger_hash))))
               ~get_ancestry:
-                (handle_request "get_ancestry"
-                   ~f:
-                     (Sync_handler.Root.prove ~consensus_constants
-                        ~logger:config.logger))
+                (handle_request "get_ancestry" ~f:(fun ~frontier s ->
+                     s
+                     |> With_hash.map_hash ~f:(fun state_hash ->
+                            { State_hash.State_hashes.state_hash
+                            ; state_body_hash = None
+                            })
+                     |> Sync_handler.Root.prove ~consensus_constants
+                          ~logger:config.logger ~frontier))
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      let open Option.Let_syntax in
@@ -1705,7 +1711,13 @@ let create ?wallets (config : Config.t) =
             trace "transaction_pool" (fun () ->
                 Network_pool.Transaction_pool.create ~config:txn_pool_config
                   ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
+                  ~time_controller:config.time_controller
+                  ~expiry_ns:
+                    (Time_ns.Span.of_hr
+                       (Float.of_int
+                          config.precomputed_values.genesis_constants
+                            .transaction_expiry_hr))
+                  ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
                   ~local_diffs:local_txns_reader
                   ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
@@ -1859,7 +1871,8 @@ let create ?wallets (config : Config.t) =
                 valid_transitions_for_network
                 ~f:(fun (`Transition transition, `Source source) ->
                   let hash =
-                    External_transition.Validated.state_hash transition
+                    (External_transition.Validated.state_hashes transition)
+                      .state_hash
                   in
                   let consensus_state =
                     transition |> External_transition.Validated.consensus_state
@@ -1950,7 +1963,13 @@ let create ?wallets (config : Config.t) =
             trace "snark_pool" (fun () ->
                 Network_pool.Snark_pool.load ~config:snark_pool_config
                   ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
+                  ~time_controller:config.time_controller
+                  ~expiry_ns:
+                    (Time_ns.Span.of_hr
+                       (Float.of_int
+                          config.precomputed_values.genesis_constants
+                            .transaction_expiry_hr))
+                  ~logger:config.logger
                   ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
                   ~local_diffs:local_snark_work_reader
                   ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)

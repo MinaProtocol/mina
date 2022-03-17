@@ -3,12 +3,24 @@
  (name swap_bad_balances)
  (public_name swap_bad_balances)
  (libraries
-   async
-   core_kernel
-   caqti
+   ;; opam libraries
+   core
+   base
+   archive_lib
    caqti-async
+   core_kernel
+   async
+   caqti
    caqti-driver-postgresql
-   archive_lib)
+   async_kernel
+   uri
+   integers
+   async_unix
+   async.async_command
+   ;; local libraries
+   currency
+   logger
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

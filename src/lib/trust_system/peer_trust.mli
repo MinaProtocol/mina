@@ -7,7 +7,7 @@
     or actually do anything when a peer should be banned. That's the
     responsibility of the caller, which is Trust_system. *)
 
-open Async
+open Async_kernel
 open Core
 open Pipe_lib
 

@@ -26,7 +26,7 @@ module Accounts = struct
       in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
-          ~f:Mina_base.Token_id.of_uint64
+          ~f:Mina_base.Token_id.of_string
       in
       let account_id = Mina_base.Account_id.create pk token_id in
       let account =
@@ -50,8 +50,7 @@ module Accounts = struct
         | None ->
             account.permissions
         | Some
-            { stake
-            ; edit_state
+            { edit_state
             ; send
             ; receive
             ; set_delegate
@@ -61,6 +60,7 @@ module Accounts = struct
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
+            ; set_voting_for
             } ->
             let auth_required a =
               match a with
@@ -72,13 +72,10 @@ module Accounts = struct
                   Proof
               | Signature ->
                   Signature
-              | Both ->
-                  Both
               | Impossible ->
                   Impossible
             in
-            { Mina_base.Permissions.Poly.stake
-            ; edit_state = auth_required edit_state
+            { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; send = auth_required send
             ; receive = auth_required receive
             ; set_delegate = auth_required set_delegate
@@ -88,6 +85,7 @@ module Accounts = struct
             ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
+            ; set_voting_for = auth_required set_voting_for
             }
       in
       let token_permissions =
@@ -229,13 +227,10 @@ module Accounts = struct
               Proof
           | Signature ->
               Signature
-          | Both ->
-              Both
           | Impossible ->
               Impossible
         in
-        let { Mina_base.Permissions.Poly.stake
-            ; edit_state
+        let { Mina_base.Permissions.Poly.edit_state
             ; send
             ; receive
             ; set_delegate
@@ -245,12 +240,13 @@ module Accounts = struct
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
+            ; set_voting_for
             } =
           account.permissions
         in
         Some
-          { Runtime_config.Accounts.Single.Permissions.stake
-          ; edit_state = auth_required edit_state
+          { Runtime_config.Accounts.Single.Permissions.edit_state =
+              auth_required edit_state
           ; send = auth_required send
           ; receive = auth_required receive
           ; set_delegate = auth_required set_delegate
@@ -260,6 +256,7 @@ module Accounts = struct
           ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
+          ; set_voting_for = auth_required set_voting_for
           }
       in
       let snapp =
@@ -299,7 +296,7 @@ module Accounts = struct
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token = Some (Mina_base.Token_id.to_uint64 account.token_id)
+      ; token = Some (Mina_base.Token_id.to_string account.token_id)
       ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =
@@ -576,6 +573,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
+  ; transaction_expiry_hr =
+      Option.value ~default:default.transaction_expiry_hr
+        (config.daemon >>= fun cfg -> cfg.transaction_expiry_hr)
   ; num_accounts =
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
@@ -602,6 +602,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
           { txpool_max_size =
               Some precomputed_values.genesis_constants.txpool_max_size
           ; peer_list_url = None
+          ; transaction_expiry_hr =
+              Some precomputed_values.genesis_constants.transaction_expiry_hr
           }
     ; genesis =
         Some

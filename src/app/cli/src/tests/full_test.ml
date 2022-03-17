@@ -114,7 +114,7 @@ let run_test () : unit Deferred.t =
              (Public_key.compress keypair.public_key))
           ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            precomputed_values.protocol_state_with_hashes.hash.state_hash
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
@@ -147,6 +147,7 @@ let run_test () : unit Deferred.t =
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
           }
       in
       let net_config =
@@ -157,7 +158,7 @@ let run_test () : unit Deferred.t =
           ; consensus_local_state
           ; is_seed = true
           ; genesis_ledger_hash =
-              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+              Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; constraint_constants
           ; log_gossip_heard =
               { snark_pool_diff = false
@@ -279,14 +280,8 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo ~valid_until:None
-              ~body:
-                (Payment
-                   { source_pk = signer
-                   ; receiver_pk
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+              ~memo ~valid_until:None
+              ~body:(Payment { source_pk = signer; receiver_pk; amount })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))

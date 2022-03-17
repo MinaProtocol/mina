@@ -1,11 +1,22 @@
 (executable
  (name gen_values)
  (libraries
-   backend
-   ppxlib
-   ppx_util
+   ;; opam libraries
+   stdio
+   ocaml-compiler-libs.common
+   ppxlib.ast
    core_kernel
-   kimchi_backend)
+   ppxlib
+   ocaml-migrate-parsetree
+   base
+   compiler-libs
+   base.caml
+   ;; local libraries
+   pickles_types
+   kimchi_backend
+   kimchi_pasta
+   kimchi
+ )
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))

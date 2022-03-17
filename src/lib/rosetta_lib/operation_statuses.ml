@@ -1,23 +1,11 @@
 open Core_kernel
 open Rosetta_models
 
-type t = [ `Success | `Pending | `Failed ] [@@deriving to_representatives]
+type t = [ `Success | `Failed ] [@@deriving to_representatives]
 
-let name = function
-  | `Success ->
-      "Success"
-  | `Pending ->
-      "Pending"
-  | `Failed ->
-      "Failed"
+let name = function `Success -> "Success" | `Failed -> "Failed"
 
-let successful = function
-  | `Success ->
-      true
-  | `Pending ->
-      false
-  | `Failed ->
-      false
+let successful = function `Success -> true | `Failed -> false
 
 let operation t =
   { Operation_status.status = name t; successful = successful t }

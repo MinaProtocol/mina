@@ -62,7 +62,7 @@ struct
       , _
       , (_, Max_branching.n) Vector.t )
       P.Base.Pairing_based.t
-      Deferred.t =
+      Promise.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -194,6 +194,7 @@ struct
             , _ )
             Dlog_based.Statement.In_circuit.t =
           { pass_through =
+              (* TODO: Only do this hashing when necessary *)
               Common.hash_pairing_me_only
                 (Reduced_me_only.Pairing_based.prepare
                    ~dlog_plonk_index:dlog_index statement.pass_through)
@@ -568,7 +569,7 @@ struct
             })
         |> to_list)
     in
-    let%map.Async_kernel.Deferred (next_proof : Tick.Proof.t) =
+    let%map.Promise (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in

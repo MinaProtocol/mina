@@ -1,17 +1,5 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 open Random_oracle
 
 val signature : Field.t State.t
@@ -102,3 +90,5 @@ val snapp_sequence_events : Field.t State.t
 val snapp_memo : Field.t State.t
 
 val snapp_test : Field.t State.t
+
+val derive_token_id : Field.t State.t

@@ -25,7 +25,7 @@ module Command_error : sig
     | Expired of
         [ `Valid_until of Mina_numbers.Global_slot.t ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
-    | Unwanted_fee_token of Token_id.t
+    | Unwanted_fee_token of Mina_base.Token_id.t
     | Invalid_transaction
   [@@deriving sexp, to_yojson]
 
@@ -72,6 +72,7 @@ val empty :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> time_controller:Block_time.Controller.t
+  -> expiry_ns:Time_ns.Span.t
   -> t
 
 (** How many transactions are currently in the pool *)

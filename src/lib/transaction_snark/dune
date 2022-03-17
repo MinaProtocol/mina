@@ -3,7 +3,59 @@
  (public_name transaction_snark)
  (library_flags -linkall)
  (inline_tests)
- (libraries core cache_dir snarky.backendless mina_base sgn bignum ppx_version.runtime transaction_protocol_state mina_state transaction_witness genesis_ledger)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async_kernel
+   base.base_internalhash_types
+   bin_prot.shape
+   async
+   sexplib0
+   bignum
+   core
+   ppx_version.runtime
+   core_kernel
+   base.md5
+   base.caml
+   async_unix
+   ;; local libraries
+   mina_base.import
+   hash_prefix_states
+   kimchi_backend.common
+   kimchi_backend
+   with_hash
+   bitstring_lib
+   one_or_two
+   snarky_integer
+   pickles.backend
+   signature_lib
+   genesis_constants
+   currency
+   random_oracle
+   snark_params
+   transaction_protocol_state
+   mina_base
+   cache_dir
+   snarky.backendless
+   sgn
+   mina_state
+   pickles
+   random_oracle_input
+   pickles_types
+   coda_genesis_ledger
+   mina_numbers
+   crypto_params
+   tuple_lib
+   consensus
+   data_hash_lib
+   quickcheck_lib
+   test_util
+   transaction_witness
+   mina_ledger
+   kimchi_backend.pasta
+   merkle_ledger
+   mina_base.util
+   )
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (instrumentation (backend bisect_ppx))

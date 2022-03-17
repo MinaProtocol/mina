@@ -104,3 +104,5 @@ let snapp_sequence_events = create "MinaSnappSeqEvents"
 let snapp_memo = create "MinaSnappMemo"
 
 let snapp_test = create "MinaSnappTest"
+
+let derive_token_id = create "MinaDeriveTokenId"
