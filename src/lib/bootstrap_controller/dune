@@ -48,4 +48,5 @@
    coda_genesis_ledger
    block_time
    mina_base.util
+   o1trace
    ))

@@ -372,7 +372,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace "worker_main" (fun () ->
+      O1trace.thread "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)

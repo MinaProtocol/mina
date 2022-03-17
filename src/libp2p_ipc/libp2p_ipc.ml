@@ -291,11 +291,12 @@ let rec stream_messages frag_stream w =
 let read_incoming_messages reader =
   let r, w = Strict_pipe.create Strict_pipe.Synchronous in
   let fragment_stream = Incremental_parsing.Fragment_stream.create () in
-  don't_wait_for (stream_messages fragment_stream w) ;
-  don't_wait_for
-    (Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
-         Incremental_parsing.Fragment_stream.add_fragment fragment_stream
-           (Stdlib.Bytes.unsafe_of_string fragment))) ;
+  O1trace.background_thread "stream_libp2p_ipc_messages" (fun () ->
+      stream_messages fragment_stream w) ;
+  O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
+      Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
+          Incremental_parsing.Fragment_stream.add_fragment fragment_stream
+            (Stdlib.Bytes.unsafe_of_string fragment))) ;
   r
 
 let write_outgoing_message writer msg =

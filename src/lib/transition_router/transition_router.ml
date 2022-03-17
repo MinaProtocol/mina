@@ -2,7 +2,6 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Mina_transition
-open O1trace
 open Network_peer
 open Mina_numbers
 
@@ -84,11 +83,10 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   producer_transition_writer_ref := producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
-    trace_recurring "transition frontier controller" (fun () ->
-        Transition_frontier_controller.run ~logger ~trust_system ~verifier
-          ~network ~time_controller ~collected_transitions ~frontier
-          ~network_transition_reader:!transition_reader_ref
-          ~producer_transition_reader ~clear_reader ~precomputed_values)
+    Transition_frontier_controller.run ~logger ~trust_system ~verifier ~network
+      ~time_controller ~collected_transitions ~frontier
+      ~network_transition_reader:!transition_reader_ref
+      ~producer_transition_reader ~clear_reader ~precomputed_values
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -127,19 +125,18 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   Option.iter best_seen_transition ~f:(fun best_seen_transition ->
       Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
-  trace_recurring "bootstrap controller" (fun () ->
-      upon
-        (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-           ~consensus_local_state ~transition_reader:!transition_reader_ref
-           ~persistent_frontier ~persistent_root ~initial_root_transition
-           ~best_seen_transition ~precomputed_values ~catchup_mode)
-        (fun (new_frontier, collected_transitions) ->
-          Strict_pipe.Writer.kill !transition_writer_ref ;
-          start_transition_frontier_controller ~logger ~trust_system ~verifier
-            ~network ~time_controller ~producer_transition_reader_ref
-            ~producer_transition_writer_ref ~verified_transition_writer
-            ~clear_reader ~collected_transitions ~transition_reader_ref
-            ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier))
+  upon
+    (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+       ~consensus_local_state ~transition_reader:!transition_reader_ref
+       ~persistent_frontier ~persistent_root ~initial_root_transition
+       ~best_seen_transition ~precomputed_values ~catchup_mode)
+    (fun (new_frontier, collected_transitions) ->
+      Strict_pipe.Writer.kill !transition_writer_ref ;
+      start_transition_frontier_controller ~logger ~trust_system ~verifier
+        ~network ~time_controller ~producer_transition_reader_ref
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ~collected_transitions ~transition_reader_ref
+        ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier)
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
@@ -504,11 +501,13 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     in
     (ref reader, ref writer)
   in
-  don't_wait_for
-  @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-         Strict_pipe.Writer.write !producer_transition_writer_ref x) ;
-  upon (wait_till_genesis ~logger ~time_controller ~precomputed_values)
-    (fun () ->
+  O1trace.background_thread "transition_router" (fun () ->
+      don't_wait_for
+      @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
+             Strict_pipe.Writer.write !producer_transition_writer_ref x) ;
+      let%bind () =
+        wait_till_genesis ~logger ~time_controller ~precomputed_values
+      in
       let valid_transition_reader, valid_transition_writer =
         let name = "valid transitions" in
         create_bufferred_pipe ~name
@@ -533,88 +532,85 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
-      upon
-        (initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
-           ~trust_system ~persistent_frontier ~persistent_root ~time_controller
-           ~frontier_w ~producer_transition_reader_ref ~catchup_mode
-           ~producer_transition_writer_ref ~clear_reader
-           ~verified_transition_writer ~transition_reader_ref
-           ~transition_writer_ref ~most_recent_valid_block_writer
-           ~consensus_local_state ~precomputed_values) (fun () ->
-          Ivar.fill_if_empty initialization_finish_signal () ;
-          let valid_transition_reader1, valid_transition_reader2 =
-            Strict_pipe.Reader.Fork.two valid_transition_reader
-          in
-          don't_wait_for
-          @@ Strict_pipe.Reader.iter valid_transition_reader1
-               ~f:(fun enveloped_transition ->
-                 let incoming_transition =
-                   Envelope.Incoming.data enveloped_transition
-                 in
-                 let current_transition =
-                   Broadcast_pipe.Reader.peek most_recent_valid_block_reader
-                 in
-                 if
-                   Consensus.Hooks.equal_select_status `Take
-                     (Consensus.Hooks.select
-                        ~constants:precomputed_values.consensus_constants
-                        ~existing:
-                          ( External_transition.Validation
-                            .forget_validation_with_hash current_transition
-                          |> With_hash.map
-                               ~f:External_transition.consensus_state )
-                        ~candidate:
-                          ( External_transition.Validation
-                            .forget_validation_with_hash incoming_transition
-                          |> With_hash.map
-                               ~f:External_transition.consensus_state )
-                        ~logger)
-                 then
-                   Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                     incoming_transition
-                 else Deferred.unit) ;
-          don't_wait_for
-          @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
-               ~f:(fun enveloped_transition ->
-                 don't_wait_for
-                 @@ let%map () =
-                      let incoming_transition =
-                        Envelope.Incoming.data enveloped_transition
-                      in
-                      match Broadcast_pipe.Reader.peek frontier_r with
-                      | Some frontier ->
-                          if
-                            is_transition_for_bootstrap ~logger frontier
-                              incoming_transition ~precomputed_values
-                          then (
-                            Strict_pipe.Writer.kill !transition_writer_ref ;
-                            Strict_pipe.Writer.kill
-                              !producer_transition_writer_ref ;
-                            let initial_root_transition =
-                              Transition_frontier.(
-                                Breadcrumb.validated_transition (root frontier))
-                            in
-                            let%bind () =
-                              Strict_pipe.Writer.write clear_writer `Clear
-                            in
-                            let%map () =
-                              Transition_frontier.close ~loc:__LOC__ frontier
-                            in
-                            start_bootstrap_controller ~logger ~trust_system
-                              ~verifier ~network ~time_controller
-                              ~producer_transition_reader_ref
-                              ~producer_transition_writer_ref
-                              ~verified_transition_writer ~clear_reader
-                              ~transition_reader_ref ~transition_writer_ref
-                              ~consensus_local_state ~frontier_w
-                              ~persistent_root ~persistent_frontier
-                              ~initial_root_transition
-                              ~best_seen_transition:(Some enveloped_transition)
-                              ~precomputed_values ~catchup_mode )
-                          else Deferred.unit
-                      | None ->
-                          Deferred.unit
-                    in
-                    Strict_pipe.Writer.write !transition_writer_ref
-                      enveloped_transition))) ;
+      let%map () =
+        initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
+          ~trust_system ~persistent_frontier ~persistent_root ~time_controller
+          ~frontier_w ~producer_transition_reader_ref ~catchup_mode
+          ~producer_transition_writer_ref ~clear_reader
+          ~verified_transition_writer ~transition_reader_ref
+          ~transition_writer_ref ~most_recent_valid_block_writer
+          ~consensus_local_state ~precomputed_values
+      in
+      Ivar.fill_if_empty initialization_finish_signal () ;
+      let valid_transition_reader1, valid_transition_reader2 =
+        Strict_pipe.Reader.Fork.two valid_transition_reader
+      in
+      don't_wait_for
+      @@ Strict_pipe.Reader.iter valid_transition_reader1
+           ~f:(fun enveloped_transition ->
+             let incoming_transition =
+               Envelope.Incoming.data enveloped_transition
+             in
+             let current_transition =
+               Broadcast_pipe.Reader.peek most_recent_valid_block_reader
+             in
+             if
+               Consensus.Hooks.equal_select_status `Take
+                 (Consensus.Hooks.select
+                    ~constants:precomputed_values.consensus_constants
+                    ~existing:
+                      ( External_transition.Validation
+                        .forget_validation_with_hash current_transition
+                      |> With_hash.map ~f:External_transition.consensus_state )
+                    ~candidate:
+                      ( External_transition.Validation
+                        .forget_validation_with_hash incoming_transition
+                      |> With_hash.map ~f:External_transition.consensus_state )
+                    ~logger)
+             then
+               Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                 incoming_transition
+             else Deferred.unit) ;
+      don't_wait_for
+      @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
+           ~f:(fun enveloped_transition ->
+             don't_wait_for
+             @@ let%map () =
+                  let incoming_transition =
+                    Envelope.Incoming.data enveloped_transition
+                  in
+                  match Broadcast_pipe.Reader.peek frontier_r with
+                  | Some frontier ->
+                      if
+                        is_transition_for_bootstrap ~logger frontier
+                          incoming_transition ~precomputed_values
+                      then (
+                        Strict_pipe.Writer.kill !transition_writer_ref ;
+                        Strict_pipe.Writer.kill !producer_transition_writer_ref ;
+                        let initial_root_transition =
+                          Transition_frontier.(
+                            Breadcrumb.validated_transition (root frontier))
+                        in
+                        let%bind () =
+                          Strict_pipe.Writer.write clear_writer `Clear
+                        in
+                        let%map () =
+                          Transition_frontier.close ~loc:__LOC__ frontier
+                        in
+                        start_bootstrap_controller ~logger ~trust_system
+                          ~verifier ~network ~time_controller
+                          ~producer_transition_reader_ref
+                          ~producer_transition_writer_ref
+                          ~verified_transition_writer ~clear_reader
+                          ~transition_reader_ref ~transition_writer_ref
+                          ~consensus_local_state ~frontier_w ~persistent_root
+                          ~persistent_frontier ~initial_root_transition
+                          ~best_seen_transition:(Some enveloped_transition)
+                          ~precomputed_values ~catchup_mode )
+                      else Deferred.unit
+                  | None ->
+                      Deferred.unit
+                in
+                Strict_pipe.Writer.write !transition_writer_ref
+                  enveloped_transition)) ;
   (verified_transition_reader, initialization_finish_signal)

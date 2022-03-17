@@ -22,6 +22,7 @@ val create :
   -> ?compare_init:('init -> 'init -> int)
   -> ?weight:('init -> int)
   -> ?max_weight_per_call:int
+  -> name:string
   -> (   [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
          | `Potentially_invalid of 'partially_validated

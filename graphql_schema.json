@@ -15743,6 +15743,23 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "threadGraph",
+              "description":
+                "A graphviz dot format representation of the deamon's internal thread graph",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,

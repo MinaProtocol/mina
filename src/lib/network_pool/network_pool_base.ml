@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 open Network_peer
-open O1trace
 
 module Make (Transition_frontier : sig
   type t
@@ -98,7 +97,9 @@ end)
           (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
     in
-    trace_recurring (Resource_pool.label ^ "_apply_and_broadcast") (fun () ->
+    O1trace.sync_thread
+      ("apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs")
+      (fun () ->
         match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok res ->
             rebroadcast res
@@ -146,7 +147,9 @@ end)
     if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
-        trace_recurring (Resource_pool.label ^ "_verification") (fun () ->
+        O1trace.sync_thread
+          ("handle_" ^ Resource_pool.label ^ "_diffs")
+          (fun () ->
             let diff, cb = f d in
             if not (Broadcast_callback.is_expired cb) then (
               let summary =
@@ -173,37 +176,41 @@ end)
                     Broadcast_callback.error
                       (Error.of_string "exceeded capacity")
                       cb
-                | `Within_capacity -> (
-                    match%bind
-                      Resource_pool.Diff.verify t.resource_pool diff
-                    with
-                    | Error err ->
-                        [%log' debug t.logger]
-                          "Refusing to rebroadcast $diff. Verification error: \
-                           $error"
-                          ~metadata:
-                            [ ("diff", summary)
-                            ; ("error", Error_json.error_to_yojson err)
-                            ] ;
-                        (*reject incoming messages*)
-                        Broadcast_callback.error err cb
-                    | Ok verified_diff -> (
-                        [%log' debug t.logger] "Verified diff: $verified_diff"
-                          ~metadata:
-                            [ ( "verified_diff"
-                              , Resource_pool.Diff.verified_to_yojson
-                                @@ Envelope.Incoming.data verified_diff )
-                            ; ( "sender"
-                              , Envelope.Sender.to_yojson
-                                @@ Envelope.Incoming.sender verified_diff )
-                            ] ;
-                        match
-                          Strict_pipe.Writer.write w (verified_diff, cb)
+                | `Within_capacity ->
+                    O1trace.thread
+                      (Printf.sprintf "verify_%s_diffs" Resource_pool.label)
+                      (fun () ->
+                        match%bind
+                          Resource_pool.Diff.verify t.resource_pool diff
                         with
-                        | Some r ->
-                            r
-                        | None ->
-                            Deferred.unit ) ) ) )))
+                        | Error err ->
+                            [%log' debug t.logger]
+                              "Refusing to rebroadcast $diff. Verification \
+                               error: $error"
+                              ~metadata:
+                                [ ("diff", summary)
+                                ; ("error", Error_json.error_to_yojson err)
+                                ] ;
+                            (*reject incoming messages*)
+                            Broadcast_callback.error err cb
+                        | Ok verified_diff -> (
+                            [%log' debug t.logger]
+                              "Verified diff: $verified_diff"
+                              ~metadata:
+                                [ ( "verified_diff"
+                                  , Resource_pool.Diff.verified_to_yojson
+                                    @@ Envelope.Incoming.data verified_diff )
+                                ; ( "sender"
+                                  , Envelope.Sender.to_yojson
+                                    @@ Envelope.Incoming.sender verified_diff )
+                                ] ;
+                            match
+                              Strict_pipe.Writer.write w (verified_diff, cb)
+                            with
+                            | Some r ->
+                                r
+                            | None ->
+                                Deferred.unit )) ) )))
     |> don't_wait_for ;
     r
 
@@ -218,32 +225,36 @@ end)
       ; constraint_constants
       }
     in
-    (* priority: Transition frontier diffs > local diffs > incoming diffs *)
-    Strict_pipe.Reader.Merge.iter
-      [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
-            `Transition_frontier_extension diff)
-      ; Strict_pipe.Reader.map
-          (filter_verified ~log_rate_limiter:false local_diffs network_pool
-             ~f:(fun (diff, cb) ->
-               (Envelope.Incoming.local diff, Broadcast_callback.Local cb)))
-          ~f:(fun d -> `Local d)
-      ; Strict_pipe.Reader.map
-          (filter_verified ~log_rate_limiter:true incoming_diffs network_pool
-             ~f:(fun (diff, cb) -> (diff, Broadcast_callback.External cb)))
-          ~f:(fun d -> `Incoming d)
-      ]
-      ~f:(fun diff_source ->
-        match diff_source with
-        | `Incoming (verified_diff, cb) ->
-            apply_and_broadcast network_pool verified_diff cb
-        | `Local (verified_diff, cb) ->
-            apply_and_broadcast network_pool verified_diff cb
-        | `Transition_frontier_extension diff ->
-            trace_recurring
-              (Resource_pool.label ^ "_handle_transition_frontier_diff")
-              (fun () ->
-                Resource_pool.handle_transition_frontier_diff diff resource_pool))
-    |> Deferred.don't_wait_for ;
+    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    Deferred.don't_wait_for
+      (O1trace.thread Resource_pool.label (fun () ->
+           Strict_pipe.Reader.Merge.iter
+             [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
+                   `Transition_frontier_extension diff)
+             ; Strict_pipe.Reader.map
+                 (filter_verified ~log_rate_limiter:false local_diffs
+                    network_pool ~f:(fun (diff, cb) ->
+                      (Envelope.Incoming.local diff, Broadcast_callback.Local cb)))
+                 ~f:(fun d -> `Diff d)
+             ; Strict_pipe.Reader.map
+                 (filter_verified ~log_rate_limiter:true incoming_diffs
+                    network_pool ~f:(fun (diff, cb) ->
+                      (diff, Broadcast_callback.External cb)))
+                 ~f:(fun d -> `Diff d)
+             ]
+             ~f:(fun diff_source ->
+               match diff_source with
+               | `Diff (verified_diff, cb) ->
+                   O1trace.thread
+                     (Printf.sprintf "processing_%s_diffs" Resource_pool.label)
+                     (fun () ->
+                       apply_and_broadcast network_pool verified_diff cb)
+               | `Transition_frontier_extension diff ->
+                   O1trace.thread
+                     (Printf.sprintf "processing_%s_transition_frontier_diffs"
+                        Resource_pool.label) (fun () ->
+                       Resource_pool.handle_transition_frontier_diff diff
+                         resource_pool)))) ;
     network_pool
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
@@ -266,7 +277,7 @@ end)
       if Time.(add time rebroadcast_window < now ()) then `Timed_out else `Ok
     in
     let rec go () =
-      trace_recurring (Resource_pool.label ^ "_rebroadcast_loop") (fun () ->
+      O1trace.sync_thread (Resource_pool.label ^ "_rebroadcast_loop") (fun () ->
           let rebroadcastable =
             Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
           in
@@ -308,6 +319,8 @@ end)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
-    don't_wait_for (rebroadcast_loop t logger) ;
+    O1trace.background_thread
+      ("rebroadcast_" ^ Resource_pool.label ^ "_diffs")
+      (fun () -> rebroadcast_loop t logger) ;
     t
 end
