@@ -23,8 +23,7 @@ type ('proof, 'result) state =
 module Q = Doubly_linked
 
 type ('init, 'partially_validated, 'result) t =
-  { name : string
-  ; mutable state : ('init, 'result) state
+  { mutable state : ('init, 'result) state
   ; how_to_add : [ `Insert | `Enqueue_back ]
   ; queue : ('init, 'result) elt Q.t
   ; compare_init : ('init -> 'init -> int) option
@@ -46,9 +45,8 @@ type ('init, 'partially_validated, 'result) t =
 [@@deriving sexp]
 
 let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
-    ?(weight = fun _ -> 1) ?max_weight_per_call ~name verifier =
-  { name
-  ; state = Waiting
+    ?(weight = fun _ -> 1) ?max_weight_per_call verifier =
+  { state = Waiting
   ; queue = Q.create ()
   ; how_to_add
   ; compare_init
@@ -272,8 +270,7 @@ module Transaction_pool = struct
 
   let create verifier : t =
     let logger = Logger.create () in
-    create ~compare_init:compare_envelope ~logger ~name:"transaction_pool"
-      (fun (ds : input list) ->
+    create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
         [%log info]
           "Dispatching $num_proofs transaction pool proofs to verifier"
           ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
@@ -368,7 +365,7 @@ module Snark_pool = struct
       ~max_weight_per_call:
         (Option.value_map ~default:1000 ~f:Int.of_string
            (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE"))
-      ~compare_init:compare_envelope ~logger ~name:"snark_pool"
+      ~compare_init:compare_envelope ~logger
       (fun ps0 ->
         [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
           ~metadata:[ ("num_proofs", `Int (List.length ps0)) ] ;

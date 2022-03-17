@@ -34,9 +34,6 @@ let grab_parent_fiber () =
       current_sync_fiber := None ;
       Some fiber
 
-(* TODO: in general, I think the fiber setup needs some more thought *)
-(* TODO: realization -- need to store a sync_fiber flag on the current scheduler ctx state and then have a hook for `don't_wait_for` or something (still have to worry about `ignore x : 'a Deferred.t` though) *)
-
 (* look through a fiber stack to find a recursive fiber call *)
 let rec find_recursive_fiber thread_name parent_thread_name
     (fiber : Thread.Fiber.t) =

@@ -16,6 +16,21 @@ end)
      and type transition_frontier_diff := Resource_pool.transition_frontier_diff
      and type config := Resource_pool.Config.t
      and type rejected_diff := Resource_pool.Diff.rejected = struct
+  let apply_and_broadcast_thread_label =
+    "apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs"
+
+  let handle_diffs_thread_label = "handle_" ^ Resource_pool.label ^ "_diffs"
+
+  let verify_diffs_thread_label = "verify_" ^ Resource_pool.label ^ "_diffs"
+
+  let processing_diffs_thread_label =
+    "processing_" ^ Resource_pool.label ^ "_diffs"
+
+  let processing_transition_frontier_diffs_thread_label =
+    "processing_" ^ Resource_pool.label ^ "_transition_frontier_diffs"
+
+  let rebroadcast_loop_thread_label = Resource_pool.label ^ "_rebroadcast_loop"
+
   module Broadcast_callback = struct
     type t =
       | Local of
@@ -97,9 +112,7 @@ end)
           (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
     in
-    O1trace.sync_thread
-      ("apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs")
-      (fun () ->
+    O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
         match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok res ->
             rebroadcast res
@@ -147,9 +160,7 @@ end)
     if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
-        O1trace.sync_thread
-          ("handle_" ^ Resource_pool.label ^ "_diffs")
-          (fun () ->
+        O1trace.sync_thread handle_diffs_thread_label (fun () ->
             let diff, cb = f d in
             if not (Broadcast_callback.is_expired cb) then (
               let summary =
@@ -177,9 +188,7 @@ end)
                       (Error.of_string "exceeded capacity")
                       cb
                 | `Within_capacity ->
-                    O1trace.thread
-                      (Printf.sprintf "verify_%s_diffs" Resource_pool.label)
-                      (fun () ->
+                    O1trace.thread verify_diffs_thread_label (fun () ->
                         match%bind
                           Resource_pool.Diff.verify t.resource_pool diff
                         with
@@ -245,14 +254,12 @@ end)
              ~f:(fun diff_source ->
                match diff_source with
                | `Diff (verified_diff, cb) ->
-                   O1trace.thread
-                     (Printf.sprintf "processing_%s_diffs" Resource_pool.label)
-                     (fun () ->
+                   O1trace.thread processing_diffs_thread_label (fun () ->
                        apply_and_broadcast network_pool verified_diff cb)
                | `Transition_frontier_extension diff ->
                    O1trace.thread
-                     (Printf.sprintf "processing_%s_transition_frontier_diffs"
-                        Resource_pool.label) (fun () ->
+                     processing_transition_frontier_diffs_thread_label
+                     (fun () ->
                        Resource_pool.handle_transition_frontier_diff diff
                          resource_pool)))) ;
     network_pool
@@ -277,30 +284,29 @@ end)
       if Time.(add time rebroadcast_window < now ()) then `Timed_out else `Ok
     in
     let rec go () =
-      O1trace.sync_thread (Resource_pool.label ^ "_rebroadcast_loop") (fun () ->
-          let rebroadcastable =
-            Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
-          in
-          if List.is_empty rebroadcastable then
-            [%log trace] "Nothing to rebroadcast"
-          else
-            [%log debug]
-              "Preparing to rebroadcast locally generated resource pool diffs \
-               $diffs"
-              ~metadata:
-                [ ("count", `Int (List.length rebroadcastable))
-                ; ( "diffs"
-                  , `List
-                      (List.map
-                         ~f:(fun d -> `String (Resource_pool.Diff.summary d))
-                         rebroadcastable) )
-                ] ;
-          let%bind () =
-            Deferred.List.iter rebroadcastable
-              ~f:(Linear_pipe.write t.write_broadcasts)
-          in
-          let%bind () = Async.after rebroadcast_interval in
-          go ())
+      let rebroadcastable =
+        Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
+      in
+      if List.is_empty rebroadcastable then
+        [%log trace] "Nothing to rebroadcast"
+      else
+        [%log debug]
+          "Preparing to rebroadcast locally generated resource pool diffs \
+           $diffs"
+          ~metadata:
+            [ ("count", `Int (List.length rebroadcastable))
+            ; ( "diffs"
+              , `List
+                  (List.map
+                     ~f:(fun d -> `String (Resource_pool.Diff.summary d))
+                     rebroadcastable) )
+            ] ;
+      let%bind () =
+        Deferred.List.iter rebroadcastable
+          ~f:(Linear_pipe.write t.write_broadcasts)
+      in
+      let%bind () = Async.after rebroadcast_interval in
+      go ()
     in
     go ()
 
@@ -319,8 +325,7 @@ end)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
-    O1trace.background_thread
-      ("rebroadcast_" ^ Resource_pool.label ^ "_diffs")
-      (fun () -> rebroadcast_loop t logger) ;
+    O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
+        rebroadcast_loop t logger) ;
     t
 end
