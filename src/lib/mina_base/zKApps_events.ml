@@ -19,12 +19,12 @@
 
     A zkApp smart contract could use a
     [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) to store more data
-    than it can fit in its 8 general purpose registers. Usually, when a snap
+    than it can fit in its 8 general purpose registers. Usually, when a zkApp
     account updates the root of its merkle tree, there will be no way to know
     what the new contents of the merkle tree are; only the cryptographic 'root
-    hash' is publically available.
+    hash' is publicly available.
 
-    In order to update the merkle tree while making the new contents publically
+    In order to update the merkle tree while making the new contents publicly
     known, a zkApp developer can emit an event containing the new data and its
     position as an event, and any other member of the network can look at this
     event to discover the new contents.
