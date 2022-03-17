@@ -9,8 +9,7 @@
     zero-knowledge proofs, and this hash is unused by the transaction logic.
 
     An event may be used to expose information that is useful or important to
-    make publically available, but without storing the data in accounts
-    on-chain.
+    make publicly available, but without storing the data in accounts on-chain.
 
     Nodes may make this data available for transactions in their pool or from
     within blocks. Archive nodes and similar services may make older historical
