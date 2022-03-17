@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Frontier_base
 
 module T = struct

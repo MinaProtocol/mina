@@ -2,6 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 
 module Api = struct

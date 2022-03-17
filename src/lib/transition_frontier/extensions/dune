@@ -16,6 +16,7 @@
    data_hash_lib
    pipe_lib
    mina_base
+   mina_transaction
    transition_frontier_base
    transition_frontier_full_frontier
    mina_ledger

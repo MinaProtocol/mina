@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 
 type t = unit
 
@@ -23,7 +24,7 @@ let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
    containing Valid_assuming to match the expected type
 *)
 let verify_commands _ (cs : User_command.Verifiable.t list) :
-    [ `Valid of Mina_base.User_command.Valid.t
+    [ `Valid of User_command.Valid.t
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t
       * Mina_base.Snapp_statement.t

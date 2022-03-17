@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 module At_most_two = struct
   [%%versioned

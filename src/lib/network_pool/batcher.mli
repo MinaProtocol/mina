@@ -38,7 +38,7 @@ val verify :
 val compare_envelope : _ Envelope.Incoming.t -> _ Envelope.Incoming.t -> int
 
 module Transaction_pool : sig
-  open Mina_base
+  open Mina_transaction
 
   type t [@@deriving sexp]
 

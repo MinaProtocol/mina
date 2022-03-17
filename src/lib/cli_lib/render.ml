@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 module type Printable_intf = sig
   type t [@@deriving to_yojson]

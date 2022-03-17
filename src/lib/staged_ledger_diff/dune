@@ -10,6 +10,7 @@
    base.caml
    ;; local libraries
    mina_base
+   mina_transaction
    transaction_snark_work
    genesis_constants
    currency

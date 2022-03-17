@@ -5,7 +5,7 @@ open Signature_lib
 open Rosetta_lib
 open Rosetta_coding
 module Signature = Mina_base.Signature
-module User_command = Mina_base.User_command
+module User_command = Mina_transaction.User_command
 module Signed_command = Mina_base.Signed_command
 
 module Keys = struct

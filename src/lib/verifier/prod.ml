@@ -3,6 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Blockchain_snark
 open O1trace
@@ -19,8 +20,8 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> bool Deferred.t
 
     val verify_commands :
-         Mina_base.User_command.Verifiable.t list
-      -> [ `Valid of Mina_base.User_command.Valid.t
+         User_command.Verifiable.t list
+      -> [ `Valid of User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Snapp_statement.t

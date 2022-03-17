@@ -21,6 +21,7 @@
    signature_lib
    mina_ledger
    mina_base
+   mina_transaction
    random_oracle
    with_hash
    mina_base.import

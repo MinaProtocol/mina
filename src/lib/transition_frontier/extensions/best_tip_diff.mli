@@ -1,4 +1,5 @@
 open Mina_base
+open Mina_transaction
 
 type view =
   { new_commands : User_command.Valid.t With_status.t list

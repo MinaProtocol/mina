@@ -2506,11 +2506,11 @@ module Block = struct
                 let nonce_map =
                   Signature_lib.Public_key.Compressed.Map.change
                     initial_nonce_map
-                    ( Mina_base.User_command.fee_payer command
+                    ( Mina_transaction.User_command.fee_payer command
                     |> Account_id.public_key )
                     ~f:(fun _ ->
                       Some
-                        ( Mina_base.User_command.nonce_exn command
+                        ( Mina_transaction.User_command.nonce_exn command
                         |> Unsigned.UInt32.succ ))
                 in
                 let%bind id =
@@ -3295,7 +3295,8 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
                           ~metadata:
                             [ ("error", `String (Caqti_error.show e))
                             ; ( "command"
-                              , Mina_base.User_command.to_yojson command )
+                              , Mina_transaction.User_command.to_yojson command
+                              )
                             ]
                           "Failed to archive user command $command from \
                            transaction pool: $block, see $error")

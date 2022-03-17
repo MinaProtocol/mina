@@ -30,6 +30,7 @@
    consensus
    mina_networking
    mina_base
+   mina_transaction
    user_command_input
    perf_histograms
    sync_status

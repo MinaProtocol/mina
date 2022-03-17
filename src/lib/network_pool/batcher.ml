@@ -234,6 +234,7 @@ let compare_envelope (e1 : _ Envelope.Incoming.t) (e2 : _ Envelope.Incoming.t) =
 
 module Transaction_pool = struct
   open Mina_base
+  open Mina_transaction
 
   type diff = User_command.Verifiable.t list Envelope.Incoming.t
   [@@deriving sexp]

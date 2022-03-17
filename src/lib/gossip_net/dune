@@ -29,6 +29,7 @@
    mina_net2
    mina_transition
    mina_base
+   mina_transaction
    perf_histograms
    o1trace
    node_addrs_and_ports

@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 open Signature_lib
 open O1trace
 

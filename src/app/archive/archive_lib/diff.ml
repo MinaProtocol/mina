@@ -1,6 +1,7 @@
 open Mina_transition
 open Core_kernel
 open Mina_base
+open Mina_transaction
 module Breadcrumb = Transition_frontier.Breadcrumb
 
 (* TODO: We should be able to fully deserialize and serialize via json *)

@@ -1,6 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 open Network_peer

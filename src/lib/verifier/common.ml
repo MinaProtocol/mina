@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list

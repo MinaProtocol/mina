@@ -17,6 +17,7 @@
    currency
    mina_base
    mina_base.import
+   mina_compile_config
    mina_numbers
    one_or_two
    pickles

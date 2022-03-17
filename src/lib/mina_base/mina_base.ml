@@ -57,6 +57,5 @@ module Token_permissions = Token_permissions
 module Transaction_status = Transaction_status
 module Transaction_union_payload = Transaction_union_payload
 module Transaction_union_tag = Transaction_union_tag
-module User_command = User_command
 module With_stack_hash = With_stack_hash
 module With_status = With_status

@@ -28,6 +28,7 @@
    daemon_rpcs
    mina_lib
    mina_base
+   mina_transaction
    user_command_input
    mina_version
    node_addrs_and_ports

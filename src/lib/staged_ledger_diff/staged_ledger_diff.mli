@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 module At_most_two : sig
   type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option

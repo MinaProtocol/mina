@@ -32,6 +32,7 @@
    rosetta_lib
    secrets
    mina_base
+   mina_transaction
    work_selector
    rosetta_coding
    logger

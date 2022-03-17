@@ -31,6 +31,7 @@
    mina_transition
    mina_ledger
    mina_base
+   mina_transaction
    mina_transaction_logic
    mina_state
    staged_ledger

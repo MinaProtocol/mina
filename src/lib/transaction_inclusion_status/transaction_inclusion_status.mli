@@ -1,6 +1,6 @@
 open Core_kernel
 open Pipe_lib
-open Mina_base
+open Mina_transaction
 
 module State : sig
   module Stable : sig

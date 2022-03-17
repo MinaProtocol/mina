@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 module Types = Types
 module Client = Client
 

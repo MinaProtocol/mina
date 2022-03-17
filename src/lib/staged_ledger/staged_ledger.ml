@@ -2572,10 +2572,8 @@ let%test_module "staged ledger tests" =
       Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * Mina_base.User_command.Valid.t list
-            * int option list] ~trials:1
-        ~f:(fun (ledger_init_state, cmds, iters) ->
+            Ledger.init_state * User_command.Valid.t list * int option list]
+        ~trials:1 ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_simple
                 (init_pks ledger_init_state)
@@ -2586,10 +2584,8 @@ let%test_module "staged ledger tests" =
       Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * Mina_base.User_command.Valid.t list
-            * int option list] ~trials:15
-        ~f:(fun (ledger_init_state, cmds, iters) ->
+            Ledger.init_state * User_command.Valid.t list * int option list]
+        ~trials:15 ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_simple
                 (init_pks ledger_init_state)
@@ -3167,7 +3163,7 @@ let%test_module "staged ledger tests" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Mina_base.User_command.Valid.t list
+            * User_command.Valid.t list
             * int option list
             * (int * Fee.t list) list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->

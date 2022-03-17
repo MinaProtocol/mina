@@ -19,10 +19,10 @@ module Base = struct
 
     val verify_commands :
          t
-      -> Mina_base.User_command.Verifiable.t list
+      -> Mina_transaction.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
             communicating with the verifier. *)
-      -> [ `Valid of Mina_base.User_command.Valid.t
+      -> [ `Valid of Mina_transaction.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Snapp_statement.t
