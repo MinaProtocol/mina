@@ -1,6 +1,7 @@
 open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Network_pool
 

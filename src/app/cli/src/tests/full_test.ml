@@ -280,14 +280,8 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo ~valid_until:None
-              ~body:
-                (Payment
-                   { source_pk = signer
-                   ; receiver_pk
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+              ~memo ~valid_until:None
+              ~body:(Payment { source_pk = signer; receiver_pk; amount })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))

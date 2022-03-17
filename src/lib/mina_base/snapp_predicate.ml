@@ -21,7 +21,7 @@ module Closed_interval = struct
   module Stable = struct
     module V1 = struct
       type 'a t = { lower : 'a; upper : 'a }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -41,8 +41,9 @@ module Closed_interval = struct
 
   let deriver ~name inner obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~lower:!.inner ~upper:!.inner
-    |> finish ~name:(name ^ "Interval")
+    |> finish (name ^ "Interval") ~t_toplevel_annots
 
   let%test_module "ClosedInterval" =
     ( module struct
@@ -147,18 +148,6 @@ module Numeric = struct
         ; to_input_checked = Checked.to_input
         }
 
-    let token_id =
-      Token_id.
-        { zero = of_uint64 Unsigned.UInt64.zero
-        ; max_value = of_uint64 Unsigned.UInt64.max_int
-        ; equal
-        ; compare
-        ; lte_checked = run Checked.( <= )
-        ; typ
-        ; to_input
-        ; to_input_checked = Checked.to_input
-        }
-
     let time =
       Block_time.
         { equal
@@ -223,14 +212,16 @@ module Numeric = struct
 
       module T = struct
         type t = { foo : Int_numeric.t }
-        [@@deriving sexp, equal, compare, fields]
+        [@@deriving annot, sexp, equal, compare, fields]
 
         let v : t =
           { foo = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 } }
 
         let deriver obj =
           let open Fields_derivers_snapps.Derivers in
-          Fields.make_creator obj ~foo:!.(deriver "Int" int) |> finish ~name:"T"
+          let ( !. ) = ( !. ) ~t_fields_annots in
+          Fields.make_creator obj ~foo:!.(deriver "Int" int)
+          |> finish "T" ~t_toplevel_annots
       end
 
       let%test_unit "roundtrip json" =
@@ -364,6 +355,16 @@ module Eq_data = struct
         ; equal_checked = run equal_var
         }
 
+    let token_id =
+      Token_id.
+        { default
+        ; to_input_checked = Checked.to_input
+        ; to_input
+        ; typ
+        ; equal
+        ; equal_checked = Checked.equal
+        }
+
     let epoch_seed =
       Epoch_seed.
         { field with
@@ -455,7 +456,7 @@ module Leaf_typs = struct
 
   let global_slot = Numeric.typ global_slot
 
-  let token_id = Numeric.typ token_id
+  let token_id = Hash.typ token_id
 end
 
 module Account = struct
@@ -473,7 +474,7 @@ module Account = struct
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
 
       module V1 = struct
@@ -485,7 +486,7 @@ module Account = struct
           ; delegate : 'pk
           ; state : 'field Snapp_state.V.Stable.V1.t
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare]
       end
     end]
   end
@@ -578,6 +579,7 @@ module Account = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
@@ -586,7 +588,7 @@ module Account = struct
       ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish ~name:"AccountPredicate"
+    |> finish "AccountPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
@@ -833,17 +835,22 @@ module Protocol_state = struct
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
       let ledger obj' =
+        let ( !. ) =
+          ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
+        in
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.Numeric.Derivers.amount
-        |> finish ~name:"EpochLedgerPredicate"
+        |> finish "EpochLedgerPredicate"
+             ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
+      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~ledger:!.ledger
         ~seed:!.(Or_ignore.deriver field)
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
         ~epoch_length:!.Numeric.Derivers.length
-      |> finish ~name:"EpochDataPredicate"
+      |> finish "EpochDataPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let f = Or_ignore.Check Field.one in
@@ -941,7 +948,6 @@ module Protocol_state = struct
     module Stable = struct
       module V1 = struct
         type ( 'snarked_ledger_hash
-             , 'token_id
              , 'time
              , 'length
              , 'vrf_output
@@ -953,7 +959,6 @@ module Protocol_state = struct
                We should include staged ledger hash again! It only changes once per
                block. *)
             snarked_ledger_hash : 'snarked_ledger_hash
-          ; snarked_next_available_token : 'token_id
           ; timestamp : 'time
           ; blockchain_length : 'length
                 (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
@@ -973,7 +978,7 @@ module Protocol_state = struct
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -983,7 +988,6 @@ module Protocol_state = struct
     module V1 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
-        , Token_id.Stable.V1.t Numeric.Stable.V1.t
         , Block_time.Stable.V1.t Numeric.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
         , unit (* TODO *)
@@ -999,9 +1003,9 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
-      ~snarked_next_available_token:!.Numeric.Derivers.token_id
       ~timestamp:!.Numeric.Derivers.block_time
       ~blockchain_length:!.Numeric.Derivers.length
       ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output:!.unit
@@ -1010,13 +1014,12 @@ module Protocol_state = struct
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
-    |> finish ~name:"ProtocolStatePredicate"
+    |> finish "ProtocolStatePredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     (* TODO: pass in ledger hash, next available token *)
     let snarked_ledger_hash = Snapp_basic.Or_ignore.Ignore in
-    let snarked_next_available_token = Snapp_basic.Or_ignore.Ignore in
     let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
@@ -1044,7 +1047,6 @@ module Protocol_state = struct
     let%bind staking_epoch_data = Epoch_data.gen in
     let%map next_epoch_data = Epoch_data.gen in
     { Poly.snarked_ledger_hash
-    ; snarked_next_available_token
     ; timestamp
     ; blockchain_length
     ; min_window_density
@@ -1058,7 +1060,6 @@ module Protocol_state = struct
 
   let to_input
       ({ snarked_ledger_hash
-       ; snarked_next_available_token
        ; timestamp
        ; blockchain_length
        ; min_window_density
@@ -1075,7 +1076,6 @@ module Protocol_state = struct
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
       [ Hash.(to_input Tc.field snarked_ledger_hash)
-      ; Numeric.(to_input Tc.token_id snarked_next_available_token)
       ; Numeric.(to_input Tc.time timestamp)
       ; length blockchain_length
       ; length min_window_density
@@ -1097,7 +1097,6 @@ module Protocol_state = struct
       module V1 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , Token_id.Stable.V1.t
           , Block_time.Stable.V1.t
           , Length.Stable.V1.t
           , unit (* TODO *)
@@ -1121,7 +1120,6 @@ module Protocol_state = struct
     module Checked = struct
       type t =
         ( Frozen_ledger_hash.var
-        , Token_id.var
         , Block_time.Checked.t
         , Length.Checked.t
         , unit (* TODO *)
@@ -1140,7 +1138,6 @@ module Protocol_state = struct
   module Checked = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
-      , Token_id.var Numeric.Checked.t
       , Block_time.Checked.t Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
@@ -1151,7 +1148,6 @@ module Protocol_state = struct
 
     let to_input
         ({ snarked_ledger_hash
-         ; snarked_next_available_token
          ; timestamp
          ; blockchain_length
          ; min_window_density
@@ -1168,7 +1164,6 @@ module Protocol_state = struct
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
         [ Hash.(to_input_checked Tc.frozen_ledger_hash snarked_ledger_hash)
-        ; Numeric.(Checked.to_input Tc.token_id snarked_next_available_token)
         ; Numeric.(Checked.to_input Tc.time timestamp)
         ; length blockchain_length
         ; length min_window_density
@@ -1187,7 +1182,6 @@ module Protocol_state = struct
     let check
         (* Bind all the fields explicity so we make sure they are all used. *)
           ({ snarked_ledger_hash
-           ; snarked_next_available_token
            ; timestamp
            ; blockchain_length
            ; min_window_density
@@ -1221,8 +1215,6 @@ module Protocol_state = struct
       Boolean.all
         ( [ Hash.(check_checked Tc.ledger_hash)
               snarked_ledger_hash s.snarked_ledger_hash
-          ; Numeric.(Checked.check Tc.token_id)
-              snarked_next_available_token s.snarked_next_available_token
           ; Numeric.(Checked.check Tc.time) timestamp s.timestamp
           ; Numeric.(Checked.check Tc.length)
               blockchain_length s.blockchain_length
@@ -1247,7 +1239,6 @@ module Protocol_state = struct
     let time = Numeric.(typ Tc.time) in
     let amount = Numeric.(typ Tc.amount) in
     let global_slot = Numeric.(typ Tc.global_slot) in
-    let token_id = Numeric.(typ Tc.token_id) in
     let epoch_data =
       let epoch_ledger =
         let open Epoch_ledger.Poly in
@@ -1264,7 +1255,6 @@ module Protocol_state = struct
     in
     Typ.of_hlistable
       [ frozen_ledger_hash
-      ; token_id
       ; time
       ; length
       ; length
@@ -1288,7 +1278,6 @@ module Protocol_state = struct
       }
     in
     { snarked_ledger_hash = Ignore
-    ; snarked_next_available_token = Ignore
     ; timestamp = Ignore
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
@@ -1309,7 +1298,6 @@ module Protocol_state = struct
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
         ({ snarked_ledger_hash
-         ; snarked_next_available_token
          ; timestamp
          ; blockchain_length
          ; min_window_density
@@ -1357,10 +1345,6 @@ module Protocol_state = struct
     let%bind () =
       Hash.(check ~label:"snarked_ledger_hash" Tc.ledger_hash)
         snarked_ledger_hash s.snarked_ledger_hash
-    in
-    let%bind () =
-      Numeric.(check ~label:"snarked_next_available_token" Tc.token_id)
-        snarked_next_available_token s.snarked_next_available_token
     in
     let%bind () =
       Numeric.(check ~label:"timestamp" Tc.time) timestamp s.timestamp

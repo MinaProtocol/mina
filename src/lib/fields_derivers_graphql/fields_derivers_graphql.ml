@@ -45,17 +45,23 @@ module Graphql_raw = struct
             ('row, 'c, 'ty, 'nullable) Input.t
       end
 
-      let add_field (type f f' ty ty' nullable1 nullable2) :
+      let add_field (type f f' ty ty' nullable1 nullable2) ~t_fields_annots :
              ('f_row, f', f, nullable1) Input.t
           -> ([< `Read | `Set_and_create ], _, _) Field.t_with_perm
           -> ('row, ty', ty, nullable2) Acc.t
           -> (('row, ty', ty, nullable2) Creator.t -> f')
              * ('row_after, ty', ty, nullable2) Acc.t =
        fun f_input field acc ->
+        let annotations =
+          Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+            (Field.name field)
+        in
         let ref_as_pipe = ref None in
         let arg =
           Schema.Arg.arg
-            (Fields_derivers.name_under_to_camel field)
+            (Option.value annotations.name
+               ~default:(Fields_derivers.name_under_to_camel field))
+            ?doc:annotations.doc
             ~typ:(!(f_input#graphql_arg) ())
         in
         let () =
@@ -94,11 +100,14 @@ module Graphql_raw = struct
         ( (fun _creator_input -> !(f_input#map) @@ Option.value_exn !ref_as_pipe)
         , acc )
 
-      let finish ?doc ~name (type ty result nullable) :
+      let finish name ~t_toplevel_annots (type ty result nullable) :
              (('row, result, ty, nullable) Input.t -> result)
              * ('row, result, ty, nullable) Acc.t
           -> _ Output.t =
        fun (creator, acc) ->
+        let annotations =
+          Fields_derivers.Annotations.Top.of_annots ~name t_toplevel_annots
+        in
         acc#graphql_creator := creator ;
         (acc#graphql_arg :=
            fun () ->
@@ -110,8 +119,9 @@ module Graphql_raw = struct
                   * expression and remove Obj.magic. *)
                  Obj.magic
                  @@ Schema.Arg.(
-                      obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
-                        ~coerce:graphql_arg_coerce
+                      obj ?doc:annotations.doc
+                        (annotations.name ^ "Input")
+                        ~fields:graphql_arg_fields ~coerce:graphql_arg_coerce
                       |> non_null)) ;
         (acc#nullable_graphql_arg :=
            fun () ->
@@ -122,8 +132,9 @@ module Graphql_raw = struct
                  (* TODO: See above *)
                  Obj.magic
                  @@ Schema.Arg.(
-                      obj ?doc (name ^ "Input") ~fields:graphql_arg_fields
-                        ~coerce:graphql_arg_coerce)) ;
+                      obj ?doc:annotations.doc
+                        (annotations.name ^ "Input")
+                        ~fields:graphql_arg_fields ~coerce:graphql_arg_coerce)) ;
         acc
 
       let int obj =
@@ -202,33 +213,47 @@ module Graphql_raw = struct
             ('input_type, 'a, 'c, 'nullable) Input.t
       end
 
-      let add_field (type f input_type orig nullable c' nullable') :
+      let add_field (type f input_type orig nullable c' nullable')
+          ~t_fields_annots :
              (orig, 'a, f, nullable) Input.t
           -> ([< `Read | `Set_and_create ], c', f) Fieldslib.Field.t_with_perm
           -> (input_type, 'row2, c', nullable') Accumulator.t
           -> (_ -> f) * (input_type, 'row2, c', nullable') Accumulator.t =
        fun t_field field acc ->
+        let annotations =
+          Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+            (Field.name field)
+        in
         let rest = !(acc#graphql_fields_accumulator) in
         acc#graphql_fields_accumulator :=
           { Accumulator.T.run =
               (fun () ->
                 Schema.field
-                  (Fields_derivers.name_under_to_camel field)
+                  (Option.value annotations.name
+                     ~default:(Fields_derivers.name_under_to_camel field))
                   ~args:Schema.Arg.[]
-                  ?doc:None ?deprecated:None
+                  ?doc:annotations.doc
+                  ~deprecated:
+                    ( Option.map annotations.deprecated ~f:(fun msg ->
+                          Schema.Deprecated (Some msg))
+                    |> Option.value ~default:Schema.NotDeprecated )
                   ~typ:(!(t_field#graphql_fields).Input.T.run ())
                   ~resolve:(fun _ x -> !(t_field#contramap) (Field.get field x)))
           }
           :: rest ;
         ((fun _ -> failwith "Unused"), acc)
 
-      let finish ~name ?doc ((_creator, obj) : 'u * _ Accumulator.t) : _ Input.t
-          =
+      let finish name ~t_toplevel_annots
+          ((_creator, obj) : 'u * _ Accumulator.t) : _ Input.t =
+        let annotations =
+          Fields_derivers.Annotations.Top.of_annots ~name t_toplevel_annots
+        in
         let graphql_fields_accumulator = !(obj#graphql_fields_accumulator) in
         let graphql_fields =
           { Input.T.run =
               (fun () ->
-                Schema.obj name ?doc ~fields:(fun _ ->
+                Schema.obj annotations.name ?doc:annotations.doc
+                  ~fields:(fun _ ->
                     List.rev
                     @@ List.map graphql_fields_accumulator ~f:(fun g ->
                            g.Accumulator.T.run ()))
@@ -238,7 +263,8 @@ module Graphql_raw = struct
         let nullable_graphql_fields =
           { Input.T.run =
               (fun () ->
-                Schema.obj name ?doc ~fields:(fun _ ->
+                Schema.obj annotations.name ?doc:annotations.doc
+                  ~fields:(fun _ ->
                     List.rev
                     @@ List.map graphql_fields_accumulator ~f:(fun g ->
                            g.Accumulator.T.run ())))
@@ -346,11 +372,18 @@ module Graphql_query = struct
       constraint 'a t = 'a Input.t
   end
 
-  let add_field : 'a Input.t -> 'field -> 'obj -> 'creator * 'obj =
+  let add_field ~t_fields_annots :
+      'a Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
+    let annotations =
+      Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+        (Field.name field)
+    in
     let rest = !(acc_obj#graphql_query_accumulator) in
     acc_obj#graphql_query_accumulator :=
-      (Fields_derivers.name_under_to_camel field, !(t_field#graphql_query))
+      ( Option.value annotations.name
+          ~default:(Fields_derivers.name_under_to_camel field)
+      , !(t_field#graphql_query) )
       :: rest ;
     ((fun _ -> failwith "unused"), acc_obj)
 
@@ -497,11 +530,12 @@ let%test_module "Test" =
 
     let o () = deriver ()
 
-    let raw_server q c =
+    let raw_server ?(print = false) q c =
       let schema = Schema.(schema [ q ] ~mutations:[] ~subscriptions:[]) in
       let res = Schema.execute schema () c in
       match res with
       | Ok (`Response data) ->
+          if print then Yojson.Basic.pretty_print Format.std_formatter data ;
           data |> Yojson.Basic.to_string
       | Error err ->
           failwithf "Unexpected error: %s" (Yojson.Basic.to_string err) ()
@@ -518,7 +552,7 @@ let%test_module "Test" =
     let query_for_all typ v str =
       raw_server (query_schema typ v) (Test.parse_query str)
 
-    let hit_server q = raw_server q (Test.introspection_query ())
+    let hit_server ?print q = raw_server ?print q (Test.introspection_query ())
 
     let hit_server_query (typ : _ Schema.typ) v =
       hit_server (query_schema typ v)
@@ -532,18 +566,22 @@ let%test_module "Test" =
             ~resolve:(fun _ _ _ -> 0))
 
     module T1 = struct
-      type t = { foo_hello : int option; bar : string list } [@@deriving fields]
+      (** T1 is foo *)
+      type t = { foo_hello : int option; bar : string list [@name "bar1"] }
+      [@@deriving annot, fields]
 
       let _v = { foo_hello = Some 1; bar = [ "baz1"; "baz2" ] }
 
+      let doc = "T1 is foo"
+
       let manual_typ =
         Schema.(
-          obj "T1" ?doc:None ~fields:(fun _ ->
+          obj "T1" ~doc ~fields:(fun _ ->
               [ field "fooHello"
                   ~args:Arg.[]
                   ~typ:int
                   ~resolve:(fun _ t -> t.foo_hello)
-              ; field "bar"
+              ; field "bar1"
                   ~args:Arg.[]
                   ~typ:(non_null (list (non_null string)))
                   ~resolve:(fun _ t -> t.bar)
@@ -551,35 +589,35 @@ let%test_module "Test" =
 
       let derived init =
         let open Graphql_fields in
-        let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+        let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
         Fields.make_creator init
           ~foo_hello:!.(option @@ int @@ o ())
           ~bar:!.(list @@ string @@ o ())
-        |> finish ~name:"T1" ?doc:None
+        |> finish "T1" ~t_toplevel_annots
 
       module Args = struct
         let manual_typ =
           Schema.Arg.(
-            obj "T1_argInput" ?doc:None
+            obj "T1Input" ~doc
               ~fields:
-                [ arg "bar" ~typ:(non_null (list (non_null string)))
+                [ arg "bar1" ~typ:(non_null (list (non_null string)))
                 ; arg "fooHello" ~typ:int
                 ]
               ~coerce:(fun bar foo_hello -> { bar; foo_hello }))
 
         let derived init =
           let open Graphql_args in
-          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
           Fields.make_creator init
             ~foo_hello:!.(option @@ int @@ o ())
             ~bar:!.(list @@ string @@ o ())
-          |> finish ~name:"T1_arg" ?doc:None
+          |> finish "T1" ~t_toplevel_annots
       end
 
       module Query = struct
         let derived init =
           let open Graphql_query in
-          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
           Fields.make_creator init
             ~foo_hello:!.(option @@ int @@ o ())
             ~bar:!.(list @@ string @@ o ())
@@ -616,7 +654,7 @@ let%test_module "Test" =
     end
 
     module T2 = struct
-      type t = { foo : T1.t Or_ignore_test.t } [@@deriving fields]
+      type t = { foo : T1.t Or_ignore_test.t } [@@deriving annot, fields]
 
       let v1 =
         { foo = Check { T1.foo_hello = Some 1; bar = [ "baz1"; "baz2" ] } }
@@ -634,24 +672,24 @@ let%test_module "Test" =
 
       let derived init =
         let open Graphql_fields in
-        let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+        let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
         Fields.make_creator init
           ~foo:!.(Or_ignore_test.derived @@ T1.derived @@ o ())
-        |> finish ~name:"T2" ?doc:None
+        |> finish "T2" ~t_toplevel_annots
 
       module Args = struct
         let manual_typ =
           Schema.Arg.(
-            obj "T2_argInput" ?doc:None
+            obj "T2Input" ?doc:None
               ~fields:[ arg "foo" ~typ:T1.Args.manual_typ ] ~coerce:(fun foo ->
                 Or_ignore_test.of_option foo))
 
         let derived init =
           let open Graphql_args in
-          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
           Fields.make_creator init
             ~foo:!.(Or_ignore_test.Args.derived @@ T1.Args.derived @@ o ())
-          |> finish ~name:"T2_arg" ?doc:None
+          |> finish "T2" ~t_toplevel_annots
       end
 
       module Query = struct
@@ -660,14 +698,14 @@ let%test_module "Test" =
             {
               foo {
                 fooHello
-                bar
+                bar1
               }
             }
           |}
 
         let derived init =
           let open Graphql_query in
-          let ( !. ) x fd acc = add_field (x (o ())) fd acc in
+          let ( !. ) x fd acc = add_field ~t_fields_annots (x (o ())) fd acc in
           Fields.make_creator init
             ~foo:!.(Or_ignore_test.Query.derived @@ T1.Query.derived @@ o ())
           |> finish

@@ -18,6 +18,8 @@
    snark_params
    mina_ledger
    mina_base
+   mina_transaction
+   mina_transaction_logic
    currency
    mina_state
    signature_lib
