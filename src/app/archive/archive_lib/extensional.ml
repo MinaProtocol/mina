@@ -2,6 +2,7 @@
 
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 
 (* the tables in the archive db uses foreign keys to refer to other

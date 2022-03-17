@@ -5,6 +5,7 @@ open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
 open O1trace
 open Signature_lib

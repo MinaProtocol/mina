@@ -5,6 +5,7 @@ open Signature_lib
 module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
+open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct

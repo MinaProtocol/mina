@@ -1,5 +1,6 @@
 open Core
 open Mina_base
+open Mina_transaction
 open Snark_params
 open Mina_state
 module Transaction_validator = Transaction_validator
