@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 open Mina_transition
 open Pipe_lib

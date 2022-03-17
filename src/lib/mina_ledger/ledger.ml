@@ -362,7 +362,7 @@ module Ledger_inner = struct
 end
 
 include Ledger_inner
-include Transaction_logic.Make (Ledger_inner)
+include Mina_transaction_logic.Make (Ledger_inner)
 
 type init_state =
   ( Signature_lib.Keypair.t
@@ -416,7 +416,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       create_new_account_exn t account_id account')
 
 let%test_unit "parties payment test" =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
@@ -445,7 +445,7 @@ let%test_unit "parties payment test" =
               let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
               (* TODO: Hack. The nonces are inconsistent between the 2
                  versions. See the comment in
-                 [Transaction_logic.For_tests.party_send] for more info.
+                 [Mina_transaction_logic.For_tests.party_send] for more info.
               *)
               L.iteri l1 ~f:(fun index account ->
                   L.set_at_index_exn l1 index

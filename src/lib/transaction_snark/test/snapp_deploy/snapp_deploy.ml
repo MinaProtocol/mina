@@ -9,7 +9,7 @@ let%test_module "Snapp deploy tests" =
     let memo = Signed_command_memo.create_from_string_exn "Snapp deploy tests"
 
     let%test_unit "create a new snapp account/deploy a smart contract" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -43,7 +43,7 @@ let%test_module "Snapp deploy tests" =
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -77,7 +77,7 @@ let%test_module "Snapp deploy tests" =
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract- different fee payer" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->

@@ -2,6 +2,7 @@ open Core
 open Async
 open Graphql_async
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency

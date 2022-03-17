@@ -1,5 +1,6 @@
 open Core
 open Mina_base
+open Mina_transaction
 open Signature_lib
 
 module type S = sig

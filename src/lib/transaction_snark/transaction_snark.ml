@@ -1,6 +1,7 @@
 open Core
 open Signature_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Snark_params
 module Global_slot = Mina_numbers.Global_slot
@@ -725,7 +726,7 @@ module Base = struct
                     < payload.body.amount)
               in
               let timing_or_error =
-                Transaction_logic.validate_timing
+                Mina_transaction_logic.validate_timing
                   ~txn_amount:payload.body.amount ~txn_global_slot
                   ~account:source_account
               in
@@ -736,8 +737,8 @@ module Base = struct
                 | Error err ->
                     let open Mina_base in
                     Transaction_status.Failure.equal
-                      (Transaction_logic.timing_error_to_user_command_status
-                         err)
+                      (Mina_transaction_logic
+                       .timing_error_to_user_command_status err)
                       Transaction_status.Failure
                       .Source_minimum_balance_violation
               in
@@ -862,7 +863,7 @@ module Base = struct
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
       ~txn_global_slot =
-    (* calculations should track Transaction_logic.validate_timing *)
+    (* calculations should track Mina_transaction_logic.validate_timing *)
     let open Account.Poly in
     let open Account.Timing.As_record in
     let { is_timed
@@ -1462,7 +1463,7 @@ module Base = struct
             -> (t, Field.Constant.t) With_stack_hash.t list
             -> (t, Field.Constant.t) With_stack_hash.t list
         end) :
-          Parties_logic.Stack_intf
+          Mina_transaction_logic.Parties_logic.Stack_intf
             with type elt = (Elt.t V.t, Field.t) With_hash.t
              and type t =
                   ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
@@ -1803,7 +1804,7 @@ module Base = struct
             , Bool.t
             , Transaction_commitment.t
             , Bool.failure_status )
-            Parties_logic.Local_state.t
+            Mina_transaction_logic.Parties_logic.Local_state.t
 
           let add_check (t : t) _failure b =
             { t with success = Bool.(t.success &&& b) }
@@ -1858,7 +1859,7 @@ module Base = struct
               , Bool.t
               , Transaction_commitment.t
               , unit )
-              Parties_logic.Local_state.t
+              Mina_transaction_logic.Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
           ; full_transaction_commitment : Transaction_commitment.t
@@ -1866,9 +1867,10 @@ module Base = struct
           ; failure : unit >
       end
 
-      include Parties_logic.Make (Inputs)
+      include Mina_transaction_logic.Parties_logic.Make (Inputs)
 
-      let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
+      let perform (type r)
+          (eff : (r, Env.t) Mina_transaction_logic.Parties_logic.Eff.t) : r =
         match eff with
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
@@ -1891,7 +1893,7 @@ module Base = struct
                   (* We always assert that the proof verifies. *)
                   Boolean.true_
             in
-            (* omit failure status here, unlike `Transaction_logic` *)
+            (* omit failure status here, unlike `Mina_transaction_logic` *)
             (Inputs.Account.account_with_hash account', success, ())
     end
 
@@ -1939,7 +1941,9 @@ module Base = struct
              statement.source.pending_coinbase_stack
            ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
            state_body) ;
-      let init : Global_state.t * _ Parties_logic.Local_state.t =
+      let init :
+          Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
+          =
         let g : Global_state.t =
           { ledger =
               ( statement.source.ledger
@@ -1949,7 +1953,7 @@ module Base = struct
               Mina_state.Protocol_state.Body.view_checked state_body
           }
         in
-        let l : _ Parties_logic.Local_state.t =
+        let l : _ Mina_transaction_logic.Parties_logic.Local_state.t =
           { parties =
               { With_hash.hash = statement.source.local_state.parties
               ; data = V.create (fun () -> !witness.local_state_init.parties)
@@ -1998,7 +2002,7 @@ module Base = struct
               let snapp_statement = snapp_statement
             end) in
             let finish v =
-              let open Parties_logic.Start_data in
+              let open Mina_transaction_logic.Parties_logic.Start_data in
               let ps =
                 V.map v ~f:(function
                   | `Skip ->
@@ -2014,7 +2018,7 @@ module Base = struct
                     Parties.Call_forest.hash (V.get ps))
               in
               let start_data =
-                { Parties_logic.Start_data.parties =
+                { Mina_transaction_logic.Parties_logic.Start_data.parties =
                     { With_hash.hash = h; data = ps }
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
@@ -3323,7 +3327,7 @@ type local_state =
   , bool
   , unit
   , Transaction_status.Failure.t option )
-  Parties_logic.Local_state.t
+  Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Sparse_ledger.Global_state.t
 
@@ -3646,7 +3650,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let full_commitment = ref Local_state.dummy.full_transaction_commitment in
   let remaining_parties =
     let partiess =
-      List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
+      List.map partiess
+        ~f:(fun parties : _ Mina_transaction_logic.Parties_logic.Start_data.t ->
           { parties; memo_hash = Signed_command_memo.hash parties.memo })
     in
     ref partiess
@@ -3731,7 +3736,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             | _ ->
                 failwith "Not enough remaining parties" )
       in
-      let hash_local_state (local : _ Parties_logic.Local_state.t) =
+      let hash_local_state
+          (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
         let hash_parties_stack ps =
           ps |> Parties.Call_forest.accumulate_hashes'
           |> Parties.Call_forest.map ~f:(fun p -> (p, ()))
@@ -3751,7 +3757,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                     ~f:(Parties.Call_forest.map ~f:(fun p -> (p, ()))))
         in
         { local with
-          Parties_logic.Local_state.parties = hash_parties_stack local.parties
+          Mina_transaction_logic.Parties_logic.Local_state.parties =
+            hash_parties_stack local.parties
         ; call_stack
         }
       in
@@ -4461,7 +4468,7 @@ module For_tests = struct
   let create_trivial_predicate_snapp ~constraint_constants
       ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept)
       ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
-    let { Transaction_logic.For_tests.Transaction_spec.fee
+    let { Mina_transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
         ; receiver = _
         ; amount
@@ -5038,7 +5045,7 @@ let%test_module "transaction_snark" =
           |> Or_error.ok_exn)
 
     let%test_unit "snapps-based payment" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
@@ -5047,7 +5054,7 @@ let%test_module "transaction_snark" =
           |> fun ((), ()) -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let partiess =
@@ -5427,7 +5434,8 @@ let%test_module "transaction_snark" =
                 ( Ledger.apply_user_command ledger ~constraint_constants
                     ~txn_global_slot:current_global_slot t2
                   |> Or_error.ok_exn
-                  : Transaction_logic.Transaction_applied.Signed_command_applied
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
                     .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
@@ -6827,7 +6835,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -6854,7 +6862,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -6915,7 +6923,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | Ok _ ->

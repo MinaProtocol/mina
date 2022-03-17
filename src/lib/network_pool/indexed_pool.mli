@@ -6,6 +6,7 @@
 open Core
 
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 
 module Command_error : sig

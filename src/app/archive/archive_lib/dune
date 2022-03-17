@@ -2,7 +2,7 @@
  (name archive_lib)
  (public_name archive_lib)
  (libraries core async caqti-driver-postgresql
-            mina_base mina_generators mina_ledger mina_caqti mina_transition one_or_two transition_frontier genesis_ledger_helper)
+            mina_base mina_generators mina_ledger mina_caqti mina_transaction mina_transition one_or_two transition_frontier genesis_ledger_helper)
  (inline_tests)
  (modes native)
  (instrumentation (backend bisect_ppx))

@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
 open O1trace
 module Ledger = Mina_ledger.Ledger
@@ -39,7 +40,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
@@ -560,8 +561,8 @@ struct
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
-          (Parties_logic.Local_state.Value.equal reg1.local_state
-             reg2.local_state)
+          (Mina_transaction_logic.Parties_logic.Local_state.Value.equal
+             reg1.local_state reg2.local_state)
           "did not connect with local state"
       in
       ()
@@ -775,7 +776,7 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Transaction_logic.Transaction_applied.transaction_with_status
+            Mina_transaction_logic.Transaction_applied.transaction_with_status
               transaction_with_info
           in
           let%bind protocol_state_body =

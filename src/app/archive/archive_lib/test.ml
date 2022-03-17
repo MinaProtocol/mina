@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Signature_lib
 
