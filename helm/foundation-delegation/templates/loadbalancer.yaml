@@ -19,15 +19,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ template "foundation-delegation.fullname" . }}-ingress
-  annotations: 
+  annotations:
     kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120s"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120s"
 spec:
   tls:
   - secretName: {{ .Values.backend.tlsSecret }}
     hosts:
-      - uptime-backend.minaprotocol.com
+      - {{ .Values.backend.host }}
   rules:
-  - host: uptime-backend.minaprotocol.com
+  - host: {{ .Values.backend.host }}
     http:
       paths:
       - path: /
