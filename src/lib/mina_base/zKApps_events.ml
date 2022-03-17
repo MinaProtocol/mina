@@ -61,15 +61,26 @@
     match, and can continue to interact with the zkApp's data by
     querying/updating the new tree.
 *)
+
 [%%import "/src/config.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
 
 module Event = struct
-  (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+  (** A single event emitted by a zkApp.
+
+      Represented as an array of field elements.
+  *)
   type t = Field.t array
 
+  (** Compute the hash of an event.
+
+      The hash input is constructed using
+      [`Random_oracle_input.Chunked.field_elements`].
+      The hash is computed using the Mina poseidon hash with initial state
+      [`Hash_prefix_states.snapp_event`].
+  *)
   let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
 
   [%%ifdef consensus_mechanism]
@@ -82,17 +93,60 @@ module Event = struct
   [%%endif]
 end
 
+(** A list of zero or more events, which may be emitted by a zkApp. *)
 type t = Event.t list
 
+(** The hash representing the empty list of events.
+
+    This is computed by passing the string `MinaSnappEventsEmpty` to
+    [`Random_oracle.salt`] and returning the resulting
+    [`Random_oracle.digest`].
+*)
 let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
 
-let push_hash acc hash =
-  Random_oracle.hash ~init:Hash_prefix_states.snapp_events [| acc; hash |]
+(** `push_hash events_commitment event_hash` returns the commitment formed by
+    hash-consing `event_hash` to `events_commitment.
 
-let push_event acc event = push_hash acc (Event.hash event)
+    This computes a cryptographic commitment to the list `event :: events`,
+    where `event_hash = hash(event)`.
 
-let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+    The hash input is constructed using
+    [`Random_oracle_input.Chunked.field_elements`] on the list of values
+```
+[events_commitment, event_hash]
+```
+    The hash is computed using the Mina poseidon hash with initial state
+    [`Hash_prefix_states.snapp_events`].
+*)
+let push_hash events_commitment event_hash =
+  Random_oracle.hash ~init:Hash_prefix_states.snapp_events
+    [| events_commitment; event_hash |]
 
+(** `push_event events_commitment event` returns the commitment formed by
+    hash-consing `event` to `events_commitment`.
+
+    This computes [`Event.hash`] on `event` and then [`push_hash`] on
+    `events_commitment` and the returned hash.
+*)
+let push_event events_commitment event =
+  push_hash events_commitment (Event.hash event)
+
+(** Returns the commitment formed by calling `push_event` on each value in the
+    list of events.
+
+    The list is processed in reverse order, with the last element included
+    first, and the first element included last.
+*)
+let hash (x : t) =
+  List.fold_right ~init:(Lazy.force empty_hash) x
+    ~f:(fun event events_commitment -> push_event events_commitment event)
+
+(** Returns the [Random_oracle_input.t] to be used when hashing larger
+    structures containing events.
+
+    This is computed by calling `hash` on the events, then forming an input
+    with `Random_oracle_input.Chunked.field`.
+*)
 let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 
 [%%ifdef consensus_mechanism]
