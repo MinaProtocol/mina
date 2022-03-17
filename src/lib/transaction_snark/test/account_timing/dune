@@ -34,6 +34,7 @@
    one_or_two
    genesis_ledger
    snarky.backendless
+   mina_transaction_logic
    )
   (library_flags -linkall)
   (inline_tests)

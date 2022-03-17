@@ -191,7 +191,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -218,7 +218,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -279,7 +279,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | Ok _ ->
