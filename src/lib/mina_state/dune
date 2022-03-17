@@ -24,6 +24,7 @@
    genesis_constants
    block_time
    mina_base
+   mina_transaction_logic
    snark_params
    consensus
    bitstring_lib
@@ -41,5 +42,6 @@
    kimchi_backend
    mina_base.util
    mina_ledger
+   unsigned_extended
    )
 )

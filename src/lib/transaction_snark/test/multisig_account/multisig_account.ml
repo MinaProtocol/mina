@@ -140,7 +140,7 @@ let%test_module "multisig_account" =
 
     (* test with a 2-of-3 multisig *)
     let%test_unit "snapps-based proved transaction" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%map sk0 = Private_key.gen
@@ -251,7 +251,7 @@ let%test_module "multisig_account" =
                     ])
               in
               let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-              let { Transaction_logic.For_tests.Transaction_spec.fee
+              let { Mina_transaction_logic.For_tests.Transaction_spec.fee
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount

@@ -1,0 +1,6 @@
+(library
+ (name bindings_js_test)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries kimchi_backend kimchi js_of_ocaml bindings_js integers_stubs_js)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))

@@ -33,6 +33,8 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime : sig
@@ -67,6 +69,8 @@ module Transaction_pool : sig
   val useful_transactions_received_time_sec : Gauge.t
 
   val pool_size : Gauge.t
+
+  val transactions_added_to_pool : Counter.t
 end
 
 module Network : sig
@@ -327,6 +331,10 @@ module Block_producer : sig
   val slots_won : Counter.t
 
   val blocks_produced : Counter.t
+
+  module Block_production_delay_histogram : Histogram
+
+  val block_production_delay : Block_production_delay_histogram.t
 end
 
 module Transition_frontier : sig

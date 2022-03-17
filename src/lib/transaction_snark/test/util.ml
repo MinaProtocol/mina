@@ -155,7 +155,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   }
 
 let gen_snapp_ledger =
-  let open Mina_base.Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let open Quickcheck.Generator.Let_syntax in
   let%bind test_spec = Test_spec.gen in
   let pks =
@@ -173,7 +173,7 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
     ~init_ledger ~snapp_pk =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;

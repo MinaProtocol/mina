@@ -104,33 +104,53 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     Fields_derivers_graphql.Graphql_query.scalar obj
 
+  exception
+    Invalid_rich_scalar of
+      [ `Uint
+      | `Field
+      | `Public_key
+      | `Amount
+      | `Balance
+      | `Unit
+      | `Proof
+      | `Verification_key ]
+
+  let except ~f v x = try f x with _ -> raise (Invalid_rich_scalar v)
+
   let iso_string ?doc obj ~(to_string : 'a -> string)
       ~(of_string : string -> 'a) ~name =
     yojson obj ?doc ~name
-      ~map:(function `String x -> of_string x | _ -> failwith "unsupported")
+      ~map:(function
+        | `String x ->
+            of_string x
+        | _ ->
+            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String))
       ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 64-bit integer represented as a string in base10"
       ~name:"UInt64" ~to_string:Unsigned.UInt64.to_string
-      ~of_string:Unsigned.UInt64.of_string
+      ~of_string:(except ~f:Unsigned.UInt64.of_string `Uint)
 
   let uint32 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 32-bit integer represented as a string in base10"
       ~name:"UInt32" ~to_string:Unsigned.UInt32.to_string
-      ~of_string:Unsigned.UInt32.of_string
+      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let field obj : _ Unified_input.t =
     iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
-      ~to_string:Field.to_string ~of_string:Field.of_string
+      ~to_string:Field.to_string
+      ~of_string:(except ~f:Field.of_string `Field)
 
   let public_key obj : _ Unified_input.t =
     iso_string obj ~name:"Field"
       ~doc:"String representing a public key in base58"
       ~to_string:Signature_lib.Public_key.Compressed.to_string
-      ~of_string:Signature_lib.Public_key.Compressed.of_base58_check_exn
+      ~of_string:
+        (except ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+           `Public_key)
 
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
@@ -155,20 +175,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let unit obj : _ Unified_input.t =
     yojson obj ?doc:None ~name:"Unit"
-      ~map:(function `String "Unit" -> () | _ -> failwith "unsupported")
+      ~map:(function
+        | `String "Unit" -> () | _ -> raise (Invalid_rich_scalar `Unit))
       ~contramap:(fun () -> `String "Unit")
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
-      ~of_string:Unsigned.UInt32.of_string
+      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let amount obj =
     iso_string obj ~name:"CurrencyAmount" ~to_string:Currency.Amount.to_string
-      ~of_string:Currency.Amount.of_string
+      ~of_string:(except ~f:Currency.Amount.of_string `Amount)
 
   let balance obj =
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
-      ~of_string:Currency.Balance.of_string
+      ~of_string:(except ~f:Currency.Balance.of_string `Balance)
 
   let option (x : _ Unified_input.t) obj : _ Unified_input.t =
     let _a = Graphql.Fields.option x obj in
@@ -199,21 +220,30 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ((list @@ inner @@ o ()) (o ()))
       obj
 
-  let add_field (x : _ Unified_input.t) fd acc =
-    let _, acc' = Graphql.Fields.add_field x fd acc in
-    let c1, acc'' = Graphql.Args.add_field x fd acc' in
-    let _, acc''' = Fields_derivers_json.To_yojson.add_field x fd acc'' in
-    let c2, acc'''' = Fields_derivers_json.Of_yojson.add_field x fd acc''' in
+  let add_field ~t_fields_annots (x : _ Unified_input.t) fd acc =
+    let _, acc' = Graphql.Fields.add_field ~t_fields_annots x fd acc in
+    let c1, acc'' = Graphql.Args.add_field ~t_fields_annots x fd acc' in
+    let _, acc''' =
+      Fields_derivers_json.To_yojson.add_field ~t_fields_annots x fd acc''
+    in
+    let c2, acc'''' =
+      Fields_derivers_json.Of_yojson.add_field ~t_fields_annots x fd acc'''
+    in
     let _, acc''''' =
-      Fields_derivers_graphql.Graphql_query.add_field x fd acc''''
+      Fields_derivers_graphql.Graphql_query.add_field ~t_fields_annots x fd
+        acc''''
     in
     ((function `Left x -> c1 x | `Right x -> c2 x), acc''''')
 
   let ( !. ) x fd acc = add_field (x @@ o ()) fd acc
 
-  let finish ~name ?doc (f, acc) =
-    let _a = Graphql.Fields.finish ~name ?doc ((fun x -> f (`Left x)), acc) in
-    let _b = Graphql.Args.finish ~name ?doc ((fun x -> f (`Left x)), acc) in
+  let finish name ~t_toplevel_annots (f, acc) =
+    let _a =
+      Graphql.Fields.finish name ~t_toplevel_annots ((fun x -> f (`Left x)), acc)
+    in
+    let _b =
+      Graphql.Args.finish name ~t_toplevel_annots ((fun x -> f (`Left x)), acc)
+    in
     let _c =
       Fields_derivers_json.To_yojson.finish ((fun x -> f (`Right x)), acc)
     in
@@ -406,7 +436,7 @@ let proof obj : _ Unified_input.t =
     | Ok proof ->
         proof
     | Error _err ->
-        failwith "error"
+        raise (Invalid_rich_scalar `Proof)
   in
   iso_string obj ~name:"SnappProof"
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
@@ -415,12 +445,16 @@ let verification_key_with_hash obj =
   let verification_key obj =
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
-        ~of_string:of_base58_check_exn
+        ~of_string:(except ~f:of_base58_check_exn `Verification_key)
         ~doc:"Verification key in Base58Check format")
+  in
+  let ( !. ) =
+    ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
   in
   With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
     ~hash:!.field obj
-  |> finish ~name:"VerificationKeyWithHash" ~doc:"Verification key with hash"
+  |> finish "VerificationKeyWithHash"
+       ~t_toplevel_annots:With_hash.Stable.Latest.t_toplevel_annots
 
 let%test_unit "verification key with hash, roundtrip json" =
   let open Pickles.Side_loaded.Verification_key in
@@ -481,7 +515,7 @@ let%test_module "Test" =
         ; bar : Unsigned_extended.UInt64.t Or_ignore_test.t
         ; baz : Unsigned_extended.UInt32.t list
         }
-      [@@deriving compare, sexp, equal, fields, yojson]
+      [@@deriving annot, compare, sexp, equal, fields, yojson]
 
       let v =
         { foo = 1
@@ -490,11 +524,13 @@ let%test_module "Test" =
         ; baz = Unsigned.UInt32.[ of_int 11; of_int 12 ]
         }
 
+      let ( !. ) = ( !. ) ~t_fields_annots
+
       let derivers obj =
         Fields.make_creator obj ~foo:!.int ~foo1:!.uint64
           ~bar:!.(Or_ignore_test.derived uint64)
           ~baz:!.(list @@ uint32 @@ o ())
-        |> finish ~name:"V"
+        |> finish "V" ~t_toplevel_annots
     end
 
     let v1 = V.derivers @@ o ()
@@ -503,14 +539,15 @@ let%test_module "Test" =
 
     module V2 = struct
       type t = { field : Field.t; nothing : unit }
-      [@@deriving compare, sexp, equal, fields]
+      [@@deriving annot, compare, sexp, equal, fields]
 
       let v = { field = Field.of_int 10; nothing = () }
 
       let derivers obj =
         let open Derivers in
+        let ( !. ) = ( !. ) ~t_fields_annots in
         Fields.make_creator obj ~field:!.field ~nothing:!.unit
-        |> finish ~name:"V2"
+        |> finish "V2" ~t_toplevel_annots
     end
 
     let v2 = V2.derivers @@ Derivers.o ()
@@ -527,7 +564,7 @@ let%test_module "Test" =
 
     module V3 = struct
       type t = { public_key : Public_key.t }
-      [@@deriving compare, sexp, equal, fields]
+      [@@deriving annot, compare, sexp, equal, fields]
 
       let v =
         { public_key =
@@ -537,7 +574,9 @@ let%test_module "Test" =
 
       let derivers obj =
         let open Derivers in
-        Fields.make_creator obj ~public_key:!.public_key |> finish ~name:"V3"
+        let ( !. ) = ( !. ) ~t_fields_annots in
+        Fields.make_creator obj ~public_key:!.public_key
+        |> finish "V3" ~t_toplevel_annots
     end
 
     let v3 = V3.derivers @@ Derivers.o ()
