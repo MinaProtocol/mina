@@ -34,6 +34,7 @@
    mina_transition
    mina_base
    mina_ledger
+   mina_transaction_logic
    syncable_ledger
    consensus
    mina_networking

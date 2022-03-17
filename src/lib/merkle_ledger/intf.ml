@@ -33,8 +33,6 @@ module type Token_id = sig
 
   val default : t
 
-  val next : t -> t
-
   include Hashable.S_binable with type t := t
 
   include Comparable.S_binable with type t := t
@@ -47,7 +45,7 @@ module type Account_id = sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
     end
   end]
@@ -57,6 +55,8 @@ module type Account_id = sig
   val token_id : t -> token_id
 
   val create : key -> token_id -> t
+
+  val derive_token_id : owner:t -> token_id
 
   include Hashable.S_binable with type t := t
 

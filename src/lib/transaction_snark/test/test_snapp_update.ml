@@ -5,6 +5,7 @@ open Signature_lib
 module U = Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
+open Mina_transaction
 
 module type Input_intf = sig
   (*Spec for all the updates to generate a parties transaction*)
@@ -233,7 +234,7 @@ module Make (Input : Input_intf) = struct
           ~snapp_pk:(Public_key.compress new_kp.public_key))
 
   let%test_unit "Update when not permitted but transaction is applied" =
-    let open Mina_base.Transaction_logic.For_tests in
+    let open Mina_transaction_logic.For_tests in
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
         Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -271,7 +272,7 @@ module Make (Input : Input_intf) = struct
             ( match
                 Ledger.apply_transaction ledger ~constraint_constants
                   ~txn_state_view:
-                    (Mina_state.Protocol_state.Body.view U.state_body)
+                    (Mina_state.Protocol_state.Body.view U.genesis_state_body)
                   (Transaction.Command (Parties parties))
               with
             | Error e ->

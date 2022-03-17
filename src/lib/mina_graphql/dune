@@ -52,6 +52,7 @@
    node_addrs_and_ports
    network_peer
    mina_base
+   mina_transaction
    mina_transition
    user_command_input
    signature_lib

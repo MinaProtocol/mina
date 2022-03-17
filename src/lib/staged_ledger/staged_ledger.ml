@@ -5,6 +5,7 @@ open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
@@ -236,14 +237,13 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ~constraint_constants ~next_available_token
+  let verify_scan_state_after_apply ~constraint_constants
       ~pending_coinbase_stack ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
-      ; next_available_token
       ; local_state = Mina_state.Local_state.empty
       ; pending_coinbase_stack
       }
@@ -284,7 +284,6 @@ module T = struct
           { local_state = Mina_state.Local_state.empty
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; next_available_token = Ledger.next_available_token ledger
           ; pending_coinbase_stack
           }
     in
@@ -311,7 +310,6 @@ module T = struct
           { local_state = Mina_state.Local_state.empty
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
-          ; next_available_token = Ledger.next_available_token ledger
           ; pending_coinbase_stack
           }
     in
@@ -324,9 +322,6 @@ module T = struct
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
-    in
-    let snarked_next_available_token =
-      Ledger.next_available_token snarked_ledger
     in
     let%bind txs_with_protocol_state =
       Scan_state.staged_transactions_with_protocol_states scan_state ~get_state
@@ -373,7 +368,6 @@ module T = struct
     f ~constraint_constants
       ~snarked_registers:
         ( { ledger = snarked_frozen_ledger_hash
-          ; next_available_token = snarked_next_available_token
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
@@ -516,7 +510,6 @@ module T = struct
     let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
-    let next_available_token_before = Ledger.next_available_token ledger in
     let pending_coinbase_target =
       push_coinbase pending_coinbase_stack_state.pc.target s
     in
@@ -528,20 +521,17 @@ module T = struct
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in
-    let next_available_token_after = Ledger.next_available_token ledger in
     let target_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     ( applied_txn
     , { Transaction_snark.Statement.source =
           { ledger = source_merkle_root
-          ; next_available_token = next_available_token_before
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
           ; local_state = empty_local_state
           }
       ; target =
           { ledger = target_merkle_root
-          ; next_available_token = next_available_token_after
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
@@ -562,8 +552,7 @@ module T = struct
           Fee_transfer.receivers t
       | Command t ->
           let t = (t :> User_command.t) in
-          let next_available_token = Ledger.next_available_token ledger in
-          User_command.accounts_accessed ~next_available_token t
+          User_command.accounts_accessed t
       | Coinbase c ->
           let ft_receivers =
             Option.map ~f:Coinbase.Fee_transfer.receiver c.fee_transfer
@@ -951,7 +940,6 @@ module T = struct
         O1trace.thread "verify_scan_state_after_apply" (fun () ->
             Deferred.(
               verify_scan_state_after_apply ~constraint_constants
-                ~next_available_token:(Ledger.next_available_token new_ledger)
                 (Frozen_ledger_hash.of_ledger_hash
                    (Ledger.merkle_root new_ledger))
                 ~pending_coinbase_stack:latest_pending_coinbase_stack
@@ -3564,15 +3552,13 @@ let%test_module "staged ledger tests" =
           Payment_payload.Poly.
             { source_pk
             ; receiver_pk
-            ; token_id = Token_id.default
             ; amount = insufficient_account_creation_fee
             }
       in
       let fee = Currency.Amount.to_fee balance in
       let payload =
-        Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
-          ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
-          ~valid_until:None ~body
+        Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk ~nonce
+          ~memo:Signed_command_memo.dummy ~valid_until:None ~body
       in
       let signed_command =
         User_command.Signed_command (Signed_command.sign kp payload)
@@ -3635,16 +3621,11 @@ let%test_module "staged ledger tests" =
           let body =
             Signed_command_payload.Body.Payment
               Payment_payload.Poly.
-                { source_pk
-                ; receiver_pk
-                ; token_id = Token_id.default
-                ; amount = account_creation_fee
-                }
+                { source_pk; receiver_pk; amount = account_creation_fee }
           in
           let payload =
-            Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk
-              ~fee_token:Token_id.default ~nonce ~memo:Signed_command_memo.dummy
-              ~valid_until:None ~body
+            Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk ~nonce
+              ~memo:Signed_command_memo.dummy ~valid_until:None ~body
           in
           User_command.Signed_command (Signed_command.sign kp payload)
         in

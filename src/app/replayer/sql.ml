@@ -167,8 +167,7 @@ module User_command = struct
     ; source_id : int
     ; receiver_id : int
     ; fee : int64
-    ; fee_token : int64
-    ; token : int64
+    ; fee_token : string
     ; amount : int64 option
     ; valid_until : int64 option
     ; memo : string
@@ -179,7 +178,6 @@ module User_command = struct
     ; txn_global_slot_since_genesis : int64
     ; sequence_no : int
     ; status : string
-    ; created_token : int64 option
     ; fee_payer_balance_id : int
     ; source_balance_id : int option
     ; receiver_balance_id : int option
@@ -194,8 +192,7 @@ module User_command = struct
         ; int
         ; int
         ; int64
-        ; int64
-        ; int64
+        ; string
         ; option int64
         ; option int64
         ; string
@@ -206,7 +203,6 @@ module User_command = struct
         ; int64
         ; int
         ; string
-        ; option int64
         ; int
         ; option int
         ; option int
@@ -307,7 +303,7 @@ module Internal_command = struct
     ; receiver_id : int
     ; receiver_balance_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; block_id : int
     ; block_height : int64
     ; global_slot_since_genesis : int64
@@ -325,7 +321,7 @@ module Internal_command = struct
         ; int
         ; int
         ; int64
-        ; int64
+        ; string
         ; int
         ; int64
         ; int64

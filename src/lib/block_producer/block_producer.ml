@@ -2,6 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 

@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 open Mina_transition
 open Pipe_lib
@@ -744,7 +745,7 @@ module Root_diff = struct
   module Stable = struct
     module V2 = struct
       type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
 

@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 
