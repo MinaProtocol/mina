@@ -384,6 +384,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
+    let transactions_sent = ref 0 in
     let send_snapp ?(unlock = true) parties =
       [%log info] "Sending snapp"
         ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
@@ -391,6 +392,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Network.Node.send_snapp ~unlock ~logger node ~parties
       with
       | Ok _snapp_id ->
+          incr transactions_sent ;
           [%log info] "Snapps transaction sent" ;
           Malleable_error.return ()
       | Error err ->
@@ -818,7 +820,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Send a snapp with an invalid signature"
         (send_invalid_snapp parties_invalid_signature "Invalid_signature")
     in
-    let padding_payments = 20 in
+    let padding_payments =
+      let needed = 12 in
+      if !transactions_sent >= needed then 0 else needed - !transactions_sent
+    in
     let%bind () =
       section "Send payments and wait for proof to be emitted"
         (let%bind () =
