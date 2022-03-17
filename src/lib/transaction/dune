@@ -26,6 +26,7 @@
    snarky.backendless
    with_hash)
  (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
     h_list.ppx
