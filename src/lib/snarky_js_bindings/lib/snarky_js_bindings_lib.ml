@@ -1,28 +1,7 @@
 module Backend = Kimchi_backend.Pasta.Vesta_based_plonk
 module Other_backend = Kimchi_backend.Pasta.Pallas_based_plonk
-
-let loose_permissions : Mina_base.Permissions.t =
-  { edit_state = None
-  ; send = None
-  ; receive = None
-  ; set_delegate = None
-  ; set_permissions = None
-  ; set_verification_key = None
-  ; set_snapp_uri = None
-  ; edit_sequence_state = None
-  ; set_token_symbol = None
-  ; increment_nonce = None
-  ; set_voting_for = None
-  }
-
 module Impl = Pickles.Impls.Step
-
-(* module Impl = Snarky_backendless.Snark.Run.Make (Backend) (Core_kernel.Unit) *)
-
 module Other_impl = Pickles.Impls.Wrap
-
-(* module Other_impl = Snarky_backendless.Snark.Run.Make (Other_backend) (Core_kernel.Unit) *)
-
 module Challenge = Limb_vector.Challenge.Make (Impl)
 module Sc =
   Pickles.Scalar_challenge.Make (Impl) (Pickles.Step_main_inputs.Inner_curve)
@@ -200,8 +179,6 @@ let bool_class : < .. > Js.t =
 
 let bool_constr : (As_bool.t -> bool_class Js.t) Js.constr =
   Obj.magic bool_class
-
-(* TODO: Extend prototype for number to allow for field element methods *)
 
 module Field = Impl.Field
 module Boolean = Impl.Boolean
@@ -1039,9 +1016,6 @@ let to_unchecked (x : Field.t) =
 
 let poseidon =
   object%js
-    (* TODO make sure this is the correct way to hash
-       has to be the same in-snark and out-of-snark
-    *)
     method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
       let input = Array.map (Js.to_array xs) ~f:of_js_field in
       let digest =
@@ -1049,41 +1023,7 @@ let poseidon =
         with _ ->
           Random_oracle.hash (Array.map ~f:to_unchecked input) |> Field.constant
       in
-      (* debug hash value: *)
-      (* let () =
-           try
-             let s = digest |> to_unchecked |> Field.Constant.to_string in
-             console_log_string "got hash" ;
-             console_log (Js.string s) ;
-             ()
-           with _ ->
-             Impl.as_prover (fun () ->
-                 let s = digest |> to_unchecked |> Field.Constant.to_string in
-                 console_log_string "got hash (as_prover)" ;
-                 console_log (Js.string s))
-         in *)
       to_js_field digest
-    (* old implementation: *)
-    (* method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
-       match
-         array_map xs ~f:(fun x ->
-             match x##.value with Constant x -> x | x -> As_prover.read_var x)
-       with
-       | exception _ ->
-           let module Sponge = Pickles.Step_main_inputs.Sponge in
-           let sponge_params = Pickles.Step_main_inputs.sponge_params in
-           let s = Sponge.create sponge_params in
-           for i = 0 to xs##.length - 1 do
-             Sponge.absorb s (`Field (array_get_exn xs i)##.value)
-           done ;
-           new%js field_constr (As_field.of_field (Sponge.squeeze_field s))
-       | xs ->
-           let module Field = Pickles.Tick_field_sponge.Field in
-           let params = Pickles.Tick_field_sponge.params in
-           let s = Field.create params in
-           array_iter xs ~f:(Field.absorb s) ;
-           new%js field_constr
-             (As_field.of_field (Impl.Field.constant (Field.squeeze s))) *)
   end
 
 class type verification_key_class =
@@ -1471,6 +1411,7 @@ module Circuit = struct
     let call (type b) (f : (unit -> b) Js.callback) =
       Js.Unsafe.(fun_call f [||])
     in
+    (* TODO this hasn't been working reliably, reconsider how we should enable async circuits *)
     circuit##.runAndCheck :=
       Js.wrap_callback
         (fun (type a)
@@ -1483,14 +1424,7 @@ module Circuit = struct
             ()
           |> Promise.map ~f:(fun r ->
                  let (), res = Or_error.ok_exn r in
-                 res)
-          (*
-          Impl.run_and_check (fun () ->
-              fun () -> Js.Unsafe.fun_call g [||] )
-            ()
-          |> Or_error.ok_exn
-        in
-        res *)) ;
+                 res)) ;
     circuit##.runAndCheckSync :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
           Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> snd) ;
@@ -1534,6 +1468,7 @@ let () =
     (fun (this : keypair_class Js.t) : verification_key_class Js.t ->
       new%js verification_key_constr (Keypair.vk this##.value))
 
+(* TODO: add verificationKey.toString / fromString *)
 let () =
   let method_ name (f : verification_key_class Js.t -> _) =
     method_ verification_key_class name f
@@ -1857,13 +1792,6 @@ module Ledger = struct
     type t =
       < type_ : Js.js_string Js.t Js.prop ; value : party_predicate Js.prop >
       Js.t
-
-    (*
-type AccountPredicate =
-  | { type: 'accept' }
-  | { type: 'nonce', value: UInt32 }
-  | { type: 'full', value: FullAccountPredicate }
-   *)
   end
 
   type party =
@@ -1888,6 +1816,20 @@ type AccountPredicate =
 
   let ledger_class : < .. > Js.t =
     Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
+
+  let loose_permissions : Mina_base.Permissions.t =
+    { edit_state = None
+    ; send = None
+    ; receive = None
+    ; set_delegate = None
+    ; set_permissions = None
+    ; set_verification_key = None
+    ; set_snapp_uri = None
+    ; edit_sequence_state = None
+    ; set_token_symbol = None
+    ; increment_nonce = None
+    ; set_voting_for = None
+    }
 
   module L : Mina_base.Transaction_logic.Ledger_intf = struct
     module Account = Mina_base.Account
@@ -2235,7 +2177,7 @@ type AccountPredicate =
   let party (party : party) : Party.Predicated.t =
     { body = body party##.body; predicate = predicate party##.predicate }
 
-  (* TODO: use proper authorization *)
+  (* TODO: enable proper authorization *)
   (* the fact that we don't leads to mock tx with state update being rejected *)
   let parties (parties : parties) : Parties.t =
     { fee_payer =
@@ -2705,16 +2647,6 @@ type AccountPredicate =
     in
     static_method "partiesToGraphQL" parties_to_graphql ;
     ()
-
-  (*
-export class Ledger {
-  static create(genesisAccounts: Array<{publicKey: PublicKey, balance: number}>): Ledger;
-
-  applyPartiesTransaction(parties: Parties);
-
-  getAccount(publicKey: PublicKey): Account | null;
-};
-*)
 end
 
 let export () =
@@ -2725,7 +2657,6 @@ let export () =
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit ;
   Js.export "Ledger" Ledger.ledger_class ;
-  (* TODO: should we use Js.wrap_callback here? *)
   Js.export "picklesCompile" pickles_compile
 
 let export_global () =
