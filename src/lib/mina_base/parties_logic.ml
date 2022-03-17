@@ -103,8 +103,6 @@ module type Token_id_intf = sig
 
   val equal : t -> t -> bool
 
-  val invalid : t
-
   val default : t
 end
 
@@ -1251,7 +1249,6 @@ module Make (Inputs : Inputs_intf) = struct
       *)
       Amount.Signed.negate (Party.balance_change party)
     in
-    Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in

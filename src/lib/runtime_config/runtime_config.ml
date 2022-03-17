@@ -233,7 +233,7 @@ module Json_layout = struct
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
-        ; token : Unsigned_extended.UInt64.t option [@default None]
+        ; token : string option [@default None]
         ; token_permissions : Token_permissions.t option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
@@ -493,7 +493,7 @@ module Accounts = struct
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
       ; timing : Timed.t option
-      ; token : Unsigned_extended.UInt64.Stable.Latest.t option
+      ; token : string option
       ; token_permissions : Token_permissions.t option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
@@ -524,7 +524,7 @@ module Accounts = struct
     ; balance : Currency.Balance.t
     ; delegate : string option
     ; timing : Single.Timed.t option
-    ; token : Unsigned_extended.UInt64.t option
+    ; token : string option
     ; token_permissions : Single.Token_permissions.t option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
