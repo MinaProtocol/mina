@@ -5,6 +5,7 @@ open Signature_lib
 module U = Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
+open Mina_transaction
 
 module type Input_intf = sig
   (*Spec for all the updates to generate a parties transaction*)

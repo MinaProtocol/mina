@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 module Hashless_ledger : Ledger_intf.S
 

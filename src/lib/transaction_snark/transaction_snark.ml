@@ -1,6 +1,7 @@
 open Core
 open Signature_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Snark_params
 module Global_slot = Mina_numbers.Global_slot
