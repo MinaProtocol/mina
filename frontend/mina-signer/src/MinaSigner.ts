@@ -336,12 +336,13 @@ export class Client {
    * @returns Signed parties
    */
   public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
+    const parties = JSON.stringify(party.parties.otherParties);
     const memo = party.feePayer.memo ?? "";
     const fee = String(party.feePayer.fee);
     const nonce = String(party.feePayer.nonce);
     const feePayer = String(party.feePayer.feePayer);
     const signedParties = minaSDK.signParty(
-      party.parties,
+      parties,
       {
         feePayer,
         fee,

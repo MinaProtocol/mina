@@ -38,7 +38,7 @@ export type Payment = {
 };
 
 export type Party = {
-  readonly parties: string;
+  readonly parties: any;
   readonly feePayer: {
     readonly feePayer: PublicKey;
     readonly fee: UInt64;

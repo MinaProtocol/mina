@@ -38,7 +38,6 @@ let _ =
            (sk_base58_check_js : string_js) =
          let other_parties_json =
            parties_js |> Js.to_string |> Yojson.Safe.from_string
-           |> Yojson.Safe.Util.member "otherParties"
          in
          let other_parties = Parties.other_parties_of_json other_parties_json in
          let other_parties_data =
