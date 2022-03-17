@@ -25,12 +25,18 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        (** Information around vesting timing for an account. Timing information slowly unrestricts the movement of funds over time. *)
         type t =
           { initial_minimum_balance : Balance.Stable.V1.t
+                (** Minimum balance required at genesis. *)
           ; cliff_time : Global_slot.Stable.V1.t
+                (** Time at which the first funds begin to be movable. *)
           ; cliff_amount : Amount.Stable.V1.t
+                (** Amount for the first movable funds. *)
           ; vesting_period : Global_slot.Stable.V1.t
+                (** Period of total time that this account vests. *)
           ; vesting_increment : Amount.Stable.V1.t
+                (** Amount that is vested every slot. *)
           }
         [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
 
@@ -171,7 +177,7 @@ module Update = struct
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
         ~vesting_period:!.global_slot ~vesting_increment:!.amount
-      |> finish "Timing" ~t_toplevel_annots
+      |> finish "PartyUpdateTiming" ~t_toplevel_annots
   end
 
   open Snapp_basic
@@ -180,6 +186,8 @@ module Update = struct
   module Stable = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
+
+      (** Description of how this party should update if the preconditions pass and the transaction is successfully applied. *)
       type t =
         { app_state :
             F.Stable.V1.t Set_or_keep.Stable.V1.t Snapp_state.V.Stable.V1.t
@@ -191,10 +199,12 @@ module Update = struct
             Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; snapp_uri : string Set_or_keep.Stable.V1.t
+              (** URI to the associated zkapp metadata. *)
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
         ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
+              (** The hardfork that your account's stake is voting for (if any). *)
         }
       [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
 
@@ -532,6 +542,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (** A party's preconditioned changes to account state. *)
       type t =
             Poly(Public_key.Compressed.Stable.V1)(Update.Stable.V1)
               (Token_id.Stable.V1)
@@ -544,12 +555,16 @@ module Body = struct
             .t
             (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
+              (** The publicKey for this account.  *)
         ; update : Update.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
         ; increment_nonce : bool
+              (** True if the nonce within this account should be incremented upon successful application. *)
         ; events : Events'.Stable.V1.t
+              (** Events . *)
         ; sequence_events : Events'.Stable.V1.t
+              (** Events . *)
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; call_depth : int
         ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
