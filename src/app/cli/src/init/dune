@@ -55,6 +55,7 @@
    graphql_lib
    node_status
    o1trace_webkit_event
+   generated_graphql_queries
    mina_user_error
    mina_transition
    mina_ledger

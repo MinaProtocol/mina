@@ -40,6 +40,8 @@ val deriver :
           (unit -> Yojson.Safe.t Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; graphql_fields :
           Yojson.Safe.t Fields_derivers_snapps.Graphql.Fields.Input.T.t ref
+      ; graphql_query : string option ref
+      ; graphql_query_accumulator : (string * string option) list ref
       ; map : (Yojson.Safe.t -> t) ref
       ; nullable_graphql_arg :
           (   unit

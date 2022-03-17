@@ -14,14 +14,6 @@ module Statement : sig
 
       include Hashable.S_binable with type t := t
     end
-
-    module V1 : sig
-      type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
-
-      include Hashable.S_binable with type t := t
-
-      val to_latest : t -> V2.t
-    end
   end
   with type V2.t = t
 
@@ -44,12 +36,6 @@ module Info : sig
   module Stable : sig
     module V2 : sig
       type t [@@deriving compare, to_yojson, version, sexp, bin_io]
-    end
-
-    module V1 : sig
-      type t [@@deriving compare, to_yojson, version, sexp, bin_io]
-
-      val to_latest : t -> V2.t
     end
   end
   with type V2.t = t

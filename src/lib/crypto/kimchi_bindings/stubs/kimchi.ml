@@ -793,8 +793,7 @@ module Protocol = struct
            prover_proof = "caml_pasta_fp_plonk_proof_create"
 
       external verify :
-           Foundations.Fq.t Foundations.or_infinity poly_comm array
-        -> ( Foundations.Fp.t
+           ( Foundations.Fp.t
            , SRS.Fp.t
            , Foundations.Fq.t Foundations.or_infinity poly_comm )
            VerifierIndex.verifier_index
@@ -804,8 +803,7 @@ module Protocol = struct
         -> bool = "caml_pasta_fp_plonk_proof_verify"
 
       external batch_verify :
-           Foundations.Fq.t Foundations.or_infinity poly_comm array array
-        -> ( Foundations.Fp.t
+           ( Foundations.Fp.t
            , SRS.Fp.t
            , Foundations.Fq.t Foundations.or_infinity poly_comm )
            VerifierIndex.verifier_index
@@ -842,8 +840,7 @@ module Protocol = struct
            prover_proof = "caml_pasta_fq_plonk_proof_create"
 
       external verify :
-           Foundations.Fp.t Foundations.or_infinity poly_comm array
-        -> ( Foundations.Fq.t
+           ( Foundations.Fq.t
            , SRS.Fq.t
            , Foundations.Fp.t Foundations.or_infinity poly_comm )
            VerifierIndex.verifier_index
@@ -853,8 +850,7 @@ module Protocol = struct
         -> bool = "caml_pasta_fq_plonk_proof_verify"
 
       external batch_verify :
-           Foundations.Fp.t Foundations.or_infinity poly_comm array array
-        -> ( Foundations.Fq.t
+           ( Foundations.Fq.t
            , SRS.Fq.t
            , Foundations.Fp.t Foundations.or_infinity poly_comm )
            VerifierIndex.verifier_index

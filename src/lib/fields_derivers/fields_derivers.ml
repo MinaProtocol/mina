@@ -1,6 +1,77 @@
+open Core_kernel
+
+module Annotations = struct
+  module Utils = struct
+    let find xs key =
+      List.find ~f:(fun (k', _) -> String.equal key k') xs |> Option.map ~f:snd
+
+    let find_string xs key =
+      find xs key |> Option.join |> Option.map ~f:(fun s -> String.strip s)
+
+    let find_bool xs key =
+      find xs key
+      |> Option.map ~f:(fun _ -> true)
+      |> Option.value ~default:false
+  end
+
+  module Top = struct
+    (** Top comment *)
+    type t = { name : string; doc : string option }
+    [@@deriving annot, sexp, compare, equal]
+
+    open Utils
+
+    let of_annots ~name t_toplevel_annots =
+      let xs = t_toplevel_annots () in
+      { name; doc = find_string xs "ocaml.doc" }
+
+    let%test_unit "top annots parse" =
+      let t = of_annots ~name:"Top" t_toplevel_annots in
+      [%test_eq: t] t { name = "Top"; doc = Some "Top comment" }
+  end
+
+  module Fields = struct
+    module T = struct
+      type t =
+        { name : string option
+        ; doc : string option [@name "document"]
+        ; skip : bool [@skip]
+        ; deprecated : string option [@depr "foo"]  (** this is deprecated *)
+        }
+      [@@deriving annot, sexp, compare, equal]
+    end
+
+    type t = string -> T.t
+
+    open Utils
+
+    let of_annots t_fields_annots field =
+      let xs = t_fields_annots field in
+      let s = find_string xs in
+      let b = find_bool xs in
+      { T.name = s "name"
+      ; doc = s "ocaml.doc"
+      ; skip = b "skip"
+      ; deprecated = s "depr"
+      }
+
+    let%test_unit "field annots parse" =
+      let annots = of_annots T.t_fields_annots in
+      [%test_eq: T.t] (annots "doc")
+        { name = Some "document"; doc = None; skip = false; deprecated = None } ;
+      [%test_eq: T.t] (annots "skip")
+        { name = None; doc = None; skip = true; deprecated = None } ;
+      [%test_eq: T.t] (annots "deprecated")
+        { name = None
+        ; doc = Some "this is deprecated"
+        ; skip = false
+        ; deprecated = Some "foo"
+        }
+  end
+end
+
 (** Rewrites underscore_case to camelCase. Note: Keeps leading underscores. *)
 let under_to_camel s =
-  let open Core_kernel in
   (* take all the underscores *)
   let prefix_us =
     String.take_while s ~f:(function '_' -> true | _ -> false)

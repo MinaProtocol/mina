@@ -32,7 +32,7 @@ module Update = struct
           ; vesting_period : Global_slot.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
+        [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -167,10 +167,11 @@ module Update = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
         ~vesting_period:!.global_slot ~vesting_increment:!.amount
-      |> finish ~name:"Timing"
+      |> finish "Timing" ~t_toplevel_annots
   end
 
   open Snapp_basic
@@ -195,7 +196,7 @@ module Update = struct
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
         ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
         }
-      [@@deriving compare, equal, sexp, hash, yojson, fields, hlist]
+      [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
 
       let to_latest = Fn.id
     end
@@ -408,7 +409,8 @@ module Update = struct
 
   let deriver obj =
     let open Fields_derivers_snapps in
-    finish ~name:"PartyUpdate"
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
@@ -459,6 +461,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        (** Body component of a party *)
         type ( 'pk
              , 'update
              , 'token_id
@@ -470,8 +473,8 @@ module Body = struct
              , 'protocol_state )
              t =
           { public_key : 'pk
-          ; update : 'update
           ; token_id : 'token_id
+          ; update : 'update
           ; balance_change : 'amount
           ; increment_nonce : 'bool
           ; events : 'events
@@ -481,7 +484,7 @@ module Body = struct
           ; protocol_state : 'protocol_state
           ; use_full_commitment : 'bool
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -558,6 +561,7 @@ module Body = struct
         iso_string obj ~name:"Fee" ~to_string:Fee.to_string
           ~of_string:Fee.of_string
       in
+      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~public_key:!.public_key
         ~update:!.Update.deriver ~token_id:!.unit ~balance_change:!.fee
         ~increment_nonce:!.unit
@@ -566,8 +570,7 @@ module Body = struct
         ~call_data:!.field ~call_depth:!.int
         ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
         ~use_full_commitment:!.unit
-      |> finish ~name:"FeePayerPartyBody"
-           ~doc:"Body component of a snapp Fee Payer Party"
+      |> finish "FeePayerPartyBody" ~t_toplevel_annots:Poly.t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let open Fields_derivers_snapps.Derivers in
@@ -639,8 +642,8 @@ module Body = struct
     let open Poly in
     Typ.of_hlistable
       [ Public_key.Compressed.typ
-      ; Update.typ ()
       ; Token_id.typ
+      ; Update.typ ()
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
@@ -692,10 +695,15 @@ module Body = struct
         iso_string ~name:"Sign" ~to_string:sign_to_string
           ~of_string:sign_of_string
       in
+      let ( !. ) =
+        ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots
+      in
       Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
         ~sgn:!.sign_deriver
-      |> finish ~name:"Balance Change"
+      |> finish "BalanceChange"
+           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
     in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~public_key:!.public_key
       ~update:!.Update.deriver ~token_id:!.token_id_deriver
       ~balance_change:!.balance_change_deriver ~increment_nonce:!.bool
@@ -704,7 +712,7 @@ module Body = struct
       ~call_data:!.field ~call_depth:!.int
       ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
       ~use_full_commitment:!.bool
-    |> finish ~name:"PartyBody" ~doc:"Body component of a snapp Party"
+    |> finish "PartyBody" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let open Fields_derivers_snapps.Derivers in
@@ -875,7 +883,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -892,9 +900,10 @@ module Predicated = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
       ~predicate:!.Predicate.deriver
-    |> finish ~name:"SnappPartyPredicated"
+    |> finish "SnappPartyPredicated" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let to_input ({ body; predicate } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -997,10 +1006,11 @@ module Predicated = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
         ~predicate:!.uint32
-      |> finish ~name:"SnappPartyPredicatedFeePayer"
-           ~doc:"A party to a snapp transaction with a nonce predicate"
+      |> finish "ZkappPartyPredicatedFeePayer"
+           ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
   module Empty = struct
@@ -1074,7 +1084,7 @@ module Fee_payer = struct
         { data : Predicated.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1090,11 +1100,11 @@ module Fee_payer = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
       ~data:!.Predicated.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
-    |> finish ~name:"SnappPartyFeePayer"
-         ~doc:"A party to a snapp transaction with a signature authorization"
+    |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
@@ -1112,7 +1122,7 @@ module Empty = struct
     module V1 = struct
       type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
         { data : Predicated.Empty.Stable.V1.t; authorization : unit }
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving annot, sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -1122,9 +1132,10 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
+    (** A party to a zkApp transaction *)
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
       { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
-    [@@deriving sexp, equal, yojson, hash, compare, fields]
+    [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
     let to_latest = Fn.id
   end
@@ -1162,9 +1173,10 @@ let increment_nonce (t : t) : bool = t.data.body.increment_nonce
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
-  |> finish ~name:"SnappParty" ~doc:"A party to a snapp transaction"
+  |> finish "ZkappParty" ~t_toplevel_annots
 
 let%test_unit "json roundtrip dummy" =
   let dummy : t =
