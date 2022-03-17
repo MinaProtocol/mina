@@ -2336,7 +2336,7 @@ let thread_graph =
   Command.async
     ~summary:
       "Return a Graphviz Dot graph representation of the internal thread \
-       hiearchy"
+       hierarchy"
     (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
        ~f:(fun graphql_endpoint () ->
          match%bind
