@@ -331,7 +331,7 @@ export class Client {
    * This type of transaction allows a user to update state on a given
    * Smart Contract running on Mina.
    *
-   * @param party A string containing other parties
+   * @param party A object representing a Parties tx
    * @param privateKey The fee payer private key
    * @returns Signed parties
    */
