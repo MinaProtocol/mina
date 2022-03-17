@@ -26,6 +26,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "1000000000"; timing = Untimed }
         ]
     ; num_snark_workers = 2
+    ; snark_worker_fee = "0.0001"
     }
 
   let transactions_sent = ref 0
