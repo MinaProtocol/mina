@@ -66,6 +66,7 @@
    mina_signature_kind
    mina_base.util
    kimchi_backend
+   hex
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
