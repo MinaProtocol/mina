@@ -24,6 +24,7 @@
    genesis_constants
    block_time
    mina_base
+   mina_transaction_logic
    snark_params
    consensus
    bitstring_lib

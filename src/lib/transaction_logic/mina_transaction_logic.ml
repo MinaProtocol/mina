@@ -2,6 +2,7 @@ open Core_kernel
 open Mina_base
 open Currency
 open Signature_lib
+module Parties_logic = Parties_logic
 module Global_slot = Mina_numbers.Global_slot
 
 module Transaction_applied = struct

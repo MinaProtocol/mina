@@ -560,8 +560,8 @@ struct
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
-          (Parties_logic.Local_state.Value.equal reg1.local_state
-             reg2.local_state)
+          (Mina_transaction_logic.Parties_logic.Local_state.Value.equal
+             reg1.local_state reg2.local_state)
           "did not connect with local state"
       in
       ()

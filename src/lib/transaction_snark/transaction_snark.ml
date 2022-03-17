@@ -1462,7 +1462,7 @@ module Base = struct
             -> (t, Field.Constant.t) With_stack_hash.t list
             -> (t, Field.Constant.t) With_stack_hash.t list
         end) :
-          Parties_logic.Stack_intf
+          Mina_transaction_logic.Parties_logic.Stack_intf
             with type elt = (Elt.t V.t, Field.t) With_hash.t
              and type t =
                   ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
@@ -1803,7 +1803,7 @@ module Base = struct
             , Bool.t
             , Transaction_commitment.t
             , Bool.failure_status )
-            Parties_logic.Local_state.t
+            Mina_transaction_logic.Parties_logic.Local_state.t
 
           let add_check (t : t) _failure b =
             { t with success = Bool.(t.success &&& b) }
@@ -1858,7 +1858,7 @@ module Base = struct
               , Bool.t
               , Transaction_commitment.t
               , unit )
-              Parties_logic.Local_state.t
+              Mina_transaction_logic.Parties_logic.Local_state.t
           ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
           ; full_transaction_commitment : Transaction_commitment.t
@@ -1866,9 +1866,10 @@ module Base = struct
           ; failure : unit >
       end
 
-      include Parties_logic.Make (Inputs)
+      include Mina_transaction_logic.Parties_logic.Make (Inputs)
 
-      let perform (type r) (eff : (r, Env.t) Parties_logic.Eff.t) : r =
+      let perform (type r)
+          (eff : (r, Env.t) Mina_transaction_logic.Parties_logic.Eff.t) : r =
         match eff with
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
@@ -1939,7 +1940,9 @@ module Base = struct
              statement.source.pending_coinbase_stack
            ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
            state_body) ;
-      let init : Global_state.t * _ Parties_logic.Local_state.t =
+      let init :
+          Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
+          =
         let g : Global_state.t =
           { ledger =
               ( statement.source.ledger
@@ -1949,7 +1952,7 @@ module Base = struct
               Mina_state.Protocol_state.Body.view_checked state_body
           }
         in
-        let l : _ Parties_logic.Local_state.t =
+        let l : _ Mina_transaction_logic.Parties_logic.Local_state.t =
           { parties =
               { With_hash.hash = statement.source.local_state.parties
               ; data = V.create (fun () -> !witness.local_state_init.parties)
@@ -1998,7 +2001,7 @@ module Base = struct
               let snapp_statement = snapp_statement
             end) in
             let finish v =
-              let open Parties_logic.Start_data in
+              let open Mina_transaction_logic.Parties_logic.Start_data in
               let ps =
                 V.map v ~f:(function
                   | `Skip ->
@@ -2014,7 +2017,7 @@ module Base = struct
                     Parties.Call_forest.hash (V.get ps))
               in
               let start_data =
-                { Parties_logic.Start_data.parties =
+                { Mina_transaction_logic.Parties_logic.Start_data.parties =
                     { With_hash.hash = h; data = ps }
                 ; memo_hash =
                     exists Field.typ ~compute:(fun () ->
@@ -3323,7 +3326,7 @@ type local_state =
   , bool
   , unit
   , Transaction_status.Failure.t option )
-  Parties_logic.Local_state.t
+  Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Sparse_ledger.Global_state.t
 
@@ -3646,7 +3649,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let full_commitment = ref Local_state.dummy.full_transaction_commitment in
   let remaining_parties =
     let partiess =
-      List.map partiess ~f:(fun parties : _ Parties_logic.Start_data.t ->
+      List.map partiess
+        ~f:(fun parties : _ Mina_transaction_logic.Parties_logic.Start_data.t ->
           { parties; memo_hash = Signed_command_memo.hash parties.memo })
     in
     ref partiess
@@ -3731,7 +3735,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             | _ ->
                 failwith "Not enough remaining parties" )
       in
-      let hash_local_state (local : _ Parties_logic.Local_state.t) =
+      let hash_local_state
+          (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
         let hash_parties_stack ps =
           ps |> Parties.Call_forest.accumulate_hashes'
           |> Parties.Call_forest.map ~f:(fun p -> (p, ()))
@@ -3751,7 +3756,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                     ~f:(Parties.Call_forest.map ~f:(fun p -> (p, ()))))
         in
         { local with
-          Parties_logic.Local_state.parties = hash_parties_stack local.parties
+          Mina_transaction_logic.Parties_logic.Local_state.parties =
+            hash_parties_stack local.parties
         ; call_stack
         }
       in
