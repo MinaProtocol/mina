@@ -19,23 +19,11 @@ import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
 
 const defaultValidUntil = "4294967295";
 
-// A variable to check if we have cleaned up any wasm workers ran by jsoo
-let didShutdown: Boolean = false;
-
-/**
- * Checks the 'didShtudown' variable and performs a clean up on any
- * wasm workers that were ran by the jsoo. This should only be called when
- * the signer is no longer used. Intended for node environments, this is a noop
- * for browsers.
- */
-// @ts-ignore
-export function shutdown() {
-  if (globalThis.wasm_rayon_poolbuilder && !didShutdown) {
-    didShutdown = true;
-    globalThis.wasm_rayon_poolbuilder.free();
-    return Promise.all(
-      globalThis.wasm_workers.map(async (worker) => worker.terminate())
-    );
+// Shut down wasm workers, which are not needed here
+if (globalThis.wasm_rayon_poolbuilder) {
+  globalThis.wasm_rayon_poolbuilder.free();
+  for (let worker of globalThis.wasm_workers) {
+    worker.terminate();
   }
 }
 
