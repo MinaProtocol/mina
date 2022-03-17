@@ -1,38 +1,8 @@
 open Core_kernel
+open Mina_base
 open Currency
 open Signature_lib
 module Global_slot = Mina_numbers.Global_slot
-
-type account_state = [ `Added | `Existed ] [@@deriving equal]
-
-module type Ledger_intf = sig
-  type t
-
-  type location
-
-  val get : t -> location -> Account.t option
-
-  val location_of_account : t -> Account_id.t -> location option
-
-  val set : t -> location -> Account.t -> unit
-
-  val get_or_create :
-    t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
-
-  val create_new_account : t -> Account_id.t -> Account.t -> unit Or_error.t
-
-  val remove_accounts_exn : t -> Account_id.t list -> unit
-
-  val merkle_root : t -> Ledger_hash.t
-
-  val with_ledger : depth:int -> f:(t -> 'a) -> 'a
-
-  val empty : depth:int -> unit -> t
-
-  val create_masked : t -> t
-
-  val apply_mask : t -> masked:t -> unit
-end
 
 module Transaction_applied = struct
   module UC = Signed_command
@@ -556,7 +526,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
   in
   timing
 
-module Make (L : Ledger_intf) : S with type ledger := L.t = struct
+module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   open L
 
   let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
@@ -600,7 +570,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
       amount =
     let fee = constraint_constants.account_creation_fee in
-    if equal_account_state action `Added then
+    if Ledger_intf.equal_account_state action `Added then
       error_opt
         (sprintf
            !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
@@ -676,7 +646,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   end
 
   let previous_empty_accounts action pk =
-    if equal_account_state action `Added then [ pk ] else []
+    if Ledger_intf.equal_account_state action `Added then [ pk ] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
@@ -2274,8 +2244,8 @@ module For_tests = struct
   module Init_ledger = struct
     type t = (Keypair.t * int) array [@@deriving sexp]
 
-    let init (type l) (module L : Ledger_intf with type t = l) (init_ledger : t)
-        (l : L.t) =
+    let init (type l) (module L : Ledger_intf.S with type t = l)
+        (init_ledger : t) (l : L.t) =
       Array.iter init_ledger ~f:(fun (kp, amount) ->
           let _tag, account, loc =
             L.get_or_create l
@@ -2503,7 +2473,7 @@ module For_tests = struct
     ; other_parties
     }
 
-  let test_eq (type l) (module L : Ledger_intf with type t = l) accounts
+  let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
       (l1 : L.t) (l2 : L.t) =
     Or_error.try_with (fun () ->
         List.iter accounts ~f:(fun a ->

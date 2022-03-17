@@ -725,7 +725,7 @@ module Base = struct
                     < payload.body.amount)
               in
               let timing_or_error =
-                Transaction_logic.validate_timing
+                Mina_transaction_logic.validate_timing
                   ~txn_amount:payload.body.amount ~txn_global_slot
                   ~account:source_account
               in
@@ -736,8 +736,8 @@ module Base = struct
                 | Error err ->
                     let open Mina_base in
                     Transaction_status.Failure.equal
-                      (Transaction_logic.timing_error_to_user_command_status
-                         err)
+                      (Mina_transaction_logic
+                       .timing_error_to_user_command_status err)
                       Transaction_status.Failure
                       .Source_minimum_balance_violation
               in
@@ -862,7 +862,7 @@ module Base = struct
 
   let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
       ~txn_global_slot =
-    (* calculations should track Transaction_logic.validate_timing *)
+    (* calculations should track Mina_transaction_logic.validate_timing *)
     let open Account.Poly in
     let open Account.Timing.As_record in
     let { is_timed
@@ -1891,7 +1891,7 @@ module Base = struct
                   (* We always assert that the proof verifies. *)
                   Boolean.true_
             in
-            (* omit failure status here, unlike `Transaction_logic` *)
+            (* omit failure status here, unlike `Mina_transaction_logic` *)
             (Inputs.Account.account_with_hash account', success, ())
     end
 
@@ -4461,7 +4461,7 @@ module For_tests = struct
   let create_trivial_predicate_snapp ~constraint_constants
       ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept)
       ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
-    let { Transaction_logic.For_tests.Transaction_spec.fee
+    let { Mina_transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
         ; receiver = _
         ; amount
@@ -5038,7 +5038,7 @@ let%test_module "transaction_snark" =
           |> Or_error.ok_exn)
 
     let%test_unit "snapps-based payment" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
@@ -5047,7 +5047,7 @@ let%test_module "transaction_snark" =
           |> fun ((), ()) -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
-      let open Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let partiess =
@@ -5427,7 +5427,8 @@ let%test_module "transaction_snark" =
                 ( Ledger.apply_user_command ledger ~constraint_constants
                     ~txn_global_slot:current_global_slot t2
                   |> Or_error.ok_exn
-                  : Transaction_logic.Transaction_applied.Signed_command_applied
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
                     .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
@@ -6827,7 +6828,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -6854,7 +6855,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
@@ -6915,7 +6916,7 @@ let%test_module "account timing check" =
       | Error err ->
           assert (
             Transaction_status.Failure.equal
-              (Transaction_logic.timing_error_to_user_command_status err)
+              (Mina_transaction_logic.timing_error_to_user_command_status err)
               Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | Ok _ ->

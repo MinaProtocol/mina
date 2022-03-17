@@ -39,7 +39,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
@@ -775,7 +775,7 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Transaction_logic.Transaction_applied.transaction_with_status
+            Mina_transaction_logic.Transaction_applied.transaction_with_status
               transaction_with_info
           in
           let%bind protocol_state_body =
