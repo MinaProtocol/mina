@@ -401,7 +401,7 @@ export class Client {
   public signTransaction(
     payload: SignableData,
     key: Keypair
-  ): Signed<SignableData> | string {
+  ): Signed<SignableData> {
     if (isMessage(payload)) {
       return this.signMessage(payload, key);
     }
