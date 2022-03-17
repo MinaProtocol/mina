@@ -542,7 +542,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (** A party's preconditioned changes to account state. *)
+      (** The body of a single account (or party's) update. *)
       type t =
             Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
               (Update.Stable.V1)
@@ -555,17 +555,25 @@ module Body = struct
             .t
             (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
-              (** The publicKey for this account.  *)
+              (** The public key of the account that the update applies to. *)
         ; token_id : Token_id.Stable.V1.t
+              (** The token ID held by the account that this update should apply to. *)
         ; update : Update.Stable.V1.t
+              (** The updates to apply to the account. *)
         ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+              (** The change in balance to apply to the account. A positive change increases the balance of the account; a negative change decreases it. *)
         ; increment_nonce : bool
-              (** True if the nonce within this account should be incremented upon successful application. *)
-        ; events : Events'.Stable.V1.t  (** Events . *)
-        ; sequence_events : Events'.Stable.V1.t  (** Events . *)
+              (** Whether to increment the account’s nonce when applying this update. *)
+        ; events : Events'.Stable.V1.t
+              (** The list of 'events', auxiliary information exposed by smart contract execution, emitted by the zkApp for this account, used to reveal information that will not be directly stored within the zkApp account. *)
+        ; sequence_events : Events'.Stable.V1.t
+              (** The list of ‘sequence events’ emitted by the snapp for this account. These events are accumulated in the order that a block producer selects the transactions, and are made available via a cryptographic commitment. A 'supervisor' or 'roll-up' rule in the zkApp smart contract may use this data to apply updates in a deterministic order when there otherwise might be data races. *)
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+              (** Opaque data encoding the data passed into and returned from snapp smart contracts. *)
         ; call_depth : int
+              (** The 'depth' into the call stack, used to compute the call stack for the transaction. This depth must always be > 0 and may only increase by 1, but may decrease by any amount. *)
         ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+              (** The condition that must be satisfied by the procotol state of the most recent block in order for this update to be accepted. *)
         ; use_full_commitment : bool
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
