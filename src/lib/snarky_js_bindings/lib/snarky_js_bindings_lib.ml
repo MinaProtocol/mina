@@ -1730,7 +1730,6 @@ module Ledger = struct
 
   type protocol_state_predicate =
     < snarkedLedgerHash : js_field or_ignore Js.prop
-    ; snarkedNextAvailableToken : js_uint64 closed_interval Js.prop
     ; timestamp : js_uint64 closed_interval Js.prop
     ; blockchainLength : js_uint32 closed_interval Js.prop
     ; minWindowDensity : js_uint32 closed_interval Js.prop
@@ -1764,7 +1763,7 @@ module Ledger = struct
   type party_body =
     < publicKey : public_key Js.prop
     ; update : party_update Js.prop
-    ; tokenId : js_uint64 Js.prop
+    ; tokenId : js_field Js.prop
     ; delta : js_int64 Js.prop
     ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
     ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
@@ -1831,16 +1830,14 @@ module Ledger = struct
     ; set_voting_for = None
     }
 
-  module L : Mina_base.Transaction_logic.Ledger_intf = struct
+  module L : Mina_base.Ledger_intf.S = struct
     module Account = Mina_base.Account
     module Account_id = Mina_base.Account_id
-    module Transaction_logic = Mina_base.Transaction_logic
     module Ledger_hash = Mina_base.Ledger_hash
     module Token_id = Mina_base.Token_id
 
     type t_ =
       { next_location : int
-      ; next_available_token : Token_id.t
       ; accounts : Account.t Int.Map.t
       ; locations : int Account_id.Map.t
       }
@@ -1864,7 +1861,8 @@ module Ledger = struct
       loc
 
     let get_or_create (t : t) (id : Account_id.t) :
-        (Transaction_logic.account_state * Account.t * location) Or_error.t =
+        (Mina_base.Ledger_intf.account_state * Account.t * location) Or_error.t
+        =
       let loc = location_of_account t id in
       let res =
         match loc with
@@ -1907,25 +1905,19 @@ module Ledger = struct
 
     let empty ~depth:_ () : t =
       ref
-        { next_available_token = Token_id.(next default)
-        ; next_location = 0
+        { next_location = 0
         ; accounts = Int.Map.empty
         ; locations = Account_id.Map.empty
         }
 
     let with_ledger (type a) ~depth ~(f : t -> a) : a = f (empty ~depth ())
 
-    let next_available_token (t : t) = !t.next_available_token
-
-    let set_next_available_token (t : t) (id : Token_id.t) : unit =
-      t := { !t with next_available_token = id }
-
     let create_masked (t : t) : t = ref !t
 
     let apply_mask (t : t) ~(masked : t) = t := !masked
   end
 
-  module T = Mina_base.Transaction_logic.Make (L)
+  module T = Mina_transaction_logic.Make (L)
 
   type ledger_class = < value : L.t Js.prop >
 
@@ -2039,11 +2031,6 @@ module Ledger = struct
       Snapp_predicate.Protocol_state.t =
     let ( ^ ) = Fn.compose in
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
-    ; snarked_next_available_token =
-        Check
-          (closed_interval
-             (Token_id.of_uint64 ^ uint64)
-             p##.snarkedNextAvailableToken)
     ; timestamp =
         Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp)
     ; blockchain_length =
@@ -2108,7 +2095,7 @@ module Ledger = struct
 
     { public_key = public_key b##.publicKey
     ; update
-    ; token_id = Token_id.of_uint64 (uint64 b##.tokenId)
+    ; token_id = Token_id.of_field (field b##.tokenId)
     ; balance_change = int64 b##.delta
     ; events =
         Array.map
@@ -2279,7 +2266,7 @@ module Ledger = struct
     let global_slot x =
       Mina_numbers.Global_slot.Checked.Unsafe.of_field @@ uint32 x
 
-    let token_id x = Mina_base.Token_id.Checked.Unsafe.of_field @@ uint64 x
+    let token_id x = Token_id.Checked.of_field @@ field x
 
     let ledger_hash x =
       (* TODO: assumes constant *)
@@ -2313,8 +2300,6 @@ module Ledger = struct
       let ( ^ ) = Fn.compose in
 
       { snarked_ledger_hash = or_ignore ledger_hash p##.snarkedLedgerHash
-      ; snarked_next_available_token =
-          numeric token_id p##.snarkedNextAvailableToken
       ; timestamp =
           numeric (Block_time.Checked.Unsafe.of_field ^ uint64) p##.timestamp
       ; blockchain_length =
@@ -2611,7 +2596,6 @@ module Ledger = struct
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           ~txn_state_view:
             { snarked_ledger_hash = Field.Constant.zero
-            ; snarked_next_available_token = Token_id.(next default)
             ; timestamp = Block_time.zero
             ; blockchain_length = Mina_numbers.Length.zero
             ; min_window_density = Mina_numbers.Length.zero

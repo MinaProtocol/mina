@@ -28,6 +28,7 @@
    fields_derivers_snapps
    genesis_constants
    mina_numbers
+   mina_transaction_logic
    random_oracle
    sgn
    signature_lib
