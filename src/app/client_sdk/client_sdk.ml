@@ -104,8 +104,8 @@ let _ =
          |> Public_key.Compressed.to_base58_check |> Js.string
 
        (** is the public key valid and derivable from private key; can
-          the private key be used to sign a transaction?
-      *)
+           the private key be used to sign a transaction?
+       *)
        method validKeypair (keypair_js : keypair_js) =
          let sk_base58_check = Js.to_string keypair_js##.privateKey in
          let pk_base58_check = Js.to_string keypair_js##.publicKey in
