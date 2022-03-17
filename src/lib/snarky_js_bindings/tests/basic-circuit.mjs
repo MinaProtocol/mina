@@ -5,6 +5,12 @@ await snarkyjs.snarky_ready;
 let { Poseidon, Circuit, Field } = snarkyjs;
 
 export { basicCircuitTest };
+
+let FieldTyp = (size) => ({
+  sizeInFields: () => size,
+  toFields: (f) => f,
+  ofFields: (f) => f,
+});
 class Main extends Circuit {
   static snarkyMain(preimage, [hash]) {
     Poseidon.hash(preimage).assertEquals(hash);
@@ -36,9 +42,3 @@ function basicCircuitTest() {
   console.log("ok?", ok);
   if (!ok) throw Error(`${name} failed`);
 }
-
-let FieldTyp = (size) => ({
-  sizeInFields: () => size,
-  toFields: (f) => f,
-  ofFields: (f) => f,
-});
