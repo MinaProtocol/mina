@@ -344,7 +344,7 @@ type local_state =
   , bool
   , unit
   , Transaction_status.Failure.t option )
-  Parties_logic.Local_state.t
+  Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
 

@@ -2,6 +2,7 @@ open Core_kernel
 open Mina_base
 open Currency
 open Signature_lib
+module Parties_logic = Parties_logic
 module Global_slot = Mina_numbers.Global_slot
 
 module Transaction_applied = struct
@@ -2244,8 +2245,8 @@ module For_tests = struct
   module Init_ledger = struct
     type t = (Keypair.t * int) array [@@deriving sexp]
 
-    let init (type l) (module L : Ledger_intf.S with type t = l) (init_ledger : t)
-        (l : L.t) =
+    let init (type l) (module L : Ledger_intf.S with type t = l)
+        (init_ledger : t) (l : L.t) =
       Array.iter init_ledger ~f:(fun (kp, amount) ->
           let _tag, account, loc =
             L.get_or_create l
