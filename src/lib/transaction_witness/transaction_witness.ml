@@ -42,7 +42,7 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { transaction : Mina_base.Transaction.Stable.V2.t
+      { transaction : Mina_transaction.Transaction.Stable.V2.t
       ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t

@@ -37,6 +37,7 @@
    transaction_snark_scan_state
    sgn
    mina_base
+   mina_transaction
    mina_transaction_logic
    verifier
    staged_ledger_diff

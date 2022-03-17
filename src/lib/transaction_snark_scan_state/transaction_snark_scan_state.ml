@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
 open O1trace
 module Ledger = Mina_ledger.Ledger
