@@ -440,7 +440,7 @@ module Node = struct
     res
 
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
     [%log info] "Sending a payment with raw signature"
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
@@ -450,11 +450,11 @@ module Node = struct
           ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
-          ~token:(Graphql_lib.Encoders.uint64 (Unsigned.UInt64.of_int 0))
+          ~token:(Graphql_lib.Encoders.token token)
           ~fee:(Graphql_lib.Encoders.fee fee)
-          ~nonce:(Graphql_lib.Encoders.uint32 (Unsigned.UInt32.of_int 0))
-          ~memo:""
-          ~validUntil:(Graphql_lib.Encoders.uint32 (Unsigned.UInt32.of_int 0))
+          ~nonce:(Graphql_lib.Encoders.nonce nonce)
+          ~memo
+          ~validUntil:(Graphql_lib.Encoders.uint32 valid_until)
           ~rawSignature:raw_signature ()
       in
       exec_graphql_request ~logger ~node:t
@@ -477,9 +477,9 @@ module Node = struct
     res
 
   let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
     send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~raw_signature
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
