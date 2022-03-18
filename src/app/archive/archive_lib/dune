@@ -61,6 +61,7 @@
    verifier
    quickcheck_lib
    snark_params
+   mina_transaction
  )
  (inline_tests)
  (modes native)

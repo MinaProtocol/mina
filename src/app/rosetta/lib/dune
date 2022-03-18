@@ -45,6 +45,7 @@
    genesis_constants
    hex
    mina_numbers
+   mina_transaction
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))

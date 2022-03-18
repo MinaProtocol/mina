@@ -56,6 +56,7 @@
    node_status
    o1trace_webkit_event
    generated_graphql_queries
+   mina_transaction
    mina_user_error
    mina_transition
    mina_ledger
@@ -94,6 +95,7 @@
    group_map
    snark_work_lib
    mina_compile_config
+   mina_transaction_logic
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)

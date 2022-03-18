@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 
 [%%versioned:

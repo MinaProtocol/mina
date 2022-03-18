@@ -34,7 +34,7 @@ module type Blockchain_state = sig
     type t =
       ( Staged_ledger_hash.t
       , Frozen_ledger_hash.t
-      , Parties_logic.Local_state.Value.t
+      , Mina_transaction_logic.Parties_logic.Local_state.Value.t
       , Block_time.t )
       Poly.t
     [@@deriving sexp]
@@ -43,7 +43,7 @@ module type Blockchain_state = sig
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
-    , Parties_logic.Local_state.Checked.t
+    , Mina_transaction_logic.Parties_logic.Local_state.Checked.t
     , Block_time.Checked.t )
     Poly.t
 

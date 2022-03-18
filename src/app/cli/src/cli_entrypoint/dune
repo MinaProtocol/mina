@@ -65,6 +65,7 @@
    prover
    blockchain_snark
    snarky.backendless
+   o1trace
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

@@ -396,20 +396,76 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
   ; next_epoch_data
   }
 
+module Party_body_components = struct
+  type ( 'pk
+       , 'update
+       , 'token_id
+       , 'amount
+       , 'events
+       , 'call_data
+       , 'int
+       , 'bool
+       , 'protocol_state )
+       t =
+    { public_key : 'pk
+    ; update : 'update
+    ; token_id : 'token_id
+    ; balance_change : 'amount
+    ; increment_nonce : 'bool
+    ; events : 'events
+    ; sequence_events : 'events
+    ; call_data : 'call_data
+    ; call_depth : 'int
+    ; protocol_state : 'protocol_state
+    ; use_full_commitment : 'bool
+    }
+
+  let to_fee_payer t : Party.Body.Fee_payer.t =
+    { public_key = t.public_key
+    ; update = t.update
+    ; token_id = t.token_id
+    ; balance_change = t.balance_change
+    ; increment_nonce = t.increment_nonce
+    ; events = t.events
+    ; sequence_events = t.sequence_events
+    ; call_data = t.call_data
+    ; call_depth = t.call_depth
+    ; protocol_state = t.protocol_state
+    ; use_full_commitment = t.use_full_commitment
+    }
+
+  let to_typical_party t : Party.Body.t =
+    { public_key = t.public_key
+    ; update = t.update
+    ; token_id = t.token_id
+    ; balance_change = t.balance_change
+    ; increment_nonce = t.increment_nonce
+    ; events = t.events
+    ; sequence_events = t.sequence_events
+    ; call_data = t.call_data
+    ; call_depth = t.call_depth
+    ; protocol_state = t.protocol_state
+    ; use_full_commitment = t.use_full_commitment
+    }
+end
+
 (* The type `a` is associated with the `delta` field, which is an unsigned fee
    for the fee payer, and a signed amount for other parties.
    The type `b` is associated with the `use_full_commitment` field, which is
    `unit` for the fee payer, and `bool` for other parties.
+   The type `c` is associated with the `token_id` field, which is `unit` for the
+   fee payer, and `Token_id.t` for other parties.
 *)
-let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
-    ?(snapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option)
+let gen_party_body_components (type a b c) ?account_id ?balances_tbl
+    ?(new_account = false) ?(snapp_account = false) ?(is_fee_payer = false)
+    ?available_public_keys ?permissions_auth
+    ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
-    ~ledger () :
-    (_, _, _, a, _, _, _, b, _) Party.Body.Poly.t Quickcheck.Generator.t =
+    ~(f_token_id : Token_id.t -> c) ~ledger () :
+    (_, _, _, a, _, _, _, b, _) Party_body_components.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
@@ -607,7 +663,8 @@ let gen_party_body (type a b) ?account_id ?balances_tbl ?(new_account = false)
       ~default:(return Snapp_predicate.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
-  { Party.Body.Poly.public_key
+  let token_id = f_token_id token_id in
+  { Party_body_components.public_key
   ; update
   ; token_id
   ; balance_change
@@ -625,18 +682,18 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
     ?permissions_auth ?required_balance_change ?required_balance ~ledger
     ~balances_tbl ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
-  let%bind body =
-    gen_party_body ~new_account ~snapp_account ~increment_nonce
+  let%bind body_components =
+    gen_party_body_components ~new_account ~snapp_account ~increment_nonce
       ?permissions_auth ?account_id ?available_public_keys
       ?required_balance_change ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
-      ~f_balance_change:Fn.id ()
+      ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
       ?protocol_state_view
   in
+  let body = Party_body_components.to_typical_party body_components in
   let account_id =
-    Account_id.create body.Party.Body.Poly.public_key
-      body.Party.Body.Poly.token_id
+    Account_id.create body.Party.Body.public_key body.Party.Body.token_id
   in
   let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
   { Party.Predicated.Poly.body; predicate }
@@ -672,17 +729,19 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
     ?protocol_state_view () :
     Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%map body0 =
-    gen_party_body ?permissions_auth ~account_id ~is_fee_payer:true
+  let%map body_components =
+    gen_party_body_components ?permissions_auth ~account_id ~is_fee_payer:true
       ~increment_nonce:() ~gen_balance_change:gen_fee
-      ~f_balance_change:fee_to_amt ~gen_use_full_commitment:(return ()) ~ledger
-      ?protocol_state_view ()
+      ~f_balance_change:fee_to_amt
+      ~f_token_id:(fun token_id ->
+        (* make sure the fee payer's token id is the default,
+           which is represented by the unit value in the body
+        *)
+        assert (Token_id.equal token_id Token_id.default) ;
+        ())
+      ~gen_use_full_commitment:(return ()) ~ledger ?protocol_state_view ()
   in
-  (* make sure the fee payer's token id is the default,
-     which is represented by the unit value in the body
-  *)
-  assert (Token_id.equal body0.token_id Token_id.default) ;
-  let body = { body0 with token_id = () } in
+  let body = Party_body_components.to_fee_payer body_components in
   (* use nonce from account in ledger *)
   let pk = body.public_key in
   let account_id = Account_id.create pk Token_id.default in

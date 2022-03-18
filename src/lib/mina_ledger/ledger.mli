@@ -1,6 +1,7 @@
 open Core
 open Signature_lib
 open Mina_base
+open Mina_transaction
 
 module Location : Merkle_ledger.Location_intf.S
 
@@ -102,7 +103,7 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 val commit : Mask.Attached.t -> unit
 
 module Transaction_applied : sig
-  open Transaction_logic
+  open Mina_transaction_logic
 
   module Signed_command_applied : sig
     module Common : sig
@@ -228,7 +229,7 @@ val apply_parties_unchecked :
          , bool
          , unit
          , Transaction_status.Failure.t option )
-         Parties_logic.Local_state.t
+         Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
 
@@ -285,4 +286,4 @@ type init_state =
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
+module Ledger_inner : Ledger_intf.S with type t = t

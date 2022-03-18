@@ -3,6 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Signature_lib
 open Archive_lib
 

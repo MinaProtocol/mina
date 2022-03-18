@@ -46,6 +46,7 @@
    pickles.backend
    kimchi_backend
    mina_base.import
+   mina_transaction_logic
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

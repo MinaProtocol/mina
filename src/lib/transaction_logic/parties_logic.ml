@@ -1,6 +1,7 @@
 (* parties_logic.ml *)
 
 open Core_kernel
+open Mina_base
 
 module type Iffable = sig
   type bool
