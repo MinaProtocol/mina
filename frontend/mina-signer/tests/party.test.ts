@@ -207,7 +207,7 @@ describe("Party", () => {
           memo: "test memo",
         },
       },
-      keypair
+      keypair.privateKey
     ) as Signed<Party>;
     expect(parties.data).toBeDefined();
     expect(parties.signature).toBeDefined();

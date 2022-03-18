@@ -82,7 +82,10 @@ class Client {
   public signMessage(message: string, key: Keypair): Signed<Message> {
     return {
       signature: minaSDK.signString(this.network, key.privateKey, message),
-      data: message,
+      data: {
+        publicKey: key.publicKey,
+        message,
+      },
     };
   }
 
@@ -97,7 +100,7 @@ class Client {
     return minaSDK.verifyStringSignature(
       this.network,
       signedMessage.signature,
-      signedMessage.signature.signer,
+      signedMessage.data.publicKey,
       signedMessage.data
     );
   }
@@ -401,19 +404,22 @@ class Client {
    */
   public signTransaction(
     payload: SignableData,
-    key: Keypair
+    privateKey: PrivateKey
   ): Signed<SignableData> {
     if (isMessage(payload)) {
-      return this.signMessage(payload, key);
+      return this.signMessage(payload.message, {
+        publicKey: payload.publicKey,
+        privateKey,
+      });
     }
     if (isPayment(payload)) {
-      return this.signPayment(payload, key.privateKey);
+      return this.signPayment(payload, privateKey);
     }
     if (isStakeDelegation(payload)) {
-      return this.signStakeDelegation(payload, key.privateKey);
+      return this.signStakeDelegation(payload, privateKey);
     }
     if (isParty(payload)) {
-      return this.signParty(payload, key.privateKey);
+      return this.signParty(payload, privateKey);
     } else {
       throw new Error(`Expected signable payload, got '${payload}'.`);
     }

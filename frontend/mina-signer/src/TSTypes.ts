@@ -10,7 +10,10 @@ export type Keypair = {
   readonly publicKey: PublicKey;
 };
 
-export type Message = string;
+export type Message = {
+  publicKey: PublicKey;
+  message: string;
+};
 
 export type Signature = {
   readonly field: string;

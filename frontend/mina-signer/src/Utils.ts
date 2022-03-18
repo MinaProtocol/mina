@@ -28,5 +28,5 @@ export function isStakeDelegation(p: SignableData): p is StakeDelegation {
 }
 
 export function isMessage(p: SignableData): p is Message {
-  return typeof p === "string";
+  return p.hasOwnProperty("publicKey") && p.hasOwnProperty("message");
 }
