@@ -243,9 +243,11 @@ labels.k8s-pod/app:"block-producer"
 #### Dashboards
 
 There are several public Grafana dashboards available here:
-
+<!-- xrefcheck:ignore link -->
 - [Network Overview](https://o1testnet.grafana.net/d/qx4y6dfWz/network-overview?orgId=1)
+<!-- xrefcheck:ignore link -->
 - [Block Producer](https://o1testnet.grafana.net/d/Rgo87HhWz/block-producer-dashboard?orgId=1&refresh=1m)
+<!-- xrefcheck:ignore link -->
 - [SNARK Worker](https://o1testnet.grafana.net/d/scQUGOhWk/snark-worker-dashboard?orgId=1&refresh=1m)
 
 # Deploy a Public Testnet
