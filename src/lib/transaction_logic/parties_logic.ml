@@ -1236,17 +1236,11 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.update_failure_status local_state failure_status
         update_permitted
     in
-    let success =
-      Bool.(
-        local_state.success &&& protocol_state_predicate_satisfied
-        &&& predicate_satisfied &&& update_permitted)
-    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status
-        ((not is_start') ||| success)
+        ((not is_start') ||| local_state.success)
         local_state.failure_status) ;
-    let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
