@@ -37,7 +37,7 @@ module T = Transaction_snark.Make (struct
   let proof_level = proof_level
 end)
 
-let state_body =
+let genesis_state_body =
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
@@ -51,9 +51,9 @@ let init_stack = Pending_coinbase.Stack.empty
 
 let apply_parties ledger parties =
   let witnesses =
-    Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-      (`Ledger ledger) parties
+    Transaction_snark.parties_witnesses_exn ~constraint_constants
+      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+      ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties
   in
   let open Impl in
   List.fold ~init:((), ()) witnesses
@@ -78,51 +78,60 @@ let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let apply_parties_with_merges ledger parties =
-  let witnesses =
-    match
-      Or_error.try_with (fun () ->
-          Transaction_snark.parties_witnesses_exn ~constraint_constants
-            ~state_body ~fee_excess:Amount.Signed.zero
-            ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties)
-    with
-    | Ok a ->
-        a
-    | Error e ->
-        failwith
-          (sprintf "parties_witnesses_exn failed with %s"
-             (Error.to_string_hum e))
-  in
-  let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
-  let open Async.Deferred.Let_syntax in
-  let%map p =
-    match List.rev witnesses with
-    | [] ->
-        failwith "no witnesses generated"
-    | (witness, spec, stmt, snapp_statement) :: rest ->
-        let open Async.Deferred.Or_error.Let_syntax in
-        let%bind p1 =
-          T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-            ~snapp_statement
-          |> deferred_or_error
-        in
-        Async.Deferred.List.fold ~init:(Ok p1) rest
-          ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
-            let%bind prev = Async.Deferred.return acc in
-            let%bind curr =
+let apply_parties_with_merges ledger partiess =
+  (*TODO: merge multiple snapp transactions*)
+  Async.Deferred.List.iter partiess ~f:(fun parties ->
+      let witnesses =
+        match
+          Or_error.try_with (fun () ->
+              Transaction_snark.parties_witnesses_exn ~constraint_constants
+                ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+                ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
+                [ parties ])
+        with
+        | Ok a ->
+            a
+        | Error e ->
+            failwith
+              (sprintf "parties_witnesses_exn failed with %s"
+                 (Error.to_string_hum e))
+      in
+      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
+      let open Async.Deferred.Let_syntax in
+      let%map p =
+        match List.rev witnesses with
+        | [] ->
+            failwith "no witnesses generated"
+        | (witness, spec, stmt, snapp_statement) :: rest ->
+            let open Async.Deferred.Or_error.Let_syntax in
+            let%bind p1 =
               T.of_parties_segment_exn ~statement:stmt ~witness ~spec
                 ~snapp_statement
               |> deferred_or_error
             in
-            let sok_digest =
-              Sok_message.create ~fee:Fee.zero
-                ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
-              |> Sok_message.digest
-            in
-            T.merge ~sok_digest prev curr)
-  in
-  let _p = Or_error.ok_exn p in
-  ()
+            Async.Deferred.List.fold ~init:(Ok p1) rest
+              ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
+                let%bind prev = Async.Deferred.return acc in
+                let%bind curr =
+                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                    ~snapp_statement
+                  |> deferred_or_error
+                in
+                let sok_digest =
+                  Sok_message.create ~fee:Fee.zero
+                    ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
+                  |> Sok_message.digest
+                in
+                T.merge ~sok_digest prev curr)
+      in
+      let _p = Or_error.ok_exn p in
+      let _s =
+        Ledger.apply_parties_unchecked ~constraint_constants
+          ~state_view:(Mina_state.Protocol_state.Body.view genesis_state_body)
+          ledger parties
+        |> Or_error.ok_exn
+      in
+      ())
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
@@ -212,3 +221,22 @@ let permissions_from_update (update : Party.Update.t) ~auth =
         default.set_voting_for
       else auth )
   }
+
+module Wallet = struct
+  type t = { private_key : Private_key.t; account : Account.t }
+
+  let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
+    let random_wallet () : t =
+      let private_key = Private_key.create () in
+      let public_key =
+        Public_key.compress (Public_key.of_private_key_exn private_key)
+      in
+      let account_id = Account_id.create public_key Token_id.default in
+      { private_key
+      ; account =
+          Account.create account_id
+            (Balance.of_int ((50 + Random.int 100) * 1_000_000_000))
+      }
+    in
+    Array.init n ~f:(fun _ -> random_wallet ())
+end

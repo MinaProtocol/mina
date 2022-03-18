@@ -302,3 +302,9 @@ query {
   runtimeConfig
 }
 |}]
+
+module Thread_graph = [%graphql {|
+query {
+  threadGraph
+}
+|}]
