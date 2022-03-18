@@ -95,6 +95,13 @@ spec:
         - "$(CODA_SNARK_FEE)"
         - "-work-selection"
         - "$(WORK_SELECTION)"
+        - "-u"
+        - "/code/watchdog.py"
+        - "/code/make_report.py" 
+        - "--incluster" 
+        - "true"
+        - "--namespace"
+        - ""
         {{-  if .Values.features.enablepeerexchange.enabled}}
         - "-enable-peer-exchange"
         - "true"
@@ -162,6 +169,20 @@ spec:
           value: {{ $.Values.snarkFee | quote }}
         - name: WORK_SELECTION
           value: {{$.Values.workSelectionAlgorithm | quote }}
+        - name: "RESTART_EVERY_MINS"
+          value: {{ .Values.restartEveryMins | quote }}
+        - name: "RESTART_NODES"
+          value: {{ .Values.restartNodes | quote }}
+        - name: "MAKE_REPORTS"
+          value: {{ .Values.makeReports | quote }}
+        - name: "MAKE_REPORT_EVERY_MINS"
+          value: {{ .Values.makeReportEveryMins | quote }}
+        - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
+          value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
+        - name: "MAKE_REPORT_ACCOUNTS"
+          value: {{ .Values.makeReportAccounts | quote }}
+        - name: "SEED_PEERS"
+          value: {{ $.Values.seedPeers | quote }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - name: CODA_LIBP2P_PASS
           valueFrom:
