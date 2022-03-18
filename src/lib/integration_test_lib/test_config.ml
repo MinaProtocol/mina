@@ -33,6 +33,7 @@ type t =
   ; log_precomputed_blocks : bool
   ; snark_worker_fee : string
   ; snark_worker_public_key : string
+  ; work_delay : int option
   ; transaction_capacity :
       Runtime_config.Proof_keys.Transaction_capacity.t option
   ; aux_account_balance : string option
@@ -54,6 +55,7 @@ let default =
   ; snark_worker_public_key =
       (let pk, _ = (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
+  ; work_delay = None
   ; transaction_capacity = None
   ; aux_account_balance = None
   }

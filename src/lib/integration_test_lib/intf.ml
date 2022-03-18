@@ -355,6 +355,8 @@ module Dsl = struct
 
     val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
 
+    (** generates a wait condition based on the network state with soft timeout
+    of 1hr and hard timeout of 2hrs*)
     val network_state : description:string -> f:(Network_state.t -> bool) -> t
   end
 

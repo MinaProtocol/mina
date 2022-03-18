@@ -27,6 +27,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
+    ; work_delay = Some 1
+    ; transaction_capacity =
+        Some Runtime_config.Proof_keys.Transaction_capacity.small
     }
 
   let transactions_sent = ref 0
@@ -39,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let ledger_proofs_emitted ~logger ~num_proofs =
     Wait_condition.network_state ~description:"snarked ledger emitted"
       ~f:(fun network_state ->
-        [%log error] "snarked_ledgers_generated = %d"
+        [%log info] "snarked_ledgers_generated = %d"
           network_state.snarked_ledgers_generated ;
         let module T = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
@@ -55,12 +58,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             list
           [@@deriving to_yojson]
         end in
-        [%log error] "snark_work = %s"
-          (Yojson.Safe.to_string
-             (T.to_yojson
-                (Map.to_alist
-                   (Map.map network_state.gossip_received ~f:(fun s ->
-                        s.snark_work))))) ;
         network_state.snarked_ledgers_generated > num_proofs)
     |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
          ~hard_timeout:(Slots 10)

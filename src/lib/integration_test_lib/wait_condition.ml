@@ -46,17 +46,13 @@ struct
     }
 
   let network_state ~description ~(f : Network_state.t -> bool) : t =
-    let a_long_time =
-      (* Just something long *)
-      Network_time_span.Literal Core.Time.Span.day
-    in
     let check () (state : Network_state.t) =
       if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = a_long_time
-    ; hard_timeout = a_long_time
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
 
   let nodes_to_initialize nodes =

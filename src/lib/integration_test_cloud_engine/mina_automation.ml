@@ -90,6 +90,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
+        ; work_delay
         ; transaction_capacity
         ; aux_account_balance
         } =
@@ -187,8 +188,8 @@ module Network_config = struct
       { Runtime_config.Proof_keys.level = Some proof_level
       ; sub_windows_per_window = None
       ; ledger_depth = None
-      ; work_delay = None
       ; block_window_duration_ms = None
+      ; work_delay
       ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
