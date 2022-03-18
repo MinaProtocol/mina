@@ -2604,7 +2604,7 @@ module Ledger = struct
         (* TODO: this is not yet working!
            * lacking API to create a proper tx on the JS side (authorization)
         *)
-        T.apply_transaction l##.value
+        T.apply_transaction_pure l##.value
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           ~txn_state_view:
             { snarked_ledger_hash = Field.Constant.zero
