@@ -34,11 +34,11 @@ module type Bool_intf = sig
 
   val all : t list -> t
 
-  type single_failure_status
-
   type failure_status
 
-  val assert_with_failure_status : t -> failure_status -> unit
+  type failure_status_tbl
+
+  val assert_with_failure_status_tbl : t -> failure_status_tbl -> unit
 end
 
 module type Balance_intf = sig
@@ -138,7 +138,7 @@ module Local_state = struct
            , 'ledger
            , 'bool
            , 'comm
-           , 'failure_status )
+           , 'failure_status_tbl )
            t =
         { parties : 'parties
         ; call_stack : 'call_stack
@@ -148,13 +148,14 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
-        ; failure_status : 'failure_status
+        ; failure_status_tbl : 'failure_status_tbl
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
   end]
 
-  let typ parties call_stack token_id excess ledger bool comm failure_status =
+  let typ parties call_stack token_id excess ledger bool comm failure_status_tbl
+      =
     Pickles.Impls.Step.Typ.of_hlistable
       [ parties
       ; call_stack
@@ -164,7 +165,7 @@ module Local_state = struct
       ; excess
       ; ledger
       ; bool
-      ; failure_status
+      ; failure_status_tbl
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -657,14 +658,14 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , Bool.failure_status )
+      , Bool.failure_status_tbl )
       Local_state.t
 
-    val add_check :
-      t -> Public_key.t -> Transaction_status.Failure.t -> Bool.t -> t
+    val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
 
-    val update_failure_status :
-      t -> Public_key.t -> Bool.single_failure_status -> Bool.t -> t
+    val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
+
+    val add_new_failure_status_bucket : t -> t
   end
 
   module Global_state : sig
@@ -777,7 +778,7 @@ module Make (Inputs : Inputs_intf) = struct
          ; full_transaction_commitment : Transaction_commitment.t
          ; amount : Amount.t
          ; bool : Bool.t
-         ; failure : Bool.single_failure_status
+         ; failure : Bool.failure_status
          ; .. >
          as
          'env)
@@ -859,8 +860,8 @@ module Make (Inputs : Inputs_intf) = struct
       in
       ((party, remaining, call_stack), to_pop, local_state)
     in
-    let public_key = Inputs.Party.public_key party in
     let local_state = { local_state with parties = remaining; call_stack } in
+    let local_state = Local_state.add_new_failure_status_bucket local_state in
     let a, inclusion_proof =
       Inputs.Ledger.get_account party local_state.ledger
     in
@@ -888,11 +889,11 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* The fee-payer must increment their nonce. *)
     let local_state =
-      Local_state.add_check local_state public_key Fee_payer_nonce_must_increase
+      Local_state.add_check local_state Fee_payer_nonce_must_increase
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
     let local_state =
-      Local_state.add_check local_state public_key Parties_replay_check_failed
+      Local_state.add_check local_state Parties_replay_check_failed
         Inputs.Bool.(
           Inputs.Party.increment_nonce party
           ||| Inputs.Party.use_full_commitment party
@@ -908,7 +909,7 @@ module Make (Inputs : Inputs_intf) = struct
     let a, local_state =
       let timing = Party.Update.timing party in
       let local_state =
-        Local_state.add_check local_state public_key
+        Local_state.add_check local_state
           Update_not_permitted_timing_existing_account
           Bool.(account_is_new ||| Set_or_keep.is_keep timing)
       in
@@ -929,7 +930,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (* TODO: Should this report 'insufficient balance'? *)
       let local_state =
-        Local_state.add_check local_state public_key Overflow (Bool.not failed1)
+        Local_state.add_check local_state Overflow (Bool.not failed1)
       in
       let fee =
         Amount.of_constant_fee constraint_constants.account_creation_fee
@@ -938,8 +939,7 @@ module Make (Inputs : Inputs_intf) = struct
         Balance.sub_amount_flagged balance fee
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Amount_insufficient_to_create_account
+        Local_state.add_check local_state Amount_insufficient_to_create_account
           Bool.(not (account_is_new &&& failed2))
       in
       let balance =
@@ -955,8 +955,7 @@ module Make (Inputs : Inputs_intf) = struct
         let has_permission =
           Controller.check ~proof_verifies ~signature_verifies controller
         in
-        Local_state.add_check local_state public_key
-          Update_not_permitted_balance
+        Local_state.add_check local_state Update_not_permitted_balance
           Bool.(
             has_permission
             ||| Amount.Signed.(equal (of_unsigned Amount.zero) balance_change))
@@ -978,8 +977,8 @@ module Make (Inputs : Inputs_intf) = struct
             (`Invalid_timing invalid_timing, timing)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Source_minimum_balance_violation (Bool.not invalid_timing)
+        Local_state.add_check local_state Source_minimum_balance_violation
+          (Bool.not invalid_timing)
       in
       let a = Account.set_timing timing a in
       (a, local_state)
@@ -1032,8 +1031,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.edit_state a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_app_state
+        Local_state.add_check local_state Update_not_permitted_app_state
           Bool.(keeping_app_state ||| has_permission)
       in
       let app_state =
@@ -1051,8 +1049,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_verification_key a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_app_state
+        Local_state.add_check local_state Update_not_permitted_app_state
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
       let verification_key =
@@ -1090,8 +1087,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.edit_sequence_state a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_sequence_state
+        Local_state.add_check local_state Update_not_permitted_sequence_state
           Bool.(is_empty ||| has_permission)
       in
       let a =
@@ -1111,8 +1107,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_snapp_uri a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_snapp_uri
+        Local_state.add_check local_state Update_not_permitted_snapp_uri
           Bool.(Set_or_keep.is_keep snapp_uri ||| has_permission)
       in
       let snapp_uri =
@@ -1130,8 +1125,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_token_symbol a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_token_symbol
+        Local_state.add_check local_state Update_not_permitted_token_symbol
           Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
       in
       let token_symbol =
@@ -1161,8 +1155,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let local_state =
         (* Note: only accounts for the default token can delegate. *)
-        Local_state.add_check local_state public_key
-          Update_not_permitted_delegate
+        Local_state.add_check local_state Update_not_permitted_delegate
           Bool.(
             Set_or_keep.is_keep delegate
             ||| has_permission &&& party_token_is_default)
@@ -1185,7 +1178,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.increment_nonce a)
       in
       let local_state =
-        Local_state.add_check local_state public_key Update_not_permitted_nonce
+        Local_state.add_check local_state Update_not_permitted_nonce
           Bool.((not increment_nonce) ||| has_permission)
       in
       let a = Account.set_nonce nonce a in
@@ -1199,8 +1192,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_voting_for a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_voting_for
+        Local_state.add_check local_state Update_not_permitted_voting_for
           Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
       in
       let voting_for =
@@ -1222,8 +1214,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_permissions a)
       in
       let local_state =
-        Local_state.add_check local_state public_key
-          Update_not_permitted_permissions
+        Local_state.add_check local_state Update_not_permitted_permissions
           Bool.(Set_or_keep.is_keep permissions ||| has_permission)
       in
       let permissions =
@@ -1240,7 +1231,7 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
     let local_state =
-      Local_state.update_failure_status local_state public_key failure_status
+      Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
     in
     let success =
@@ -1250,9 +1241,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* The first party must succeed. *)
     Bool.(
-      assert_with_failure_status
+      assert_with_failure_status_tbl
         ((not is_start') ||| success)
-        local_state.failure_status) ;
+        local_state.failure_status_tbl) ;
     let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
@@ -1320,8 +1311,7 @@ module Make (Inputs : Inputs_intf) = struct
       Bool.((not is_last_party) ||| delta_settled)
     in
     let local_state =
-      Local_state.add_check local_state public_key Invalid_fee_excess
-        valid_fee_excess
+      Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
     in
     let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in

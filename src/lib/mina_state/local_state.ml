@@ -26,7 +26,7 @@ let display
      ; excess
      ; ledger
      ; success
-     ; failure_status
+     ; failure_status_tbl
      } :
       t) : display =
   let f x =
@@ -43,8 +43,9 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
-  ; failure_status =
-      Transaction_status.Failure.Table.to_yojson failure_status
+  ; failure_status_tbl =
+      Transaction_status.Failure.Table.to_display failure_status_tbl
+      |> Transaction_status.Failure.Table.display_to_yojson
       |> Yojson.Safe.to_string
   }
 
@@ -57,7 +58,7 @@ let dummy : t =
   ; excess = Amount.zero
   ; ledger = Frozen_ledger_hash.empty_hash
   ; success = true
-  ; failure_status = Signature_lib.Public_key.Compressed.Table.create ()
+  ; failure_status_tbl = []
   }
 
 let empty = dummy
@@ -86,7 +87,7 @@ let gen : t Quickcheck.Generator.t =
   ; ledger
   ; excess
   ; success
-  ; failure_status = Signature_lib.Public_key.Compressed.Table.create ()
+  ; failure_status_tbl = []
   }
 
 let to_input
@@ -98,7 +99,7 @@ let to_input
      ; excess
      ; ledger
      ; success
-     ; failure_status = _
+     ; failure_status_tbl = _
      } :
       t) =
   let open Random_oracle.Input.Chunked in
@@ -132,7 +133,7 @@ module Checked = struct
       ~excess:(f !Currency.Amount.Checked.assert_equal)
       ~ledger:(f !Ledger_hash.assert_equal)
       ~success:(f Impl.Boolean.Assert.( = ))
-      ~failure_status:(f (fun () () -> ()))
+      ~failure_status_tbl:(f (fun () () -> ()))
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
@@ -144,7 +145,7 @@ module Checked = struct
       ~token_id:(f Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Checked.equal)
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
-      ~failure_status:(f (fun () () -> Impl.Boolean.true_))
+      ~failure_status_tbl:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
       ({ parties
@@ -155,7 +156,7 @@ module Checked = struct
        ; excess
        ; ledger
        ; success
-       ; failure_status = _
+       ; failure_status_tbl = _
        } :
         t) =
     (* failure_status is the unit value, no need to represent it *)
@@ -179,8 +180,8 @@ end
 *)
 let failure_status_typ : (unit, Transaction_status.Failure.Table.t) Impl.Typ.t =
   Impl.Typ.transport Impl.Typ.unit
-    ~there:(fun _failure_status -> ())
-    ~back:(fun () -> Signature_lib.Public_key.Compressed.Table.create ())
+    ~there:(fun _failure_status_tbl -> ())
+    ~back:(fun () -> [])
 
 let typ : (Checked.t, t) Impl.Typ.t =
   let open Mina_transaction_logic.Parties_logic.Local_state in

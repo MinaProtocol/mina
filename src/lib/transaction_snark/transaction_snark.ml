@@ -1081,11 +1081,12 @@ module Base = struct
 
           let display _b ~label:_ = ""
 
-          type single_failure_status = unit
-
           type failure_status = unit
 
-          let assert_with_failure_status b _failure_status = Assert.is_true b
+          type failure_status_tbl = unit
+
+          let assert_with_failure_status_tbl b _failure_status_tbl =
+            Assert.is_true b
         end
 
         module Controller = struct
@@ -1804,14 +1805,16 @@ module Base = struct
             , Ledger.t
             , Bool.t
             , Transaction_commitment.t
-            , Bool.failure_status )
+            , Bool.failure_status_tbl )
             Mina_transaction_logic.Parties_logic.Local_state.t
 
-          let add_check (t : t) _public_key _failure b =
+          let add_check (t : t) _failure b =
             { t with success = Bool.(t.success &&& b) }
 
-          let update_failure_status (t : t) _public_key _failure_status b =
-            add_check (t : t) _public_key () b
+          let update_failure_status_tbl (t : t) _failure_status b =
+            add_check (t : t) () b
+
+          let add_new_failure_status_bucket t = t
         end
 
         module Global_state = struct
@@ -1973,7 +1976,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
-          ; failure_status = ()
+          ; failure_status_tbl = ()
           }
         in
         (g, l)
@@ -2044,7 +2047,7 @@ module Base = struct
                   acc
               in
               (* replace any transaction failure with unit value *)
-              (global_state, { local_state with failure_status = () })
+              (global_state, { local_state with failure_status_tbl = () })
             in
             let acc' =
               match party_spec.is_start with
@@ -2055,7 +2058,7 @@ module Base = struct
                       acc
                   in
                   (* replace any transaction failure with unit value *)
-                  (global_state, { local_state with failure_status = () })
+                  (global_state, { local_state with failure_status_tbl = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
