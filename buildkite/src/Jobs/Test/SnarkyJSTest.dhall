@@ -26,7 +26,7 @@ Pipeline.build
       Command.build
         Command.Config::{
             commands = RunInToolchain.runInToolchainBuster ([] : List Text) "buildkite/scripts/test-snarkyjs-bindings.sh"
-          , label = "Run SnarkyJS bindings tests"
+          , label = "SnarkyJS unit tests"
           , key = "snarkyjs-bindings-test"
           , target = Size.XLarge
           , docker = None Docker.Type
