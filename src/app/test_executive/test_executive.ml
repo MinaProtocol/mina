@@ -45,6 +45,7 @@ let tests : test list =
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ]
@@ -245,6 +246,7 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
+  [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
       ~debug:inputs.debug ~test_config:T.config ~images
@@ -255,6 +257,7 @@ let main inputs =
   let error_accumulator_ref = ref None in
   let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
+  [%log trace] "preparing up cleanup phase" ;
   let f_dispatch_cleanup =
     let pause_cleanup_func () =
       if inputs.debug then
@@ -272,6 +275,7 @@ let main inputs =
       ~network_state_writer_ref ~cleanup_deferred_ref
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
+  [%log trace] "attaching signal handler" ;
   Signal.handle Signal.terminating ~f:(fun signal ->
       [%log info] "handling signal %s" (Signal.to_string signal) ;
       let error =
@@ -289,19 +293,22 @@ let main inputs =
              (sprintf
                 !"log engine fatal error: %s"
                 (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-           ~test_result:(Malleable_error.return ()))
+           ~test_result:(Malleable_error.hard_error_string "fatal error"))
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let init_result =
           let open Deferred.Or_error.Let_syntax in
           let lift = Deferred.map ~f:Or_error.return in
+          [%log trace] "initializing network manager" ;
           let%bind net_manager =
             lift @@ Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
+          [%log trace] "deploying network" ;
           let%bind network =
             lift @@ Engine.Network_manager.deploy net_manager
           in
+          [%log trace] "initializing log engine" ;
           let%map log_engine = Engine.Log_engine.create ~logger ~network in
           log_engine_ref := Some log_engine ;
           let event_router =
@@ -310,10 +317,12 @@ let main inputs =
           in
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
+          [%log trace] "beginning to process network events" ;
           let network_state_reader, network_state_writer =
             Dsl.Network_state.listen ~logger event_router
           in
           network_state_writer_ref := Some network_state_writer ;
+          [%log trace] "initializing dsl" ;
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
@@ -323,7 +332,9 @@ let main inputs =
         let%bind network, dsl =
           Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
+        [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize ~logger network in
+        [%log trace] "executing test" ;
         T.run network dsl)
   in
   let exit_reason, test_result =

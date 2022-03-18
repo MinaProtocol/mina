@@ -2014,7 +2014,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
-    O1trace.measure "apply_transaction" (fun () ->
+    O1trace.sync_thread "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
         let txn_global_slot = txn_state_view.global_slot_since_genesis in
         Or_error.map

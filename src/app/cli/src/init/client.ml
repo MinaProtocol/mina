@@ -2276,31 +2276,28 @@ let hash_transaction =
        in
        printf "%s\n" (Transaction_hash.to_base58_check hash))
 
+let humanize_graphql_error
+    ~(graphql_endpoint : Uri.t Cli_lib.Flag.Types.with_name) = function
+  | `Failed_request e ->
+      Error.create "Unable to connect to Mina daemon" () (fun () ->
+          Sexp.List
+            [ List [ Atom "uri"; Atom (Uri.to_string graphql_endpoint.value) ]
+            ; List [ Atom "uri_flag"; Atom graphql_endpoint.name ]
+            ; List [ Atom "error_message"; Atom e ]
+            ])
+  | `Graphql_error e ->
+      Error.createf "GraphQL error: %s" e
+
 let runtime_config =
   Command.async
     ~summary:"Compute the runtime configuration used by a running daemon"
     (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
        ~f:(fun graphql_endpoint () ->
-         let%bind runtime_config =
+         match%bind
            Graphql_client.query
              (Graphql_queries.Runtime_config.make ())
              graphql_endpoint
-           |> Deferred.Result.map_error ~f:(function
-                | `Failed_request e ->
-                    Error.create "Unable to connect to Mina daemon" ()
-                      (fun () ->
-                        Sexp.List
-                          [ List
-                              [ Atom "uri"
-                              ; Atom (Uri.to_string graphql_endpoint.value)
-                              ]
-                          ; List [ Atom "uri_flag"; Atom graphql_endpoint.name ]
-                          ; List [ Atom "error_message"; Atom e ]
-                          ])
-                | `Graphql_error e ->
-                    Error.createf "GraphQL error: %s" e)
-         in
-         match runtime_config with
+         with
          | Ok runtime_config ->
              Format.printf "%s@."
                (Yojson.Basic.pretty_to_string runtime_config#runtimeConfig) ;
@@ -2308,7 +2305,30 @@ let runtime_config =
          | Error err ->
              Format.eprintf
                "Failed to retrieve runtime configuration. Error:@.%s@."
-               (Error.to_string_hum err) ;
+               (Error.to_string_hum
+                  (humanize_graphql_error ~graphql_endpoint err)) ;
+             exit 1))
+
+let thread_graph =
+  Command.async
+    ~summary:
+      "Return a Graphviz Dot graph representation of the internal thread \
+       hierarchy"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         match%bind
+           Graphql_client.query
+             (Graphql_queries.Thread_graph.make ())
+             graphql_endpoint
+         with
+         | Ok graph ->
+             print_endline graph#threadGraph ;
+             return ()
+         | Error e ->
+             Format.eprintf
+               "Failed to retrieve runtime configuration. Error:@.%s@."
+               (Error.to_string_hum
+                  (humanize_graphql_error ~graphql_endpoint e)) ;
              exit 1))
 
 module Visualization = struct
@@ -2434,6 +2454,7 @@ let advanced =
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ("thread-graph", thread_graph)
     ]
 
 let ledger =

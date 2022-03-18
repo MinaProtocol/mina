@@ -121,7 +121,7 @@ let precomputed_values = Precomputed_values.compiled_inputs
 let state_body =
   Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hash.data |> Protocol_state.body))
+        values.protocol_state_with_hashes.data |> Protocol_state.body))
 
 let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 

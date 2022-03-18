@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Mina_base
 open Currency
-open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -305,17 +304,6 @@ struct
 
   let logger = lazy (Logger.create ())
 
-  let time label f =
-    let logger = Lazy.force logger in
-    let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
-    [%log debug]
-      ~metadata:
-        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
-        ]
-      "%s took $time_elapsed" label ;
-    x
-
   module Timer = struct
     module Info = struct
       module Time_span = struct
@@ -481,10 +469,7 @@ struct
     | Ok None ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs)) -> (
-        match%map.Deferred
-          ksprintf time "verify:%s" __LOC__ (fun () ->
-              Verifier.verify ~verifier proofs)
-        with
+        match%map.Deferred Verifier.verify ~verifier proofs with
         | Ok true ->
             Ok res
         | Ok false ->
@@ -503,7 +488,7 @@ struct
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
     match%map
-      time "scan_statement" (fun () ->
+      O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
           scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
@@ -877,14 +862,14 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m ~key:(Mina_state.Protocol_state.hash ps) ~data:ps)
+        State_hash.Map.set m
+          ~key:(State_hash.With_state_hashes.state_hash ps)
+          ~data:ps)
   in
   let protocol_states_assoc =
-    List.filter_map (State_hash.Set.to_list required_state_hashes)
-      ~f:(fun hash ->
-        let open Option.Let_syntax in
-        let%map state = State_hash.Map.find received_state_map hash in
-        (hash, state))
+    List.filter_map
+      (State_hash.Set.to_list required_state_hashes)
+      ~f:(State_hash.Map.find received_state_map)
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc

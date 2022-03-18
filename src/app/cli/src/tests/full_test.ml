@@ -6,7 +6,6 @@ open Mina_base
 open Mina_state
 open Signature_lib
 open Pipe_lib
-open O1trace
 open Init
 open Mina_numbers
 
@@ -114,7 +113,7 @@ let run_test () : unit Deferred.t =
              (Public_key.compress keypair.public_key))
           ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            precomputed_values.protocol_state_with_hashes.hash.state_hash
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
@@ -147,6 +146,7 @@ let run_test () : unit Deferred.t =
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
           }
       in
       let net_config =
@@ -272,7 +272,7 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
-        trace_recurring "build_payment" (fun () ->
+        O1trace.sync_thread "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
               Signed_command_memo.create_from_string_exn

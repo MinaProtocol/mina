@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open O1trace
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
@@ -70,8 +69,9 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       |> Strict_pipe.Writer.write primary_transition_writer) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun envelope ->
-        Network_peer.Envelope.Incoming.data envelope
-        |> Mina_transition.External_transition.Initial_validated.state_hash)
+        ( Network_peer.Envelope.Incoming.data envelope
+        |> Mina_transition.External_transition.Initial_validated.state_hashes )
+          .state_hash)
     |> Mina_base.State_hash.Set.of_list
   in
   let extensions = Transition_frontier.extensions frontier in
@@ -91,28 +91,24 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true )) ;
-  trace_recurring "validator" (fun () ->
-      Transition_handler.Validator.run
-        ~consensus_constants:
-          (Precomputed_values.consensus_constants precomputed_values)
-        ~logger ~trust_system ~time_controller ~frontier
-        ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~unprocessed_transition_cache) ;
+  Transition_handler.Validator.run
+    ~consensus_constants:
+      (Precomputed_values.consensus_constants precomputed_values)
+    ~logger ~trust_system ~time_controller ~frontier
+    ~transition_reader:network_transition_reader ~valid_transition_writer
+    ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
-  trace_recurring "processor" (fun () ->
-      Transition_handler.Processor.run ~logger ~precomputed_values
-        ~time_controller ~trust_system ~verifier ~frontier
-        ~primary_transition_reader ~producer_transition_reader
-        ~clean_up_catchup_scheduler ~catchup_job_writer
-        ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-        ~processed_transition_writer) ;
-  trace_recurring "catchup" (fun () ->
-      Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
-        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-        ~unprocessed_transition_cache) ;
+  Transition_handler.Processor.run ~logger ~precomputed_values ~time_controller
+    ~trust_system ~verifier ~frontier ~primary_transition_reader
+    ~producer_transition_reader ~clean_up_catchup_scheduler ~catchup_job_writer
+    ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+    ~processed_transition_writer ;
+  Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
+    ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+    ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

@@ -312,7 +312,9 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       Result.of_option account ~error:[ Account_not_some ]
     and () =
       if
-        List.for_all ops ~f:(fun op -> Option.equal String.equal op.status None)
+        List.for_all ops ~f:(fun op ->
+            let p = Option.equal String.equal op.status in
+            p None || p (Some ""))
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_x =
@@ -388,7 +390,9 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
           V.fail Account_not_some
     and () =
       if
-        List.for_all ops ~f:(fun op -> Option.equal String.equal op.status None)
+        List.for_all ops ~f:(fun op ->
+            let p = Option.equal String.equal op.status in
+            p None || p (Some ""))
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =

@@ -3,7 +3,6 @@ open Async_kernel
 open Pipe_lib
 open Mina_base
 open Signature_lib
-open O1trace
 
 type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
 
@@ -114,11 +113,12 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
         ( Core.Sys.command
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int )) ;
-  trace_task "subscriptions new block loop" (fun () ->
+  O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
-            new_block
-            |> Mina_transition.External_transition.Validated.state_hash
+            ( new_block
+            |> Mina_transition.External_transition.Validated.state_hashes )
+              .state_hash
           in
           (let path, log = !precomputed_block_writer in
            let precomputed_block =

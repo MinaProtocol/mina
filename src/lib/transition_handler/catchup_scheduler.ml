@@ -87,33 +87,31 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
       Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
           Block_time.Timeout.cancel time_controller timeout ())) ;
   let breadcrumb_builder_supervisor =
-    O1trace.trace_recurring "breadcrumb builder" (fun () ->
-        Capped_supervisor.create ~job_capacity:30
-          (fun (initial_hash, transition_branches) ->
-            match%map
-              Breadcrumb_builder.build_subtrees_of_breadcrumbs
-                ~logger:
-                  (Logger.extend logger
-                     [ ( "catchup_scheduler"
-                       , `String "Called from catchup scheduler" )
-                     ])
-                ~precomputed_values ~verifier ~trust_system ~frontier
-                ~initial_hash transition_branches
-            with
-            | Ok trees_of_breadcrumbs ->
-                Writer.write catchup_breadcrumbs_writer
-                  (trees_of_breadcrumbs, `Catchup_scheduler)
-            | Error err ->
-                [%log debug]
-                  !"Error during buildup breadcrumbs inside catchup_scheduler: \
-                    $error"
-                  ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
-                List.iter transition_branches ~f:(fun subtree ->
-                    Rose_tree.iter subtree ~f:(fun cached_transition ->
-                        ignore
-                          ( Cached.invalidate_with_failure cached_transition
-                            : External_transition.Initial_validated.t
-                              Envelope.Incoming.t )))))
+    Capped_supervisor.create ~job_capacity:30
+      (fun (initial_hash, transition_branches) ->
+        match%map
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs
+            ~logger:
+              (Logger.extend logger
+                 [ ("catchup_scheduler", `String "Called from catchup scheduler")
+                 ])
+            ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+            transition_branches
+        with
+        | Ok trees_of_breadcrumbs ->
+            Writer.write catchup_breadcrumbs_writer
+              (trees_of_breadcrumbs, `Catchup_scheduler)
+        | Error err ->
+            [%log debug]
+              !"Error during buildup breadcrumbs inside catchup_scheduler: \
+                $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+            List.iter transition_branches ~f:(fun subtree ->
+                Rose_tree.iter subtree ~f:(fun cached_transition ->
+                    ignore
+                      ( Cached.invalidate_with_failure cached_transition
+                        : External_transition.Initial_validated.t
+                          Envelope.Incoming.t ))))
   in
   { logger
   ; collected_transitions
@@ -153,8 +151,9 @@ let cancel_timeout t hash =
   remaining_time
 
 let rec extract_subtree t cached_transition =
-  let { With_hash.hash; _ }, _ =
-    Envelope.Incoming.data (Cached.peek cached_transition)
+  let hash =
+    let t, _ = Envelope.Incoming.data (Cached.peek cached_transition) in
+    State_hash.With_state_hashes.state_hash t
   in
   let successors =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
@@ -176,16 +175,14 @@ let rec remove_tree t parent_hash =
     Gauge.dec_one
       Transition_frontier_controller.transitions_in_catchup_scheduler) ;
   List.iter children ~f:(fun child ->
-      let { With_hash.hash; _ }, _ =
-        Envelope.Incoming.data (Cached.peek child)
-      in
-      remove_tree t hash)
+      let transition, _ = Envelope.Incoming.data (Cached.peek child) in
+      remove_tree t (State_hash.With_state_hashes.state_hash transition))
 
 let watch t ~timeout_duration ~cached_transition =
   let transition_with_hash, _ =
     Envelope.Incoming.data (Cached.peek cached_transition)
   in
-  let hash = With_hash.hash transition_with_hash in
+  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
   let parent_hash =
     With_hash.data transition_with_hash |> External_transition.parent_hash
   in
@@ -235,10 +232,11 @@ let watch t ~timeout_duration ~cached_transition =
       if
         List.exists cached_sibling_transitions
           ~f:(fun cached_sibling_transition ->
-            let { With_hash.hash = sibling_hash; _ }, _ =
+            let sibling, _ =
               Envelope.Incoming.data (Cached.peek cached_sibling_transition)
             in
-            State_hash.equal hash sibling_hash)
+            State_hash.equal hash
+              (State_hash.With_state_hashes.state_hash sibling))
       then
         [%log' debug t.logger]
           ~metadata:[ ("state_hash", State_hash.to_yojson hash) ]

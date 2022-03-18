@@ -6,7 +6,6 @@ open Mina_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
-open O1trace
 open Network_peer
 module Archive_client = Archive_client
 module Config = Config
@@ -426,7 +425,6 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                          (fun () ->
                            [%log info]
                              "Offline for too long; restarting libp2p_helper" ;
-                           trace_event "libp2p_helper restart" ;
                            Mina_networking.restart_helper net ;
                            next_helper_restart := None ;
                            match !offline_shutdown with
@@ -521,6 +519,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | Invalidated ->
           ()) ) ;
   (* recompute Mina status on an interval *)
+  let stabilize () = O1trace.sync_thread "stabilize_sync_status" stabilize in
   stabilize () ;
   every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
   observer
@@ -760,7 +759,7 @@ let root_diff t =
     Strict_pipe.create ~name:"root diff"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  trace_recurring_task "root diff pipe reader" (fun () ->
+  O1trace.background_thread "read_root_diffs" (fun () ->
       let open Root_diff.Stable.Latest in
       let length_of_breadcrumb =
         Fn.compose Unsigned.UInt32.to_int
@@ -792,7 +791,8 @@ let root_diff t =
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned { new_root; _ }, _) ->
                       let root_hash =
-                        Transition_frontier.Root_data.Limited.hash new_root
+                        (Transition_frontier.Root_data.Limited.hashes new_root)
+                          .state_hash
                       in
                       let new_root_breadcrumb =
                         Transition_frontier.(find_exn frontier root_hash)
@@ -1275,7 +1275,7 @@ let create ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
-      trace "mina_lib" (fun () ->
+      O1trace.thread "mina_lib" (fun () ->
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1286,7 +1286,7 @@ let create ?wallets (config : Config.t) =
                       "unhandled exception from daemon-side prover server: $exn"
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ]))
               (fun () ->
-                trace "prover" (fun () ->
+                O1trace.thread "manage_prover_subprocess" (fun () ->
                     Prover.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants ~pids:config.pids
@@ -1304,7 +1304,7 @@ let create ?wallets (config : Config.t) =
                        $exn"
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ]))
               (fun () ->
-                trace "verifier" (fun () ->
+                O1trace.thread "manage_verifier_subprocess" (fun () ->
                     Verifier.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants:
@@ -1323,7 +1323,7 @@ let create ?wallets (config : Config.t) =
                        server: $exn"
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ]))
               (fun () ->
-                trace "vrf_evaluator" (fun () ->
+                O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
                     Vrf_evaluator.create ~constraint_constants ~pids:config.pids
                       ~logger:config.logger ~conf_dir:config.conf_dir
                       ~consensus_constants
@@ -1356,7 +1356,8 @@ let create ?wallets (config : Config.t) =
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1)))
                   (fun () ->
-                    trace "uptime SNARK worker" (fun () ->
+                    O1trace.thread "manage_uptimer_snark_worker_subprocess"
+                      (fun () ->
                         Uptime_service.Uptime_snark_worker.create
                           ~logger:config.logger ~pids:config.pids))
                 >>| Result.ok)
@@ -1416,7 +1417,7 @@ let create ?wallets (config : Config.t) =
               | Some frontier ->
                   Transition_frontier.close ~loc:__LOC__ frontier) ;
           let handle_request name ~f query_env =
-            trace_recurring name (fun () ->
+            O1trace.thread ("handle_request_" ^ name) (fun () ->
                 let input = Envelope.Incoming.data query_env in
                 Deferred.return
                 @@
@@ -1430,7 +1431,7 @@ let create ?wallets (config : Config.t) =
           let net_ref = ref None in
           let sync_status_ref = ref None in
           let get_node_status _env =
-            trace_recurring "get_node_status" (fun () ->
+            O1trace.thread "handle_request_get_node_status" (fun () ->
                 let node_ip_addr =
                   config.gossip_net_params.addrs_and_ports.external_ip
                 in
@@ -1469,18 +1470,16 @@ let create ?wallets (config : Config.t) =
                           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                         with
                         | None ->
-                            ( config.precomputed_values.protocol_state_with_hash
+                            ( config.precomputed_values
+                                .protocol_state_with_hashes
                                 .hash
+                                .state_hash
                             , None
                             , [] )
                         | Some frontier ->
                             let tip = Transition_frontier.best_tip frontier in
                             let protocol_state_hash =
-                              let state =
-                                Transition_frontier.Breadcrumb.protocol_state
-                                  tip
-                              in
-                              Mina_state.Protocol_state.hash state
+                              Transition_frontier.Breadcrumb.state_hash tip
                             in
                             let k_breadcrumbs =
                               Transition_frontier.root frontier
@@ -1563,7 +1562,7 @@ let create ?wallets (config : Config.t) =
                         })
           in
           let get_some_initial_peers _ =
-            trace_recurring "get_some_initial_peers" (fun () ->
+            O1trace.thread "handle_request_get_some_initial_peers" (fun () ->
                 match !net_ref with
                 | None ->
                     (* should be unreachable; without a network, we wouldn't receive this RPC call *)
@@ -1574,94 +1573,106 @@ let create ?wallets (config : Config.t) =
                     Mina_networking.peers net)
           in
           let%bind net =
-            Mina_networking.create config.net_config ~get_some_initial_peers
-              ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                (fun query_env ->
-                trace_recurring
-                  "get_staged_ledger_aux_and_pending_coinbases_at_hash"
-                  (fun () ->
-                    let input = Envelope.Incoming.data query_env in
-                    Deferred.return
-                    @@
-                    let open Option.Let_syntax in
-                    let%bind frontier =
-                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                    in
-                    let%map ( scan_state
-                            , expected_merkle_root
-                            , pending_coinbases
-                            , protocol_states ) =
-                      Sync_handler
-                      .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                        ~frontier input
-                    in
-                    let staged_ledger_hash =
-                      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                        (Staged_ledger.Scan_state.hash scan_state)
-                        expected_merkle_root pending_coinbases
-                    in
-                    [%log' debug config.logger]
-                      ~metadata:
-                        [ ( "staged_ledger_hash"
-                          , Staged_ledger_hash.to_yojson staged_ledger_hash )
-                        ]
-                      "sending scan state and pending coinbase" ;
-                    ( scan_state
-                    , expected_merkle_root
-                    , pending_coinbases
-                    , protocol_states )))
-              ~answer_sync_ledger_query:(fun query_env ->
-                let open Deferred.Or_error.Let_syntax in
-                trace_recurring "answer_sync_ledger_query" (fun () ->
-                    let ledger_hash, _ = Envelope.Incoming.data query_env in
-                    let%bind frontier =
-                      Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
-                    in
-                    Sync_handler.answer_query ~frontier ledger_hash
-                      (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                      ~logger:config.logger ~trust_system:config.trust_system
-                    |> Deferred.map
-                       (* begin error string prefix so we can pattern-match *)
-                         ~f:
-                           (Result.of_option
-                              ~error:
-                                (Error.createf
-                                   !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                                   Mina_networking.refused_answer_query_string
-                                   ledger_hash))))
-              ~get_ancestry:
-                (handle_request "get_ancestry"
-                   ~f:
-                     (Sync_handler.Root.prove ~consensus_constants
-                        ~logger:config.logger))
-              ~get_best_tip:
-                (handle_request "get_best_tip" ~f:(fun ~frontier () ->
-                     let open Option.Let_syntax in
-                     let open Proof_carrying_data in
-                     let%map proof_with_data =
-                       Best_tip_prover.prove ~logger:config.logger frontier
-                     in
-                     { proof_with_data with
-                       data = With_hash.data proof_with_data.data
-                     }))
-              ~get_node_status
-              ~get_transition_chain_proof:
-                (handle_request "get_transition_chain_proof"
-                   ~f:(fun ~frontier hash ->
-                     Transition_chain_prover.prove ~frontier hash))
-              ~get_transition_chain:
-                (handle_request "get_transition_chain"
-                   ~f:Sync_handler.get_transition_chain)
-              ~get_transition_knowledge:(fun _q ->
-                trace_recurring "get_transition_knowledge" (fun () ->
-                    return
-                      ( match
+            O1trace.thread "mina_networking" (fun () ->
+                Mina_networking.create config.net_config ~get_some_initial_peers
+                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+                    (fun query_env ->
+                    O1trace.thread
+                      "handle_request_get_staged_ledger_aux_and_pending_coinbases_at_hash"
+                      (fun () ->
+                        let input = Envelope.Incoming.data query_env in
+                        Deferred.return
+                        @@
+                        let open Option.Let_syntax in
+                        let%bind frontier =
                           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        with
-                      | None ->
-                          []
-                      | Some frontier ->
-                          Sync_handler.best_tip_path ~frontier )))
+                        in
+                        let%map ( scan_state
+                                , expected_merkle_root
+                                , pending_coinbases
+                                , protocol_states ) =
+                          Sync_handler
+                          .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                            ~frontier input
+                        in
+                        let staged_ledger_hash =
+                          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+                            (Staged_ledger.Scan_state.hash scan_state)
+                            expected_merkle_root pending_coinbases
+                        in
+                        [%log' debug config.logger]
+                          ~metadata:
+                            [ ( "staged_ledger_hash"
+                              , Staged_ledger_hash.to_yojson staged_ledger_hash
+                              )
+                            ]
+                          "sending scan state and pending coinbase" ;
+                        ( scan_state
+                        , expected_merkle_root
+                        , pending_coinbases
+                        , protocol_states )))
+                  ~answer_sync_ledger_query:(fun query_env ->
+                    let open Deferred.Or_error.Let_syntax in
+                    O1trace.thread "handle_request_answer_sync_ledger_query"
+                      (fun () ->
+                        let ledger_hash, _ = Envelope.Incoming.data query_env in
+                        let%bind frontier =
+                          Deferred.return
+                          @@ peek_frontier frontier_broadcast_pipe_r
+                        in
+                        Sync_handler.answer_query ~frontier ledger_hash
+                          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                          ~logger:config.logger
+                          ~trust_system:config.trust_system
+                        |> Deferred.map
+                           (* begin error string prefix so we can pattern-match *)
+                             ~f:
+                               (Result.of_option
+                                  ~error:
+                                    (Error.createf
+                                       !"%s for ledger_hash: \
+                                         %{sexp:Ledger_hash.t}"
+                                       Mina_networking
+                                       .refused_answer_query_string ledger_hash))))
+                  ~get_ancestry:
+                    (handle_request "get_ancestry" ~f:(fun ~frontier s ->
+                         s
+                         |> With_hash.map_hash ~f:(fun state_hash ->
+                                { State_hash.State_hashes.state_hash
+                                ; state_body_hash = None
+                                })
+                         |> Sync_handler.Root.prove ~consensus_constants
+                              ~logger:config.logger ~frontier))
+                  ~get_best_tip:
+                    (handle_request "get_best_tip" ~f:(fun ~frontier () ->
+                         let open Option.Let_syntax in
+                         let open Proof_carrying_data in
+                         let%map proof_with_data =
+                           Best_tip_prover.prove ~logger:config.logger frontier
+                         in
+                         { proof_with_data with
+                           data = With_hash.data proof_with_data.data
+                         }))
+                  ~get_node_status
+                  ~get_transition_chain_proof:
+                    (handle_request "get_transition_chain_proof"
+                       ~f:(fun ~frontier hash ->
+                         Transition_chain_prover.prove ~frontier hash))
+                  ~get_transition_chain:
+                    (handle_request "get_transition_chain"
+                       ~f:Sync_handler.get_transition_chain)
+                  ~get_transition_knowledge:(fun _q ->
+                    O1trace.thread "handle_request_get_transition_knowledge"
+                      (fun () ->
+                        return
+                          ( match
+                              Broadcast_pipe.Reader.peek
+                                frontier_broadcast_pipe_r
+                            with
+                          | None ->
+                              []
+                          | Some frontier ->
+                              Sync_handler.best_tip_path ~frontier ))))
           in
           (* tie the first knot *)
           net_ref := Some net ;
@@ -1682,13 +1693,12 @@ let create ?wallets (config : Config.t) =
                 config.precomputed_values.genesis_constants.txpool_max_size
           in
           let transaction_pool =
-            trace "transaction_pool" (fun () ->
-                Network_pool.Transaction_pool.create ~config:txn_pool_config
-                  ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
-                  ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
-                  ~local_diffs:local_txns_reader
-                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
+            Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
+              ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
+              ~local_diffs:local_txns_reader
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
@@ -1723,77 +1733,75 @@ let create ?wallets (config : Config.t) =
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
-            trace "transition router" (fun () ->
-                Transition_router.run ~logger:config.logger
-                  ~trust_system:config.trust_system ~verifier ~network:net
-                  ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
-                  ~time_controller:config.time_controller
-                  ~consensus_local_state:config.consensus_local_state
-                  ~persistent_root_location:config.persistent_root_location
-                  ~persistent_frontier_location:
-                    config.persistent_frontier_location
-                  ~frontier_broadcast_pipe:
-                    (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-                  ~catchup_mode
-                  ~network_transition_reader:
-                    (Strict_pipe.Reader.map external_transitions_reader
-                       ~f:(fun (tn, tm, cb) ->
-                         let lift_consensus_time =
-                           Fn.compose UInt32.to_int
-                             Consensus.Data.Consensus_time.to_uint32
-                         in
-                         let tn_production_consensus_time =
-                           External_transition.consensus_time_produced_at
-                             (Envelope.Incoming.data tn)
-                         in
-                         let tn_production_slot =
-                           lift_consensus_time tn_production_consensus_time
-                         in
-                         let tn_production_time =
-                           Consensus.Data.Consensus_time.to_time
-                             ~constants:consensus_constants
-                             tn_production_consensus_time
-                         in
-                         let tm_slot =
-                           lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn
-                                ~constants:consensus_constants tm)
-                         in
-                         Mina_metrics.Block_latency.Gossip_slots.update
-                           (Float.of_int (tm_slot - tn_production_slot)) ;
-                         Mina_metrics.Block_latency.Gossip_time.update
-                           Block_time.(
-                             Span.to_time_span @@ diff tm tn_production_time) ;
-                         (`Transition tn, `Time_received tm, `Valid_cb cb)))
-                  ~producer_transition_reader:
-                    (Strict_pipe.Reader.map producer_transition_reader
-                       ~f:(fun breadcrumb ->
-                         let et =
-                           Transition_frontier.Breadcrumb.validated_transition
-                             breadcrumb
-                         in
-                         let validation_callback =
-                           Mina_net2.Validation_callback
-                           .create_without_expiration ()
-                         in
-                         External_transition.Validated.poke_validation_callback
-                           et validation_callback ;
-                         don't_wait_for
-                           (* this will never throw since the callback was created without expiration *)
-                           (let%map v =
-                              Mina_net2.Validation_callback.await_exn
-                                validation_callback
-                            in
-                            if
-                              Mina_net2.Validation_callback
-                              .equal_validation_result v `Accept
-                            then
-                              Mina_networking.broadcast_state net
-                                (External_transition.Validation
-                                 .forget_validation_with_hash et)) ;
-                         breadcrumb))
-                  ~most_recent_valid_block
-                  ~precomputed_values:config.precomputed_values)
+            Transition_router.run ~logger:config.logger
+              ~trust_system:config.trust_system ~verifier ~network:net
+              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
+              ~time_controller:config.time_controller
+              ~consensus_local_state:config.consensus_local_state
+              ~persistent_root_location:config.persistent_root_location
+              ~persistent_frontier_location:config.persistent_frontier_location
+              ~frontier_broadcast_pipe:
+                (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+              ~catchup_mode
+              ~network_transition_reader:
+                (Strict_pipe.Reader.map external_transitions_reader
+                   ~f:(fun (tn, tm, cb) ->
+                     let lift_consensus_time =
+                       Fn.compose UInt32.to_int
+                         Consensus.Data.Consensus_time.to_uint32
+                     in
+                     let tn_production_consensus_time =
+                       External_transition.consensus_time_produced_at
+                         (Envelope.Incoming.data tn)
+                     in
+                     let tn_production_slot =
+                       lift_consensus_time tn_production_consensus_time
+                     in
+                     let tn_production_time =
+                       Consensus.Data.Consensus_time.to_time
+                         ~constants:consensus_constants
+                         tn_production_consensus_time
+                     in
+                     let tm_slot =
+                       lift_consensus_time
+                         (Consensus.Data.Consensus_time.of_time_exn
+                            ~constants:consensus_constants tm)
+                     in
+                     Mina_metrics.Block_latency.Gossip_slots.update
+                       (Float.of_int (tm_slot - tn_production_slot)) ;
+                     Mina_metrics.Block_latency.Gossip_time.update
+                       Block_time.(
+                         Span.to_time_span @@ diff tm tn_production_time) ;
+                     (`Transition tn, `Time_received tm, `Valid_cb cb)))
+              ~producer_transition_reader:
+                (Strict_pipe.Reader.map producer_transition_reader
+                   ~f:(fun breadcrumb ->
+                     let et =
+                       Transition_frontier.Breadcrumb.validated_transition
+                         breadcrumb
+                     in
+                     let validation_callback =
+                       Mina_net2.Validation_callback.create_without_expiration
+                         ()
+                     in
+                     External_transition.Validated.poke_validation_callback et
+                       validation_callback ;
+                     don't_wait_for
+                       (* this will never throw since the callback was created without expiration *)
+                       (let%map v =
+                          Mina_net2.Validation_callback.await_exn
+                            validation_callback
+                        in
+                        if
+                          Mina_net2.Validation_callback.equal_validation_result
+                            v `Accept
+                        then
+                          Mina_networking.broadcast_state net
+                            (External_transition.Validation
+                             .forget_validation_with_hash et)) ;
+                     breadcrumb))
+              ~most_recent_valid_block
+              ~precomputed_values:config.precomputed_values
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -1807,7 +1815,8 @@ let create ?wallets (config : Config.t) =
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
-          trace_task "transaction pool broadcast loop" (fun () ->
+          O1trace.background_thread "broadcast_transaction_pool_diffs"
+            (fun () ->
               let rl = Network_pool.Transaction_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
@@ -1823,12 +1832,13 @@ let create ?wallets (config : Config.t) =
                   in
                   Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit)) ;
-          trace_task "valid_transitions_for_network broadcast loop" (fun () ->
+          O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
                 ~f:(fun (`Transition transition, `Source source) ->
                   let hash =
-                    External_transition.Validated.state_hash transition
+                    (External_transition.Validated.state_hashes transition)
+                      .state_hash
                   in
                   let consensus_state =
                     transition |> External_transition.Validated.consensus_state
@@ -1916,13 +1926,12 @@ let create ?wallets (config : Config.t) =
               ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
-            trace "snark_pool" (fun () ->
-                Network_pool.Snark_pool.load ~config:snark_pool_config
-                  ~constraint_constants ~consensus_constants
-                  ~time_controller:config.time_controller ~logger:config.logger
-                  ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
-                  ~local_diffs:local_snark_work_reader
-                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r)
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
+              ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
+              ~local_diffs:local_snark_work_reader
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let snark_jobs_state =
             Work_selector.State.init
@@ -1938,7 +1947,7 @@ let create ?wallets (config : Config.t) =
                 Secrets.Wallets.load ~logger:config.logger
                   ~disk_location:config.wallets_disk_location
           in
-          trace_task "snark pool broadcast loop" (fun () ->
+          O1trace.background_thread "broadcast_snark_pool_diffs" (fun () ->
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
@@ -1973,14 +1982,12 @@ let create ?wallets (config : Config.t) =
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
-            trace "coda_subscriptions" (fun () ->
-                Coda_subscriptions.create ~logger:config.logger
-                  ~constraint_constants ~new_blocks ~wallets
-                  ~transition_frontier:frontier_broadcast_pipe_r
-                  ~is_storing_all:config.is_archive_rocksdb
-                  ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
-                  ~time_controller:config.time_controller
-                  ~precomputed_block_writer)
+            Coda_subscriptions.create ~logger:config.logger
+              ~constraint_constants ~new_blocks ~wallets
+              ~transition_frontier:frontier_broadcast_pipe_r
+              ~is_storing_all:config.is_archive_rocksdb
+              ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
+              ~time_controller:config.time_controller ~precomputed_block_writer
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =
@@ -1998,19 +2005,18 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            trace "sync_status_observer" (fun () ->
-                create_sync_status_observer ~logger:config.logger ~net
-                  ~is_seed:config.is_seed ~demo_mode:config.demo_mode
-                  ~transition_frontier_and_catchup_signal_incr
-                  ~online_status_incr:
-                    ( Var.watch @@ of_broadcast_pipe
-                    @@ Mina_networking.online_status net )
-                  ~first_connection_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Mina_networking.on_first_connect net ~f:Fn.id )
-                  ~first_message_incr:
-                    ( Var.watch @@ of_deferred
-                    @@ Mina_networking.on_first_received_message net ~f:Fn.id ))
+            create_sync_status_observer ~logger:config.logger ~net
+              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+              ~transition_frontier_and_catchup_signal_incr
+              ~online_status_incr:
+                ( Var.watch @@ of_broadcast_pipe
+                @@ Mina_networking.online_status net )
+              ~first_connection_incr:
+                ( Var.watch @@ of_deferred
+                @@ Mina_networking.on_first_connect net ~f:Fn.id )
+              ~first_message_incr:
+                ( Var.watch @@ of_deferred
+                @@ Mina_networking.on_first_received_message net ~f:Fn.id )
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
