@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
-open O1trace
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
@@ -273,106 +272,88 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
-        trace_recurring "handle_new_best_tip_ledger" (fun () ->
-            Throttle.enqueue t.snark_table_lock (fun () ->
-                let%map _ =
-                  let open Interruptible.Deferred_let_syntax in
-                  Interruptible.force
-                    (let%bind.Interruptible () =
-                       Interruptible.lift (Deferred.return ())
-                         (Base_ledger.detached_signal ledger)
-                     in
-                     let%bind prover_account_ids =
-                       trace_recurring
-                         "generate account ids of provers in snark table"
-                         (fun () ->
-                           let account_ids =
-                             t.snark_tables.all |> Statement_table.data
-                             |> List.map
-                                  ~f:(fun
-                                       { Priced_proof.fee = { prover; _ }; _ }
-                                     -> prover)
-                             |> List.dedup_and_sort
-                                  ~compare:Public_key.Compressed.compare
-                             |> List.map ~f:(fun prover ->
-                                    ( prover
-                                    , Account_id.create prover Token_id.default
-                                    ))
-                             |> Public_key.Compressed.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_ids))
-                     in
-                     (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                     let%bind prover_account_locations =
-                       trace_recurring
-                         "lookup prover account locations in best tip ledger"
-                         (fun () ->
-                           let account_locations =
-                             prover_account_ids |> Map.data
-                             |> Base_ledger.location_of_account_batch ledger
-                             |> Account_id.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_locations))
-                     in
-                     let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                     let%map () =
-                       trace_recurring
-                         "filter snark table based on best tip ledger"
-                         (fun () ->
-                           let open Deferred.Let_syntax in
-                           Statement_table.fold ~init:Deferred.unit
-                             t.snark_tables.all
-                             ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc
-                                ->
-                               let%bind () = acc in
-                               let%map () = yield () in
-                               let prover_account_exists =
-                                 prover
-                                 |> Map.find_exn prover_account_ids
-                                 |> Map.find_exn prover_account_locations
-                                 |> Option.is_some
-                               in
-                               let keep =
-                                 fee_is_sufficient t ~fee
-                                   ~account_exists:prover_account_exists
-                               in
-                               if not keep then (
-                                 Hashtbl.remove t.snark_tables.all key ;
-                                 Hashtbl.remove t.snark_tables.rebroadcastable
-                                   key )))
-                     in
-                     ())
-                in
-                ()))
+        Throttle.enqueue t.snark_table_lock (fun () ->
+            let%map _ =
+              let open Interruptible.Deferred_let_syntax in
+              Interruptible.force
+                (let%bind.Interruptible () =
+                   Interruptible.lift (Deferred.return ())
+                     (Base_ledger.detached_signal ledger)
+                 in
+                 let%bind prover_account_ids =
+                   let account_ids =
+                     t.snark_tables.all |> Statement_table.data
+                     |> List.map
+                          ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
+                            prover)
+                     |> List.dedup_and_sort
+                          ~compare:Public_key.Compressed.compare
+                     |> List.map ~f:(fun prover ->
+                            (prover, Account_id.create prover Token_id.default))
+                     |> Public_key.Compressed.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ()) ~f:(Fn.const account_ids)
+                 in
+                 (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                 let%bind prover_account_locations =
+                   let account_locations =
+                     prover_account_ids |> Map.data
+                     |> Base_ledger.location_of_account_batch ledger
+                     |> Account_id.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ())
+                     ~f:(Fn.const account_locations)
+                 in
+                 let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
+                 let%map () =
+                   let open Deferred.Let_syntax in
+                   Statement_table.fold ~init:Deferred.unit t.snark_tables.all
+                     ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc ->
+                       let%bind () = acc in
+                       let%map () = yield () in
+                       let prover_account_exists =
+                         prover
+                         |> Map.find_exn prover_account_ids
+                         |> Map.find_exn prover_account_locations
+                         |> Option.is_some
+                       in
+                       let keep =
+                         fee_is_sufficient t ~fee
+                           ~account_exists:prover_account_exists
+                       in
+                       if not keep then (
+                         Hashtbl.remove t.snark_tables.all key ;
+                         Hashtbl.remove t.snark_tables.rebroadcastable key ))
+                 in
+                 ())
+            in
+            ())
 
       let handle_new_refcount_table t
           ({ removed; refcount_table; best_tip_table } :
             Extensions.Snark_pool_refcount.view) =
-        trace_recurring "handle_new_refcount_table" (fun () ->
-            t.ref_table <- Some refcount_table ;
-            t.best_tip_table <- Some best_tip_table ;
-            t.removed_counter <- t.removed_counter + removed ;
-            if t.removed_counter >= removed_breadcrumb_wait then (
-              t.removed_counter <- 0 ;
-              Statement_table.filter_keys_inplace t.snark_tables.all
-                ~f:(fun k ->
-                  let keep = work_is_referenced t k in
-                  if not keep then
-                    Hashtbl.remove t.snark_tables.rebroadcastable k ;
-                  keep) ;
-              Mina_metrics.(
-                Gauge.set Snark_work.snark_pool_size
-                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
-            Deferred.unit)
+        t.ref_table <- Some refcount_table ;
+        t.best_tip_table <- Some best_tip_table ;
+        t.removed_counter <- t.removed_counter + removed ;
+        if t.removed_counter >= removed_breadcrumb_wait then (
+          t.removed_counter <- 0 ;
+          Statement_table.filter_keys_inplace t.snark_tables.all ~f:(fun k ->
+              let keep = work_is_referenced t k in
+              if not keep then Hashtbl.remove t.snark_tables.rebroadcastable k ;
+              keep) ;
+          Mina_metrics.(
+            Gauge.set Snark_work.snark_pool_size
+              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
 
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
-            handle_new_best_tip_ledger t ledger
+            O1trace.thread "apply_new_best_tip_ledger_to_snark_pool" (fun () ->
+                handle_new_best_tip_ledger t ledger)
         | `New_refcount_table refcount_table ->
-            handle_new_refcount_table t refcount_table
+            O1trace.sync_thread "apply_refcount_table_to_snark_pool" (fun () ->
+                handle_new_refcount_table t refcount_table) ;
+            Deferred.unit
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
