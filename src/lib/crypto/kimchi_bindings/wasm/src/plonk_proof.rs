@@ -855,7 +855,7 @@ pub mod to_test {
             // poseidon
             let first_row = Wire::new(1);
             let last_row = Wire::new(12);
-            let rc = oracle::pasta::fp::params().round_constants;
+            let rc = oracle::pasta::fp_kimchi::params().round_constants;
             let (poseidon, _row) =
                 CircuitGate::<Fp>::create_poseidon_gadget(0, [first_row, last_row], &rc);
             gates.extend(poseidon);
@@ -870,16 +870,16 @@ pub mod to_test {
         let group_map = <Affine as CommitmentCurve>::Map::setup();
 
         // create the index
-        let fp_sponge_params = oracle::pasta::fp::params();
+        let fp_sponge_params = oracle::pasta::fp_kimchi::params();
         let cs = ConstraintSystem::<Fp>::create(gates, vec![], fp_sponge_params.clone(), public)
             .unwrap();
         let n = cs.domain.d1.size as usize;
-        let fq_sponge_params = oracle::pasta::fq::params();
+        let fq_sponge_params = oracle::pasta::fq_kimchi::params();
         let (endo_q, _endo_r) = endos::<Other>();
         let mut srs = SRS::create(n);
         srs.add_lagrange_basis(cs.domain.d1);
         let srs = std::sync::Arc::new(srs);
-        let index = Index::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
+        let index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
 
         // witness
         let witness = {
@@ -957,6 +957,7 @@ pub mod to_test {
         ProverProof::create::<
             DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &index, vec![prev]);
+        >(&group_map, witness, &index, vec![prev])
+        .unwrap();
     }
 }
