@@ -8,6 +8,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  (* [%%import "/src/config.mlh"] *)
+
+  module Base58_check = Base58_check.Make (struct
+    let description = "User command memo"
+
+    let version_byte = Base58_check.Version_bytes.user_command_memo
+  end)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -15,8 +23,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  (* DONE BUT UNTESTED: porting send-payments *)
-  (* CURRENTLY: port timed accounts test *)
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
   (* TODO: test snark work *)
@@ -55,55 +61,54 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    (* fee for user commands *)
-    let fee = Currency.Fee.of_int 10_000_000 in
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
       Network.block_producers network
     in
+    (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
+    let amount = Currency.Amount.of_int 2_000_000_000 in
+    let fee = Currency.Fee.of_int 10_000_000 in
+    let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
+    let sender_kp =
+      (Node.network_keypair untimed_node_b |> Option.value_exn).keypair
+    in
+    let sender_pub_key =
+      sender_kp.public_key |> Signature_lib.Public_key.compress
+    in
+    let txn_body =
+      Signed_command_payload.Body.Payment
+        { source_pk = sender_pub_key
+        ; receiver_pk = receiver_pub_key
+        ; token_id = Token_id.default
+        ; amount
+        }
+    in
+    let user_command_input =
+      User_command_input.create ~fee
+        ~fee_token:(Signed_command_payload.Body.token txn_body)
+        ~fee_payer_pk:sender_pub_key ~valid_until:None
+        ~memo:(Signed_command_memo.of_string (Base58_check.encode ""))
+        ~body:txn_body ~signer:sender_pub_key
+        ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
+    in
+    let%bind txn_signed =
+      User_command_input.to_user_command
+        ~get_current_nonce:(fun _ -> failwith "don't call me")
+        ~get_account:(fun _ -> failwith "don't call me")
+        ~constraint_constants:(Engine.Network.constraint_constants network)
+        ~logger user_command_input
+      |> Deferred.bind ~f:Malleable_error.or_hard_error
+    in
+    let (signed_cmmd, _)
+          : Signed_command.t
+            * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
+      txn_signed
+    in
+    (* setup complete *)
     let%bind () =
       section "send a single payment between 2 untimed accounts"
-        (let amount = Currency.Amount.of_int 2_000_000_000 in
-         let fee = Currency.Fee.of_int 10_000_000 in
-         let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
-         let sender_kp =
-           (Node.network_keypair untimed_node_b |> Option.value_exn).keypair
-         in
-         let sender_pub_key =
-           sender_kp.public_key |> Signature_lib.Public_key.compress
-         in
-         let txn_body =
-           Signed_command_payload.Body.Payment
-             { source_pk = sender_pub_key
-             ; receiver_pk = receiver_pub_key
-             ; token_id = Token_id.default
-             ; amount
-             }
-         in
-         let user_command_input =
-           User_command_input.create ~fee
-             ~fee_token:(Signed_command_payload.Body.token txn_body)
-             ~fee_payer_pk:sender_pub_key ~valid_until:None
-             ~memo:
-               (Signed_command_memo.of_string "payment from node b to node a")
-             ~body:txn_body ~signer:sender_pub_key
-             ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
-         in
-         let%bind txn_signed =
-           User_command_input.to_user_command
-             ~get_current_nonce:(fun _ -> failwith "don't call me")
-             ~get_account:(fun _ -> failwith "don't call me")
-             ~constraint_constants:(Engine.Network.constraint_constants network)
-             ~logger user_command_input
-           |> Deferred.bind ~f:Malleable_error.or_hard_error
-         in
-         let (signed_cmmd, _)
-               : Signed_command.t
-                 * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
-           txn_signed
-         in
-         let%bind { nonce; _ } =
+        (let%bind { nonce; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
@@ -126,6 +131,49 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
               ~command_type:Send_payment))
+    in
+    let%bind () =
+      section
+        "attempt to send again the same signed transaction command as before \
+         to conduct a replay attack"
+        (let open Deferred.Let_syntax in
+        match%bind
+          Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
+            ~sender_pub_key:
+              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+            ~receiver_pub_key:
+              (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
+            ~amount:
+              ( Signed_command_payload.amount signed_cmmd.payload
+              |> Option.value_exn )
+            ~fee:(Signed_command_payload.fee signed_cmmd.payload)
+            ~nonce:signed_cmmd.payload.common.nonce
+            ~memo:
+              (Signed_command_memo.to_string signed_cmmd.payload.common.memo)
+            ~token:(Signed_command_payload.token signed_cmmd.payload)
+            ~valid_until:signed_cmmd.payload.common.valid_until
+            ~raw_signature:
+              (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+        with
+        | Ok { nonce; _ } ->
+            Malleable_error.soft_error_format ~value:()
+              "Replay attack succeeded, but it should fail because the nonce \
+               is old.  attempted nonce: %d"
+              (Unsigned.UInt32.to_int nonce)
+        | Error error ->
+            (* expect GraphQL error due to bad nonce *)
+            let err_str = Error.to_string_mach error in
+            let err_str_lowercase = String.lowercase err_str in
+            if String.is_substring ~substring:"dsafsdfasfasdf" err_str_lowercase
+            then (
+              [%log info] "Got expected bad nonce error from GraphQL" ;
+              Malleable_error.return () )
+            else (
+              [%log error]
+                "Payment failed in GraphQL, but for unexpected reason: %s"
+                err_str ;
+              Malleable_error.soft_error_format ~value:()
+                "Payment failed for unexpected reason: %s" err_str ))
     in
     (* let%bind () =
          section "send a single payment between 2 untimed accounts"
