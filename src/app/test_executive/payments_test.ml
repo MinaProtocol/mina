@@ -85,7 +85,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            User_command_input.create ~fee
              ~fee_token:(Signed_command_payload.Body.token txn_body)
              ~fee_payer_pk:sender_pub_key ~valid_until:None
-             ~memo:(Signed_command_memo.of_string "")
+             ~memo:
+               (Signed_command_memo.of_string "payment from node b to node a")
              ~body:txn_body ~signer:sender_pub_key
              ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
          in
