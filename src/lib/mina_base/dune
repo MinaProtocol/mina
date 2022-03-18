@@ -35,7 +35,6 @@
    signature_lib
    rosetta_coding
    random_oracle
-   o1trace
    hash_prefix_states
    dummy_values
    currency
