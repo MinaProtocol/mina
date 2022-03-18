@@ -338,12 +338,12 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
    - for user commands, the tables user_commands and blocks_user_commands
      we compare those against the same-named values in the balances row
 *)
-let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
+let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token
     ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error :
     unit Deferred.t =
   let%bind pk = pk_of_pk_id pool pk_id in
   let%bind balance_info = balance_info_of_id pool ~id:balance_id in
-  let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
+  let token = Token_id.of_string token in
   let account_id = Account_id.create pk token in
   let account =
     match Ledger.location_of_account ledger account_id with
@@ -608,7 +608,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
     cmd.secondary_sequence_no ;
   let%bind receiver_pk = pk_of_pk_id pool cmd.receiver_id in
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
-  let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
+  let fee_token = Token_id.of_string cmd.token in
   let txn_global_slot =
     cmd.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
@@ -622,7 +622,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   in
   let pk_id = cmd.receiver_id in
   let balance_id = cmd.receiver_balance_id in
-  let token_int64 = cmd.token in
+  let token = cmd.token in
   let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
   let balance_block_data = internal_command_to_balance_block_data cmd in
   let open Ledger in
@@ -642,7 +642,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
-            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
+            ~balance_id ~pk_id ~token ~balance_block_data ~set_nonces
             ~repair_nonces ~continue_on_error
       | Error err ->
           fail_on_error err )
@@ -680,7 +680,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       match undo_or_error with
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
-            ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
+            ~balance_id ~pk_id ~token ~balance_block_data ~set_nonces
             ~repair_nonces ~continue_on_error
       | Error err ->
           fail_on_error err )
@@ -691,9 +691,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       in
       let%bind () =
         verify_balance ~logger ~pool ~ledger
-          ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id
-          ~token_int64 ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
+          ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id ~token
+          ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error
       in
       (* the actual application is in the "coinbase" case *)
       Deferred.unit
@@ -710,7 +709,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
       failwithf "Expected fee transfer, got: %s" cmd.type_ () ;
     let%map receiver_pk = pk_of_pk_id pool cmd.receiver_id in
     let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
-    let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
+    let fee_token = Token_id.of_string cmd.token in
     Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token
   in
   let%bind fee_transfer1 = fee_transfer_of_cmd cmd1 in
@@ -737,13 +736,13 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
       let%bind () =
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance_id ~pk_id:cmd1.receiver_id
-          ~token_int64:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
+          ~token:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
           ~continue_on_error
       in
       let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance_id ~pk_id:cmd2.receiver_id
-        ~token_int64:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
+        ~token:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
         ~continue_on_error
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
@@ -753,20 +752,12 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
 
 module User_command_helpers = struct
   let body_of_sql_user_cmd pool
-      ({ type_
-       ; source_id
-       ; receiver_id
-       ; token = tok
-       ; amount
-       ; global_slot_since_genesis
-       ; _
-       } :
+      ({ type_; source_id; receiver_id; amount; global_slot_since_genesis; _ } :
         Sql.User_command.t) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
     let%bind source_pk = pk_of_pk_id pool source_id in
     let%map receiver_pk = pk_of_pk_id pool receiver_id in
-    let token_id = Token_id.of_uint64 (Unsigned.UInt64.of_int64 tok) in
     let amount =
       Option.map amount
         ~f:(Fn.compose Currency.Amount.of_uint64 Unsigned.UInt64.of_int64)
@@ -778,36 +769,11 @@ module User_command_helpers = struct
           failwithf "Payment at global slot since genesis %Ld has NULL amount"
             global_slot_since_genesis () ;
         let amount = Option.value_exn amount in
-        Payment
-          Payment_payload.Poly.{ source_pk; receiver_pk; token_id; amount }
+        Payment Payment_payload.Poly.{ source_pk; receiver_pk; amount }
     | "delegation" ->
         Stake_delegation
           (Stake_delegation.Set_delegate
              { delegator = source_pk; new_delegate = receiver_pk })
-    | "create_token" ->
-        Create_new_token
-          { New_token_payload.token_owner_pk = source_pk
-          ; disable_new_accounts = false
-          }
-    | "create_account" ->
-        Create_token_account
-          { New_account_payload.token_id
-          ; token_owner_pk = source_pk
-          ; receiver_pk
-          ; account_disabled = false
-          }
-    | "mint_tokens" ->
-        if Option.is_none amount then
-          failwithf
-            "Mint token at global slot since genesis %Ld has NULL amount"
-            global_slot_since_genesis () ;
-        let amount = Option.value_exn amount in
-        Mint_tokens
-          { Minting_payload.token_id
-          ; token_owner_pk = source_pk
-          ; receiver_pk
-          ; amount
-          }
     | _ ->
         failwithf "Invalid user command type: %s" type_ ()
 end
@@ -828,7 +794,6 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
   let payload =
     Signed_command_payload.create
       ~fee:(Currency.Fee.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee)
-      ~fee_token:(Token_id.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee_token)
       ~fee_payer_pk
       ~nonce:(Unsigned.UInt32.of_int64 cmd.nonce)
       ~valid_until ~memo ~body
@@ -857,25 +822,13 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
   with
   | Ok _undo ->
       (* verify balances in database against current ledger *)
-      let token_int64 =
-        (* if the command is "create token", the token for the command is 0 (meaning unused),
-           and the balance is for source/receiver account using the new token
-        *)
-        match (cmd.token, cmd.created_token) with
-        | 0L, Some token ->
-            token
-        | n, Some m ->
-            failwithf "New token %Ld in user command with nonzero token %Ld" n m
-              ()
-        | _, None ->
-            cmd.token
-      in
+      let token = Token_id.(to_string default) in
       let balance_block_data = user_command_to_balance_block_data cmd in
       let%bind () =
         match cmd.source_balance_id with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
-              ~pk_id:cmd.source_id ~token_int64 ~balance_block_data ~set_nonces
+              ~pk_id:cmd.source_id ~token ~balance_block_data ~set_nonces
               ~repair_nonces ~continue_on_error
         | None ->
             return ()
@@ -884,15 +837,15 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         match cmd.receiver_balance_id with
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
-              ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
-              ~set_nonces ~repair_nonces ~continue_on_error
+              ~pk_id:cmd.receiver_id ~token ~balance_block_data ~set_nonces
+              ~repair_nonces ~continue_on_error
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance_id ~pk_id:cmd.fee_payer_id
-        ~token_int64:cmd.fee_token ~balance_block_data ~set_nonces
-        ~repair_nonces ~continue_on_error
+        ~token:cmd.fee_token ~balance_block_data ~set_nonces ~repair_nonces
+        ~continue_on_error
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -924,10 +877,6 @@ module Snapp_helpers = struct
     in
     let snarked_ledger_hash =
       Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
-    in
-    let snarked_next_available_token =
-      parent_block.next_available_token |> Unsigned.UInt64.of_int64
-      |> Token_id.of_uint64
     in
     let timestamp = parent_block.timestamp |> Block_time.of_int64 in
     let blockchain_length =
@@ -1003,7 +952,6 @@ module Snapp_helpers = struct
     let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
     return
       { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
-      ; snarked_next_available_token
       ; timestamp
       ; blockchain_length
       ; min_window_density
@@ -1172,9 +1120,7 @@ module Snapp_helpers = struct
       ; voting_for
       }
     in
-    let token_id =
-      body_data.token_id |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-    in
+    let token_id = body_data.token_id |> Token_id.of_string in
     let balance_change =
       let magnitude =
         body_data.balance_change |> Int64.abs |> Unsigned.UInt64.of_int64
@@ -1215,23 +1161,6 @@ module Snapp_helpers = struct
           in
           Snapp_predicate.Hash.Check
             (Frozen_ledger_hash.of_base58_check_exn hash_str)
-    in
-    let%bind snarked_next_available_token =
-      match protocol_state_data.snarked_next_available_token_id with
-      | None ->
-          return Snapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp token id bounds" ~f:(fun db ->
-                Processor.Snapp_token_id_bounds.load db id)
-          in
-          let to_token_id i64 =
-            i64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-          in
-          let lower = to_token_id bounds.token_id_lower_bound in
-          let upper = to_token_id bounds.token_id_upper_bound in
-          Snapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind timestamp =
       match protocol_state_data.timestamp_id with
@@ -1370,7 +1299,6 @@ module Snapp_helpers = struct
     in
     let protocol_state : Snapp_predicate.Protocol_state.t =
       { snarked_ledger_hash
-      ; snarked_next_available_token
       ; timestamp
       ; blockchain_length
       ; min_window_density

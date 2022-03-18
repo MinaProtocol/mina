@@ -1,5 +1,18 @@
-open Marlin_plonk_bindings
+open Kimchi
 open Js_of_ocaml
+module Bigint_256 = Foundations.BigInt256
+module Pasta_fp = Foundations.Fp
+module Pasta_fq = Foundations.Fq
+module Pasta_fp_vector = FieldVectors.Fp
+module Pasta_fq_vector = FieldVectors.Fq
+module Pasta_pallas = Pallas
+module Pasta_vesta = Vesta
+module Pasta_fp_urs = Protocol.SRS.Fp
+module Pasta_fq_urs = Protocol.SRS.Fq
+module Pasta_fp_index = Protocol.Index.Fp
+module Pasta_fq_index = Protocol.Index.Fq
+module Pasta_fp_verifier_index = Protocol.VerifierIndex.Fp
+module Pasta_fq_verifier_index = Protocol.VerifierIndex.Fq
 
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
 imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
@@ -121,13 +134,13 @@ let _ =
 
        method print x = print x
 
-       method copy x y = copy ~over:x y
+       method copy x y = copy x y
 
-       method mutAdd x y = mut_add x ~other:y
+       method mutAdd x y = mut_add x y
 
-       method mutSub x y = mut_sub x ~other:y
+       method mutSub x y = mut_sub x y
 
-       method mutMul x y = mut_sub x ~other:y
+       method mutMul x y = mut_sub x y
 
        method mutSquare x = mut_square x
 
@@ -186,13 +199,13 @@ let _ =
 
        method print x = print x
 
-       method copy x y = copy ~over:x y
+       method copy x y = copy x y
 
-       method mutAdd x y = mut_add x ~other:y
+       method mutAdd x y = mut_add x y
 
-       method mutSub x y = mut_sub x ~other:y
+       method mutSub x y = mut_sub x y
 
-       method mutMul x y = mut_sub x ~other:y
+       method mutMul x y = mut_sub x y
 
        method mutSquare x = mut_square x
 
@@ -284,14 +297,14 @@ let _ =
              | None ->
                  assert false ) ) ;
          print twenty_one ;
-         copy ~over:eleven twenty_one ;
+         copy eleven twenty_one ;
          assert (equal eleven twenty_one) ;
          assert (String.equal (to_string eleven) "21") ;
-         mut_add one_again ~other:ten ;
+         mut_add one_again ten ;
          assert (String.equal (to_string one_again) "11") ;
-         mut_sub one_again ~other:one ;
+         mut_sub one_again one ;
          assert (String.equal (to_string one_again) "10") ;
-         mut_mul one_again ~other:ten ;
+         mut_mul one_again ten ;
          assert (String.equal (to_string one_again) "100") ;
          mut_square one_again ;
          assert (String.equal (to_string one_again) "10000") ;
@@ -343,14 +356,14 @@ let _ =
              | None ->
                  assert false ) ) ;
          print twenty_one ;
-         copy ~over:eleven twenty_one ;
+         copy eleven twenty_one ;
          assert (equal eleven twenty_one) ;
          assert (String.equal (to_string eleven) "21") ;
-         mut_add one_again ~other:ten ;
+         mut_add one_again ten ;
          assert (String.equal (to_string one_again) "11") ;
-         mut_sub one_again ~other:one ;
+         mut_sub one_again one ;
          assert (String.equal (to_string one_again) "10") ;
-         mut_mul one_again ~other:ten ;
+         mut_mul one_again ten ;
          assert (String.equal (to_string one_again) "100") ;
          mut_square one_again ;
          assert (String.equal (to_string one_again) "10000") ;
@@ -423,9 +436,9 @@ let _ =
 
 let eq_affine ~field_equal x y =
   match (x, y) with
-  | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
+  | Foundations.Infinity, Foundations.Infinity ->
       true
-  | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2) ->
+  | Foundations.Finite (x1, y1), Foundations.Finite (x2, y2) ->
       field_equal x1 x2 && field_equal y1 y2
   | _ ->
       false
@@ -466,9 +479,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Types.Or_infinity.Infinity ->
-               of_affine Types.Or_infinity.Infinity
-           | Types.Or_infinity.Finite (x, y) ->
+           | Foundations.Infinity ->
+               of_affine Foundations.Infinity
+           | Foundations.Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -501,12 +514,12 @@ let _ =
              (Pasta_fq.to_string endo_scalar)
              "26005156700822196841419187675678338661165322343552424574062261873906994770353"
          ) ;
-         let one_copied = affine_deep_copy affine_one in
+         let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
-         let infinity_copied = affine_deep_copy affine_infinity in
+         let infinity_copied = deep_copy affine_infinity in
          assert (eq affine_infinity infinity_copied) ;
          assert (eq affine_infinity Infinity) ;
-         let infinity_copied_ = affine_deep_copy Infinity in
+         let infinity_copied_ = deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
     end)
 
@@ -546,9 +559,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Types.Or_infinity.Infinity ->
-               of_affine Types.Or_infinity.Infinity
-           | Types.Or_infinity.Finite (x, y) ->
+           | Foundations.Infinity ->
+               of_affine Foundations.Infinity
+           | Foundations.Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -581,27 +594,27 @@ let _ =
              (Pasta_fp.to_string endo_scalar)
              "8503465768106391777493614032514048814691664078728891710322960303815233784505"
          ) ;
-         let one_copied = affine_deep_copy affine_one in
+         let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
-         let infinity_copied = affine_deep_copy affine_infinity in
+         let infinity_copied = deep_copy affine_infinity in
          assert (eq affine_infinity infinity_copied) ;
          assert (eq affine_infinity Infinity) ;
-         let infinity_copied_ = affine_deep_copy Infinity in
+         let infinity_copied_ = deep_copy Foundations.Infinity in
          assert (eq infinity_copied_ Infinity)
     end)
 
-let eq_poly_comm ~field_equal (x : _ Types.Poly_comm.t)
-    (y : _ Types.Poly_comm.t) =
+let eq_poly_comm ~field_equal (x : _ Protocol.poly_comm)
+    (y : _ Protocol.poly_comm) =
   Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
   && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
 
-module Backend = Zexe_backend.Pasta.Pallas_based_plonk
+module Backend = Kimchi_backend.Pasta.Pallas_based_plonk
 
 let () = Backend.Keypair.set_urs_info []
 
 module Impl =
   Snarky_backendless.Snark.Run.Make
-    (Zexe_backend.Pasta.Pallas_based_plonk)
+    (Kimchi_backend.Pasta.Pallas_based_plonk)
     (Unit)
 
 let _ =
@@ -627,15 +640,14 @@ let _ =
            ()
          in
          let input = Data_spec.[ Typ.field ] in
-         let _kp =
+         let _pk =
            time "generate_keypair" (fun () ->
-               generate_keypair ~exposing:input main)
+               constraint_system ~exposing:input main |> Backend.Keypair.create)
          in
-         let kp =
+         let pk =
            time "generate_keypair2" (fun () ->
-               generate_keypair ~exposing:input main)
+               constraint_system ~exposing:input main |> Backend.Keypair.create)
          in
-         let pk = Keypair.pk kp in
          let x = Backend.Field.of_int 2 in
          let pi =
            time "generate witness conv" (fun () ->
@@ -646,7 +658,7 @@ let _ =
                          ~primary:public_inputs))
                  () x)
          in
-         let vk = Keypair.vk kp in
+         let vk = Backend.Keypair.vk pk in
          let vec = Backend.Field.Vector.create () in
          Backend.Field.Vector.emplace_back vec x ;
          assert (time "verify proof" (fun () -> Backend.Proof.verify pi vk vec))
@@ -673,10 +685,7 @@ let _ =
           let inputs =
             time "inputs" (fun () -> Array.init n (fun i -> Pasta_fp.of_int i))
           in
-          let _ =
-            time "commit" (fun () ->
-                commit_evaluations urs ~domain_size:n inputs)
-          in
+          let _ = time "commit" (fun () -> commit_evaluations urs n inputs) in
           let _ =
             let xs = Array.init log_n (fun _ -> Pasta_fp.random ()) in
             time "b_poly" (fun () -> b_poly_commitment urs xs)
@@ -686,12 +695,12 @@ let _ =
          let eq = eq_poly_comm ~field_equal:Pasta_fq.equal in
          let first = create 10 in
          let second = create 16 in
-         let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
-         let lcomm1_again = lagrange_commitment second ~domain_size:8 0 in
+         let lcomm1 = lagrange_commitment first 8 0 in
+         let lcomm1_again = lagrange_commitment second 8 0 in
          assert (eq lcomm1 lcomm1_again) ;
          let inputs = Pasta_fp.[| of_int 1; of_int 2; of_int 3; of_int 4 |] in
-         let commits = commit_evaluations second ~domain_size:8 inputs in
-         let commits_again = commit_evaluations second ~domain_size:8 inputs in
+         let commits = commit_evaluations second 8 inputs in
+         let commits_again = commit_evaluations second 8 inputs in
          assert (eq commits commits_again) ;
          let inputs2 = Array.init 64 Pasta_fp.of_int in
          let affines =
@@ -701,10 +710,10 @@ let _ =
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
-         let h_first = h first in
-         let h_second = h second in
-         let h_first_again = Pasta_vesta.affine_deep_copy h_first in
-         let h_second_again = Pasta_vesta.affine_deep_copy h_second in
+         let h_first = urs_h first in
+         let h_second = urs_h second in
+         let h_first_again = Pasta_vesta.deep_copy h_first in
+         let h_second_again = Pasta_vesta.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
     end)
@@ -718,12 +727,12 @@ let _ =
          let eq = eq_poly_comm ~field_equal:Pasta_fp.equal in
          let first = create 10 in
          let second = create 16 in
-         let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
-         let lcomm1_again = lagrange_commitment second ~domain_size:8 0 in
+         let lcomm1 = lagrange_commitment first 8 0 in
+         let lcomm1_again = lagrange_commitment second 8 0 in
          assert (eq lcomm1 lcomm1_again) ;
          let inputs = Pasta_fq.[| of_int 1; of_int 2; of_int 3; of_int 4 |] in
-         let commits = commit_evaluations second ~domain_size:8 inputs in
-         let commits_again = commit_evaluations second ~domain_size:8 inputs in
+         let commits = commit_evaluations second 8 inputs in
+         let commits_again = commit_evaluations second 8 inputs in
          assert (eq commits commits_again) ;
          let inputs2 = Array.init 64 Pasta_fq.of_int in
          let affines =
@@ -733,34 +742,36 @@ let _ =
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
-         let h_first = h first in
-         let h_second = h second in
-         let h_first_again = Pasta_pallas.affine_deep_copy h_first in
-         let h_second_again = Pasta_pallas.affine_deep_copy h_second in
+         let h_first = urs_h first in
+         let h_second = urs_h second in
+         let h_first_again = Pasta_pallas.deep_copy h_first in
+         let h_second_again = Pasta_pallas.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
     end)
 
-let mk_wires kind i (r1, c1) (r2, c2) (r3, c3) c : _ Types.Plonk_gate.t =
-  { kind
+let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ Protocol.circuit_gate =
+  { typ
   ; wires =
-      { row = i
-      ; l = { row = r1; col = c1 }
-      ; r = { row = r2; col = c2 }
-      ; o = { row = r3; col = c3 }
-      }
-  ; c
+      ( { row = r1; col = c1 }
+      , { row = r2; col = c2 }
+      , { row = r3; col = c3 }
+      , { row = i; col = 3 }
+      , { row = i; col = 4 }
+      , { row = i; col = 5 }
+      , { row = i; col = 6 } )
+  ; coeffs
   }
 
 let _ =
-  let open Pasta_fp_index.Gate_vector in
+  let open Protocol.Gates.Vector.Fp in
   Js.export "pasta_fp_gate_vector_test"
     (object%js (_self)
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Types.Plonk_gate.kind = kind1; wires = wires1; c = c1 }
-             { Types.Plonk_gate.kind = kind2; wires = wires2; c = c2 } =
+         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
+             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fp.equal c1 c2 with _ -> false
          in
@@ -774,29 +785,39 @@ let _ =
              assert false )
          in
          let rand_fields i = Array.init i Pasta_fp.rng in
-         let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (rand_fields 0) in
+         let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (rand_fields 0) in
          let generic =
-           mk_wires Generic 1 (1, L) (1, R) (1, O) (rand_fields 1)
+           mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
          in
-         let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (rand_fields 2) in
-         let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (rand_fields 3) in
-         let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (rand_fields 5) in
-         let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (rand_fields 10) in
-         let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (rand_fields 20) in
+         let add1 =
+           mk_wires CompleteAdd 1 (1, 0) (1, 1) (1, 2) (rand_fields 2)
+         in
+         let add2 =
+           mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+         in
+         let vbmul1 =
+           mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+         in
+         let vbmul2 =
+           mk_wires VarBaseMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+         in
+         let vbmul3 =
+           mk_wires VarBaseMul 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+         in
          let endomul1 =
-           mk_wires Endomul1 6 (6, L) (6, R) (6, O) (rand_fields 30)
+           mk_wires EndoMul 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
          in
          let endomul2 =
-           mk_wires Endomul2 7 (7, L) (7, R) (7, O) (rand_fields 31)
+           mk_wires EndoMul 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
          in
          let endomul3 =
-           mk_wires Endomul3 8 (8, L) (8, R) (8, O) (rand_fields 32)
+           mk_wires EndoMul 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
          in
          let endomul4 =
-           mk_wires Endomul4 9 (9, L) (9, R) (9, O) (rand_fields 33)
+           mk_wires EndoMul 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
          in
          let poseidon =
-           mk_wires Poseidon 10 (10, L) (10, R) (10, O) (rand_fields 34)
+           mk_wires Poseidon 10 (10, 0) (10, 1) (10, 2) (rand_fields 34)
          in
          let all =
            [ zero
@@ -818,52 +839,58 @@ let _ =
            List.iteri
              (fun i x -> assert_eq_or_log ~extra:i ~loc:__LOC__ x (get vec i))
              all ;
-           wrap vec zero.wires.l zero.wires.r ;
+           let l, r, o, _, _, _, _ = zero.wires in
+           wrap vec l r ;
            assert_eq_or_log ~loc:__LOC__ (get vec 0)
-             (mk_wires Zero 0 (0, R) (0, R) (0, O) zero.c) ;
-           wrap vec zero.wires.o zero.wires.l ;
+             (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs) ;
+           wrap vec o l ;
            assert_eq_or_log ~loc:__LOC__ (get vec 0)
-             (mk_wires Zero 0 (0, R) (0, R) (0, L) zero.c)
+             (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
          in
          test_vec vec1 ; test_vec vec2
     end)
 
 let _ =
-  let open Pasta_fq_index.Gate_vector in
+  let open Protocol.Gates.Vector.Fq in
   Js.export "pasta_fq_gate_vector_test"
     (object%js (_self)
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Types.Plonk_gate.kind = kind1; wires = wires1; c = c1 }
-             { Types.Plonk_gate.kind = kind2; wires = wires2; c = c2 } =
+         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
+             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fq.equal c1 c2 with _ -> false
          in
          let rand_fields i = Array.init i Pasta_fq.rng in
-         let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (rand_fields 0) in
+         let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (rand_fields 0) in
          let generic =
-           mk_wires Generic 1 (1, L) (1, R) (1, O) (rand_fields 1)
+           mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
          in
-         let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (rand_fields 2) in
-         let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (rand_fields 3) in
-         let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (rand_fields 5) in
-         let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (rand_fields 10) in
-         let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (rand_fields 20) in
+         let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (rand_fields 2) in
+         let add2 =
+           mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+         in
+         let vbmul1 =
+           mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+         in
+         let vbmul2 =
+           mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+         in
+         let vbmul3 =
+           mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+         in
          let endomul1 =
-           mk_wires Endomul1 6 (6, L) (6, R) (6, O) (rand_fields 30)
+           mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
          in
          let endomul2 =
-           mk_wires Endomul2 7 (7, L) (7, R) (7, O) (rand_fields 31)
+           mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
          in
          let endomul3 =
-           mk_wires Endomul3 8 (8, L) (8, R) (8, O) (rand_fields 32)
+           mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
          in
          let endomul4 =
-           mk_wires Endomul4 9 (9, L) (9, R) (9, O) (rand_fields 33)
-         in
-         let poseidon =
-           mk_wires Poseidon 10 (10, L) (10, R) (10, O) (rand_fields 34)
+           mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
          in
          let all =
            [ zero
@@ -877,16 +904,20 @@ let _ =
            ; endomul2
            ; endomul3
            ; endomul4
-           ; poseidon
            ]
          in
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
-           wrap vec zero.wires.l zero.wires.r ;
-           assert (eq (get vec 0) (mk_wires Zero 0 (0, R) (0, R) (0, O) zero.c)) ;
-           wrap vec zero.wires.o zero.wires.l ;
-           assert (eq (get vec 0) (mk_wires Zero 0 (0, R) (0, R) (0, L) zero.c))
+           let l, r, o, _, _, _, _ = zero.wires in
+           wrap vec l r ;
+           assert (
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs)
+           ) ;
+           wrap vec o l ;
+           assert (
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
+           )
          in
          test_vec vec1 ; test_vec vec2
     end)
@@ -897,49 +928,26 @@ let _ =
     (object%js (_self)
        method run =
          let gate_vector =
-           let open Gate_vector in
+           let open Protocol.Gates.Vector.Fp in
            let vec = create () in
            let fields = Array.map Pasta_fp.of_int in
-           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (fields [||]) in
            let generic =
-             mk_wires Generic 1 (1, L) (1, R) (1, O)
+             mk_wires Generic 1 (1, 0) (1, 1) (1, 2)
                (fields [| 0; 0; 0; 0; 0 |])
            in
-           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
-           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
-           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
-           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
-           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
-           let endomul1 =
-             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
-           let endomul2 =
-             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
            in
-           let endomul3 =
-             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
            in
-           let endomul4 =
-             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
-           in
-           let poseidon =
-             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ; poseidon
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
@@ -964,33 +972,39 @@ let _ =
     (object%js (_self)
        method run =
          let gate_vector =
-           let open Gate_vector in
+           let open Protocol.Gates.Vector.Fq in
            let vec = create () in
-           let fields = Array.map Pasta_fq.of_int in
-           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let rand_fields i = Array.init i Pasta_fq.rng in
+           let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (rand_fields 0) in
            let generic =
-             mk_wires Generic 1 (1, L) (1, R) (1, O)
-               (fields [| 0; 0; 0; 0; 0 |])
+             mk_wires Generic 1 (1, 0) (1, 1) (1, 2) (rand_fields 1)
            in
-           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
-           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
-           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
-           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
-           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let add1 =
+             mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (rand_fields 2)
+           in
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (rand_fields 3)
+           in
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (rand_fields 5)
+           in
+           let vbmul2 =
+             mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (rand_fields 10)
+           in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
+           in
            let endomul1 =
-             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+             mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
            in
            let endomul2 =
-             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+             mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
            in
            let endomul3 =
-             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+             mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
            in
            let endomul4 =
-             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
-           in
-           let poseidon =
-             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
+             mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
            in
            let all =
              [ zero
@@ -1004,7 +1018,6 @@ let _ =
              ; endomul2
              ; endomul3
              ; endomul4
-             ; poseidon
              ]
            in
            List.iter (add vec) all ;
@@ -1025,67 +1038,43 @@ let _ =
          assert (domain_d8_size index2 = 128)
     end)
 
-let eq_verification_shifts ~field_equal
-    { Types.Plonk_verification_shifts.r = r0; o = o0 }
-    { Types.Plonk_verification_shifts.r = r1; o = o1 } =
-  field_equal r0 r1 && field_equal o0 o1
+let eq_verification_shifts ~field_equal l r = Array.for_all2 field_equal l r
 
 let verification_evals_to_list
-    { Types.Plonk_verification_evals.sigma_comm_0
-    ; sigma_comm_1
-    ; sigma_comm_2
-    ; ql_comm
-    ; qr_comm
-    ; qo_comm
-    ; qm_comm
-    ; qc_comm
-    ; rcm_comm_0
-    ; rcm_comm_1
-    ; rcm_comm_2
-    ; psm_comm
-    ; add_comm
-    ; mul1_comm
-    ; mul2_comm
-    ; emul1_comm
-    ; emul2_comm
-    ; emul3_comm
+    { Protocol.VerifierIndex.sigma_comm : 'PolyComm array
+    ; coefficients_comm : 'PolyComm array
+    ; generic_comm : 'PolyComm
+    ; psm_comm : 'PolyComm
+    ; complete_add_comm : 'PolyComm
+    ; mul_comm : 'PolyComm
+    ; emul_comm : 'PolyComm
+    ; endomul_scalar_comm : 'PolyComm
+    ; chacha_comm : 'PolyComm array option
     } =
-  [ sigma_comm_0
-  ; sigma_comm_1
-  ; sigma_comm_2
-  ; ql_comm
-  ; qr_comm
-  ; qo_comm
-  ; qm_comm
-  ; qc_comm
-  ; rcm_comm_0
-  ; rcm_comm_1
-  ; rcm_comm_2
-  ; psm_comm
-  ; add_comm
-  ; mul1_comm
-  ; mul2_comm
-  ; emul1_comm
-  ; emul2_comm
-  ; emul3_comm
-  ]
+  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
+  :: endomul_scalar_comm
+  :: ( Array.append sigma_comm coefficients_comm
+     |> Array.append (Option.value ~default:[||] chacha_comm)
+     |> Array.to_list )
 
 let eq_verifier_index ~field_equal ~other_field_equal
-    { Types.Plonk_verifier_index.domain =
+    { Protocol.VerifierIndex.domain =
         { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
     ; max_quot_size = i1_3
-    ; urs = _
+    ; srs = _
     ; evals = evals1
     ; shifts = shifts1
+    ; lookup_index = _
     }
-    { Types.Plonk_verifier_index.domain =
+    { Protocol.VerifierIndex.domain =
         { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
     ; max_quot_size = i2_3
-    ; urs = _
+    ; srs = _
     ; evals = evals2
     ; shifts = shifts2
+    ; lookup_index = _
     } =
   i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
   && List.for_all2
@@ -1100,49 +1089,26 @@ let _ =
     (object%js (_self)
        method run =
          let gate_vector =
-           let open Pasta_fp_index.Gate_vector in
+           let open Protocol.Gates.Vector.Fp in
            let vec = create () in
            let fields = Array.map Pasta_fp.of_int in
-           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (fields [||]) in
            let generic =
-             mk_wires Generic 1 (1, L) (1, R) (1, O)
+             mk_wires Generic 1 (1, 0) (1, 1) (1, 2)
                (fields [| 0; 0; 0; 0; 0 |])
            in
-           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
-           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
-           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
-           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
-           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
-           let endomul1 =
-             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
-           let endomul2 =
-             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
            in
-           let endomul3 =
-             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
            in
-           let endomul4 =
-             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
-           in
-           let poseidon =
-             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ; poseidon
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
@@ -1173,49 +1139,26 @@ let _ =
     (object%js (_self)
        method run =
          let gate_vector =
-           let open Pasta_fq_index.Gate_vector in
+           let open Protocol.Gates.Vector.Fq in
            let vec = create () in
            let fields = Array.map Pasta_fq.of_int in
-           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let zero = mk_wires Zero 0 (0, 0) (0, 1) (0, 2) (fields [||]) in
            let generic =
-             mk_wires Generic 1 (1, L) (1, R) (1, O)
+             mk_wires Generic 1 (1, 0) (1, 1) (1, 2)
                (fields [| 0; 0; 0; 0; 0 |])
            in
-           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
-           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
-           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
-           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
-           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
-           let endomul1 =
-             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           let add1 = mk_wires Poseidon 1 (1, 0) (1, 1) (1, 2) (fields [||]) in
+           let add2 =
+             mk_wires CompleteAdd 2 (2, 0) (2, 1) (2, 2) (fields [||])
            in
-           let endomul2 =
-             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           let vbmul1 =
+             mk_wires VarBaseMul 3 (3, 0) (3, 1) (3, 2) (fields [||])
            in
-           let endomul3 =
-             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           let vbmul2 = mk_wires EndoMul 4 (4, 0) (4, 1) (4, 2) (fields [||]) in
+           let vbmul3 =
+             mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (fields [||])
            in
-           let endomul4 =
-             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
-           in
-           let poseidon =
-             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ; poseidon
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in

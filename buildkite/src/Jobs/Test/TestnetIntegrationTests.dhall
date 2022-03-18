@@ -30,6 +30,8 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "archive-node" dependsOn,
-    TestExecutive.execute "zkapps" dependsOn
+    TestExecutive.execute "opt-block-prod" dependsOn,
+    TestExecutive.execute "zkapps" dependsOn,
+    TestExecutive.execute "zkapps-timing" dependsOn
   ]
 }

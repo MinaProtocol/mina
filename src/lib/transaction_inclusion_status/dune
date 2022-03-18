@@ -23,6 +23,7 @@
    mina_numbers
    pipe_lib
    mina_base
+   mina_transaction
    transition_frontier
    network_pool
    transition_frontier_base

@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 
 [%%versioned:
 module Stable : sig
