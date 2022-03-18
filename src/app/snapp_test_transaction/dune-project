@@ -1,2 +1,3 @@
 (lang dune 2.7)
 (name snapp_test_transaction)
+(implicit_transitive_deps false)
