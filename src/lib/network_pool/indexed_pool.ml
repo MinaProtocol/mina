@@ -1,6 +1,7 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 open Signature_lib
 

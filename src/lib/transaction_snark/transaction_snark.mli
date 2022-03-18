@@ -1,5 +1,6 @@
 open Core
 open Mina_base
+open Mina_transaction
 open Snark_params
 open Mina_state
 module Transaction_validator = Transaction_validator
@@ -344,7 +345,7 @@ type local_state =
   , bool
   , unit
   , Transaction_status.Failure.t option )
-  Parties_logic.Local_state.t
+  Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
 
@@ -492,7 +493,7 @@ module For_tests : sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
     -> snapp_kp:Signature_lib.Keypair.t
-    -> Transaction_logic.For_tests.Transaction_spec.t
+    -> Mina_transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
 

@@ -39,7 +39,6 @@ module Global_state = struct
   [@@deriving sexp, to_yojson]
 end
 
-module GS = Global_state
 module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Account_id) (Account)
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
@@ -136,8 +135,6 @@ module L = struct
   let empty ~depth () = ref (empty ~depth ())
 end
 
-module T = Transaction_logic.Make (L)
-
 [%%define_locally
 M.
   ( of_hash
@@ -149,21 +146,6 @@ M.
   , add_path
   , merkle_root
   , iteri )]
-
-let apply_parties_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ledger c =
-  let open T in
-  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
-    (ref ledger) c ~init:[]
-    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
-      ( { GS.ledger = !ledger; fee_excess; protocol_state }
-      , { local_state with ledger = !(local_state.ledger) } )
-      :: acc)
-  |> Result.map ~f:(fun (party_applied, states) ->
-         (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the parties that generated the states.
-         *)
-         (party_applied, List.rev states))
 
 let of_root ~depth (h : Ledger_hash.t) =
   of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
@@ -189,22 +171,6 @@ let has_locked_tokens_exn ~global_slot ~account_id t =
   let idx = find_index_exn t account_id in
   let _, account = get_or_initialize_exn account_id t idx in
   Account.has_locked_tokens ~global_slot account
-
-let apply_transaction_logic f t x =
-  let open Or_error.Let_syntax in
-  let t' = ref t in
-  let%map app = f t' x in
-  (!t', app)
-
-let apply_user_command ~constraint_constants ~txn_global_slot =
-  apply_transaction_logic
-    (T.apply_user_command ~constraint_constants ~txn_global_slot)
-
-let apply_transaction' = T.apply_transaction
-
-let apply_transaction ~constraint_constants ~txn_state_view =
-  apply_transaction_logic
-    (T.apply_transaction ~constraint_constants ~txn_state_view)
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
