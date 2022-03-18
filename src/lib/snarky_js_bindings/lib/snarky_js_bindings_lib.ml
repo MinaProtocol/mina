@@ -2075,26 +2075,23 @@ module Ledger = struct
     in
     { With_hash.data = vk; hash = Mina_base.Snapp_account.digest_vk vk }
 
+  let update (u : party_update) : Party.Update.t =
+    { app_state =
+        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+            set_or_keep field (array_get_exn u##.appState i))
+    ; delegate = set_or_keep public_key u##.delegate
+    ; verification_key =
+        set_or_keep verification_key_with_hash u##.verificationKey
+    ; permissions = Keep
+    ; snapp_uri = Keep
+    ; token_symbol = Keep
+    ; timing = Keep
+    ; voting_for = Keep
+    }
+
   let body (b : party_body) : Party.Body.t =
-    let update : Party.Update.t =
-      let u = b##.update in
-
-      { Party.Update.app_state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
-              set_or_keep field (array_get_exn u##.appState i))
-      ; delegate = set_or_keep public_key u##.delegate
-      ; verification_key =
-          set_or_keep verification_key_with_hash u##.verificationKey
-      ; permissions = Keep
-      ; snapp_uri = Keep
-      ; token_symbol = Keep
-      ; timing = Keep
-      ; voting_for = Keep
-      }
-    in
-
     { public_key = public_key b##.publicKey
-    ; update
+    ; update = update b##.update
     ; token_id = Token_id.of_field (field b##.tokenId)
     ; balance_change = int64 b##.delta
     ; events =
@@ -2114,15 +2111,30 @@ module Ledger = struct
     ; protocol_state = protocol_state b##.protocolState
     }
 
+  let fee_payer_body (b : party_body) : Party.Body.Fee_payer.t =
+    { public_key = public_key b##.publicKey
+    ; update = update b##.update
+    ; token_id = ()
+    ; balance_change = Currency.Amount.to_fee (int64 b##.delta).magnitude
+    ; events =
+        Array.map
+          (Js.to_array b##.events)
+          ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
+        |> Array.to_list
+    ; sequence_events =
+        Array.map
+          (Js.to_array b##.sequenceEvents)
+          ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
+        |> Array.to_list
+    ; call_data = field b##.callData
+    ; call_depth = b##.depth
+    ; increment_nonce = ()
+    ; use_full_commitment = ()
+    ; protocol_state = protocol_state b##.protocolState
+    }
+
   let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
-    let b = body party##.body in
-    { body =
-        { b with
-          token_id = ()
-        ; increment_nonce = ()
-        ; use_full_commitment = ()
-        ; balance_change = Currency.Amount.to_fee b.balance_change.magnitude
-        }
+    { body = fee_payer_body party##.body
     ; predicate =
         uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
     }
