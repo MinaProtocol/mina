@@ -288,14 +288,21 @@ let print_values prefix =
   if debug then Format.eprintf "Finding base for %s@." prefix ;
   Option.iter (find_base_pk prefix) ~f:(fun (base_pk, add_index) ->
       let field_elements = List.drop field_elements add_index in
+      (* Start with no additional field elements added to the base public key.
+      *)
       let field_selectors = List.map ~f:(fun _ -> false) field_elements in
       let rec go field_selectors =
         let field =
+          (* Convert `field_selectors` into a field element by adding the
+             corresponding member of `field_elements` every time it is `true`,
+             and skipping it when it's `false`.
+          *)
           List.fold2_exn ~init:base_pk.x field_elements field_selectors
             ~f:(fun field selected_field selected ->
               if selected then Snark_params.Tick.Field.add field selected_field
               else field)
         in
+        (* Test both odd and even versions of the public key. *)
         let pk_odd = { base_pk with x = field } in
         let pk_even = { pk_odd with is_odd = true } in
         print_pk_if_matches prefix pk_odd ;
