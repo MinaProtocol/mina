@@ -1,15 +1,83 @@
-(** This module defines a tool that can be used to find invalid public keys
-    with some fixed prefix.
-
-    By invalid, we mean that the public key is not a valid point on the Mina
-    elliptic curve, and thus that the public key has no corresponding private
-    key.
+(** This tool is designed to find public keys with some fixed prefix.
 
     The prefix to search for can be found as the first positional argument to
     this command. If none is given, the default value used is
     zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 
     Usage: dune exec src/lib/find_address/find_address.exe [PREFIX_STRING].
+
+    The output of the tool is a list of all public keys whose base58-check
+    representation contains the given prefix (after the initial, fixed 'version
+    byte').
+
+    ## Valid and invalid keys
+
+    The output public keys are annotated with `(valid)` or `(invalid)`,
+    depending on whether they correspond to 'valid' or 'invalid' public keys.
+
+    A Mina public key is a point on the Pallas elliptic curve, which we can
+    represent as a pair of Pallas base field elements `(x, y)`. These values
+    must satisfy the elliptic curve equation `y^2 = x^3 + 5` over the base
+    field.
+
+    In order to reduce the amount of data that is sent over the Mina network,
+    and to reduce the length of base58-check encoded public keys, the Mina key
+    format uses a 'compressed' representation.
+    This compressed representation is the coorindate `x` of the public key and
+    an `is_odd` boolean, where `is_odd` determines which value of `y` it
+    matches, either `y = sqrt(x^3 + 5)` or `y = -sqrt(x^3 + 5)`.
+
+    For some values of `x`, there is no square-root of `x^3 + 5` in the finite
+    field, and so there is no Mina public key with that `x` coordinate.
+    However, since we can choose any value of `x` in the 'compressed'
+    representation, it is possible to encode one of these values.
+    We call a compressed public key with no `y` coordinate 'invalid', and a
+    compressed public key where we can calculate the `y` coordinate 'valid'.
+
+    ## Finding a private key for a public key generated with this tool
+
+    A Mina private key is an element of the Pallas scalar field.
+
+    A private key `a` can be transformed into a public key using `g` the
+    'generator' point of the Pallas curve. To do this, `g` is 'scaled' by `a`
+    (equivalently, `g` is combined with itself `a` times in the Pallas curve).
+    This is fairly cheap to do in practice via the double-and-add algorithm.
+    See https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication for
+    more information.
+
+    The reverse direction -- transforming a public key into a private key -- is
+    considered to be computationally intractable. This problem is generally
+    known as the 'discrete logarithm problem', and is the basis for the
+    security of Mina's signature scheme. The best known algorithms for finding
+    a private key from a public key are only slightly better than
+    'guess-and-check', where you repeatedly choose a random number and test it
+    to check whether it is right.
+
+    The probability of finding the private key for a given public key is
+    approximately `1 / 2^255` with guess-and-check; in other words, about 1 in
+    10000000000000000000000000000000000000000000000000000000000000000000000000000.
+
+    By using this tool to generate a public key with a sufficiently-large
+    'vanity prefix', one can effectively choose an elliptic curve point's `x`
+    value without any knowledge of its `y` value or any other properties of the
+    resulting curve point. Thus, it is effectively impossible to find the
+    private key for any such key output by this tool.
+
+    ### Invalid keys
+
+    Invalid keys give the strongest possible assurance that no private key
+    exists for the public key, since they do not represent points on the Pallas
+    curve at all. Thus, it is mathematically impossible to find a private key
+    that will generate an invalid key, since every private key maps to exactly
+    1 point on the Pallas curve: its public key.
+
+    While these may be preferable to in some cases, currently the Mina protocol
+    rejects any transactions using invalid public keys.
+
+    This tool still provides the ability to create 'vanity' invalid keys, in
+    case this situation changes in future. In the meantime, the statistical
+    guarantees provided by a valid 'vanity' key should suffice for all
+    practical uses.
 *)
 
 open Core_kernel
