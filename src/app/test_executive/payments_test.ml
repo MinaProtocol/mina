@@ -93,10 +93,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~body:txn_body ~signer:sender_pub_key
         ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
     in
+    let%bind { nonce = sender_current_nonce; _ } =
+      Network.Node.must_get_balance ~logger untimed_node_b
+        ~public_key:sender_pub_key
+    in
     let%bind txn_signed =
       User_command_input.to_user_command
-        ~get_current_nonce:(fun _ -> failwith "don't call me")
-        ~get_account:(fun _ -> failwith "don't call me")
+        ~get_current_nonce:(fun _ ->
+          Result.return (`Min sender_current_nonce, sender_current_nonce))
+        ~get_account:(fun _ -> failwith "this is get_account, don't call me")
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
@@ -136,15 +141,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "check that the account balances are what we expect after the previous \
          txn"
-        (let%bind node_b_balance =
+        (let%bind { total_balance = node_b_balance; _ } =
            Network.Node.must_get_balance ~logger untimed_node_b
-             ~account_id:
-               (Mina_base.Account_id.create sender_pub_key Token_id.default)
+             ~public_key:sender_pub_key
+           (* ~account_id:
+              (Mina_base.Account_id.create sender_pub_key Token_id.default) *)
          in
-         let%bind node_a_balance =
+         let%bind { total_balance = node_a_balance; _ } =
            Network.Node.must_get_balance ~logger untimed_node_a
-             ~account_id:
-               (Mina_base.Account_id.create receiver_pub_key Token_id.default)
+             ~public_key:receiver_pub_key
+           (* ~account_id:
+              (Mina_base.Account_id.create receiver_pub_key Token_id.default) *)
          in
          let node_a_expected =
            Currency.Amount.add (Currency.Amount.of_int 4_000_000_000_000) amount

@@ -179,8 +179,9 @@ module Node = struct
     module Get_balance =
     [%graphql
     {|
-      query ($public_key: PublicKey, $token: UInt64) {
-        account(publicKey: $public_key, token: $token) {
+      query ($public_key: PublicKey) {
+        account(publicKey: $public_key) {
+          nonce
           balance {
             total @bsDecoder(fn: "Decoders.balance")
           }
@@ -308,18 +309,21 @@ module Node = struct
   let must_get_best_chain ~logger t =
     get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let get_balance ~logger t ~account_id =
+  type get_balance_result =
+    { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+
+  let get_balance ~logger t ~public_key =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
-        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
         :: logger_metadata t ) ;
-    let pk = Mina_base.Account_id.public_key account_id in
-    let token = Mina_base.Account_id.token_id account_id in
+    (* let pk = Mina_base.Account_id.public_key account_id in *)
+    (* let token = Mina_base.Account_id.token_id account_id in *)
     let get_balance_obj =
       Graphql.Get_balance.make
-        ~public_key:(Graphql_lib.Encoders.public_key pk)
-        ~token:(Graphql_lib.Encoders.token token)
+        ~public_key:(Graphql_lib.Encoders.public_key public_key)
+        (* ~token:(Graphql_lib.Encoders.token token) *)
         ()
     in
     let%bind balance_obj =
@@ -329,13 +333,19 @@ module Node = struct
     match balance_obj#account with
     | None ->
         Deferred.Or_error.errorf
-          !"Account with %{sexp:Mina_base.Account_id.t} not found"
-          account_id
+          !"Account with public_key %s not found"
+          (Signature_lib.Public_key.Compressed.to_string public_key)
     | Some acc ->
-        return acc#balance#total
+        return
+          { nonce =
+              acc#nonce
+              |> Option.value_exn ~message:"the nonce from get_balance is None"
+              |> Unsigned.UInt32.of_string
+          ; total_balance = acc#balance#total
+          }
 
-  let must_get_balance ~logger t ~account_id =
-    get_balance ~logger t ~account_id
+  let must_get_balance ~logger t ~public_key =
+    get_balance ~logger t ~public_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =

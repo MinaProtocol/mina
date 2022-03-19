@@ -106,17 +106,20 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      type get_balance_result =
+        { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+
       val get_balance :
            logger:Logger.t
         -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> get_balance_result Async_kernel.Deferred.Or_error.t
 
       val must_get_balance :
            logger:Logger.t
         -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Malleable_error.t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> get_balance_result Malleable_error.t
 
       val get_peer_id :
            logger:Logger.t
