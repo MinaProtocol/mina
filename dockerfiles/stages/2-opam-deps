@@ -39,6 +39,9 @@ RUN opam switch import src/opam.export
 
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
+# Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
-  && opam clean --logs -cs
+  && opam clean --logs -cs \
+  && rm -rf .graphql_ppx_cache/ \
+  && rm -rf .ppx
