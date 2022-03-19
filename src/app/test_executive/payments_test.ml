@@ -69,6 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_int 2_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
+    let test_constants = Engine.Network.constraint_constants network in
     let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
     let sender_kp =
       (Node.network_keypair untimed_node_b |> Option.value_exn).keypair
@@ -96,8 +97,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       User_command_input.to_user_command
         ~get_current_nonce:(fun _ -> failwith "don't call me")
         ~get_account:(fun _ -> failwith "don't call me")
-        ~constraint_constants:(Engine.Network.constraint_constants network)
-        ~logger user_command_input
+        ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
     let (signed_cmmd, _)
@@ -131,6 +131,56 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
               ~command_type:Send_payment))
+    in
+    let%bind () =
+      section
+        "check that the account balances are what we expect after the previous \
+         txn"
+        (let%bind node_b_balance =
+           Network.Node.must_get_balance ~logger untimed_node_b
+             ~account_id:
+               (Mina_base.Account_id.create sender_pub_key Token_id.default)
+         in
+         let%bind node_a_balance =
+           Network.Node.must_get_balance ~logger untimed_node_a
+             ~account_id:
+               (Mina_base.Account_id.create receiver_pub_key Token_id.default)
+         in
+         let node_a_expected =
+           Currency.Amount.add (Currency.Amount.of_int 4_000_000_000_000) amount
+           |> Option.value_exn
+         in
+
+         let node_b_expected =
+           Currency.Amount.sub
+             ( Currency.Amount.add
+                 (Currency.Amount.of_int 3_000_000_000_000)
+                 test_constants.coinbase_amount
+             |> Option.value_exn )
+             amount
+           |> Option.value_exn
+         in
+         if
+           (* node_a is the receiver *)
+           (* node_a_balance >= 4_000_000_000_000 + txn_amount *)
+           Currency.Amount.( >= )
+             (Currency.Balance.to_amount node_a_balance)
+             node_a_expected
+           (* node_b is the sender *)
+           (* node_b_balance <= (3_000_000_000_000 + possible_coinbase_reward) - txn_amount *)
+           && Currency.Amount.( <= )
+                (Currency.Balance.to_amount node_b_balance)
+                node_b_expected
+         then Malleable_error.return ()
+         else
+           Malleable_error.soft_error_format ~value:()
+             "Error with account balances.  receiving node_a balance is %d and \
+              should be at least %d, node_b balance is %d and should be at \
+              most %d"
+             (Currency.Balance.to_int node_a_balance)
+             (Currency.Amount.to_int node_a_expected)
+             (Currency.Balance.to_int node_a_balance)
+             (Currency.Amount.to_int node_b_expected))
     in
     let%bind () =
       section
