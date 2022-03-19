@@ -261,8 +261,7 @@ let next_bitstring x =
     | true :: rest ->
         false :: go rest
   in
-  try Some (go x)
-  with Stop -> None
+  try Some (go x) with Stop -> None
 
 let print_values prefix =
   let len = String.length prefix in
