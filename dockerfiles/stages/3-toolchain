@@ -31,11 +31,12 @@ USER root
 
 # OS package dependencies
 RUN apt-get update --yes \
-  && apt-get install --yes --no-install-recommends \
+  && apt-get install --yes \
     apt-transport-https \
     apt-utils \
     awscli \
     cmake \
+    fakeroot \
     gnupg2 \
     jq \
     libboost-dev \
@@ -98,7 +99,7 @@ RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terra
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
     && apt-get update --yes \
-    && apt-get install --yes --no-install-recommends google-cloud-sdk kubectl \
+    && apt-get install --yes google-cloud-sdk kubectl \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Helm tools
