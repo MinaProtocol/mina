@@ -28,9 +28,9 @@ ARG ROCKSDB_VERSION=v5.18.4
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-  && apt-get upgrade --yes \
-  && apt-get install --no-install-recommends --yes \
+RUN apt-get update --quiet \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes \
     libboost-dev \
     libboost-program-options-dev \
     libbz2-dev \
@@ -68,6 +68,9 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && chown root:root /etc/sudoers.d/opam \
   && chmod 777 /tmp
 
+# --- Quiet git warnings about detatched head states, which are used frequently in later stages
+RUN git config --global advice.detachedHead false
+
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
   "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" \
@@ -99,11 +102,11 @@ RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
-    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
+    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
-  && strip -S /usr/local/lib/librocksdb_coda.a 2>/dev/null
+  && strip -S /usr/local/lib/librocksdb_coda.a
 # Clear CXXFLAGS afterwards to avoid affecting other code
 ENV CXXFLAGS ""
 

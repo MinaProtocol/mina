@@ -7,9 +7,6 @@ shopt -s nullglob
 
 INPUT_ARGS="$@"
 
-# These arrays can be overwritten or extended in scripts to adjust verbosity
-# Example:
-declare -a LOG_FILES=('mina.log')
 # stderr is mostly used to print "reading password from environment varible ..."
 # prover and verifier logs are also sparse, mostly memory stats and debug info
 # mina-best-tip.log is useful for organizing a hard fork and is one way to monitor new blocks as they are added, but not critical
@@ -39,9 +36,8 @@ if [[ ${FILE_LOG_LEVEL} ]]; then
   EXTRA_FLAGS+=" --file-log-level ${FILE_LOG_LEVEL}"
 fi
 
-# If VERBOSE=true then also append other log files
+# If VERBOSE=true then print daemon flags
 if [[ ${VERBOSE} ]]; then
-  LOG_FILES+=("${VERBOSE_LOG_FILES[@]}")
   # Print the flags to the daemon for debugging use
   echo "[Debug] Input Args: ${INPUT_ARGS}"
   echo "[Debug] Extra Flags: ${EXTRA_FLAGS}"
@@ -54,21 +50,18 @@ mkdir -p .mina-config
 # Create all of the log files that we will tail later
 touch "${LOG_FILES[@]}"
 
-set +e # Allow wait and kill commands to fail in this loop
-while true; do
-  rm -f .mina-config/.mina-lock
-  mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-stderr.log 1>mina.log &
-  mina_pid=$!
+set +e # Allow remaining commands to fail without exiting early
+rm -f .mina-config/.mina-lock
+mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-stderr.log
+echo "Mina process exited with status code $?"
 
-  tail -q -f "${LOG_FILES[@]}" &
-  tail_pid=$!
+# TODO: would a specified directory of "post-failure" scripts make sense here?
+# Something like `mina client export-local-logs > ~/.mina-config/log-exports/blah`
 
-  wait "$mina_pid"
-  echo "Mina process exited with status code $?"
-  sleep 15
-  kill "$tail_pid"
+# TODO: have a better way to intersperse log files like we used to, without infinite disk use
+# For now, tail the last 20 lines of the verbose log files when the node shuts down
+if [[ ${VERBOSE} ]]; then
+  tail -n 20 "${VERBOSE_LOG_FILES[@]}"
+fi
 
-  if [ ! -f stay_alive ]; then
-    exit 0
-  fi
-done
+sleep 15 # to allow all mina proccesses to quit, cleanup, and finish logging
