@@ -263,25 +263,28 @@ let next_bitstring x =
   in
   try Some (go x) with Stop -> None
 
-let print_values prefix =
+(** Print the given public key if its base58-check representation matches the
+    given prefix.
+
+    The printed base58-check string is annotated with `(valid)` or `(invalid)`,
+    depending on whether it corresponds to a 'valid' public key or not.
+*)
+let print_pk_if_matches prefix pk =
   let len = String.length prefix in
+  let pk_string = Public_key.Compressed.to_base58_check pk in
+  let actual_prefix = String.prefix pk_string len in
+  if String.equal actual_prefix prefix then
+    match Public_key.decompress pk with
+    | Some _ ->
+        Format.printf "%s (valid)@." pk_string
+    | None ->
+        Format.printf "%s (invalid)@." pk_string
+
+let print_values prefix =
   if debug then Format.eprintf "Finding base for %s@." prefix ;
   Option.iter (find_base_pk prefix) ~f:(fun (base_pk, add_index) ->
       let field_elements = List.drop field_elements add_index in
       let field_selectors = List.map ~f:(fun _ -> false) field_elements in
-      let print_value_if_valid pk =
-        let pk_string = Public_key.Compressed.to_base58_check pk in
-        let actual_prefix = String.prefix pk_string len in
-        if String.equal actual_prefix prefix then (
-          match Public_key.decompress pk with
-          | Some _ ->
-              Format.printf "%s (valid)@." pk_string ;
-              false
-          | None ->
-              Format.printf "%s@." pk_string ;
-              true )
-        else false
-      in
       let rec go field_selectors =
         let field =
           List.fold2_exn ~init:base_pk.x field_elements field_selectors
@@ -290,9 +293,9 @@ let print_values prefix =
               else field)
         in
         let pk_odd = { base_pk with x = field } in
-        ( if print_value_if_valid pk_odd then
-          let pk_even = { pk_odd with is_odd = true } in
-          ignore @@ print_value_if_valid pk_even ) ;
+        let pk_even = { pk_odd with is_odd = true } in
+        print_pk_if_matches prefix pk_odd ;
+        print_pk_if_matches prefix pk_even ;
         (* We could backtrack when the pk is invalid rather than blindly
            calling [next_bitstring], but this is efficient enough with a
            sufficiently large prefix.
