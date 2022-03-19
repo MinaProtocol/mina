@@ -238,24 +238,38 @@ let find_base_pk prefix =
         *)
         Stop (Some (pk, i)))
 
+(** Compute the next bitstring, reverse-lexicographically. Equivalent to adding
+    1 bitwise.
+    If there is no space to handle the 'overflow', returns `None`.
+
+    For example:
+    * `[false, false, false]` is mapped to `Some([true, false, false])`;
+    * `[true, false, true]` is mapped to `Some([false, true, true])`;
+    * `[true, true, false]` is mapped to `Some([false, false, true])`;
+    * `[true, true, true]` is mapped to `None`.
+*)
+let next_bitstring x =
+  let exception Stop in
+  let rec go = function
+    | [] ->
+        (* All of the bits in the input bitstring were already true. We don't
+           want to extend the bitstring, so stop here.
+        *)
+        raise Stop
+    | false :: rest ->
+        true :: rest
+    | true :: rest ->
+        false :: go rest
+  in
+  try Some (go x)
+  with Stop -> None
+
 let print_values prefix =
   let len = String.length prefix in
   if debug then Format.eprintf "Finding base for %s@." prefix ;
   Option.iter (find_base_pk prefix) ~f:(fun (base_pk, add_index) ->
       let field_elements = List.drop field_elements add_index in
       let field_selectors = List.map ~f:(fun _ -> false) field_elements in
-      let exception Stop in
-      let next_exn x =
-        let rec go = function
-          | [] ->
-              raise Stop
-          | false :: rest ->
-              true :: rest
-          | true :: rest ->
-              false :: go rest
-        in
-        go x
-      in
       let print_value_if_valid pk =
         let pk_string = Public_key.Compressed.to_base58_check pk in
         let actual_prefix = String.prefix pk_string len in
@@ -281,13 +295,13 @@ let print_values prefix =
           let pk_even = { pk_odd with is_odd = true } in
           ignore @@ print_value_if_valid pk_even ) ;
         (* We could backtrack when the pk is invalid rather than blindly
-           calling [next_exn], but this is efficient enough with a sufficiently
-           large prefix.
+           calling [next_bitstring], but this is efficient enough with a
+           sufficiently large prefix.
         *)
-        match next_exn field_selectors with
-        | field_selectors ->
+        match next_bitstring field_selectors with
+        | Some field_selectors ->
             go field_selectors
-        | exception Stop ->
+        | None ->
             ()
       in
       if debug then Format.eprintf "Keys for %s:@." prefix ;
