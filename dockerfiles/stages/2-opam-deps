@@ -19,6 +19,11 @@ ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 # and to keep Docker image reasonable size
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
+ENV OPAMERRLOGLEN 20
+ENV OPAMSKIPUPDATE true
+ENV OPAMREQUIRECHECKSUMS true
+ENV OPAMJSON /home/mina/opam.json
+
 
 # --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
 # git will clone into an empty dir, but this also helps us set the workdir in advance
@@ -35,13 +40,13 @@ ENV OPAMYES 1
 
 # --- Import Opam Switch
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-RUN opam switch import src/opam.export
+RUN opam switch import src/opam.export --quiet
 
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
 # Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
-  && opam clean --logs -cs \
+  && opam clean --logs -cs --quiet \
   && rm -rf .graphql_ppx_cache/ \
   && rm -rf .ppx
