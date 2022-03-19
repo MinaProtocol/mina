@@ -101,7 +101,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       User_command_input.to_user_command
         ~get_current_nonce:(fun _ ->
           Result.return (`Min sender_current_nonce, sender_current_nonce))
-        ~get_account:(fun _ -> failwith "this is get_account, don't call me")
+        ~get_account:(fun _ -> `Active None)
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
