@@ -15,10 +15,15 @@
 open Core_kernel
 open Signature_lib
 
+(** Set to `true` for debugging output. *)
 let debug = false
 
+(** The prefix to use if no prefix was given as a positional argument. *)
 let default_prefix = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 
+(** The prefix to find, taken from the first positional argument, or
+    `default_prefix` if no positional argument was given.
+*)
 let desired_prefix =
   try Sys.argv.(1)
   with _ ->
@@ -26,11 +31,34 @@ let desired_prefix =
       default_prefix ;
     default_prefix
 
+(** The 'smallest' value of `Public_key.Compressed.t` when encoded as bytes.
+    This value corresponds to a byte-string of all zeros.
+*)
 let min_value : Public_key.Compressed.t =
   { x = Snark_params.Tick.Field.zero; is_odd = false }
 
+(** The base58-check representation of `min_value`. *)
 let min_value_compressed = Public_key.Compressed.to_base58_check min_value
 
+(** A nearly-maximal value of `Public_key.Compressed.t`, when encoded as bytes.
+
+    The component `x` of the compressed public key is encoded in little-endian
+    -- the least significant byte appears first in the byte representation --
+    so this value is chosen to maximise those bytes. For example,
+    `0x00112233445566778899` would convert in little-endian to the list of
+    bytes `[0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00]`, where
+    `0x...` represents a hexadecimal (base-16) number using digits `0..9A..F`.
+
+    The finite field used for the Pasta curve's coordinates (the base field)
+    uses slightly fewer than 256 bytes, so we will not get a valid result if we
+    use the string of 64 `F`s. For transparency of implementation, we chose to
+    set the high nybble (4 bits) to 0.
+
+    This choice may exclude a small number of addresses at the end of the
+    search space, if the prefix is nearly-maximal. It is recommended to select
+    public keys from the start of the search space (ie. the first values
+    output) to avoid this small bias.
+*)
 let max_value : Public_key.Compressed.t =
   { x =
       Kimchi_backend.Pasta.Basic.Bigint256.of_hex_string
@@ -39,8 +67,14 @@ let max_value : Public_key.Compressed.t =
   ; is_odd = true
   }
 
+(** The base58-check representation of `max_value`. *)
 let max_value_compressed = Public_key.Compressed.to_base58_check max_value
 
+(** The first position at which the base58 strings `min_value_compressed` and
+    `max_value_compressed` differ.
+    Any characters before this position will be the same in every public key
+    encoded with base58-check, and correspond to the fixed 'version byte'.
+*)
 let first_different_position =
   let rec go i =
     if Char.equal min_value_compressed.[i] max_value_compressed.[i] then
@@ -49,9 +83,41 @@ let first_different_position =
   in
   go 0
 
+(** The common prefix to all base58-check-encoded public keys, computed from
+    `first_different_position`.
+*)
 let fixed_prefix =
   String.sub ~pos:0 ~len:first_different_position min_value_compressed
 
+(** Returns the list of characters that are valid as the next character after
+    the `fixed_prefix`.
+
+    This is a list of each character between (inclusive) the characters in
+    `min_value_compressed` and `max_value_compressed` at position
+    `first_different_position`.
+
+    Note: this code uses the knowledge that the Mina base58-check alphabet has
+    its characters in the same order as the the standard ASCII encoding,
+    iterating over the characters using their ASCII ordering rather than
+    looking them up in the alphabet directly.
+
+    The interested reader can confirm that this is the case with the following code:
+```ocaml
+let mina_alphabet =
+  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+in
+let mina_alphabet_characters = String.to_array mina_alphabet in
+let mina_alphabet_ascii_indexes =
+  Array.map ~f:Char.to_int mina_alphabet_characters
+in
+let mina_alphabet_ascii_indexes_sorted =
+  Array.sorted_copy ~compare:Int.compare mina_alphabet_ascii_indexes
+in
+Array.equal Int.equal
+  mina_alphabet_ascii_indexes
+  mina_alphabet_ascii_indexes_sorted;;
+```
+*)
 let changed_prefixes =
   let rec go c c_final acc =
     if c >= c_final then List.rev acc else go (Int.succ c) c_final (c :: acc)
@@ -59,10 +125,20 @@ let changed_prefixes =
   let get_char_int str = Char.to_int str.[first_different_position] in
   go (get_char_int min_value_compressed) (get_char_int max_value_compressed) []
 
+(** The prefixes to search for.
+
+    For each character `c` in `changed_prefixes`, this calculates the string
+    that concatenates `fixed_prefix`, `c`, and `desired_prefix`.
+*)
 let true_prefixes =
   List.map changed_prefixes ~f:(fun c ->
       fixed_prefix ^ String.of_char (Char.of_int_exn c) ^ desired_prefix)
 
+(** Compute the list of powers of 2 that fit inside the Pallas base field.
+
+    This is an optimisation to allow us to quickly compute a field element that
+    encodes to a desired bit-string when we convert it to bytes.
+*)
 let field_elements =
   let open Snark_params.Tick.Field in
   let two = of_int 2 in
@@ -73,6 +149,23 @@ let field_elements =
   in
   go one 0 []
 
+(** The powers of 2 in the Pallas base field, in order of their 'significance'
+    when coverted to bytes.
+
+    This sorting is important to counteract a quirk of the little-endian bytes
+    encoding: the bytes themselves are stored in 'reverse' order compared to
+    the hexadecimal representation, but the bits within the bytes are stored in
+    'forward' order.
+    For example, the string of bits representing `0x40BF` is
+    `[0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]`, which is encoded as
+    `[1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0]`.
+
+    This code is written to be agnostic about the details of the ordering;
+    instead, it sorts the powers of 2 based on how 'small' their base58-check
+    string encoding is in ASCII string ordering, using the fact that the order
+    of strings in the Mina base58-check alphabet is equivalent to the ordering
+    under ASCII strings (as discussed above in `changed_prefixes`).
+*)
 let field_elements =
   List.sort field_elements ~compare:(fun field1 field2 ->
       let pk1 =
