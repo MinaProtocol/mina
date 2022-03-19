@@ -7,8 +7,9 @@ FROM debian:stretch-slim AS production
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-RUN apt-get -y update \
-  && apt -y install --no-install-recommends \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     dnsutils \
@@ -24,8 +25,8 @@ RUN apt-get -y update \
 
 # mina keypair package
 RUN echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list \
-   && apt-get update \
-   && apt-get install -y "mina-generate-keypair=1.2.1beta1-45440dc"
+   && apt-get update --quiet --yes \
+   && apt-get install --quiet --yes "mina-generate-keypair=1.2.1beta1-45440dc"
 
 WORKDIR /
 
