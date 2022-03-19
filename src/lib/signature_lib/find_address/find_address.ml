@@ -276,8 +276,12 @@ let print_pk_if_matches prefix pk =
   if String.equal actual_prefix prefix then
     match Public_key.decompress pk with
     | Some _ ->
+        (* The compressed public key corresponds to a Pallas curve point. *)
         Format.printf "%s (valid)@." pk_string
     | None ->
+        (* There is no point on the Pallas curve that matches this compressed
+           public key.
+        *)
         Format.printf "%s (invalid)@." pk_string
 
 let print_values prefix =
