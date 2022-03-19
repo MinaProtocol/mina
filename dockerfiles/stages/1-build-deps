@@ -28,9 +28,9 @@ ARG ROCKSDB_VERSION=v5.18.4
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-  && apt-get upgrade --yes \
-  && apt-get install --no-install-recommends --yes \
+RUN apt-get update --quiet \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes \
     libboost-dev \
     libboost-program-options-dev \
     libbz2-dev \

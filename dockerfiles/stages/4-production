@@ -15,9 +15,9 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ENV DEBIAN_FRONTEND noninteractive
 
 # --- Dependencies across many platforms
-RUN apt-get update --yes \
-  && apt-get upgrade --yes \
-  && apt-get install --yes --no-install-recommends \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-utils \
     curl \
     ca-certificates \
@@ -36,8 +36,8 @@ RUN apt-get update --yes \
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
-     && apt-get update --yes \
-     && apt-get install --yes --no-install-recommends \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps7 \
          libffi6 \
@@ -45,8 +45,8 @@ RUN test "$deb_codename" = "buster" \
 
 # --- Debian 9 "Stretch" Dependencies
 RUN test "$deb_codename" = "stretch" \
-     && apt-get update --yes \
-     && apt-get install --yes --no-install-recommends \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc1 \
          libprocps6 \
          libffi6 \
@@ -54,8 +54,8 @@ RUN test "$deb_codename" = "stretch" \
 
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
-     && apt-get update --yes \
-     && apt-get install --yes --no-install-recommends \
+     && apt-get update --quiet --yes \
+     && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps8 \
          libffi7 \
