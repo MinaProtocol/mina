@@ -55,9 +55,11 @@ let min_value_compressed = Public_key.Compressed.to_base58_check min_value
     set the high nybble (4 bits) to 0.
 
     This choice may exclude a small number of addresses at the end of the
-    search space, if the prefix is nearly-maximal. It is recommended to select
-    public keys from the start of the search space (ie. the first values
-    output) to avoid this small bias.
+    search space, if the prefix is nearly-maximal. In practice, this does not
+    affect the results of the calculations below, but individuals concerned by
+    this decision are recommended to select public keys from the start of the
+    search space (ie. the first values output) to entirely rule out any
+    possible influence.
 *)
 let max_value : Public_key.Compressed.t =
   { x =
