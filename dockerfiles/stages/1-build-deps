@@ -66,7 +66,7 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam \
   && chmod 440 /etc/sudoers.d/opam \
   && chown root:root /etc/sudoers.d/opam \
-  && chmod 777 /tmp \
+  && chmod 777 /tmp
 
 # --- Quiet git warnings about detatched head states, which are used frequently in later stages
 RUN git config --global advice.detachedHead false
