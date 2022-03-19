@@ -180,30 +180,68 @@ let field_elements =
          (Public_key.Compressed.to_base58_check pk1)
          (Public_key.Compressed.to_base58_check pk2))
 
+(** Find a 'base' public key to start searching from.
+
+    This starts at the minimum value and tests each value from `field_elements`
+    to see if adding it to the `x` coordinate of the public key gives a
+    matching base58-check string.
+    This operates as a quasi- binary search:
+    * if the output string after including the field element is still too low
+      to match the prefix, update the best pk to increase that coordinate by
+      that field element;
+    * if the output string after including the field element is too high to
+      match the prefix, including that field element will cause us to
+      overshoot, so we leave the best public key unchanged and move on to the
+      next one;
+    * if the output string has a prefix matching the desired prefix, we stop
+      searching and return the *current best* (before we considered this field
+      element).
+
+    Since we have ordered our field elements by their contribution to the
+    base58-check output, we know that the contributions of all smaller (by byte
+    encoding) field elements will be too small to reach the desired prefix.
+    Similarly, including any more of the already-considered field elements will
+    increase the base58-check output past the desired prefix, by the additive
+    nature of their contributions.
+
+    We return a public key that encodes to the largest base58-check value less
+    than our target prefix, and a count of the number of field elements that we
+    added or skipped to construct it.
+*)
+let find_base_pk prefix =
+  let len = String.length prefix in
+  List.fold_until
+    ~init:(0, min_value, min_value_compressed)
+    ~finish:(fun _ -> None)
+    field_elements
+    ~f:(fun (i, pk, pk_compressed) field ->
+      let pk' = { pk with x = Snark_params.Tick.Field.add pk.x field } in
+      let pk_string = Public_key.Compressed.to_base58_check pk' in
+      let actual_prefix = String.prefix pk_string len in
+      let compared = String.compare actual_prefix prefix in
+      if debug then Format.eprintf "%s@." pk_string ;
+      if compared < 0 && String.( < ) pk_compressed pk_string then
+        (* The public key has a prefix closer to the desired prefix than the
+           previous best, update the best candidate.
+        *)
+        Continue (i + 1, pk', pk_string)
+      else if compared > 0 then
+        (* The public key has a prefix greater than the desired prefix.
+           Including this field element will cause us to overshoot, so keep
+           the previous best candidate and try the next field element.
+        *)
+        Continue (i + 1, pk, pk_compressed)
+      else
+        (* Increasing by this field element brings us into the desired range.
+           Stop searching, and return the previous best, along with the count
+           of field elements that we have already considered.
+        *)
+        Stop (Some (pk, i)))
+
 let print_values prefix =
   let len = String.length prefix in
   if debug then Format.eprintf "Finding base for %s@." prefix ;
-  let add_index = ref None in
-  let base_pk, _ =
-    List.fold_until
-      ~init:(0, min_value, min_value_compressed)
-      ~finish:(fun (_, min_value, min_value_compressed) ->
-        (min_value, min_value_compressed))
-      field_elements
-      ~f:(fun (i, pk, pk_compressed) field ->
-        let pk' = { pk with x = Snark_params.Tick.Field.add pk.x field } in
-        let pk_string = Public_key.Compressed.to_base58_check pk' in
-        let actual_prefix = String.prefix pk_string len in
-        let compared = String.compare actual_prefix prefix in
-        if debug then Format.eprintf "%s@." pk_string ;
-        if compared < 0 && String.( < ) pk_compressed pk_string then
-          Continue (i + 1, pk', pk_string)
-        else if compared > 0 then Continue (i + 1, pk, pk_compressed)
-        else (
-          if Option.is_none !add_index then add_index := Some i ;
-          Stop (pk, pk_compressed) ))
-  in
-  Option.iter !add_index ~f:(fun add_index ->
+  Option.iter (find_base_pk prefix) ~f:(fun (base_pk, add_index) ->
       let field_elements = List.drop field_elements add_index in
       let field_selectors = List.map ~f:(fun _ -> false) field_elements in
       let exception Stop in
