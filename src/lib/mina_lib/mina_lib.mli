@@ -119,7 +119,7 @@ val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
-val best_ledger : t -> Ledger.t Participating_state.t
+val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t
 
 val root_length : t -> int Participating_state.t
 
@@ -145,7 +145,7 @@ module Root_diff : sig
   module Stable : sig
     module V2 : sig
       type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
     end

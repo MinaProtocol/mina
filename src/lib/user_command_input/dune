@@ -2,9 +2,25 @@
  (name user_command_input)
  (public_name user_command_input)
  (libraries
-   ; opam deps
+   ;; opam libraries
+   bin_prot.shape
    core
-   ; libs
-   mina_base signature_lib secrets participating_state)
+   core_kernel
+   async_kernel
+   sexplib0
+   base.caml
+   async
+   ;; local libraries
+   logger
+   genesis_constants
+   currency
+   unsigned_extended
+   participating_state
+   secrets
+   signature_lib
+   mina_base
+   mina_numbers
+   mina_base.import
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.make)))

@@ -15,9 +15,8 @@ module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
         { block :
-            ( External_transition.Stable.Latest.t
-            , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t
+            External_transition.Stable.Latest.t
+            State_hash.With_state_hashes.Stable.Latest.t
         ; sender_receipt_chains_from_parent_ledger :
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
@@ -62,10 +61,10 @@ module Builder = struct
              Option.value_exn
                (let open Option.Let_syntax in
                let%bind ledger_location =
-                 Ledger.location_of_account ledger sender
+                 Mina_ledger.Ledger.location_of_account ledger sender
                in
                let%map { receipt_chain_hash; _ } =
-                 Ledger.get ledger ledger_location
+                 Mina_ledger.Ledger.get ledger ledger_location
                in
                (sender, receipt_chain_hash)))
     in

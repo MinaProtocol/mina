@@ -14,7 +14,6 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open O1trace
 open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
@@ -78,7 +77,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
-    ~hash:(External_transition.Validated.state_hash transition)
+    ~hash:(External_transition.Validated.state_hashes transition).state_hash
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
@@ -96,8 +95,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
   let initially_validated_transition =
     Envelope.Incoming.data enveloped_initially_validated_transition
   in
-  let { With_hash.hash = transition_hash; data = transition }, _ =
-    initially_validated_transition
+  let transition_hash, transition =
+    let t, _ = initially_validated_transition in
+    (State_hash.With_state_hashes.state_hash t, With_hash.data t)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   Deferred.map ~f:(Fn.const ())
@@ -240,8 +240,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
       ~precomputed_values
   in
-  ignore
-    ( Reader.Merge.iter
+  O1trace.background_thread "process_blocks" (fun () ->
+      Reader.Merge.iter
         (* It is fine to skip the cache layer on blocks produced by this node
            * because it is extraordinarily unlikely we would write an internal bug
            * triggering this case, and the external case (where we received an
@@ -261,7 +261,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
-          trace_recurring "transition_handler_processor" (fun () ->
+          O1trace.thread "transition_handler_processor" (fun () ->
               match msg with
               | `Catchup_breadcrumbs
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -334,8 +334,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                     Gauge.dec_one
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition transition ->
-                  process_transition ~transition))
-      : unit Deferred.t )
+                  process_transition ~transition)))
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -432,8 +431,9 @@ let%test_module "Transition_handler.Processor tests" =
                                [%test_eq: State_hash.t]
                                  (Transition_frontier.Breadcrumb.state_hash
                                     next_expected_breadcrumb)
-                                 (External_transition.Validated.state_hash
-                                    newly_added_transition) ;
+                                 (External_transition.Validated.state_hashes
+                                    newly_added_transition)
+                                   .state_hash ;
                                [%log info]
                                  ~metadata:
                                    [ ( "height"

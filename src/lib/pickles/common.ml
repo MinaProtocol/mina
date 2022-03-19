@@ -181,7 +181,7 @@ module Ipa = struct
             Or_infinity.Finite comm)
       in
       let urs = Backend.Tick.Keypair.load_urs () in
-      Run_in_thread.run_in_thread (fun () ->
+      Promise.run_in_thread (fun () ->
           Kimchi.Protocol.SRS.Fp.batch_accumulator_check urs
             (Array.map comms ~f:or_infinite_conv)
             chals)
@@ -228,20 +228,46 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
       (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
+    (* The poseidon and generic gates are special cases,
+       as they use coefficient commitments from the verifier index.
+       Note that for all gates, powers of alpha start at a^0 = 1.
+    *)
     let poseidon =
       let (pn :: ps) = Vector.rev m.coefficients_comm in
-      scale
-        (Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha))
-        plonk.poseidon_selector
-      |> negate
+      let res =
+        Vector.fold ~init:pn ps ~f:(fun acc c -> c + endoscale acc alpha)
+      in
+      scale res plonk.poseidon_selector |> negate
     in
+
+    (*
+    Remember, the layout of the generic gate:
+    | 0  |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 |
+    | l1 | r1 | o1 | m1 | c1 | l2 | r2 | o2 | m2 | c2 |
+    *)
     let generic =
       let coeffs = Vector.to_array m.coefficients_comm in
-      let (c0 :: cs) = plonk.generic in
-      Vector.foldi cs
-        ~init:(c0 * coeffs.(0))
-        ~f:(fun i acc c -> acc + (c * coeffs.(Int.(i + 1))))
+      let (generic_selector
+          :: l1 :: r1 :: o1 :: m1 :: l2 :: r2 :: o2 :: m2 :: _) =
+        plonk.generic
+      in
+      (* Second gate first, to multiply with a power of alpha. *)
+      let snd_gate = l2 * coeffs.(5) in
+      let snd_gate = snd_gate + (r2 * coeffs.(6)) in
+      let snd_gate = snd_gate + (o2 * coeffs.(7)) in
+      let snd_gate = snd_gate + (m2 * coeffs.(8)) in
+      let snd_gate = snd_gate + coeffs.(9) in
+      let snd_gate = endoscale snd_gate alpha in
+      (* And then the first gate. *)
+      let generic_gate = snd_gate + (l1 * coeffs.(0)) in
+      let generic_gate = generic_gate + (r1 * coeffs.(1)) in
+      let generic_gate = generic_gate + (o1 * coeffs.(2)) in
+      let generic_gate = generic_gate + (m1 * coeffs.(3)) in
+      let generic_gate = generic_gate + coeffs.(4) in
+      (* generic_selector * (fst_gate + snd_gate * alpha) *)
+      generic_selector * generic_gate
     in
+
     List.reduce_exn ~f:( + )
       [ plonk.perm * sigma_comm_last
       ; generic

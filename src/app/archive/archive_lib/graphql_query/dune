@@ -1,7 +1,18 @@
 (library
  (name graphql_query)
  (public_name graphql_query)
- (libraries core mina_base mina_transition graphql_lib)
+ (libraries
+   ;;opam libraries
+   core
+   yojson
+   core_kernel
+   ;;local libraries
+   block_time
+   currency
+   signature_lib
+   mina_base
+   mina_numbers
+ )
  (preprocessor_deps ../../archive_graphql_schema.json)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))

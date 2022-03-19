@@ -3,4 +3,26 @@
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda))
- (libraries core_kernel consensus mina_intf mina_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler test_genesis_ledger mina_networking ledger_catchup))
+ (libraries
+   ;; opam libraries
+   base
+   async_kernel
+   core_kernel
+   core
+   ;; local libraries
+   transition_frontier
+   data_hash_lib
+   mina_metrics
+   network_peer
+   cache_lib
+   mina_transition
+   o1trace
+   pipe_lib
+   mina_base
+   transition_handler
+   ledger_catchup
+   transition_frontier_extensions
+   transition_frontier_base
+   precomputed_values
+   logger
+))

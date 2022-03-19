@@ -23,7 +23,7 @@ locals {
     archiveAddress     = null
   }
 
-  snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, length(var.snark_worker_public_key) - 6, 6))}"
+  snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, -6, -1))}"
 
   default_archive_node = {
     image                   = var.mina_archive_image
@@ -37,7 +37,9 @@ locals {
     postgresDB              = "archive"
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
+    # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
     remoteSchemaFile        = var.mina_archive_schema
+    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
 
     persistenceEnabled      = true
     persistenceSize         = "8Gi"

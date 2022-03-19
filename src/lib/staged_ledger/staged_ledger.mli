@@ -1,7 +1,9 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
+module Ledger = Mina_ledger.Ledger
 
 type t [@@deriving sexp]
 
@@ -47,8 +49,10 @@ module Scan_state : sig
   (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
   val check_required_protocol_states :
        t
-    -> protocol_states:Mina_state.Protocol_state.value list
-    -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
+    -> protocol_states:
+         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+    -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+       Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -174,7 +178,7 @@ val create_diff :
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
-  -> epoch_ledger:Mina_base.Sparse_ledger.t
+  -> epoch_ledger:Mina_ledger.Sparse_ledger.t
   -> global_slot:Mina_numbers.Global_slot.t
   -> bool
 

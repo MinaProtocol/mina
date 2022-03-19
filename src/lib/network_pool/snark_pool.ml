@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
-open O1trace
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
@@ -104,6 +103,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> incoming_diffs:
          ( Resource_pool.Diff.t Envelope.Incoming.t
          * Mina_net2.Validation_callback.t )
@@ -273,106 +273,88 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
-        trace_recurring "handle_new_best_tip_ledger" (fun () ->
-            Throttle.enqueue t.snark_table_lock (fun () ->
-                let%map _ =
-                  let open Interruptible.Deferred_let_syntax in
-                  Interruptible.force
-                    (let%bind.Interruptible () =
-                       Interruptible.lift (Deferred.return ())
-                         (Base_ledger.detached_signal ledger)
-                     in
-                     let%bind prover_account_ids =
-                       trace_recurring
-                         "generate account ids of provers in snark table"
-                         (fun () ->
-                           let account_ids =
-                             t.snark_tables.all |> Statement_table.data
-                             |> List.map
-                                  ~f:(fun
-                                       { Priced_proof.fee = { prover; _ }; _ }
-                                     -> prover)
-                             |> List.dedup_and_sort
-                                  ~compare:Public_key.Compressed.compare
-                             |> List.map ~f:(fun prover ->
-                                    ( prover
-                                    , Account_id.create prover Token_id.default
-                                    ))
-                             |> Public_key.Compressed.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_ids))
-                     in
-                     (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                     let%bind prover_account_locations =
-                       trace_recurring
-                         "lookup prover account locations in best tip ledger"
-                         (fun () ->
-                           let account_locations =
-                             prover_account_ids |> Map.data
-                             |> Base_ledger.location_of_account_batch ledger
-                             |> Account_id.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_locations))
-                     in
-                     let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                     let%map () =
-                       trace_recurring
-                         "filter snark table based on best tip ledger"
-                         (fun () ->
-                           let open Deferred.Let_syntax in
-                           Statement_table.fold ~init:Deferred.unit
-                             t.snark_tables.all
-                             ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc
-                                ->
-                               let%bind () = acc in
-                               let%map () = yield () in
-                               let prover_account_exists =
-                                 prover
-                                 |> Map.find_exn prover_account_ids
-                                 |> Map.find_exn prover_account_locations
-                                 |> Option.is_some
-                               in
-                               let keep =
-                                 fee_is_sufficient t ~fee
-                                   ~account_exists:prover_account_exists
-                               in
-                               if not keep then (
-                                 Hashtbl.remove t.snark_tables.all key ;
-                                 Hashtbl.remove t.snark_tables.rebroadcastable
-                                   key )))
-                     in
-                     ())
-                in
-                ()))
+        Throttle.enqueue t.snark_table_lock (fun () ->
+            let%map _ =
+              let open Interruptible.Deferred_let_syntax in
+              Interruptible.force
+                (let%bind.Interruptible () =
+                   Interruptible.lift (Deferred.return ())
+                     (Base_ledger.detached_signal ledger)
+                 in
+                 let%bind prover_account_ids =
+                   let account_ids =
+                     t.snark_tables.all |> Statement_table.data
+                     |> List.map
+                          ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
+                            prover)
+                     |> List.dedup_and_sort
+                          ~compare:Public_key.Compressed.compare
+                     |> List.map ~f:(fun prover ->
+                            (prover, Account_id.create prover Token_id.default))
+                     |> Public_key.Compressed.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ()) ~f:(Fn.const account_ids)
+                 in
+                 (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                 let%bind prover_account_locations =
+                   let account_locations =
+                     prover_account_ids |> Map.data
+                     |> Base_ledger.location_of_account_batch ledger
+                     |> Account_id.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ())
+                     ~f:(Fn.const account_locations)
+                 in
+                 let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
+                 let%map () =
+                   let open Deferred.Let_syntax in
+                   Statement_table.fold ~init:Deferred.unit t.snark_tables.all
+                     ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc ->
+                       let%bind () = acc in
+                       let%map () = yield () in
+                       let prover_account_exists =
+                         prover
+                         |> Map.find_exn prover_account_ids
+                         |> Map.find_exn prover_account_locations
+                         |> Option.is_some
+                       in
+                       let keep =
+                         fee_is_sufficient t ~fee
+                           ~account_exists:prover_account_exists
+                       in
+                       if not keep then (
+                         Hashtbl.remove t.snark_tables.all key ;
+                         Hashtbl.remove t.snark_tables.rebroadcastable key ))
+                 in
+                 ())
+            in
+            ())
 
       let handle_new_refcount_table t
           ({ removed; refcount_table; best_tip_table } :
             Extensions.Snark_pool_refcount.view) =
-        trace_recurring "handle_new_refcount_table" (fun () ->
-            t.ref_table <- Some refcount_table ;
-            t.best_tip_table <- Some best_tip_table ;
-            t.removed_counter <- t.removed_counter + removed ;
-            if t.removed_counter >= removed_breadcrumb_wait then (
-              t.removed_counter <- 0 ;
-              Statement_table.filter_keys_inplace t.snark_tables.all
-                ~f:(fun k ->
-                  let keep = work_is_referenced t k in
-                  if not keep then
-                    Hashtbl.remove t.snark_tables.rebroadcastable k ;
-                  keep) ;
-              Mina_metrics.(
-                Gauge.set Snark_work.snark_pool_size
-                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
-            Deferred.unit)
+        t.ref_table <- Some refcount_table ;
+        t.best_tip_table <- Some best_tip_table ;
+        t.removed_counter <- t.removed_counter + removed ;
+        if t.removed_counter >= removed_breadcrumb_wait then (
+          t.removed_counter <- 0 ;
+          Statement_table.filter_keys_inplace t.snark_tables.all ~f:(fun k ->
+              let keep = work_is_referenced t k in
+              if not keep then Hashtbl.remove t.snark_tables.rebroadcastable k ;
+              keep) ;
+          Mina_metrics.(
+            Gauge.set Snark_work.snark_pool_size
+              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
 
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
-            handle_new_best_tip_ledger t ledger
+            O1trace.thread "apply_new_best_tip_ledger_to_snark_pool" (fun () ->
+                handle_new_best_tip_ledger t ledger)
         | `New_refcount_table refcount_table ->
-            handle_new_refcount_table t refcount_table
+            O1trace.sync_thread "apply_refcount_table_to_snark_pool" (fun () ->
+                handle_new_refcount_table t refcount_table) ;
+            Deferred.unit
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
@@ -408,7 +390,8 @@ struct
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+          ~expiry_ns:_ ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer
+          =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -671,7 +654,8 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
+      ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
+      ~frontier_broadcast_pipe =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -699,7 +683,7 @@ struct
           network_pool
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~incoming_diffs ~local_diffs
+            ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
             ~frontier_broadcast_pipe
     in
     store_periodically (resource_pool res) ;
@@ -707,7 +691,7 @@ struct
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
-include Make (Mina_base.Ledger) (Staged_ledger)
+include Make (Mina_ledger.Ledger) (Staged_ledger)
           (struct
             include Transition_frontier
 
@@ -773,6 +757,11 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int
+           precomputed_values.genesis_constants.transaction_expiry_hr)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -829,7 +818,7 @@ let%test_module "random set test" =
         let open Deferred.Let_syntax in
         let resource_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller
+            ~consensus_constants ~time_controller ~expiry_ns
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -1013,8 +1002,8 @@ let%test_module "random set test" =
           in
           let network_pool =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader ~logger
+              ~consensus_constants ~time_controller ~expiry_ns
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -1103,7 +1092,7 @@ let%test_module "random set test" =
             in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+                ~consensus_constants ~time_controller ~expiry_ns
                 ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
@@ -1181,7 +1170,7 @@ let%test_module "random set test" =
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~expiry_ns ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

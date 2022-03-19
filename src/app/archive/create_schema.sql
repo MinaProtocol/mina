@@ -34,7 +34,7 @@ CREATE INDEX idx_public_keys_value ON public_keys(value);
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , public_key_id           int       NOT NULL REFERENCES public_keys(id)
-, token                   bigint    NOT NULL
+, token                   text      NOT NULL
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
@@ -62,8 +62,8 @@ CREATE TABLE user_commands
 , fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token      bigint              NOT NULL
-, token          bigint              NOT NULL
+, fee_token      text                NOT NULL
+, token          text                NOT NULL
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -79,7 +79,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, token       bigint                NOT NULL
+, token       text                  NOT NULL
 , hash        text                  NOT NULL
 , UNIQUE (hash,type)
 );
@@ -127,7 +127,6 @@ CREATE TABLE blocks
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
 , min_window_density           bigint NOT NULL
 , total_currency               bigint NOT NULL
-, next_available_token         bigint NOT NULL
 , ledger_hash                  text   NOT NULL
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL
@@ -150,6 +149,7 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
     blocks_user_commands and blocks_internal_commands tables
    they are included here to allow Rosetta account queries to consume
     fewer Postgresql resources
+   TODO: nonce column is NULLable until we can establish valid nonces for all rows
 */
 
 CREATE TABLE balances
@@ -160,6 +160,7 @@ CREATE TABLE balances
 , block_height                 int    NOT NULL
 , block_sequence_no            int    NOT NULL
 , block_secondary_sequence_no  int    NOT NULL
+, nonce                        bigint
 , UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
 );
 
@@ -175,7 +176,7 @@ CREATE TABLE blocks_user_commands
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
-, created_token     bigint
+, created_token     text
 , fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
 , receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE

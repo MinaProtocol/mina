@@ -89,7 +89,8 @@ module "ci_testnet" {
   agent_send_every_mins = "1"
 
   archive_node_count  = 0
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/2f36b15d48e956e5242c0abc134f1fa7711398dd/src/app/archive/create_schema.sql"
+  mina_archive_schema = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"]
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
