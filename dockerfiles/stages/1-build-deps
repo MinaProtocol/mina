@@ -66,7 +66,10 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam \
   && chmod 440 /etc/sudoers.d/opam \
   && chown root:root /etc/sudoers.d/opam \
-  && chmod 777 /tmp
+  && chmod 777 /tmp \
+
+# --- Quiet git warnings about detatched head states, which are used frequently in later stages
+RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
@@ -99,7 +102,7 @@ RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
     || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
