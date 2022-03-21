@@ -10,30 +10,6 @@
     representation contains the given prefix (after the initial, fixed 'version
     byte').
 
-    ## Valid and invalid keys
-
-    The output public keys are annotated with `(valid)` or `(invalid)`,
-    depending on whether they correspond to 'valid' or 'invalid' public keys.
-
-    A Mina public key is a point on the Pallas elliptic curve, which we can
-    represent as a pair of Pallas base field elements `(x, y)`. These values
-    must satisfy the elliptic curve equation `y^2 = x^3 + 5` over the base
-    field.
-
-    In order to reduce the amount of data that is sent over the Mina network,
-    and to reduce the length of base58-check encoded public keys, the Mina key
-    format uses a 'compressed' representation.
-    This compressed representation is the coordinate `x` of the public key and
-    an `is_odd` boolean, where `is_odd` determines which value of `y` it
-    matches, either `y = sqrt(x^3 + 5)` or `y = -sqrt(x^3 + 5)`.
-
-    For some values of `x`, there is no square-root of `x^3 + 5` in the finite
-    field, and so there is no Mina public key with that `x` coordinate.
-    However, since we can choose any value of `x` in the 'compressed'
-    representation, it is possible to encode one of these values.
-    We call a compressed public key with no `y` coordinate 'invalid', and a
-    compressed public key where we can calculate the `y` coordinate 'valid'.
-
     ## Finding a private key for a public key generated with this tool
 
     A Mina private key is an element of the Pallas scalar field.
@@ -78,6 +54,30 @@
     case this situation changes in future. In the meantime, the statistical
     guarantees provided by a valid 'vanity' key should suffice for all
     practical uses.
+
+    ## Valid and invalid keys
+
+    The output public keys are annotated with `(valid)` or `(invalid)`,
+    depending on whether they correspond to 'valid' or 'invalid' public keys.
+
+    A Mina public key is a point on the Pallas elliptic curve, which we can
+    represent as a pair of Pallas base field elements `(x, y)`. These values
+    must satisfy the elliptic curve equation `y^2 = x^3 + 5` over the base
+    field.
+
+    In order to reduce the amount of data that is sent over the Mina network,
+    and to reduce the length of base58-check encoded public keys, the Mina key
+    format uses a 'compressed' representation.
+    This compressed representation is the coordinate `x` of the public key and
+    an `is_odd` boolean, where `is_odd` determines which value of `y` it
+    matches, either `y = sqrt(x^3 + 5)` or `y = -sqrt(x^3 + 5)`.
+
+    For some values of `x`, there is no square-root of `x^3 + 5` in the finite
+    field, and so there is no Mina public key with that `x` coordinate.
+    However, since we can choose any value of `x` in the 'compressed'
+    representation, it is possible to encode one of these values.
+    We call a compressed public key with no `y` coordinate 'invalid', and a
+    compressed public key where we can calculate the `y` coordinate 'valid'.
 *)
 
 open Core_kernel
