@@ -16,9 +16,9 @@ declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '
 for script in /entrypoint.d/* /entrypoint.d/.*; do
   if [[ "$( basename "${script}")" == *mina-env ]]; then
     source "${script}"
-  else if [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
+  elif [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
     source "${script}"
-  else if [[ -f "${script}" ]]; then
+  elif [[ -f "${script}" ]]; then
     "${script}" $INPUT_ARGS
   else
     echo "[ERROR] Entrypoint script ${script} is not a regular file, ignoring"
