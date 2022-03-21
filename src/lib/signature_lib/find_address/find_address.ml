@@ -23,7 +23,7 @@
     In order to reduce the amount of data that is sent over the Mina network,
     and to reduce the length of base58-check encoded public keys, the Mina key
     format uses a 'compressed' representation.
-    This compressed representation is the coorindate `x` of the public key and
+    This compressed representation is the coordinate `x` of the public key and
     an `is_odd` boolean, where `is_odd` determines which value of `y` it
     matches, either `y = sqrt(x^3 + 5)` or `y = -sqrt(x^3 + 5)`.
 
@@ -40,7 +40,7 @@
 
     A private key `a` can be transformed into a public key using `g` the
     'generator' point of the Pallas curve. To do this, `g` is 'scaled' by `a`
-    (equivalently, `g` is combined with itself `a` times in the Pallas curve).
+    (equivalently, `g` is added to itself `a` times in the Pallas curve).
     This is fairly cheap to do in practice via the double-and-add algorithm.
     See https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication for
     more information.
