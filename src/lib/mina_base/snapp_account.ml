@@ -3,7 +3,7 @@
 open Core_kernel
 open Snark_params.Tick
 open Snapp_basic
-module Events = ZKApps_events
+module Events = Zkapps_events
 
 module Sequence_events = struct
   let empty_hash = lazy Random_oracle.(salt "MinaSnappSequenceEmpty" |> digest)
