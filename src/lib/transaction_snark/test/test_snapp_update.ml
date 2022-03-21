@@ -272,7 +272,7 @@ module Make (Input : Input_intf) = struct
             ( match
                 Ledger.apply_transaction ledger ~constraint_constants
                   ~txn_state_view:
-                    (Mina_state.Protocol_state.Body.view U.state_body)
+                    (Mina_state.Protocol_state.Body.view U.genesis_state_body)
                   (Transaction.Command (Parties parties))
               with
             | Error e ->
