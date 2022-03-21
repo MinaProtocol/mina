@@ -1,3 +1,13 @@
 (executable
  (name find_address)
- (libraries core_kernel signature_lib))
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   ;; local libraries
+   pickles.backend
+   pickles
+   kimchi_pasta
+   kimchi_backend
+   signature_lib
+   snark_params))
