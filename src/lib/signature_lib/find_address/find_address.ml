@@ -30,8 +30,8 @@
     to check whether it is right.
 
     The probability of finding the private key for a given public key is
-    approximately `1 / 2^255` with guess-and-check; in other words, about 1 in
-    10000000000000000000000000000000000000000000000000000000000000000000000000000.
+    approximately `1 / 2^128` with the more-efficient Pollard's rho algorithm;
+    in other words, about 1 in 100000000000000000000000000000000000000.
 
     By using this tool to generate a public key with a sufficiently-large
     'vanity prefix', one can effectively choose an elliptic curve point's `x`
