@@ -3,7 +3,14 @@
  (public_name rosetta_coding)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel snark_params signature_lib)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ppx_inline_test.config
+   ;; local libraries
+   snark_params
+   signature_lib
+)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_assert ppx_let ppx_inline_test))

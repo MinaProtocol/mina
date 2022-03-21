@@ -1,6 +1,46 @@
 (library
  (name fake_network)
  (public_name fake_network)
- (libraries async core gadt_lib gossip_net mina_networking mina_ledger sync_handler)
+ (libraries
+   ;; opam libraries
+   core.uuid
+   core_kernel.uuid
+   async_unix
+   async
+   core
+   core_kernel
+   base.caml
+   async_kernel
+   sexplib0
+   ;; local libraries
+   snark_params
+   pickles
+   pickles.backend
+   genesis_constants
+   signature_lib
+   verifier
+   precomputed_values
+   block_time
+   trust_system
+   logger
+   consensus
+   transition_frontier
+   mina_base
+   gadt_lib
+   mina_networking
+   sync_handler
+   network_peer
+   staged_ledger
+   mina_state
+   with_hash
+   proof_carrying_data
+   mina_transition
+   coda_genesis_proof
+   transition_chain_prover
+   mina_ledger
+   kimchi
+   kimchi_backend.pasta
+   data_hash_lib
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std)))

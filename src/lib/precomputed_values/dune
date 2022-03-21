@@ -3,11 +3,22 @@
  (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
-   mina_base
+   ;; opam libraries
+   core
+   core_kernel
+   ;; local libraries
+   genesis_constants
+   mina_state
+   coda_genesis_proof
    crypto_params
+   mina_base
    dummy_values
-   genesis_proof
-   snarky.backendless)
+   snarky.backendless
+   coda_genesis_ledger
+   consensus
+   coda_runtime_config
+   test_genesis_ledger
+ )
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))

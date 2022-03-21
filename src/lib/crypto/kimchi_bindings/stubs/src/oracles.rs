@@ -2,10 +2,10 @@ use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::prover::ProverProof;
-use kimchi::{index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof};
+use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use oracle::{
     self,
-    poseidon::PlonkSpongeConstants15W,
+    poseidon::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
@@ -30,7 +30,7 @@ macro_rules! impl_oracles {
                 index: $index,
                 proof: CamlProverProof<$CamlG, $CamlF>,
             ) -> CamlOracles<$CamlF> {
-                let index: DlogVerifierIndex<$G> = index.into();
+                let index: VerifierIndex<$G> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                     .into_iter()
@@ -52,7 +52,7 @@ macro_rules! impl_oracles {
                 let proof: ProverProof<$G> = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstants15W>, DefaultFrSponge<$F, PlonkSpongeConstants15W>>(&index, &p_comm);
+                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm);
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,

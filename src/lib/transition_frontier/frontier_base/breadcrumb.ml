@@ -70,7 +70,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
     ~transition:
       (transition_with_validation : External_transition.Almost_validated.t)
     ~sender ~transition_receipt_time () =
-  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
+  O1trace.thread "build_breadcrumb" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation.validate_staged_ledger_diff
@@ -265,16 +265,11 @@ module For_tests = struct
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
         let payload : Signed_command.Payload.t =
-          Signed_command.Payload.create ~fee:Fee.zero
-            ~fee_token:Token_id.default ~fee_payer_pk:sender_pk ~nonce
-            ~valid_until:None ~memo:Signed_command_memo.dummy
+          Signed_command.Payload.create ~fee:Fee.zero ~fee_payer_pk:sender_pk
+            ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
-                 { source_pk = sender_pk
-                 ; receiver_pk
-                 ; token_id = token
-                 ; amount = send_amount
-                 })
+                 { source_pk = sender_pk; receiver_pk; amount = send_amount })
         in
         Signed_command.sign sender_keypair payload)
 
@@ -469,40 +464,15 @@ module For_tests = struct
       in
       List.rev ls
 
-  let build_fail ?skip_staged_ledger_verification ~logger ~precomputed_values
-      ~verifier ~trust_system ~parent
-      ~transition:
-        (transition_with_validation : External_transition.Almost_validated.t)
-      ~sender ~transition_receipt_time () :
+  let build_fail ?skip_staged_ledger_verification:_ ~logger:_
+      ~precomputed_values:_ ~verifier:_ ~trust_system:_ ~parent:_ ~transition:_
+      ~sender:_ ~transition_receipt_time:_ () :
       ( t
       , [> `Fatal_error of exn
         | `Invalid_staged_ledger_diff of Core_kernel.Error.t
         | `Invalid_staged_ledger_hash of Core_kernel.Error.t ] )
       result
       Async_kernel.Deferred.t =
-    O1trace.trace_recurring "Breadcrumb.build" (fun () ->
-        let _ = logger in
-        let _ = precomputed_values in
-        let _ = skip_staged_ledger_verification in
-        let _ = verifier in
-        let _ = sender in
-        let _ = transition_receipt_time in
-        let _ = trust_system in
-        let _ = parent in
-        let _ = transition_with_validation in
-
-        Deferred.return
-          (Error (`Fatal_error (failwith "deliberately failing for unit tests"))))
+    Deferred.return
+      (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
 end
-
-(*         match%bind
-          External_transition.Staged_ledger_validation
-          .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
-            ~precomputed_values ~verifier
-            ~parent_staged_ledger:(staged_ledger parent)
-            ~parent_protocol_state:
-              (External_transition.Validated.protocol_state
-                 parent.validated_transition)
-            transition_with_validation
-        with
-        | Ok  *)

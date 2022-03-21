@@ -4,7 +4,15 @@
  (public_name test_encodings)
  (modes native)
  (modules test_encodings)
- (libraries core_kernel signature_lib rosetta_lib)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   base
+   ;; local libraries
+   signature_lib
+   rosetta_lib
+   rosetta_coding
+)
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp)))

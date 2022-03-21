@@ -14,26 +14,48 @@
    ppx_deriving_yojson
    h_list.ppx))
  (libraries
-  digestif
-  mina_version
-  base58_check
-  base64
-  codable
-  kimchi_backend
-  random_oracle_input
-  pickles_base
-  pickles.composition_types
-  pickles.limb_vector
-  pickles.plonk_checks
-  pickles.precomputed
-  pickles.one_hot_vector
-  pickles.pseudo
-  snarky_log
-  sponge
-  group_map
-  snarky_group_map
-  snarky_curve
-  snarky.backendless
-  key_cache
-  core_kernel
-  snark_keys_header))
+   ;; opam libraries
+   stdio
+   integers
+   result
+   base.caml
+   bignum.bigint
+   core_kernel
+   base64
+   digestif
+   ppx_inline_test.config
+   sexplib0
+   base
+   async_kernel
+   bin_prot.shape
+   ;; local libraries
+   kimchi
+   kimchi_backend.pasta
+   bitstring_lib
+   snarky.intf
+   pickles.backend
+   pickles_types
+   snarky.backendless
+   snarky_group_map
+   sponge
+   pickles.pseudo
+   pickles.precomputed
+   pickles.limb_vector
+   pickles_base
+   kimchi_backend
+   mina_version
+   base58_check
+   codable
+   random_oracle_input
+   pickles.composition_types
+   pickles.plonk_checks
+   pickles.one_hot_vector
+   snarky_log
+   group_map
+   snarky_curve
+   key_cache
+   snark_keys_header
+   tuple_lib
+   promise
+   kimchi_backend.common
+))

@@ -6,15 +6,16 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps h_list.ppx ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
+   ;; opam libraries
+   base.base_internalhash_types
+   sexplib0
+   bin_prot.shape
+   base.caml
+   ppxlib
+   ppx_inline_test.config
+   core_kernel
+   ;; local libraries
+   snarky.backendless
    random_oracle_input
    pickles_types
-   ;    pickles.limb_vector
-   ;    pickles.marlin_checks
-   ;    pickles.one_hot_vector
-   ;    pickles.pseudo
-   ;    snarky_log
-   ;    sponge
-   ;    group_map
-   ;    snarky_group_map
-   ;    snarky_curve
-   core_kernel))
+))

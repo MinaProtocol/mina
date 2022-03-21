@@ -11,11 +11,6 @@ module Block_data : sig
       type t = Mina_state.Protocol_state.Body.Value.Stable.V2.t
       [@@deriving sexp]
     end
-
-    module V1 : sig
-      type t = Mina_state.Protocol_state.Body.Value.Stable.V1.t
-      [@@deriving sexp]
-    end
   end]
 
   type var
@@ -32,11 +27,6 @@ module Poly : sig
       type 'a t = { transaction : 'a; block_data : Block_data.Stable.V2.t }
       [@@deriving sexp]
     end
-
-    module V1 : sig
-      type 'a t = { transaction : 'a; block_data : Block_data.Stable.V1.t }
-      [@@deriving sexp]
-    end
   end]
 end
 
@@ -44,10 +34,6 @@ end
 module Stable : sig
   module V2 : sig
     type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
-  end
-
-  module V1 : sig
-    type 'a t = 'a Poly.Stable.V1.t [@@deriving sexp]
   end
 end]
 

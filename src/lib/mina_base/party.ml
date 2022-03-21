@@ -21,33 +21,6 @@ module type Type = sig
 end
 
 module Update = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'state_element
-             , 'pk
-             , 'vk
-             , 'perms
-             , 'snapp_uri
-             , 'token_symbol
-             , 'timing
-             , 'voting_for )
-             t =
-          { app_state : 'state_element Snapp_state.V.Stable.V1.t
-          ; delegate : 'pk
-          ; verification_key : 'vk
-          ; permissions : 'perms
-          ; snapp_uri : 'snapp_uri
-          ; token_symbol : 'token_symbol
-          ; timing : 'timing
-          ; voting_for : 'voting_for
-          }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
-      end
-    end]
-  end
-
   module Timing_info = struct
     [%%versioned
     module Stable = struct
@@ -59,7 +32,7 @@ module Update = struct
           ; vesting_period : Global_slot.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist, fields]
+        [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -194,10 +167,11 @@ module Update = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
         ~vesting_period:!.global_slot ~vesting_increment:!.amount
-      |> finish ~name:"Timing"
+      |> finish "Timing" ~t_toplevel_annots
   end
 
   open Snapp_basic
@@ -207,19 +181,22 @@ module Update = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t =
-        ( F.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
-        , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-          , F.Stable.V1.t )
-          With_hash.Stable.V1.t
-          Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        , string Set_or_keep.Stable.V1.t
-        , Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
-        , State_hash.Stable.V1.t Set_or_keep.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+        { app_state :
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Snapp_state.V.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; verification_key :
+            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
+            , F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
+        ; snapp_uri : string Set_or_keep.Stable.V1.t
+        ; token_symbol :
+            Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
+        }
+      [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
 
       let to_latest = Fn.id
     end
@@ -287,25 +264,29 @@ module Update = struct
         ; timing
         ; voting_for
         }
-        : _ Poly.t )
+        : t )
 
   module Checked = struct
     open Pickles.Impls.Step
 
     type t =
-      ( Field.t Set_or_keep.Checked.t
-      , Public_key.Compressed.var Set_or_keep.Checked.t
-      , ( Boolean.var
-        , (Side_loaded_verification_key.t option, Field.Constant.t) With_hash.t
-          Data_as_hash.t )
-        Snapp_basic.Flagged_option.t
-        Set_or_keep.Checked.t
-      , Permissions.Checked.t Set_or_keep.Checked.t
-      , string Data_as_hash.t Set_or_keep.Checked.t
-      , Account.Token_symbol.var Set_or_keep.Checked.t
-      , Timing_info.Checked.t Set_or_keep.Checked.t
-      , State_hash.var Set_or_keep.Checked.t )
-      Poly.t
+      { app_state : Field.t Set_or_keep.Checked.t Snapp_state.V.t
+      ; delegate : Public_key.Compressed.var Set_or_keep.Checked.t
+      ; verification_key :
+          ( Boolean.var
+          , ( Side_loaded_verification_key.t option
+            , Field.Constant.t )
+            With_hash.t
+            Data_as_hash.t )
+          Snapp_basic.Flagged_option.t
+          Set_or_keep.Checked.t
+      ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
+      ; snapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
+      ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
+      ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
+      ; voting_for : State_hash.var Set_or_keep.Checked.t
+      }
+    [@@deriving hlist]
 
     let to_input
         ({ app_state
@@ -386,7 +367,6 @@ module Update = struct
       ]
 
   let typ () : (Checked.t, t) Typ.t =
-    let open Poly in
     let open Pickles.Impls.Step in
     Typ.of_hlistable
       [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
@@ -424,13 +404,14 @@ module Update = struct
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
       ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
       ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let deriver obj =
     let open Fields_derivers_snapps in
-    finish ~name:"PartyUpdate"
-    @@ Poly.Fields.make_creator
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    finish "PartyUpdate" ~t_toplevel_annots
+    @@ Fields.make_creator
          ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
@@ -457,7 +438,7 @@ module Update = struct
          { With_hash.data; hash })
     in
     let update : t =
-      { Poly.app_state
+      { app_state
       ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
       ; permissions = Set_or_keep.Set Permissions.user_default
@@ -476,55 +457,105 @@ module Events = Snapp_account.Events
 module Sequence_events = Snapp_account.Sequence_events
 
 module Body = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'pk
-             , 'update
-             , 'token_id
-             , 'amount
-             , 'events
-             , 'call_data
-             , 'int
-             , 'bool
-             , 'protocol_state )
-             t =
-          { public_key : 'pk
-          ; update : 'update
-          ; token_id : 'token_id
-          ; balance_change : 'amount
-          ; increment_nonce : 'bool
-          ; events : 'events
-          ; sequence_events : 'events
-          ; call_data : 'call_data
-          ; call_depth : 'int
-          ; protocol_state : 'protocol_state
-          ; use_full_commitment : 'bool
-          }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
-      end
-    end]
+  module Poly
+      (Public_key : Type)
+      (Token_id : Type)
+      (Update : Type)
+      (Amount : Type)
+      (Events : Type)
+      (Call_data : Type)
+      (Int : Type)
+      (Bool : Type)
+      (Protocol_state : Type) =
+  struct
+    (** Body component of a party *)
+    type t =
+      { public_key : Public_key.t
+      ; token_id : Token_id.t
+      ; update : Update.t
+      ; balance_change : Amount.t
+      ; increment_nonce : Bool.t
+      ; events : Events.t
+      ; sequence_events : Events.t
+      ; call_data : Call_data.t
+      ; call_depth : Int.t
+      ; protocol_state : Protocol_state.t
+      ; use_full_commitment : Bool.t
+      }
   end
 
   (* Why isn't this derived automatically? *)
   let hash_fold_array f init x = Array.fold ~init ~f x
 
+  module Int = struct
+    include Int
+
+    type t = int [@@deriving sexp, equal, yojson, hash, compare]
+  end
+
+  module Bool = struct
+    include Bool
+
+    type t = bool [@@deriving sexp, equal, yojson, hash, compare]
+  end
+
+  module Unit = struct
+    include Unit
+
+    type t = unit [@@deriving sexp, equal, yojson, hash, compare]
+  end
+
+  module Amount_sgn_signed_poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        [@@deriving sexp, equal, hash, compare, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Events' = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Pickles.Backend.Tick.Field.Stable.V1.t array list
+        [@@deriving sexp, equal, hash, compare, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Update.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-        , Pickles.Backend.Tick.Field.Stable.V1.t array list
-        , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-        , int
-        , bool
-        , Snapp_predicate.Protocol_state.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+            Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
+              (Update.Stable.V1)
+              (Amount_sgn_signed_poly.Stable.V1)
+              (Events'.Stable.V1)
+              (Pickles.Backend.Tick.Field.Stable.V1)
+              (Int)
+              (Bool)
+              (Snapp_predicate.Protocol_state.Stable.V1)
+            .t
+            (* Opaque to txn logic *) =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V1.t
+        ; update : Update.Stable.V1.t
+        ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+        ; increment_nonce : bool
+        ; events : Events'.Stable.V1.t
+        ; sequence_events : Events'.Stable.V1.t
+        ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+        ; call_depth : int
+        ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+        ; use_full_commitment : bool
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -543,17 +574,28 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Public_key.Compressed.Stable.V1.t
-          , Update.Stable.V1.t
-          , unit
-          , Fee.Stable.V1.t
-          , Pickles.Backend.Tick.Field.Stable.V1.t array list
-          , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *)
-          , int
-          , unit
-          , Snapp_predicate.Protocol_state.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
+              Poly(Public_key.Compressed.Stable.V1)(Unit)(Update.Stable.V1)
+                (Fee.Stable.V1)
+                (Events'.Stable.V1)
+                (Pickles.Backend.Tick.Field.Stable.V1)
+                (Int)
+                (Unit)
+                (Snapp_predicate.Protocol_state.Stable.V1)
+              .t
+              (* Opaque to txn logic *) =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : unit [@skip]
+          ; update : Update.Stable.V1.t
+          ; balance_change : Fee.Stable.V1.t
+          ; increment_nonce : unit [@skip]
+          ; events : Events'.Stable.V1.t
+          ; sequence_events : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+          ; use_full_commitment : unit [@skip]
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -561,8 +603,8 @@ module Body = struct
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; update = Update.dummy
       ; token_id = ()
+      ; update = Update.dummy
       ; balance_change = Fee.zero
       ; increment_nonce = ()
       ; events = []
@@ -579,16 +621,16 @@ module Body = struct
         iso_string obj ~name:"Fee" ~to_string:Fee.to_string
           ~of_string:Fee.of_string
       in
-      Poly.Fields.make_creator obj ~public_key:!.public_key
-        ~update:!.Update.deriver ~token_id:!.unit ~balance_change:!.fee
-        ~increment_nonce:!.unit
+      let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
+      let unit = ( !. ) ~skip_data:() skip in
+      Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
+        ~token_id:unit ~balance_change:!.fee ~increment_nonce:unit
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
         ~call_data:!.field ~call_depth:!.int
         ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
-        ~use_full_commitment:!.unit
-      |> finish ~name:"FeePayerPartyBody"
-           ~doc:"Body component of a snapp Fee Payer Party"
+        ~use_full_commitment:unit
+      |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let open Fields_derivers_snapps.Derivers in
@@ -598,33 +640,62 @@ module Body = struct
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
-    { t with
-      balance_change =
+    { public_key = t.public_key
+    ; token_id = Token_id.default
+    ; update = t.update
+    ; balance_change =
         { Signed_poly.sgn = Sgn.Neg
         ; magnitude = Amount.of_fee t.balance_change
         }
-    ; token_id = Token_id.default
     ; increment_nonce = true
+    ; events = t.events
+    ; sequence_events = t.sequence_events
+    ; call_data = t.call_data
+    ; call_depth = t.call_depth
+    ; protocol_state = t.protocol_state
     ; use_full_commitment = true
     }
 
   module Checked = struct
+    module Type_of_var (V : sig
+      type var
+    end) =
+    struct
+      type t = V.var
+    end
+
+    module Int_as_prover_ref = struct
+      type t = int As_prover.Ref.t
+    end
+
     type t =
-      ( Public_key.Compressed.var
-      , Update.Checked.t
-      , Token_id.Checked.t
-      , Amount.Signed.var
-      , Events.var
-      , Field.Var.t
-      , int As_prover.Ref.t
-      , Boolean.var
-      , Snapp_predicate.Protocol_state.Checked.t )
-      Poly.t
+          Poly(Type_of_var(Public_key.Compressed))(Token_id.Checked)
+            (Update.Checked)
+            (Type_of_var(Amount.Signed))
+            (Type_of_var(Events))
+            (Field.Var)
+            (Int_as_prover_ref)
+            (Type_of_var(Boolean))
+            (Snapp_predicate.Protocol_state.Checked)
+          .t =
+      { public_key : Public_key.Compressed.var
+      ; token_id : Token_id.Checked.t
+      ; update : Update.Checked.t
+      ; balance_change : Amount.Signed.var
+      ; increment_nonce : Boolean.var
+      ; events : Events.var
+      ; sequence_events : Events.var
+      ; call_data : Field.Var.t
+      ; call_depth : int As_prover.Ref.t
+      ; protocol_state : Snapp_predicate.Protocol_state.Checked.t
+      ; use_full_commitment : Boolean.var
+      }
+    [@@deriving annot, hlist, fields]
 
     let to_input
         ({ public_key
-         ; update
          ; token_id
+         ; update
          ; balance_change
          ; increment_nonce
          ; events
@@ -657,11 +728,10 @@ module Body = struct
   end
 
   let typ () : (Checked.t, t) Typ.t =
-    let open Poly in
     Typ.of_hlistable
       [ Public_key.Compressed.typ
-      ; Update.typ ()
       ; Token_id.typ
+      ; Update.typ ()
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
@@ -671,8 +741,8 @@ module Body = struct
       ; Snapp_predicate.Protocol_state.typ
       ; Impl.Boolean.typ
       ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let dummy : t =
     { public_key = Public_key.Compressed.empty
@@ -713,19 +783,24 @@ module Body = struct
         iso_string ~name:"Sign" ~to_string:sign_to_string
           ~of_string:sign_of_string
       in
+      let ( !. ) =
+        ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots
+      in
       Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
         ~sgn:!.sign_deriver
-      |> finish ~name:"Balance Change"
+      |> finish "BalanceChange"
+           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
     in
-    Poly.Fields.make_creator obj ~public_key:!.public_key
-      ~update:!.Update.deriver ~token_id:!.token_id_deriver
-      ~balance_change:!.balance_change_deriver ~increment_nonce:!.bool
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
+      ~token_id:!.token_id_deriver ~balance_change:!.balance_change_deriver
+      ~increment_nonce:!.bool
       ~events:!.(list @@ array field @@ o ())
       ~sequence_events:!.(list @@ array field @@ o ())
       ~call_data:!.field ~call_depth:!.int
       ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
       ~use_full_commitment:!.bool
-    |> finish ~name:"PartyBody" ~doc:"Body component of a snapp Party"
+    |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let open Fields_derivers_snapps.Derivers in
@@ -896,7 +971,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
   end
@@ -913,9 +988,10 @@ module Predicated = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
       ~predicate:!.Predicate.deriver
-    |> finish ~name:"SnappPartyPredicated"
+    |> finish "SnappPartyPredicated" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let to_input ({ body; predicate } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -1018,10 +1094,11 @@ module Predicated = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
         ~predicate:!.uint32
-      |> finish ~name:"SnappPartyPredicatedFeePayer"
-           ~doc:"A party to a snapp transaction with a nonce predicate"
+      |> finish "ZkappPartyPredicatedFeePayer"
+           ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
   module Empty = struct
@@ -1095,7 +1172,7 @@ module Fee_payer = struct
         { data : Predicated.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1111,11 +1188,11 @@ module Fee_payer = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
       ~data:!.Predicated.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
-    |> finish ~name:"SnappPartyFeePayer"
-         ~doc:"A party to a snapp transaction with a signature authorization"
+    |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
@@ -1133,7 +1210,7 @@ module Empty = struct
     module V1 = struct
       type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
         { data : Predicated.Empty.Stable.V1.t; authorization : unit }
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving annot, sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -1143,9 +1220,10 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
+    (** A party to a zkApp transaction *)
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
       { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
-    [@@deriving sexp, equal, yojson, hash, compare, fields]
+    [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
     let to_latest = Fn.id
   end
@@ -1163,10 +1241,10 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
   }
 
 (** The change in balance to apply to the target account of this party.
-    When this is negative, the amount will be withdrawn from the account and
-    made available to later parties in the same transaction.
-    When this is positive, the amount will be deposited into the account from
-    the funds made available by previous parties in the same transaction.
+      When this is negative, the amount will be withdrawn from the account and
+      made available to later parties in the same transaction.
+      When this is positive, the amount will be deposited into the account from
+      the funds made available by previous parties in the same transaction.
 *)
 let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 
@@ -1183,9 +1261,10 @@ let increment_nonce (t : t) : bool = t.data.body.increment_nonce
 
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
-  |> finish ~name:"SnappParty" ~doc:"A party to a snapp transaction"
+  |> finish "ZkappParty" ~t_toplevel_annots
 
 let%test_unit "json roundtrip dummy" =
   let dummy : t =

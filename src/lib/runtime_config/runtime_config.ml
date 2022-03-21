@@ -110,8 +110,7 @@ module Json_layout = struct
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
@@ -126,8 +125,7 @@ module Json_layout = struct
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
-          [| "stake"
-           ; "edit_state"
+          [| "edit_state"
            ; "send"
            ; "receive"
            ; "set_delegate"
@@ -235,7 +233,7 @@ module Json_layout = struct
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
-        ; token : Unsigned_extended.UInt64.t option [@default None]
+        ; token : string option [@default None]
         ; token_permissions : Token_permissions.t option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
@@ -495,7 +493,7 @@ module Accounts = struct
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
       ; timing : Timed.t option
-      ; token : Unsigned_extended.UInt64.Stable.Latest.t option
+      ; token : string option
       ; token_permissions : Token_permissions.t option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
@@ -526,7 +524,7 @@ module Accounts = struct
     ; balance : Currency.Balance.t
     ; delegate : string option
     ; timing : Single.Timed.t option
-    ; token : Unsigned_extended.UInt64.t option
+    ; token : string option
     ; token_permissions : Single.Token_permissions.t option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option

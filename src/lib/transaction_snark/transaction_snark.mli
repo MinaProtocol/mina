@@ -1,5 +1,6 @@
 open Core
 open Mina_base
+open Mina_transaction
 open Snark_params
 open Mina_state
 module Transaction_validator = Transaction_validator
@@ -70,20 +71,17 @@ module Statement : sig
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
-             , 'token_id
              , 'sok_digest
              , 'local_state )
              t =
           { source :
               ( 'ledger_hash
               , 'pending_coinbase
-              , 'token_id
               , 'local_state )
               Registers.Stable.V1.t
           ; target :
               ( 'ledger_hash
               , 'pending_coinbase
-              , 'token_id
               , 'local_state )
               Registers.Stable.V1.t
           ; supply_increase : 'amount
@@ -92,57 +90,29 @@ module Statement : sig
           }
         [@@deriving compare, equal, hash, sexp, yojson, hlist]
       end
-
-      module V1 : sig
-        type ( 'ledger_hash
-             , 'amount
-             , 'pending_coinbase
-             , 'fee_excess
-             , 'token_id
-             , 'sok_digest )
-             t
-
-        (* =
-             { source: 'ledger_hash
-             ; target: 'ledger_hash
-             ; supply_increase: 'amount
-             ; pending_coinbase_stack_state: 'pending_coinbase
-             ; fee_excess: 'fee_excess
-             ; next_available_token_before: 'token_id
-             ; next_available_token_after: 'token_id
-             ; sok_digest: 'sok_digest }
-           [@@deriving compare, equal, hash, sexp, yojson]
-
-           val to_latest :
-                ('ledger_hash -> 'ledger_hash')
-             -> ('amount -> 'amount')
-             -> ('pending_coinbase -> 'pending_coinbase')
-             -> ('fee_excess -> 'fee_excess')
-             -> ('token_id -> 'token_id')
-             -> ('sok_digest -> 'sok_digest')
-             -> ( 'ledger_hash
-                , 'amount
-                , 'pending_coinbase
-                , 'fee_excess
-                , 'token_id
-                , 'sok_digest )
-                t
-             -> ( 'ledger_hash'
-                , 'amount'
-                , 'pending_coinbase'
-                , 'fee_excess'
-                , 'token_id'
-                , 'sok_digest' )
-                t *)
-      end
     end]
+
+    val with_empty_local_state :
+         supply_increase:'amount
+      -> fee_excess:'fee_excess
+      -> sok_digest:'sok_digest
+      -> source:'ledger_hash
+      -> target:'ledger_hash
+      -> pending_coinbase_stack_state:
+           'pending_coinbase Pending_coinbase_stack_state.poly
+      -> ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , Mina_transaction_logic.Parties_logic.Local_state.Value.t )
+         t
   end
 
   type ( 'ledger_hash
        , 'amount
        , 'pending_coinbase
        , 'fee_excess
-       , 'token_id
        , 'sok_digest
        , 'local_state )
        poly =
@@ -150,14 +120,11 @@ module Statement : sig
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
-        , 'token_id
         , 'sok_digest
         , 'local_state )
         Poly.t =
-    { source :
-        ('ledger_hash, 'pending_coinbase, 'token_id, 'local_state) Registers.t
-    ; target :
-        ('ledger_hash, 'pending_coinbase, 'token_id, 'local_state) Registers.t
+    { source : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
+    ; target : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
     ; supply_increase : 'amount
     ; fee_excess : 'fee_excess
     ; sok_digest : 'sok_digest
@@ -172,25 +139,10 @@ module Statement : sig
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Token_id.Stable.V1.t
         , unit
         , Local_state.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
-    end
-
-    module V1 : sig
-      type t =
-        ( Frozen_ledger_hash.Stable.V1.t
-        , Currency.Amount.Stable.V1.t
-        , Pending_coinbase_stack_state.Stable.V1.t
-        , Fee_excess.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , unit )
-        Poly.Stable.V1.t
-      [@@deriving compare, equal, hash, sexp, yojson]
-
-      val to_latest : t -> V2.t
     end
   end]
 
@@ -203,22 +155,9 @@ module Statement : sig
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
-          , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
           , Local_state.Stable.V1.t )
           Poly.Stable.V2.t
-        [@@deriving compare, equal, hash, sexp, yojson]
-      end
-
-      module V1 : sig
-        type t =
-          ( Frozen_ledger_hash.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
-          , Pending_coinbase_stack_state.Stable.V1.t
-          , Fee_excess.Stable.V1.t
-          , Token_id.Stable.V1.t
-          , Sok_message.Digest.Stable.V1.t )
-          Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
@@ -228,7 +167,6 @@ module Statement : sig
       , Currency.Amount.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
-      , Token_id.var
       , Sok_message.Digest.Checked.t
       , Local_state.Checked.t )
       Poly.t
@@ -314,8 +252,6 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> next_available_token_before:Token_id.t
-  -> next_available_token_after:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
@@ -329,8 +265,6 @@ val check_user_command :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> next_available_token_before:Token_id.t
-  -> next_available_token_after:Token_id.t
   -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -343,8 +277,6 @@ val generate_transaction_witness :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> next_available_token_before:Token_id.t
-  -> next_available_token_after:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
@@ -429,7 +361,7 @@ type local_state =
   , bool
   , unit
   , Transaction_status.Failure.t option )
-  Parties_logic.Local_state.t
+  Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
 
@@ -525,6 +457,39 @@ val constraint_system_digests :
 val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
 
 module Base : sig
+  val check_timing :
+       balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> timed_balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> account:
+         ( 'b
+         , 'c
+         , 'd
+         , 'e
+         , Currency.Balance.var
+         , 'f
+         , 'g
+         , 'h
+         , 'i
+         , ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+         , 'j
+         , 'k
+         , 'l )
+         Account.Poly.t
+    -> txn_amount:Currency.Amount.var option
+    -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+    -> ( [> `Min_balance of Currency.Balance.var ]
+         * ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+       , 'a )
+       Tick.Checked.t
+
   module Parties_snark : sig
     val main :
          ?witness:Parties_segment.Witness.t
@@ -544,7 +509,7 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypair : Signature_lib.Keypair.t option
+      ; snapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
       ; new_snapp_account : bool
       ; snapp_update : Party.Update.t
@@ -561,19 +526,44 @@ module For_tests : sig
     -> Spec.t
     -> Parties.t
 
-  val update_state :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+  val update_states :
+       ?snapp_prover:
+         ( unit
+         , unit
+         , unit
+         , Snapp_statement.t
+         , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+         Pickles.Prover.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
-    -> (Parties.t * (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t)
-       Async.Deferred.t
+    -> Parties.t Async.Deferred.t
 
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
     -> snapp_kp:Signature_lib.Keypair.t
-    -> Transaction_logic.For_tests.Transaction_spec.t
+    -> Mina_transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
+
+  val create_trivial_snapp_account :
+       ?permissions:Permissions.t
+    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> ledger:Mina_ledger.Ledger.t
+    -> Account.key
+    -> unit
+
+  val create_trivial_snapp :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> unit
+    -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+       * [> `Prover of
+            ( unit
+            , unit
+            , unit
+            , Snapp_statement.t
+            , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+            Pickles.Prover.t ]
 
   val multiple_transfers : Spec.t -> Parties.t
 end

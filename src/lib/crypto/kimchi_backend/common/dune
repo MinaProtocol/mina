@@ -14,18 +14,30 @@
    ppx_deriving.std
    h_list.ppx))
  (libraries
-  hex
-  digestif
-  pickles_types
-  kimchi
-  key_cache
-  sgn_type
-  snarky.backendless
-  sponge
-  snarkette
-  core_kernel
-  integers
-  allocation_functor))
+   ;; opam libraries
+   result
+   async_kernel
+   sexplib0
+   bin_prot.shape
+   integers
+   digestif
+   core_kernel
+   base.caml
+   ppx_inline_test.config
+   bignum.bigint
+   base.base_internalhash_types
+   ;; local libraries
+   tuple_lib
+   snarky.backendless
+   key_cache
+   pickles_types
+   hex
+   kimchi
+   sponge
+   allocation_functor
+   snarky.intf
+   promise
+))
 
 (rule
  (targets version.ml)

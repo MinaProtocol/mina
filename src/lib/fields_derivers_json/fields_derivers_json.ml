@@ -13,19 +13,28 @@ module To_yojson = struct
 
   module Accumulator = struct
     type ('input_type, 'a, 'c) t =
-      < to_json_accumulator : (string * ('input_type -> Yojson.Safe.t)) list ref
+      < to_json_accumulator :
+          (string * ('input_type -> Yojson.Safe.t)) option list ref
       ; .. >
       as
       'a
       constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
-  let add_field t_field field acc =
+  let add_field ~t_fields_annots t_field field acc =
+    let annotations =
+      Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+        (Field.name field)
+    in
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
-      ( Fields_derivers.name_under_to_camel field
-      , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
-      )
+      ( if annotations.skip then None
+      else
+        ( Option.value annotations.name
+            ~default:(Fields_derivers.name_under_to_camel field)
+        , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
+        )
+        |> Option.return )
       :: rest ;
     ((fun _ -> failwith "Unused"), acc)
 
@@ -35,8 +44,15 @@ module To_yojson = struct
     (obj#to_json :=
        fun t ->
          `Assoc
-           ( List.map to_json_accumulator ~f:(fun (name, f) -> (name, f t))
+           ( List.filter_map to_json_accumulator
+               ~f:(Option.map ~f:(fun (name, f) -> (name, f t)))
            |> List.rev )) ;
+    obj
+
+  let skip obj =
+    obj#contramap := Fn.id ;
+    (obj#to_json :=
+       fun _ -> failwith "Unexpected: This obj#to_json should be skipped") ;
     obj
 
   let int obj =
@@ -87,15 +103,41 @@ module Of_yojson = struct
       constraint ('input_type, 'a, 'c) t = ('input_type, 'a, 'c) Input.t
   end
 
-  let add_field : ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
+  exception Field_not_found of string
+
+  let add_field ?skip_data ~t_fields_annots :
+      ('t, 'a, 'c) Input.t -> 'field -> 'obj -> 'creator * 'obj =
    fun t_field field acc_obj ->
+    let annotations =
+      Fields_derivers.Annotations.Fields.of_annots t_fields_annots
+        (Field.name field)
+    in
     let creator finished_obj =
       let map = !(finished_obj#of_json_creator) in
       !(t_field#map)
-        (!(t_field#of_json)
-           (Map.find_exn map (Fields_derivers.name_under_to_camel field)))
+        ( if annotations.skip then
+          match skip_data with
+          | Some x ->
+              x
+          | None ->
+              failwith
+                "If you are skipping a field in of_json but intend on building \
+                 this field, you must provide skip_data to add_field!"
+        else
+          !(t_field#of_json)
+            (let name =
+               Option.value annotations.name
+                 ~default:(Fields_derivers.name_under_to_camel field)
+             in
+             match Map.find map name with
+             | None ->
+                 raise (Field_not_found name)
+             | Some x ->
+                 x) )
     in
     (creator, acc_obj)
+
+  exception Json_not_object
 
   let finish (creator, obj) =
     let of_json json =
@@ -104,31 +146,45 @@ module Of_yojson = struct
           obj#of_json_creator := String.Map.of_alist_exn pairs ;
           creator obj
       | _ ->
-          failwith "todo"
+          raise Json_not_object
     in
     obj#map := Fn.id ;
     obj#of_json := of_json ;
     obj
 
-  (* TODO: Replace failwith's exception *)
+  exception Invalid_json_scalar of [ `Int | `String | `Bool | `List ]
+
+  let skip obj =
+    obj#contramap := Fn.id ;
+    (obj#of_json :=
+       fun _ -> failwith "Unexpected: This obj#of_json should be skipped") ;
+    obj
+
   let int obj =
-    (obj#of_json := function `Int x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `Int x -> x | _ -> raise (Invalid_json_scalar `Int)) ;
     obj#map := Fn.id ;
     obj
 
   let string obj =
-    (obj#of_json := function `String x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `String x -> x | _ -> raise (Invalid_json_scalar `String)) ;
     obj#map := Fn.id ;
     obj
 
   let bool obj =
-    (obj#of_json := function `Bool x -> x | _ -> failwith "todo") ;
+    (obj#of_json :=
+       function `Bool x -> x | _ -> raise (Invalid_json_scalar `Bool)) ;
     obj#map := Fn.id ;
     obj
 
   let list x obj =
     (obj#of_json :=
-       function `List xs -> List.map xs ~f:!(x#of_json) | _ -> failwith "todo") ;
+       function
+       | `List xs ->
+           List.map xs ~f:!(x#of_json)
+       | _ ->
+           raise (Invalid_json_scalar `List)) ;
     obj#map := List.map ~f:!(x#map) ;
     obj
 
@@ -146,9 +202,10 @@ end
 
 let%test_module "Test" =
   ( module struct
-    type t = { foo_hello : int; bar : string list } [@@deriving fields]
+    type t = { foo_hello : int; skipped : int [@skip]; bar : string list }
+    [@@deriving annot, fields]
 
-    let v = { foo_hello = 1; bar = [ "baz1"; "baz2" ] }
+    let v = { foo_hello = 1; skipped = 0; bar = [ "baz1"; "baz2" ] }
 
     let m =
       {json|{ fooHello: 1, bar: ["baz1", "baz2"] }|json}
@@ -200,14 +257,19 @@ let%test_module "Test" =
 
     let to_json obj =
       let open To_yojson in
-      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
-      Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
+      let ( !. ) x fd acc = add_field ~t_fields_annots (x @@ o ()) fd acc in
+      Fields.make_creator obj ~foo_hello:!.int ~skipped:!.skip
+        ~bar:!.(list @@ string @@ o ())
       |> finish
 
     let of_json obj =
       let open Of_yojson in
-      let ( !. ) x fd acc = add_field (x @@ o ()) fd acc in
-      Fields.make_creator obj ~foo_hello:!.int ~bar:!.(list @@ string @@ o ())
+      let ( !. ) ?skip_data x fd acc =
+        add_field ?skip_data ~t_fields_annots (x @@ o ()) fd acc
+      in
+      Fields.make_creator obj ~foo_hello:!.int
+        ~skipped:(( !. ) ~skip_data:0 skip)
+        ~bar:!.(list @@ string @@ o ())
       |> finish
 
     let both_json obj =
