@@ -79,7 +79,7 @@ module As_field = struct
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
         if is_array then
           (* Cvar case *)
-          (* TODO: Check this works *)
+          (* TODO: Make this conversion more robust by rejecting invalid cases *)
           Obj.magic value
         else
           (* Object case *)
@@ -151,7 +151,7 @@ module As_bool = struct
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
         if is_array then
           (* Cvar case *)
-          (* TODO: Check this works *)
+          (* TODO: Make this conversion more robust by rejecting invalid cases *)
           Obj.magic value
         else
           (* Object case *)
@@ -1659,17 +1659,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     let prove (statement_js : snapp_statement_js) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
-      (* let prevs = Statement_with_proof.([]) in *)
       let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
     prove
   in
-  (* TODO: would be nice to have a general map function, which maps an H3_2 to something independent of all 3 heterogeneous type params *)
   let rec to_js_provers :
       type a b c.
          (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
-         (* (_, _, _, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t *)
       -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
     function
     | [] ->
@@ -2604,7 +2601,7 @@ module Ledger = struct
         (* TODO: this is not yet working!
            * lacking API to create a proper tx on the JS side (authorization)
         *)
-        T.apply_transaction_pure l##.value
+        T.apply_transaction l##.value
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
           ~txn_state_view:
             { snarked_ledger_hash = Field.Constant.zero
