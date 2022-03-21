@@ -1,6 +1,7 @@
 /* eslint-env node */
 let fs = require("fs");
 let path = require("path");
+let childProcess = require("child_process");
 
 let dir = path.dirname(__filename);
 let resolve = (file) => path.resolve(dir, file);
@@ -19,9 +20,14 @@ if (!nodeModulesExists) {
   fs.writeFileSync(`${nodeModules}/env/index.js`, "module.exports = {};");
   fs.mkdirSync(`${nodeModules}/snarkyjs`);
 }
+
+function copy(source, target) {
+  return childProcess.execSync(`cp -R ${source} ${target}`);
+}
+
 // copy over js artifacts
 try {
-  fs.cpSync(snarkyPath, `${nodeModules}/snarkyjs/index.js`);
+  copy(snarkyPath, `${nodeModules}/snarkyjs/index.js`);
 } catch (err) {
   console.log(
     "Error: Cannot find snarky_js_node.bc.js. Did you forget to run `dune build`?"
@@ -32,7 +38,7 @@ try {
 fs.readdirSync(wasmPath)
   .filter((f) => f.startsWith("plonk_wasm"))
   .forEach((file) => {
-    fs.cpSync(`${wasmPath}/${file}`, `${nodeModules}/snarkyjs/${file}`);
+    copy(`${wasmPath}/${file}`, `${nodeModules}/snarkyjs/${file}`);
   });
 
 let snarkyjs = require("snarkyjs");
