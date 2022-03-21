@@ -42,7 +42,10 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
+            breadcrumb
+            |> Transition_frontier.Breadcrumb.validated_block
+            |> Mina_block.Validated.valid_commands
+            |> List.exists
               ~f:(fun { data = cmd'; _ } ->
                 match cmd' with
                 | Snapp_command _ ->

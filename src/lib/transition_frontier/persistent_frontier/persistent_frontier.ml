@@ -2,25 +2,26 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
 open Frontier_base
 module Database = Database
 
-exception Invalid_genesis_state_hash of External_transition.Validated.t
+exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root
-    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
+    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_block
     ~root ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
-  let snarked_ledger_hash =
-    External_transition.Validated.blockchain_state root_transition
-    |> Blockchain_state.snarked_ledger_hash
+  let blockchain_state =
+    root_block
+    |> Mina_block.Validated.forget
+    |> With_hash.data
+    |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+    |> Protocol_state.blockchain_state
   in
-  let snarked_next_available_token =
-    External_transition.Validated.blockchain_state root_transition
-    |> Blockchain_state.snarked_next_available_token
-  in
+  let snarked_ledger_hash = Blockchain_state.snarked_ledger_hash blockchain_state in
+  let snarked_next_available_token = Blockchain_state.snarked_next_available_token blockchain_state in
   let scan_state = scan_state root in
   let pending_coinbase = pending_coinbase root in
   let protocol_states_map =
@@ -157,7 +158,7 @@ module Instance = struct
   let get_root_transition t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db
-    >>= Database.get_transition t.db
+    >>= Database.get_block t.db
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -186,48 +187,39 @@ module Instance = struct
       ~ignore_consensus_local_state ~precomputed_values
       ~persistent_root_instance =
     let open Deferred.Result.Let_syntax in
-    let downgrade_transition transition genesis_state_hash :
-        ( External_transition.Almost_validated.t
+    let downgrade_block validated_block genesis_state_hash :
+        ( Mina_block.almost_valid_block
         , [`Invalid_genesis_protocol_state] )
         Result.t =
-      let open Result.Let_syntax in
-      let transition =
-        External_transition.Validation.forget_validation_with_hash transition
-      in
-      let%map t =
-        External_transition.Validation.wrap transition
-        |> External_transition.skip_time_received_validation
-             `This_transition_was_not_received_via_gossip
-        |> External_transition.validate_genesis_protocol_state
-             ~genesis_state_hash
-      in
-      External_transition.skip_proof_validation
-        `This_transition_was_generated_internally t
-      |> External_transition.skip_delta_transition_chain_validation
-           `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_frontier_dependencies_validation
-           `This_transition_was_loaded_from_persistence
-      |> External_transition.skip_protocol_versions_validation
-           `This_transition_has_valid_protocol_versions
+      (* we explicitly re-validate the genesis protocol state here to prevent X-version bugs *)
+      validated_block
+      |> Mina_block.Validated.remember
+      |> Mina_block.Validation.reset_staged_ledger_diff_validation
+      |> Mina_block.Validation.reset_genesis_protocol_state_validation
+      |> Mina_block.Validation.validate_genesis_protocol_state ~genesis_state_hash
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, protocol_states, root_hash =
+    let%bind root, root_block, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
-      let%bind root_transition = Database.get_transition t.db root_hash in
+      let%bind root_block = Database.get_block t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
       in
-      (root, root_transition, best_tip, protocol_states, root_hash))
+      (root, root_block, best_tip, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
     let root_genesis_state_hash =
-      External_transition.Validated.protocol_state root_transition
+      root_block
+      |> Mina_block.Validated.forget
+      |> With_hash.data
+      |> Mina_block.header
+      |> Mina_block.Header.protocol_state
       |> Protocol_state.genesis_state_hash
     in
     (* construct the root staged ledger in memory *)
@@ -235,7 +227,7 @@ module Instance = struct
       let open Deferred.Let_syntax in
       match%map
         construct_staged_ledger_at_root ~precomputed_values ~root_ledger
-          ~root_transition ~root ~protocol_states ~logger:t.factory.logger
+          ~root_block ~root ~protocol_states ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -247,7 +239,7 @@ module Instance = struct
       Full_frontier.create ~logger:t.factory.logger
         ~time_controller:t.factory.time_controller
         ~root_data:
-          { transition= root_transition
+          { block= root_block
           ; staged_ledger= root_staged_ledger
           ; protocol_states=
               (*TODO: store the hashes as well?*)
@@ -276,27 +268,26 @@ module Instance = struct
     let%bind () =
       Deferred.map
         (Database.crawl_successors t.db root_hash
-           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
-             let%bind transition =
+           ~init:(Full_frontier.root frontier) ~f:(fun parent block ->
+             let%bind block =
                match
-                 downgrade_transition transition root_genesis_state_hash
+                 downgrade_block block root_genesis_state_hash
                with
                | Ok t ->
                    Deferred.Result.return t
                | Error `Invalid_genesis_protocol_state ->
-                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
+                   Error (`Fatal_error (Invalid_genesis_state_hash block))
                    |> Deferred.return
              in
              (* we're loading transitions from persistent storage,
                 don't assign a timestamp
              *)
-             let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None ~transition_receipt_time ()
+                 ~trust_system:(Trust_system.null ()) ~parent ~block
+                 ~sender:None ~block_receipt_time:None ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
@@ -344,14 +335,14 @@ let with_instance_exn t ~f =
   x
 
 let reset_database_exn t ~root_data ~genesis_state_hash =
-  let open Root_data.Limited in
   let open Deferred.Let_syntax in
-  let root_transition = transition root_data in
+  let root_block = Root_data.Limited.validated_block root_data in
   [%log' info t.logger]
     ~metadata:
       [ ( "state_hash"
-        , State_hash.to_yojson
-          @@ External_transition.Validated.state_hash root_transition ) ]
+        , root_block
+          |> Mina_block.Validated.state_hash
+          |> State_hash.to_yojson )]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->

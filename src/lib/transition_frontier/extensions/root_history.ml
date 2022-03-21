@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)
 
@@ -30,7 +29,6 @@ module T = struct
     (t, t)
 
   let enqueue t new_root =
-    let open Root_data.Historical in
     ( if Queue.length t.history >= t.capacity then
       let oldest_root = Queue.dequeue_front_exn t.history in
       (*Update the protocol states required for scan state at the new root*)
@@ -41,23 +39,24 @@ module T = struct
         Full_frontier.Protocol_states_for_root_scan_state
         .protocol_states_for_next_root_scan_state
           t.protocol_states_for_root_scan_state
-          ~new_scan_state:(scan_state new_oldest_root)
+          ~new_scan_state:(Root_data.Historical.scan_state new_oldest_root)
           ~old_root_state:
-            { With_hash.data=
-                External_transition.Validated.protocol_state
-                  (transition oldest_root)
-            ; hash=
-                External_transition.Validated.state_hash
-                  (transition oldest_root) }
+            ( oldest_root
+              |> Root_data.Historical.validated_block 
+              |> Mina_block.Validated.forget
+              |> With_hash.map ~f:(fun block ->
+                  block |> Mina_block.header |> Mina_block.Header.protocol_state) )
         |> State_hash.Map.of_alist_exn
       in
       t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
+    let current_root_hash =
+      t.current_root
+      |> Root_data.Historical.validated_block
+      |> Mina_block.Validated.state_hash
+    in
     assert (
       [%equal: [`Ok | `Key_already_present]] `Ok
-        (Queue.enqueue_back t.history
-           (External_transition.Validated.state_hash
-              (transition t.current_root))
-           t.current_root) ) ;
+        (Queue.enqueue_back t.history current_root_hash t.current_root) );
     t.current_root <- new_root
 
   let handle_diffs root_history frontier diffs_with_mutants =
@@ -98,8 +97,13 @@ let protocol_states_for_scan_state
       let res =
         match Queue.lookup history hash with
         | Some data ->
-            Some
-              (External_transition.Validated.protocol_state (transition data))
+            Some (
+              data
+              |> Root_data.Historical.validated_block
+              |> Mina_block.Validated.forget
+              |> With_hash.data
+              |> Mina_block.header
+              |> Mina_block.Header.protocol_state)
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
             State_hash.Map.find protocol_states_for_root_scan_state hash

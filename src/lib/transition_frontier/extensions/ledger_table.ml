@@ -52,18 +52,19 @@ module T = struct
           in
           let ledger_hash = Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger
-      | E (Root_transitioned transition, _) -> (
-        match transition.garbage with
+      | E (Root_transitioned root, _) -> (
+        match root.garbage with
         | Full nodes ->
             let open Mina_state in
             List.iter nodes ~f:(fun node ->
-                let With_hash.{data= external_transition; _}, _ =
-                  node.transition
+                let With_hash.{data= block; _} =
+                  Mina_block.Validated.forget node.block
                 in
                 let blockchain_state =
-                  Protocol_state.blockchain_state
-                  @@ Mina_transition.External_transition.protocol_state
-                       external_transition
+                  block
+                  |> Mina_block.header
+                  |> Mina_block.Header.protocol_state
+                  |> Protocol_state.blockchain_state
                 in
                 let staged_ledger =
                   Blockchain_state.staged_ledger_hash blockchain_state

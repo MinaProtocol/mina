@@ -1,0 +1,5 @@
+(library
+ (name mina_block)
+ (public_name mina_block)
+ (preprocess (pps ppx_jane ppx_coda ppx_version))
+ (libraries async_kernel core_kernel mina_base mina_state protocol_version staged_ledger staged_ledger_diff transition_chain_verifier truth))

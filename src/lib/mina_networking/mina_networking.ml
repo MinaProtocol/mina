@@ -1034,7 +1034,7 @@ type t =
   ; trust_system : Trust_system.t
   ; gossip_net : Gossip_net.Any.t
   ; states :
-      ( External_transition.t Envelope.Incoming.t
+      ( Mina_block.with_hash Envelope.Incoming.t
       * Block_time.t
       * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
@@ -1137,8 +1137,9 @@ let create (config : Config.t)
   in
   let validate_protocol_versions ~rpc_name sender external_transition =
     let open Trust_system.Actions in
-    let External_transition.{ valid_current; valid_next; matches_daemon } =
-      External_transition.protocol_version_status external_transition
+    let header = external_transition |> External_transition.decompose |> Mina_block.header in
+    let Mina_block.Header.{ valid_current; valid_next; matches_daemon } =
+      Mina_block.Header.protocol_version_status header
     in
     let%bind () =
       if valid_current then return ()
@@ -1152,8 +1153,7 @@ let create (config : Config.t)
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Mina_block.Header.current_protocol_version header)) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1172,8 +1172,8 @@ let create (config : Config.t)
                   , `String
                       (Protocol_version.to_string
                          (Option.value_exn
-                            (External_transition.proposed_protocol_version_opt
-                               external_transition))) )
+                            (Mina_block.Header.proposed_protocol_version_opt header
+                               ))) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1191,8 +1191,8 @@ let create (config : Config.t)
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Mina_block.Header.current_protocol_version header
+                            )) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string @@ get_current ()) )
                 ] ) )
@@ -1484,10 +1484,19 @@ let create (config : Config.t)
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
+            let block = External_transition.decompose state in
+            let protocol_state = 
+              block
+              |> Mina_block.header
+              |> Mina_block.Header.protocol_state
+            in
+            let block_with_hash = {With_hash.data= block; hash= Protocol_state.hash protocol_state} in
             Perf_histograms.add_span ~name:"external_transition_latency"
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)
-                 ( External_transition.protocol_state state
+                 ( block
+                 |> Mina_block.header
+                 |> Mina_block.Header.protocol_state
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
@@ -1497,13 +1506,13 @@ let create (config : Config.t)
                   [ ("external_transition", External_transition.to_yojson state)
                   ]
                 (Block_received
-                   { state_hash = External_transition.state_hash state
+                   { state_hash = With_hash.hash block_with_hash
                    ; sender = Envelope.Incoming.sender envelope
                    }) ;
             Mina_net2.Validation_callback.set_message_type valid_cb `Block ;
             Mina_metrics.(Counter.inc_one Network.Block.received) ;
             `Fst
-              ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
+              ( Envelope.Incoming.map envelope ~f:(fun _ -> block_with_hash)
               , Block_time.now config.time_controller
               , valid_cb )
         | Snark_pool_diff diff ->

@@ -1,6 +1,7 @@
 open Async
 open Core
 open Pipe_lib
+open Mina_state
 
 type catchup_job_states =
   { finished : int
@@ -217,7 +218,11 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           let node_status_data =
             { block_height_at_best_tip =
                 Transition_frontier.best_tip tf
-                |> Transition_frontier.Breadcrumb.blockchain_length
+                |> Transition_frontier.Breadcrumb.block
+                |> Mina_block.header
+                |> Mina_block.Header.protocol_state
+                |> Protocol_state.consensus_state
+                |> Consensus.Data.Consensus_state.blockchain_length
                 |> Unsigned.UInt32.to_int
             ; max_observed_block_height =
                 !Mina_metrics.Transition_frontier.max_blocklength_observed

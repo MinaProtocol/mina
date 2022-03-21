@@ -9,12 +9,12 @@ module Actions = struct
         (** Connection error while peer connected to node. *)
     | Outgoing_connection_error
         (** Encountered connection error while connecting to a peer. *)
-    | Gossiped_old_transition of int64 * int
-        (** Peer gossiped a transition which was too old. Includes time before cutoff period in which the transition was received, expressed in slots and delta. *)
-    | Gossiped_future_transition
-        (** Peer gossiped a transition before its slot. *)
-    | Gossiped_invalid_transition
-        (** Peer gossiped an invalid transition to us. *)
+    | Gossiped_old_block of int64 * int
+        (** Peer gossiped a block which was too old. Includes time before cutoff period in which the block was received, expressed in slots and delta. *)
+    | Gossiped_future_block
+        (** Peer gossiped a block before its slot. *)
+    | Gossiped_invalid_block
+        (** Peer gossiped an invalid block to us. *)
     | Disconnected_chain
         (** Peer has been determined to be on a chain that is not connected to our chain. *)
     | Sent_bad_hash
@@ -31,9 +31,9 @@ module Actions = struct
     | Sent_mismatched_protocol_version
         (** Peer sent block with protocol version not matching daemon protocol version *)
     | Has_invalid_genesis_protocol_state
-        (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
-    | Sent_invalid_transition_chain_merkle_proof
-        (** Peer sent us a transition chain witness that does not verify *)
+        (**Peer gossiped a block that has a different genesis protocol state from that of mine*)
+    | Sent_invalid_block_chain_merkle_proof
+        (** Peer sent us a block chain witness that does not verify *)
     | Violated_protocol  (** Peer violated the specification of the protocol. *)
     | Made_request
         (** Peer made a valid request. This causes a small decrease to mitigate
@@ -74,12 +74,12 @@ module Actions = struct
     let epoch_ledger_provided_increment = 10. *. fulfilled_increment in
     let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
-    | Gossiped_old_transition (slot_diff, delta) ->
+    | Gossiped_old_block (slot_diff, delta) ->
         (* NOTE: slot_diff here is [received_slot - (produced_slot + Δ)]
          *
-         * We want to decrease the score exponentially based on how out of date the transition
+         * We want to decrease the score exponentially based on how out of date the block
          * we received was. We would like the base score decrease to be some constant
-         * [c], and we would like to instantly ban any peers who send us transitions
+         * [c], and we would like to instantly ban any peers who send us blocks
          * received more than [Δ] slots out of date. Therefore, we want some function
          * [f] where [f(1) = c] and [f(Δ) >= 2]. We start by fitting an geometric function
          * such that [f(Δ) = 2]. [(1/y)x^2] should be [2] when [x] is [Δ], so if we solve for
@@ -93,9 +93,9 @@ module Actions = struct
         let y = (Float.of_int delta ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
-    | Gossiped_future_transition ->
+    | Gossiped_future_block ->
         Insta_ban
-    | Gossiped_invalid_transition ->
+    | Gossiped_invalid_block ->
         Insta_ban
     | Disconnected_chain ->
         Insta_ban
@@ -117,7 +117,7 @@ module Actions = struct
     (*Genesis ledger (and the genesis protocol state) is now a runtime config, so we should ban nodes that are running using a different genesis ledger*)
     | Has_invalid_genesis_protocol_state ->
         Insta_ban
-    | Sent_invalid_transition_chain_merkle_proof ->
+    | Sent_invalid_block_chain_merkle_proof ->
         Insta_ban
     (* incoming and outgoing connection errors can happen due to network
        failures, killing the client, or ungraceful shutdown, so we need to be

@@ -8,3 +8,5 @@ module Stable = struct
     type ('a, 'b) t = { data : 'a; proof : 'b } [@@deriving sexp, fields]
   end
 end]
+
+let map t ~data ~proof = {data= data t.data; proof= proof t.proof}

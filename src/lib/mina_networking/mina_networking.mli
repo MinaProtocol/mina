@@ -182,7 +182,7 @@ type t
 
 val states :
      t
-  -> ( External_transition.t Envelope.Incoming.t
+  -> ( Mina_block.with_hash Envelope.Incoming.t
      * Block_time.t
      * Mina_net2.Validation_callback.t )
      Strict_pipe.Reader.t

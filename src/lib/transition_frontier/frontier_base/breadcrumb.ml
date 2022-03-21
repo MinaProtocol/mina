@@ -2,93 +2,90 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
 open Network_peer
 
 module T = struct
   let id = "breadcrumb"
 
   type t =
-    { validated_transition: External_transition.Validated.t
+    { validated_block: Mina_block.Validated.t
     ; staged_ledger: Staged_ledger.t [@sexp.opaque]
     ; just_emitted_a_proof: bool
-    ; transition_receipt_time: Time.t option }
+    ; block_receipt_time: Time.t option }
   [@@deriving sexp, fields]
 
   type 'a creator =
-       validated_transition:External_transition.Validated.t
+       validated_block:Mina_block.Validated.t
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
-    -> transition_receipt_time:Time.t option
+    -> block_receipt_time:Time.t option
     -> 'a
 
-  let map_creator creator ~f ~validated_transition ~staged_ledger
-      ~just_emitted_a_proof ~transition_receipt_time =
+  let map_creator creator ~f ~validated_block ~staged_ledger
+      ~just_emitted_a_proof ~block_receipt_time =
     f
-      (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
-         ~transition_receipt_time)
+      (creator ~validated_block ~staged_ledger ~just_emitted_a_proof
+         ~block_receipt_time)
 
-  let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
-      ~transition_receipt_time =
-    { validated_transition
+  let create ~validated_block ~staged_ledger ~just_emitted_a_proof
+      ~block_receipt_time =
+    { validated_block
     ; staged_ledger
     ; just_emitted_a_proof
-    ; transition_receipt_time }
+    ; block_receipt_time }
 
   let to_yojson
-      { validated_transition
+      { validated_block
       ; staged_ledger= _
       ; just_emitted_a_proof
-      ; transition_receipt_time } =
+      ; block_receipt_time } =
     `Assoc
-      [ ( "validated_transition"
-        , External_transition.Validated.to_yojson validated_transition )
+      [ ( "validated_block"
+        , Mina_block.Validated.to_yojson validated_block )
       ; ("staged_ledger", `String "<opaque>")
       ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
-      ; ( "transition_receipt_time"
+      ; ( "block_receipt_time"
         , `String
-            (Option.value_map transition_receipt_time
+            (Option.value_map block_receipt_time
                ~default:"<not available>"
                ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc)) ) ]
 end
 
+include Allocation_functor.Make.Sexp (T)
+
 [%%define_locally
 T.
-  ( validated_transition
+  ( validated_block
   , staged_ledger
   , just_emitted_a_proof
-  , transition_receipt_time
+  , block_receipt_time
   , to_yojson )]
-
-include Allocation_functor.Make.Sexp (T)
 
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values
     ~verifier ~trust_system ~parent
-    ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender
-    ~transition_receipt_time () =
+    ~block:(block_with_validation :
+                  Mina_block.almost_valid_block) ~sender
+    ~block_receipt_time () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
-        External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+        Mina_block.Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           ~precomputed_values ~verifier
           ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
-            (External_transition.Validated.protocol_state
-               parent.validated_transition)
-          transition_with_validation
+            ( parent.validated_block
+              |> Mina_block.Validated.header
+              |> Mina_block.Header.protocol_state )
+          block_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
-          , `External_transition_with_validation
-              fully_valid_external_transition
+          , `Block_with_validation fully_valid_block
           , `Staged_ledger transitioned_staged_ledger ) ->
-          return
-          @@ Ok
-               (create ~validated_transition:fully_valid_external_transition
-                  ~staged_ledger:transitioned_staged_ledger
-                  ~just_emitted_a_proof ~transition_receipt_time)
+          Deferred.Result.return
+             (create ~validated_block:(Mina_block.Validated.lift fully_valid_block)
+                ~staged_ledger:transitioned_staged_ledger
+                ~just_emitted_a_proof ~block_receipt_time)
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -106,7 +103,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
             | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
                   record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+                    Actions.(Gossiped_invalid_block, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
       | Error
@@ -146,7 +143,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                       | Insufficient_work _
                       | Mismatched_statuses _
                       | Invalid_public_key _ ->
-                          make_actions Gossiped_invalid_transition
+                          make_actions Gossiped_invalid_block
                       | Unexpected _ ->
                           failwith
                             "build: Unexpected staged ledger error should \
@@ -159,34 +156,35 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
               (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error))
   )
 
-let lift f breadcrumb = f (validated_transition breadcrumb)
+let mask = Fn.compose Staged_ledger.ledger staged_ledger
 
-let state_hash = lift External_transition.Validated.state_hash
+let block_with_hash = Fn.compose Mina_block.Validated.forget validated_block
 
-let parent_hash = lift External_transition.Validated.parent_hash
+let block = Fn.compose With_hash.data block_with_hash
 
-let protocol_state = lift External_transition.Validated.protocol_state
+let state_hash = Fn.compose Mina_block.Validated.state_hash validated_block
 
-let consensus_state = lift External_transition.Validated.consensus_state
+let protocol_state b =
+  b
+  |> block
+  |> Mina_block.header
+  |> Mina_block.Header.protocol_state
+
+let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
 let consensus_state_with_hash breadcrumb =
-  breadcrumb |> validated_transition
-  |> External_transition.Validation.forget_validation_with_hash
-  |> With_hash.map ~f:External_transition.consensus_state
+  breadcrumb
+  |> block_with_hash
+  |> With_hash.map ~f:(fun block ->
+    block
+    |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+    |> Protocol_state.consensus_state)
 
-let blockchain_state = lift External_transition.Validated.blockchain_state
-
-let blockchain_length = lift External_transition.Validated.blockchain_length
-
-let block_producer = lift External_transition.Validated.block_producer
-
-let commands = lift External_transition.Validated.commands
-
-let completed_works = lift External_transition.Validated.completed_works
-
-let payments = lift External_transition.Validated.payments
-
-let mask = Fn.compose Staged_ledger.ledger staged_ledger
+let parent_hash b =
+  b
+  |> protocol_state
+  |> Protocol_state.previous_state_hash
 
 let equal breadcrumb1 breadcrumb2 =
   State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)
@@ -208,11 +206,19 @@ type display =
 [@@deriving yojson]
 
 let display t =
-  let blockchain_state = Blockchain_state.display (blockchain_state t) in
-  let consensus_state = consensus_state t in
+  let protocol_state = 
+    t
+    |> block
+    |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+  in
+  let blockchain_state = Blockchain_state.display (Protocol_state.blockchain_state protocol_state) in
+  let consensus_state = Protocol_state.consensus_state protocol_state in
   let parent =
-    Visualization.display_prefix_of_string @@ State_hash.to_base58_check
-    @@ parent_hash t
+    t
+    |> parent_hash
+    |> State_hash.to_base58_check
+    |> Visualization.display_prefix_of_string
   in
   { state_hash= name t
   ; blockchain_state
@@ -222,7 +228,9 @@ let display t =
 let all_user_commands breadcrumbs =
   Sequence.fold (Sequence.of_list breadcrumbs) ~init:Signed_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      breadcrumb |> commands
+      breadcrumb
+      |> validated_block
+      |> Mina_block.Validated.valid_commands
       |> List.filter_map ~f:(fun {data; _} ->
              match data with
              | Snapp_command _ ->
@@ -328,8 +336,10 @@ module For_tests = struct
       in
       let current_state_view, state_and_body_hash =
         let prev_state =
-          validated_transition parent_breadcrumb
-          |> External_transition.Validated.protocol_state
+          parent_breadcrumb
+          |> block
+          |> Mina_block.header
+          |> Mina_block.Header.protocol_state
         in
         let current_state_view =
           Protocol_state.body prev_state |> Protocol_state.Body.view
@@ -364,12 +374,15 @@ module For_tests = struct
         | Error e ->
             failwith (Staged_ledger.Staged_ledger_error.to_string e)
       in
-      let previous_transition = parent_breadcrumb.validated_transition in
       let previous_protocol_state =
-        previous_transition |> External_transition.Validated.protocol_state
+        parent_breadcrumb
+        |> block
+        |> Mina_block.header
+        |> Mina_block.Header.protocol_state
       in
       let previous_ledger_hash =
-        previous_protocol_state |> Protocol_state.blockchain_state
+        previous_protocol_state
+        |> Protocol_state.blockchain_state
         |> Blockchain_state.snarked_ledger_hash
       in
       let next_ledger_hash =
@@ -414,28 +427,31 @@ module For_tests = struct
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
       Protocol_version.(set_current zero) ;
-      let next_external_transition =
-        External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.blockchain_dummy
-          ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~validation_callback:
-            (Mina_net2.Validation_callback.create_without_expiration ())
-          ~delta_transition_chain_proof:(previous_state_hash, []) ()
+      let next_block =
+        let body = Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff in
+        let body_reference = Mina_block.Body_reference.of_body body in
+        let header =
+          Mina_block.Header.create
+            ~protocol_state ~protocol_state_proof:Proof.blockchain_dummy
+            ~delta_block_chain_proof:(previous_ledger_hash, [])
+            ~body_reference ()
+        in
+        (* We manually created a validated an block *)
+        let block = {With_hash.hash= Protocol_state.hash protocol_state; data= Mina_block.create ~header ~body} in
+        Mina_block.Validated.unsafe_of_trusted_block
+          ~delta_block_chain_proof:(Non_empty_list.singleton previous_state_hash)
+          (`This_block_is_trusted_to_be_safe block)
       in
-      (* We manually created a verified an external_transition *)
-      let (`I_swear_this_is_safe_see_my_comment
-            next_verified_external_transition) =
-        External_transition.Validated.create_unsafe next_external_transition
-      in
-      let transition_receipt_time = Some (Time.now ()) in
+      let block_receipt_time = Some (Time.now ()) in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~parent:parent_breadcrumb
-          ~transition:
-            (External_transition.Validation.reset_staged_ledger_diff_validation
-               next_verified_external_transition)
+          ~block:
+            ( next_block
+            |> Mina_block.Validated.remember
+            |> Mina_block.Validation.reset_staged_ledger_diff_validation)
           ~sender:None ~skip_staged_ledger_verification:`All
-          ~transition_receipt_time ()
+          ~block_receipt_time ()
       with
       | Ok new_breadcrumb ->
           [%log info]

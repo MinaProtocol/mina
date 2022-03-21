@@ -10,7 +10,6 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Frontier_base
 
 type t
@@ -20,12 +19,12 @@ module Error : sig
     [ `Root
     | `Best_tip
     | `Frontier_hash
-    | `Root_transition
-    | `Best_tip_transition
-    | `Parent_transition of State_hash.t
-    | `New_root_transition
-    | `Old_root_transition
-    | `Transition of State_hash.t
+    | `Root_block
+    | `Best_tip_block
+    | `Parent_block of State_hash.t
+    | `New_root_block
+    | `Old_root_block
+    | `Block of State_hash.t
     | `Arcs of State_hash.t
     | `Protocol_states_for_root_scan_state ]
 
@@ -54,11 +53,11 @@ val check :
        | `Corrupt of
          [> `Not_found of
             [> `Best_tip
-            | `Best_tip_transition
+            | `Best_tip_block
             | `Frontier_hash
             | `Root
-            | `Root_transition
-            | `Transition of State_hash.t
+            | `Root_block
+            | `Block of State_hash.t
             | `Arcs of State_hash.t
             | `Protocol_states_for_root_scan_state ]
          | `Raised of Core_kernel.Error.t ] ] )
@@ -68,10 +67,10 @@ val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
-  -> transition:External_transition.Validated.t
+  -> block:Mina_block.Validated.t
   -> ( unit
      , [> `Not_found of
-          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
+          [> `Parent_block of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
 
 val move_root :
@@ -79,14 +78,14 @@ val move_root :
   -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
   -> ( State_hash.t
-     , [> `Not_found of [> `New_root_transition | `Old_root_transition]] )
+     , [> `Not_found of [> `New_root_block | `Old_root_block]] )
      Result.t
 
-val get_transition :
+val get_block :
      t
   -> State_hash.t
-  -> ( External_transition.Validated.t
-     , [> `Not_found of [> `Transition of State_hash.t]] )
+  -> ( Mina_block.Validated.t
+     , [> `Not_found of [> `Block of State_hash.t]] )
      Result.t
 
 val get_arcs :
@@ -114,9 +113,9 @@ val crawl_successors :
      t
   -> State_hash.t
   -> init:'a
-  -> f:('a -> External_transition.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
   -> ( unit
      , [> `Crawl_error of 'b
-       | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t]
+       | `Not_found of [> `Arcs of State_hash.t | `Block of State_hash.t]
        ] )
      Deferred.Result.t

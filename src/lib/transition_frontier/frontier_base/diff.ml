@@ -9,12 +9,12 @@ type lite = Lite
 module Node = struct
   type _ t =
     | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+    | Lite : Mina_block.Validated.t -> lite t
 end
 
 module Node_list = struct
   type full_node =
-    { transition: External_transition.Validated.t
+    { block: Mina_block.Validated.t
     ; scan_state: Staged_ledger.Scan_state.t }
 
   type lite_node = State_hash.t
@@ -28,10 +28,7 @@ module Node_list = struct
   type 'repr node_list = 'repr t
 
   let to_lite =
-    let f {transition; _} =
-      External_transition.Validated.state_hash transition
-    in
-    List.map ~f
+    List.map ~f:(fun {block; _} -> Mina_block.Validated.state_hash block)
 
   module Lite = struct
     module Binable_arg = struct
@@ -151,7 +148,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
         State_hash.to_yojson
-          (External_transition.Validated.state_hash transition)
+          (Mina_block.Validated.state_hash transition)
     | Root_transitioned {new_root; garbage; just_emitted_a_proof} ->
         let garbage_hashes =
           match garbage with
@@ -172,7 +169,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
-      New_node (Lite (Breadcrumb.validated_transition breadcrumb))
+      New_node (Lite (Breadcrumb.validated_block breadcrumb))
   | Root_transitioned
       {new_root; garbage= Full garbage_nodes; just_emitted_a_proof} ->
       Root_transitioned
@@ -223,7 +220,7 @@ module Lite = struct
 
           let to_binable = function
             | E (New_node (Lite x)) ->
-                (New_node x : Binable_arg.Stable.V2.t)
+                (New_node (External_transition.Validated.lift x) : Binable_arg.Stable.V2.t)
             | E (Root_transitioned x) ->
                 Root_transitioned x
             | E (Best_tip_changed x) ->
@@ -231,7 +228,7 @@ module Lite = struct
 
           let of_binable = function
             | (New_node x : Binable_arg.Stable.V2.t) ->
-                E (New_node (Lite x))
+                E (New_node (Lite (External_transition.Validated.lower x)))
             | Root_transitioned x ->
                 E (Root_transitioned x)
             | Best_tip_changed x ->

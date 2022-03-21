@@ -7,7 +7,6 @@
  (libraries
    core
    mina_base
-   mina_transition
    syncable_ledger
    pipe_lib
    consensus

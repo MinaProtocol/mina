@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
+open Mina_state
 open Frontier_base
 open Network_peer
 
@@ -150,15 +150,15 @@ module Make (Inputs : Inputs_intf) :
         None )
     in
     let get hash =
-      let%map validated_transition =
+      let%map validated_block =
         Option.merge
           Transition_frontier.(
-            find frontier hash >>| Breadcrumb.validated_transition)
+            find frontier hash >>| Breadcrumb.validated_block)
           ( find_in_root_history frontier hash
-          >>| fun x -> Root_data.Historical.transition x )
+          >>| fun x -> Root_data.Historical.validated_block x )
           ~f:Fn.const
       in
-      External_transition.Validation.forget_validation validated_transition
+      With_hash.data @@ Mina_block.Validated.forget validated_block
     in
     match Transition_frontier.catchup_tree frontier with
     | Full _ ->
@@ -180,6 +180,13 @@ module Make (Inputs : Inputs_intf) :
     go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
+    let consensus_state_with_hash block =
+      With_hash.map block ~f:(fun b ->
+        b
+        |> Mina_block.header
+        |> Mina_block.Header.protocol_state
+        |> Protocol_state.consensus_state)
+
     let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
       let open Option.Let_syntax in
       let%bind best_tip_with_witness = Best_tip_prover.prove ~logger frontier in
@@ -190,8 +197,7 @@ module Make (Inputs : Inputs_intf) :
                (Logger.extend logger
                   [ ("selection_context", `String "Root.prove") ])
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_with_witness.data)
+               (consensus_state_with_hash best_tip_with_witness.data)
              ~candidate:seen_consensus_state)
           `Keep
       in
@@ -203,7 +209,7 @@ module Make (Inputs : Inputs_intf) :
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
         ~precomputed_values observed_state peer_root =
       let open Deferred.Result.Let_syntax in
-      let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
+      let%bind ( (`Root _, `Best_tip (best_tip_block, _)) as
                verified_witness ) =
         Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
           peer_root
@@ -214,9 +220,7 @@ module Make (Inputs : Inputs_intf) :
              ~logger:
                (Logger.extend logger
                   [ ("selection_context", `String "Root.verify") ])
-             ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_transition)
+             ~existing:(consensus_state_with_hash best_tip_block)
              ~candidate)
           `Keep
       in
@@ -227,7 +231,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  best_tip_transition.hash))
+                  best_tip_block.hash))
       in
       verified_witness
   end

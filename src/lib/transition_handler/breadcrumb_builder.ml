@@ -1,16 +1,16 @@
-open Mina_base
 open Core
 open Async
 open Cache_lib
-open Mina_transition
+open Mina_base
+open Mina_state
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
-    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
+    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_blocks =
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
-      (Mina_base.State_hash.to_base58_check initial_hash)
+      (State_hash.to_base58_check initial_hash)
   in
   (* If the breadcrumb we are targeting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
@@ -21,16 +21,17 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     | None ->
         [%log error]
           ~metadata:
-            [ ("state_hash", Mina_base.State_hash.to_yojson initial_hash)
-            ; ( "transition_hashes"
+            [ ("state_hash", State_hash.to_yojson initial_hash)
+            ; ( "block_hashes"
               , `List
-                  (List.map subtrees_of_enveloped_transitions ~f:(fun subtree ->
+                  (List.map subtrees_of_enveloped_blocks ~f:(fun subtree ->
                        Rose_tree.to_yojson
-                         (fun enveloped_transitions ->
-                           Cached.peek enveloped_transitions
+                         (fun enveloped_blocks ->
+                           Cached.peek enveloped_blocks
                            |> Envelope.Incoming.data
-                           |> External_transition.Initial_validated.state_hash
-                           |> Mina_base.State_hash.to_yojson)
+                           |> Mina_block.Validation.block_with_hash
+                           |> With_hash.hash
+                           |> State_hash.to_yojson)
                          subtree)) )
             ]
           "Transition frontier already garbage-collected the parent of \
@@ -39,8 +40,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     | Some breadcrumb ->
         Or_error.return breadcrumb
   in
-  Deferred.Or_error.List.map subtrees_of_enveloped_transitions
-    ~f:(fun subtree_of_enveloped_transitions ->
+  Deferred.Or_error.List.map subtrees_of_enveloped_blocks
+    ~f:(fun subtree_of_enveloped_blocks ->
       let open Deferred.Or_error.Let_syntax in
       let%bind init_breadcrumb =
         breadcrumb_if_present
@@ -49,39 +50,39 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
         |> Deferred.return
       in
       Rose_tree.Deferred.Or_error.fold_map_over_subtrees
-        subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
+        subtree_of_enveloped_blocks ~init:(Cached.pure init_breadcrumb)
         ~f:(fun
              cached_parent
-             (Rose_tree.T (cached_enveloped_transition, _) as subtree)
+             (Rose_tree.T (cached_enveloped_block, _) as subtree)
            ->
           let open Deferred.Let_syntax in
           let%map cached_result =
-            Cached.transform cached_enveloped_transition
-              ~f:(fun enveloped_transition ->
+            Cached.transform cached_enveloped_block
+              ~f:(fun enveloped_block ->
                 let open Deferred.Or_error.Let_syntax in
-                let transition_with_initial_validation =
-                  Envelope.Incoming.data enveloped_transition
+                let block_with_initial_validation =
+                  Envelope.Incoming.data enveloped_block
                 in
-                let transition_receipt_time = Some (Time.now ()) in
-                let transition_with_hash, _ =
-                  transition_with_initial_validation
-                in
-                let mostly_validated_transition =
+                let block_receipt_time = Some (Time.now ()) in
+                let mostly_validated_block =
                   (* TODO: handle this edge case more gracefully *)
                   (* since we are building a disconnected subtree of breadcrumbs,
                    * we skip this step in validation *)
-                  External_transition.skip_frontier_dependencies_validation
-                    `This_transition_belongs_to_a_detached_subtree
-                    transition_with_initial_validation
+                  Mina_block.Validation.skip_frontier_dependencies_validation
+                    `This_block_belongs_to_a_detached_subtree
+                    block_with_initial_validation
                 in
-                let sender = Envelope.Incoming.sender enveloped_transition in
+                let sender = Envelope.Incoming.sender enveloped_block in
                 let parent = Cached.peek cached_parent in
                 let expected_parent_hash =
                   Transition_frontier.Breadcrumb.state_hash parent
                 in
                 let actual_parent_hash =
-                  transition_with_hash |> With_hash.data
-                  |> External_transition.parent_hash
+                  block_with_initial_validation
+                  |> Mina_block.Validation.block
+                  |> Mina_block.header
+                  |> Mina_block.Header.protocol_state
+                  |> Protocol_state.previous_state_hash
                 in
                 let%bind () =
                   Deferred.return
@@ -99,8 +100,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                       Deferred.Or_error.try_with ~here:[%here] (fun () ->
                           Transition_frontier.Breadcrumb.build ~logger
                             ~precomputed_values ~verifier ~trust_system ~parent
-                            ~transition:mostly_validated_transition
-                            ~sender:(Some sender) ~transition_receipt_time ()))
+                            ~block:mostly_validated_block
+                            ~sender:(Some sender) ~block_receipt_time ()))
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg
@@ -145,7 +146,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                             Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
                                 Trust_system.record trust_system logger ip_addr
                                   ( Trust_system.Actions
-                                    .Gossiped_invalid_transition
+                                    .Gossiped_invalid_block
                                   , Some (msg, []) ))
                           in
                           Error error

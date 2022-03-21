@@ -1,7 +1,7 @@
-(** This module contains the transition processor. The transition processor is
- *  the thread in which transitions are attached the to the transition frontier.
+(** This module contains the transition processor. The block processor is
+ *  the thread in which blocks are attached the to the transition frontier.
  *
- *  Two types of data are handled by the transition processor: validated external transitions
+ *  Two types of data are handled by the block processor: validated blocks
  *  with precomputed state hashes (via the block producer and validator pipes)
  *  and breadcrumb rose trees (via the catchup pipe).
  *)
@@ -15,10 +15,7 @@ open Mina_base
 open Mina_state
 open Cache_lib
 open O1trace
-open Mina_transition
 open Network_peer
-module Transition_frontier_validation =
-  External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
@@ -36,16 +33,14 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~only_if_present ~time_controller ~source
+    ~processed_block_writer ~only_if_present ~time_controller ~source
     cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
   in
   let consensus_constants = precomputed_values.consensus_constants in
-  let transition =
-    Transition_frontier.Breadcrumb.validated_transition breadcrumb
-  in
+  let block = Transition_frontier.Breadcrumb.validated_block breadcrumb in
   let%map () =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
@@ -64,87 +59,92 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   | `Internal ->
       ()
   | _ ->
-      let transition_time =
-        External_transition.Validated.consensus_time_produced_at transition
+      let block_time =
+        block
+        |> Mina_block.Validated.header
+        |> Mina_block.Header.protocol_state
+        |> Protocol_state.consensus_state
+        |> Consensus.Data.Consensus_state.consensus_time
       in
       let time_elapsed =
         Block_time.diff
           (Block_time.now time_controller)
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
-             transition_time)
+             block_time)
       in
       Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
-  Writer.write processed_transition_writer
-    (`Transition transition, `Source source) ;
-  Catchup_scheduler.notify catchup_scheduler
-    ~hash:(External_transition.Validated.state_hash transition)
+  Writer.write processed_block_writer
+    (`Block block, `Source source) ;
+  Catchup_scheduler.notify catchup_scheduler ~hash:(Mina_block.Validated.state_hash block)
 
-let process_transition ~logger ~trust_system ~verifier ~frontier
-    ~catchup_scheduler ~processed_transition_writer ~time_controller
-    ~transition:cached_initially_validated_transition ~precomputed_values =
-  let enveloped_initially_validated_transition =
-    Cached.peek cached_initially_validated_transition
+let process_block ~logger ~trust_system ~verifier ~frontier
+    ~catchup_scheduler ~processed_block_writer ~time_controller
+    ~block:cached_initially_validated_block ~precomputed_values =
+  let enveloped_initially_validated_block =
+    Cached.peek cached_initially_validated_block
   in
-  let transition_receipt_time =
+  let block_receipt_time =
     Some
-      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
+      (Envelope.Incoming.received_at enveloped_initially_validated_block)
   in
   let sender =
-    Envelope.Incoming.sender enveloped_initially_validated_transition
+    Envelope.Incoming.sender enveloped_initially_validated_block
   in
-  let initially_validated_transition =
-    Envelope.Incoming.data enveloped_initially_validated_transition
+  let initially_validated_block =
+    Envelope.Incoming.data enveloped_initially_validated_block
   in
-  let { With_hash.hash = transition_hash; data = transition }, _ =
-    initially_validated_transition
+  let { With_hash.hash = block_hash; data = block }, _ =
+    initially_validated_block
   in
-  let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
+  let metadata = [ ("state_hash", State_hash.to_yojson block_hash) ] in
   Deferred.map ~f:(Fn.const ())
     (let open Deferred.Result.Let_syntax in
-    let%bind mostly_validated_transition =
+    let%bind mostly_validated_block =
       let open Deferred.Let_syntax in
       match
-        Transition_frontier_validation.validate_frontier_dependencies
+        Mina_block.Validation.validate_frontier_dependencies
           ~consensus_constants:
             precomputed_values.Precomputed_values.consensus_constants ~logger
-          ~frontier initially_validated_transition
+          ~root_block:(Transition_frontier.Breadcrumb.block_with_hash @@ Transition_frontier.root frontier)
+          ~get_block_by_hash:(Fn.compose (Option.map ~f:Transition_frontier.Breadcrumb.block_with_hash) (Transition_frontier.find frontier))
+          initially_validated_block
       with
       | Ok t ->
           return (Ok t)
       | Error `Not_selected_over_frontier_root ->
           let%map () =
             Trust_system.record_envelope_sender trust_system logger sender
-              ( Trust_system.Actions.Gossiped_invalid_transition
+              ( Trust_system.Actions.Gossiped_invalid_block
               , Some
-                  ( "The transition with hash $state_hash was not selected \
+                  ( "The block with hash $state_hash was not selected \
                      over the transition frontier root"
                   , metadata ) )
           in
-          let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
+          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t)
               =
-            Cached.invalidate_with_failure cached_initially_validated_transition
+            Cached.invalidate_with_failure cached_initially_validated_block
           in
           Error ()
       | Error `Already_in_frontier ->
           [%log warn] ~metadata
-            "Refusing to process the transition with hash $state_hash because \
+            "Refusing to process the block with hash $state_hash because \
              is is already in the transition frontier" ;
-          let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
+          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t)
               =
-            Cached.invalidate_with_failure cached_initially_validated_transition
+            Cached.invalidate_with_failure cached_initially_validated_block
           in
           return (Error ())
       | Error `Parent_missing_from_frontier -> (
           let _, validation =
-            Cached.peek cached_initially_validated_transition
+            Cached.peek cached_initially_validated_block
             |> Envelope.Incoming.data
           in
           match validation with
           | ( _
             , _
             , _
-            , (`Delta_transition_chain, Truth.True delta_state_hashes)
+            , (`Delta_block_chain, Truth.True delta_state_hashes)
             , _
             , _
             , _ ) ->
@@ -156,27 +156,29 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
-                ~cached_transition:cached_initially_validated_transition ;
+                ~cached_block:cached_initially_validated_block ;
               return (Error ())
           | _ ->
               failwith
-                "This is impossible since the transition just passed \
-                 initial_validation so delta_transition_chain_proof must be \
+                "This is impossible since the block just passed \
+                 initial_validation so delta_block_chain_proof must be \
                  true" )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
-      Protocol_state.previous_state_hash
-        (External_transition.protocol_state transition)
+      block
+      |> Mina_block.header
+      |> Mina_block.Header.protocol_state
+      |> Protocol_state.previous_state_hash
     in
     let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
     let%bind breadcrumb =
-      cached_transform_deferred_result cached_initially_validated_transition
+      cached_transform_deferred_result cached_initially_validated_block
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~transition_receipt_time
+            ~verifier ~trust_system ~block_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition
+            ~block:mostly_validated_block
             (* TODO: Can we skip here? *) ())
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
@@ -184,7 +186,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
               [%log error]
                 ~metadata:
                   (metadata @ [ ("error", Error_json.error_to_yojson error) ])
-                "Error while building breadcrumb in the transition handler \
+                "Error while building breadcrumb in the block handler \
                  processor: $error" ;
               Deferred.return (Error ())
           | Error (`Fatal_error exn) ->
@@ -197,21 +199,21 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
-         ~processed_transition_writer ~only_if_present:false ~time_controller
+         ~processed_block_writer ~only_if_present:false ~time_controller
          ~source:`Gossip breadcrumb ~precomputed_values))
 
 let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~trust_system ~time_controller ~frontier
-    ~(primary_transition_reader :
-       ( External_transition.Initial_validated.t Envelope.Incoming.t
+    ~(primary_block_reader :
+       ( Mina_block.initial_valid_block Envelope.Incoming.t
        , State_hash.t )
        Cached.t
        Reader.t)
-    ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
+    ~(producer_block_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t)
     ~(catchup_job_writer :
        ( State_hash.t
-         * ( External_transition.Initial_validated.t Envelope.Incoming.t
+         * ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t
            Rose_tree.t
@@ -230,19 +232,19 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t) ~processed_transition_writer =
+       Writer.t) ~processed_block_writer =
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
       ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
-    add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
+    add_and_finalize ~frontier ~catchup_scheduler ~processed_block_writer
       ~time_controller ~precomputed_values
   in
-  let process_transition =
-    process_transition ~logger ~trust_system ~verifier ~frontier
-      ~catchup_scheduler ~processed_transition_writer ~time_controller
+  let process_block =
+    process_block ~logger ~trust_system ~verifier ~frontier
+      ~catchup_scheduler ~processed_block_writer ~time_controller
       ~precomputed_values
   in
   ignore
@@ -250,23 +252,23 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         (* It is fine to skip the cache layer on blocks produced by this node
            * because it is extraordinarily unlikely we would write an internal bug
            * triggering this case, and the external case (where we received an
-           * identical external transition from the network) can happen iff there
+           * identical block from the network) can happen iff there
            * is another node with the exact same private key and view of the
            * transaction pool. *)
-        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
+        [ Reader.map producer_block_reader ~f:(fun breadcrumb ->
               Mina_metrics.(
                 Gauge.inc_one
-                  Transition_frontier_controller.transitions_being_processed) ;
+                  Transition_frontier_controller.blocks_being_processed) ;
               `Local_breadcrumb (Cached.pure breadcrumb))
         ; Reader.map catchup_breadcrumbs_reader
             ~f:(fun (cb, catchup_breadcrumbs_callback) ->
               `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback))
-        ; Reader.map primary_transition_reader ~f:(fun vt ->
-              `Partially_valid_transition vt)
+        ; Reader.map primary_block_reader ~f:(fun vt ->
+              `Partially_valid_block vt)
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
-          trace_recurring "transition_handler_processor" (fun () ->
+          trace_recurring "block_handler_processor" (fun () ->
               match msg with
               | `Catchup_breadcrumbs
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -305,18 +307,21 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   | `Catchup_scheduler ->
                       () )
               | `Local_breadcrumb breadcrumb ->
-                  let transition_time =
-                    Transition_frontier.Breadcrumb.validated_transition
-                      (Cached.peek breadcrumb)
-                    |> External_transition.Validated.protocol_state
+                  let block_time =
+                    breadcrumb
+                    |> Cached.peek
+                    |> Transition_frontier.Breadcrumb.validated_block
+                    |> Mina_block.Validated.header
+                    |> Mina_block.Header.protocol_state
                     |> Protocol_state.blockchain_state
-                    |> Blockchain_state.timestamp |> Block_time.to_time
+                    |> Blockchain_state.timestamp
+                    |> Block_time.to_time
                   in
                   Perf_histograms.add_span
-                    ~name:"accepted_transition_local_latency"
+                    ~name:"accepted_block_local_latency"
                     (Core_kernel.Time.diff
                        Block_time.(now time_controller |> to_time)
-                       transition_time) ;
+                       block_time) ;
                   let%map () =
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
@@ -337,9 +342,9 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   in
                   Mina_metrics.(
                     Gauge.dec_one
-                      Transition_frontier_controller.transitions_being_processed)
-              | `Partially_valid_transition transition ->
-                  process_transition ~transition))
+                      Transition_frontier_controller.blocks_being_processed)
+              | `Partially_valid_block block ->
+                  process_block ~block))
       : unit Deferred.t )
 
 let%test_module "Transition_handler.Processor tests" =
@@ -371,14 +376,16 @@ let%test_module "Transition_handler.Processor tests" =
             ~pids:(Child_processes.Termination.create_pid_table ()))
 
     let downcast_breadcrumb breadcrumb =
-      let transition =
-        Transition_frontier.Breadcrumb.validated_transition breadcrumb
-        |> External_transition.Validation.reset_frontier_dependencies_validation
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+      let block =
+        breadcrumb
+        |> Transition_frontier.Breadcrumb.validated_block
+        |> Mina_block.Validated.remember
+        |> Mina_block.Validation.reset_frontier_dependencies_validation
+        |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
-      Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
+      Envelope.Incoming.wrap ~data:block ~sender:Envelope.Sender.Local
 
-    let%test_unit "adding transitions whose parents are in the frontier" =
+    let%test_unit "adding blocks whose parents are in the frontier" =
       let frontier_size = 1 in
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
@@ -388,12 +395,12 @@ let%test_module "Transition_handler.Processor tests" =
         ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
-                let valid_transition_reader, valid_transition_writer =
+                let valid_block_reader, valid_block_writer =
                   Strict_pipe.create
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)))
                 in
-                let producer_transition_reader, _ =
+                let producer_block_reader, _ =
                   Strict_pipe.create
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)))
@@ -404,32 +411,32 @@ let%test_module "Transition_handler.Processor tests" =
                 let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
                   Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
                 in
-                let processed_transition_reader, processed_transition_writer =
+                let processed_block_reader, processed_block_writer =
                   Strict_pipe.create
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)))
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
-                let cache = Unprocessed_transition_cache.create ~logger in
+                let cache = Unprocessed_block_cache.create ~logger in
                 run ~logger ~time_controller ~verifier ~trust_system
                   ~clean_up_catchup_scheduler ~frontier
-                  ~primary_transition_reader:valid_transition_reader
-                  ~producer_transition_reader ~catchup_job_writer
+                  ~primary_block_reader:valid_block_reader
+                  ~producer_block_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ~precomputed_values ;
+                  ~processed_block_writer ~precomputed_values ;
                 List.iter branch ~f:(fun breadcrumb ->
                     downcast_breadcrumb breadcrumb
-                    |> Unprocessed_transition_cache.register_exn cache
-                    |> Strict_pipe.Writer.write valid_transition_writer) ;
+                    |> Unprocessed_block_cache.register_exn cache
+                    |> Strict_pipe.Writer.write valid_block_writer) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)
                     time_controller
-                    (Strict_pipe.Reader.fold_until processed_transition_reader
+                    (Strict_pipe.Reader.fold_until processed_block_reader
                        ~init:branch
                        ~f:(fun
                             remaining_breadcrumbs
-                            (`Transition newly_added_transition, _)
+                            (`Block newly_added_block, _)
                           ->
                          Deferred.return
                            ( match remaining_breadcrumbs with
@@ -437,18 +444,19 @@ let%test_module "Transition_handler.Processor tests" =
                                [%test_eq: State_hash.t]
                                  (Transition_frontier.Breadcrumb.state_hash
                                     next_expected_breadcrumb)
-                                 (External_transition.Validated.state_hash
-                                    newly_added_transition) ;
+                                 (Mina_block.Validated.state_hash newly_added_block) ;
                                [%log info]
                                  ~metadata:
                                    [ ( "height"
                                      , `Int
-                                         ( External_transition.Validated
-                                           .blockchain_length
-                                             newly_added_transition
-                                         |> Unsigned.UInt32.to_int ) )
+                                         ( newly_added_block
+                                           |> Mina_block.Validated.header
+                                           |> Mina_block.Header.protocol_state
+                                           |> Protocol_state.consensus_state
+                                           |> Consensus.Data.Consensus_state.blockchain_length
+                                           |> Unsigned.UInt32.to_int ) )
                                    ]
-                                 "transition of $height passed processor" ;
+                                 "block of $height passed processor" ;
                                if List.is_empty tail then `Stop true
                                else `Continue tail
                            | [] ->

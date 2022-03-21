@@ -39,19 +39,19 @@ module Worker = struct
 
   type apply_diff_error_internal =
     [ `Not_found of
-      [ `New_root_transition
-      | `Old_root_transition
-      | `Parent_transition of State_hash.t
+      [ `New_root_block
+      | `Old_root_block
+      | `Parent_block of State_hash.t
       | `Arcs of State_hash.t
       | `Best_tip ] ]
 
   let apply_diff_error_internal_to_string = function
-    | `Not_found `New_root_transition ->
-        "new root transition not found"
-    | `Not_found `Old_root_transition ->
-        "old root transition not found"
-    | `Not_found (`Parent_transition hash) ->
-        Printf.sprintf "parent transition %s not found"
+    | `Not_found `New_root_block ->
+        "new root block not found"
+    | `Not_found `Old_root_block ->
+        "old root block not found"
+    | `Not_found (`Parent_block hash) ->
+        Printf.sprintf "parent block %s not found"
           (State_hash.to_base58_check hash)
     | `Not_found `Best_tip ->
         "best tip not found"
@@ -67,15 +67,15 @@ module Worker = struct
           `Apply_diff diff_type )
     in
     match diff with
-    | New_node (Lite transition) -> (
+    | New_node (Lite block) -> (
         let r =
-          ( Database.add t.db ~transition
+          ( Database.add t.db ~block
             :> (mutant, apply_diff_error_internal) Result.t )
         in
         match r with
         | Ok x ->
             Ok x
-        | Error (`Not_found (`Parent_transition h | `Arcs h)) ->
+        | Error (`Not_found (`Parent_block h | `Arcs h)) ->
             [%log' trace t.logger]
               "Did not add node $hash to DB. Its $parent has already been \
                thrown away"
@@ -83,8 +83,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (Mina_transition.External_transition.Validated
-                          .state_hash transition)) )
+                         (Mina_block.Validated.state_hash block)) )
                 ; ("parent", `String (State_hash.to_base58_check h)) ] ;
             Ok ()
         | _ ->

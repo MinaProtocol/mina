@@ -1244,24 +1244,24 @@ end
 module Transition_frontier_controller = struct
   let subsystem = "Transition_frontier_controller"
 
-  let transitions_being_processed : Gauge.t =
+  let blocks_being_processed : Gauge.t =
     let help =
-      "transitions currently being processed by the transition frontier \
+      "blocks currently being processed by the transition frontier \
        controller"
     in
-    Gauge.v "transitions_being_processed" ~help ~namespace ~subsystem
+    Gauge.v "blocks_being_processed" ~help ~namespace ~subsystem
 
-  let transitions_in_catchup_scheduler =
-    let help = "transitions stored inside catchup scheduler" in
-    Gauge.v "transitions_in_catchup_scheduler" ~help ~namespace ~subsystem
+  let blocks_in_catchup_scheduler =
+    let help = "blocks stored inside catchup scheduler" in
+    Gauge.v "blocks_in_catchup_scheduler" ~help ~namespace ~subsystem
 
   let catchup_time_ms =
     let help = "time elapsed while doing catchup" in
     Gauge.v "catchup_time_ms" ~help ~namespace ~subsystem
 
-  let transitions_downloaded_from_catchup =
-    let help = "# of transitions downloaded by ledger_catchup" in
-    Gauge.v "transitions_downloaded_from_catchup" ~help ~namespace ~subsystem
+  let blocks_downloaded_from_catchup =
+    let help = "# of blocks downloaded by ledger_catchup" in
+    Gauge.v "blocks_downloaded_from_catchup" ~help ~namespace ~subsystem
 
   let breadcrumbs_built_by_processor : Counter.t =
     let help = "breadcrumbs built by the processor" in

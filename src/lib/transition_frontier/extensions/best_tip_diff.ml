@@ -32,7 +32,11 @@ module T = struct
       Logger.create ~id:Logger.Logger_id.best_tip_diff ()
     in
     ( {logger; best_tip_diff_logger}
-    , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
+    , { new_commands=
+          frontier
+          |> Full_frontier.root
+          |> Breadcrumb.validated_block
+          |> Mina_block.Validated.valid_commands
       ; removed_commands= []
       ; reorg_best_tip= false } )
 
@@ -78,12 +82,13 @@ module T = struct
               let added_to_best_tip_path, removed_from_best_tip_path =
                 get_path_diff t frontier new_best_tip_breadcrumb old_best_tip
               in
+              let commands_of_breadcrumb = Fn.compose Mina_block.Validated.valid_commands Breadcrumb.validated_block in
               let new_commands =
-                List.bind added_to_best_tip_path ~f:Breadcrumb.commands
+                List.bind added_to_best_tip_path ~f:commands_of_breadcrumb
                 @ new_commands
               in
               let removed_commands =
-                List.bind removed_from_best_tip_path ~f:Breadcrumb.commands
+                List.bind removed_from_best_tip_path ~f:commands_of_breadcrumb
                 @ removed_commands
               in
               let reorg_best_tip =
@@ -92,7 +97,7 @@ module T = struct
               let added_transitions =
                 List.map
                   ~f:(fun b ->
-                    { Log_event.protocol_state= Breadcrumb.protocol_state b
+                    { Log_event.protocol_state= b |> Breadcrumb.block |> Mina_block.header |> Mina_block.Header.protocol_state
                     ; state_hash= Breadcrumb.state_hash b
                     ; just_emitted_a_proof= Breadcrumb.just_emitted_a_proof b
                     } )
@@ -101,7 +106,7 @@ module T = struct
               let removed_transitions =
                 List.map
                   ~f:(fun b ->
-                    { Log_event.protocol_state= Breadcrumb.protocol_state b
+                    { Log_event.protocol_state= b |> Breadcrumb.block |> Mina_block.header |> Mina_block.Header.protocol_state
                     ; state_hash= Breadcrumb.state_hash b
                     ; just_emitted_a_proof= Breadcrumb.just_emitted_a_proof b
                     } )

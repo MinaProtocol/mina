@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_transition
 
 (* Historical root data is similar to Limited root data, except that it also
  * contains a recording of some extra computed staged ledger properties that
@@ -13,7 +12,7 @@ module Historical : sig
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val validated_block : t -> Mina_block.Validated.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
@@ -34,7 +33,7 @@ module Limited : sig
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val validated_block : t -> Mina_block.Validated.t
 
   val hash : t -> State_hash.t
 
@@ -46,7 +45,7 @@ module Limited : sig
     t -> (State_hash.t * Mina_state.Protocol_state.value) list
 
   val create :
-       transition:External_transition.Validated.t
+       block:Mina_block.Validated.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
     -> protocol_states:(State_hash.t * Mina_state.Protocol_state.value) list
@@ -76,7 +75,7 @@ module Minimal : sig
 
   val upgrade :
        t
-    -> transition:External_transition.Validated.t
+    -> block:Mina_block.Validated.t
     -> protocol_states:( Mina_base.State_hash.t
                        * Mina_state.Protocol_state.Value.t )
                        list
@@ -90,7 +89,7 @@ module Minimal : sig
 end
 
 type t =
-  { transition: External_transition.Validated.t
+  { block: Mina_block.Validated.t
   ; staged_ledger: Staged_ledger.t
   ; protocol_states:
       (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list }

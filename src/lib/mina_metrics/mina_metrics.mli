@@ -396,13 +396,13 @@ module Catchup : sig
 end
 
 module Transition_frontier_controller : sig
-  val transitions_being_processed : Gauge.t
+  val blocks_being_processed : Gauge.t
 
-  val transitions_in_catchup_scheduler : Gauge.t
+  val blocks_in_catchup_scheduler : Gauge.t
 
   val catchup_time_ms : Gauge.t
 
-  val transitions_downloaded_from_catchup : Gauge.t
+  val blocks_downloaded_from_catchup : Gauge.t
 
   val breadcrumbs_built_by_processor : Counter.t
 

@@ -5,7 +5,6 @@ open Async
 open Mina_base
 open Mina_state
 open Pipe_lib.Strict_pipe
-open Mina_transition
 open Network_peer
 
 type Structured_log_events.t += Bootstrap_complete
@@ -17,8 +16,8 @@ type t =
   ; consensus_constants : Consensus.Constants.t
   ; verifier : Verifier.t
   ; precomputed_values : Precomputed_values.t
-  ; mutable best_seen_transition : External_transition.Initial_validated.t
-  ; mutable current_root : External_transition.Initial_validated.t
+  ; mutable best_seen_block : Mina_block.initial_valid_block
+  ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
   }
 
@@ -60,9 +59,13 @@ let worth_getting_root t candidate =
               , `String "Bootstrap_controller.worth_getting_root" )
             ])
        ~existing:
-         ( t.best_seen_transition
-         |> External_transition.Validation.forget_validation_with_hash
-         |> With_hash.map ~f:External_transition.consensus_state )
+         ( t.best_seen_block
+           |> Mina_block.Validation.block_with_hash
+           |> With_hash.map ~f:(fun b ->
+             b
+             |> Mina_block.header
+             |> Mina_block.Header.protocol_state
+             |> Protocol_state.consensus_state) )
        ~candidate
 
 let received_bad_proof t host e =
@@ -90,24 +93,24 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
   in
-  t.best_seen_transition <- peer_best_tip ;
+  t.best_seen_block <- peer_best_tip ;
   t.current_root <- peer_root ;
   let blockchain_state =
-    t.current_root |> External_transition.Initial_validated.blockchain_state
+    t.current_root
+    |> Mina_block.Validation.block
+    |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+    |> Protocol_state.blockchain_state
   in
-  let expected_staged_ledger_hash =
-    blockchain_state |> Blockchain_state.staged_ledger_hash
-  in
-  let snarked_ledger_hash =
-    blockchain_state |> Blockchain_state.snarked_ledger_hash
-  in
+  let expected_staged_ledger_hash = Blockchain_state.staged_ledger_hash blockchain_state in
+  let snarked_ledger_hash = Blockchain_state.snarked_ledger_hash blockchain_state in
   return
   @@
   match
     Sync_ledger.Db.new_goal root_sync_ledger
       (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
       ~data:
-        ( External_transition.Initial_validated.state_hash t.current_root
+        ( With_hash.hash @@ Mina_block.Validation.block_with_hash t.current_root
         , sender
         , expected_staged_ledger_hash )
       ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
@@ -115,14 +118,20 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
   | `New ->
       `Syncing_new_snarked_ledger
   | `Update_data ->
-      `Updating_root_transition
+      `Updating_root_block
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender ~root_sync_ledger ~genesis_constants
-    candidate_transition =
+let on_block t ~sender ~root_sync_ledger ~genesis_constants
+    candidate_block =
   let candidate_consensus_state =
-    With_hash.map ~f:External_transition.consensus_state candidate_transition
+    candidate_block
+    |> Mina_block.Validation.block_with_hash
+    |> With_hash.map ~f:(fun b ->
+      b
+      |> Mina_block.header
+      |> Mina_block.Header.protocol_state
+      |> Protocol_state.consensus_state)
   in
   if not @@ should_sync ~root_sync_ledger t candidate_consensus_state then
     Deferred.return `Ignored
@@ -134,7 +143,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     | Error e ->
         [%log' error t.logger]
           ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-          !"Could not get the proof of the root transition from the network: \
+          !"Could not get the proof of the root block from the network: \
             $error" ;
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
@@ -142,7 +151,11 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
             ~consensus_constants:t.consensus_constants ~genesis_constants
             ~precomputed_values:t.precomputed_values candidate_consensus_state
-            peer_root_with_proof.data
+            ( peer_root_with_proof
+              |> Envelope.Incoming.data
+              |> Proof_carrying_data.map
+                  ~data:Mina_transition.External_transition.decompose
+                  ~proof:(fun (hashes, root) -> (hashes, Mina_transition.External_transition.decompose root)) )
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -151,40 +164,41 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
-let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
+let sync_ledger t ~preferred ~root_sync_ledger ~block_graph
     ~sync_ledger_reader ~genesis_constants =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
-      let (transition, _) : External_transition.Initial_validated.t =
-        Envelope.Incoming.data incoming_transition
+  Reader.iter sync_ledger_reader ~f:(fun incoming_block ->
+      let block_validation = Envelope.Incoming.data incoming_block in
+      let {With_hash.data=block; hash=state_hash} = Mina_block.Validation.block_with_hash block_validation in
+      let protocol_state =
+        block
+        |> Mina_block.header
+        |> Mina_block.Header.protocol_state
       in
-      let previous_state_hash =
-        External_transition.parent_hash (With_hash.data transition)
-      in
-      let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
-      Transition_cache.add transition_graph ~parent:previous_state_hash
-        incoming_transition ;
+      let consensus_state = Protocol_state.consensus_state protocol_state in
+      let previous_state_hash = Protocol_state.previous_state_hash protocol_state in
+      let sender = Envelope.Incoming.remote_sender_exn incoming_block in
+      Transition_cache.add block_graph ~parent:previous_state_hash
+        incoming_block ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if
-        worth_getting_root t
-          (With_hash.map ~f:External_transition.consensus_state transition)
+        worth_getting_root t {With_hash.data= consensus_state; hash= state_hash}
       then (
         [%log' trace t.logger]
           "Added the transition from sync_ledger_reader into cache"
           ~metadata:
-            [ ("state_hash", State_hash.to_yojson (With_hash.hash transition))
-            ; ( "external_transition"
-              , External_transition.to_yojson (With_hash.data transition) )
+            [ ("state_hash", State_hash.to_yojson state_hash)
+            ; ( "block", Mina_block.to_yojson block )
             ] ;
         Deferred.ignore_m
-        @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
-             transition )
+        @@ on_block t ~sender ~root_sync_ledger ~genesis_constants
+             block_validation )
       else Deferred.unit)
 
-let external_transition_compare consensus_constants =
+let block_compare consensus_constants =
   Comparable.lift
     (fun existing candidate ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
@@ -196,14 +210,18 @@ let external_transition_compare consensus_constants =
              ~candidate ~logger:(Logger.null ())
       then -1
       else 1)
-    ~f:(With_hash.map ~f:External_transition.consensus_state)
+    ~f:(With_hash.map ~f:(fun block ->
+        block
+        |> Mina_block.header
+        |> Mina_block.Header.protocol_state
+        |> Protocol_state.consensus_state))
 
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
-    ~transition_reader ~best_seen_transition ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~precomputed_values
+    ~block_reader ~best_seen_block ~persistent_root
+    ~persistent_frontier ~initial_root_block ~precomputed_values
     ~catchup_mode =
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
@@ -217,22 +235,24 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            ( `Capacity 50
            , `Overflow
                (Drop_head
-                  (fun head ->
+                  (fun (`Block head, `Valid_cb cb)  ->
                     Mina_metrics.(
                       Counter.inc_one
                         Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
-                    External_transition.Initial_validated
-                    .handle_dropped_transition
-                      (Envelope.Incoming.data head)
-                      ~pipe_name:sync_ledger_pipe ~logger)) ))
+                    [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
+                      ~metadata:
+                        [ ("state_hash", head |> Envelope.Incoming.data |> With_hash.hash |> State_hash.to_yojson)
+                        ; ("pipe", `String sync_ledger_pipe)
+                        ] ;
+                    Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject))))
     in
     don't_wait_for
-      (transfer_while_writer_alive transition_reader sync_ledger_writer
+      (transfer_while_writer_alive block_reader sync_ledger_writer
          ~f:Fn.id) ;
-    let initial_root_transition =
-      initial_root_transition
-      |> External_transition.Validation.reset_frontier_dependencies_validation
-      |> External_transition.Validation.reset_staged_ledger_diff_validation
+    let initial_root_block =
+      initial_root_block
+      |> Mina_block.Validation.reset_frontier_dependencies_validation
+      |> Mina_block.Validation.reset_staged_ledger_diff_validation
     in
     let t =
       { network
@@ -242,11 +262,11 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       ; trust_system
       ; verifier
       ; precomputed_values
-      ; best_seen_transition = initial_root_transition
-      ; current_root = initial_root_transition
+      ; best_seen_block = initial_root_block
+      ; current_root = initial_root_block
       }
     in
-    let transition_graph = Transition_cache.create () in
+    let block_graph = Block_cache.create () in
     let temp_persistent_root_instance =
       Transition_frontier.Persistent_root.create_instance_exn persistent_root
     in
@@ -263,14 +283,14 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
          don't_wait_for
            (sync_ledger t
               ~preferred:
-                ( Option.to_list best_seen_transition
+                ( Option.to_list best_seen_block
                 |> List.filter_map ~f:(fun x ->
                        match Envelope.Incoming.sender x with
                        | Local ->
                            None
                        | Remote r ->
                            Some r) )
-              ~root_sync_ledger ~transition_graph ~sync_ledger_reader
+              ~root_sync_ledger ~block_graph ~sync_ledger_reader
               ~genesis_constants) ;
          (* We ignore the resulting ledger returned here since it will always
             * be the same as the ledger we started with because we are syncing
@@ -312,7 +332,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             let%bind new_root =
               t.current_root
               |> External_transition.skip_frontier_dependencies_validation
-                   `This_transition_belongs_to_a_detached_subtree
+                   `This_block_belongs_to_a_detached_subtree
               |> External_transition.validate_staged_ledger_hash
                    (`Staged_ledger_already_materialized
                      received_staged_ledger_hash)
@@ -402,7 +422,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             ; ( "expected_staged_ledger_hash"
               , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
             ]
-          "Failed to find scan state for the transition with hash $state_hash \
+          "Failed to find scan state for the block with hash $state_hash \
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
         Writer.close sync_ledger_writer ;
@@ -425,7 +445,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 , Some ("Received valid scan state from peer", []) ))
         in
         let consensus_state =
-          t.best_seen_transition
+          t.best_seen_block
           |> External_transition.Initial_validated.consensus_state
         in
         (* Synchronize consensus local state if necessary *)
@@ -492,7 +512,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         | Ok () ->
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data : Transition_frontier.Root_data.Limited.t =
-              Transition_frontier.Root_data.Limited.create ~transition:new_root
+              Transition_frontier.Root_data.Limited.create ~block:new_root
                 ~scan_state ~pending_coinbase ~protocol_states
             in
             let%bind () =
@@ -531,23 +551,23 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                      snarked_ledger"
             in
             [%str_log info] Bootstrap_complete ;
-            let collected_transitions =
-              Transition_cache.data transition_graph
+            let collected_blocks =
+              Transition_cache.data block_graph
             in
             let logger =
               Logger.extend logger
                 [ ( "context"
-                  , `String "Filter collected transitions in bootstrap" )
+                  , `String "Filter collected blocks in bootstrap" )
                 ]
             in
             let root_consensus_state =
               Transition_frontier.(
                 Breadcrumb.consensus_state_with_hash (root new_frontier))
             in
-            let filtered_collected_transitions =
-              List.filter collected_transitions ~f:(fun incoming_transition ->
-                  let transition =
-                    Envelope.Incoming.data incoming_transition
+            let filtered_collected_blocks =
+              List.filter collected_blocks ~f:(fun incoming_block ->
+                  let block =
+                    Envelope.Incoming.data incoming_block
                     |> External_transition.Validation
                        .forget_validation_with_hash
                   in
@@ -556,20 +576,20 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                        ~existing:root_consensus_state
                        ~candidate:
                          (With_hash.map ~f:External_transition.consensus_state
-                            transition)
+                            block)
                        ~logger)
             in
-            [%log debug] "Sorting filtered transitions by consensus state"
+            [%log debug] "Sorting filtered blocks by consensus state"
               ~metadata:[] ;
-            let sorted_filtered_collected_transitions =
-              List.sort filtered_collected_transitions
+            let sorted_filtered_collected_blocks =
+              List.sort filtered_collected_blocks
                 ~compare:
                   (Comparable.lift
                      ~f:
                        (Fn.compose
                           External_transition.Validation
                           .forget_validation_with_hash Envelope.Incoming.data)
-                     (external_transition_compare t.consensus_constants))
+                     (block_compare t.consensus_constants))
             in
             let this_cycle =
               { cycle_result = "success"
@@ -581,7 +601,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               }
             in
             ( this_cycle :: previous_cycles
-            , (new_frontier, sorted_filtered_collected_transitions) ) )
+            , (new_frontier, sorted_filtered_collected_blocks) ) )
   in
   let%map time_elapsed, (cycles, result) = time_deferred (loop []) in
   [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
@@ -619,21 +639,21 @@ let%test_module "Bootstrap_controller tests" =
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
-    let downcast_transition ~sender transition =
-      let transition =
-        transition
+    let downcast_block ~sender block =
+      let block =
+        block
         |> External_transition.Validation.reset_frontier_dependencies_validation
         |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
-      Envelope.Incoming.wrap ~data:transition
+      Envelope.Incoming.wrap ~data:block
         ~sender:(Envelope.Sender.Remote sender)
 
     let downcast_breadcrumb ~sender breadcrumb =
-      downcast_transition ~sender
-        (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
+      downcast_block ~sender
+        (Transition_frontier.Breadcrumb.validated_block breadcrumb)
 
     let make_non_running_bootstrap ~genesis_root ~network =
-      let transition =
+      let block =
         genesis_root
         |> External_transition.Validation.reset_frontier_dependencies_validation
         |> External_transition.Validation.reset_staged_ledger_diff_validation
@@ -644,12 +664,12 @@ let%test_module "Bootstrap_controller tests" =
       ; trust_system
       ; verifier
       ; precomputed_values
-      ; best_seen_transition = transition
-      ; current_root = transition
+      ; best_seen_block = block
+      ; current_root = block
       ; network
       }
 
-    let%test_unit "Bootstrap controller caches all transitions it is passed \
+    let%test_unit "Bootstrap controller caches all blocks it is passed \
                    through the transition_reader" =
       let branch_size = (max_frontier_length * 2) + 2 in
       Quickcheck.test ~trials:1
@@ -676,9 +696,9 @@ let%test_module "Bootstrap_controller tests" =
           let [ me; other ] = fake_network.peer_networks in
           let genesis_root =
             Transition_frontier.(
-              Breadcrumb.validated_transition @@ root me.state.frontier)
+              Breadcrumb.validated_block @@ root me.state.frontier)
           in
-          let transition_graph = Transition_cache.create () in
+          let block_graph = Block_cache.create () in
           let sync_ledger_reader, sync_ledger_writer =
             Pipe_lib.Strict_pipe.create ~name:"sync_ledger_reader" Synchronous
           in
@@ -692,7 +712,7 @@ let%test_module "Bootstrap_controller tests" =
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
-                sync_ledger bootstrap ~root_sync_ledger ~transition_graph
+                sync_ledger bootstrap ~root_sync_ledger ~block_graph
                   ~preferred:[] ~sync_ledger_reader
                   ~genesis_constants:Genesis_constants.compiled
               in
@@ -703,15 +723,15 @@ let%test_module "Bootstrap_controller tests" =
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred) ;
-          let expected_transitions =
+          let expected_blocks =
             List.map branch
               ~f:
                 (Fn.compose
                    External_transition.Validation.forget_validation_with_hash
-                   Transition_frontier.Breadcrumb.validated_transition)
+                   Transition_frontier.Breadcrumb.validated_block)
           in
-          let saved_transitions =
-            Transition_cache.data transition_graph
+          let saved_blocks =
+            Transition_cache.data block_graph
             |> List.map
                  ~f:
                    (Fn.compose
@@ -724,17 +744,17 @@ let%test_module "Bootstrap_controller tests" =
               [@@deriving sexp]
 
               let compare =
-                external_transition_compare
+                block_compare
                   (Precomputed_values.consensus_constants precomputed_values)
             end
 
             include Comparable.Make (T)
           end in
           [%test_result: E.Set.t]
-            (E.Set.of_list saved_transitions)
-            ~expect:(E.Set.of_list expected_transitions))
+            (E.Set.of_list saved_blocks)
+            ~expect:(E.Set.of_list expected_blocks))
 
-    let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
+    let run_bootstrap ~timeout_duration ~my_net ~block_reader =
       let open Fake_network in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
@@ -743,9 +763,9 @@ let%test_module "Bootstrap_controller tests" =
       let persistent_frontier =
         Transition_frontier.persistent_frontier my_net.state.frontier
       in
-      let initial_root_transition =
+      let initial_root_block =
         Transition_frontier.(
-          Breadcrumb.validated_transition (root my_net.state.frontier))
+          Breadcrumb.validated_block (root my_net.state.frontier))
       in
       let%bind () =
         Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
@@ -753,42 +773,42 @@ let%test_module "Bootstrap_controller tests" =
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run ~logger ~trust_system ~verifier ~network:my_net.network
-           ~best_seen_transition:None
+           ~best_seen_block:None
            ~consensus_local_state:my_net.state.consensus_local_state
-           ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition ~precomputed_values)
+           ~block_reader ~persistent_root ~persistent_frontier
+           ~catchup_mode:`Normal ~initial_root_block ~precomputed_values)
 
-    let assert_transitions_increasingly_sorted ~root
-        (incoming_transitions :
+    let assert_blocks_increasingly_sorted ~root
+        (incoming_blocks :
           External_transition.Initial_validated.t Envelope.Incoming.t list) =
       let root =
         With_hash.data @@ fst
-        @@ Transition_frontier.Breadcrumb.validated_transition root
+        @@ Transition_frontier.Breadcrumb.validated_block root
       in
       let blockchain_length =
         Fn.compose Consensus.Data.Consensus_state.blockchain_length
           External_transition.consensus_state
       in
       ignore
-        ( List.fold_result ~init:root incoming_transitions
-            ~f:(fun max_acc incoming_transition ->
-              let With_hash.{ data = transition; _ }, _ =
-                Envelope.Incoming.data incoming_transition
+        ( List.fold_result ~init:root incoming_blocks
+            ~f:(fun max_acc incoming_block ->
+              let With_hash.{ data = block; _ }, _ =
+                Envelope.Incoming.data incoming_block
               in
               let open Result.Let_syntax in
               let%map () =
                 Result.ok_if_true
                   Mina_numbers.Length.(
-                    blockchain_length max_acc <= blockchain_length transition)
+                    blockchain_length max_acc <= blockchain_length block)
                   ~error:
                     (Error.of_string
                        "The blocks are not sorted in increasing order")
               in
-              transition)
+              block)
           |> Or_error.ok_exn
           : External_transition.t )
 
-    let%test_unit "sync with one node after receiving a transition" =
+    let%test_unit "sync with one node after receiving a block" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -799,26 +819,26 @@ let%test_module "Bootstrap_controller tests" =
             ])
         ~f:(fun fake_network ->
           let [ my_net; peer_net ] = fake_network.peer_networks in
-          let transition_reader, transition_writer =
+          let block_reader, block_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
           in
           Envelope.Incoming.wrap
             ~data:
               ( Transition_frontier.best_tip peer_net.state.frontier
-              |> Transition_frontier.Breadcrumb.validated_transition
+              |> Transition_frontier.Breadcrumb.validated_block
               |> External_transition.Validated.to_initial_validated )
             ~sender:(Envelope.Sender.Remote peer_net.peer)
-          |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
-          let new_frontier, sorted_external_transitions =
+          |> Pipe_lib.Strict_pipe.Writer.write block_writer ;
+          let new_frontier, sorted_external_blocks =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap
                   ~timeout_duration:(Block_time.Span.of_ms 30_000L)
-                  ~my_net ~transition_reader)
+                  ~my_net ~block_reader)
           in
-          assert_transitions_increasingly_sorted
+          assert_blocks_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
-            sorted_external_transitions ;
+            sorted_external_blocks ;
           [%test_result: Ledger_hash.t]
             ( Ledger.Db.merkle_root
             @@ Transition_frontier.root_snarked_ledger new_frontier )
@@ -874,7 +894,7 @@ let%test_module "Bootstrap_controller tests" =
                   (Staged_ledger.hash actual_staged_ledger) )))
 
     (*
-    let%test_unit "if we see a new transition that is better than the \
+    let%test_unit "if we see a new block that is better than the \
                    transition that we are syncing from, than we should \
                    retarget our root" =
       Quickcheck.test ~trials:1

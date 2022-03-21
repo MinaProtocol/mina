@@ -1,3 +1,5 @@
+(* TODO: rename transition -> block *)
+
 (** This module glues together the various components that compose
 *  the transition frontier, wrapping high-level initialization
 *  logic as well as gluing together the logic for adding items
@@ -6,7 +8,6 @@ open Core
 
 open Async_kernel
 open Mina_base
-open Mina_transition
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -51,7 +52,7 @@ type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
 
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
-  let transition = External_transition.genesis ~precomputed_values in
+  let block = Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
@@ -61,7 +62,7 @@ let genesis_root_data ~precomputed_values =
       (Pending_coinbase.create
          ~depth:constraint_constants.pending_coinbase_depth ())
   in
-  create ~transition ~scan_state ~pending_coinbase ~protocol_states
+  create ~block ~scan_state ~pending_coinbase ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -363,7 +364,7 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
-  let user_cmds = Breadcrumb.commands breadcrumb in
+  let user_cmds = Mina_block.Validated.valid_commands @@ Breadcrumb.validated_block breadcrumb in
   if not (List.is_empty user_cmds) then
     (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
        command or snapp command
@@ -494,10 +495,8 @@ module For_tests = struct
       ~(precomputed_values : Precomputed_values.t) () =
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let transition_receipt_time = Some (Time.now ()) in
-        let genesis_transition =
-          External_transition.For_tests.genesis ~precomputed_values
-        in
+        let block_receipt_time = Some (Time.now ()) in
+        let genesis_block = Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values in
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         in
@@ -525,9 +524,9 @@ module For_tests = struct
                    ~snarked_ledger:genesis_ledger
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
-        Breadcrumb.create ~validated_transition:genesis_transition
+        Breadcrumb.create ~validated_block:genesis_block
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
-          ~transition_receipt_time )
+          ~block_receipt_time )
 
   let gen_persistence ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
@@ -630,7 +629,7 @@ module For_tests = struct
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:(Breadcrumb.validated_transition root)
+        ~block:(Breadcrumb.validated_block root)
         ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
@@ -645,9 +644,10 @@ module For_tests = struct
           ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        Persistent_root.Instance.set_root_state_hash instance
-          (External_transition.Validated.state_hash
-             (Root_data.Limited.transition root_data)) ;
+        root_data
+        |> Root_data.Limited.validated_block
+        |> Mina_block.Validated.state_hash
+        |> Persistent_root.Instance.set_root_state_hash instance ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
