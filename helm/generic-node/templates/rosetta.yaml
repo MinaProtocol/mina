@@ -197,4 +197,3 @@ spec:
         emptyDir: {}
       - name: wallet-keys
         emptyDir: {}
----
