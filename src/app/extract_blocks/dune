@@ -25,6 +25,7 @@
    block_time
    mina_numbers
    mina_base
+   mina_transaction
    currency
    unsigned_extended
    error_json

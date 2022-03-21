@@ -153,6 +153,13 @@ module Make (Schema : Graphql_intf.Schema) = struct
         (except ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
            `Public_key)
 
+  let skip obj : _ Unified_input.t =
+    let _a = Graphql.Fields.skip obj in
+    let _b = Graphql.Args.skip obj in
+    let _c = Fields_derivers_json.To_yojson.skip obj in
+    let _d = Fields_derivers_graphql.Graphql_query.skip obj in
+    Fields_derivers_json.Of_yojson.skip obj
+
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
     let _b = Graphql.Args.int obj in
@@ -173,12 +180,6 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _c = Fields_derivers_json.To_yojson.bool obj in
     let _d = Fields_derivers_graphql.Graphql_query.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
-
-  let unit obj : _ Unified_input.t =
-    yojson obj ?doc:None ~name:"Unit"
-      ~map:(function
-        | `String "Unit" -> () | _ -> raise (Invalid_rich_scalar `Unit))
-      ~contramap:(fun () -> `String "Unit")
 
   let global_slot obj =
     iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
@@ -221,14 +222,17 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ((list @@ inner @@ o ()) (o ()))
       obj
 
-  let add_field ~t_fields_annots (x : _ Unified_input.t) fd acc =
+  let add_field ?skip_data ~t_fields_annots (x : _ Unified_input.t) fd acc =
     let _, acc' = Graphql.Fields.add_field ~t_fields_annots x fd acc in
-    let c1, acc'' = Graphql.Args.add_field ~t_fields_annots x fd acc' in
+    let c1, acc'' =
+      Graphql.Args.add_field ?skip_data ~t_fields_annots x fd acc'
+    in
     let _, acc''' =
       Fields_derivers_json.To_yojson.add_field ~t_fields_annots x fd acc''
     in
     let c2, acc'''' =
-      Fields_derivers_json.Of_yojson.add_field ~t_fields_annots x fd acc'''
+      Fields_derivers_json.Of_yojson.add_field ?skip_data ~t_fields_annots x fd
+        acc'''
     in
     let _, acc''''' =
       Fields_derivers_graphql.Graphql_query.add_field ~t_fields_annots x fd
@@ -236,7 +240,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     ((function `Left x -> c1 x | `Right x -> c2 x), acc''''')
 
-  let ( !. ) x fd acc = add_field (x @@ o ()) fd acc
+  let ( !. ) ?skip_data x fd acc = add_field ?skip_data (x @@ o ()) fd acc
 
   let finish name ~t_toplevel_annots (f, acc) =
     let _a =
@@ -539,15 +543,16 @@ let%test_module "Test" =
     let%test_unit "full roundtrips" = Test.Loop.run v1 V.v
 
     module V2 = struct
-      type t = { field : Field.t; nothing : unit }
+      type t = { field : Field.t; nothing : unit [@skip] }
       [@@deriving annot, compare, sexp, equal, fields]
 
       let v = { field = Field.of_int 10; nothing = () }
 
       let derivers obj =
         let open Derivers in
-        let ( !. ) = ( !. ) ~t_fields_annots in
-        Fields.make_creator obj ~field:!.field ~nothing:!.unit
+        let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
+        Fields.make_creator obj ~field:!.field
+          ~nothing:(( !. ) ~skip_data:() skip)
         |> finish "V2" ~t_toplevel_annots
     end
 
@@ -557,7 +562,7 @@ let%test_module "Test" =
       let open Derivers in
       [%test_eq: string]
         (Yojson.Safe.to_string (to_json v2 V2.v))
-        {|{"field":"10","nothing":"Unit"}|}
+        {|{"field":"10"}|}
 
     let%test_unit "roundtrip json'" =
       let open Derivers in

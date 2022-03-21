@@ -11,7 +11,7 @@ module Public_key = Signature_lib.Public_key
 module Signed_command_payload = Mina_base.Signed_command_payload
 module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_base.Transaction_hash
+module Transaction_hash = Mina_transaction.Transaction_hash
 
 module Get_options_metadata =
 [%graphql
@@ -1044,8 +1044,7 @@ module Submit = struct
             M.fail
               (Errors.create
                  ~context:
-                   "Must have one of payment, stakeDelegation, createToken, \
-                    createTokenAccount, or mintTokens"
+                   "Must have one of payment, stakeDelegation"
                  (`Json_parse None))
       in
       Transaction_identifier_response.create

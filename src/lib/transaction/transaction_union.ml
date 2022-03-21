@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_base
 open Signature_lib
 open Snark_params.Tick
 open Currency

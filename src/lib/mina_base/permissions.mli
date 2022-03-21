@@ -116,7 +116,7 @@ val deriver :
           list
           ref
       ; graphql_query : string option ref
-      ; graphql_query_accumulator : (string * string option) list ref
+      ; graphql_query_accumulator : (string * string option) option list ref
       ; map : (Auth_required.t Poly.t -> Auth_required.t Poly.t) ref
       ; nullable_graphql_arg :
           (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
@@ -134,7 +134,7 @@ val deriver :
            -> [> `Assoc of (string * Yojson.Safe.t) list ])
           ref
       ; to_json_accumulator :
-          (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) list ref
+          (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
       ; .. >
       as
       'a)

@@ -308,6 +308,11 @@ module Call_forest = struct
 
   let to_list (type p) (t : (p, _) t) : p list =
     fold t ~init:[] ~f:(fun acc p -> p :: acc)
+
+  let exists (type p) (t : (p, _) t) ~(f : p -> bool) : bool =
+    with_return (fun { return } ->
+        fold t ~init:() ~f:(fun () p -> if f p then return true else ()) ;
+        false)
 end
 
 module Wire = struct

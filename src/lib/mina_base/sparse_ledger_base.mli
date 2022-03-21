@@ -26,8 +26,7 @@ module Global_state : sig
   [@@deriving sexp, to_yojson]
 end
 
-module L :
-  Transaction_logic.Ledger_intf with type t = t ref and type location = int
+module L : Ledger_intf.S with type t = t ref and type location = int
 
 val merkle_root : t -> Ledger_hash.t
 
@@ -49,52 +48,6 @@ val of_root : depth:int -> Ledger_hash.t -> t
     placeholder.
 *)
 val empty : depth:int -> unit -> t
-
-val apply_user_command :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> t
-  -> Signed_command.With_valid_signature.t
-  -> (t * Transaction_logic.Transaction_applied.Signed_command_applied.t)
-     Or_error.t
-
-val apply_transaction' :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
-  -> t ref
-  -> Transaction.t
-  -> Transaction_logic.Transaction_applied.t Or_error.t
-
-val apply_transaction :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
-  -> t
-  -> Transaction.t
-  -> (t * Transaction_logic.Transaction_applied.t) Or_error.t
-
-(** Apply all parties within a parties transaction, accumulating the
-    intermediate (global, local) state pairs, in order from first to last
-    party.
-*)
-val apply_parties_unchecked_with_states :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
-  -> fee_excess:Currency.Amount.Signed.t
-  -> t
-  -> Parties.t
-  -> ( Transaction_logic.Transaction_applied.Parties_applied.t
-     * ( Global_state.t
-       * ( Stack_frame.value
-         , Stack_frame.value list
-         , Token_id.t
-         , Currency.Amount.t
-         , t
-         , bool
-         , unit
-         , Transaction_status.Failure.t option )
-         Parties_logic.Local_state.t )
-       list )
-     Or_error.t
 
 val add_path :
      t

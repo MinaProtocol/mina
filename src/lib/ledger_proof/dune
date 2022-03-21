@@ -12,6 +12,7 @@
    transaction_snark
    mina_base
    mina_state
+   mina_transaction_logic
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare ppx_version ppx_deriving_yojson)))

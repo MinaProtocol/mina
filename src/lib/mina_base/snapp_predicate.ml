@@ -183,8 +183,11 @@ module Numeric = struct
         ~of_string:Token_id.of_string
 
     let block_time_inner obj =
-      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
-        ~to_string:Block_time.to_string obj
+      let ( ^^ ) = Fn.compose in
+      iso_string ~name:"BlockTime"
+        ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
+        ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
+        obj
 
     let nonce obj = deriver "Nonce" uint32 obj
 
@@ -971,7 +974,7 @@ module Protocol_state = struct
                    global_slot_since_hard_fork in [slots_per_epoch * a, slots_per_epoch * b]
                 *)
           ; min_window_density : 'length
-          ; last_vrf_output : 'vrf_output
+          ; last_vrf_output : 'vrf_output [@skip]
           ; total_currency : 'amount
           ; global_slot_since_hard_fork : 'global_slot
           ; global_slot_since_genesis : 'global_slot
@@ -1003,12 +1006,15 @@ module Protocol_state = struct
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+    let ( !. ) ?skip_data =
+      ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
+    in
+    let last_vrf_output = ( !. ) ~skip_data:() skip in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
       ~timestamp:!.Numeric.Derivers.block_time
       ~blockchain_length:!.Numeric.Derivers.length
-      ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output:!.unit
+      ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output
       ~total_currency:!.Numeric.Derivers.amount
       ~global_slot_since_hard_fork:!.Numeric.Derivers.global_slot
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot

@@ -1,8 +1,8 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Currency
-open O1trace
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
@@ -39,7 +39,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_info :
-            Transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
@@ -298,17 +298,6 @@ struct
 
   let logger = lazy (Logger.create ())
 
-  let time label f =
-    let logger = Lazy.force logger in
-    let start = Core.Time.now () in
-    let%map x = trace_recurring label f in
-    [%log debug]
-      ~metadata:
-        [ ("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))
-        ]
-      "%s took $time_elapsed" label ;
-    x
-
   module Timer = struct
     module Info = struct
       module Time_span = struct
@@ -517,10 +506,7 @@ struct
     | Ok (None, _) ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
-        match%map.Deferred
-          ksprintf time "verify:%s" __LOC__ (fun () ->
-              Verifier.verify ~verifier proofs)
-        with
+        match%map.Deferred Verifier.verify ~verifier proofs with
         | Ok true ->
             Ok res
         | Ok false ->
@@ -560,14 +546,14 @@ struct
           "did not connect with pending-coinbase stack"
       and () =
         clarify_error
-          (Parties_logic.Local_state.Value.equal reg1.local_state
-             reg2.local_state)
+          (Mina_transaction_logic.Parties_logic.Local_state.Value.equal
+             reg1.local_state reg2.local_state)
           "did not connect with local state"
       in
       ()
     in
     match%map
-      time "scan_statement" (fun () ->
+      O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
           scan_statement t ~constraint_constants ~statement_check ~verifier)
     with
     | Error (`Error e) ->
@@ -775,7 +761,7 @@ let all_work_pairs t
         , init_stack ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
-            Transaction_logic.Transaction_applied.transaction_with_status
+            Mina_transaction_logic.Transaction_applied.transaction_with_status
               transaction_with_info
           in
           let%bind protocol_state_body =

@@ -5,6 +5,7 @@ open Async
 open Core
 open Caqti_async
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 open Pipe_lib
@@ -2496,7 +2497,7 @@ module Block = struct
             ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
             | { Mina_base.With_status.status
-              ; data = Mina_base.Transaction.Command command
+              ; data = Transaction.Command command
               } ->
                 let user_command =
                   { Mina_base.With_status.status; data = command }

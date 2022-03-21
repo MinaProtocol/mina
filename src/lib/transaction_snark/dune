@@ -20,6 +20,8 @@
    async_unix
    ;; local libraries
    mina_base.import
+   mina_transaction
+   mina_transaction_logic
    hash_prefix_states
    kimchi_backend.common
    kimchi_backend
@@ -39,6 +41,7 @@
    snarky.backendless
    sgn
    mina_state
+   o1trace
    pickles
    random_oracle_input
    pickles_types

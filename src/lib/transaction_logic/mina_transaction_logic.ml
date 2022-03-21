@@ -1,38 +1,10 @@
 open Core_kernel
+open Mina_base
 open Currency
 open Signature_lib
+open Mina_transaction
+module Parties_logic = Parties_logic
 module Global_slot = Mina_numbers.Global_slot
-
-type account_state = [ `Added | `Existed ] [@@deriving equal]
-
-module type Ledger_intf = sig
-  type t
-
-  type location
-
-  val get : t -> location -> Account.t option
-
-  val location_of_account : t -> Account_id.t -> location option
-
-  val set : t -> location -> Account.t -> unit
-
-  val get_or_create :
-    t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
-
-  val create_new_account : t -> Account_id.t -> Account.t -> unit Or_error.t
-
-  val remove_accounts_exn : t -> Account_id.t list -> unit
-
-  val merkle_root : t -> Ledger_hash.t
-
-  val with_ledger : depth:int -> f:(t -> 'a) -> 'a
-
-  val empty : depth:int -> unit -> t
-
-  val create_masked : t -> t
-
-  val apply_mask : t -> masked:t -> unit
-end
 
 module Transaction_applied = struct
   module UC = Signed_command
@@ -556,7 +528,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
   in
   timing
 
-module Make (L : Ledger_intf) : S with type ledger := L.t = struct
+module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   open L
 
   let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
@@ -600,7 +572,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
       amount =
     let fee = constraint_constants.account_creation_fee in
-    if equal_account_state action `Added then
+    if Ledger_intf.equal_account_state action `Added then
       error_opt
         (sprintf
            !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
@@ -676,7 +648,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   end
 
   let previous_empty_accounts action pk =
-    if equal_account_state action `Added then [ pk ] else []
+    if Ledger_intf.equal_account_state action `Added then [ pk ] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
@@ -1548,7 +1520,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       let if_ = Parties.value_if
 
-      let empty = []
+      let empty () = []
 
       let is_empty = List.is_empty
 
@@ -1570,7 +1542,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Parties = struct
       type t = (Party.t, Parties.Digest.t) Parties.Call_forest.t
 
-      let empty = []
+      let empty () = []
 
       let if_ = Parties.value_if
 
@@ -2204,32 +2176,29 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
-    O1trace.measure "apply_transaction" (fun () ->
-        let previous_hash = merkle_root ledger in
-        let txn_global_slot = txn_state_view.global_slot_since_genesis in
-        Or_error.map
-          ( match t with
-          | Command (Signed_command txn) ->
-              Or_error.map
-                (apply_user_command_unchecked ~constraint_constants
-                   ~txn_global_slot ledger txn) ~f:(fun applied ->
-                  Transaction_applied.Varying.Command (Signed_command applied))
-          | Command (Parties txn) ->
-              Or_error.map
-                (apply_parties_unchecked ~state_view:txn_state_view
-                   ~constraint_constants ledger txn) ~f:(fun (applied, _) ->
-                  Transaction_applied.Varying.Command (Parties applied))
-          | Fee_transfer t ->
-              Or_error.map
-                (apply_fee_transfer ~constraint_constants ~txn_global_slot
-                   ledger t) ~f:(fun applied ->
-                  Transaction_applied.Varying.Fee_transfer applied)
-          | Coinbase t ->
-              Or_error.map
-                (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
-                ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied)
-          )
-          ~f:(fun varying -> { Transaction_applied.previous_hash; varying }))
+    let previous_hash = merkle_root ledger in
+    let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    Or_error.map
+      ( match t with
+      | Command (Signed_command txn) ->
+          Or_error.map
+            (apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+               ledger txn) ~f:(fun applied ->
+              Transaction_applied.Varying.Command (Signed_command applied))
+      | Command (Parties txn) ->
+          Or_error.map
+            (apply_parties_unchecked ~state_view:txn_state_view
+               ~constraint_constants ledger txn) ~f:(fun (applied, _) ->
+              Transaction_applied.Varying.Command (Parties applied))
+      | Fee_transfer t ->
+          Or_error.map
+            (apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t)
+            ~f:(fun applied -> Transaction_applied.Varying.Fee_transfer applied)
+      | Coinbase t ->
+          Or_error.map
+            (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
+            ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied) )
+      ~f:(fun varying -> { Transaction_applied.previous_hash; varying })
 
   let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
       payment =
@@ -2296,8 +2265,8 @@ module For_tests = struct
   module Init_ledger = struct
     type t = (Keypair.t * int) array [@@deriving sexp]
 
-    let init (type l) (module L : Ledger_intf with type t = l) (init_ledger : t)
-        (l : L.t) =
+    let init (type l) (module L : Ledger_intf.S with type t = l)
+        (init_ledger : t) (l : L.t) =
       Array.iter init_ledger ~f:(fun (kp, amount) ->
           let _tag, account, loc =
             L.get_or_create l
@@ -2531,7 +2500,7 @@ module For_tests = struct
     ; other_parties
     }
 
-  let test_eq (type l) (module L : Ledger_intf with type t = l) accounts
+  let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
       (l1 : L.t) (l2 : L.t) =
     Or_error.try_with (fun () ->
         List.iter accounts ~f:(fun a ->

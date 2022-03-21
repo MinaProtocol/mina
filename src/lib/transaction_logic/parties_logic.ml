@@ -1,6 +1,7 @@
 (* parties_logic.ml *)
 
 open Core_kernel
+open Mina_base
 
 module type Iffable = sig
   type bool
@@ -198,7 +199,7 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Transaction_status.Failure.Stable.V1.t option )
+          , Transaction_status.Failure.Stable.V2.t option )
           Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -339,7 +340,7 @@ module type Stack_intf = sig
 
   type elt
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -357,7 +358,7 @@ module type Parties_intf = sig
 
   module Opt : Opt_intf with type bool := bool
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -750,9 +751,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let default_caller = Token_id.default
 
-  let stack_frame_default =
+  let stack_frame_default () =
     Stack_frame.make ~caller:default_caller ~caller_caller:default_caller
-      ~calls:Ps.empty
+      ~calls:(Ps.empty ())
 
   let assert_ = Bool.Assert.is_true
 
@@ -764,8 +765,9 @@ module Make (Inputs : Inputs_intf) = struct
       (Opt.map ~f:fst res, Opt.map ~f:snd res)
     in
     (* Handle the None cases *)
-    ( Opt.or_default ~if_:Stack_frame.if_ ~default:stack_frame_default next_frame
-    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+    ( Opt.or_default ~if_:Stack_frame.if_ ~default:(stack_frame_default ())
+        next_frame
+    , Opt.or_default ~if_:Call_stack.if_ ~default:(Call_stack.empty ())
         next_call_stack )
 
   let get_next_party (current_forest : Stack_frame.t)
@@ -914,12 +916,12 @@ module Make (Inputs : Inputs_intf) = struct
                   (Stack_frame.make ~calls:start_data.parties
                      ~caller:default_caller ~caller_caller:default_caller)
                 ~else_:local_state.frame
-            , Call_stack.if_ is_start' ~then_:Call_stack.empty
+            , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
         | `Yes start_data ->
             ( Stack_frame.make ~calls:start_data.parties ~caller:default_caller
                 ~caller_caller:default_caller
-            , Call_stack.empty )
+            , Call_stack.empty () )
         | `No ->
             (local_state.frame, local_state.call_stack)
       in
@@ -974,13 +976,21 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let predicate_satisfied : Bool.t =
+    let predicate_satisfied =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
-    let protocol_state_predicate_satisfied : Bool.t =
+    let local_state =
+      Local_state.add_check local_state Account_precondition_unsatisfied
+        predicate_satisfied
+    in
+    let protocol_state_predicate_satisfied =
       h.perform
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
+    in
+    let local_state =
+      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
+        protocol_state_predicate_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
@@ -1340,17 +1350,11 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.update_failure_status local_state failure_status
         update_permitted
     in
-    let success =
-      Bool.(
-        local_state.success &&& protocol_state_predicate_satisfied
-        &&& predicate_satisfied &&& update_permitted)
-    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status
-        ((not is_start') ||| success)
+        ((not is_start') ||| local_state.success)
         local_state.failure_status) ;
-    let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would

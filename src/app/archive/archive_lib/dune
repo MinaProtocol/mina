@@ -1,8 +1,68 @@
 (library
  (name archive_lib)
  (public_name archive_lib)
- (libraries core async caqti-driver-postgresql
-            mina_base mina_generators mina_ledger mina_caqti mina_transition one_or_two transition_frontier genesis_ledger_helper)
+ (libraries
+   ;;opam libraries
+   sexplib0
+   async_unix
+   base64
+   async_rpc_kernel
+   base.caml
+   bin_prot.shape
+   async_kernel
+   caqti-driver-postgresql
+   core
+   async
+   core_kernel
+   caqti
+   caqti-async
+   async.async_rpc
+   integers
+   ppx_inline_test.config
+   uri
+   ;;local libraries
+   kimchi_backend
+   child_processes
+   precomputed_values
+   coda_genesis_ledger
+   coda_runtime_config
+   sgn
+   mina_base.util
+   kimchi_backend.pasta
+   pickles
+   pipe_lib
+   block_time
+   currency
+   staged_ledger
+   data_hash_lib
+   transition_frontier_base
+   genesis_ledger_helper
+   one_or_two
+   mina_caqti
+   mina_generators
+   mina_base
+   mina_ledger
+   mina_transition
+   transition_frontier
+   logger
+   mina_metrics
+   signature_lib
+   mina_numbers
+   unsigned_extended
+   mina_state
+   pickles_types
+   pickles.backend
+   with_hash
+   mina_base.import
+   consensus
+   genesis_constants
+   genesis_ledger_helper.lib
+   mina_compile_config
+   verifier
+   quickcheck_lib
+   snark_params
+   mina_transaction
+ )
  (inline_tests)
  (modes native)
  (instrumentation (backend bisect_ppx))

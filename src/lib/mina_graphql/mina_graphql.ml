@@ -2,6 +2,7 @@ open Core
 open Async
 open Graphql_async
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency
@@ -4217,6 +4218,18 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic)
 
+  let thread_graph =
+    field "threadGraph"
+      ~doc:
+        "A graphviz dot format representation of the deamon's internal thread \
+         graph"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun _ () ->
+        Bytes.unsafe_to_string
+          ~no_mutation_while_string_reachable:
+            (O1trace.Thread.dump_thread_graph ()))
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -4304,6 +4317,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; thread_graph
     ]
 end
 

@@ -1,6 +1,7 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 open Signature_lib
 
@@ -744,8 +745,8 @@ let expired_by_predicate (t : t) :
              None)
   |> Sequence.filter ~f:(fun (_, ps) ->
          ps.other_parties
-         |> List.map ~f:Party.protocol_state
-         |> List.exists ~f:(fun predicate ->
+         |> Parties.Call_forest.exists ~f:(fun party ->
+                let predicate = Party.protocol_state party in
                 match predicate.timestamp with
                 | Check { upper; _ } ->
                     let upper =
@@ -937,8 +938,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         true
     | User_command.Parties ps ->
         ps.other_parties
-        |> List.map ~f:Party.protocol_state
-        |> List.exists ~f:(fun predicate ->
+        |> Parties.Call_forest.exists ~f:(fun party ->
+               let predicate = Party.protocol_state party in
                match predicate.timestamp with
                | Check { lower; upper } ->
                    let lower =

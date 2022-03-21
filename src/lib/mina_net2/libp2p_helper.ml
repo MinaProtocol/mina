@@ -1,7 +1,6 @@
 open Async
 open Core
 open Pipe_lib
-open O1trace
 
 exception Libp2p_helper_died_unexpectedly
 
@@ -182,27 +181,33 @@ let handle_incoming_message t msg ~handle_push_message =
   in
   match msg with
   | RpcResponse rpc_response ->
-      let rpc_header =
-        Libp2pHelperInterface.RpcResponse.header_get rpc_response
-      in
-      let sequence_number = RpcMessageHeader.sequence_number_get rpc_header in
-      record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-      ( match Hashtbl.find t.outstanding_requests sequence_number with
-      | Some ivar ->
-          if Ivar.is_full ivar then
-            [%log' error t.logger]
-              "Attempted fill outstanding libp2p_helper RPC request more than \
-               once"
-          else Ivar.fill ivar (Libp2p_ipc.rpc_response_to_or_error rpc_response)
-      | None ->
-          [%log' error t.logger]
-            "Attempted to fill outstanding libp2p_helper RPC request, but not \
-             outstanding request was found" ) ;
+      O1trace.sync_thread "handle_libp2p_ipc_rpc_response" (fun () ->
+          let rpc_header =
+            Libp2pHelperInterface.RpcResponse.header_get rpc_response
+          in
+          let sequence_number =
+            RpcMessageHeader.sequence_number_get rpc_header
+          in
+          record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
+          match Hashtbl.find t.outstanding_requests sequence_number with
+          | Some ivar ->
+              if Ivar.is_full ivar then
+                [%log' error t.logger]
+                  "Attempted fill outstanding libp2p_helper RPC request more \
+                   than once"
+              else
+                Ivar.fill ivar
+                  (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+          | None ->
+              [%log' error t.logger]
+                "Attempted to fill outstanding libp2p_helper RPC request, but \
+                 not outstanding request was found") ;
       Deferred.unit
   | PushMessage push_msg ->
-      let push_header = DaemonInterface.PushMessage.header_get push_msg in
-      record_message_delay (PushMessageHeader.time_sent_get push_header) ;
-      handle_push_message t (DaemonInterface.PushMessage.get push_msg)
+      O1trace.thread "handle_libp2p_ipc_push" (fun () ->
+          let push_header = DaemonInterface.PushMessage.header_get push_msg in
+          record_message_delay (PushMessageHeader.time_sent_get push_header) ;
+          handle_push_message t (DaemonInterface.PushMessage.get push_msg))
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
       Deferred.unit
@@ -210,12 +215,15 @@ let handle_incoming_message t msg ~handle_push_message =
 let spawn ~logger ~pids ~conf_dir ~handle_push_message =
   let termination_handler = ref (fun ~killed:_ _result -> Deferred.unit) in
   match%map
-    Child_processes.start_custom ~logger ~name:"libp2p_helper"
-      ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
-      ~conf_dir ~args:[] ~stdout:`Chunks ~stderr:`Lines
-      ~termination:
-        (`Handler
-          (fun ~killed _process result -> !termination_handler ~killed result))
+    O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
+        Child_processes.start_custom ~logger ~name:"libp2p_helper"
+          ~git_root_relative_path:
+            "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
+          ~stdout:`Chunks ~stderr:`Lines
+          ~termination:
+            (`Handler
+              (fun ~killed _process result ->
+                !termination_handler ~killed result)))
   with
   | Error e ->
       Or_error.tag (Error e)
@@ -233,9 +241,12 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
         }
       in
       termination_handler := handle_libp2p_helper_termination t ~pids ;
-      trace_recurring_task "process libp2p_helper stderr" (fun () ->
+      O1trace.background_thread "handle_libp2p_helper_subprocess_logs"
+        (fun () ->
           Child_processes.stderr process
           |> Strict_pipe.Reader.iter ~f:(fun line ->
+                 Mina_metrics.(
+                   Counter.inc_one Mina_metrics.Network.ipc_logs_received_total) ;
                  let record_result =
                    let open Result.Let_syntax in
                    let%bind json =
@@ -255,13 +266,15 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;
                  Deferred.unit)) ;
-      trace_recurring_task "process libp2p_helper stdout" (fun () ->
+      O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
           |> Strict_pipe.Reader.iter ~f:(function
                | Ok msg ->
-                   msg |> Libp2p_ipc.Reader.DaemonInterface.Message.get
-                   |> handle_incoming_message t ~handle_push_message
+                   let msg =
+                     Libp2p_ipc.Reader.DaemonInterface.Message.get msg
+                   in
+                   handle_incoming_message t msg ~handle_push_message
                | Error error ->
                    [%log error]
                      "failed to parse IPC message over libp2p_helper stdout: \

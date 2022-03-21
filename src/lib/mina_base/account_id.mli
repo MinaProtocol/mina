@@ -11,6 +11,8 @@ module Digest : sig
     end
   end]
 
+  val of_field : Snark_params.Tick.Field.t -> t
+
   include Stringable.S with type t := t
 
   include Comparable_binable with type t := t
@@ -41,6 +43,8 @@ module Digest : sig
     val equal : t -> t -> Boolean.var
 
     val if_ : Boolean.var -> then_:t -> else_:t -> t
+
+    val of_field : Pickles.Impls.Step.Field.t -> t
 
     module Assert : sig
       val equal : t -> t -> unit

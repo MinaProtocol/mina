@@ -77,7 +77,7 @@ module Hashless_ledger = struct
   let remove_accounts_exn _t =
     failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"
 
-  (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
+  (* Without undo validating that the hashes match, Mina_transaction_logic doesn't really care what this is. *)
   let merkle_root _t = Ledger_hash.empty_hash
 
   let create l = { base = l; overlay = Hashtbl.create (module Account_id) }
@@ -115,7 +115,7 @@ module Hashless_ledger = struct
     Ledger.close ledger ; res
 end
 
-include Transaction_logic.Make (Hashless_ledger)
+include Mina_transaction_logic.Make (Hashless_ledger)
 
 let create = Hashless_ledger.create
 
@@ -126,6 +126,10 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
         .status)
     (apply_user_command l ~constraint_constants ~txn_global_slot uc)
 
+let apply_transaction' ~constraint_constants ~txn_state_view l t =
+  O1trace.sync_thread "apply_transaction" (fun () ->
+      apply_transaction ~constraint_constants ~txn_state_view l t)
+
 let apply_transaction ~constraint_constants ~txn_state_view l txn =
   Result.map ~f:Transaction_applied.user_command_status
-    (apply_transaction l ~constraint_constants ~txn_state_view txn)
+    (apply_transaction' l ~constraint_constants ~txn_state_view txn)

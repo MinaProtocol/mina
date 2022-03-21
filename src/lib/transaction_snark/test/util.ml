@@ -7,11 +7,11 @@ module Impl = Pickles.Impls.Step
 module Parties_segment = Transaction_snark.Parties_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants = Genesis_constants.Constraint_constants.for_unit_tests
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-let genesis_constants = Genesis_constants.for_unit_tests
+let genesis_constants = Genesis_constants.compiled
 
-let proof_level = Genesis_constants.Proof_level.for_unit_tests
+let proof_level = Genesis_constants.Proof_level.compiled
 
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
@@ -37,7 +37,7 @@ module T = Transaction_snark.Make (struct
   let proof_level = proof_level
 end)
 
-let state_body =
+let genesis_state_body =
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
@@ -51,9 +51,9 @@ let init_stack = Pending_coinbase.Stack.empty
 
 let apply_parties ledger parties =
   let witnesses =
-    Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Amount.Signed.zero ~pending_coinbase_init_stack:init_stack
-      (`Ledger ledger) parties
+    Transaction_snark.parties_witnesses_exn ~constraint_constants
+      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+      ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties
   in
   let open Impl in
   List.fold ~init:((), ()) witnesses
@@ -78,51 +78,60 @@ let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let apply_parties_with_merges ledger parties =
-  let witnesses =
-    match
-      Or_error.try_with (fun () ->
-          Transaction_snark.parties_witnesses_exn ~constraint_constants
-            ~state_body ~fee_excess:Amount.Signed.zero
-            ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties)
-    with
-    | Ok a ->
-        a
-    | Error e ->
-        failwith
-          (sprintf "parties_witnesses_exn failed with %s"
-             (Error.to_string_hum e))
-  in
-  let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
-  let open Async.Deferred.Let_syntax in
-  let%map p =
-    match List.rev witnesses with
-    | [] ->
-        failwith "no witnesses generated"
-    | (witness, spec, stmt, snapp_statement) :: rest ->
-        let open Async.Deferred.Or_error.Let_syntax in
-        let%bind p1 =
-          T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-            ~snapp_statement
-          |> deferred_or_error
-        in
-        Async.Deferred.List.fold ~init:(Ok p1) rest
-          ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
-            let%bind prev = Async.Deferred.return acc in
-            let%bind curr =
+let apply_parties_with_merges ledger partiess =
+  (*TODO: merge multiple snapp transactions*)
+  Async.Deferred.List.iter partiess ~f:(fun parties ->
+      let witnesses =
+        match
+          Or_error.try_with (fun () ->
+              Transaction_snark.parties_witnesses_exn ~constraint_constants
+                ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+                ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
+                [ parties ])
+        with
+        | Ok a ->
+            a
+        | Error e ->
+            failwith
+              (sprintf "parties_witnesses_exn failed with %s"
+                 (Error.to_string_hum e))
+      in
+      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
+      let open Async.Deferred.Let_syntax in
+      let%map p =
+        match List.rev witnesses with
+        | [] ->
+            failwith "no witnesses generated"
+        | (witness, spec, stmt, snapp_statement) :: rest ->
+            let open Async.Deferred.Or_error.Let_syntax in
+            let%bind p1 =
               T.of_parties_segment_exn ~statement:stmt ~witness ~spec
                 ~snapp_statement
               |> deferred_or_error
             in
-            let sok_digest =
-              Sok_message.create ~fee:Fee.zero
-                ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
-              |> Sok_message.digest
-            in
-            T.merge ~sok_digest prev curr)
-  in
-  let _p = Or_error.ok_exn p in
-  ()
+            Async.Deferred.List.fold ~init:(Ok p1) rest
+              ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
+                let%bind prev = Async.Deferred.return acc in
+                let%bind curr =
+                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                    ~snapp_statement
+                  |> deferred_or_error
+                in
+                let sok_digest =
+                  Sok_message.create ~fee:Fee.zero
+                    ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
+                  |> Sok_message.digest
+                in
+                T.merge ~sok_digest prev curr)
+      in
+      let _p = Or_error.ok_exn p in
+      let _s =
+        Ledger.apply_parties_unchecked ~constraint_constants
+          ~state_view:(Mina_state.Protocol_state.Body.view genesis_state_body)
+          ledger parties
+        |> Or_error.ok_exn
+      in
+      ())
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
@@ -146,7 +155,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   }
 
 let gen_snapp_ledger =
-  let open Mina_base.Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let open Quickcheck.Generator.Let_syntax in
   let%bind test_spec = Test_spec.gen in
   let pks =
@@ -164,7 +173,7 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
     ~init_ledger ~snapp_pk =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
@@ -212,3 +221,71 @@ let permissions_from_update (update : Party.Update.t) ~auth =
         default.set_voting_for
       else auth )
   }
+
+module Wallet = struct
+  type t = { private_key : Private_key.t; account : Account.t }
+
+  let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
+    let random_wallet () : t =
+      let private_key = Private_key.create () in
+      let public_key =
+        Public_key.compress (Public_key.of_private_key_exn private_key)
+      in
+      let account_id = Account_id.create public_key Token_id.default in
+      { private_key
+      ; account =
+          Account.create account_id
+            (Balance.of_int ((50 + Random.int 100) * 1_000_000_000))
+      }
+    in
+    Array.init n ~f:(fun _ -> random_wallet ())
+
+  let user_command ~fee_payer ~source_pk ~receiver_pk amt fee nonce memo =
+    let payload : Signed_command.Payload.t =
+      Signed_command.Payload.create ~fee
+        ~fee_payer_pk:(Account.public_key fee_payer.account)
+        ~nonce ~memo ~valid_until:None
+        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
+    in
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
+      Signed_command.Poly.Stable.Latest.
+        { payload
+        ; signer = Public_key.of_private_key_exn fee_payer.private_key
+        ; signature
+        }
+    |> Option.value_exn
+
+  let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee nonce memo
+      =
+    let fee_payer = wallets.(i) in
+    let receiver = wallets.(j) in
+    user_command ~fee_payer
+      ~source_pk:(Account.public_key fee_payer.account)
+      ~receiver_pk:(Account.public_key receiver.account)
+      amt fee nonce memo
+end
+
+let genesis_state_body_hash =
+  Mina_state.Protocol_state.Body.hash genesis_state_body
+
+(** Each transaction pushes the previous protocol state (used to validate
+    the transaction) to the pending coinbase stack of protocol states*)
+let pending_coinbase_state_update state_body_hash stack =
+  Pending_coinbase.Stack.(push_state state_body_hash stack)
+
+(** Push protocol state and coinbase if it is a coinbase transaction to the
+      pending coinbase stacks (coinbase stack and state stack)*)
+let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
+    state_body_hash stack =
+  let stack_with_state = pending_coinbase_state_update state_body_hash stack in
+  match t with
+  | Coinbase c ->
+      Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+  | _ ->
+      stack_with_state
+
+let check_balance pk balance ledger =
+  let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
+  let acc = Ledger.get ledger loc |> Option.value_exn in
+  [%test_eq: Balance.t] acc.balance (Balance.of_int balance)

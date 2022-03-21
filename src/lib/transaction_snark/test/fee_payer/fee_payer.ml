@@ -5,6 +5,7 @@ open Signature_lib
 module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
+open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
@@ -124,7 +125,7 @@ let%test_module "Fee payer tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key))
 
     let%test_unit "snapp transaction with non-existent fee payer account" =
-      let open Mina_base.Transaction_logic.For_tests in
+      let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -157,7 +158,7 @@ let%test_module "Fee payer tests" =
                   let ledger0 = Ledger.register_mask ledger mask in
                   Ledger.apply_transaction ledger0 ~constraint_constants
                     ~txn_state_view:
-                      (Mina_state.Protocol_state.Body.view U.state_body)
+                      (Mina_state.Protocol_state.Body.view U.genesis_state_body)
                     (Transaction.Command (Parties parties))
                 with
               | Error _ ->
@@ -168,7 +169,7 @@ let%test_module "Fee payer tests" =
               match
                 Or_error.try_with (fun () ->
                     Transaction_snark.parties_witnesses_exn
-                      ~constraint_constants ~state_body:U.state_body
+                      ~constraint_constants ~state_body:U.genesis_state_body
                       ~fee_excess:Amount.Signed.zero
                       ~pending_coinbase_init_stack:U.init_stack (`Ledger ledger)
                       [ parties ])

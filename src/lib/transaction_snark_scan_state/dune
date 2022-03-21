@@ -24,6 +24,8 @@
    transaction_witness
    transaction_snark
    mina_base
+   mina_transaction
+   mina_transaction_logic
    snark_work_lib
    one_or_two
    mina_ledger

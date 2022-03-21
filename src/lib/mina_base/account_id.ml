@@ -41,6 +41,8 @@ module Digest = struct
 
   let of_string = of_base58_check_exn
 
+  let of_field = Fn.id
+
   [%%ifdef consensus_mechanism]
 
   [%%versioned
@@ -113,6 +115,8 @@ module Digest = struct
     let equal : t -> t -> Boolean.var = Field.equal
 
     let if_ = Field.if_
+
+    let of_field = Fn.id
 
     module Assert = struct
       let equal : t -> t -> unit = Field.Assert.equal
