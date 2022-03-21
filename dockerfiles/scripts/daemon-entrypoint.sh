@@ -51,8 +51,6 @@ fi
 
 # Mina daemon initialization
 mkdir -p .mina-config
-# Create all of the log files that we will tail later
-touch "${LOG_FILES[@]}"
 
 set +e # Allow remaining commands to fail without exiting early
 rm -f .mina-config/.mina-lock
