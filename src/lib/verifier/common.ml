@@ -109,7 +109,7 @@ let check :
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =
-                  List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
+                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
               ; memo
               }
           in

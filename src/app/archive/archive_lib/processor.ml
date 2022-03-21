@@ -1494,7 +1494,8 @@ module User_command = struct
         Snapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer.data
       in
       let%bind snapp_other_parties_ids =
-        Mina_caqti.deferred_result_list_map ps.other_parties
+        Mina_caqti.deferred_result_list_map
+          (Parties.Call_forest.to_parties_list ps.other_parties)
           ~f:(Snapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
