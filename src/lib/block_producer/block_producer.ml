@@ -2,9 +2,9 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
-open O1trace
 
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
@@ -145,12 +145,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       in
       let diff =
         let diff =
-          measure "create_diff" (fun () ->
-              Staged_ledger.create_diff ~constraint_constants staged_ledger
-                ~coinbase_receiver ~logger
-                ~current_state_view:previous_state_view
-                ~transactions_by_fee:transactions ~get_completed_work
-                ~log_block_creation ~supercharge_coinbase)
+          Staged_ledger.create_diff ~constraint_constants staged_ledger
+            ~coinbase_receiver ~logger ~current_state_view:previous_state_view
+            ~transactions_by_fee:transactions ~get_completed_work
+            ~log_block_creation ~supercharge_coinbase
           |> Result.map_error ~f:(fun err ->
                  Staged_ledger.Staged_ledger_error.Pre_diff err)
         in
@@ -278,7 +276,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Block_time.now time_controller
               |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
             in
-            measure "consensus generate_transition" (fun () ->
+            O1trace.sync_thread "generate_consensus_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
                   ~block_data ~supercharge_coinbase
@@ -286,29 +284,30 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ~supply_increase ~logger ~constraint_constants))
       in
       lift_sync (fun () ->
-          measure "making Snark and Internal transitions" (fun () ->
-              let snark_transition =
+          let snark_transition =
+            O1trace.sync_thread "generate_snark_transition" (fun () ->
                 Snark_transition.create_value
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~pending_coinbase_update ()
-              in
-              let internal_transition =
+                  ~pending_coinbase_update ())
+          in
+          let internal_transition =
+            O1trace.sync_thread "generate_internal_transition" (fun () ->
                 Internal_transition.create ~snark_transition
                   ~prover_state:
                     (Consensus.Data.Block_data.prover_state block_data)
                   ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                   ~ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof))
-              in
-              let witness =
-                { Pending_coinbase_witness.pending_coinbases =
-                    Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
-                }
-              in
-              Some (protocol_state, internal_transition, witness)))
+                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof)))
+          in
+          let witness =
+            { Pending_coinbase_witness.pending_coinbases =
+                Staged_ledger.pending_coinbase_collection staged_ledger
+            ; is_new_stack
+            }
+          in
+          Some (protocol_state, internal_transition, witness))
 
 module Precomputed_block = struct
   type t = External_transition.Precomputed_block.t =
@@ -471,7 +470,7 @@ module Vrf_evaluation_state = struct
 
   let poll_vrf_evaluator ~logger vrf_evaluator =
     let f () =
-      measure "asking vrf evaluator for any slots won" (fun () ->
+      O1trace.thread "query_vrf_evaluator" (fun () ->
           Vrf_evaluator.slots_won_so_far vrf_evaluator)
     in
     retry ~logger ~error_message:"Error fetching slots from the VRF evaluator" f
@@ -520,7 +519,7 @@ module Vrf_evaluation_state = struct
   let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
     let set_epoch_data () =
       let f () =
-        measure "Setting epoch data of the VRF evaluator" (fun () ->
+        O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
             Vrf_evaluator.set_new_epoch_state vrf_evaluator ~epoch_data_for_vrf)
       in
       retry ~logger
@@ -540,7 +539,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) ~block_reward_threshold
     ~block_produced_bvar =
-  trace "block_producer" (fun () ->
+  O1trace.sync_thread "produce_blocks" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
       let genesis_breadcrumb =
@@ -660,7 +659,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
               |> Sequence.map
                    ~f:Transaction_hash.User_command_with_valid_signature.data
             in
-            trace_event "waiting for ivar..." ;
             let%bind () =
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
@@ -671,7 +669,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk ~block_reward_threshold
             in
-            trace_event "next state generated" ;
             match next_state_opt with
             | None ->
                 Interruptible.return ()
@@ -717,7 +714,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     let%bind protocol_state_proof =
                       time ~logger ~time_controller
                         "Protocol_state_proof proving time(ms)" (fun () ->
-                          measure "proving state transition valid" (fun () ->
+                          O1trace.thread "dispatch_block_proving" (fun () ->
                               Prover.prove prover
                                 ~prev_state:previous_protocol_state
                                 ~prev_state_proof:previous_protocol_state_proof
@@ -889,7 +886,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
       let scheduler = Singleton_scheduler.create time_controller in
       let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
-        trace_recurring "check next block timing" (fun () ->
+        O1trace.sync_thread "check_next_block_timing" (fun () ->
             (* Begin checking for the ability to produce a block *)
             match Broadcast_pipe.Reader.peek frontier_reader with
             | None ->
@@ -907,7 +904,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 in
                 let now = Block_time.now time_controller in
                 let epoch_data_for_vrf, ledger_snapshot =
-                  measure "asking consensus the epoch data" (fun () ->
+                  O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
                       Consensus.Hooks.get_epoch_data_for_vrf
                         ~constants:consensus_constants (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state

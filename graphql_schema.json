@@ -681,7 +681,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "FeePayerPartyBodyInput",
-          "description": "Body component of a party",
+          "description": null,
           "fields": [
             {
               "name": "publicKey",
@@ -693,22 +693,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
                   "ofType": null
                 }
               },
@@ -739,22 +723,6 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "incrementNonce",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -861,22 +829,6 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "ProtocolStatePredicateInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "useFullCommitment",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
                   "ofType": null
                 }
               },
@@ -900,20 +852,6 @@
               "defaultValue": null
             },
             {
-              "name": "tokenId",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "update",
               "description": null,
               "type": {
@@ -934,20 +872,6 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "incrementNonce",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
               },
               "defaultValue": null
             },
@@ -1044,20 +968,6 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "ProtocolStatePredicateInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "useFullCommitment",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
                   "ofType": null
                 }
               },
@@ -2532,22 +2442,6 @@
               "deprecationReason": null
             },
             {
-              "name": "lastVrfOutput",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "totalCurrency",
               "description": null,
               "args": [],
@@ -2654,20 +2548,6 @@
               "defaultValue": null
             },
             {
-              "name": "lastVrfOutput",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "totalCurrency",
               "description": null,
               "type": {
@@ -2733,7 +2613,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "PartyBodyInput",
-          "description": "Body component of a party",
+          "description": null,
           "fields": [
             {
               "name": "publicKey",
@@ -7122,7 +7002,7 @@
         {
           "kind": "OBJECT",
           "name": "PartyBody",
-          "description": "Body component of a party",
+          "description": null,
           "fields": [
             {
               "name": "publicKey",
@@ -7756,22 +7636,6 @@
               "deprecationReason": null
             },
             {
-              "name": "lastVrfOutput",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "totalCurrency",
               "description": null,
               "args": [],
@@ -8337,16 +8201,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "Unit",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "Field",
           "description": "String representing a public key in base58",
           "fields": null,
@@ -8358,7 +8212,7 @@
         {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
-          "description": "Body component of a party",
+          "description": null,
           "fields": [
             {
               "name": "publicKey",
@@ -8370,22 +8224,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
                   "ofType": null
                 }
               },
@@ -8416,22 +8254,6 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "incrementNonce",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
-                  "ofType": null
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8538,22 +8360,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ProtocolStatePredicate",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "useFullCommitment",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Unit",
                   "ofType": null
                 }
               },
@@ -13823,6 +13629,23 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "JSON",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "threadGraph",
+              "description":
+                "A graphviz dot format representation of the deamon's internal thread graph",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },

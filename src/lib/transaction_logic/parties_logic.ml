@@ -870,13 +870,21 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let predicate_satisfied : Bool.t =
+    let predicate_satisfied =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
-    let protocol_state_predicate_satisfied : Bool.t =
+    let local_state =
+      Local_state.add_check local_state Account_precondition_unsatisfied
+        predicate_satisfied
+    in
+    let protocol_state_predicate_satisfied =
       h.perform
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
+    in
+    let local_state =
+      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
+        protocol_state_predicate_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
@@ -1234,17 +1242,11 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
     in
-    let success =
-      Bool.(
-        local_state.success &&& protocol_state_predicate_satisfied
-        &&& predicate_satisfied &&& update_permitted)
-    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status_tbl
-        ((not is_start') ||| success)
+        ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
-    let local_state = { local_state with success } in
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would

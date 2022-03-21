@@ -33,6 +33,7 @@
    mina_state
    mina_net2
    mina_base
+   mina_transaction
    truth
    transition_chain_verifier
    staged_ledger

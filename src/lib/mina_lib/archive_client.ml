@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open O1trace
 
 let dispatch ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
@@ -86,7 +85,7 @@ let transfer ~logger ~archive_location
 let run ~logger
     ~(frontier_broadcast_pipe :
        Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
-  trace_task "Daemon sending diffs to archive loop" (fun () ->
+  O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
           (Option.value_map ~default:Deferred.unit

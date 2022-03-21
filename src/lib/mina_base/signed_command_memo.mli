@@ -45,6 +45,11 @@ val of_base58_check : string -> t Or_error.t
 
 val of_base58_check_exn : string -> t
 
+(** for a memo of bytes, return a plaintext string
+    for a memo of a digest, return a hex-encoded string, prefixed by '0x'
+*)
+val to_string_hum : t -> string
+
 (** is the memo a digest *)
 val is_digest : t -> bool
 

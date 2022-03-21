@@ -31,6 +31,7 @@
    merkle_mask
    merkle_ledger
    mina_base
+   mina_transaction
    mina_transaction_logic
    signature_lib
    mina_numbers
