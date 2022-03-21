@@ -133,8 +133,7 @@ let push_event events_commitment event =
 (** Returns the commitment formed by calling `push_event` on each value in the
     list of events.
 *)
-let hash (x : t) =
-  List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
 (** Returns the [Random_oracle_input.t] to be used when hashing larger
     structures containing events.
