@@ -108,7 +108,7 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
 
 let apply_transaction' ~constraint_constants ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      T.apply_transaction_pure ~constraint_constants ~txn_state_view l t)
+      T.apply_transaction ~constraint_constants ~txn_state_view l t)
 
 let apply_transaction ~constraint_constants ~txn_state_view =
   apply_transaction_logic

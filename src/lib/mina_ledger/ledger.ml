@@ -366,7 +366,7 @@ include Mina_transaction_logic.Make (Ledger_inner)
 
 let apply_transaction ~constraint_constants ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction_pure ~constraint_constants ~txn_state_view l t)
+      apply_transaction ~constraint_constants ~txn_state_view l t)
 
 type init_state =
   ( Signature_lib.Keypair.t

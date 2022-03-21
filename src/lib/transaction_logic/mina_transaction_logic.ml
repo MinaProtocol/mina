@@ -364,7 +364,7 @@ module type S = sig
     -> Coinbase.t
     -> Transaction_applied.Coinbase_applied.t Or_error.t
 
-  val apply_transaction_pure :
+  val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_state_view:Snapp_predicate.Protocol_state.View.t
     -> ledger
@@ -2151,7 +2151,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] applied.previous_hash (merkle_root ledger)) ;
     res
 
-  let apply_transaction_pure ~constraint_constants
+  let apply_transaction ~constraint_constants
       ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
