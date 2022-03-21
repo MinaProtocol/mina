@@ -178,7 +178,8 @@ end
    (an alternative would be to fail, since we intend never to do that,
    and it would make debugging difficult if we ever did that)
 *)
-let failure_status_typ : (unit, Transaction_status.Failure.Table.t) Impl.Typ.t =
+let failure_status_tbl_typ :
+    (unit, Transaction_status.Failure.Table.t) Impl.Typ.t =
   Impl.Typ.transport Impl.Typ.unit
     ~there:(fun _failure_status_tbl -> ())
     ~back:(fun () -> [])
@@ -195,7 +196,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Amount.typ
     ; Ledger_hash.typ
     ; Boolean.typ
-    ; failure_status_typ
+    ; failure_status_tbl_typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist

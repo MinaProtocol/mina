@@ -1099,7 +1099,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let assert_with_failure_status_tbl b failure_status_tbl =
         if (not b) && not (is_empty failure_status_tbl) then
           (* Raise a more useful error message if we have a failure
-                description. *)
+             description. *)
           Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
           @@ Transaction_status.Failure.Table.display_to_yojson
           @@ Transaction_status.Failure.Table.to_display failure_status_tbl
@@ -1567,10 +1567,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           match t.failure_status_tbl with
           | hd :: tl when not b ->
               (failure :: hd) :: tl
-          | otherwise ->
-              otherwise
+          | old_failure_status_tbl ->
+              old_failure_status_tbl
         in
-        { t with failure_status_tbl }
+        { t with failure_status_tbl; success = t.success && b }
 
       let update_failure_status_tbl (t : t) failure_status b =
         match failure_status with
