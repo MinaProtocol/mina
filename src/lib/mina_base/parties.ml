@@ -183,36 +183,40 @@ module Call_forest = struct
   let accumulate_hashes_predicated xs =
     accumulate_hashes ~hash_party:Party.Predicated.digest xs
 
+  (* Delegate_call means, preserve the current caller.
+  *)
   let add_callers (type party party_with_caller digest id)
       (ps : (party, digest) t) ~(call_type : party -> Party.Call_type.t)
       ~(add_caller : party -> id -> party_with_caller) ~(null_id : id)
       ~(party_id : party -> id) : (party_with_caller, digest) t =
-    let rec go curr_caller parent_id ps =
-      let id_for_party p =
-        match call_type p with
-        | Delegate_call ->
-            curr_caller
-        | Call ->
-            parent_id
-      in
+    let module Context = struct
+      type t = { caller : id; self : id }
+    end in
+    let open Context in
+    let rec go curr_context ps =
       match ps with
       | { With_stack_hash.elt = { Tree.party = p; party_digest; calls }
         ; stack_hash
         }
         :: ps ->
-          let id = id_for_party p in
-          { With_stack_hash.elt =
-              { Tree.party = add_caller p id
-              ; party_digest
-              ; calls = go id (party_id p) calls
-              }
-          ; stack_hash
-          }
-          :: go curr_caller parent_id ps
+          let elt =
+            let context =
+              match call_type p with
+              | Delegate_call ->
+                  curr_context
+              | Call ->
+                  { caller = curr_context.self; self = party_id p }
+            in
+            { Tree.party = add_caller p context.caller
+            ; party_digest
+            ; calls = go context calls
+            }
+          in
+          { With_stack_hash.elt; stack_hash } :: go curr_context ps
       | [] ->
           []
     in
-    go null_id null_id ps
+    go { caller = null_id; self = null_id } ps
 
   let add_callers' (type h) (ps : (Party.Predicated.Wire.t, h) t) :
       (Party.Predicated.t, h) t =

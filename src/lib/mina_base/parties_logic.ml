@@ -791,15 +791,15 @@ module Make (Inputs : Inputs_intf) = struct
       Ps.pop_exn (Stack_frame.calls current_forest)
     in
     let party_caller = Party.caller party in
+    let is_delegate_call =
+      Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
+    in
     let () =
-      let is_caller =
+      let is_normal_call =
         Token_id.equal party_caller (Stack_frame.caller current_forest)
       in
-      let is_caller_caller =
-        Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
-      in
       (* Check that party has a valid caller. *)
-      assert_ Bool.(is_caller ||| is_caller_caller)
+      assert_ Bool.(is_normal_call ||| is_delegate_call)
     in
     let () =
       (* Check that the token owner was consulted if using a non-default
@@ -851,10 +851,13 @@ module Make (Inputs : Inputs_intf) = struct
           (Stack_frame.if_ remainder_of_current_forest_empty
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame)
         ~else_:
-          (Stack_frame.make ~calls:party_forest
-             ~caller:
-               (Account_id.derive_token_id ~owner:(Party.account_id party))
-             ~caller_caller:(Stack_frame.caller current_forest))
+          (let caller =
+             Token_id.if_ is_delegate_call
+               ~then_:(Stack_frame.caller current_forest)
+               ~else_:
+                 (Account_id.derive_token_id ~owner:(Party.account_id party))
+           and caller_caller = party_caller in
+           Stack_frame.make ~calls:party_forest ~caller ~caller_caller)
     in
     (party, new_current_forest, new_call_stack)
 
