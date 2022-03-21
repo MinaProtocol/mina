@@ -10,4 +10,6 @@
    kimchi_pasta
    kimchi_backend
    signature_lib
-   snark_params))
+   snark_params)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
