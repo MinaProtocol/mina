@@ -8,14 +8,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
-  (* [%%import "/src/config.mlh"] *)
-
-  module Base58_check = Base58_check.Make (struct
-    let description = "User command memo"
-
-    let version_byte = Base58_check.Version_bytes.user_command_memo
-  end)
-
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -85,23 +77,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; amount
         }
     in
-    let user_command_input =
-      User_command_input.create ~fee
-        ~fee_token:(Signed_command_payload.Body.token txn_body)
-        ~fee_payer_pk:sender_pub_key ~valid_until:None
-        ~memo:(Signed_command_memo.of_string (Base58_check.encode ""))
-        ~body:txn_body ~signer:sender_pub_key
-        ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
-    in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_balance ~logger untimed_node_b
         ~public_key:sender_pub_key
     in
+    let user_command_input =
+      User_command_input.create ~fee ~nonce:sender_current_nonce
+        ~fee_token:(Signed_command_payload.Body.token txn_body)
+        ~fee_payer_pk:sender_pub_key ~valid_until:None
+        ~memo:(Signed_command_memo.create_from_string_exn "")
+        ~body:txn_body ~signer:sender_pub_key
+        ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
+    in
+    [%log info] "user_command_input: $user_command"
+      ~metadata:
+        [ ( "user_command"
+          , User_command_input.Stable.Latest.to_yojson user_command_input )
+        ] ;
     let%bind txn_signed =
       User_command_input.to_user_command
         ~get_current_nonce:(fun _ ->
-          Result.return (`Min sender_current_nonce, sender_current_nonce))
-        ~get_account:(fun _ -> `Active None)
+          failwith "get_current_nonce, don't call me")
+          (* (fun _ ->
+             Result.return (`Min sender_current_nonce, sender_current_nonce)) *)
+        ~get_account:(fun _ -> `Bootstrapping)
+          (* (fun _ -> failwith "get_account, don't call me") *)
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
