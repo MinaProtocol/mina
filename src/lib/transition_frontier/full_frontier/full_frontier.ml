@@ -374,7 +374,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   let () =
     match enable_epoch_ledger_sync with
     | `Enabled snarked_ledger ->
-        O1trace.measure "calling consensus hook frontier_root_transition"
+        O1trace.sync_thread "update_consensus_local_state"
           (fun () ->
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state old_root_node.breadcrumb)
@@ -402,7 +402,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
-    O1trace.measure "committing new root mask" (fun () -> Ledger.commit m1) ;
+    O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () -> Ledger.commit m1) ;
     [%test_result: Ledger_hash.t]
       ~message:
         "Merkle root of new root's staged ledger mask is the same after \
@@ -501,7 +501,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
   let open Diff in
-  O1trace.measure "calculate_diffs" (fun () ->
+  O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_node =
         Hashtbl.find_exn t.table (Breadcrumb.parent_hash breadcrumb)

@@ -258,7 +258,7 @@ let get_transaction_data (type c) ~constraint_constants coinbase_parts ~receiver
     ~coinbase_amount commands completed_works ~(forget : c -> _) =
   let open Result.Let_syntax in
   let%bind coinbases =
-    O1trace.measure "create_coinbase" (fun () ->
+    O1trace.sync_thread "create_coinbase" (fun () ->
         create_coinbase ~constraint_constants coinbase_parts ~receiver
           ~coinbase_amount)
   in
