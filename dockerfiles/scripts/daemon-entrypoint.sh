@@ -14,16 +14,14 @@ declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '
 
 # Attempt to execute or source custom entrypoint scripts accordingly
 for script in /entrypoint.d/*; do
-  # The different behavior of source vs. executing the script tends to be
-  # difficult for users to reason about, so make sure to always source files ending in `mina-env`
-  if [[ "$script" == /entrypoint.d/*mina-env ]]; then
-    source "$script"
+  if [[ "$( basename "${script}")" == *mina-env ]]; then
+    source "${script}"
+  else if [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
+    source "${script}"
+  else if [[ -f "${script}" ]]; then
+    "${script}" $INPUT_ARGS
   else
-    if [[ -x "$script" ]]; then
-      "$script" $INPUT_ARGS
-    else
-      source "$script"
-    fi
+    echo "[ERROR] Entrypoint script ${script} is not a regular file, ignoring"
   fi
 done
 
@@ -62,10 +60,12 @@ echo "Mina process exited with status code ${MINA_EXIT_CODE}"
 # Example: `mina client export-local-logs > ~/.mina-config/log-exports/blah`
 #  to export logs every time the daemon shuts down
 for script in /exitpoint.d/*; do
-  if [[ -x "$script" ]]; then
-    "$script"
+  if [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
+    source "${script}"
+  else if [[ -f "${script}" ]]; then
+    "${script}"
   else
-    source "$script"
+    echo "[ERROR] Exitpoint script ${script} is not a regular file, ignoring"
   fi
 done
 
