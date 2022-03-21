@@ -34,6 +34,9 @@ set +u # allow these variables to be unset, including EXTRA_FLAGS
 if [[ ${PEER_LIST_URL} ]]; then
   APPENDED_FLAGS+=" --peer-list-url ${PEER_LIST_URL}"
 fi
+if [[ ${PEER_LIST_FILE} ]]; then
+  APPENDED_FLAGS+=" --peer-list-file ${PEER_LIST_FILE}"
+fi
 if [[ ${LOG_LEVEL} ]]; then
   APPENDED_FLAGS+=" --log-level ${LOG_LEVEL}"
 fi
@@ -54,9 +57,17 @@ mkdir -p .mina-config
 
 set +e # Allow remaining commands to fail without exiting early
 rm -f .mina-config/.mina-lock
+
+# Export variables that the daemon would read directly
+export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
+
+# Run the daemon in the foreground
 mina ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
 export MINA_EXIT_CODE="$?"
 echo "Mina process exited with status code ${MINA_EXIT_CODE}"
+
+# Don't export variables to exitpoint scripts
+export -n MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
 # Attempt to execute or source custom EXITpoint scripts
 # Example: `mina client export-local-logs > ~/.mina-config/log-exports/blah`
