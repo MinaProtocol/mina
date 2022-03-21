@@ -21,12 +21,13 @@ if (!nodeModulesExists) {
 }
 // copy over js artifacts
 try {
-  fs.cpSync(snarkyPath, "node_modules/snarkyjs/index.js");
+  fs.cpSync(snarkyPath, `${nodeModules}/snarkyjs/index.js`);
 } catch (err) {
   console.log(
     "Error: Cannot find snarky_js_node.bc.js. Did you forget to run `dune build`?"
   );
-  process.exit(1);
+  console.log(err);
+  throw err;
 }
 fs.readdirSync(wasmPath)
   .filter((f) => f.startsWith("plonk_wasm"))
@@ -35,7 +36,7 @@ fs.readdirSync(wasmPath)
   });
 
 let snarkyjs = require("snarkyjs");
-if (!nodeModulesExists) fs.rmSync(nodeModules, {recursive: true});
+if (!nodeModulesExists) fs.rmSync(nodeModules, { recursive: true });
 
 let didShutdown = false;
 

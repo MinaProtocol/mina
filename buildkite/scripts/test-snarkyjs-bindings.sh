@@ -15,5 +15,8 @@ dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=dev --verbose
 dune b src/lib/snarky_js_bindings/lib --profile=dev --verbose
 dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js --profile=dev --verbose
 
+ls -la _build/default/src/lib/snarky_js_bindings/
+ls -la .
+
 echo "Running tests in Javascript"
 node src/lib/snarky_js_bindings/tests/run-tests.mjs
