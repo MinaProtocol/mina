@@ -4,6 +4,8 @@ set -euo pipefail
 
 # If glob doesn't match anything, return empty string rather than literal pattern
 shopt -s nullglob
+# Match files starting with .
+shopt -s dotglob
 
 INPUT_ARGS="$@"
 
@@ -13,7 +15,7 @@ INPUT_ARGS="$@"
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
-for script in /entrypoint.d/* /entrypoint.d/.*; do
+for script in /entrypoint.d/*; do
   if [[ "$( basename "${script}")" == *mina-env ]]; then
     source "${script}"
   elif [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
