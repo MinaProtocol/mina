@@ -12,51 +12,60 @@ INPUT_ARGS="$@"
 # mina-best-tip.log is useful for organizing a hard fork and is one way to monitor new blocks as they are added, but not critical
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
-EXTRA_FLAGS=""
-
 # Attempt to execute or source custom entrypoint scripts accordingly
-# Example: mount a mina-env file with variable evironment variables to source and pass to the daemon
-for script in /entrypoint.d/*; do
-  if [ -x "$script" ]; then
-    "$script" $INPUT_ARGS
+for script in /entrypoint.d/* /entrypoint.d/.*; do
+  if [[ "$( basename "${script}")" == *mina-env ]]; then
+    source "${script}"
+  else if [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then
+    source "${script}"
+  else if [[ -f "${script}" ]]; then
+    "${script}" $INPUT_ARGS
   else
-    source "$script"
+    echo "[ERROR] Entrypoint script ${script} is not a regular file, ignoring"
   fi
 done
 
-set +u # allow these variables to be unset
+APPENDED_FLAGS=""
+
+set +u # allow these variables to be unset, including EXTRA_FLAGS
 # Support flags from .mina-env on debian
 if [[ ${PEER_LIST_URL} ]]; then
-  EXTRA_FLAGS+=" --peer-list-url ${PEER_LIST_URL}"
+  APPENDED_FLAGS+=" --peer-list-url ${PEER_LIST_URL}"
 fi
 if [[ ${LOG_LEVEL} ]]; then
-  EXTRA_FLAGS+=" --log-level ${LOG_LEVEL}"
+  APPENDED_FLAGS+=" --log-level ${LOG_LEVEL}"
 fi
 if [[ ${FILE_LOG_LEVEL} ]]; then
-  EXTRA_FLAGS+=" --file-log-level ${FILE_LOG_LEVEL}"
+  APPENDED_FLAGS+=" --file-log-level ${FILE_LOG_LEVEL}"
 fi
 
 # If VERBOSE=true then print daemon flags
 if [[ ${VERBOSE} ]]; then
   # Print the flags to the daemon for debugging use
-  echo "[Debug] Input Args: ${INPUT_ARGS}"
+  echo "[Debug] Input Arguments: ${INPUT_ARGS}"
   echo "[Debug] Extra Flags: ${EXTRA_FLAGS}"
+  echo "[Debug] Dynamically Appended Flags: ${APPENDED_FLAGS}"
 fi
-
-set -u
 
 # Mina daemon initialization
 mkdir -p .mina-config
-# Create all of the log files that we will tail later
-touch "${LOG_FILES[@]}"
 
 set +e # Allow remaining commands to fail without exiting early
 rm -f .mina-config/.mina-lock
-mina $INPUT_ARGS $EXTRA_FLAGS 2>mina-stderr.log
-echo "Mina process exited with status code $?"
+mina ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
+export MINA_EXIT_CODE="$?"
+echo "Mina process exited with status code ${MINA_EXIT_CODE}"
 
-# TODO: would a specified directory of "post-failure" scripts make sense here?
-# Something like `mina client export-local-logs > ~/.mina-config/log-exports/blah`
+# Attempt to execute or source custom EXITpoint scripts
+# Example: `mina client export-local-logs > ~/.mina-config/log-exports/blah`
+#  to export logs every time the daemon shuts down
+for script in /exitpoint.d/*; do
+  if [[ -f "${script}" ]] && [[ -x "${script}" ]]; then
+    "${script}"
+  else
+    echo "[ERROR] Exitpoint script ${script} is not an executable regular file, ignoring"
+  fi
+done
 
 # TODO: have a better way to intersperse log files like we used to, without infinite disk use
 # For now, tail the last 20 lines of the verbose log files when the node shuts down
