@@ -85,6 +85,7 @@ module Network_config = struct
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
+        ; extra_genesis_accounts
         ; num_snark_workers
         ; num_archive_nodes
         ; log_precomputed_blocks
@@ -133,6 +134,17 @@ module Network_config = struct
           , aux_keypairs )
       | _ ->
           failwith "there should be at least one aux keypair"
+    in
+    let extra_accounts =
+      List.map extra_genesis_accounts ~f:(fun { keypair; balance } ->
+          let default = Runtime_config.Accounts.Single.default in
+          { default with
+            pk =
+              Some
+                Public_key.(Compressed.to_string (compress keypair.public_key))
+          ; sk = None
+          ; balance = Balance.of_formatted_string balance
+          })
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
@@ -220,7 +232,7 @@ module Network_config = struct
       ; proof = Some proof_config
       ; ledger =
           Some
-            { base = Accounts (bp_accounts @ aux_accounts)
+            { base = Accounts (bp_accounts @ aux_accounts @ extra_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []

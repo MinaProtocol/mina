@@ -12,6 +12,10 @@ module Block_producer = struct
   type t = { balance : string; timing : Mina_base.Account_timing.t }
 end
 
+module Extra_accounts = struct
+  type t = { keypair : Signature_lib.Keypair.t; balance : string }
+end
+
 type constants =
   { constraints : Genesis_constants.Constraint_constants.t
   ; genesis : Genesis_constants.t
@@ -28,6 +32,7 @@ type t =
   ; proof_level : Runtime_config.Proof_keys.Level.t
   ; txpool_max_size : int
   ; block_producers : Block_producer.t list
+  ; extra_genesis_accounts : Extra_accounts.t list
   ; num_snark_workers : int
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
@@ -48,6 +53,7 @@ let default =
   ; proof_level = Full
   ; txpool_max_size = 3000
   ; block_producers = []
+  ; extra_genesis_accounts = []
   ; num_snark_workers = 0
   ; num_archive_nodes = 0
   ; log_precomputed_blocks = false

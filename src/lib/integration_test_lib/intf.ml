@@ -92,7 +92,6 @@ module Engine = struct
       (** returned string is the transaction id *)
       val send_snapp :
            logger:Logger.t
-        -> ?unlock:bool
         -> t
         -> parties:Mina_base.Parties.t
         -> string Deferred.Or_error.t
