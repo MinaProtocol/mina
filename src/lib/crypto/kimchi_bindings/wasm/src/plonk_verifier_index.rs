@@ -374,7 +374,7 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
+                let (linearization, powers_of_alpha) = expr_linearization(domain, false, None);
 
                 let index =
                     DlogVerifierIndex {
