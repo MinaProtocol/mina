@@ -163,15 +163,8 @@ let step_main :
                 match Type_equal.Id.same_witness self.id d.id with
                 | Some T ->
                     basic.typ
-                | None -> (
-                    (* TODO: Abstract this into a function in Types_map *)
-                    match d.kind with
-                    | Compiled ->
-                        let d = Types_map.lookup_compiled d.id in
-                        d.typ
-                    | Side_loaded ->
-                        let d = Types_map.lookup_side_loaded d.id in
-                        d.permanent.typ )
+                | None ->
+                    Types_map.typ d
               in
               typ)
               d
