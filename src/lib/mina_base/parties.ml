@@ -176,7 +176,8 @@ module Call_forest = struct
         let node_hash = Tree.hash node in
         { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
 
-  let accumulate_hashes' xs =
+  let accumulate_hashes' (type a) (xs : (Party.t, a) t) : (Party.t, Digest.t) t
+      =
     let hash_party (p : Party.t) = Party.Predicated.digest p.data in
     accumulate_hashes ~hash_party xs
 
@@ -640,33 +641,18 @@ include Codable.Make_base58_check (Stable.Latest)
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-(* TODO: Ask gregor or brandon *)
-let deriver _obj = failwith "TODO"
-
-module Party_with_depth = struct
-  type t = { party : Party.t; depth : int } [@@deriving fields]
-
-  let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~party:!.Party.deriver ~depth:!.int
-    |> finish "PartyWithDepth" ~t_toplevel_annots
-end
-
 type other_parties = (Party.t, Digest.t) Call_forest.t
 
-let of_parties_with_depth (_ps : Party_with_depth.t list) : other_parties =
-  failwith "TODO"
-
-let to_parties_with_depth (_ps : other_parties) : Party_with_depth.t list =
-  failwith "TODO"
-
-let parties_with_depth_deriver obj =
-  Fields_derivers_snapps.Derivers.list @@ Party_with_depth.deriver @@ obj
-
 let other_parties_deriver obj =
+  let of_parties_with_depth (ps : Party.t list) : other_parties =
+    Call_forest.of_parties_list ps ~party_depth:(fun (p : Party.t) ->
+        p.data.body.call_depth)
+    |> Call_forest.accumulate_hashes'
+  and to_parties_with_depth (ps : other_parties) : Party.t list =
+    Call_forest.to_list ps
+  in
   let open Fields_derivers_snapps.Derivers in
-  let inner = (list @@ Party_with_depth.deriver @@ o ()) @@ o () in
+  let inner = (list @@ Party.deriver @@ o ()) @@ o () in
   iso ~map:of_parties_with_depth ~contramap:to_parties_with_depth inner obj
 
 let deriver obj =
