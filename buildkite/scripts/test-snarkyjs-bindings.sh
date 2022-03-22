@@ -12,4 +12,4 @@ dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js --profile=dev
 
 echo "Running tests in Javascript"
 node --version
-node --experimental-wasm-threads src/lib/snarky_js_bindings/tests/run-tests.mjs
+node src/lib/snarky_js_bindings/tests/run-tests.mjs
