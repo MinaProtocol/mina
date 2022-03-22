@@ -248,8 +248,7 @@ macro_rules! impl_oracles {
 pub mod fp {
     use super::*;
     use crate::{
-        arkworks::{WasmGVesta, WasmPastaFp},
-        plonk_proof::fp::WasmFpProverProof as WasmProverProof,
+        arkworks::WasmPastaFp, plonk_proof::fp::WasmFpProverProof as WasmProverProof,
         plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::vesta::WasmFpPolyComm as WasmPolyComm,
     };
@@ -274,8 +273,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::{
-        arkworks::{WasmGPallas, WasmPastaFq},
-        plonk_proof::fq::WasmFqProverProof as WasmProverProof,
+        arkworks::WasmPastaFq, plonk_proof::fq::WasmFqProverProof as WasmProverProof,
         plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::pallas::WasmFqPolyComm as WasmPolyComm,
     };
