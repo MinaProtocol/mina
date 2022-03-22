@@ -1,6 +1,5 @@
 SNARKY_JS_PATH=$1
-[ -z "$SNARKY_JS_PATH" ] && echo "Usage: ./build-snarkyjs-node.sh [/path/to/snarkyjs]" && exit 1
-# TODO: once snarkyjs is a git submodule of mina, change these scripts to not require a path to snarkyjs (it could stay optional though)
+[ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
 dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js
 cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$SNARKY_JS_PATH"/src/node_bindings/
