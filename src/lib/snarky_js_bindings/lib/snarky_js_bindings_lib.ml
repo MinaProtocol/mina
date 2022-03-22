@@ -2488,51 +2488,89 @@ module Ledger = struct
       ~protocol_state_predicate_hash ~memo_hash:Field.zero
     |> to_js_field
 
-  let () =
-    let static_method name f =
-      Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
+  let add_account_exn (l : L.t) pk balance =
+    let account_id = account_id pk in
+
+    let bal_u64 =
+      (* TODO: Why is this conversion necessary to make it work ? *)
+      Unsigned.UInt64.of_string (Int.to_string balance)
     in
-    let method_ name (f : ledger_class Js.t -> _) =
-      method_ ledger_class name f
+
+    let balance = Currency.Balance.of_uint64 bal_u64 in
+
+    let a : Mina_base.Account.t =
+      { (Mina_base.Account.create account_id balance) with
+        permissions = loose_permissions
+      }
     in
-    let add_account_exn (l : L.t) pk balance =
-      let account_id = account_id pk in
 
-      let bal_u64 =
-        (* TODO: Why is this conversion necessary to make it work ? *)
-        Unsigned.UInt64.of_string (Int.to_string balance)
-      in
+    create_new_account_exn l account_id a
 
-      let balance = Currency.Balance.of_uint64 bal_u64 in
+  let create
+      (genesis_accounts :
+        < publicKey : public_key Js.prop ; balance : int Js.prop > Js.t
+        Js.js_array
+        Js.t) : ledger_class Js.t =
+    let l = L.empty ~depth:20 () in
+    array_iter genesis_accounts ~f:(fun a ->
+        add_account_exn l a##.publicKey a##.balance) ;
+    new%js ledger_constr l
 
-      let a : Mina_base.Account.t =
-        { (Mina_base.Account.create account_id balance) with
-          permissions = loose_permissions
-        }
-      in
+  let get_account l (pk : public_key) : account Js.opt =
+    match
+      Option.bind
+        (L.location_of_account l##.value (account_id pk))
+        ~f:(L.get l##.value)
+    with
+    | None ->
+        Js.Opt.empty
+    | Some a ->
+        let mk x : field_class Js.t =
+          new%js field_constr (As_field.of_field x)
+        in
 
-      create_new_account_exn l account_id a
-    in
-    let create
-        (genesis_accounts :
-          < publicKey : public_key Js.prop ; balance : int Js.prop > Js.t
-          Js.js_array
-          Js.t) : ledger_class Js.t =
-      let l = L.empty ~depth:20 () in
-      array_iter genesis_accounts ~f:(fun a ->
-          add_account_exn l a##.publicKey a##.balance) ;
-      new%js ledger_constr l
-    in
-    static_method "create" create ;
+        let uint64 n =
+          object%js
+            val value =
+              Unsigned.UInt64.to_string n
+              |> Field.Constant.of_string |> Field.constant |> mk
+          end
+        in
+        let uint32 n =
+          object%js
+            val value =
+              Unsigned.UInt32.to_string n
+              |> Field.Constant.of_string |> Field.constant |> mk
+          end
+        in
+        let app_state =
+          let xs = new%js Js.array_empty in
+          ( match a.snapp with
+          | Some s ->
+              Pickles_types.Vector.iter s.app_state ~f:(fun x ->
+                  ignore (xs##push (mk (Field.constant x))))
+          | None ->
+              for _ = 0 to max_state_size - 1 do
+                xs##push (mk Field.zero) |> ignore
+              done ) ;
+          xs
+        in
+        Js.Opt.return
+          (object%js
+             val balance = uint64 (Currency.Balance.to_uint64 a.balance)
 
-    static_method "hashParty" hash_party ;
-    static_method "hashProtocolState" hash_protocol_state ;
-    static_method "hashTransaction" hash_transaction ;
+             val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
 
-    static_method "hashPartyChecked" hash_party_checked ;
-    static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
-    static_method "hashTransactionChecked" hash_transaction_checked ;
+             val snapp =
+               object%js
+                 val appState = app_state
+               end
+          end)
 
+  let add_account l (pk : public_key) (balance : int) =
+    add_account_exn l##.value pk balance
+
+  let apply_parties_transaction l (p : parties) : unit =
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
           { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
@@ -2544,79 +2582,46 @@ module Ledger = struct
       ; epoch_length = Mina_numbers.Length.zero
       }
     in
-    method_ "getAccount" (fun l (pk : public_key) : account Js.opt ->
-        match
-          Option.bind
-            (L.location_of_account l##.value (account_id pk))
-            ~f:(L.get l##.value)
-        with
-        | None ->
-            Js.Opt.empty
-        | Some a ->
-            let mk x : field_class Js.t =
-              new%js field_constr (As_field.of_field x)
-            in
+    (* TODO: this is not yet working!
+       * lacking API to create a proper tx on the JS side (authorization)
+    *)
+    T.apply_transaction l##.value
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~txn_state_view:
+        { snarked_ledger_hash = Field.Constant.zero
+        ; timestamp = Block_time.zero
+        ; blockchain_length = Mina_numbers.Length.zero
+        ; min_window_density = Mina_numbers.Length.zero
+        ; last_vrf_output = ()
+        ; total_currency = Currency.Amount.zero
+        ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
+        ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
+        ; staking_epoch_data = epoch_data
+        ; next_epoch_data = epoch_data
+        }
+      (Command (Parties (parties p)))
+    |> Or_error.ok_exn |> ignore
 
-            let uint64 n =
-              object%js
-                val value =
-                  Unsigned.UInt64.to_string n
-                  |> Field.Constant.of_string |> Field.constant |> mk
-              end
-            in
-            let uint32 n =
-              object%js
-                val value =
-                  Unsigned.UInt32.to_string n
-                  |> Field.Constant.of_string |> Field.constant |> mk
-              end
-            in
-            let app_state =
-              let xs = new%js Js.array_empty in
-              ( match a.snapp with
-              | Some s ->
-                  Pickles_types.Vector.iter s.app_state ~f:(fun x ->
-                      ignore (xs##push (mk (Field.constant x))))
-              | None ->
-                  for _ = 0 to max_state_size - 1 do
-                    xs##push (mk Field.zero) |> ignore
-                  done ) ;
-              xs
-            in
-            Js.Opt.return
-              (object%js
-                 val balance = uint64 (Currency.Balance.to_uint64 a.balance)
+  let () =
+    let static_method name f =
+      Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
+    in
+    let method_ name (f : ledger_class Js.t -> _) =
+      method_ ledger_class name f
+    in
+    static_method "create" create ;
 
-                 val nonce =
-                   uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
+    static_method "hashParty" hash_party ;
+    static_method "hashProtocolState" hash_protocol_state ;
+    static_method "hashTransaction" hash_transaction ;
 
-                 val snapp =
-                   object%js
-                     val appState = app_state
-                   end
-              end)) ;
-    method_ "addAccount" (fun l (pk : public_key) (balance : int) ->
-        add_account_exn l##.value pk balance) ;
-    method_ "applyPartiesTransaction" (fun l (p : parties) : unit ->
-        (* TODO: this is not yet working!
-           * lacking API to create a proper tx on the JS side (authorization)
-        *)
-        T.apply_transaction l##.value
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          ~txn_state_view:
-            { snarked_ledger_hash = Field.Constant.zero
-            ; timestamp = Block_time.zero
-            ; blockchain_length = Mina_numbers.Length.zero
-            ; min_window_density = Mina_numbers.Length.zero
-            ; last_vrf_output = ()
-            ; total_currency = Currency.Amount.zero
-            ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-            ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-            ; staking_epoch_data = epoch_data
-            ; next_epoch_data = epoch_data
-            }
-          (Command (Parties (parties p)))
-        |> Or_error.ok_exn |> ignore) ;
+    static_method "hashPartyChecked" hash_party_checked ;
+    static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
+    static_method "hashTransactionChecked" hash_transaction_checked ;
+
+    method_ "getAccount" get_account ;
+    method_ "addAccount" add_account ;
+    method_ "applyPartiesTransaction" apply_parties_transaction ;
 
     let full = Parties.deriver @@ Fields_derivers_snapps.Derivers.o () in
     let parties_to_json ps =
