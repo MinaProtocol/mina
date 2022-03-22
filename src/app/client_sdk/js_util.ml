@@ -23,6 +23,45 @@ type payload_common_js =
   ; memo : string_js Js.prop >
   Js.t
 
+type payload_fee_payer_party_js =
+  < fee : string_js Js.prop
+  ; feePayer : string_js Js.prop
+  ; nonce : string_js Js.prop
+  ; memo : string_js Js.prop >
+  Js.t
+
+let payload_of_fee_payer_party_js
+    (fee_payer_party_js : payload_fee_payer_party_js) =
+  let fee_payer_pk =
+    fee_payer_party_js##.feePayer
+    |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
+  in
+  let fee =
+    fee_payer_party_js##.fee |> Js.to_string |> Currency.Fee.of_string
+  in
+  let nonce =
+    fee_payer_party_js##.nonce |> Js.to_string
+    |> Mina_numbers.Account_nonce.of_string
+  in
+  { Party.Fee_payer.data =
+      { body =
+          { public_key = fee_payer_pk
+          ; update = Party.Update.noop
+          ; token_id = ()
+          ; balance_change = fee
+          ; increment_nonce = ()
+          ; events = []
+          ; sequence_events = []
+          ; call_data = Field.zero
+          ; call_depth = 0
+          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; use_full_commitment = ()
+          }
+      ; predicate = nonce
+      }
+  ; authorization = Signature.dummy
+  }
+
 let payload_common_of_js (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
