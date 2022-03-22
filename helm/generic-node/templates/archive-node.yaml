@@ -1,5 +1,5 @@
 ---
-{{-  if .Values.archive.enabled}}
+{{- if .Values.archive.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
@@ -101,6 +101,7 @@ spec:
         - "-upload-blocks-to-gcloud"
         - "true"
         {{- end }}
+{{- end}}
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}
@@ -184,4 +185,3 @@ spec:
         emptyDir: {}
       - name: wallet-keys
         emptyDir: {}
----

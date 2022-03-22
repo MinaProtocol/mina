@@ -141,7 +141,6 @@ spec:
         - "--config-directory"
         - "{{.Values.features.persistence.mountPath}}/.mina-config"
         {{- end }}
-        "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}'"
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}

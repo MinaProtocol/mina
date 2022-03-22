@@ -113,8 +113,6 @@ spec:
           value: {{.Values.ports.graphql | quote}}
         - name: DAEMON_ROSETTA_PG_CONN_PORT
           value: {{.Values.rosetta.pg_conn | quote}}
-        - name: DAEMON_GRAPHQL_URI
-          value: {{.Values.rosetta.graphql_host | quote}} : {{ .Values.ports.graphql | quote }}/graphql
         - name: DAEMON_CLIENT_PORT
           value: {{.Values.ports.client  | quote}}
         - name: DAEMON_ROSETTA_PORT
@@ -148,7 +146,7 @@ spec:
         - name: MINA_PRIVKEY_PASS
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.features.privateKeySecret.secretName | quote}}
+            - name: {{ .Values.features.privateKeySecret.secretName | quote}}
               key: password
         {{- end }}
         ports:
@@ -197,3 +195,4 @@ spec:
         emptyDir: {}
       - name: wallet-keys
         emptyDir: {}
+{{- end }}
