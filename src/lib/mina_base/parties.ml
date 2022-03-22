@@ -643,14 +643,39 @@ include Codable.Make_base58_check (Stable.Latest)
 (* TODO: Ask gregor or brandon *)
 let deriver _obj = failwith "TODO"
 
-(*
+module Party_with_depth = struct
+  type t = { party : Party.t; depth : int } [@@deriving fields]
+
+  let deriver obj =
+    let open Fields_derivers_snapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~party:!.Party.deriver ~depth:!.int
+    |> finish "PartyWithDepth" ~t_toplevel_annots
+end
+
+type other_parties = (Party.t, Digest.t) Call_forest.t
+
+let of_parties_with_depth (_ps : Party_with_depth.t list) : other_parties =
+  failwith "TODO"
+
+let to_parties_with_depth (_ps : other_parties) : Party_with_depth.t list =
+  failwith "TODO"
+
+let parties_with_depth_deriver obj =
+  Fields_derivers_snapps.Derivers.list @@ Party_with_depth.deriver @@ obj
+
+let other_parties_deriver obj =
+  let open Fields_derivers_snapps.Derivers in
+  let inner = (list @@ Party_with_depth.deriver @@ o ()) @@ o () in
+  iso ~map:of_parties_with_depth ~contramap:to_parties_with_depth inner obj
+
+let deriver obj =
   let open Fields_derivers_snapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
-    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~other_parties:!.other_parties_deriver
     ~memo:!.Signed_command_memo.deriver
   |> finish "Parties" ~t_toplevel_annots
-       *)
 
 let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
 
