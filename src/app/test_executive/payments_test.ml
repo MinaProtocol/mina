@@ -98,8 +98,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       User_command_input.to_user_command
         ~get_current_nonce:(fun _ ->
           failwith "get_current_nonce, don't call me")
-          (* (fun _ ->
-             Result.return (`Min sender_current_nonce, sender_current_nonce)) *)
+        ~nonce_map:
+          (Account_id.Map.of_alist_exn
+             [ ( Account_id.create sender_pub_key
+                   (Signed_command_payload.Body.token txn_body)
+               , (sender_current_nonce, sender_current_nonce) )
+             ])
         ~get_account:(fun _ -> `Bootstrapping)
           (* (fun _ -> failwith "get_account, don't call me") *)
         ~constraint_constants:test_constants ~logger user_command_input
