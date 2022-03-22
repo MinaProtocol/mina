@@ -82,13 +82,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Deferred () =
       let open Deferred.Let_syntax in
       let%bind process =
-        Async_unix.Process.create_exn ~prog:"/bin/bash"
-          ~args:
-            [ "./scripts/send-parties-transaction.sh"
-            ; parties_query
-            ; parties_deploy_contract_str
-            ; uri
-            ]
+        Async_unix.Process.create_exn
+          ~prog:"./scripts/send-parties-transaction.sh"
+          ~args:[ parties_query; parties_deploy_contract_str; uri ]
           ()
       in
       let%map.Deferred output =
