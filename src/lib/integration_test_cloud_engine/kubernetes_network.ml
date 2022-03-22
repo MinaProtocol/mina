@@ -134,7 +134,6 @@ module Node = struct
               id
               nonce
               hash
-              failureReason
             }
           }
       }
@@ -167,7 +166,6 @@ module Node = struct
             id
             nonce
             hash
-            failureReason
           }
         }
       }
@@ -189,7 +187,6 @@ module Node = struct
               id
               nonce
               hash
-              failureReason
             }
           }
       }
@@ -406,11 +403,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =
-    { id : string
-    ; hash : string
-    ; nonce : Unsigned.uint32
-    ; failure_reason : string
-    }
+    { id : string; hash : string; nonce : Unsigned.uint32 }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -449,8 +442,6 @@ module Node = struct
       { id = return_obj#id
       ; hash = return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
-      ; failure_reason =
-          Option.value return_obj#failureReason ~default:"txn successful"
       }
     in
     [%log info] "Sent payment"
@@ -458,7 +449,6 @@ module Node = struct
         [ ("user_command_id", `String res.id)
         ; ("hash", `String res.hash)
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
-        ; ("failureReason", `String res.failure_reason)
         ] ;
     res
 
@@ -503,8 +493,6 @@ module Node = struct
       { id = return_obj#id
       ; hash = return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
-      ; failure_reason =
-          Option.value return_obj#failureReason ~default:"txn successful"
       }
     in
     [%log info] "stake delegation sent"
@@ -512,7 +500,6 @@ module Node = struct
         [ ("user_command_id", `String res.id)
         ; ("hash", `String res.hash)
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
-        ; ("failureReason", `String res.failure_reason)
         ] ;
     res
 
@@ -534,10 +521,10 @@ module Node = struct
           ~validUntil:(Graphql_lib.Encoders.uint32 valid_until)
           ~rawSignature:raw_signature ()
       in
-      [%log info] "send_payment_obj via $query with $variables "
+      [%log info] "send_payment_obj via with $variables "
         ~metadata:
-          [ ("query", Yojson.Safe.from_string send_payment_obj#query)
-          ; ("variables", send_payment_obj#variables)
+          [ (* ("query", (Yojson.Safe.from_string ( String.substr_replace_all send_payment_obj#query ~pattern:"\"" ~with_:"`") ) ) *)
+            ("variables", send_payment_obj#variables)
           ] ;
       exec_graphql_request ~logger ~node:t
         ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
@@ -548,8 +535,6 @@ module Node = struct
       { id = return_obj#id
       ; hash = return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
-      ; failure_reason =
-          Option.value return_obj#failureReason ~default:"txn successful"
       }
     in
     [%log info] "Sent payment"
@@ -557,7 +542,6 @@ module Node = struct
         [ ("user_command_id", `String res.id)
         ; ("hash", `String res.hash)
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
-        ; ("failureReason", `String res.failure_reason)
         ] ;
     res
 
