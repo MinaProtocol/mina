@@ -9,6 +9,87 @@ open Impls.Step
 open Step_main_inputs
 module B = Inductive_rule.B
 
+let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
+    (pass_through : Digest.t) (unfinalized : Unfinalized.t)
+    (should_verify : B.t) : _ Vector.t * B.t =
+  let open Pairing_main in
+  Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
+  let ( app_state
+      , state
+      , prev_evals
+      , sg_old
+      , old_bulletproof_challenges
+      , (opening, messages) ) =
+    p
+  in
+  let finalized, chals =
+    with_label __LOC__ (fun () ->
+        let sponge_digest = state.sponge_digest_before_evaluations in
+        let sponge =
+          let open Step_main_inputs in
+          let sponge = Sponge.create sponge_params in
+          Sponge.absorb sponge (`Field sponge_digest) ;
+          sponge
+        in
+        finalize_other_proof d.max_branching ~max_width:d.max_width
+          ~step_widths:d.branchings ~step_domains:d.step_domains ~sponge
+          ~old_bulletproof_challenges state.deferred_values prev_evals)
+  in
+  let which_branch = state.deferred_values.which_branch in
+  let state =
+    with_label __LOC__ (fun () ->
+        { state with
+          deferred_values =
+            { state.deferred_values with
+              which_branch =
+                Pseudo.choose
+                  ( state.deferred_values.which_branch
+                  , Vector.init d.branches ~f:Field.of_int )
+                  ~f:Fn.id
+                |> Types.Index.of_field (module Impl)
+            }
+        })
+  in
+  let statement =
+    let prev_me_only =
+      with_label __LOC__ (fun () ->
+          let hash =
+            (* TODO: Don't rehash when it's not necessary *)
+            unstage (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
+          in
+          hash ~widths:d.branchings
+            ~max_width:(Nat.Add.n d.max_branching)
+            ~which_branch
+            (* Use opt sponge for cutting off the bulletproof challenges early *)
+            { app_state
+            ; dlog_plonk_index = d.wrap_key
+            ; sg = sg_old
+            ; old_bulletproof_challenges
+            })
+    in
+    { Types.Dlog_based.Statement.pass_through = prev_me_only
+    ; proof_state = { state with me_only = pass_through }
+    }
+  in
+  let verified =
+    with_label __LOC__ (fun () ->
+        verify ~branching:d.max_branching ~wrap_domain:d.wrap_domains.h
+          ~is_base_case:(Boolean.not should_verify)
+          ~sg_old ~opening ~messages ~wrap_verification_key:d.wrap_key statement
+          unfinalized)
+  in
+  if debug then
+    as_prover
+      As_prover.(
+        fun () ->
+          let finalized = read Boolean.typ finalized in
+          let verified = read Boolean.typ verified in
+          let should_verify = read Boolean.typ should_verify in
+          printf "finalized: %b\n%!" finalized ;
+          printf "verified: %b\n%!" verified ;
+          printf "should_verify: %b\n\n%!" should_verify) ;
+  (chals, Boolean.(verified &&& finalized ||| not should_verify))
+
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
     type branching self_branches prev_vars prev_values a_var a_value max_branching local_branches local_signature.
@@ -246,99 +327,14 @@ let step_main :
                   , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
                   , S pi ) ->
-                    Boolean.Assert.( = ) unfinalized.should_finalize
-                      should_verify ;
-                    let ( app_state
-                        , state
-                        , prev_evals
-                        , sg_old
-                        , old_bulletproof_challenges
-                        , (opening, messages) ) =
-                      p
+                    let chals, v =
+                      verify_one p d pass_through unfinalized should_verify
                     in
-                    let finalized, chals =
-                      with_label __LOC__ (fun () ->
-                          let sponge_digest =
-                            state.sponge_digest_before_evaluations
-                          in
-                          let sponge =
-                            let open Step_main_inputs in
-                            let sponge = Sponge.create sponge_params in
-                            Sponge.absorb sponge (`Field sponge_digest) ;
-                            sponge
-                          in
-                          finalize_other_proof d.max_branching
-                            ~max_width:d.max_width ~step_widths:d.branchings
-                            ~step_domains:d.step_domains ~sponge
-                            ~old_bulletproof_challenges state.deferred_values
-                            prev_evals)
-                    in
-                    let which_branch = state.deferred_values.which_branch in
-                    let state =
-                      with_label __LOC__ (fun () ->
-                          { state with
-                            deferred_values =
-                              { state.deferred_values with
-                                which_branch =
-                                  Pseudo.choose
-                                    ( state.deferred_values.which_branch
-                                    , Vector.init d.branches ~f:Field.of_int )
-                                    ~f:Fn.id
-                                  |> Types.Index.of_field (module Impl)
-                              }
-                          })
-                    in
-                    let statement =
-                      let prev_me_only =
-                        with_label __LOC__ (fun () ->
-                            let hash =
-                              (* TODO: Don't rehash when it's not necessary *)
-                              unstage
-                                (hash_me_only_opt ~index:d.wrap_key
-                                   d.var_to_field_elements)
-                            in
-                            hash ~widths:d.branchings
-                              ~max_width:(Nat.Add.n d.max_branching)
-                              ~which_branch
-                              (* Use opt sponge for cutting off the bulletproof challenges early *)
-                              { app_state
-                              ; dlog_plonk_index = d.wrap_key
-                              ; sg = sg_old
-                              ; old_bulletproof_challenges
-                              })
-                      in
-                      { Types.Dlog_based.Statement.pass_through = prev_me_only
-                      ; proof_state = { state with me_only = pass_through }
-                      }
-                    in
-                    let verified =
-                      with_label __LOC__ (fun () ->
-                          verify ~branching:d.max_branching
-                            ~wrap_domain:d.wrap_domains.h
-                            ~is_base_case:(Boolean.not should_verify)
-                            ~sg_old ~opening ~messages
-                            ~wrap_verification_key:d.wrap_key statement
-                            unfinalized)
-                    in
-                    if debug then
-                      as_prover
-                        As_prover.(
-                          fun () ->
-                            let finalized = read Boolean.typ finalized in
-                            let verified = read Boolean.typ verified in
-                            let should_verify =
-                              read Boolean.typ should_verify
-                            in
-                            printf "finalized: %b\n%!" finalized ;
-                            printf "verified: %b\n%!" verified ;
-                            printf "should_verify: %b\n\n%!" should_verify) ;
                     let chalss, vs =
                       go proofs datas pass_throughs unfinalizeds should_verifys
                         pi
                     in
-                    ( chals :: chalss
-                    , Boolean.(verified &&& finalized ||| not should_verify)
-                      :: vs )
+                    (chals :: chalss, v :: vs)
               in
               let chalss, vs =
                 go prevs datas pass_throughs unfinalized_proofs
