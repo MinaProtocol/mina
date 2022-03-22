@@ -56,13 +56,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
     let%bind.Deferred parties_deploy_contract, unit_with_error =
       Deferred.both
-        ((fun _my_sk ->
-           failwith
-             "TODO: shell exec to make/sign the deploy transaction with \
-              keypair for paying fees")
-           (Signature_lib.Private_key.to_base58_check my_sk))
+        (let%bind.Deferred process =
+           Async_unix.Process.create_exn ~prog:"node"
+             ~args:
+               [ "true"; Signature_lib.Private_key.to_base58_check my_sk; "0" ]
+             ()
+         in
+         let%map.Deferred output =
+           Async_unix.Process.collect_output_and_wait process
+         in
+         let json = output.stdout in
+         Mina_base.Parties.of_json (Yojson.Safe.from_string json))
         (wait_for t (Wait_condition.node_to_initialize node))
     in
+
+    (* let uri = Integration_test_cloud_engine.Kubernetes_network.Graphql.ingress_uri node in *)
     let%bind () = Deferred.return unit_with_error in
     (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
     let () = failwith "TODO: shell exec to send signed transaction" in
