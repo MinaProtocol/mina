@@ -4,7 +4,7 @@ use kimchi::prover::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use oracle::{
     self,
-    poseidon::PlonkSpongeConstantsKimchi,
+    constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
@@ -167,7 +167,7 @@ macro_rules! impl_oracles {
                 lgr_comm: WasmVector<$WasmPolyComm>, // the bases to commit polynomials
                 index: $index,    // parameters
                 proof: $WasmProverProof, // the final proof (contains public elements at the beginning)
-            ) -> [<Wasm $field_name:camel Oracles>] {
+            ) -> Result<[<Wasm $field_name:camel Oracles>], JsValue> {
                 // conversions
 
                 let index: DlogVerifierIndex<$G> = index.into();
@@ -192,7 +192,7 @@ macro_rules! impl_oracles {
                 let proof: ProverProof<$G> = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm);
+                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
@@ -211,13 +211,13 @@ macro_rules! impl_oracles {
                     .map(|x| x.0.into())
                     .collect();
 
-                [<Wasm $field_name:camel Oracles>] {
+                Ok([<Wasm $field_name:camel Oracles>] {
                     o: oracles.into(),
                     p_eval0: p_eval[0][0].into(),
                     p_eval1: p_eval[1][0].into(),
                     opening_prechallenges,
                     digest_before_evaluations: digest.into(),
-                }
+                })
             }
 
             #[wasm_bindgen]
