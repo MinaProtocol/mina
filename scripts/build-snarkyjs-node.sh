@@ -16,3 +16,7 @@ pushd "$SNARKY_JS_PATH"/src/node_bindings
   wasm-opt --detect-features --enable-mutable-globals -O4 plonk_wasm_bg.wasm -o plonk_wasm_bg.wasm.opt
   mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
 popd
+
+pushd "$SNARKY_JS_PATH"
+  npm run build
+popd
