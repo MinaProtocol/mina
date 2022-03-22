@@ -3444,8 +3444,9 @@ let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( (({ Party.authorization = a1; _ } as p)
-        :: { Party.authorization = a2; _ } :: parties)
+    | ( (({ Party.authorization = (Signature _ | None_given) as a1; _ } as p)
+        :: { Party.authorization = (Signature _ | None_given) as a2; _ }
+           :: parties)
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3472,8 +3473,9 @@ let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
               ~before ~after
           :: acc )
     | ( []
-        :: (({ Party.authorization = a1; _ } as p)
-           :: { Party.authorization = a2; _ } :: parties)
+        :: (({ Party.authorization = (Signature _ | None_given) as a1; _ } as p)
+           :: { Party.authorization = (Signature _ | None_given) as a2; _ }
+              :: parties)
            :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3486,8 +3488,10 @@ let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
-    | ( [ ({ Party.authorization = a1; _ } as p) ]
-        :: ({ Party.authorization = a2; _ } :: parties) :: partiess
+    | ( [ ({ Party.authorization = (Signature _ | None_given) as a1; _ } as p) ]
+        :: ({ Party.authorization = (Signature _ | None_given) as a2; _ }
+           :: parties)
+           :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
@@ -3513,8 +3517,11 @@ let group_by_parties_rev partiess stmtss : Parties_intermediate_state.t list =
               ~before ~after
           :: acc )
     | ( []
-        :: [ ({ Party.authorization = a1; _ } as p) ]
-           :: ({ Party.authorization = a2; _ } :: parties) :: partiess
+        :: [ ({ Party.authorization = (Signature _ | None_given) as a1; _ } as p)
+           ]
+           :: ({ Party.authorization = (Signature _ | None_given) as a2; _ }
+              :: parties)
+              :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
       ) ->
@@ -3888,6 +3895,49 @@ struct
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
+  let first_party (witness : Transaction_witness.Parties_segment_witness.t) =
+    match witness.local_state_init.parties with
+    | [] ->
+        with_return (fun { return } ->
+            List.iter witness.start_parties ~f:(fun s ->
+                List.iter ~f:(fun x -> return (Some x)) s.parties.other_parties) ;
+            None)
+    | xs ->
+        Parties.Call_forest.hd_party xs |> Option.map ~f:fst
+
+  let party_proof (p : Party.t) =
+    match p.authorization with
+    | Proof p ->
+        Some p
+    | Signature _ | None_given ->
+        None
+
+  let snapp_proof_data ~(snapp_statement : (int * Snapp_statement.t) option)
+      ~(witness : Transaction_witness.Parties_segment_witness.t) =
+    let open Option.Let_syntax in
+    let%bind p = first_party witness in
+    let%bind tag, snapp_statement = snapp_statement in
+    let%map pi = party_proof p in
+    let vk =
+      let account_id =
+        Account_id.create p.data.body.public_key p.data.body.token_id
+      in
+      let account : Account.t =
+        Sparse_ledger.(
+          get_exn witness.local_state_init.ledger
+            (find_index_exn witness.local_state_init.ledger account_id))
+      in
+      match
+        Option.value_map ~default:None account.snapp ~f:(fun s ->
+            s.verification_key)
+      with
+      | None ->
+          failwith "No verification key found in the account"
+      | Some s ->
+          s
+    in
+    (snapp_statement, pi, vk, tag)
+
   let of_parties_segment_exn ~statement ~snapp_statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
@@ -3899,58 +3949,16 @@ struct
           opt_signed_unsigned [] statement
       | Opt_signed_opt_signed ->
           opt_signed_opt_signed [] statement
-      | Proved ->
-          let proofs =
-            let party_proof (p : Party.t) =
-              match p.authorization with
-              | Proof p ->
-                  Some p
-              | Signature _ | None_given ->
-                  None
-            in
-            let open Option.Let_syntax in
-            let parties =
-              match witness.local_state_init.parties with
-              | [] ->
-                  List.concat_map witness.start_parties ~f:(fun s ->
-                      s.parties.other_parties)
-              | xs ->
-                  Parties.Call_forest.to_parties_list xs |> List.map ~f:fst
-            in
-            List.filter_map parties ~f:(fun p ->
-                let%bind tag, snapp_statement = snapp_statement in
-                let%map pi = party_proof p in
-                let vk =
-                  let account_id =
-                    Account_id.create p.data.body.public_key
-                      p.data.body.token_id
-                  in
-                  let account : Account.t =
-                    Sparse_ledger.(
-                      get_exn witness.local_state_init.ledger
-                        (find_index_exn witness.local_state_init.ledger
-                           account_id))
-                  in
-                  match
-                    Option.value_map ~default:None account.snapp ~f:(fun s ->
-                        s.verification_key)
-                  with
-                  | None ->
-                      failwith "No verification key found in the account"
-                  | Some s ->
-                      s
-                in
-                (snapp_statement, pi, vk, tag))
-          in
-          proved
-            ( match proofs with
-            | [ (s, p, v, tag) ] ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                (* TODO: We should not have to pass the statement in here. *)
-                [ (s, p) ]
-            | [] | _ :: _ :: _ ->
-                failwith "of_parties_segment: Expected exactly one proof" )
-            statement
+      | Proved -> (
+          match snapp_proof_data ~snapp_statement ~witness with
+          | None ->
+              failwith "of_parties_segment: Expected exactly one proof"
+          | Some (s, p, v, tag) ->
+              (* TODO: We should not have to pass the statement in here. *)
+              proved
+                ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
+                  [ (s, p) ] )
+                statement )
     in
     let open Async in
     let%map proof = res in
