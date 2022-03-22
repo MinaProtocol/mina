@@ -7,11 +7,11 @@ module Impl = Pickles.Impls.Step
 module Parties_segment = Transaction_snark.Parties_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants = Genesis_constants.Constraint_constants.for_unit_tests
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-let genesis_constants = Genesis_constants.for_unit_tests
+let genesis_constants = Genesis_constants.compiled
 
-let proof_level = Genesis_constants.Proof_level.for_unit_tests
+let proof_level = Genesis_constants.Proof_level.compiled
 
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
@@ -239,4 +239,53 @@ module Wallet = struct
       }
     in
     Array.init n ~f:(fun _ -> random_wallet ())
+
+  let user_command ~fee_payer ~source_pk ~receiver_pk amt fee nonce memo =
+    let payload : Signed_command.Payload.t =
+      Signed_command.Payload.create ~fee
+        ~fee_payer_pk:(Account.public_key fee_payer.account)
+        ~nonce ~memo ~valid_until:None
+        ~body:(Payment { source_pk; receiver_pk; amount = Amount.of_int amt })
+    in
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
+      Signed_command.Poly.Stable.Latest.
+        { payload
+        ; signer = Public_key.of_private_key_exn fee_payer.private_key
+        ; signature
+        }
+    |> Option.value_exn
+
+  let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee nonce memo
+      =
+    let fee_payer = wallets.(i) in
+    let receiver = wallets.(j) in
+    user_command ~fee_payer
+      ~source_pk:(Account.public_key fee_payer.account)
+      ~receiver_pk:(Account.public_key receiver.account)
+      amt fee nonce memo
 end
+
+let genesis_state_body_hash =
+  Mina_state.Protocol_state.Body.hash genesis_state_body
+
+(** Each transaction pushes the previous protocol state (used to validate
+    the transaction) to the pending coinbase stack of protocol states*)
+let pending_coinbase_state_update state_body_hash stack =
+  Pending_coinbase.Stack.(push_state state_body_hash stack)
+
+(** Push protocol state and coinbase if it is a coinbase transaction to the
+      pending coinbase stacks (coinbase stack and state stack)*)
+let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
+    state_body_hash stack =
+  let stack_with_state = pending_coinbase_state_update state_body_hash stack in
+  match t with
+  | Coinbase c ->
+      Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+  | _ ->
+      stack_with_state
+
+let check_balance pk balance ledger =
+  let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
+  let acc = Ledger.get ledger loc |> Option.value_exn in
+  [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
