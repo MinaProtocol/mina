@@ -85,3 +85,5 @@ if [[ ${VERBOSE} ]]; then
 fi
 
 sleep 15 # to allow all mina proccesses to quit, cleanup, and finish logging
+
+exit ${MINA_EXIT_CODE}
