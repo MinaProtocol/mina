@@ -1,6 +1,6 @@
 # Scan State Refactoring
 
-Parallel scan state is a data structure implemented to efficiently fold over infinite stream of data, periodically returning results of the operation associated with it. It is currently used to keep track of transactions for which snarks (ledger proofs) are to be generated . Read [this](https://codaprotocol.com/blog/scanning_for_scans.html) to learn more.
+Parallel scan state is a data structure implemented to efficiently fold over infinite stream of data, periodically returning results of the operation associated with it. It is currently used to keep track of transactions for which snarks (ledger proofs) are to be generated . Read [this](http://web.archive.org/web/20181220161633/https://codaprotocol.com/blog/scanning_for_scans.html) to learn more.
 The parallel scan state is a forest of full-binary trees with leaves (or called `Base` nodes) instantiated with values of type `Transaction_with_witness.t` and intermediate nodes (or called `Merge` nodes) instantiated with values of type `Ledger_proof_with_sok_message.t` in the module `Transaction_snark_scan_state`. Each node is a job that is to becompleted by a snark worker.
 
 Everytime a transition (block) is applied, the transactions in it are transformed to new base jobs and added to the scan state. A transition also includes completed works that correspond to a sequence of jobs that already exist in the scan state. These, when added to scan state, create new merge jobs except when it is for the root node in which case the proof is simply returned as the result.
