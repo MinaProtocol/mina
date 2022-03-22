@@ -24,6 +24,7 @@
    snark_params
    pickles
    mina_base.import
+   o1trace
    rocksdb
    random_oracle
    currency

@@ -72,6 +72,8 @@ let tag (memo : t) = memo.[tag_index]
 
 let length memo = Char.to_int memo.[length_index]
 
+let is_bytes memo = Char.equal (tag memo) bytes_tag
+
 let is_digest memo = Char.equal (tag memo) digest_tag
 
 let is_valid memo =
@@ -163,6 +165,25 @@ let hash memo =
   Random_oracle.hash ~init:Hash_prefix.snapp_memo
     (Random_oracle.Legacy.pack_input
        (Random_oracle_input.Legacy.bitstring (to_bits memo)))
+
+let to_plaintext (memo : t) : string Or_error.t =
+  if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+  else Error (Error.of_string "Memo does not contain text bytes")
+
+let to_digest (memo : t) : string Or_error.t =
+  if is_digest memo then Ok (String.sub memo ~pos:2 ~len:digest_length)
+  else Error (Error.of_string "Memo does not contain a digest")
+
+let to_string_hum (memo : t) =
+  match to_plaintext memo with
+  | Ok text ->
+      text
+  | Error _ -> (
+      match to_digest memo with
+      | Ok digest ->
+          sprintf "0x%s" (Hex.encode digest)
+      | Error _ ->
+          "(Invalid memo, neither text nor a digest)" )
 
 [%%ifdef consensus_mechanism]
 
