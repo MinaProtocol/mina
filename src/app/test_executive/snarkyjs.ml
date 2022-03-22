@@ -53,19 +53,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let my_account_id =
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in
-    let (keypair : Signature_lib.Keypair.t) =
-      { public_key = my_pk |> Signature_lib.Public_key.decompress_exn
-      ; private_key = my_sk
-      }
-    in
     (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
     let%bind.Deferred parties_deploy_contract, unit_with_error =
       Deferred.both
-        ((fun _keypair ->
+        ((fun _my_sk ->
            failwith
              "TODO: shell exec to make/sign the deploy transaction with \
               keypair for paying fees")
-           keypair)
+           (Signature_lib.Private_key.to_base58_check my_sk))
         (wait_for t (Wait_condition.node_to_initialize node))
     in
     let%bind () = Deferred.return unit_with_error in
