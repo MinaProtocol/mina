@@ -157,30 +157,26 @@ let step_main :
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let step_domains, typ =
+          let typ =
             (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
-              let typ : (_, m) Vector.t * (var, value) Typ.t =
+              let typ : (var, value) Typ.t =
                 match Type_equal.Id.same_witness self.id d.id with
                 | Some T ->
-                    (basic.step_domains, basic.typ)
+                    basic.typ
                 | None -> (
                     (* TODO: Abstract this into a function in Types_map *)
                     match d.kind with
                     | Compiled ->
                         let d = Types_map.lookup_compiled d.id in
-                        (d.step_domains, d.typ)
+                        d.typ
                     | Side_loaded ->
                         let d = Types_map.lookup_side_loaded d.id in
-                        (* TODO: This replication to please the type checker is
-                           pointless... *)
-                        ( Vector.init d.permanent.branches ~f:(fun _ ->
-                              Side_loaded_verification_key.max_domains_with_x)
-                        , d.permanent.typ ) )
+                        d.permanent.typ )
               in
               typ)
               d
           in
-          let t = Per_proof_witness.typ ~step_domains typ n1 n2 in
+          let t = Per_proof_witness.typ typ n1 n2 in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
           .
