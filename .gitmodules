@@ -45,4 +45,3 @@
 [submodule "src/lib/snarky_js_bindings/snarkyjs"]
 	path = src/lib/snarky_js_bindings/snarkyjs
 	url = https://github.com/o1-labs/snarkyjs.git
-	branch = feature/deploy-txn
