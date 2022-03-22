@@ -252,8 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp with transfer from timed account that succeeds"
-        (send_snapp ~unlock:false ~logger node
-           parties_transfer_from_timed_account)
+        (send_snapp ~logger node parties_transfer_from_timed_account)
     in
     let%bind () =
       section "Waiting for snapp with transfer from timed account that succeeds"
@@ -338,8 +337,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          assert (
            Currency.Amount.( < ) proposed_balance
              (Option.value_exn locked_balance |> Currency.Balance.to_amount) ) ;
-         send_snapp ~unlock:false ~logger node
-           parties_invalid_transfer_from_timed_account)
+         send_snapp ~logger node parties_invalid_transfer_from_timed_account)
     in
     let%bind () =
       section
