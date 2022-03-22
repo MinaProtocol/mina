@@ -21,7 +21,7 @@ use mina_curves::pasta::{
     vesta::{Affine as GAffine, VestaParameters},
 };
 use oracle::{
-    poseidon::PlonkSpongeConstantsKimchi,
+    constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use std::convert::TryInto;
@@ -81,8 +81,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create::<EFqSponge, EFrSponge>(&group_map, witness, index, prev)
-            .map_err(|e| ocaml::Error::Error(e.into()))?;
+        let proof =
+            ProverProof::create_recursive::<EFqSponge, EFrSponge>(&group_map, witness, index, prev)
+                .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
     })
 }
