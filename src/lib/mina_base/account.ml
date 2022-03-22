@@ -3,28 +3,13 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Util
-
-[%%ifdef consensus_mechanism]
-
+open Mina_base_util
 open Snark_params
 open Tick
-
-[%%else]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Currency
 open Mina_numbers
 open Fold_lib
-open Import
+open Mina_base_import
 
 module Index = struct
   [%%versioned
@@ -149,12 +134,15 @@ module Token_symbol = struct
   (* 48 = max_length * 8 *)
   module Num_bits = Pickles_types.Nat.N48
 
+  let num_bits = Pickles_types.Nat.to_int Num_bits.n
+
   let to_bits (x : t) =
     Pickles_types.Vector.init Num_bits.n ~f:(fun i ->
-        try
-          let c = x.[i / 8] |> Char.to_int in
+        let byte_index = i / 8 in
+        if byte_index < String.length x then
+          let c = x.[byte_index] |> Char.to_int in
           c land (1 lsl (i mod 8)) <> 0
-        with _ -> false)
+        else false)
 
   let of_bits x : t =
     let c, j, chars =
@@ -187,34 +175,44 @@ module Token_symbol = struct
         (Char.gen_uniform_inclusive Char.min_value Char.max_value))
       ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
+  let to_field (x : t) : Field.t =
+    Field.project (Pickles_types.Vector.to_list (to_bits x))
+
   let to_input (x : t) =
-    Random_oracle_input.Chunked.packeds
-      (List.to_array
-         (List.map
-            ~f:(fun b -> (field_of_bool b, 1))
-            (Pickles_types.Vector.to_list (to_bits x))))
+    Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
   [%%ifdef consensus_mechanism]
 
-  type var = (Boolean.var, Num_bits.n) Pickles_types.Vector.t
+  type var = Field.Var.t
+
+  let range_check (t : var) =
+    let%bind actual =
+      make_checked (fun () ->
+          let _, _, actual_packed =
+            Pickles.Scalar_challenge.to_field_checked' ~num_bits m
+              (Kimchi_backend_common.Scalar_challenge.create t)
+          in
+          actual_packed)
+    in
+    Field.Checked.Assert.equal t actual
 
   let var_of_value x =
     Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
 
+  let of_field (x : Field.t) : t =
+    of_bits
+      (Pickles_types.Vector.of_list_and_length_exn
+         (List.take (Field.unpack x) num_bits)
+         Num_bits.n)
+
   let typ : (var, t) Typ.t =
-    Typ.transport ~there:to_bits ~back:of_bits
-    @@ Pickles_types.Vector.typ Boolean.typ Num_bits.n
+    Typ.transport
+      { Field.typ with check = range_check }
+      ~there:to_field ~back:of_field
 
-  let var_to_input (x : var) =
-    Random_oracle_input.Chunked.packeds
-      (List.to_array
-         (List.map
-            ~f:(fun (b : Boolean.var) -> ((b :> Field.Var.t), 1))
-            (Pickles_types.Vector.to_list x)))
+  let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
-  let if_ (b : Boolean.var) ~(then_ : var) ~(else_ : var) : var =
-    Pickles_types.Vector.map2 then_ else_ ~f:(fun then_ else_ ->
-        Snark_params.Tick.Run.Boolean.if_ b ~then_ ~else_)
+  let if_ = Tick.Run.Field.if_
 
   [%%endif]
 end
@@ -224,7 +222,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ( 'pk
-           , 'tid
+           , 'id
            , 'token_permissions
            , 'token_symbol
            , 'amount
@@ -238,7 +236,7 @@ module Poly = struct
            , 'snapp_uri )
            t =
         { public_key : 'pk
-        ; token_id : 'tid
+        ; token_id : 'id
         ; token_permissions : 'token_permissions
         ; token_symbol : 'token_symbol
         ; balance : 'amount
@@ -286,6 +284,8 @@ module Poly = struct
   end]
 end
 
+let token = Poly.token_id
+
 module Key = struct
   [%%versioned
   module Stable = struct
@@ -319,7 +319,7 @@ module Binable_arg = struct
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
-        , Permissions.Stable.V1.t
+        , Permissions.Stable.V2.t
         , Snapp_account.Stable.V2.t option
         , string )
         (* TODO: Cache the digest of this? *)
@@ -379,8 +379,6 @@ module Stable = struct
 end]
 
 [%%define_locally Stable.Latest.(public_key)]
-
-let token { Poly.token_id; _ } = token_id
 
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
@@ -492,7 +490,7 @@ let crypto_hash t =
 
 type var =
   ( Public_key.Compressed.var
-  , Token_id.var
+  , Token_id.Checked.t
   , Token_permissions.var
   , Token_symbol.var
   , Balance.var
@@ -577,7 +575,7 @@ let var_of_t
      } :
       value) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.var_of_t token_id
+  ; token_id = Token_id.Checked.constant token_id
   ; token_permissions = Token_permissions.var_of_t token_permissions
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
@@ -595,7 +593,7 @@ module Checked = struct
   module Unhashed = struct
     type t =
       ( Public_key.Compressed.var
-      , Token_id.var
+      , Token_id.Checked.t
       , Token_permissions.var
       , Token_symbol.var
       , Balance.var
@@ -624,11 +622,7 @@ module Checked = struct
          ~snapp:(f (fun (x, _) -> field x))
          ~permissions:(f Permissions.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~token_id:
-           (* We use [run_checked] here to avoid routing the [Checked.t]
-              monad throughout this calculation.
-           *)
-           (f Token_id.Checked.to_input)
+         ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
          ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
@@ -641,6 +635,10 @@ module Checked = struct
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:crypto_hash_prefix (pack_input (to_input t))))
+
+  let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
+
+  let amount_upper_bound = Bignum_bigint.(one lsl Amount.length_in_bits)
 
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =

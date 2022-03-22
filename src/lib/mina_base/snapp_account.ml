@@ -1,23 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-module Hash_prefix_states = Hash_prefix_states
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
-open Snark_params_nonconsensus
-
-[%%endif]
-
 open Snapp_basic
 
 module Events = struct
@@ -177,14 +161,18 @@ let digest_vk (t : Side_loaded_verification_key.t) =
     hash ~init:Hash_prefix_states.side_loaded_vk
       (pack_input (Side_loaded_verification_key.to_input t)))
 
+let dummy_vk_hash =
+  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Snapp_state.V.t
-    , ( Pickles.Side_loaded.Verification_key.Checked.t Lazy.t
-      , Pickles.Impls.Step.Field.t Lazy.t )
-      With_hash.t
+    , ( Boolean.var
+      , (Side_loaded_verification_key.t option, Field.t) With_hash.t
+        Data_as_hash.t )
+      Flagged_option.t
     , Mina_numbers.Snapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
     , Mina_numbers.Global_slot.Checked.t
@@ -210,7 +198,8 @@ module Checked = struct
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input' { t with verification_key = Lazy.force t.verification_key.hash }
+    to_input'
+      { t with verification_key = Data_as_hash.hash t.verification_key.data }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -230,19 +219,13 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Snapp_state.typ Field.typ
-    ; Typ.transport Pickles.Side_loaded.Verification_key.typ
-        ~there:(function
-          | None ->
-              Pickles.Side_loaded.Verification_key.dummy
-          | Some x ->
-              With_hash.data x)
-        ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
-      |> Typ.transport_var
-           ~there:(fun wh -> Lazy.force (With_hash.data wh))
-           ~back:(fun x ->
-             With_hash.of_data
-               (lazy x)
-               ~hash_data:(fun _ -> lazy (Checked.digest_vk x)))
+    ; Flagged_option.option_typ
+        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
+        (Data_as_hash.typ ~hash:With_hash.hash)
+      |> Typ.transport
+           ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
+           ~back:
+             (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
     ; Mina_numbers.Snapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot.typ
@@ -252,9 +235,6 @@ let typ : (Checked.t, t) Typ.t =
     ~value_of_hlist:of_hlist
 
 [%%endif]
-
-let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 let to_input (t : t) =
   let open Random_oracle.Input.Chunked in

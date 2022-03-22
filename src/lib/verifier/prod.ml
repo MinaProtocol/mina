@@ -5,7 +5,6 @@ open Async
 open Mina_base
 open Mina_state
 open Blockchain_snark
-open O1trace
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned]
 
@@ -234,7 +233,7 @@ module Worker = struct
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
-              (Logger.Transport.File_system.dumb_logrotate
+              (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
@@ -435,7 +434,7 @@ let with_retry ~logger f =
   go 4
 
 let verify_blockchain_snarks { worker; logger } chains =
-  trace_recurring "Verifier.verify_blockchain_snarks" (fun () ->
+  O1trace.thread "dispatch_blockchain_snark_verification" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } =
             let ivar = !worker in
@@ -458,19 +457,11 @@ let verify_blockchain_snarks { worker; logger } chains =
               |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
             ]))
 
-module Id = Unique_id.Int ()
-
 let verify_transaction_snarks { worker; logger } ts =
-  trace_recurring "Verifier.verify_transaction_snarks" (fun () ->
-      let id = Id.create () in
+  O1trace.thread "dispatch_transaction_snark_verification" (fun () ->
       let n = List.length ts in
-      let metadata () =
-        ("id", `String (Id.to_string id))
-        :: ("n", `Int n)
-        :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
-      in
-      [%log trace] "verify $n transaction_snarks (before)"
-        ~metadata:(metadata ()) ;
+      let metadata = [ ("n", `Int n) ] in
+      [%log trace] "verify $n transaction_snarks (before)" ~metadata ;
       let%map res =
         with_retry ~logger (fun () ->
             let%bind { connection; _ } = Ivar.read !worker in
@@ -482,11 +473,11 @@ let verify_transaction_snarks { worker; logger } ts =
         ~metadata:
           ( ( "result"
             , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
-          :: metadata () ) ;
+          :: metadata ) ;
       res)
 
 let verify_commands { worker; logger } ts =
-  trace_recurring "Verifier.verify_commands" (fun () ->
+  O1trace.thread "dispatch_user_command_verification" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands

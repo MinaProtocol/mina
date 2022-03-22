@@ -9,7 +9,7 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Predicate [@value 1]
         | Source_not_present
@@ -34,8 +34,11 @@ module Failure = struct
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
+        | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
+        | Account_precondition_unsatisfied
+        | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
       [@@deriving sexp, yojson, equal, compare, enum, hash]
@@ -107,10 +110,16 @@ module Failure = struct
         "Update_not_permitted_permissions"
     | Update_not_permitted_nonce ->
         "Update_not_permitted_nonce"
+    | Update_not_permitted_voting_for ->
+        "Update_not_permitted_voting_for"
     | Parties_replay_check_failed ->
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
+    | Account_precondition_unsatisfied ->
+        "Account_precondition_unsatisfied"
+    | Protocol_state_precondition_unsatisfied ->
+        "Protocol_state_precondition_unsatisfied"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -163,10 +172,16 @@ module Failure = struct
         Ok Update_not_permitted_permissions
     | "Update_not_permitted_nonce" ->
         Ok Update_not_permitted_nonce
+    | "Update_not_permitted_voting_for" ->
+        Ok Update_not_permitted_voting_for
     | "Parties_replay_check_failed" ->
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Account_precondition_unsatisfied" ->
+        Ok Account_precondition_unsatisfied
+    | "Protocol_state_precondition_unsatisfied" ->
+        Ok Protocol_state_precondition_unsatisfied
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -240,11 +255,18 @@ module Failure = struct
     | Update_not_permitted_nonce ->
         "The authentication for an account didn't allow the requested update \
          to its nonce"
+    | Update_not_permitted_voting_for ->
+        "The authentication for an account didn't allow the requested update \
+         to its voted-for state hash"
     | Parties_replay_check_failed ->
         "Check to avoid replays failed. The party must increment nonce or use \
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
+    | Account_precondition_unsatisfied ->
+        "The party's account precondition unsatisfied"
+    | Protocol_state_precondition_unsatisfied ->
+        "The party's protocol state precondition unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
@@ -371,13 +393,12 @@ end
 module Auxiliary_data = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
         ; receiver_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
@@ -388,16 +409,15 @@ module Auxiliary_data = struct
   let empty =
     { fee_payer_account_creation_fee_paid = None
     ; receiver_account_creation_fee_paid = None
-    ; created_token = None
     }
 end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
+      | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Stable.V2.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

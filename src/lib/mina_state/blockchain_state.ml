@@ -6,54 +6,14 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ( 'staged_ledger_hash
-           , 'snarked_ledger_hash
-           , 'token_id
-           , 'local_state
-           , 'time )
-           t =
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'local_state, 'time) t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; registers :
-            ( 'snarked_ledger_hash
-            , unit
-            , 'token_id
-            , 'local_state )
-            Registers.Stable.V1.t
+            ('snarked_ledger_hash, unit, 'local_state) Registers.Stable.V1.t
         ; timestamp : 'time
         }
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
-    end
-
-    module V1 = struct
-      type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        { staged_ledger_hash : 'staged_ledger_hash
-        ; snarked_ledger_hash : 'snarked_ledger_hash
-        ; genesis_ledger_hash : 'snarked_ledger_hash
-        ; snarked_next_available_token : 'token_id
-        ; timestamp : 'time
-        }
-      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
-
-      let to_latest
-          { staged_ledger_hash
-          ; snarked_ledger_hash
-          ; genesis_ledger_hash
-          ; snarked_next_available_token
-          ; timestamp
-          } =
-        { V2.staged_ledger_hash
-        ; genesis_ledger_hash
-        ; timestamp
-        ; registers =
-            { Registers.ledger =
-                { tree = snarked_ledger_hash
-                ; next_available_token = snarked_next_available_token
-                }
-            ; pending_coinbase_stack = ()
-            ; local_state = Local_state.dummy
-            }
-        }
     end
   end]
 end
@@ -67,10 +27,7 @@ Poly.
   , to_hlist
   , of_hlist )]
 
-let snarked_ledger_hash (t : _ Poly.t) = t.registers.ledger.tree
-
-let snarked_next_available_token (t : _ Poly.t) =
-  t.registers.ledger.next_available_token
+let snarked_ledger_hash (t : _ Poly.t) = t.registers.ledger
 
 module Value = struct
   [%%versioned
@@ -79,7 +36,6 @@ module Value = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
-        , Token_id.Stable.V1.t
         , Local_state.Stable.V1.t
         , Block_time.Stable.V1.t )
         Poly.Stable.V2.t
@@ -87,25 +43,12 @@ module Value = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
-
-      let to_latest (t : t) : V2.t = Poly.Stable.V1.to_latest t
-    end
   end]
 end
 
 type var =
   ( Staged_ledger_hash.var
   , Frozen_ledger_hash.var
-  , Token_id.var
   , Local_state.Checked.t
   , Block_time.Checked.t )
   Poly.t
@@ -118,7 +61,7 @@ let data_spec =
   let open Data_spec in
   [ Staged_ledger_hash.typ
   ; Frozen_ledger_hash.typ
-  ; Registers.typ [ Ledger_commitment.typ; Typ.unit; Local_state.typ ]
+  ; Registers.typ [ Frozen_ledger_hash.typ; Typ.unit; Local_state.typ ]
   ; Block_time.Checked.typ
   ]
 
@@ -139,7 +82,7 @@ let var_to_input
     *)
     let { ledger; pending_coinbase_stack = (); local_state } = registers in
     Array.reduce_exn ~f:append
-      [| Ledger_commitment.Checked.to_input ledger
+      [| Frozen_ledger_hash.var_to_input ledger
        ; Local_state.Checked.to_input local_state
       |]
   in
@@ -161,7 +104,7 @@ let to_input
     *)
     let { ledger; pending_coinbase_stack = (); local_state } = registers in
     Array.reduce_exn ~f:append
-      [| Ledger_commitment.to_input ledger; Local_state.to_input local_state |]
+      [| Frozen_ledger_hash.to_input ledger; Local_state.to_input local_state |]
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
@@ -174,16 +117,13 @@ let set_timestamp t timestamp = { t with Poly.timestamp }
 
 let negative_one
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(consensus_constants : Consensus.Constants.t) ~genesis_ledger_hash
-    ~snarked_next_available_token : Value.t =
+    ~(consensus_constants : Consensus.Constants.t) ~genesis_ledger_hash :
+    Value.t =
   { staged_ledger_hash =
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
   ; registers =
-      { ledger =
-          { tree = genesis_ledger_hash
-          ; next_available_token = snarked_next_available_token
-          }
+      { ledger = genesis_ledger_hash
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.dummy
       }
@@ -193,7 +133,7 @@ let negative_one
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
 
-type display = (string, string, string, Local_state.display, string) Poly.t
+type display = (string, string, Local_state.display, string) Poly.t
 [@@deriving yojson]
 
 let display
@@ -211,12 +151,8 @@ let display
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; registers =
       { ledger =
-          { Ledger_commitment.tree =
-              Visualization.display_prefix_of_string
-              @@ Frozen_ledger_hash.to_base58_check ledger.tree
-          ; next_available_token =
-              Token_id.to_string ledger.next_available_token
-          }
+          Visualization.display_prefix_of_string
+          @@ Frozen_ledger_hash.to_base58_check ledger
       ; pending_coinbase_stack = ()
       ; local_state = Local_state.display local_state
       }

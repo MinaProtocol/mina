@@ -1,12 +1,115 @@
 #!/bin/bash
 
+# exit script when commands fail
+set -e
+# kill background process when script closes
+trap "killall background" EXIT
+
+# ================================================
+# Constants
+
+MINA=_build/default/src/app/cli/src/mina.exe
+LOGPROC=_build/default/src/app/logproc/logproc.exe
+
+export MINA_PRIVKEY_PASS='naughty blue worm'
+SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+SEED_PEER_ID="/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+
+SNARK_WORKER_FEE=0.01
+
+TRANSACTION_FREQUENCY=5
+
+WHALE_START_PORT=4000
+FISH_START_PORT=5000
+NODE_START_PORT=6000
+
+# ================================================
+# Inputs (set to default values)
+
 whales=1
 fish=1
 nodes=1
 transactions=false
 reset=false
 
-help=false
+# ================================================
+# Globals (assigned during execution of script)
+
+ledgerfolder=""
+snark_worker_pubkey=""
+nodesfolder=""
+config=""
+seed_pid=""
+whale_pids=()
+fish_pids=()
+node_pids=()
+
+# ================================================
+# Helper functions
+
+help() {
+  echo "-w|--whales #"
+  echo "-f|--fish #"
+  echo "-n|--nodes #"
+  echo "-t|--transactions"
+  echo "-r|--reset"
+  echo "-h|--help"
+  exit
+}
+
+clean-dir() {
+  rm -rf $1
+  mkdir -p $1
+}
+
+generate-keypair() {
+  $MINA advanced generate-keypair -privkey-path $1
+}
+
+# Execute a daemon, exposing all 5 ports in
+# sequence starting with provided bas port.
+exec-daemon() {
+  base_port=$1
+  shift
+  client_port=$base_port
+  rest_port=$(($base_port+1))
+  external_port=$(($base_port+2))
+  daemon_metrics_port=$(($base_port+3))
+  libp2p_metrics_port=$(($base_port+4))
+  echo $MINA daemon \
+    -client-port $client_port \
+    -rest-port $rest_port \
+    -external-port $external_port \
+    -metrics-port $daemon_metrics_port \
+    -libp2p-metrics-port $libp2p_metrics_port \
+    -config-file $config \
+    -generate-genesis-proof true \
+    -log-json \
+    -log-level Trace \
+    $@
+  exec $MINA daemon \
+    -client-port $client_port \
+    -rest-port $rest_port \
+    -external-port $external_port \
+    -metrics-port $daemon_metrics_port \
+    -libp2p-metrics-port $libp2p_metrics_port \
+    -config-file $config \
+    -generate-genesis-proof true \
+    -log-json \
+    -log-level Trace \
+    $@
+}
+
+# Spawn a node in the background.
+# Configures node directory and logs.
+spawn-node() {
+  folder=$1
+  shift
+  exec-daemon $@ -config-directory $folder &> $folder/log.txt &
+}
+
+# ================================================
+# PARSE INPUTS FROM ARGUMENTS
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -15,22 +118,11 @@ while [[ "$#" -gt 0 ]]; do
         -n|--nodes) nodes="$2"; shift ;;
         -t|--transactions) transactions=true ;;
         -r|--reset) reset=true ;;
-        -h|--help) help=true; shift ;;
+        -h|--help) help ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
-
-if $help; then
-  echo "-w|--whales #"
-  echo "-f|--fish #"
-  echo "-n|--nodes #"
-  echo "-t|--transactions"
-  echo "-r|--reset"
-  echo "-h|--help"
-  exit
-fi
-
 
 if $transactions; then
   if [ "$fish" -eq "0" ]; then
@@ -38,11 +130,6 @@ if $transactions; then
     exit
   fi
 fi
-
-# kill background process when script closes
-trap "killall background" EXIT
-
-# ================================================
 
 echo "Starting network with:"
 echo -e "\t1 seed"
@@ -65,20 +152,23 @@ if [ ! -d "$ledgerfolder" ]; then
   
   mkdir $ledgerfolder
 
-  S=./automation/scripts
+  clean-dir $ledgerfolder/offline_whale_keys
+  clean-dir $ledgerfolder/offline_fish_keys
+  clean-dir $ledgerfolder/online_whale_keys
+  clean-dir $ledgerfolder/online_fish_keys
+  clean-dir $ledgerfolder/service-keys
 
-  rm -rf $ledgerfolder/offline_whale_keys
-  rm -rf $ledgerfolder/offline_fish_keys
-  rm -rf $ledgerfolder/online_whale_keys
-  rm -rf $ledgerfolder/online_fish_keys
-  rm -rf $ledgerfolder/service-keys
+  generate-keypair $ledgerfolder/snark_worker_keys/snark_worker_account
+  for i in $(seq 1 $fish); do
+    generate-keypair $ledgerfolder/offline_fish_keys/offline_fish_account_$i
+    generate-keypair $ledgerfolder/online_fish_keys/online_fish_account_$i
+  done
+  for i in $(seq 1 $whales); do
+    generate-keypair $ledgerfolder/offline_whale_keys/offline_whale_account_$i
+    generate-keypair $ledgerfolder/online_whale_keys/online_whale_account_$i
+  done
 
-  python3 $S/testnet-keys.py keys generate-offline-fish-keys --count $fish --output-dir $ledgerfolder/offline_fish_keys
-  python3 $S/testnet-keys.py keys generate-online-fish-keys --count $fish --output-dir $ledgerfolder/online_fish_keys
-  python3 $S/testnet-keys.py keys generate-offline-whale-keys --count $whales --output-dir $ledgerfolder/offline_whale_keys
-  python3 $S/testnet-keys.py keys generate-online-whale-keys --count $whales --output-dir $ledgerfolder/online_whale_keys
-
-  if [ "$(uname)" != "Darwin" ]; then
+  if [ "$(uname)" != "Darwin" ] && [ $fish -gt 0 ]; then
     file=$(ls $ledgerfolder/offline_fish_keys/ | head -n 1)
     owner=$(stat -c "%U" $ledgerfolder/offline_fish_keys/$file)
 
@@ -95,58 +185,38 @@ if [ ! -d "$ledgerfolder" ]; then
   chmod -R 0700 $ledgerfolder/offline_whale_keys
   chmod -R 0700 $ledgerfolder/online_whale_keys
 
-  python3 $S/testnet-keys.py ledger generate-ledger --num-whale-accounts $whales --num-fish-accounts $fish \
-          --offline-whale-accounts-directory $ledgerfolder/offline_whale_keys  \
-          --offline-fish-accounts-directory $ledgerfolder/offline_fish_keys \
-          --online-whale-accounts-directory $ledgerfolder/online_whale_keys  \
-          --online-fish-accounts-directory $ledgerfolder/online_fish_keys
+  python3 scripts/generate-local-network-ledger.py \
+    --num-whale-accounts $whales \
+    --num-fish-accounts $fish \
+    --offline-whale-accounts-directory $ledgerfolder/offline_whale_keys  \
+    --offline-fish-accounts-directory $ledgerfolder/offline_fish_keys \
+    --online-whale-accounts-directory $ledgerfolder/online_whale_keys \
+    --online-fish-accounts-directory $ledgerfolder/online_fish_keys
 
-  cp $S/genesis_ledger.json $ledgerfolder/genesis_ledger.json
+  cp scripts/genesis_ledger.json $ledgerfolder/genesis_ledger.json
 fi
+
+snark_worker_pubkey=$(cat $ledgerfolder/snark_worker_keys/snark_worker_account.pub)
 
 # ================================================
 # Update Timestamp
 
-python3 - <<END
-import json
-import datetime
-
-d = datetime.datetime.utcnow()
-d = d.isoformat("T") + "Z"
-
-with open("$ledgerfolder/genesis_ledger.json") as f:
-  ledger = json.load(f)
-
-data = {
-  "genesis": {
-    "genesis_state_timestamp": d,
-  },
-  "ledger": ledger
-}
-
-with open("$ledgerfolder/daemon.json", 'w') as outfile:
-    json.dump(data, outfile)
-END
-
-daemon=$ledgerfolder/daemon.json
+config=$ledgerfolder/daemon.json
+jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S.%6NZ")\"}, ledger:.}" \
+  < $ledgerfolder/genesis_ledger.json \
+  > $config
 
 # ================================================
 # Launch nodes
 
-MINA=_build/default/src/app/cli/src/mina.exe
-LOGPROC=_build/default/src/app/logproc/logproc.exe
-
-
 nodesfolder=$ledgerfolder/nodes
-
-rm -rf $nodesfolder
-mkdir -p $nodesfolder
+clean-dir $nodesfolder
 
 # ----------
 
 mkdir $nodesfolder/seed
 
-$MINA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -metrics-port 3003 -libp2p-metrics-port 3004 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace &> $nodesfolder/seed/log.txt &
+spawn-node $nodesfolder/seed 3000 -seed -discovery-keypair $SEED_PEER_KEY
 seed_pid=$!
 
 echo 'waiting for seed to go up...'
@@ -158,62 +228,33 @@ done
 
 # ----------
 
-whale_start_port=4000
+snark_worker_flags="-snark-worker-fee $SNARK_WORKER_FEE -run-snark-worker $snark_worker_pubkey -work-selection seq"
+
 for i in $(seq 1 $whales); do
   folder=$nodesfolder/whale_$i
   keyfile=$ledgerfolder/online_whale_keys/online_whale_account_$i
-  logfile=$folder/log.txt
   mkdir $folder
-  client_port=$(echo $whale_start_port + 0 + $i*5 | bc)
-  rest_port=$(echo $whale_start_port + 1 + $i*5 | bc)
-  ext_port=$(echo $whale_start_port + 2 + $i*5 | bc)
-  metrics_port=$(echo $whale_start_port + 3 + $i*5 | bc)
-  libp2p_metrics_port=$(echo $whale_start_port + 4 + $i*5 | bc)
-
-  MINA_PRIVKEY_PASS="naughty blue worm" $MINA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -snark-worker-fee "0.01" -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  spawn-node $folder $(($WHALE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   whale_pids[${i}]=$!
-  whale_logfiles[${i}]=$logfile
-  whale_clientport[${i}]=$client_port
 done
 
 # ----------
 
-fish_start_port=5000
 for i in $(seq 1 $fish); do
   folder=$nodesfolder/fish_$i
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_$i
-  logfile=$folder/log.txt
   mkdir $folder
-  client_port=$(echo $fish_start_port + 0 + $i*5 | bc)
-  rest_port=$(echo $fish_start_port + 1 + $i*5 | bc)
-  ext_port=$(echo $fish_start_port + 2 + $i*5 | bc)
-  metrics_port=$(echo $fish_start_port + 3 + $i*5 | bc)
-  libp2p_metrics_port=$(echo $fish_start_port + 4 + $i*5 | bc)
-
-  MINA_PRIVKEY_PASS="naughty blue worm" $MINA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -snark-worker-fee "0.01" -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  spawn-node $folder $(($FISH_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   fish_pids[${i}]=$!
-  fish_logfiles[${i}]=$logfile
-  fish_clientport[${i}]=$client_port
 done
 
 # ----------
 
-node_start_port=6000
 for i in $(seq 1 $nodes); do
   folder=$nodesfolder/node_$i
-  keyfile=$ledgerfolder/online_node_keys/online_node_account_$i
-  logfile=$folder/log.txt
   mkdir $folder
-  client_port=$(echo $node_start_port + 0 + $i*5 | bc)
-  rest_port=$(echo $node_start_port + 1 + $i*5 | bc)
-  ext_port=$(echo $node_start_port + 2 + $i*5 | bc)
-  metrics_port=$(echo $node_start_port + 3 + $i*5 | bc)
-  libp2p_metrics_port=$(echo $node_start_port + 4 + $i*5 | bc)
-
-  MINA_PRIVKEY_PASS="naughty blue worm" $MINA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -log-json -log-level Trace &> $logfile &
+  spawn-node $folder $(($NODE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID
   node_pids[${i}]=$!
-  node_logfiles[${i}]=$logfile
-  node_clientport[${i}]=$client_port
 done
 
 # ================================================
@@ -230,24 +271,24 @@ echo -e "\twhales"
 for i in $(seq 1 $whales); do
   echo -e "\t\t$i"
   echo -e "\t\t  pid ${whale_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port ${whale_clientport[${i}]}"
-  echo -e "\t\t  logs: cat ${whale_logfiles[${i}]} | $LOGPROC"
+  echo -e "\t\t  status: $MINA client status -daemon-port $(($WHALE_START_PORT+($i-1)*5))"
+  echo -e "\t\t  logs: cat $nodesfolder/whale_$i/log.txt | $LOGPROC"
 done
 
 echo -e "\tfish"
 for i in $(seq 1 $fish); do
   echo -e "\t\t$i"
   echo -e "\t\t  pid ${fish_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port ${fish_clientport[${i}]}"
-  echo -e "\t\t  logs: cat ${fish_logfiles[${i}]} | $LOGPROC"
+  echo -e "\t\t  status: $MINA client status -daemon-port $(($FISH_START_PORT+($i-1)*5))"
+  echo -e "\t\t  logs: cat $nodesfolder/fish_$i/log.txt | $LOGPROC"
 done
 
 echo -e "\tnodes"
 for i in $(seq 1 $nodes); do
   echo -e "\t\t$i"
   echo -e "\t\t  pid ${node_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port ${node_clientport[${i}]}"
-  echo -e "\t\t  logs: cat ${node_logfiles[${i}]} | $LOGPROC"
+  echo -e "\t\t  status: $MINA client status -daemon-port $(($NODE_START_PORT+($i-1)*5))"
+  echo -e "\t\t  logs: cat $nodesfolder/node_$i/log.txt | $LOGPROC"
 done
 
 # ================================================
@@ -257,27 +298,31 @@ if $transactions; then
   folder=$nodesfolder/fish_1
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_1
   pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
-  port=5006
-  transaction_frequency=5
+  rest_server="http://127.0.0.1:5001/graphql"
 
   echo "waiting for node to be up to start sending transactions..."
 
-  until $MINA client status -daemon-port 5005 &> /dev/null
+  until $MINA client status -daemon-port 5000 &> /dev/null
   do
     sleep 1
   done
 
   echo "starting to send transactions every $transaction_frequency seconds"
 
-  MINA_PRIVKEY_PASS="naughty blue worm" $MINA account import -config-directory $folder -rest-server "http://127.0.0.1:$port/graphql" -privkey-path $keyfile &> /dev/null
+  set +e
 
-  MINA_PRIVKEY_PASS="naughty blue worm" $MINA account unlock -rest-server "http://127.0.0.1:$port/graphql" -public-key $pubkey  &> /dev/null
+  $MINA account import -rest-server $rest_server -privkey-path $keyfile
+  $MINA account unlock -rest-server $rest_server -public-key $pubkey
+
+  sleep $TRANSACTION_FREQUENCY
+  $MINA client send-payment -rest-server $rest_server -amount 1 -nonce 0 -receiver $pubkey -sender $pubkey
 
   while true; do
-    sleep $transaction_frequency
-    MINA_PRIVKEY_PASS="naughty blue worm" $MINA client send-payment -rest-server "http://127.0.0.1:$port/graphql" -amount 1 -receiver $pubkey -sender $pubkey &> /dev/null
+    sleep $TRANSACTION_FREQUENCY
+    $MINA client send-payment -rest-server $rest_server -amount 1 -receiver $pubkey -sender $pubkey
   done
 
+  set -e
 fi
 
 # ================================================

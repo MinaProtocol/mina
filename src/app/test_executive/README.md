@@ -4,30 +4,36 @@
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-1) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
+1) Make sure you have the following critical tools installed
+- terraform (https://www.terraform.io/downloads)
+- google cloud SDK (https://cloud.google.com/sdk/docs/install)
+- docker (https://docs.docker.com/get-docker/)
+- kubernetes `kubectl` (https://kubernetes.io/docs/tasks/tools/)
 
-2) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Download this key and save to one's preferred path, it will be needed in step 4 of this setup.  Note that each individual should have their own key.
+2) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
+
+3) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Note that each individual should have their own unique key.  Download this key as a json file and save it to one's preferred path.  Run `export GOOGLE_CLOUD_KEYFILE_JSON=<path-to-service-account-key-file>` and/or put it in one's .bashrc or .profile. (Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_CLOUD_KEYFILE_JSON` is already in your path-- if it is then what you already have may work without further changes.)  the path to the automated-validation service account's keyfile will also be needed in step 4 of this setup.  
 
 ![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
-3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
+4) In addition to `GCLOUD_API_KEY` and `GOOGLE_CLOUD_KEYFILE_JSON`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
 - `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
-- any other vars relating to Google cloud access,
-- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
+- the following AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
 - vars relating to ocaml compilation
 
-4) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
+5) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
 
 ```
-gcloud auth login --no-launch-browser <personal login name>
+gcloud auth login --no-launch-browser <gcloud-acct-login-username>
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1
 kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-gcloud auth activate-service-account <service account name> --key-file=<path to service account key file>
+gcloud auth activate-service-account --key-file=<path-to-service-account-key-file>
 ```
 
 When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
 
-5) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+
+6) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
 
 ```
 alias test_executive=./_build/default/src/app/test_executive/test_executive.exe

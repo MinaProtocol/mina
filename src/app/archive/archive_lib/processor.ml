@@ -5,6 +5,7 @@ open Async
 open Core
 open Caqti_async
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 open Pipe_lib
@@ -25,6 +26,12 @@ module Public_key = struct
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM public_keys WHERE value = ?")
       public_key
+
+  let find_by_id (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         "SELECT value FROM public_keys WHERE id = ?")
+      id
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Public_key.Compressed.t) =
@@ -156,8 +163,6 @@ module Snapp_permissions = struct
           "proof"
       | Permissions.Auth_required.Signature ->
           "signature"
-      | Permissions.Auth_required.Both ->
-          "both"
       | Permissions.Auth_required.Impossible ->
           "impossible"
     in
@@ -170,8 +175,6 @@ module Snapp_permissions = struct
           Result.return Permissions.Auth_required.Proof
       | "signature" ->
           Result.return Permissions.Auth_required.Signature
-      | "both" ->
-          Result.return Permissions.Auth_required.Both
       | "impossible" ->
           Result.return Permissions.Auth_required.Impossible
       | s ->
@@ -180,8 +183,7 @@ module Snapp_permissions = struct
     Caqti_type.enum ~encode ~decode "snapp_auth_required_type"
 
   type t =
-    { stake : bool
-    ; edit_state : Permissions.Auth_required.t
+    { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
@@ -191,31 +193,30 @@ module Snapp_permissions = struct
     ; edit_sequence_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
+    ; set_voting_for : Permissions.Auth_required.t
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ bool
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ]
+      [ auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ]
 
   let table_name = "snapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
     let value =
-      { stake = perms.stake
-      ; edit_state = perms.edit_state
+      { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
       ; set_delegate = perms.set_delegate
@@ -225,6 +226,7 @@ module Snapp_permissions = struct
       ; edit_sequence_state = perms.edit_sequence_state
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
+      ; set_voting_for = perms.set_voting_for
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -302,6 +304,7 @@ module Snapp_updates = struct
     ; snapp_uri : string option
     ; token_symbol : string option
     ; timing_id : int option
+    ; voting_for : string option
     }
   [@@deriving fields, hlist]
 
@@ -315,6 +318,7 @@ module Snapp_updates = struct
         ; option string
         ; option string
         ; option int
+        ; option string
         ]
 
   let table_name = "snapp_updates"
@@ -348,6 +352,10 @@ module Snapp_updates = struct
     in
     let snapp_uri = Snapp_basic.Set_or_keep.to_option update.snapp_uri in
     let token_symbol = Snapp_basic.Set_or_keep.to_option update.token_symbol in
+    let voting_for =
+      Option.map ~f:State_hash.to_base58_check
+        (Snapp_basic.Set_or_keep.to_option update.voting_for)
+    in
     let value =
       { app_state_id
       ; delegate_id
@@ -356,6 +364,7 @@ module Snapp_updates = struct
       ; snapp_uri
       ; token_symbol
       ; timing_id
+      ; voting_for
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -588,24 +597,20 @@ module Snapp_predicate = struct
 end
 
 module Snapp_token_id_bounds = struct
-  type t = { token_id_lower_bound : int64; token_id_upper_bound : int64 }
+  type t = { token_id_lower_bound : string; token_id_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
   let table_name = "snapp_token_id_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (token_id_bounds : Token_id.t Mina_base.Snapp_predicate.Closed_interval.t)
       =
-    let token_id_lower_bound =
-      token_id_bounds.lower |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-    in
-    let token_id_upper_bound =
-      token_id_bounds.upper |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-    in
+    let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
+    let token_id_upper_bound = token_id_bounds.upper |> Token_id.to_string in
     let value = { token_id_lower_bound; token_id_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -745,7 +750,7 @@ end
 module Timing_info = struct
   type t =
     { public_key_id : int
-    ; token : int64
+    ; token : string
     ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
@@ -757,7 +762,7 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; string; int64; int64; int64; int64; int64; int64 ]
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -807,9 +812,7 @@ module Timing_info = struct
         return id
     | None ->
         let values =
-          let token =
-            Token_id.to_uint64 (Account.token acc) |> Unsigned.UInt64.to_int64
-          in
+          let token = Token_id.to_string (Account.token acc) in
           match acc.timing with
           | Timed timing ->
               { public_key_id
@@ -977,7 +980,6 @@ end
 module Snapp_predicate_protocol_states = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; snarked_next_available_token_id : int option
     ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
@@ -999,7 +1001,6 @@ module Snapp_predicate_protocol_states = struct
         ; option int
         ; option int
         ; option int
-        ; option int
         ; int
         ; int
         ]
@@ -1013,11 +1014,6 @@ module Snapp_predicate_protocol_states = struct
       Mina_caqti.add_if_snapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
-    in
-    let%bind snarked_next_available_token_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_token_id_bounds.add_if_doesn't_exist (module Conn))
-        ps.snarked_next_available_token
     in
     let%bind timestamp_id =
       Mina_caqti.add_if_snapp_check
@@ -1057,7 +1053,6 @@ module Snapp_predicate_protocol_states = struct
     in
     let value =
       { snarked_ledger_hash_id
-      ; snarked_next_available_token_id
       ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
@@ -1084,7 +1079,7 @@ module Snapp_party_body = struct
   type t =
     { public_key_id : int
     ; update_id : int
-    ; token_id : int64
+    ; token_id : string
     ; balance_change : int64
     ; increment_nonce : bool
     ; events_ids : int array
@@ -1101,7 +1096,7 @@ module Snapp_party_body = struct
       Caqti_type.
         [ int
         ; int
-        ; int64
+        ; string
         ; int64
         ; bool
         ; Mina_caqti.array_int_typ
@@ -1141,9 +1136,7 @@ module Snapp_party_body = struct
         (module Conn)
         body.protocol_state
     in
-    let token_id =
-      Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
-    in
+    let token_id = Token_id.to_string body.token_id in
     let balance_change =
       let magnitude =
         Currency.Amount.to_uint64 body.balance_change.magnitude
@@ -1352,8 +1345,8 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; fee_token : int64
-      ; token : int64
+      ; fee_token : string
+      ; token : string
       ; nonce : int
       ; amount : int64 option
       ; fee : int64
@@ -1370,8 +1363,8 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; int64
-          ; int64
+          ; string
+          ; string
           ; int
           ; option int64
           ; int64
@@ -1458,12 +1451,8 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; fee_token =
-                Signed_command.fee_token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
-            ; token =
-                Signed_command.token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
+            ; fee_token = Signed_command.fee_token t |> Token_id.to_string
+            ; token = Signed_command.token t |> Token_id.to_string
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount =
                 Signed_command.amount t
@@ -1474,7 +1463,8 @@ module User_command = struct
                 |> fun amt ->
                 Currency.Fee.to_uint64 amt |> Unsigned.UInt64.to_int64 )
             ; valid_until
-            ; memo = Signed_command.memo t |> Signed_command_memo.to_string
+            ; memo =
+                Signed_command.memo t |> Signed_command_memo.to_base58_check
             ; hash = transaction_hash |> Transaction_hash.to_base58_check
             }
   end
@@ -1584,9 +1574,8 @@ module User_command = struct
       ; fee_payer_id
       ; source_id
       ; receiver_id
-      ; fee_token =
-          user_cmd.fee_token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-      ; token = user_cmd.token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      ; fee_token = user_cmd.fee_token |> Token_id.to_string
+      ; token = user_cmd.token |> Token_id.to_string
       ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
       ; amount = user_cmd.amount |> amount_opt_to_int64_opt
       ; fee =
@@ -1597,7 +1586,7 @@ module User_command = struct
             ~f:
               (Fn.compose Unsigned.UInt32.to_int64
                  Mina_numbers.Global_slot.to_uint32)
-      ; memo = user_cmd.memo |> Signed_command_memo.to_string
+      ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
       ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
       }
 
@@ -1618,7 +1607,7 @@ module Internal_command = struct
     { typ : string
     ; receiver_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; hash : string
     }
 
@@ -1627,7 +1616,7 @@ module Internal_command = struct
     let decode ((typ, receiver_id, fee, token), hash) =
       Ok { typ; receiver_id; fee; token; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -1675,9 +1664,7 @@ module Internal_command = struct
           ; fee =
               internal_cmd.fee |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token =
-              internal_cmd.token |> Token_id.to_uint64
-              |> Unsigned.UInt64.to_int64
+          ; token = internal_cmd.token |> Token_id.to_string
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1697,7 +1684,7 @@ module Fee_transfer = struct
     { kind : Kind.t
     ; receiver_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; hash : string
     }
 
@@ -1719,7 +1706,7 @@ module Fee_transfer = struct
       in
       Ok { kind; receiver_id; fee; token; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -1751,7 +1738,7 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token = Token_id.to_string t.fee_token |> Int64.of_string
+          ; token = Token_id.to_string t.fee_token
           ; hash = transaction_hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1764,16 +1751,13 @@ module Coinbase = struct
   let typ =
     let encode t =
       Ok
-        ( ( coinbase_typ
-          , t.receiver_id
-          , t.amount
-          , Token_id.(to_string default) |> Int64.of_string )
+        ( (coinbase_typ, t.receiver_id, t.amount, Token_id.(to_string default))
         , t.hash )
     in
     let decode ((_, receiver_id, amount, _), hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -1803,55 +1787,200 @@ module Coinbase = struct
           }
 end
 
+module Find_nonce = struct
+  let sql_template public_keys_sql_list =
+    (* using a string containing the comma-delimited public keys list as an SQL parameter results
+       in syntax errors, so we inline that list into the query
+    *)
+    sprintf
+      {sql|
+SELECT t.pk_id, MAX(pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
+(
+WITH RECURSIVE pending_chain_nonce AS (
+
+               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                FROM blocks b
+                WHERE id = $1
+                LIMIT 1)
+
+                UNION ALL
+
+                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+
+                FROM blocks b
+                INNER JOIN pending_chain_nonce
+                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
+                AND pending_chain_nonce.chain_status <> 'canonical'
+
+               )
+
+              /* Slot and balance are NULL here */
+              SELECT pks.id AS pk_id,pks.value AS pk,full_chain.height,cmds.nonce
+
+              FROM (SELECT
+                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+                    FROM pending_chain_nonce
+
+                    UNION ALL
+
+                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                    FROM blocks b
+                    WHERE chain_status = 'canonical') AS full_chain
+
+              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+              INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+              INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
+
+              WHERE pks.value IN (%s)
+              AND busc.user_command_id = cmds.id
+
+              ORDER BY (full_chain.height, busc.sequence_no) DESC
+            ) t
+            GROUP BY t.pk_id LIMIT $2
+    |sql}
+      public_keys_sql_list
+
+  type t =
+    { public_key_id : int; public_key : string; height : int; nonce : int64 }
+  [@@deriving hlist]
+
+  let typ =
+    let open Mina_caqti.Type_spec in
+    let spec = Caqti_type.[ int; string; int; int64 ] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
+    if List.is_empty public_keys then
+      (* SQL query would fail, because `IN ()` is invalid syntax *)
+      return @@ Ok []
+    else
+      let public_keys_sql_list =
+        public_keys
+        |> List.map ~f:(fun pk ->
+               sprintf "'%s'"
+                 (Signature_lib.Public_key.Compressed.to_base58_check pk))
+        |> String.concat ~sep:","
+      in
+      Conn.collect_list
+        (Caqti_request.collect
+           Caqti_type.(tup2 int int)
+           typ
+           (sql_template public_keys_sql_list))
+        (parent_id, List.length public_keys)
+
+  (* INVARIANT: The map is populated with all the public_keys present *)
+  let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
+    let open Deferred.Result.Let_syntax in
+    let%map ts = collect (module Conn) ~public_keys ~parent_id in
+    let alist =
+      List.map ts ~f:(fun t ->
+          ( Signature_lib.Public_key.Compressed.of_base58_check_exn t.public_key
+          , Account.Nonce.of_uint32 Unsigned.UInt32.(of_int64 t.nonce |> succ)
+          ))
+    in
+    let map = Signature_lib.Public_key.Compressed.Map.of_alist_exn alist in
+    List.fold public_keys ~init:map ~f:(fun map key ->
+        match
+          Signature_lib.Public_key.Compressed.Map.add map ~key
+            ~data:Account.Nonce.zero
+        with
+        | `Ok map' ->
+            map'
+        | `Duplicate ->
+            map)
+end
+
 module Balance = struct
-  type t = { id : int; public_key_id : int; balance : int64 } [@@deriving hlist]
+  type t =
+    { id : int
+    ; public_key_id : int
+    ; balance : int64
+    ; block_id : int
+    ; block_height : int64
+    ; block_sequence_no : int
+    ; block_secondary_sequence_no : int
+    ; nonce : int64 option
+    }
+  [@@deriving hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int64 ]
+      Caqti_type.[ int; int; int64; int; int64; int; int; option int64 ]
 
   let balance_to_int64 (balance : Currency.Balance.t) : int64 =
     balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64
     |> Unsigned.UInt64.to_int64
 
   let find (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
+      ~block_secondary_sequence_no =
+    (* TODO: Do we need to query with the nonce here? *)
     Conn.find_opt
       (Caqti_request.find_opt
-         Caqti_type.(tup2 int int64)
+         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
          Caqti_type.int
          {sql| SELECT id FROM balances
                WHERE public_key_id = $1
                AND balance = $2
+               AND block_id = $3
+               AND block_height = $4
+               AND block_sequence_no = $5
+               AND block_secondary_sequence_no = $6
          |sql})
-      (public_key_id, balance_to_int64 balance)
+      ( (public_key_id, balance_to_int64 balance)
+      , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
+      )
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
-      (Caqti_request.find Caqti_type.int
-         Caqti_type.(tup2 int int64)
-         {sql| SELECT public_key_id, balance FROM balances
+      (Caqti_request.find Caqti_type.int typ
+         {sql| SELECT id, public_key_id, balance,
+                      block_id, block_height,
+                      block_sequence_no, block_secondary_sequence_no, nonce
+               FROM balances
                WHERE id = $1
          |sql})
       id
 
   let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
+      ~block_secondary_sequence_no ~nonce =
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 int int64)
+         Caqti_type.(
+           tup2 (tup2 int int64) (tup4 int int64 (tup2 int int) (option int64)))
          Caqti_type.int
-         {sql| INSERT INTO balances (public_key_id, balance) VALUES (?, ?) RETURNING id |sql})
-      (public_key_id, balance_to_int64 balance)
+         {sql| INSERT INTO balances (public_key_id, balance,
+                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no, nonce)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               RETURNING id |sql})
+      ( (public_key_id, balance_to_int64 balance)
+      , ( block_id
+        , block_height
+        , (block_sequence_no, block_secondary_sequence_no)
+        , nonce ) )
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) =
+      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
+      ~block_secondary_sequence_no ~nonce =
     let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~public_key_id ~balance with
+    match%bind
+      find
+        (module Conn)
+        ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
+        ~block_secondary_sequence_no
+    with
     | Some balance_id ->
         return balance_id
     | None ->
-        add (module Conn) ~public_key_id ~balance
+        add
+          (module Conn)
+          ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
+          ~block_secondary_sequence_no ~nonce
 end
 
 module Block_and_internal_command = struct
@@ -1928,7 +2057,7 @@ module Block_and_signed_command = struct
     ; failure_reason : string option
     ; fee_payer_account_creation_fee_paid : int64 option
     ; receiver_account_creation_fee_paid : int64 option
-    ; created_token : int64 option
+    ; created_token : string option
     ; fee_payer_balance_id : int
     ; source_balance_id : int option
     ; receiver_balance_id : int option
@@ -1945,7 +2074,7 @@ module Block_and_signed_command = struct
         ; option string
         ; option int64
         ; option int64
-        ; option int64
+        ; option string
         ; int
         ; option int
         ; option int
@@ -1968,8 +2097,7 @@ module Block_and_signed_command = struct
       Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
     in
     let created_token =
-      Option.map created_token ~f:(fun tid ->
-          Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid))
+      Option.map created_token ~f:(fun tid -> Token_id.to_string tid)
     in
     Conn.exec
       (Caqti_request.exec typ
@@ -2000,9 +2128,9 @@ module Block_and_signed_command = struct
       ; receiver_balance_id
       }
 
-  let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
-      ~sequence_no ~(status : Transaction_status.t) ~fee_payer_id ~source_id
-      ~receiver_id =
+  let add_with_status (module Conn : CONNECTION) ~block_id ~block_height
+      ~user_command_id ~sequence_no ~(status : Transaction_status.t)
+      ~fee_payer_id ~source_id ~receiver_id ~nonce_map =
     let open Deferred.Result.Let_syntax in
     let ( status_str
         , failure_reason
@@ -2017,19 +2145,31 @@ module Block_and_signed_command = struct
       | Applied
           ( { fee_payer_account_creation_fee_paid
             ; receiver_account_creation_fee_paid
-            ; created_token
             }
           , balances ) ->
           ( "applied"
           , None
           , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token
+          , None
           , balances )
       | Failed (failure, balances) ->
           ("failed", Some failure, None, None, None, balances)
     in
-    let add_optional_balance id balance =
+    let pk_of_id id =
+      let%map pk_str = Public_key.find_by_id (module Conn) id in
+      Signature_lib.Public_key.Compressed.of_base58_check pk_str
+      |> Or_error.ok_exn
+      (* Note: This is safe because the database will already have the
+       * correctly formatted public key by this point. *)
+    in
+    let nonce_int64_of_pk pk =
+      Signature_lib.Public_key.Compressed.Map.find nonce_map pk
+      |> Option.map ~f:(fun nonce ->
+             Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
+    in
+    let add_optional_balance id balance ~block_id ~block_height
+        ~block_sequence_no ~block_secondary_sequence_no ~nonce =
       match balance with
       | None ->
           Deferred.Result.return None
@@ -2037,7 +2177,8 @@ module Block_and_signed_command = struct
           let%map balance_id =
             Balance.add_if_doesn't_exist
               (module Conn)
-              ~public_key_id:id ~balance
+              ~public_key_id:id ~balance ~block_id ~block_height
+              ~block_sequence_no ~block_secondary_sequence_no ~nonce
           in
           Some balance_id
     in
@@ -2045,15 +2186,25 @@ module Block_and_signed_command = struct
      * assume the fee payer balance will be Some here *)
     let fee_payer_balance = Option.value_exn fee_payer_balance in
     let%bind fee_payer_balance_id =
+      let%bind fee_payer_pk = pk_of_id fee_payer_id in
+      let nonce = nonce_int64_of_pk fee_payer_pk in
       Balance.add_if_doesn't_exist
         (module Conn)
-        ~public_key_id:fee_payer_id ~balance:fee_payer_balance
+        ~public_key_id:fee_payer_id ~balance:fee_payer_balance ~block_id
+        ~block_height ~block_sequence_no:sequence_no
+        ~block_secondary_sequence_no:0 ~nonce
     in
     let%bind source_balance_id =
-      add_optional_balance source_id source_balance
+      let%bind source_pk = pk_of_id source_id in
+      let nonce = nonce_int64_of_pk source_pk in
+      add_optional_balance source_id source_balance ~block_id ~block_height
+        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
     in
     let%bind receiver_balance_id =
-      add_optional_balance receiver_id receiver_balance
+      let%bind receiver_pk = pk_of_id receiver_id in
+      let nonce = nonce_int64_of_pk receiver_pk in
+      add_optional_balance receiver_id receiver_balance ~block_id ~block_height
+        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
     in
     add
       (module Conn)
@@ -2123,7 +2274,6 @@ module Block = struct
     ; next_epoch_data_id : int
     ; min_window_density : int64
     ; total_currency : int64
-    ; next_available_token : int64
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
@@ -2144,7 +2294,6 @@ module Block = struct
         ; int
         ; int
         ; int
-        ; int64
         ; int64
         ; int64
         ; string
@@ -2213,16 +2362,57 @@ module Block = struct
             (module Conn)
             (Consensus.Data.Consensus_state.next_epoch_data consensus_state)
         in
+        let height =
+          consensus_state |> Consensus.Data.Consensus_state.blockchain_length
+          |> Unsigned.UInt32.to_int64
+        in
+        let transactions =
+          let coinbase_receiver =
+            Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+          in
+          let supercharge_coinbase =
+            Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
+          in
+          match
+            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
+              ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
+          with
+          | Ok transactions ->
+              transactions
+          | Error e ->
+              Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
+        in
+        (* grab all the nonces associated with every public key in all of these
+         * transactions for blocks earlier than this one. *)
+        let%bind initial_nonce_map :
+            ( Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t
+            , _ )
+            Deferred.Result.t =
+          let public_keys =
+            transactions
+            |> List.map ~f:(fun x -> Transaction.public_keys x.data)
+            |> List.concat
+          in
+          (* if this block is disconnected and doesn't have a parent, the nonce map will need to start empty *)
+          match parent_id with
+          | None ->
+              Deferred.Result.return
+                Signature_lib.Public_key.Compressed.Map.empty
+          | Some parent_id ->
+              Find_nonce.initialize_nonce_map
+                (module Conn)
+                ~public_keys ~parent_id
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
                |sql})
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -2242,18 +2432,11 @@ module Block = struct
                 Protocol_state.consensus_state protocol_state
                 |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.registers |> Registers.next_available_token
-                |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
             ; ledger_hash =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
-            ; height =
-                consensus_state
-                |> Consensus.Data.Consensus_state.blockchain_length
-                |> Unsigned.UInt32.to_int64
+            ; height
             ; global_slot_since_hard_fork =
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
@@ -2267,22 +2450,6 @@ module Block = struct
                 (* we don't yet know the chain status for a block we're adding *)
             ; chain_status = Chain_status.(to_string Pending)
             }
-        in
-        let transactions =
-          let coinbase_receiver =
-            Consensus.Data.Consensus_state.coinbase_receiver consensus_state
-          in
-          let supercharge_coinbase =
-            Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
-          in
-          match
-            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-              ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
-          with
-          | Ok transactions ->
-              transactions
-          | Error e ->
-              Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance
             =
@@ -2317,14 +2484,35 @@ module Block = struct
           then Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
           else None
         in
-        let%bind (_ : int) =
-          Mina_caqti.deferred_result_list_fold transactions ~init:0
-            ~f:(fun sequence_no -> function
+        let nonce_int64_of_pk nonce_map pk =
+          Signature_lib.Public_key.Compressed.Map.find nonce_map pk
+          |> Option.map ~f:(fun nonce ->
+                 Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
+        in
+        let%bind (_
+                   : int
+                     * Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t)
+            =
+          Mina_caqti.deferred_result_list_fold transactions
+            ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
+            function
             | { Mina_base.With_status.status
-              ; data = Mina_base.Transaction.Command command
+              ; data = Transaction.Command command
               } ->
                 let user_command =
                   { Mina_base.With_status.status; data = command }
+                in
+                (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
+                   Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
+                let nonce_map =
+                  Signature_lib.Public_key.Compressed.Map.change
+                    initial_nonce_map
+                    ( Mina_base.User_command.fee_payer command
+                    |> Account_id.public_key )
+                    ~f:(fun _ ->
+                      Some
+                        ( Mina_base.User_command.nonce_exn command
+                        |> Unsigned.UInt32.succ ))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
@@ -2342,14 +2530,14 @@ module Block = struct
                       in
                       Block_and_signed_command.add_with_status
                         (module Conn)
-                        ~block_id ~user_command_id:id ~sequence_no
-                        ~status:user_command.status ~fee_payer_id ~source_id
-                        ~receiver_id
+                        ~block_id ~block_height:height ~user_command_id:id
+                        ~sequence_no ~status:user_command.status ~fee_payer_id
+                        ~source_id ~receiver_id ~nonce_map
                       >>| ignore
                   | Parties _ ->
                       Deferred.Result.return ()
                 in
-                sequence_no + 1
+                (sequence_no + 1, nonce_map)
             | { data = Fee_transfer fee_transfer_bundled; status } ->
                 let balances =
                   Transaction_status.Fee_transfer_balance_data
@@ -2407,10 +2595,14 @@ module Block = struct
                           (module Conn)
                           receiver_pk
                       in
+                      let nonce = nonce_int64_of_pk nonce_map receiver_pk in
                       let%bind receiver_balance_id =
                         Balance.add_if_doesn't_exist
                           (module Conn)
-                          ~public_key_id:receiver_id ~balance
+                          ~public_key_id:receiver_id ~balance ~block_id
+                          ~block_height:height ~block_sequence_no:sequence_no
+                          ~block_secondary_sequence_no:secondary_sequence_no
+                          ~nonce
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -2422,7 +2614,7 @@ module Block = struct
                         ~receiver_account_creation_fee_paid ~receiver_balance_id
                       >>| ignore)
                 in
-                sequence_no + 1
+                (sequence_no + 1, nonce_map)
             | { data = Coinbase coinbase; status } ->
                 let balances =
                   Transaction_status.Coinbase_balance_data.of_balance_data_exn
@@ -2447,6 +2639,7 @@ module Block = struct
                           (module Conn)
                           receiver_pk
                       in
+                      let nonce = nonce_int64_of_pk nonce_map receiver_pk in
                       let balance =
                         Option.value_exn balances.fee_transfer_receiver_balance
                       in
@@ -2454,6 +2647,9 @@ module Block = struct
                         Balance.add_if_doesn't_exist
                           (module Conn)
                           ~public_key_id:fee_transfer_receiver_id ~balance
+                          ~block_id ~block_height:height
+                          ~block_sequence_no:sequence_no
+                          ~block_secondary_sequence_no:0 ~nonce
                       in
                       let receiver_account_creation_fee_paid =
                         account_creation_fee_of_fees_and_balance fee balance
@@ -2476,11 +2672,14 @@ module Block = struct
                     (module Conn)
                     coinbase.receiver
                 in
+                let nonce = nonce_int64_of_pk nonce_map coinbase.receiver in
                 let%bind receiver_balance_id =
                   Balance.add_if_doesn't_exist
                     (module Conn)
                     ~public_key_id:coinbase_receiver_id
-                    ~balance:balances.coinbase_receiver_balance
+                    ~balance:balances.coinbase_receiver_balance ~block_id
+                    ~block_height:height ~block_sequence_no:sequence_no
+                    ~block_secondary_sequence_no:0 ~nonce
                 in
                 let receiver_account_creation_fee_paid =
                   account_creation_fee_of_fees_and_balance ?additional_fee
@@ -2495,12 +2694,13 @@ module Block = struct
                     ~receiver_balance_id
                   >>| ignore
                 in
-                sequence_no + 1)
+                (sequence_no + 1, nonce_map))
         in
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
-      ({ data = t; hash } : (External_transition.t, State_hash.t) With_hash.t) =
+      ({ data = t; hash = { state_hash = hash; _ } } :
+        External_transition.t State_hash.With_state_hashes.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:(External_transition.protocol_state t)
       ~staged_ledger_diff:(External_transition.staged_ledger_diff t)
@@ -2510,10 +2710,77 @@ module Block = struct
       (t : External_transition.Precomputed_block.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
-      ~hash:(Protocol_state.hash t.protocol_state)
+      ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
+    (* modelled on query in Rosetta.Lib.Account.query_pending
+       except that all we need is the nonce, not the balance
+
+       see the comment explaining the design there
+    *)
+    let nonce_query =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        Caqti_type.int64
+        {sql| SELECT nonce
+              FROM (WITH RECURSIVE chain AS (
+
+                     (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                      FROM blocks b
+                      WHERE height = (select MAX(height) from blocks)
+                      ORDER BY timestamp ASC, state_hash ASC
+                      LIMIT 1)
+
+                      UNION ALL
+
+                      SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+                      FROM blocks b
+                      INNER JOIN chain
+
+                      ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
+
+                     )
+
+                    SELECT nonce
+
+                    FROM (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                          FROM chain
+
+                          UNION ALL
+
+                          SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                          FROM blocks b
+
+                          WHERE chain_status = 'canonical') AS full_chain
+
+                    INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
+                    INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
+                    INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
+
+                    WHERE pks.value = $1
+                    AND full_chain.height <= $2
+
+                    ORDER BY (full_chain.height,busc.sequence_no) DESC
+                    LIMIT 1
+                )
+                AS result
+        |sql}
+    in
+    let run_nonce_query pk =
+      let pk_str = Signature_lib.Public_key.Compressed.to_base58_check pk in
+      let%map last_nonce =
+        Conn.find_opt nonce_query
+          (pk_str, block.height |> Unsigned.UInt32.to_int64)
+      in
+      (* last nonce was in the last user_command for the public key, add 1 to get current nonce
+         if no nonce found, leave as None (it could be 0, but could also be missing data)
+      *)
+      Result.map last_nonce ~f:(Option.map ~f:Int64.succ)
+    in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -2549,10 +2816,10 @@ module Block = struct
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql})
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -2568,9 +2835,6 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; total_currency =
                 block.total_currency |> Currency.Amount.to_uint64
-                |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                block.next_available_token |> Token_id.to_uint64
                 |> Unsigned.UInt64.to_int64
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
@@ -2596,33 +2860,52 @@ module Block = struct
       in
       List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
-    let balance_id_of_pk_and_balance pk balance =
+    let balance_id_of_info pk balance ~block_sequence_no
+        ~block_secondary_sequence_no ~nonce =
       let%bind public_key_id =
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
-      Balance.add_if_doesn't_exist (module Conn) ~public_key_id ~balance
+      Balance.add_if_doesn't_exist
+        (module Conn)
+        ~public_key_id ~balance ~block_id
+        ~block_height:(block.height |> Unsigned.UInt32.to_int64)
+        ~block_sequence_no ~block_secondary_sequence_no ~nonce
     in
-    let balance_id_of_pk_and_balance_opt pk balance_opt =
+    let balance_id_of_info_balance_opt pk balance_opt ~block_sequence_no
+        ~block_secondary_sequence_no ~nonce =
       Option.value_map balance_opt ~default:(Deferred.Result.return None)
         ~f:(fun balance ->
-          let%map id = balance_id_of_pk_and_balance pk balance in
+          let%map id =
+            balance_id_of_info pk balance ~block_sequence_no
+              ~block_secondary_sequence_no ~nonce
+          in
           Some id)
     in
     (* add user commands to join table *)
     let%bind () =
       Mina_caqti.deferred_result_list_fold user_cmds_with_ids ~init:()
         ~f:(fun () (user_command, user_command_id) ->
-          let%bind source_balance_id =
-            balance_id_of_pk_and_balance_opt user_command.source
-              user_command.source_balance
+          let fee_payer_nonce =
+            user_command.nonce |> Unsigned.UInt32.to_int64
           in
           let%bind fee_payer_balance_id =
-            balance_id_of_pk_and_balance user_command.fee_payer
+            balance_id_of_info user_command.fee_payer
               user_command.fee_payer_balance
+              ~block_sequence_no:user_command.sequence_no
+              ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
+          in
+          let%bind source_balance_id =
+            balance_id_of_info_balance_opt user_command.source
+              user_command.source_balance
+              ~block_sequence_no:user_command.sequence_no
+              ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
           in
           let%bind receiver_balance_id =
-            balance_id_of_pk_and_balance_opt user_command.receiver
+            let%bind nonce = run_nonce_query user_command.receiver in
+            balance_id_of_info_balance_opt user_command.receiver
               user_command.receiver_balance
+              ~block_sequence_no:user_command.sequence_no
+              ~block_secondary_sequence_no:0 ~nonce
           in
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
@@ -2664,8 +2947,12 @@ module Block = struct
              , (sequence_no, secondary_sequence_no) )
            ->
           let%bind receiver_balance_id =
-            balance_id_of_pk_and_balance internal_command.receiver
+            let%bind nonce = run_nonce_query internal_command.receiver in
+            balance_id_of_info internal_command.receiver
               internal_command.receiver_balance
+              ~block_sequence_no:internal_command.sequence_no
+              ~block_secondary_sequence_no:
+                internal_command.secondary_sequence_no ~nonce
           in
           let receiver_account_creation_fee_paid =
             internal_command.receiver_account_creation_fee_paid
@@ -2718,12 +3005,28 @@ module Block = struct
       |sql})
       (end_block_id, start_block_id)
 
-  let get_highest_canonical_blocks (module Conn : CONNECTION) =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.unit
+  let get_highest_canonical_block_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.unit
          Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY \
           height DESC LIMIT 1")
+
+  let get_nearest_canonical_block_above (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64
+         Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
+          height > ? ORDER BY height ASC LIMIT 1")
+      height
+
+  let get_nearest_canonical_block_below (module Conn : CONNECTION) height =
+    Conn.find
+      (Caqti_request.find Caqti_type.int64
+         Caqti_type.(tup2 int int64)
+         "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
+          height < ? ORDER BY height DESC LIMIT 1")
+      height
 
   let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
     Conn.exec
@@ -2744,26 +3047,24 @@ module Block = struct
   (* update chain_status for blocks now known to be canonical or orphaned *)
   let update_chain_status (module Conn : CONNECTION) ~block_id =
     let open Deferred.Result.Let_syntax in
-    match%bind get_highest_canonical_blocks (module Conn) () with
-    | [] ->
-        (* no canonical blocks in this database, don't update statuses
-           this can happen on a new database, such as a test database
-        *)
+    match%bind get_highest_canonical_block_opt (module Conn) () with
+    | None ->
+        (* unit tests, no canonical block, can't mark any block as canonical *)
         Deferred.Result.return ()
-    | [ (highest_canonical_block_id, greatest_canonical_height) ] ->
-        let%bind block = load (module Conn) ~id:block_id in
+    | Some (highest_canonical_block_id, greatest_canonical_height) ->
         let k_int64 = Genesis_constants.k |> Int64.of_int in
-        let block_height_less_k_int64 = Int64.( - ) block.height k_int64 in
+        let%bind block = load (module Conn) ~id:block_id in
         if
           Int64.( > ) block.height
             (Int64.( + ) greatest_canonical_height k_int64)
         then
-          (* subchain between new block and highest canonical block *)
+          (* a new block, allows marking some pending blocks as canonical *)
           let%bind subchain_blocks =
             get_subchain
               (module Conn)
               ~start_block_id:highest_canonical_block_id ~end_block_id:block_id
           in
+          let block_height_less_k_int64 = Int64.( - ) block.height k_int64 in
           (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
           let canonical_blocks =
             List.filter subchain_blocks ~f:(fun subchain_block ->
@@ -2777,11 +3078,33 @@ module Block = struct
               mark_as_orphaned
                 (module Conn)
                 ~state_hash:block.state_hash ~height:block.height)
-        else Deferred.Result.return ()
-    | _ ->
-        failwith
-          "update_chain_status: expected 0 or 1 results from \
-           get_highest_canonical_blocks"
+        else if Int64.( < ) block.height greatest_canonical_height then
+          (* a missing block added in the middle of canonical chain *)
+          let%bind canonical_block_above_id, _above_height =
+            get_nearest_canonical_block_above (module Conn) block.height
+          in
+          let%bind canonical_block_below_id, _below_height =
+            get_nearest_canonical_block_below (module Conn) block.height
+          in
+          (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
+             canonical block above this one *)
+          let%bind canonical_blocks =
+            get_subchain
+              (module Conn)
+              ~start_block_id:canonical_block_below_id
+              ~end_block_id:canonical_block_above_id
+          in
+          Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
+            ~f:(fun () block ->
+              let%bind () =
+                mark_as_canonical (module Conn) ~state_hash:block.state_hash
+              in
+              mark_as_orphaned
+                (module Conn)
+                ~state_hash:block.state_hash ~height:block.height)
+        else
+          (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
+          Deferred.Result.return ()
 
   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
@@ -2887,6 +3210,9 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
+          [%log info] "Attempting to add block data for $state_hash"
+            ~metadata:
+              [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
@@ -2925,8 +3251,9 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hash)
+      ( block.External_transition.Precomputed_block.protocol_state
+      |> Protocol_state.hashes )
+        .state_hash)
 
 let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
@@ -2936,14 +3263,16 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added { block; _ }) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
-        let hash block = With_hash.hash block in
+        let hash = State_hash.With_state_hashes.state_hash in
         match%map
           add_block_aux ~logger ~delete_older_than ~hash ~add_block pool block
         with
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                [ ( "block"
+                  , State_hash.With_state_hashes.state_hash block
+                    |> State_hash.to_yojson )
                 ; ("error", `String (Caqti_error.show e))
                 ]
               "Failed to archive block: $block, see $error"
@@ -3112,8 +3441,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 "Precomputed block $block could not be archived: $error"
                 ~metadata:
                   [ ( "block"
-                    , Protocol_state.hash precomputed_block.protocol_state
-                      |> State_hash.to_yojson )
+                    , (Protocol_state.hashes precomputed_block.protocol_state)
+                        .state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
           | Ok () ->

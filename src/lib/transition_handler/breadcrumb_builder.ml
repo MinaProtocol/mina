@@ -27,10 +27,12 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   (List.map subtrees_of_enveloped_transitions ~f:(fun subtree ->
                        Rose_tree.to_yojson
                          (fun enveloped_transitions ->
-                           Cached.peek enveloped_transitions
-                           |> Envelope.Incoming.data
-                           |> External_transition.Initial_validated.state_hash
-                           |> Mina_base.State_hash.to_yojson)
+                           let transition, _ =
+                             enveloped_transitions |> Cached.peek
+                             |> Envelope.Incoming.data
+                           in
+                           Mina_base.State_hash.(
+                             to_yojson (With_state_hashes.state_hash transition)))
                          subtree)) )
             ]
           "Transition frontier already garbage-collected the parent of \
@@ -95,12 +97,11 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 in
                 let open Deferred.Let_syntax in
                 match%bind
-                  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
-                      Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                          Transition_frontier.Breadcrumb.build ~logger
-                            ~precomputed_values ~verifier ~trust_system ~parent
-                            ~transition:mostly_validated_transition
-                            ~sender:(Some sender) ~transition_receipt_time ()))
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      Transition_frontier.Breadcrumb.build ~logger
+                        ~precomputed_values ~verifier ~trust_system ~parent
+                        ~transition:mostly_validated_transition
+                        ~sender:(Some sender) ~transition_receipt_time ())
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg

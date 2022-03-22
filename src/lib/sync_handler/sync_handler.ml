@@ -1,6 +1,8 @@
 open Core_kernel
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_transition
 open Frontier_base
 open Network_peer
@@ -227,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  best_tip_transition.hash))
+                  (State_hash.With_state_hashes.state_hash best_tip_transition)))
       in
       verified_witness
   end

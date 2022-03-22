@@ -64,9 +64,6 @@ end = struct
     in
     loop location
 
-  let merkle_path_batch t locs =
-    List.zip_exn locs (List.map locs ~f:(merkle_path t))
-
   let merkle_root t = empty_hash_at_height t.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
@@ -114,11 +111,6 @@ end = struct
 
   let tokens _t _pk = Token_id.Set.empty
 
-  let next_available_token _t = Token_id.(next default)
-
-  let set_next_available_token _t _tid =
-    failwith "set_next_available_token: null ledgers cannot be mutated"
-
   let iteri _t ~f:_ = ()
 
   let fold_until _t ~init ~f:_ ~finish = finish init
@@ -162,5 +154,5 @@ end = struct
 
   let depth t = t.depth
 
-  let detached_signal _ = Async.Deferred.never ()
+  let detached_signal _ = Async_kernel.Deferred.never ()
 end

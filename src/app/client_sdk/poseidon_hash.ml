@@ -6,7 +6,7 @@ open Js_of_ocaml
  * *************** *)
 
 module Field = struct
-  include Snark_params_nonconsensus.Field
+  include Snark_params.Tick.Field
 
   (* Converts a byterray into a [Field.t], raises an exception if the number obtained is larger than the order *)
   let of_bytes bytearray =
@@ -82,7 +82,7 @@ module Hash = struct
   include Sponge.Make_hash (Sponge.Poseidon (Config))
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
 
   let update ~state = update ~state params
 
@@ -93,7 +93,7 @@ module Hash = struct
       ~pack:Field.project
 end
 
-module String_sign = String_sign_nonconsensus.String_sign
+module String_sign = String_sign
 
 (* ************************ *
  *   javascript interface   *

@@ -1,15 +1,3 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
-
 open Core_kernel
 open Hash_prefixes
 
@@ -123,3 +111,5 @@ let snapp_sequence_events = salt snapp_sequence_events
 let snapp_memo = salt snapp_memo
 
 let snapp_test = salt snapp_test
+
+let derive_token_id = salt derive_token_id

@@ -9,11 +9,10 @@ use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{commitment::PolyComm, srs::SRS};
+use kimchi::circuits::constraints::{zk_polynomial, zk_w3, Shifts};
+use kimchi::circuits::wires::{COLUMNS, PERMUTS};
+use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-
-use kimchi::index::{expr_linearization, VerifierIndex};
-use kimchi_circuits::nolookup::constraints::{zk_polynomial, zk_w3, Shifts};
-use kimchi_circuits::wires::{COLUMNS, PERMUTS};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -49,6 +48,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
+            lookup_index: vi.lookup_index.map(Into::into),
         }
     }
 }
@@ -81,12 +81,13 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let linearization = expr_linearization(domain, false, None);
+        let (linearization, powers_of_alpha) = expr_linearization(domain, false, &None);
 
         VerifierIndex::<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
+            powers_of_alpha,
             srs: index.srs.0,
 
             sigma_comm,
@@ -107,13 +108,11 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             w: zk_w3(domain),
             endo: endo_q,
 
-            lookup_used: None,
-            lookup_tables: vec![],
-            lookup_selectors: vec![],
+            lookup_index: index.lookup_index.map(Into::into),
             linearization,
 
-            fr_sponge_params: oracle::pasta::fp_3::params(),
-            fq_sponge_params: oracle::pasta::fq_3::params(),
+            fr_sponge_params: oracle::pasta::fp_kimchi::params(),
+            fq_sponge_params: oracle::pasta::fq_kimchi::params(),
         }
     }
 }
@@ -125,8 +124,8 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fq_3::params();
-    let fr_sponge_params = oracle::pasta::fp_3::params();
+    let fq_sponge_params = oracle::pasta::fq_kimchi::params();
+    let fr_sponge_params = oracle::pasta::fp_kimchi::params();
     VerifierIndex::<GAffine>::from_file(
         srs.0,
         path,
@@ -229,6 +228,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
+        lookup_index: None,
     }
 }
 

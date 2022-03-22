@@ -170,9 +170,16 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
   ; srs_length_log2
   }
 
-let perm_alpha0 : int = 2 + 15
+(* TODO: not true anymore if lookup is used *)
+
+(** The offset of the powers of alpha for the permutation. 
+(see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
+let perm_alpha0 : int = 21
 
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
+  (** Computes the ft evaluation at zeta. 
+  (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
+  *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) p_eval0 =
@@ -210,6 +217,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let constant_term = Sc.constant_term env in
     ft_eval0 - constant_term
 
+  (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
@@ -229,14 +237,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       in
       let generic =
         let open Vector in
-        let (w0 :: w1 :: w2 :: _) = e0.w in
-        let generic_w0 = e0.generic_selector * w0 in
-        [ generic_w0
-        ; e0.generic_selector * w1
-        ; e0.generic_selector * w2
-        ; generic_w0 * w1
-        ; e0.generic_selector
-        ]
+        let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = e0.w in
+        let m1 = l1 * r1 in
+        let m2 = l2 * r2 in
+        [ e0.generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
@@ -257,6 +261,14 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; generic
         }
 
+  (** Check that computed proof scalars match the expected ones,
+    using the native field.
+    Note that the expected scalars are used to check 
+    the linearization in a proof over the other field 
+    (where those checks are more efficient), 
+    but we deferred the arithmetic checks until here 
+    so that we have the efficiency of the native field.
+  *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
       ~shift ~env (plonk : _ In_circuit.t) evals =

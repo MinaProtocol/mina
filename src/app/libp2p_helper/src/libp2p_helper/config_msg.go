@@ -2,6 +2,7 @@ package main
 
 import (
 	cryptorand "crypto/rand"
+	gonet "net"
 	"time"
 
 	"codanet"
@@ -140,7 +141,12 @@ func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrI
 			pubsub.WithDirectPeers(directPeers),
 			pubsub.WithValidateQueueSize(validationQueueSize),
 			pubsub.WithMessageIdFn(func(pmsg *pb.Message) string {
-				hash, err := blake2b.New256([]byte(pmsg.GetTopic()))
+				hmacKey := []byte(pmsg.GetTopic())
+				if len(hmacKey) > 64 {
+					hmacKey2 := blake2b.Sum256(hmacKey)
+					hmacKey = hmacKey2[:]
+				}
+				hash, err := blake2b.New256(hmacKey)
 				panicOnErr(err)
 				_, err = hash.Write(pmsg.GetData())
 				panicOnErr(err)
@@ -261,7 +267,37 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
+	knownPrivateIpNetsRaw, err := m.KnownPrivateIpNets()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	knownPrivateIpNets := make([]gonet.IPNet, 0, knownPrivateIpNetsRaw.Len())
+	err = textListForeach(knownPrivateIpNetsRaw, func(v string) error {
+		_, addr, err := gonet.ParseCIDR(v)
+		if err == nil {
+			knownPrivateIpNets = append(knownPrivateIpNets, *addr)
+		}
+		return err
+	})
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	helper, err := codanet.MakeHelper(
+		app.Ctx,
+		listenOn,
+		externalMaddr,
+		stateDir,
+		privk,
+		netId,
+		seeds,
+		gatingConfig,
+		int(m.MinConnections()),
+		int(m.MaxConnections()),
+		m.MinaPeerExchange(),
+		time.Millisecond,
+		knownPrivateIpNets,
+	)
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
@@ -409,16 +445,16 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	var newState *codanet.CodaGatingState
+	var gatingConfig *codanet.CodaGatingConfig
 	gc, err := SetGatingConfigReqT(m).GatingConfig()
 	if err == nil {
-		newState, err = readGatingConfig(gc, app.AddedPeers)
+		gatingConfig, err = readGatingConfig(gc, app.AddedPeers)
 	}
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.P2p.SetGatingState(newState)
+	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetGatingConfig()

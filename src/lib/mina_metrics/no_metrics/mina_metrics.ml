@@ -35,12 +35,16 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Histogram = struct
   type t = unit
 
   let observe : t -> float -> unit = fun _ _ -> ()
+
+  let buckets () = []
 end
 
 module Runtime = struct
@@ -75,6 +79,8 @@ module Transaction_pool = struct
   let useful_transactions_received_time_sec : Gauge.t = ()
 
   let pool_size : Gauge.t = ()
+
+  let transactions_added_to_pool : Counter.t = ()
 end
 
 module Network = struct
@@ -259,6 +265,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -337,6 +345,10 @@ module Block_producer = struct
   let slots_won : Counter.t = ()
 
   let blocks_produced : Counter.t = ()
+
+  module Block_production_delay_histogram = Histogram
+
+  let block_production_delay : Block_production_delay_histogram.t = ()
 end
 
 module Transition_frontier = struct
@@ -441,6 +453,14 @@ module Block_latency = struct
   end
 
   module Inclusion_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
+
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()

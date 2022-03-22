@@ -108,7 +108,8 @@ let check :
           let v : User_command.Valid.t =
             User_command.Poly.Parties
               { Parties.fee_payer
-              ; other_parties = Parties.Call_forest.map other_parties ~f:fst
+              ; other_parties =
+                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
               ; memo
               }
           in

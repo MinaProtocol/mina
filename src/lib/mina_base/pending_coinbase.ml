@@ -1,7 +1,6 @@
 open Core_kernel
-open Import
+open Mina_base_import
 open Snarky_backendless
-module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
 open Let_syntax
@@ -154,7 +153,7 @@ module Coinbase_stack = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -214,7 +213,7 @@ module Stack_hash = struct
 
       include T
 
-      let to_latest = Core.Fn.id
+      let to_latest = Fn.id
 
       [%%define_from_scope to_yojson, of_yojson]
 
@@ -528,8 +527,7 @@ module Merkle_tree_versioned = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
-        , Stack_versioned.Stable.V1.t
-        , unit )
+        , Stack_versioned.Stable.V1.t )
         Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
@@ -542,8 +540,7 @@ module Merkle_tree_versioned = struct
       t =
       ( Hash_versioned.t
       , Stack_id.t
-      , Stack_versioned.t
-      , unit )
+      , Stack_versioned.t )
       Sparse_ledger_lib.Sparse_ledger.T.t
 end
 
@@ -705,9 +702,6 @@ module T = struct
 
       let if_ = if_
     end
-
-    (* Dummy value for Sparse_ledger *)
-    let token _ = ()
   end
 
   module Hash = struct
@@ -738,19 +732,9 @@ module T = struct
     type _unused = unit
       constraint
         t =
-        (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
+        (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
 
-    module Dummy_token = struct
-      type t = unit [@@deriving sexp, yojson]
-
-      let max () () = ()
-
-      let next () = ()
-    end
-
-    module M =
-      Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Dummy_token) (Stack_id)
-        (Stack)
+    module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
     [%%define_locally
     M.
@@ -1033,11 +1017,7 @@ module T = struct
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
     let root_hash = hash_at_level depth in
-    { Poly.tree =
-        make_tree
-          (Merkle_tree.of_hash ~depth ~next_available_token:()
-             ~next_available_index:None root_hash)
-          Stack_id.zero
+    { Poly.tree = make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list = []
     ; new_pos = Stack_id.zero
     }
@@ -1276,7 +1256,7 @@ let%test_unit "add stack + remove stack = initial tree " =
   in
   let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
-      Async.Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
@@ -1293,7 +1273,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           in
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
-          Async.Deferred.return ()))
+          Async_kernel.Deferred.return ()))
 
 module type Pending_coinbase_intf = sig
   type t [@@deriving sexp]

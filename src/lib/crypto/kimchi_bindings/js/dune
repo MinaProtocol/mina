@@ -1,0 +1,5 @@
+(library
+ (name bindings_js)
+ (js_of_ocaml (javascript_files bindings.js))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

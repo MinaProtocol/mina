@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -89,6 +90,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
+        ; aux_account_balance
         } =
       test_config
     in
@@ -103,16 +105,36 @@ module Network_config = struct
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
-    let block_producer_keypairs, runtime_accounts =
-      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-      let keypairs =
-        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
-      in
-      if num_block_producers > List.length keypairs then
-        failwith
-          "not enough sample keypairs for specified number of block producers" ;
-      let f index ({ Test_config.Block_producer.balance; timing }, (pk, sk)) =
-        let runtime_account =
+    let bp_keypairs, aux_keypairs =
+      List.split_n
+        (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1)
+        num_block_producers
+    in
+    if List.length bp_keypairs < num_block_producers then
+      failwith
+        "not enough sample keypairs for specified number of block producers" ;
+    let aux_accounts, aux_keypairs =
+      match aux_account_balance with
+      | None ->
+          ([], [])
+      | Some balance when List.length aux_keypairs > 0 ->
+          let balance = Balance.of_formatted_string balance in
+          let default = Runtime_config.Accounts.Single.default in
+          ( List.map aux_keypairs ~f:(fun (pk, _) ->
+                { default with
+                  pk = Some (Public_key.Compressed.to_string pk)
+                ; balance
+                })
+          , aux_keypairs )
+      | _ ->
+          failwith "there should be at least one aux keypair"
+    in
+    let bp_accounts =
+      List.map (List.zip_exn block_producers bp_keypairs)
+        ~f:(fun ({ Test_config.Block_producer.balance; timing }, (pk, _)) ->
           let timing =
             match timing with
             | Account.Timing.Untimed ->
@@ -128,13 +150,12 @@ module Network_config = struct
                   }
           in
           (* an account may be used for snapp transactions, so add
-             permissions and snapp account
+             permissions
           *)
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
             Some
-              { stake = false
-              ; edit_state = None
+              { edit_state = None
               ; send = None
               ; receive = None
               ; set_delegate = None
@@ -144,6 +165,7 @@ module Network_config = struct
               ; edit_sequence_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
+              ; set_voting_for = None
               }
           in
           let default = Runtime_config.Accounts.Single.default in
@@ -156,21 +178,7 @@ module Network_config = struct
           ; delegate = None
           ; timing
           ; permissions
-          }
-        in
-        let secret_name = "test-keypair-" ^ Int.to_string index in
-        let keypair =
-          { Keypair.public_key = Public_key.decompress_exn pk
-          ; private_key = sk
-          }
-        in
-        ( Network_keypair.create_network_keypair ~keypair ~secret_name
-        , runtime_account )
-      in
-      List.mapi ~f
-        (List.zip_exn block_producers
-           (List.take keypairs (List.length block_producers)))
-      |> List.unzip
+          })
     in
     (* DAEMON CONFIG *)
     let proof_config =
@@ -193,7 +201,11 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; transaction_expiry_hr = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -208,7 +220,7 @@ module Network_config = struct
           (* was: Some proof_config; TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
-            { base = Accounts runtime_accounts
+            { base = Accounts (bp_accounts @ aux_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -237,13 +249,25 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_schema_aux_files =
+      [ "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+      ; "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+      ]
     in
+    let mk_net_keypair index (pk, sk) =
+      let secret_name = "test-keypair-" ^ Int.to_string index in
+      let keypair =
+        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
+      in
+      Network_keypair.create_network_keypair ~keypair ~secret_name
+    in
+    let aux_net_keypairs = List.mapi aux_keypairs ~f:mk_net_keypair in
+    let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; keypairs = block_producer_keypairs
+    ; keypairs = bp_net_keypairs @ aux_net_keypairs
     ; constants
     ; terraform =
         { cluster_name
@@ -258,10 +282,11 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs =
-            List.mapi block_producer_keypairs ~f:block_producer_config
+            List.mapi bp_net_keypairs ~f:block_producer_config
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
@@ -321,16 +346,19 @@ end
 module Network_manager = struct
   type t =
     { logger : Logger.t
+    ; testnet_name : string
     ; cluster : string
     ; namespace : string
+    ; graphql_enabled : bool
     ; testnet_dir : string
     ; testnet_log_filter : string
     ; constants : Test_config.constants
-    ; seed_nodes : Kubernetes_network.Node.t list
-    ; block_producer_nodes : Kubernetes_network.Node.t list
-    ; snark_coordinator_nodes : Kubernetes_network.Node.t list
-    ; archive_nodes : Kubernetes_network.Node.t list
-    ; nodes_by_app_id : Kubernetes_network.Node.t String.Map.t
+    ; seed_workloads : Kubernetes_network.Workload.t list
+    ; block_producer_workloads : Kubernetes_network.Workload.t list
+    ; snark_coordinator_workloads : Kubernetes_network.Workload.t list
+    ; snark_worker_workloads : Kubernetes_network.Workload.t list
+    ; archive_workloads : Kubernetes_network.Workload.t list
+    ; workloads_by_id : Kubernetes_network.Workload.t String.Map.t
     ; mutable deployed : bool
     ; keypairs : Keypair.t list
     }
@@ -396,65 +424,75 @@ module Network_manager = struct
         |> Terraform.to_string
         |> Out_channel.output_string ch) ;
     let testnet_log_filter = Network_config.testnet_log_filter network_config in
-    let cons_node pod_id mina_container_id mina_archive_container_id
-        network_keypair_opt =
-      { Kubernetes_network.Node.testnet_name =
-          network_config.terraform.testnet_name
-      ; cluster = cluster_id
-      ; namespace = network_config.terraform.testnet_name
-      ; pod_id
-      ; mina_container_id
-      ; mina_archive_container_id
-      ; graphql_enabled = network_config.terraform.deploy_graphql_ingress
-      ; network_keypair = network_keypair_opt
-      }
+    let cons_workload workload_id node_info : Kubernetes_network.Workload.t =
+      { workload_id; node_info }
+    in
+    let cons_node_info ?network_keypair ?(has_archive_container = false)
+        primary_container_id : Kubernetes_network.Node.info =
+      { network_keypair; has_archive_container; primary_container_id }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [ cons_node "seed" "mina" None None ] in
-    let snark_coordinator_name =
-      "snark-coordinator-"
-      ^ String.lowercase
-          (String.sub network_config.terraform.snark_worker_public_key
-             ~pos:
-               ( String.length network_config.terraform.snark_worker_public_key
-               - 6 )
-             ~len:6)
+    let seed_workloads = [ cons_workload "seed" [ cons_node_info "mina" ] ] in
+    let snark_coordinator_id =
+      String.lowercase
+        (String.sub network_config.terraform.snark_worker_public_key
+           ~pos:
+             (String.length network_config.terraform.snark_worker_public_key - 6)
+           ~len:6)
     in
-    let snark_coordinator_nodes =
+    let snark_coordinator_workloads =
       if network_config.terraform.snark_worker_replicas > 0 then
-        [ cons_node snark_coordinator_name "coordinator" None None ]
+        [ cons_workload
+            ("snark-coordinator-" ^ snark_coordinator_id)
+            [ cons_node_info "mina" ]
+        ]
       else []
     in
-    let block_producer_nodes =
+    let snark_worker_workloads =
+      if network_config.terraform.snark_worker_replicas > 0 then
+        [ cons_workload
+            ("snark-worker-" ^ snark_coordinator_id)
+            (List.init network_config.terraform.snark_worker_replicas
+               ~f:(fun _i -> cons_node_info "worker"))
+        ]
+      else []
+    in
+    let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
-          cons_node bp_config.name "mina" None (Some bp_config.keypair))
+          cons_workload bp_config.name
+            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ])
     in
-    let archive_nodes =
+    let archive_workloads =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
-          cons_node (sprintf "archive-%d" (i + 1)) "mina" (Some "archive") None)
+          cons_workload
+            (sprintf "archive-%d" (i + 1))
+            [ cons_node_info ~has_archive_container:true "mina" ])
     in
-    let nodes_by_app_id =
-      let all_nodes =
-        seed_nodes @ snark_coordinator_nodes @ block_producer_nodes
-        @ archive_nodes
+    let workloads_by_id =
+      let all_workloads =
+        seed_workloads @ snark_coordinator_workloads @ snark_worker_workloads
+        @ block_producer_workloads @ archive_workloads
       in
-      all_nodes
-      |> List.map ~f:(fun node -> (node.pod_id, node))
+      all_workloads
+      |> List.map ~f:(fun w -> (w.workload_id, w))
       |> String.Map.of_alist_exn
     in
     let t =
       { logger
       ; cluster = cluster_id
       ; namespace = network_config.terraform.testnet_name
+      ; testnet_name = network_config.terraform.testnet_name
+      ; graphql_enabled = network_config.terraform.deploy_graphql_ingress
       ; testnet_dir
       ; testnet_log_filter
       ; constants = network_config.constants
-      ; seed_nodes
-      ; block_producer_nodes
-      ; snark_coordinator_nodes
-      ; archive_nodes
-      ; nodes_by_app_id
+      ; seed_workloads
+      ; block_producer_workloads
+      ; snark_coordinator_workloads
+      ; snark_worker_workloads
+      ; archive_workloads
+      ; workloads_by_id
       ; deployed = false
       ; keypairs =
           List.map network_config.keypairs ~f:(fun { keypair; _ } -> keypair)
@@ -466,18 +504,52 @@ module Network_manager = struct
     t
 
   let deploy t =
+    let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
-    [%log' info t.logger] "Deploying network" ;
-    let%map _ = run_cmd_exn t "terraform" [ "apply"; "-auto-approve" ] in
+    [%log info] "Deploying network" ;
+    let%bind _ = run_cmd_exn t "terraform" [ "apply"; "-auto-approve" ] in
     t.deployed <- true ;
+    let config : Kubernetes_network.config =
+      { testnet_name = t.testnet_name
+      ; cluster = t.cluster
+      ; namespace = t.namespace
+      ; graphql_enabled = t.graphql_enabled
+      }
+    in
+    let%map seeds =
+      Deferred.List.concat_map t.seed_workloads
+        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+    and block_producers =
+      Deferred.List.concat_map t.block_producer_workloads
+        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+    and snark_coordinators =
+      Deferred.List.concat_map t.snark_coordinator_workloads
+        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+    and snark_workers =
+      Deferred.List.concat_map t.snark_worker_workloads
+        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+    and archive_nodes =
+      Deferred.List.concat_map t.archive_workloads
+        ~f:(Kubernetes_network.Workload.get_nodes ~config)
+    in
+    let all_nodes =
+      seeds @ block_producers @ snark_coordinators @ snark_workers
+      @ archive_nodes
+    in
+    let nodes_by_pod_id =
+      all_nodes
+      |> List.map ~f:(fun node -> (node.pod_id, node))
+      |> String.Map.of_alist_exn
+    in
     let result =
       { Kubernetes_network.namespace = t.namespace
       ; constants = t.constants
-      ; seeds = t.seed_nodes
-      ; block_producers = t.block_producer_nodes
-      ; snark_coordinators = t.snark_coordinator_nodes
-      ; archive_nodes = t.archive_nodes
-      ; nodes_by_app_id = t.nodes_by_app_id
+      ; seeds
+      ; block_producers
+      ; snark_coordinators
+      ; snark_workers
+      ; archive_nodes
+      ; nodes_by_pod_id
       ; testnet_log_filter = t.testnet_log_filter
       ; keypairs = t.keypairs
       }
@@ -486,14 +558,13 @@ module Network_manager = struct
       Fn.compose (String.concat ~sep:", ")
         (List.map ~f:Kubernetes_network.Node.id)
     in
-    [%log' info t.logger] "Network deployed" ;
-    [%log' info t.logger] "testnet namespace: %s" t.namespace ;
-    [%log' info t.logger] "snark coordinators: %s"
+    [%log info] "Network deployed" ;
+    [%log info] "testnet namespace: %s" t.namespace ;
+    [%log info] "snark coordinators: %s"
       (nodes_to_string result.snark_coordinators) ;
-    [%log' info t.logger] "block producers: %s"
-      (nodes_to_string result.block_producers) ;
-    [%log' info t.logger] "archive nodes: %s"
-      (nodes_to_string result.archive_nodes) ;
+    [%log info] "snark workers: %s" (nodes_to_string result.snark_workers) ;
+    [%log info] "block producers: %s" (nodes_to_string result.block_producers) ;
+    [%log info] "archive nodes: %s" (nodes_to_string result.archive_nodes) ;
     result
 
   let destroy t =

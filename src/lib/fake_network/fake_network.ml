@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Gadt_lib
 open Signature_lib
 open Network_peer
@@ -106,7 +107,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
     ; consensus_local_state
     ; is_seed = Vect.is_empty peers
     ; genesis_ledger_hash =
-        Ledger.merkle_root
+        Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
     ; creatable_gossip_net =
@@ -228,7 +229,11 @@ module Generator = struct
                 (Sync_handler.Root.prove
                    ~consensus_constants:precomputed_values.consensus_constants
                    ~logger ~frontier
-                   (Envelope.Incoming.data query_env)) )
+                   ( Envelope.Incoming.data query_env
+                   |> With_hash.map_hash ~f:(fun state_hash ->
+                          { State_hash.State_hashes.state_hash
+                          ; state_body_hash = None
+                          }) )) )
     ; get_best_tip =
         ( match get_best_tip with
         | Some f ->
@@ -285,7 +290,7 @@ module Generator = struct
         ~epoch_ledger_location
         ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         ~genesis_state_hash:
-          (With_hash.hash precomputed_values.protocol_state_with_hash)
+          precomputed_values.protocol_state_with_hashes.hash.state_hash
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values ~verifier
@@ -326,7 +331,7 @@ module Generator = struct
         ~epoch_ledger_location
         ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         ~genesis_state_hash:
-          (With_hash.hash precomputed_values.protocol_state_with_hash)
+          precomputed_values.protocol_state_with_hashes.hash.state_hash
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

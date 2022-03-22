@@ -120,8 +120,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
-    let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
-
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
     let index_of_account_exn (T ((module Base), t)) =
@@ -164,12 +162,6 @@ module Make_base (Inputs : Inputs_intf) :
     let tokens (T ((module Base), t)) pk = Base.tokens t pk
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
-
-    let next_available_token (T ((module Base), t)) =
-      Base.next_available_token t
-
-    let set_next_available_token (T ((module Base), t)) =
-      Base.set_next_available_token t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 
