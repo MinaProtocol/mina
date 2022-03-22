@@ -101,6 +101,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          frontier"
         (wait_for_zkapp parties_deploy_contract)
     in
+    (*
     let%bind manipulation_of_contract_transaction =
       failwith
         "TODO: shell exec to make/sign+send the user manipulation transction \
@@ -111,7 +112,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for manipulation transaction to be included in transition \
          frontier"
         (wait_for_zkapp manipulation_of_contract_transaction)
-    in
+    in*)
     let%bind () =
       section "Verify that the manipulation transaction did update the ledger"
         ( [%log info] "Verifying permissions for account"
