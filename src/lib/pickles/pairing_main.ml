@@ -714,19 +714,6 @@ struct
         in
         go pt n)
 
-  let actual_evaluation (e : (Boolean.var * Field.t) array) ~(pt_to_n : Field.t)
-      : Field.t =
-    with_label "actual_evaluation" (fun () ->
-        match List.rev (Array.to_list e) with
-        | (b, e) :: es ->
-            List.fold
-              ~init:Field.((b :> t) * e)
-              es
-              ~f:(fun acc (keep, fx) ->
-                Field.if_ keep ~then_:Field.(fx + (pt_to_n * acc)) ~else_:acc)
-        | [] ->
-            failwith "empty list")
-
   let actual_evaluation (e : Field.t array) ~(pt_to_n : Field.t) : Field.t =
     with_label "actual_evaluation" (fun () ->
         match List.rev (Array.to_list e) with
