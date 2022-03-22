@@ -262,9 +262,13 @@ module Network_config = struct
       }
     in
     let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
+    in
     let mina_archive_schema_aux_files =
-      [ "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-      ; "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "snapp_tables.sql"
       ]
     in
     let mk_net_keypair index (pk, sk) =

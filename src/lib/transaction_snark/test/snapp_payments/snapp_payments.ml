@@ -151,4 +151,43 @@ let%test_module "Snapp payments tests" =
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               U.apply_parties ledger partiess |> fun _ -> ()))
+
+    let%test_unit "multiple transfers from one account" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let fee = Fee.of_int 1_000_000 in
+                  let amount = Amount.of_int 1_000_000_000 in
+                  let spec = List.hd_exn specs in
+                  let receiver_count = 3 in
+                  let new_receiver =
+                    Signature_lib.Public_key.compress new_kp.public_key
+                  in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; receivers =
+                        (new_receiver, amount)
+                        :: ( List.take specs (receiver_count - 1)
+                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                    ; amount
+                    ; snapp_account_keypairs = []
+                    ; memo
+                    ; new_snapp_account = false
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    }
+                  in
+                  let parties =
+                    Transaction_snark.For_tests.multiple_transfers test_spec
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.apply_parties_with_merges ledger [ parties ])))
   end )
