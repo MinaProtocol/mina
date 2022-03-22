@@ -1164,9 +1164,12 @@ module Predicated = struct
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
-      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+      let ( !. ) ?skip_data =
+        ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
+      in
+      let unit = ( !. ) ~skip_data:() skip in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
-        ~predicate:!.uint32 ~caller:!.skip
+        ~predicate:!.uint32 ~caller:unit
       |> finish "ZkappPartyPredicatedFeePayer"
            ~t_toplevel_annots:Poly.t_toplevel_annots
   end

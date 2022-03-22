@@ -176,7 +176,8 @@ module Call_forest = struct
         let node_hash = Tree.hash node in
         { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
 
-  let accumulate_hashes' xs =
+  let accumulate_hashes' (type a) (xs : (Party.t, a) t) : (Party.t, Digest.t) t
+      =
     let hash_party (p : Party.t) = Party.Predicated.digest p.data in
     accumulate_hashes ~hash_party xs
 
@@ -643,17 +644,27 @@ include Codable.Make_base58_check (Stable.Latest)
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-(* TODO: Ask gregor or brandon *)
-let deriver _obj = failwith "TODO"
+type other_parties = (Party.t, Digest.t) Call_forest.t
 
-(*
+let other_parties_deriver obj =
+  let of_parties_with_depth (ps : Party.t list) : other_parties =
+    Call_forest.of_parties_list ps ~party_depth:(fun (p : Party.t) ->
+        p.data.body.call_depth)
+    |> Call_forest.accumulate_hashes'
+  and to_parties_with_depth (ps : other_parties) : Party.t list =
+    Call_forest.to_list ps
+  in
+  let open Fields_derivers_snapps.Derivers in
+  let inner = (list @@ Party.deriver @@ o ()) @@ o () in
+  iso ~map:of_parties_with_depth ~contramap:to_parties_with_depth inner obj
+
+let deriver obj =
   let open Fields_derivers_snapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
-    ~other_parties:!.(list @@ Party.deriver @@ o ())
+    ~other_parties:!.other_parties_deriver
     ~memo:!.Signed_command_memo.deriver
   |> finish "Parties" ~t_toplevel_annots
-       *)
 
 let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
 
