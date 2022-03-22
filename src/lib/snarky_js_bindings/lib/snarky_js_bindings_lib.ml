@@ -703,6 +703,11 @@ class type group_class = As_group.group_class
 
 let group_constr = As_group.group_constr
 
+let to_js_group (x : Impl.Field.t) (y : Impl.Field.t) : group_class Js.t =
+  new%js group_constr
+    (As_field.of_field_obj (to_js_field x))
+    (As_field.of_field_obj (to_js_field y))
+
 let scalar_shift =
   Pickles_types.Shifted_value.Type1.Shift.create (module Other_backend.Field)
 
@@ -1801,7 +1806,8 @@ module Ledger = struct
     < appState : js_field Js.js_array Js.t Js.readonly_prop > Js.t
 
   type account =
-    < balance : js_uint64 Js.readonly_prop
+    < publicKey : group_class Js.t Js.readonly_prop
+    ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
     ; snapp : zkapp_account Js.readonly_prop >
     Js.t
@@ -2512,6 +2518,55 @@ module Ledger = struct
         add_account_exn l a##.publicKey a##.balance) ;
     new%js ledger_constr l
 
+  module To_js = struct
+    let field x = to_js_field @@ Field.constant x
+
+    let uint32 n =
+      object%js
+        val value =
+          Unsigned.UInt32.to_string n |> Field.Constant.of_string |> field
+      end
+
+    let uint64 n =
+      object%js
+        val value =
+          Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
+      end
+
+    let app_state (a : Mina_base.Account.t) =
+      let xs = new%js Js.array_empty in
+      ( match a.snapp with
+      | Some s ->
+          Pickles_types.Vector.iter s.app_state ~f:(fun x ->
+              ignore (xs##push (field x)))
+      | None ->
+          for _ = 0 to max_state_size - 1 do
+            xs##push (field Field.Constant.zero) |> ignore
+          done ) ;
+      xs
+
+    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
+      let x, y = Signature_lib.Public_key.decompress_exn pk in
+      to_js_group (Field.constant x) (Field.constant y)
+
+    let account (a : Mina_base.Account.t) =
+      object%js
+        val publicKey = public_key a.public_key
+
+        val balance = uint64 (Currency.Balance.to_uint64 a.balance)
+
+        val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
+
+        val snapp =
+          object%js
+            val appState = app_state a
+          end
+      end
+
+    let option (transform : 'a -> 'b) (x : 'a option) =
+      Js.Optdef.option (Option.map x ~f:transform)
+  end
+
   let get_account l (pk : public_key) : account Js.opt =
     match
       Option.bind
@@ -2521,52 +2576,12 @@ module Ledger = struct
     | None ->
         Js.Opt.empty
     | Some a ->
-        let mk x : field_class Js.t =
-          new%js field_constr (As_field.of_field x)
-        in
-
-        let uint64 n =
-          object%js
-            val value =
-              Unsigned.UInt64.to_string n
-              |> Field.Constant.of_string |> Field.constant |> mk
-          end
-        in
-        let uint32 n =
-          object%js
-            val value =
-              Unsigned.UInt32.to_string n
-              |> Field.Constant.of_string |> Field.constant |> mk
-          end
-        in
-        let app_state =
-          let xs = new%js Js.array_empty in
-          ( match a.snapp with
-          | Some s ->
-              Pickles_types.Vector.iter s.app_state ~f:(fun x ->
-                  ignore (xs##push (mk (Field.constant x))))
-          | None ->
-              for _ = 0 to max_state_size - 1 do
-                xs##push (mk Field.zero) |> ignore
-              done ) ;
-          xs
-        in
-        Js.Opt.return
-          (object%js
-             val balance = uint64 (Currency.Balance.to_uint64 a.balance)
-
-             val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
-
-             val snapp =
-               object%js
-                 val appState = app_state
-               end
-          end)
+        Js.Opt.return (To_js.account a)
 
   let add_account l (pk : public_key) (balance : int) =
     add_account_exn l##.value pk balance
 
-  let apply_parties_transaction l (p : parties) : unit =
+  let dummy_state_view : Snapp_predicate.Protocol_state.View.t =
     let epoch_data =
       { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
           { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
@@ -2578,25 +2593,47 @@ module Ledger = struct
       ; epoch_length = Mina_numbers.Length.zero
       }
     in
-    (* TODO: this is not yet working!
-       * lacking API to create a proper tx on the JS side (authorization)
-    *)
-    T.apply_transaction l##.value
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~txn_state_view:
-        { snarked_ledger_hash = Field.Constant.zero
-        ; timestamp = Block_time.zero
-        ; blockchain_length = Mina_numbers.Length.zero
-        ; min_window_density = Mina_numbers.Length.zero
-        ; last_vrf_output = ()
-        ; total_currency = Currency.Amount.zero
-        ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-        ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-        ; staking_epoch_data = epoch_data
-        ; next_epoch_data = epoch_data
-        }
-      (Command (Parties (parties p)))
-    |> Or_error.ok_exn |> ignore
+    { snarked_ledger_hash = Field.Constant.zero
+    ; timestamp = Block_time.zero
+    ; blockchain_length = Mina_numbers.Length.zero
+    ; min_window_density = Mina_numbers.Length.zero
+    ; last_vrf_output = ()
+    ; total_currency = Currency.Amount.zero
+    ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
+    ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
+    ; staking_epoch_data = epoch_data
+    ; next_epoch_data = epoch_data
+    }
+
+  let deriver () = Parties.deriver @@ Fields_derivers_snapps.Derivers.o ()
+
+  let parties_to_json ps =
+    parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
+
+  (* TODO: this is not yet working!
+   * lacking API to create a proper tx on the JS side (authorization)
+   *)
+  let apply_parties_transaction l (p : parties) =
+    let ledger = l##.value in
+    let txn = parties p in
+    let applied_exn =
+      T.apply_parties_unchecked ~state_view:dummy_state_view
+        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+        ledger txn
+    in
+    let applied, _ = Or_error.ok_exn applied_exn in
+    let T.Transaction_applied.Parties_applied.{ accounts; command } = applied in
+    let () =
+      match command.status with
+      | Applied (_aux_data, _balance) ->
+          ()
+      | Failed (failure, _balance) ->
+          raise_error (Mina_base.Transaction_status.Failure.to_string failure)
+    in
+    let account_list =
+      List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
+    in
+    Js.array @@ Array.of_list account_list
 
   let () =
     let static_method name f =
@@ -2619,10 +2656,6 @@ module Ledger = struct
     method_ "addAccount" add_account ;
     method_ "applyPartiesTransaction" apply_parties_transaction ;
 
-    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
-    let parties_to_json ps =
-      parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
-    in
     static_method "partiesToJson" parties_to_json ;
     let rec yojson_to_gql (y : Yojson.Safe.t) : string =
       match y with
@@ -2637,7 +2670,7 @@ module Ledger = struct
           Yojson.Safe.to_string x
     in
     let parties_to_graphql ps =
-      parties ps |> !(full#to_json) |> yojson_to_gql |> Js.string
+      parties ps |> !((deriver ())#to_json) |> yojson_to_gql |> Js.string
     in
     static_method "partiesToGraphQL" parties_to_graphql ;
     ()
