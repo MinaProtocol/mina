@@ -1328,8 +1328,7 @@ module Staged_ledger_validation = struct
         ; Option.some_if
             (not
                (Frozen_ledger_hash.equal target_ledger_hash
-                  ( Blockchain_state.registers blockchain_state
-                  |> Registers.ledger )))
+                  (Blockchain_state.snarked_ledger_hash blockchain_state)))
             `Incorrect_target_snarked_ledger_hash
         ]
     in

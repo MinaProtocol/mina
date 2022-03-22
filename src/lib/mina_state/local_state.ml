@@ -106,7 +106,7 @@ let to_input
      ; field full_transaction_commitment
      ; Token_id.to_input token_id
      ; Amount.to_input excess
-     ; Frozen_ledger_hash.to_input ledger
+     ; Ledger_hash.to_input ledger
      ; packed (Mina_base.Util.field_of_bool success, 1)
     |]
 
@@ -127,7 +127,7 @@ module Checked = struct
       ~full_transaction_commitment:(f Field.Assert.equal)
       ~token_id:(f Token_id.Checked.Assert.equal)
       ~excess:(f !Currency.Amount.Checked.assert_equal)
-      ~ledger:(f !Frozen_ledger_hash.assert_equal)
+      ~ledger:(f !Ledger_hash.assert_equal)
       ~success:(f Impl.Boolean.Assert.( = ))
       ~failure_status:(f (fun () () -> ()))
 
@@ -140,8 +140,7 @@ module Checked = struct
       ~full_transaction_commitment:(f Field.equal)
       ~token_id:(f Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Checked.equal)
-      ~ledger:(f !Frozen_ledger_hash.equal_var)
-      ~success:(f Impl.Boolean.equal)
+      ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
       ~failure_status:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
@@ -165,7 +164,7 @@ module Checked = struct
        ; field full_transaction_commitment
        ; Token_id.Checked.to_input token_id
        ; Amount.var_to_input excess
-       ; Frozen_ledger_hash.var_to_input ledger
+       ; Ledger_hash.var_to_input ledger
        ; packed ((success :> Snark_params.Tick.Field.Var.t), 1)
       |]
 end
@@ -191,7 +190,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Field.typ
     ; Token_id.typ
     ; Amount.typ
-    ; Frozen_ledger_hash.typ
+    ; Ledger_hash.typ
     ; Boolean.typ
     ; failure_status_typ
     ]

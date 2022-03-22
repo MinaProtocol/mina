@@ -50,11 +50,12 @@ let with_handler k w ?handler =
 module Impl = Pickles.Impls.Step
 
 let non_pc_registers_equal_var t1 t2 =
-  let ( ! ) f x y = Impl.run_checked (f x y) in
   Impl.make_checked (fun () ->
       let module F = Core_kernel.Field in
+      let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
       let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
-      Registers.Fields.fold ~init:[] ~ledger:(f !Ledger_hash.equal_var)
+      Registers.Fields.fold ~init:[]
+        ~ledger:(f !Frozen_ledger_hash.equal_var)
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
           acc)

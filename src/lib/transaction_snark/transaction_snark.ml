@@ -338,7 +338,7 @@ module Statement = struct
           Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
       end in
       Registers.Fields.to_list
-        ~ledger:(check (module Frozen_ledger_hash))
+        ~ledger:(check (module Ledger_hash))
         ~pending_coinbase_stack:(check (module PC))
         ~local_state:(check (module Local_state))
       |> Or_error.combine_errors_unit
@@ -961,7 +961,7 @@ module Base = struct
 
     module Global_state = struct
       type t =
-        { ledger : Frozen_ledger_hash.var * Sparse_ledger.t Prover_value.t
+        { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
         ; fee_excess : Amount.Signed.var
         ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
         }
@@ -1694,7 +1694,7 @@ module Base = struct
           , Call_stack.t
           , Token_id.t
           , Amount.t
-          , Frozen_ledger_hash.var * Sparse_ledger.t V.t
+          , Ledger_hash.var * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t
           , failure_status )
@@ -1756,12 +1756,12 @@ module Base = struct
         end
 
         module Ledger = struct
-          type t = Frozen_ledger_hash.var * Sparse_ledger.t V.t
+          type t = Ledger_hash.var * Sparse_ledger.t V.t
 
           type inclusion_proof = (Boolean.var * Field.t) list
 
           let if_ b ~then_:((xt, rt) : t) ~else_:((xe, re) : t) =
-            ( run_checked (Frozen_ledger_hash.if_ b ~then_:xt ~else_:xe)
+            ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
             , V.if_ b ~then_:rt ~else_:re )
 
           let empty ~depth () : t =
@@ -1816,10 +1816,11 @@ module Base = struct
                       let idx = idx ledger (Mina_base.Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
 
-          let check_inclusion ((ledger, _) : t) (account, incl) =
-            with_label __LOC__
-              (fun () -> Field.Assert.equal (implied_root account incl))
-              (Ledger_hash.var_to_hash_packed ledger)
+          let check_inclusion ((root, _) : t) (account, incl) =
+            with_label __LOC__ (fun () ->
+                Field.Assert.equal
+                  (implied_root account incl)
+                  (Ledger_hash.var_to_hash_packed root))
 
           let check_account public_key token_id
               (({ data = account; _ }, _) : Account.t * _) =
@@ -1949,7 +1950,7 @@ module Base = struct
 
         module Global_state = struct
           type t = Global_state.t =
-            { ledger : Frozen_ledger_hash.var * Sparse_ledger.t Prover_value.t
+            { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
             ; fee_excess : Amount.Signed.t
             ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
             }
@@ -2237,9 +2238,9 @@ module Base = struct
             ; ledger = fst local.ledger
             }) ;
       with_label __LOC__ (fun () ->
-          Frozen_ledger_hash.assert_equal (fst global.ledger)
-            statement.target.ledger
-          |> run_checked) ;
+          run_checked
+            (Frozen_ledger_hash.assert_equal (fst global.ledger)
+               statement.target.ledger)) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Checked.assert_equal statement.supply_increase
