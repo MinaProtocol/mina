@@ -69,7 +69,10 @@ rosetta:
   pg_conn: 'postgres://postgresql:5432'
   graphql_host: 'http://127.0.0.1'
 
-libp2p:
+daemon:
+  enabled: false
+
+  libp2p:
   seed:
     enabled: true
   staticKeypair:

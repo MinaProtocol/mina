@@ -1,4 +1,5 @@
 ---
+{{-  if .Values.daemon.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
@@ -295,4 +296,5 @@ spec:
       resources:
         requests:
           storage: {{.Values.features.persistence.size}}
+{{- end }}
 ---
