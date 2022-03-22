@@ -40,7 +40,11 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       type signed_command_result =
-        { id : string; hash : string; nonce : Unsigned.uint32 }
+        { id : string
+        ; hash : string
+        ; nonce : Unsigned.uint32
+        ; failure_reason : string
+        }
 
       val send_payment :
            logger:Logger.t
