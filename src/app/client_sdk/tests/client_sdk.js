@@ -1,6 +1,7 @@
 /* eslint-env node */
 let fs = require("fs");
 let path = require("path");
+let childProcess = require("child_process");
 
 let dir = path.dirname(__filename);
 let resolve = (file) => path.resolve(dir, file);
@@ -17,23 +18,29 @@ if (!nodeModulesExists) {
   fs.writeFileSync(`${nodeModules}/env/index.js`, "module.exports = {};");
   fs.mkdirSync(`${nodeModules}/client_sdk`);
 }
+
+function copy(source, target) {
+  return childProcess.execSync(`cp -R ${source} ${target}`);
+}
+
 // copy over js artifacts
 try {
-  fs.cpSync(clientSdkPath, "node_modules/client_sdk/index.js");
+  copy(clientSdkPath, `${nodeModules}/client_sdk/index.js`);
 } catch (err) {
   console.log(
     "Error: Cannot find client_sdk.bc.js. Did you forget to run `dune build`?"
   );
-  process.exit(1);
+  console.log(err);
+  throw err;
 }
 fs.readdirSync(wasmPath)
   .filter((f) => f.startsWith("plonk_wasm"))
   .forEach((file) => {
-    fs.cpSync(`${wasmPath}/${file}`, `${nodeModules}/client_sdk/${file}`);
+    copy(`${wasmPath}/${file}`, `${nodeModules}/client_sdk/${file}`);
   });
 
 let clientSDK = require("client_sdk");
-if (!nodeModulesExists) fs.rmSync(nodeModules);
+if (!nodeModulesExists) fs.rmSync(nodeModules, { recursive: true });
 
 let didShutdown = false;
 
