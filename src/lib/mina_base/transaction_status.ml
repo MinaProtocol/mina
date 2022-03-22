@@ -47,13 +47,13 @@ module Failure = struct
     end
   end]
 
-  module Table = struct
+  module Collection = struct
     type display = (int * t list) list [@@deriving to_yojson]
 
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Stable.V1.t list list
+        type t = Stable.V2.t list list
         [@@deriving equal, compare, yojson, sexp, hash]
 
         let to_latest = Fn.id

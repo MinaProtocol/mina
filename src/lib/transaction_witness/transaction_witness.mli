@@ -21,7 +21,7 @@ module Parties_segment_witness : sig
             , Sparse_ledger.Stable.V2.t
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-            , Transaction_status.Failure.Table.Stable.V1.t )
+            , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Parties_logic.Local_state.Stable.V1.t
         ; start_parties :
             ( Parties.Stable.V1.t

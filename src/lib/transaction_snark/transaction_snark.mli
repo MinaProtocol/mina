@@ -360,7 +360,7 @@ type local_state =
   , Mina_ledger.Sparse_ledger.t
   , bool
   , unit
-  , Transaction_status.Failure.Table.t )
+  , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t

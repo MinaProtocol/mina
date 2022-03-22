@@ -309,7 +309,7 @@ module type S = sig
            , ledger
            , bool
            , unit
-           , Transaction_status.Failure.Table.t )
+           , Transaction_status.Failure.Collection.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
@@ -342,7 +342,7 @@ module type S = sig
                , ledger
                , bool
                , unit
-               , Transaction_status.Failure.Table.t )
+               , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
           -> 'acc)
     -> ?fee_excess:Amount.Signed.t
@@ -1093,7 +1093,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type failure_status = Transaction_status.Failure.t option
 
-      type failure_status_tbl = Transaction_status.Failure.Table.t
+      type failure_status_tbl = Transaction_status.Failure.Collection.t
 
       let is_empty t = List.join t |> List.is_empty
 
@@ -1102,8 +1102,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           (* Raise a more useful error message if we have a failure
              description. *)
           Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
-          @@ Transaction_status.Failure.Table.display_to_yojson
-          @@ Transaction_status.Failure.Table.to_display failure_status_tbl
+          @@ Transaction_status.Failure.Collection.display_to_yojson
+          @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
         else assert b
     end
 

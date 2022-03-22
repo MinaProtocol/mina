@@ -44,8 +44,8 @@ let display
       @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
   ; failure_status_tbl =
-      Transaction_status.Failure.Table.to_display failure_status_tbl
-      |> Transaction_status.Failure.Table.display_to_yojson
+      Transaction_status.Failure.Collection.to_display failure_status_tbl
+      |> Transaction_status.Failure.Collection.display_to_yojson
       |> Yojson.Safe.to_string
   }
 
@@ -179,7 +179,7 @@ end
    and it would make debugging difficult if we ever did that)
 *)
 let failure_status_tbl_typ :
-    (unit, Transaction_status.Failure.Table.t) Impl.Typ.t =
+    (unit, Transaction_status.Failure.Collection.t) Impl.Typ.t =
   Impl.Typ.transport Impl.Typ.unit
     ~there:(fun _failure_status_tbl -> ())
     ~back:(fun () -> [])
