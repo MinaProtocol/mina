@@ -2154,32 +2154,29 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
-    O1trace.sync_thread "apply_transaction" (fun () ->
-        let previous_hash = merkle_root ledger in
-        let txn_global_slot = txn_state_view.global_slot_since_genesis in
-        Or_error.map
-          ( match t with
-          | Command (Signed_command txn) ->
-              Or_error.map
-                (apply_user_command_unchecked ~constraint_constants
-                   ~txn_global_slot ledger txn) ~f:(fun applied ->
-                  Transaction_applied.Varying.Command (Signed_command applied))
-          | Command (Parties txn) ->
-              Or_error.map
-                (apply_parties_unchecked ~state_view:txn_state_view
-                   ~constraint_constants ledger txn) ~f:(fun (applied, _) ->
-                  Transaction_applied.Varying.Command (Parties applied))
-          | Fee_transfer t ->
-              Or_error.map
-                (apply_fee_transfer ~constraint_constants ~txn_global_slot
-                   ledger t) ~f:(fun applied ->
-                  Transaction_applied.Varying.Fee_transfer applied)
-          | Coinbase t ->
-              Or_error.map
-                (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
-                ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied)
-          )
-          ~f:(fun varying -> { Transaction_applied.previous_hash; varying }))
+    let previous_hash = merkle_root ledger in
+    let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    Or_error.map
+      ( match t with
+      | Command (Signed_command txn) ->
+          Or_error.map
+            (apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+               ledger txn) ~f:(fun applied ->
+              Transaction_applied.Varying.Command (Signed_command applied))
+      | Command (Parties txn) ->
+          Or_error.map
+            (apply_parties_unchecked ~state_view:txn_state_view
+               ~constraint_constants ledger txn) ~f:(fun (applied, _) ->
+              Transaction_applied.Varying.Command (Parties applied))
+      | Fee_transfer t ->
+          Or_error.map
+            (apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t)
+            ~f:(fun applied -> Transaction_applied.Varying.Fee_transfer applied)
+      | Coinbase t ->
+          Or_error.map
+            (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
+            ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied) )
+      ~f:(fun varying -> { Transaction_applied.previous_hash; varying })
 
   let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
       payment =

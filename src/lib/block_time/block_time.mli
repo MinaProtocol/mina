@@ -193,6 +193,8 @@ module Time : sig
 
   val of_uint64 : Unsigned.UInt64.t -> t
 
+  val to_uint64 : t -> Unsigned.UInt64.t
+
   val to_string : t -> string
 
   (** Strip time offset *)

@@ -118,8 +118,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && apt install --yes --no-install-recommends nodejs yarn \
     && rm -rf /var/lib/apt/lists/*
 
-USER opam
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
-  && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}" \
-  && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+  && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
