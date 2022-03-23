@@ -92,7 +92,6 @@ module Engine = struct
       (** returned string is the transaction id *)
       val send_snapp :
            logger:Logger.t
-        -> ?unlock:bool
         -> t
         -> parties:Mina_base.Parties.t
         -> string Deferred.Or_error.t
@@ -354,6 +353,10 @@ module Dsl = struct
       -> t
 
     val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
+
+    (** generates a wait condition based on the network state with soft timeout
+    of 1hr and hard timeout of 2hrs*)
+    val network_state : description:string -> f:(Network_state.t -> bool) -> t
   end
 
   module type Util_intf = sig

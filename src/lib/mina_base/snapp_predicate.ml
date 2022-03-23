@@ -183,8 +183,11 @@ module Numeric = struct
         ~of_string:Token_id.of_string
 
     let block_time_inner obj =
-      iso_string ~name:"BlockTime" ~of_string:Block_time.of_string_exn
-        ~to_string:Block_time.to_string obj
+      let ( ^^ ) = Fn.compose in
+      iso_string ~name:"BlockTime"
+        ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
+        ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
+        obj
 
     let nonce obj = deriver "Nonce" uint32 obj
 

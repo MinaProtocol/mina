@@ -2244,13 +2244,35 @@ var fq_oracles_deep_copy = function(x) {
 };
 
 
-// TODO
+// This is fake -- parameters are only needed on the Rust side, so no need to return something meaningful
 // Provides: caml_pasta_fp_poseidon_params_create
 function caml_pasta_fp_poseidon_params_create() {
     return [0];
 }
+// Provides: caml_pasta_fq_poseidon_params_create
+function caml_pasta_fq_poseidon_params_create() {
+    return [0];
+}
 
 // Provides: caml_pasta_fp_poseidon_block_cipher
-function caml_pasta_fp_poseidon_block_cipher(_params, field_vector) {
-    
+// Requires: plonk_wasm, caml_fp_vector_to_rust, caml_fp_vector_of_rust
+function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
+    // 1. get permuted field vector from rust
+    var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(caml_fp_vector_to_rust(fp_vector));
+    var new_fp_vector = caml_fp_vector_of_rust(wasm_flat_vector);
+    // 2. write back modified field vector to original one
+    new_fp_vector.forEach(function (a, i) {
+        fp_vector[i] = a;
+    });
+}
+// Provides: caml_pasta_fq_poseidon_block_cipher
+// Requires: plonk_wasm, caml_fq_vector_to_rust, caml_fq_vector_of_rust
+function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
+    // 1. get permuted field vector from rust
+    var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(caml_fq_vector_to_rust(fq_vector));
+    var new_fq_vector = caml_fq_vector_of_rust(wasm_flat_vector);
+    // 2. write back modified field vector to original one
+    new_fq_vector.forEach(function (a, i) {
+        fq_vector[i] = a;
+    });
 }

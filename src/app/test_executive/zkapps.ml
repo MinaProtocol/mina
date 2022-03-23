@@ -18,15 +18,67 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
+    let keypair =
+      let private_key = Signature_lib.Private_key.create () in
+      let public_key =
+        Signature_lib.Public_key.of_private_key_exn private_key
+      in
+      { Signature_lib.Keypair.private_key; public_key }
+    in
     { default with
       requires_graphql = true
     ; block_producers =
         [ { balance = "8000000000"; timing = Untimed }
         ; { balance = "1000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
         ]
-    ; num_snark_workers = 0
+    ; extra_genesis_accounts = [ { keypair; balance = "1000" } ]
+    ; num_snark_workers = 2
+    ; snark_worker_fee = "0.0001"
+    ; work_delay = Some 1
+    ; transaction_capacity =
+        Some Runtime_config.Proof_keys.Transaction_capacity.small
     }
+
+  let transactions_sent = ref 0
+
+  let send_snapp ~logger node parties =
+    incr transactions_sent ;
+    send_snapp ~logger node parties
+
+  (* An event which fires when [n] ledger proofs have been emitted *)
+  let ledger_proofs_emitted ~logger ~num_proofs =
+    Wait_condition.network_state ~description:"snarked ledger emitted"
+      ~f:(fun network_state ->
+        [%log info] "snarked ledgers generated = %d"
+          network_state.snarked_ledgers_generated ;
+        let module T = struct
+          type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
+        end in
+        network_state.snarked_ledgers_generated >= num_proofs)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
+         ~hard_timeout:(Slots 10)
+
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
+
+  let send_padding_transactions ~fee ~logger ~n nodes =
+    let sender = List.nth_exn nodes 0 in
+    let receiver = List.nth_exn nodes 1 in
+    let open Malleable_error.Let_syntax in
+    let%bind sender_pub_key = Util.pub_key_of_node sender in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    repeat_seq ~n ~f:(fun () ->
+        Network.Node.must_send_payment ~logger sender ~sender_pub_key
+          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        >>| ignore)
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -47,6 +99,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; private_key = fee_payer_sk
       }
     in
+    let keypair2 = (List.hd_exn config.extra_genesis_accounts).keypair in
     let num_snapp_accounts = 3 in
     let snapp_keypairs =
       List.init num_snapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -57,10 +110,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
             Mina_base.Token_id.default)
     in
+    let fee = Currency.Fee.of_int 1_000_000 in
     let%bind parties_create_account =
       (* construct a Parties.t, similar to snapp_test_transaction create-snapp-account *)
       let open Mina_base in
-      let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -88,8 +141,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Deferred parties_update_permissions, permissions_updated =
       (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
       let open Mina_base in
-      let fee = Currency.Fee.of_int 1_000_000 in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp update permissions"
       in
@@ -106,7 +158,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair, nonce)
+        { sender = (keypair2, nonce)
         ; fee
         ; receivers = []
         ; amount = Currency.Amount.zero
@@ -131,9 +183,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred snapp_update_all, parties_update_all =
       let open Mina_base in
-      let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 3 in
+      let nonce = Account.Nonce.of_int 1 in
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
@@ -174,7 +225,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair, nonce)
+        { sender = (keypair2, nonce)
         ; fee
         ; receivers = []
         ; amount
@@ -212,7 +263,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { data =
               { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 4
+                predicate = Mina_base.Account.Nonce.of_int 2
               }
           ; authorization = Mina_base.Signature.dummy
           }
@@ -393,6 +444,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Error.of_string
                     "Ledger permissions do not match update permissions") )))
     in
+    (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
       section "Send a snapp to update all fields"
         (send_snapp ~logger node parties_update_all)
@@ -432,6 +484,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible") )))
     in
     let%bind () =
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 12 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
+    in
+    let%bind () =
       section "Send a snapp with an invalid nonce"
         (send_invalid_snapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
@@ -448,6 +509,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a snapp with an invalid proof"
         (send_invalid_snapp ~logger node parties_invalid_proof "Invalid_proof")
+    in
+    let%bind () =
+      section "Wait for proof to be emitted"
+        (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()
 end

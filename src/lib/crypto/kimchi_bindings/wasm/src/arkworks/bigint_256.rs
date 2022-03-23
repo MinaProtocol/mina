@@ -37,7 +37,7 @@ impl IntoWasmAbi for WasmBigInteger256 {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     fn into_abi(self) -> Self::Abi {
         let mut bytes: Vec<u8> = vec![];
-        self.0.write(&mut bytes);
+        self.0.write(&mut bytes).unwrap();
         bytes.into_abi()
     }
 }
