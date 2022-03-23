@@ -162,20 +162,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                     ~statement:
                       { sok_digest = Sok_message.Digest.default
                       ; source =
-                          { ledger =
-                              { tree = Sparse_ledger.merkle_root sparse_ledger
-                              ; next_available_token =
-                                  next_available_token_before
-                              }
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger
                           ; pending_coinbase_stack = coinbase_stack_source
                           ; local_state = Mina_state.Local_state.empty
                           }
                       ; target =
-                          { ledger =
-                              { tree = Sparse_ledger.merkle_root sparse_ledger'
-                              ; next_available_token =
-                                  next_available_token_after
-                              }
+                          { ledger = Sparse_ledger.merkle_root sparse_ledger'
                           ; pending_coinbase_stack = coinbase_stack_target
                           ; local_state = Mina_state.Local_state.empty
                           }
