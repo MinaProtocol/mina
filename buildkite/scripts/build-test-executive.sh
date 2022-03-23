@@ -22,5 +22,6 @@ cp _build/default/src/app/logproc/logproc.exe .
 chmod +rwx logproc.exe
 
 echo "--- build JS dependencies"
-bash ./scripts/build-snarkyjs-node.sh
+source ~/.profile
+make snarkyjs
 make mina_signer
