@@ -218,23 +218,44 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
       }
     in
-    let parties_invalid_proof =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { data =
-              { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 5
-              }
-          ; authorization = Mina_base.Proof.dummy
-          }
-      }
-    in
     let parties_insufficient_fee =
       let p = parties_update_all in
       { p with
-        fee_payer = { data = { p.fee_payer.data with fee = 8000000000 } }
+        fee_payer =
+          { p.fee_payer with
+            data =
+              { body =
+                  { p.fee_payer.data.body with
+                    balance_change = Currency.Fee.of_int 8000000000
+                  }
+              ; predicate = Mina_base.Account.Nonce.of_int 4
+              }
+          }
       }
+    in
+    let parties_invalid_proof =
+      let p = parties_update_all in
+      Mina_base.Parties.
+        { fee_payer =
+            { p.fee_payer with
+              data =
+                { p.fee_payer.data with
+                  predicate = Mina_base.Account.Nonce.of_int 4
+                }
+            }
+        ; other_parties =
+            List.map p.other_parties ~f:(fun other_p ->
+                match other_p.authorization with
+                | Proof _ ->
+                    { other_p with
+                      authorization =
+                        Mina_base.(
+                          Control.Proof Mina_base.Proof.blockchain_dummy)
+                    }
+                | _ ->
+                    other_p)
+        ; memo = p.memo
+        }
     in
     let with_timeout =
       let soft_slots = 3 in
@@ -418,6 +439,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Send a snapp with an invalid signature"
         (send_invalid_snapp ~logger node parties_invalid_signature
            "Invalid_signature")
+    in
+    let%bind () =
+      section "Send a snapp with an insufficient fee"
+        (send_invalid_snapp ~logger node parties_insufficient_fee
+           "Insufficient_fee")
     in
     let%bind () =
       section "Send a snapp with an invalid proof"
