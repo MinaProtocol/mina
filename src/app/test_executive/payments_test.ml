@@ -105,7 +105,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                , (sender_current_nonce, sender_current_nonce) )
              ])
         ~get_account:(fun _ -> `Bootstrapping)
-          (* (fun _ -> failwith "get_account, don't call me") *)
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
@@ -149,14 +148,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind { total_balance = node_b_balance; _ } =
            Network.Node.must_get_balance ~logger untimed_node_b
              ~public_key:sender_pub_key
-           (* ~account_id:
-              (Mina_base.Account_id.create sender_pub_key Token_id.default) *)
          in
          let%bind { total_balance = node_a_balance; _ } =
            Network.Node.must_get_balance ~logger untimed_node_a
              ~public_key:receiver_pub_key
-           (* ~account_id:
-              (Mina_base.Account_id.create receiver_pub_key Token_id.default) *)
          in
          let node_a_expected =
            (* 40_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
@@ -292,7 +287,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                signature is wrong.  attempted nonce: %d"
               (Unsigned.UInt32.to_int nonce)
         | Error error ->
-            (* expect GraphQL error due to bad nonce *)
+            (* expect GraphQL error due to invalid signature *)
             let err_str = Error.to_string_mach error in
             let err_str_lowercase = String.lowercase err_str in
             if
@@ -308,23 +303,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               Malleable_error.soft_error_format ~value:()
                 "Payment failed for unexpected reason: %s" err_str ))
     in
-    (* let%bind () =
-         section "send a single payment between 2 untimed accounts"
-           (let amount = Currency.Amount.of_int 2_000_000_000 in
-            let fee = Currency.Fee.of_int 10_000_000 in
-            let receiver = untimed_node_a in
-            let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-            let sender = untimed_node_b in
-            let%bind sender_pub_key = Util.pub_key_of_node sender in
-            let%bind { nonce; _ } =
-              Network.Node.must_send_payment ~logger sender ~sender_pub_key
-                ~receiver_pub_key ~amount ~fee
-            in
-            wait_for t
-              (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-                 ~command_type:Send_payment))
-       in *)
     let%bind () =
       section "send a single payment from timed account using available liquid"
         (let amount = Currency.Amount.of_int 3_000_000_000_000 in
