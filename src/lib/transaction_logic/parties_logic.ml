@@ -36,7 +36,9 @@ module type Bool_intf = sig
 
   type failure_status
 
-  val assert_with_failure_status : t -> failure_status -> unit
+  type failure_status_tbl
+
+  val assert_with_failure_status_tbl : t -> failure_status_tbl -> unit
 end
 
 module type Balance_intf = sig
@@ -136,7 +138,7 @@ module Local_state = struct
            , 'ledger
            , 'bool
            , 'comm
-           , 'failure_status )
+           , 'failure_status_tbl )
            t =
         { parties : 'parties
         ; call_stack : 'call_stack
@@ -146,13 +148,14 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
-        ; failure_status : 'failure_status
+        ; failure_status_tbl : 'failure_status_tbl
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
   end]
 
-  let typ parties call_stack token_id excess ledger bool comm failure_status =
+  let typ parties call_stack token_id excess ledger bool comm failure_status_tbl
+      =
     Pickles.Impls.Step.Typ.of_hlistable
       [ parties
       ; call_stack
@@ -162,7 +165,7 @@ module Local_state = struct
       ; excess
       ; ledger
       ; bool
-      ; failure_status
+      ; failure_status_tbl
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -179,9 +182,9 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Transaction_status.Failure.Stable.V1.t option )
+          , Transaction_status.Failure.Collection.Stable.V1.t )
           Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving equal, compare, hash, yojson, sexp]
 
         let to_latest = Fn.id
       end
@@ -655,12 +658,14 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , Bool.failure_status )
+      , Bool.failure_status_tbl )
       Local_state.t
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
 
-    val update_failure_status : t -> Bool.failure_status -> Bool.t -> t
+    val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
+
+    val add_new_failure_status_bucket : t -> t
   end
 
   module Global_state : sig
@@ -856,6 +861,7 @@ module Make (Inputs : Inputs_intf) = struct
       ((party, remaining, call_stack), to_pop, local_state)
     in
     let local_state = { local_state with parties = remaining; call_stack } in
+    let local_state = Local_state.add_new_failure_status_bucket local_state in
     let a, inclusion_proof =
       Inputs.Ledger.get_account party local_state.ledger
     in
@@ -864,13 +870,21 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let predicate_satisfied : Bool.t =
+    let predicate_satisfied =
       h.perform (Check_predicate (is_start', party, a, global_state))
     in
-    let protocol_state_predicate_satisfied : Bool.t =
+    let local_state =
+      Local_state.add_check local_state Account_precondition_unsatisfied
+        predicate_satisfied
+    in
+    let protocol_state_predicate_satisfied =
       h.perform
         (Check_protocol_state_predicate
            (Party.protocol_state party, global_state))
+    in
+    let local_state =
+      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
+        protocol_state_predicate_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
@@ -1225,20 +1239,14 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
     let local_state =
-      Local_state.update_failure_status local_state failure_status
+      Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
-    in
-    let success =
-      Bool.(
-        local_state.success &&& protocol_state_predicate_satisfied
-        &&& predicate_satisfied &&& update_permitted)
     in
     (* The first party must succeed. *)
     Bool.(
-      assert_with_failure_status
-        ((not is_start') ||| success)
-        local_state.failure_status) ;
-    let local_state = { local_state with success } in
+      assert_with_failure_status_tbl
+        ((not is_start') ||| local_state.success)
+        local_state.failure_status_tbl) ;
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would

@@ -45,25 +45,29 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let nodes_to_initialize nodes =
-    let open Network_state in
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
-      if
-        List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
+      if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
+
+  let nodes_to_initialize nodes =
+    let open Network_state in
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false))
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 

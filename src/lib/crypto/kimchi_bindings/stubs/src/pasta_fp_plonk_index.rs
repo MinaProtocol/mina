@@ -79,12 +79,9 @@ pub fn caml_pasta_fp_plonk_index_create(
     }
 
     // create index
-    Ok(CamlPastaFpPlonkIndex(Box::new(ProverIndex::<GAffine>::create(
-        cs,
-        oracle::pasta::fq_kimchi::params(),
-        endo_q,
-        srs.clone(),
-    ))))
+    Ok(CamlPastaFpPlonkIndex(Box::new(
+        ProverIndex::<GAffine>::create(cs, oracle::pasta::fq_kimchi::params(), endo_q, srs.clone()),
+    )))
 }
 
 #[ocaml_gen::func]
@@ -148,7 +145,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

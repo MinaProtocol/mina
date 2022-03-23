@@ -91,6 +91,22 @@ module Statement : sig
         [@@deriving compare, equal, hash, sexp, yojson, hlist]
       end
     end]
+
+    val with_empty_local_state :
+         supply_increase:'amount
+      -> fee_excess:'fee_excess
+      -> sok_digest:'sok_digest
+      -> source:'ledger_hash
+      -> target:'ledger_hash
+      -> pending_coinbase_stack_state:
+           'pending_coinbase Pending_coinbase_stack_state.poly
+      -> ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , Mina_transaction_logic.Parties_logic.Local_state.Value.t )
+         t
   end
 
   type ( 'ledger_hash
@@ -344,7 +360,7 @@ type local_state =
   , Mina_ledger.Sparse_ledger.t
   , bool
   , unit
-  , Transaction_status.Failure.t option )
+  , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
@@ -441,6 +457,39 @@ val constraint_system_digests :
 val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
 
 module Base : sig
+  val check_timing :
+       balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> timed_balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+    -> account:
+         ( 'b
+         , 'c
+         , 'd
+         , 'e
+         , Currency.Balance.var
+         , 'f
+         , 'g
+         , 'h
+         , 'i
+         , ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+         , 'j
+         , 'k
+         , 'l )
+         Account.Poly.t
+    -> txn_amount:Currency.Amount.var option
+    -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+    -> ( [> `Min_balance of Currency.Balance.var ]
+         * ( Tick.Boolean.var
+           , Mina_numbers.Global_slot.Checked.var
+           , Currency.Balance.var
+           , Currency.Amount.var )
+           Account_timing.As_record.t
+       , 'a )
+       Tick.Checked.t
+
   module Parties_snark : sig
     val main :
          ?witness:Parties_segment.Witness.t

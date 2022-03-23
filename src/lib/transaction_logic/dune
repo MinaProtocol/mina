@@ -31,7 +31,6 @@
    mina_base.import
    mina_numbers
    mina_transaction
-   o1trace
    one_or_two
    pickles_types
    pickles
