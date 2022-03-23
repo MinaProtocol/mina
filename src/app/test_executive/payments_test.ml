@@ -35,8 +35,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "40000"; timing = Untimed }
-        ; { balance = "30000"; timing = Untimed }
+        [ { balance = "40000"; timing = Untimed } (* 40_000_000_000_000 *)
+        ; { balance = "30000"; timing = Untimed } (* 30_000_000_000_000 *)
         ; { balance = "10000"
           ; timing =
               make_timing ~min_balance:1_000_000_000_000 ~cliff_time:8
@@ -159,14 +159,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (Mina_base.Account_id.create receiver_pub_key Token_id.default) *)
          in
          let node_a_expected =
-           Currency.Amount.add (Currency.Amount.of_int 4_000_000_000_000) amount
+           (* 40_000_000_000_000 is the original amount, change this is original amount changes *)
+           Currency.Amount.add
+             (Currency.Amount.of_int 40_000_000_000_000)
+             amount
            |> Option.value_exn
          in
 
          let node_b_expected =
            Currency.Amount.sub
              ( Currency.Amount.add
-                 (Currency.Amount.of_int 3_000_000_000_000)
+                 (* 30_000_000_000_000 is the original amount, change this is original amount changes *)
+                 (Currency.Amount.of_int 30_000_000_000_000)
                  test_constants.coinbase_amount
              |> Option.value_exn )
              amount
@@ -174,12 +178,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          if
            (* node_a is the receiver *)
-           (* node_a_balance >= 4_000_000_000_000 + txn_amount *)
+           (* node_a_balance >= 40_000_000_000_000 + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (3_000_000_000_000 + possible_coinbase_reward) - txn_amount *)
+           (* node_b_balance <= (30_000_000_000_000 + possible_coinbase_reward) - txn_amount *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected
