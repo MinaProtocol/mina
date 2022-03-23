@@ -1,5 +1,5 @@
 open Core_kernel
-module Digest = Kimchi_backend.Pasta.Basic.Fp
+module Digest = Pickles.Backend.Tick.Field
 
 let add_caller (p : _ Party.t_) (caller : 'c) : 'c Party.t_ =
   { authorization = p.authorization; data = { p.data with caller } }
@@ -257,6 +257,68 @@ module Call_forest = struct
           []
     in
     go null_id ps
+
+  let%test "add_callers" =
+    let module P = struct
+      type 'a t = { id : int; caller : 'a } [@@deriving equal]
+    end in
+    let module With_call_type = struct
+      type nonrec t = (Party.Call_type.t P.t, unit) t
+    end in
+    let null_id = -1 in
+    let module With_id = struct
+      type tmp = (int P.t, unit) t [@@deriving equal]
+
+      type t = tmp [@@deriving equal]
+    end in
+    let of_tree tree : _ t =
+      [ { With_stack_hash.elt = tree; stack_hash = () } ]
+    in
+    let node id caller calls =
+      { Tree.party = { P.id; caller }
+      ; party_digest = ()
+      ; calls =
+          List.map calls ~f:(fun elt ->
+              { With_stack_hash.elt; stack_hash = () })
+      }
+    in
+    let t : With_call_type.t =
+      let open Party.Call_type in
+      node 0 Call
+        [ node 1 Call
+            [ node 11 Call [ node 111 Call []; node 112 Delegate_call [] ]
+            ; node 12 Delegate_call
+                [ node 121 Call []; node 122 Delegate_call [] ]
+            ]
+        ; node 2 Delegate_call
+            [ node 21 Delegate_call
+                [ node 211 Call []; node 212 Delegate_call [] ]
+            ; node 22 Call [ node 221 Call []; node 222 Delegate_call [] ]
+            ]
+        ]
+      |> of_tree
+    in
+    let expected_output : With_id.t =
+      node 0 null_id
+        [ node 1 0
+            [ node 11 1 [ node 111 11 []; node 112 1 [] ]
+            ; node 12 0 [ node 121 12 []; node 122 0 [] ]
+            ]
+        ; node 2 null_id
+            [ node 21 null_id [ node 211 21 []; node 212 null_id [] ]
+            ; node 22 2 [ node 221 22 []; node 222 2 [] ]
+            ]
+        ]
+      |> of_tree
+    in
+    let open P in
+    With_id.equal
+      (add_callers t
+         ~call_type:(fun p -> p.caller)
+         ~add_caller:(fun p caller : int P.t -> { p with caller })
+         ~null_id
+         ~party_id:(fun p -> p.id))
+      expected_output
 
   module With_hashes = struct
     [%%versioned
