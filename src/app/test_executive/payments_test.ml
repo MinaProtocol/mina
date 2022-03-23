@@ -130,7 +130,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~fee:(Signed_command_payload.fee signed_cmmd.payload)
              ~nonce:signed_cmmd.payload.common.nonce
              ~memo:
-               (Signed_command_memo.to_string signed_cmmd.payload.common.memo)
+               (Signed_command_memo.to_raw_bytes_exn
+                  signed_cmmd.payload.common.memo)
              ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
@@ -210,7 +211,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~fee:(Signed_command_payload.fee signed_cmmd.payload)
             ~nonce:signed_cmmd.payload.common.nonce
             ~memo:
-              (Signed_command_memo.to_string signed_cmmd.payload.common.memo)
+              (Signed_command_memo.to_raw_bytes_exn
+                 signed_cmmd.payload.common.memo)
             ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
