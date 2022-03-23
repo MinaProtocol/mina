@@ -6,9 +6,7 @@ set -eo pipefail
 
 echo "Building SnarkyJS.."
 source ~/.profile
-dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=dev
-dune b src/lib/snarky_js_bindings/lib --profile=dev
-dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js --profile=dev
+make snarkyjs
 
 echo "Running tests in Javascript"
 node --version

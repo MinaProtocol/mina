@@ -1,7 +1,8 @@
 SNARKY_JS_PATH=$1
 [ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
-dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js
+dune b src/lib/crypto/kimchi_bindings/js/node_js \
+&& dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js || exit 1
 cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$SNARKY_JS_PATH"/src/node_bindings/
 cp _build/default/src/lib/snarky_js_bindings/snarky_js_node*.js "$SNARKY_JS_PATH"/src/node_bindings/
 
@@ -17,6 +18,4 @@ pushd "$SNARKY_JS_PATH"/src/node_bindings
   mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
 popd
 
-pushd "$SNARKY_JS_PATH"
-  npm run build
-popd
+npm run build --prefix="$SNARKY_JS_PATH"
