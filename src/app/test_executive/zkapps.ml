@@ -218,6 +218,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
       }
     in
+    let parties_invalid_proof =
+      let p = parties_update_all in
+      { p with
+        fee_payer =
+          { data =
+              { p.fee_payer.data with
+                predicate = Mina_base.Account.Nonce.of_int 5
+              }
+          ; authorization = Mina_base.Proof.dummy
+          }
+      }
+    in
+    let parties_insufficient_fee =
+      let p = parties_update_all in
+      { p with
+        fee_payer = { data = { p.fee_payer.data with fee = 8000000000 } }
+      }
+    in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -400,6 +418,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Send a snapp with an invalid signature"
         (send_invalid_snapp ~logger node parties_invalid_signature
            "Invalid_signature")
+    in
+    let%bind () =
+      section "Send a snapp with an invalid proof"
+        (send_invalid_snapp ~logger node parties_invalid_proof "Invalid_proof")
     in
     return ()
 end
