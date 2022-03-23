@@ -42,9 +42,7 @@ let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
 
 let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
     (t :
-      ( Tick.Curve.Affine.t
-      , (_, n) Vector.t )
-      Types.Wrap.Proof_state.Me_only.t) =
+      (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
   Tock_field_sponge.digest Tock_field_sponge.params
     (Types.Wrap.Proof_state.Me_only.to_field_elements t
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]))

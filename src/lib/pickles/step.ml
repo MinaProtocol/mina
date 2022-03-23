@@ -145,8 +145,7 @@ struct
               ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
           in
           let plonk_minimal =
-            { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-              .Minimal
+            { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
               .zeta
             ; alpha
             ; beta = Challenge.Constant.to_tick_field plonk0.beta
@@ -453,8 +452,8 @@ struct
           H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Wrap)
             (struct
               let f :
-                  type a b c.
-                  (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t =
+                  type a b c. (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t
+                  =
                fun (T t) -> t.statement.proof_state.me_only
             end)
         in

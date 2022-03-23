@@ -4,7 +4,6 @@ open Async_kernel
 open Pickles_types
 open Common
 open Import
-open Types
 open Backend
 open Tuple_lib
 
@@ -90,10 +89,8 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let zetaw = Tick.Field.mul zeta w in
         let tick_plonk_minimal :
-            _
-            Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-            .Minimal
-            .t =
+            _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+            =
           let chal = Challenge.Constant.to_tick_field in
           { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
         in

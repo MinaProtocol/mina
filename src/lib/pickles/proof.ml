@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Types
 open Common
 open Backend
 
@@ -23,7 +22,7 @@ module Base = struct
           , ('s, 'sgs, 'bp_chals) Me_only.Step.t
           , 'dlog_me_onlys )
           Types.Step.Statement.t
-      ; index : Index.t
+      ; index : Types.Index.t
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.t
       }
@@ -199,7 +198,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     type t =
       ( ( Tock.Inner_curve.Affine.t
         , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
-        Wrap.Proof_state.Me_only.t
+        Types.Wrap.Proof_state.Me_only.t
       , ( unit
         , Tock.Curve.Affine.t Max_branching_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
@@ -298,7 +297,7 @@ module Branching_2 = struct
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
               Vector.Vector_2.Stable.V1.t )
-            Wrap.Proof_state.Me_only.Stable.V1.t
+            Types.Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -366,7 +365,7 @@ module Branching_max = struct
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
-            Wrap.Proof_state.Me_only.Stable.V1.t
+            Types.Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t

@@ -147,8 +147,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             (P.Base.Me_only.Wrap.Prepared)
             (E01 (Step_acc))
             (struct
-              let f :
-                  type a. a P.Base.Me_only.Wrap.Prepared.t -> Step_acc.t =
+              let f : type a. a P.Base.Me_only.Wrap.Prepared.t -> Step_acc.t =
                fun t -> t.sg
             end)
         in
@@ -156,9 +155,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         k (V.f Max_local_max_branchings.length (M.f prev_me_only))
     | Old_bulletproof_challenges ->
         let module M =
-          H1.Map
-            (P.Base.Me_only.Wrap.Prepared)
-            (Challenges_vector.Constant)
+          H1.Map (P.Base.Me_only.Wrap.Prepared) (Challenges_vector.Constant)
             (struct
               let f (t : _ P.Base.Me_only.Wrap.Prepared.t) =
                 t.old_bulletproof_challenges

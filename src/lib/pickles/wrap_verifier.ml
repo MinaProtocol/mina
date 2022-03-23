@@ -462,8 +462,7 @@ struct
          array) ~(sg_old : (_, Max_branching.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.Type1.t) ~advice
       ~(messages : _ Messages.t) ~which_branch ~openings_proof
-      ~(plonk :
-         _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_branching.eq in
     let public_input =
       Array.concat_map public_input ~f:(function
