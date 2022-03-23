@@ -221,6 +221,8 @@ module Dlog_based = struct
         { t with plonk = Plonk.to_minimal t.plonk }
     end
 
+    (** The component of the proof accumulation state that is only computed on by the
+        "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
     module Me_only = struct
       [%%versioned
       module Stable = struct
@@ -335,6 +337,8 @@ module Dlog_based = struct
       { t with deferred_values = Deferred_values.to_minimal t.deferred_values }
   end
 
+  (** The component of the proof accumulation state that is only computed on by the
+      "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
   module Pass_through = struct
     type ('g, 's, 'sg, 'bulletproof_challenges) t =
       { app_state : 's
