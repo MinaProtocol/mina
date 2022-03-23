@@ -30,7 +30,7 @@ module Tag = Tag
 module Dirty = Dirty
 module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
-module Pairing_main = Pairing_main
+module Step_verifier = Step_verifier
 
 let profile_constraints = false
 
@@ -1161,7 +1161,7 @@ let%test_module "test" =
             (`Plus_two_to_len [|b; b|])
         in
         let _ =
-          Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+          Step_verifier.Scalar_challenge.endo g (Scalar_challenge [b])
         in
         ()
 

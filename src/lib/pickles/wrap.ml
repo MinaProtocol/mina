@@ -27,7 +27,7 @@ let vector_of_list (type a t)
   List.iter xs ~f:(V.emplace_back r) ;
   r
 
-let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
+let b_poly = Tick.Field.(Wrap_verifier.b_poly ~add ~mul ~one)
 
 let tick_rounds = Nat.to_int Tick.Rounds.n
 

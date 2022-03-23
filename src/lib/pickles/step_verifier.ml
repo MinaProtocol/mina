@@ -440,7 +440,7 @@ struct
         Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
             scalar prechallenge))
 
-  let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~one)
+  let b_poly = Field.(Wrap_verifier.b_poly ~add ~mul ~one)
 
   module Pseudo = Pseudo.Make (Impl)
 
@@ -1033,6 +1033,11 @@ struct
         | `Opt sponge ->
             Opt_sponge.squeeze sponge)
 
+  let accumulation_verifier
+      (accumulator_verification_key : _ Types_map.For_step.t) prev_accumulators
+      proof new_accumulator : Boolean.var =
+    Boolean.false_
+
   let verify ~branching ~is_base_case ~sg_old
       ~(opening : _ Pickles_types.Dlog_plonk_types.Openings.Bulletproof.t)
       ~messages ~wrap_domain ~wrap_verification_key statement
@@ -1046,10 +1051,6 @@ struct
         Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
-      (*
-      let fp (Shifted_value.Shifted_value ((s_div_2, s_odd): Other_field.t)) =
-        [| (s_div_2, Field.size_in_bits - 1); ((s_odd :> Field.t), 1) |]
-      in *)
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)

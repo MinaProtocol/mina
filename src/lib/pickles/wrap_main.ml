@@ -28,7 +28,7 @@ module SC = Scalar_challenge
    We use corresponding type variable names throughout this file.
 *)
 
-include Dlog_main.Make (struct
+include Wrap_verifier.Make (struct
   include Wrap_main_inputs
   module Branching_pred = Nat.N0
 end)

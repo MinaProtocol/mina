@@ -9,7 +9,7 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
   * ( Challenge.Make(Impl).t
     , Challenge.Make(Impl).t Scalar_challenge.t
     , Impl.Field.t Shifted_value.Type1.t
-    , Pairing_main.Make(Step_main_inputs).Other_field.t
+    , Step_verifier.Make(Step_main_inputs).Other_field.t
     , unit
     , Digest.Make(Impl).t
     , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
@@ -49,7 +49,7 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let open Impls.Step in
   let open Step_main_inputs in
-  let open Pairing_main in
+  let open Step_verifier in
   let index =
     Typ.transport (One_hot_vector.typ local_branches) ~there:Types.Index.to_int
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))

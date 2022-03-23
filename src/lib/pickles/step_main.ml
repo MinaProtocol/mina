@@ -12,7 +12,7 @@ module B = Inductive_rule.B
 let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
     (pass_through : Digest.t) (unfinalized : Unfinalized.t)
     (should_verify : B.t) : _ Vector.t * B.t =
-  let open Pairing_main in
+  let open Step_verifier in
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
   let ( app_state
       , state
@@ -213,7 +213,7 @@ let step_main :
           in
           M.f prevs
         in
-        let open Pairing_main in
+        let open Step_verifier in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
