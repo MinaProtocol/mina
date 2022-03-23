@@ -3860,7 +3860,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             | _ ->
                 failwith "Not enough remaining parties" )
       in
-      let hash_local_state (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
+      let hash_local_state
+          (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
         let frame (frame : Stack_frame.value) =
           { frame with
             calls = Parties.Call_forest.map frame.calls ~f:(fun p -> (p, ()))
