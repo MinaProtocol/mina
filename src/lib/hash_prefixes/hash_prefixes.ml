@@ -75,11 +75,11 @@ let checkpoint_list = create "CodaCheckpoints"
 
 let bowe_gabizon_hash = create "CodaTockBGHash"
 
-let snapp_predicate = create "CodaSnappPred"
+let zkapp_predicate = create "CodaSnappPred"
 
-let snapp_predicate_account = create "CodaSnappPredAcct"
+let zkapp_predicate_account = create "CodaSnappPredAcct"
 
-let snapp_predicate_protocol_state = create "CodaSnappPredPS"
+let zkapp_predicate_protocol_state = create "CodaSnappPredPS"
 
 let party_predicate = create "MinaPartyPredicate"
 

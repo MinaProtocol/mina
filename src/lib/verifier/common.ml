@@ -46,7 +46,7 @@ let check :
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest
+                (Zkapp_predicate.Protocol_state.digest
                    fee_payer.data.body.protocol_state)
               ~memo_hash:(Signed_command_memo.hash memo)
           in

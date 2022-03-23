@@ -634,7 +634,7 @@ module Account = struct
 
   let digest t =
     Random_oracle.(
-      hash ~init:Hash_prefix.snapp_predicate_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix.zkapp_predicate_account (pack_input (to_input t)))
 
   module Checked = struct
     type t =
@@ -724,7 +724,7 @@ module Account = struct
 
     let digest (t : t) =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.snapp_predicate_account (pack_input (to_input t)))
+        hash ~init:Hash_prefix.zkapp_predicate_account (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, Stable.Latest.t) Typ.t =
@@ -1094,7 +1094,7 @@ module Protocol_state = struct
 
   let digest t =
     Random_oracle.(
-      hash ~init:Hash_prefix.snapp_predicate_protocol_state
+      hash ~init:Hash_prefix.zkapp_predicate_protocol_state
         (pack_input (to_input t)))
 
   module View = struct
@@ -1182,7 +1182,7 @@ module Protocol_state = struct
 
     let digest t =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.snapp_predicate_protocol_state
+        hash ~init:Hash_prefix.zkapp_predicate_protocol_state
           (pack_input (to_input t)))
 
     let check
@@ -1647,7 +1647,7 @@ let to_input
 
 let digest t =
   Random_oracle.(
-    hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
+    hash ~init:Hash_prefix.zkapp_predicate (pack_input (to_input t)))
 
 let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
     ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
@@ -1713,7 +1713,7 @@ module Checked = struct
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
+      hash ~init:Hash_prefix.zkapp_predicate (pack_input (to_input t)))
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =

@@ -855,7 +855,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
 
 module Zkapp_helpers = struct
   let get_parent_state_view ~pool block_id :
-      Snapp_predicate.Protocol_state.View.t Deferred.t =
+      Zkapp_predicate.Protocol_state.View.t Deferred.t =
     (* when a Zkapp is applied, use the protocol state associated with the parent block
        of the block containing the transaction
     *)
@@ -951,7 +951,7 @@ module Zkapp_helpers = struct
     in
     let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
     return
-      { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+      { Zkapp_predicate.Protocol_state.Poly.snarked_ledger_hash
       ; timestamp
       ; blockchain_length
       ; min_window_density
@@ -1146,20 +1146,20 @@ module Zkapp_helpers = struct
     let%bind protocol_state_data =
       query_db pool
         ~f:(fun db ->
-          Processor.Snapp_predicate_protocol_states.load db
+          Processor.Zkapp_predicate_protocol_states.load db
             body_data.zkapp_predicate_protocol_state_id)
         ~item:"Zkapp predicate protocol state"
     in
     let%bind snarked_ledger_hash =
       match protocol_state_data.snarked_ledger_hash_id with
       | None ->
-          return Snapp_predicate.Hash.Ignore
+          return Zkapp_predicate.Hash.Ignore
       | Some id ->
           let%map hash_str =
             query_db pool ~item:"snarked ledger hash" ~f:(fun db ->
                 Processor.Snarked_ledger_hash.load db id)
           in
-          Snapp_predicate.Hash.Check
+          Zkapp_predicate.Hash.Check
             (Frozen_ledger_hash.of_base58_check_exn hash_str)
     in
     let%bind timestamp =
@@ -1175,7 +1175,7 @@ module Zkapp_helpers = struct
           let lower = to_timestamp bounds.timestamp_lower_bound in
           let upper = to_timestamp bounds.timestamp_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_predicate.Closed_interval.t)
     in
     let length_bounds_of_id = function
       | None ->
@@ -1191,7 +1191,7 @@ module Zkapp_helpers = struct
           let lower = to_length bounds.length_lower_bound in
           let upper = to_length bounds.length_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_predicate.Closed_interval.t)
     in
     let%bind blockchain_length =
       length_bounds_of_id protocol_state_data.blockchain_length_id
@@ -1213,7 +1213,7 @@ module Zkapp_helpers = struct
           let lower = to_amount bounds.amount_lower_bound in
           let upper = to_amount bounds.amount_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_predicate.Closed_interval.t)
     in
     (* TODO: this will change *)
     let last_vrf_output = () in
@@ -1235,7 +1235,7 @@ module Zkapp_helpers = struct
           let lower = to_slot bounds.global_slot_lower_bound in
           let upper = to_slot bounds.global_slot_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_predicate.Closed_interval.t)
     in
     let%bind global_slot_since_hard_fork =
       global_slot_of_id protocol_state_data.curr_global_slot_since_hard_fork
@@ -1284,7 +1284,7 @@ module Zkapp_helpers = struct
       let%map epoch_length =
         length_bounds_of_id epoch_data_raw.epoch_length_id
       in
-      { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger
+      { Zkapp_predicate.Protocol_state.Epoch_data.Poly.ledger
       ; seed
       ; start_checkpoint
       ; lock_checkpoint
@@ -1297,7 +1297,7 @@ module Zkapp_helpers = struct
     let%bind next_epoch_data =
       epoch_data_of_id protocol_state_data.next_epoch_data_id
     in
-    let protocol_state : Snapp_predicate.Protocol_state.t =
+    let protocol_state : Zkapp_predicate.Protocol_state.t =
       { snarked_ledger_hash
       ; timestamp
       ; blockchain_length
@@ -1389,7 +1389,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
           let%bind (predicate : Party.Predicate.t) =
             let%bind predicate_data =
               query_db pool ~item:"Zkapp predicate" ~f:(fun db ->
-                  Processor.Snapp_predicate.load db
+                  Processor.Zkapp_predicate.load db
                     zkapp_party_data.predicate_id)
             in
             match predicate_data.kind with
@@ -1420,7 +1420,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                         let upper = to_balance bounds.balance_upper_bound in
                         Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
-                            : _ Snapp_predicate.Closed_interval.t )
+                            : _ Zkapp_predicate.Closed_interval.t )
                   in
                   let%bind nonce =
                     match zkapp_account_data.nonce_id with
@@ -1439,7 +1439,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                         let upper = to_nonce bounds.nonce_upper_bound in
                         Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
-                            : _ Snapp_predicate.Closed_interval.t )
+                            : _ Zkapp_predicate.Closed_interval.t )
                   in
                   let receipt_chain_hash =
                     Option.value_map zkapp_account_data.receipt_chain_hash
@@ -1501,7 +1501,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                       ; sequence_state
                       ; proved_state
                       }
-                      : Snapp_predicate.Account.t )
+                      : Zkapp_predicate.Account.t )
                 in
                 Party.Predicate.Full zkapp_account
             | Nonce -> (

@@ -1924,7 +1924,7 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
-  module Snapp_predicate = Mina_base.Snapp_predicate
+  module Zkapp_predicate = Mina_base.Zkapp_predicate
   module Party = Mina_base.Party
   module Parties = Mina_base.Parties
   module Zkapp_state = Mina_base.Zkapp_state
@@ -2000,11 +2000,11 @@ module Ledger = struct
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
-      _ Snapp_predicate.Closed_interval.t =
+      _ Zkapp_predicate.Closed_interval.t =
     { lower = f c##.lower; upper = f c##.upper }
 
   let epoch_data (e : epoch_data_predicate) :
-      Snapp_predicate.Protocol_state.Epoch_data.t =
+      Zkapp_predicate.Protocol_state.Epoch_data.t =
     let ( ^ ) = Fn.compose in
     { ledger =
         { hash = or_ignore field e##.ledger##.hash
@@ -2025,7 +2025,7 @@ module Ledger = struct
     }
 
   let protocol_state (p : protocol_state_predicate) :
-      Snapp_predicate.Protocol_state.t =
+      Zkapp_predicate.Protocol_state.t =
     let ( ^ ) = Fn.compose in
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
     ; timestamp =
@@ -2248,14 +2248,14 @@ module Ledger = struct
 
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
       Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
-        { Snapp_predicate.Closed_interval.lower = transform x##.lower
+        { Zkapp_predicate.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
 
     let numeric_equal (type a b) (transform : a -> b) (x : a) =
       let x' = transform x in
       Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
-        { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
+        { Zkapp_predicate.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
         b Zkapp_basic.Set_or_keep.Checked.t =
@@ -2282,7 +2282,7 @@ module Ledger = struct
       Mina_base.Frozen_ledger_hash.var_of_t @@ field_value x
 
     let epoch_data (e : epoch_data_predicate) :
-        Snapp_predicate.Protocol_state.Epoch_data.Checked.t =
+        Zkapp_predicate.Protocol_state.Epoch_data.Checked.t =
       let ( ^ ) = Fn.compose in
       { ledger =
           { hash = or_ignore ledger_hash e##.ledger##.hash
@@ -2305,7 +2305,7 @@ module Ledger = struct
       }
 
     let protocol_state (p : protocol_state_predicate) :
-        Snapp_predicate.Protocol_state.Checked.t =
+        Zkapp_predicate.Protocol_state.Checked.t =
       let ( ^ ) = Fn.compose in
 
       { snarked_ledger_hash = or_ignore ledger_hash p##.snarkedLedgerHash
@@ -2459,11 +2459,11 @@ module Ledger = struct
     p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
-    p |> protocol_state |> Snapp_predicate.Protocol_state.digest
+    p |> protocol_state |> Zkapp_predicate.Protocol_state.digest
     |> Field.constant |> to_js_field
 
   let hash_protocol_state_checked (p : protocol_state_predicate) =
-    p |> Checked.protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
+    p |> Checked.protocol_state |> Zkapp_predicate.Protocol_state.Checked.digest
     |> to_js_field
 
   (* TODO memo hash *)
@@ -2534,7 +2534,7 @@ module Ledger = struct
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
     let epoch_data =
-      { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
+      { Zkapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
           { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
           ; total_currency = Currency.Amount.zero
           }
