@@ -37,11 +37,11 @@ module Wrap = struct
                 Vector.t
               , Digest.Constant.t
               , bool )
-              Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+              Types.Step.Proof_state.Per_proof.In_circuit.t
             , max_branching )
             Vector.t
           , Digest.Constant.t )
-          Types.Pairing_based.Proof_state.t
+          Types.Step.Proof_state.t
           t
       | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
       | Openings_proof :
@@ -84,11 +84,11 @@ module Wrap = struct
                   Vector.t
                 , Digest.Constant.t
                 , bool )
-                Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+                Types.Step.Proof_state.Per_proof.In_circuit.t
               , max_branching )
               Vector.t
             , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.t
+            Types.Step.Proof_state.t
             t
         | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
         | Openings_proof :

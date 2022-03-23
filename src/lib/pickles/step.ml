@@ -61,7 +61,7 @@ struct
       , (_, prevs_length) Vector.t
       , _
       , (_, Max_branching.n) Vector.t )
-      P.Base.Pairing_based.t
+      P.Base.Step.t
       Promise.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
@@ -195,9 +195,9 @@ struct
             Dlog_based.Statement.In_circuit.t =
           { pass_through =
               (* TODO: Only do this hashing when necessary *)
-              Common.hash_pairing_me_only
-                (Reduced_me_only.Pairing_based.prepare
-                   ~dlog_plonk_index:dlog_index statement.pass_through)
+              Common.hash_step_me_only
+                (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
+                   statement.pass_through)
                 ~app_state:data.value_to_field_elements
           ; proof_state =
               { statement.proof_state with
@@ -389,7 +389,7 @@ struct
           Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
         in
         ( `Sg sg
-        , { Types.Pairing_based.Proof_state.Per_proof.deferred_values =
+        , { Types.Step.Proof_state.Per_proof.deferred_values =
               { plonk =
                   { plonk with
                     zeta = plonk0.zeta
@@ -443,7 +443,7 @@ struct
       go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
         prev_vars_length
     in
-    let next_statement : _ Types.Pairing_based.Statement.t =
+    let next_statement : _ Types.Step.Statement.t =
       let unfinalized_proofs_extended =
         Vector.extend unfinalized_proofs lte Max_branching.n
           Unfinalized.Constant.dummy
@@ -478,7 +478,7 @@ struct
         let module V = H3.To_vector (VV) in
         V.f prev_values_length (M.f prev_with_proofs)
       in
-      let me_only : _ Reduced_me_only.Pairing_based.t =
+      let me_only : _ Reduced_me_only.Step.t =
         (* Have the sg be available in the opening proof and verify it. *)
         { app_state = next_state; sg = sgs; old_bulletproof_challenges }
       in
@@ -488,8 +488,7 @@ struct
       }
     in
     let next_me_only_prepared =
-      Reduced_me_only.Pairing_based.prepare
-        ~dlog_plonk_index:self_dlog_plonk_index
+      Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
         next_statement.proof_state.me_only
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
@@ -508,7 +507,7 @@ struct
           | None ->
               Snarky_backendless.Request.unhandled )
     in
-    let next_statement_hashed : _ Types.Pairing_based.Statement.t =
+    let next_statement_hashed : _ Types.Step.Statement.t =
       let rec pad :
           type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -536,7 +535,7 @@ struct
       { proof_state =
           { next_statement.proof_state with
             me_only =
-              Common.hash_pairing_me_only ~app_state:A_value.to_field_elements
+              Common.hash_step_me_only ~app_state:A_value.to_field_elements
                 next_me_only_prepared
           }
       ; pass_through =
@@ -606,7 +605,7 @@ struct
       let module V = H3.To_vector (E) in
       V.f prev_values_length (M.f prev_with_proofs)
     in
-    { P.Base.Pairing_based.proof = next_proof
+    { P.Base.Step.proof = next_proof
     ; statement = next_statement
     ; index = branch_data.index
     ; prev_evals =

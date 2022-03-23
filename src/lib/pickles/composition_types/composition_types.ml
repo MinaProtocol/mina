@@ -602,7 +602,7 @@ module Dlog_based = struct
   end
 end
 
-module Pairing_based = struct
+module Step = struct
   module Plonk_polys = Vector.Nat.N10
 
   module Openings = struct

@@ -227,9 +227,8 @@ let verify_heterogenous (ts : Instance.t list) =
             ->
            let prepared_statement : _ Types.Dlog_based.Statement.In_circuit.t =
              { pass_through =
-                 Common.hash_pairing_me_only
-                   ~app_state:A_value.to_field_elements
-                   (Reduced_me_only.Pairing_based.prepare
+                 Common.hash_step_me_only ~app_state:A_value.to_field_elements
+                   (Reduced_me_only.Step.prepare
                       ~dlog_plonk_index:key.commitments
                       { t.statement.pass_through with app_state })
              ; proof_state =

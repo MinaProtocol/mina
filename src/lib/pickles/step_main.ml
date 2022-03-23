@@ -124,7 +124,7 @@ let step_main :
     -> (   ( (Unfinalized.t, max_branching) Vector.t
            , Field.t
            , (Field.t, max_branching) Vector.t )
-           Types.Pairing_based.Statement.t
+           Types.Step.Statement.t
         -> unit)
        Staged.t =
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
@@ -188,7 +188,7 @@ let step_main :
         let f = Fn.id
       end)
   in
-  let main (stmt : _ Types.Pairing_based.Statement.t) =
+  let main (stmt : _ Types.Step.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->

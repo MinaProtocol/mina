@@ -5,11 +5,11 @@ open Types
 open Common
 open Backend
 
-(* The pairing-based "reduced" me-only contains the data of the standard me-only
+(* The step-proof "reduced" me-only contains the data of the standard me-only
    but without the wrap verification key. The purpose of this type is for sending
-   pairing me-onlys on the wire. There is no need to send the wrap-key since everyone
+   step me-onlys on the wire. There is no need to send the wrap-key since everyone
    knows it. *)
-module Pairing_based = struct
+module Step = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -20,7 +20,7 @@ module Pairing_based = struct
   end]
 
   let prepare ~dlog_plonk_index { app_state; sg; old_bulletproof_challenges } =
-    { Pairing_based.Proof_state.Me_only.app_state
+    { Types.Step.Proof_state.Me_only.app_state
     ; sg
     ; dlog_plonk_index
     ; old_bulletproof_challenges =

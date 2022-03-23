@@ -10,7 +10,7 @@ let hash_fold_array = Pickles_types.Dlog_plonk_types.hash_fold_array
 module Base = struct
   module Me_only = Reduced_me_only
 
-  module Pairing_based = struct
+  module Step = struct
     type ( 's
          , 'unfinalized_proofs
          , 'sgs
@@ -20,9 +20,9 @@ module Base = struct
          t =
       { statement :
           ( 'unfinalized_proofs
-          , ('s, 'sgs, 'bp_chals) Me_only.Pairing_based.t
+          , ('s, 'sgs, 'bp_chals) Me_only.Step.t
           , 'dlog_me_onlys )
-          Types.Pairing_based.Statement.t
+          Types.Step.Statement.t
       ; index : Index.t
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.t
@@ -44,7 +44,7 @@ module Base = struct
       [@@@no_toplevel_latest_type]
 
       module V2 = struct
-        type ('dlog_me_only, 'pairing_me_only) t =
+        type ('dlog_me_only, 'step_me_only) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
@@ -55,7 +55,7 @@ module Base = struct
               , Tock.Field.Stable.V1.t
               , 'dlog_me_only
               , Digest.Constant.Stable.V1.t
-              , 'pairing_me_only
+              , 'step_me_only
               , Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
@@ -73,8 +73,8 @@ module Base = struct
       end
     end]
 
-    type ('dlog_me_only, 'pairing_me_only) t =
-          ('dlog_me_only, 'pairing_me_only) Stable.Latest.t =
+    type ('dlog_me_only, 'step_me_only) t =
+          ('dlog_me_only, 'step_me_only) Stable.Latest.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
@@ -82,7 +82,7 @@ module Base = struct
           , Tock.Field.t
           , 'dlog_me_only
           , Digest.Constant.t
-          , 'pairing_me_only
+          , 'step_me_only
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
           , Index.t )
@@ -105,7 +105,7 @@ type ('s, 'mlmb, _) with_data =
             Step_bp_vec.t
           , 'most_recent_width )
           Vector.t )
-        Base.Me_only.Pairing_based.t )
+        Base.Me_only.Step.t )
       Base.Dlog_based.t
       -> ('s, 'mlmb, _) with_data
 
@@ -206,7 +206,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
           Max_branching_at_most.t )
-        Base.Me_only.Pairing_based.t )
+        Base.Me_only.Step.t )
       Base.Dlog_based.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
@@ -307,7 +307,7 @@ module Branching_2 = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
-            Base.Me_only.Pairing_based.Stable.V1.t )
+            Base.Me_only.Step.Stable.V1.t )
           Base.Dlog_based.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -376,7 +376,7 @@ module Branching_max = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
-            Base.Me_only.Pairing_based.Stable.V1.t )
+            Base.Me_only.Step.Stable.V1.t )
           Base.Dlog_based.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 

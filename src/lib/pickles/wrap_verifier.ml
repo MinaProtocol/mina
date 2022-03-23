@@ -346,7 +346,7 @@ struct
       ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Types.Pairing_based.Openings.Bulletproof.Advice.t)
+      (advice : _ Types.Step.Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
         ({ lr; delta; z_1; z_2; sg } :
@@ -721,12 +721,10 @@ struct
     SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
 
   let map_plonk_to_field plonk =
-    Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-    .map_challenges
+    Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
       ~f:(Util.seal (module Impl))
       ~scalar:scalar_to_field plonk
-    |> Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-       .map_fields
+    |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
 
   module Plonk_checks = struct
@@ -752,7 +750,7 @@ struct
         , _
         , _ Shifted_value.Type2.t
         , _ )
-        Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
+        Types.Step.Proof_state.Deferred_values.In_circuit.t)
       { Dlog_plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
@@ -889,15 +887,15 @@ struct
     , bulletproof_challenges )
 
   let map_challenges
-      { Types.Pairing_based.Proof_state.Deferred_values.plonk
+      { Types.Step.Proof_state.Deferred_values.plonk
       ; combined_inner_product
       ; xi
       ; bulletproof_challenges
       ; b
       } ~f ~scalar =
-    { Types.Pairing_based.Proof_state.Deferred_values.plonk =
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-        .map_challenges plonk ~f ~scalar
+    { Types.Step.Proof_state.Deferred_values.plonk =
+        Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+          plonk ~f ~scalar
     ; combined_inner_product
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges

@@ -32,12 +32,11 @@ let wrap_domains =
          Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
   }
 
-let hash_pairing_me_only ~app_state
-    (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
+let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
+    (Types.Step.Proof_state.Me_only.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state)
 
@@ -200,7 +199,7 @@ let tock_unpadded_public_input_of_statement prev_statement =
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
-    (prev_statement : _ Types.Pairing_based.Statement.t) =
+    (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv)) =
       Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n

@@ -3,14 +3,14 @@ open Core_kernel
 module SC = Scalar_challenge
 open Import
 open Util
-open Types.Pairing_based
+open Types.Step
 open Pickles_types
 open Common
 open Import
 module S = Sponge
 
 module Make
-    (Inputs : Intf.Pairing_main_inputs.S
+    (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
                  and type Impl.prover_state = unit
                  and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
@@ -307,11 +307,11 @@ struct
       (m1 :
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t )
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t)
+        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t)
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t )
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
+        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
@@ -831,8 +831,8 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-      .map_challenges ~f:Fn.id ~scalar plonk
+      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+        ~f:Fn.id ~scalar plonk
     in
     let domain =
       match step_domains with
@@ -917,8 +917,8 @@ struct
           (module Field)
           ~shift:shift1 combined_inner_product
       in
-      print_fp "pairing_main cip expected" expected ;
-      print_fp "pairing_main cip actual" actual_combined_inner_product ;
+      print_fp "step_main cip expected" expected ;
+      print_fp "step_main cip actual" actual_combined_inner_product ;
       equal expected actual_combined_inner_product
     in
     let bulletproof_challenges =
@@ -955,7 +955,7 @@ struct
 
   let hash_me_only (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Pairing_based.Proof_state.Me_only in
+    let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
       Array.iter
@@ -966,7 +966,7 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun (t : _ Types.Pairing_based.Proof_state.Me_only.t) ->
+    stage (fun (t : _ Types.Step.Proof_state.Me_only.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -976,7 +976,7 @@ struct
 
   let hash_me_only_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Pairing_based.Proof_state.Me_only in
+    let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
       Array.iter
@@ -1048,7 +1048,7 @@ struct
         , _
         , _
         , _ )
-        Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =
+        Types.Step.Proof_state.Per_proof.In_circuit.t) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
       with_label "pack_statement" (fun () ->
@@ -1063,10 +1063,8 @@ struct
                `Packed_bits (x, n))
     in
     let sponge = Sponge.create sponge_params in
-    let { Types.Pairing_based.Proof_state.Deferred_values.xi
-        ; combined_inner_product
-        ; b
-        } =
+    let { Types.Step.Proof_state.Deferred_values.xi; combined_inner_product; b }
+        =
       unfinalized.deferred_values
     in
     let ( sponge_digest_before_evaluations_actual

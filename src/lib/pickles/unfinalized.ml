@@ -18,7 +18,7 @@ type t =
     Pickles_types.Vector.t
   , Field.t
   , Boolean.var )
-  Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+  Types.Step.Proof_state.Per_proof.In_circuit.t
 
 module Plonk_checks = struct
   include Plonk_checks
@@ -35,7 +35,7 @@ module Constant = struct
       Vector.t
     , Digest.Constant.t
     , bool )
-    Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+    Types.Step.Proof_state.Per_proof.In_circuit.t
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 

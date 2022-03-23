@@ -267,7 +267,7 @@ module Wrap_main_inputs = struct
   end
 end
 
-module Pairing_main_inputs = struct
+module Step_main_inputs = struct
   module type S = sig
     include Inputs_base
 

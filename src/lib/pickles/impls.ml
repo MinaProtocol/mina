@@ -126,7 +126,7 @@ module Step = struct
   module Challenge = Challenge.Make (Impl)
 
   let input ~branching ~wrap_rounds =
-    let open Types.Pairing_based.Statement in
+    let open Types.Step.Statement in
     let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ

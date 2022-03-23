@@ -14,7 +14,12 @@ module SC = Scalar_challenge
 open Core_kernel
 open Async_kernel
 open Import
-open Types
+
+open struct
+  module Index = Types.Index
+  module Nvector = Types.Nvector
+end
+
 open Pickles_types
 open Poly_types
 open Hlist
@@ -43,7 +48,7 @@ let verify max_branching statement key proofs =
    definition of a set into an inductive SNARK system for proving using those rules.
 
    The two ingredients we use are two SNARKs.
-   - A pairing based SNARK for a field Fp, using the group G1/Fq (whose scalar field is Fp)
+   - A step based SNARK for a field Fp, using the group G1/Fq (whose scalar field is Fp)
    - A DLOG based SNARK for a field Fq, using the group G/Fp (whose scalar field is Fq)
 
    For convenience in this discussion, let's define
@@ -156,8 +161,8 @@ let pad_local_max_branchings
 open Kimchi_backend
 
 module Me_only = struct
-  module Dlog_based = Types.Dlog_based.Proof_state.Me_only
-  module Pairing_based = Types.Pairing_based.Proof_state.Me_only
+  module Wrap = Types.Dlog_based.Proof_state.Me_only
+  module Step = Types.Step.Proof_state.Me_only
 end
 
 module Proof_ = P.Base
@@ -723,7 +728,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
-        let pairing_vk = fst (Lazy.force step_vk) in
+        let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           let prevs =
@@ -760,8 +765,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           let%map.Promise proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
-              ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
+              A_value.to_field_elements ~step_vk ~step_domains:b.domains
+              ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in

@@ -110,8 +110,8 @@ let pack_statement max_branching t =
   with_label __LOC__ (fun () ->
       Spec.pack
         (module Impl)
-        (Types.Pairing_based.Statement.spec max_branching Backend.Tock.Rounds.n)
-        (Types.Pairing_based.Statement.to_data t))
+        (Types.Step.Statement.spec max_branching Backend.Tock.Rounds.n)
+        (Types.Step.Statement.to_data t))
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size
@@ -226,7 +226,7 @@ let wrap_main
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->
-              let open Types.Pairing_based.Proof_state in
+              let open Types.Step.Proof_state in
               let typ =
                 typ
                   (module Impl)
@@ -235,7 +235,7 @@ let wrap_main
               in
               exists typ ~request:(fun () -> Req.Proof_state))
         in
-        let pairing_plonk_index =
+        let step_plonk_index =
           with_label __LOC__ (fun () ->
               choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
@@ -382,7 +382,7 @@ let wrap_main
                 hash_me_only Max_branching.n
                   { sg = sacc; old_bulletproof_challenges = chals })
           in
-          { Types.Pairing_based.Statement.pass_through = prev_me_onlys
+          { Types.Step.Statement.pass_through = prev_me_onlys
           ; proof_state = prev_proof_state
           }
         in
@@ -428,7 +428,7 @@ let wrap_main
           with_label __LOC__ (fun () ->
               incrementally_verify_proof
                 (module Max_branching)
-                ~step_widths ~step_domains ~verification_key:pairing_plonk_index
+                ~step_widths ~step_domains ~verification_key:step_plonk_index
                 ~xi ~sponge
                 ~public_input:
                   (Array.map (pack_statement Max_branching.n prev_statement)
