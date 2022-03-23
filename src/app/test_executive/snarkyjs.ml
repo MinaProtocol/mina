@@ -59,7 +59,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind.Deferred process =
            Async_unix.Process.create_exn ~prog:"node"
              ~args:
-               [ "true"; Signature_lib.Private_key.to_base58_check my_sk; "0" ]
+               [ "src/lib/snarky_js_bindings/tests/ci.mjs"
+               ; "true"
+               ; Signature_lib.Private_key.to_base58_check my_sk
+               ; "0"
+               ]
              ()
          in
          let%map.Deferred output =
