@@ -57,10 +57,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Deferred ( (parties_deploy_contract_str, parties_deploy_contract)
                       , unit_with_error ) =
       Deferred.both
-        (let%bind.Deferred () =
-           Async_unix.Unix.system_exn "make snarkyjs && make mina_signer"
-         in
-         let%bind.Deferred process =
+        (let%bind.Deferred process =
            Async_unix.Process.create_exn ~prog:"node"
              ~args:
                [ "src/lib/snarky_js_bindings/tests/ci.mjs"
