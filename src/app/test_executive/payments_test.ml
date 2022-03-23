@@ -216,7 +216,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section
         "attempt to send again the same signed transaction command as before \
-         to conduct a replay attack"
+         to conduct a replay attack. expecting a bad nonce"
         (let open Deferred.Let_syntax in
         match%bind
           Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
@@ -252,6 +252,54 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 err_str_lowercase
             then (
               [%log info] "Got expected bad nonce error from GraphQL" ;
+              Malleable_error.return () )
+            else (
+              [%log error]
+                "Payment failed in GraphQL, but for unexpected reason: %s"
+                err_str ;
+              Malleable_error.soft_error_format ~value:()
+                "Payment failed for unexpected reason: %s" err_str ))
+    in
+    let%bind () =
+      section
+        "attempt to send again the same signed transaction command as before, \
+         but changing the nonce, to conduct a replay attack.  expecting an \
+         Invalid signature"
+        (let open Deferred.Let_syntax in
+        match%bind
+          Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
+            ~sender_pub_key:
+              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+            ~receiver_pub_key:
+              (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
+            ~amount:
+              ( Signed_command_payload.amount signed_cmmd.payload
+              |> Option.value_exn )
+            ~fee:(Signed_command_payload.fee signed_cmmd.payload)
+            ~nonce:
+              (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
+            ~memo:
+              (Signed_command_memo.to_raw_bytes_exn
+                 signed_cmmd.payload.common.memo)
+            ~token:(Signed_command_payload.token signed_cmmd.payload)
+            ~valid_until:signed_cmmd.payload.common.valid_until
+            ~raw_signature:
+              (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+        with
+        | Ok { nonce; _ } ->
+            Malleable_error.soft_error_format ~value:()
+              "Replay attack succeeded, but it should fail because the \
+               signature is wrong.  attempted nonce: %d"
+              (Unsigned.UInt32.to_int nonce)
+        | Error error ->
+            (* expect GraphQL error due to bad nonce *)
+            let err_str = Error.to_string_mach error in
+            let err_str_lowercase = String.lowercase err_str in
+            if
+              String.is_substring ~substring:"Invalid signature"
+                err_str_lowercase
+            then (
+              [%log info] "Got expected invalid signature error from GraphQL" ;
               Malleable_error.return () )
             else (
               [%log error]
