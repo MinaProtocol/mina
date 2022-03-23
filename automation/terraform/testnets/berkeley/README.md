@@ -1,6 +1,6 @@
 # Berkeley Testnet deployment
 
-The QA-net for snapps is called `berkeley`, by decision of the Node Working Group, and runs an image from `develop` which is the branch all snapps related PRs for the protocol are based off of and merged to
+The QA-net for zkapps is called `berkeley`, by decision of the Node Working Group, and runs an image from `develop` which is the branch all zkapps related PRs for the protocol are based off of and merged to
 
 Setup for deploying the testnet
 

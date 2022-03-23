@@ -190,7 +190,7 @@ module Update = struct
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; snapp_uri : string Set_or_keep.Stable.V1.t
+        ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -231,7 +231,7 @@ module Update = struct
           let%map permissions = Permissions.gen ~auth_tag in
           Set_or_keep.Set permissions
     in
-    let%bind snapp_uri =
+    let%bind zkapp_uri =
       let uri_gen =
         Quickcheck.Generator.of_list
           [ "https://www.example.com"
@@ -259,7 +259,7 @@ module Update = struct
         ; delegate
         ; verification_key
         ; permissions
-        ; snapp_uri
+        ; zkapp_uri
         ; token_symbol
         ; timing
         ; voting_for
@@ -281,7 +281,7 @@ module Update = struct
           Snapp_basic.Flagged_option.t
           Set_or_keep.Checked.t
       ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
-      ; snapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
+      ; zkapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
       ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
       ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
       ; voting_for : State_hash.var Set_or_keep.Checked.t
@@ -293,7 +293,7 @@ module Update = struct
          ; delegate
          ; verification_key
          ; permissions
-         ; snapp_uri
+         ; zkapp_uri
          ; token_symbol
          ; timing
          ; voting_for
@@ -309,7 +309,7 @@ module Update = struct
               field (Data_as_hash.hash x.data))
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
-        ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
+        ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
@@ -323,7 +323,7 @@ module Update = struct
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
-    ; snapp_uri = Keep
+    ; zkapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
@@ -336,7 +336,7 @@ module Update = struct
        ; delegate
        ; verification_key
        ; permissions
-       ; snapp_uri
+       ; zkapp_uri
        ; token_symbol
        ; timing
        ; voting_for
@@ -355,8 +355,8 @@ module Update = struct
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
-          (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
-          ~dummy:(Account.hash_snapp_uri_opt None)
+          (Set_or_keep.map ~f:Account.hash_zkapp_uri zkapp_uri)
+          ~dummy:(Account.hash_zkapp_uri_opt None)
           ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
@@ -395,8 +395,8 @@ module Update = struct
                    }))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Account.hash_snapp_uri
-             ~non_preimage:(Account.hash_snapp_uri_opt None)
+          (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
+             ~non_preimage:(Account.hash_zkapp_uri_opt None)
              ~dummy_value:"")
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -416,7 +416,7 @@ module Update = struct
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~snapp_uri:!.(Set_or_keep.deriver string)
+         ~zkapp_uri:!.(Set_or_keep.deriver string)
          ~token_symbol:!.(Set_or_keep.deriver string)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
@@ -442,7 +442,7 @@ module Update = struct
       ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
       ; permissions = Set_or_keep.Set Permissions.user_default
-      ; snapp_uri = Set_or_keep.Set "https://www.example.com"
+      ; zkapp_uri = Set_or_keep.Set "https://www.example.com"
       ; token_symbol = Set_or_keep.Set "TOKEN"
       ; timing = Set_or_keep.Set Timing_info.dummy
       ; voting_for = Set_or_keep.Set State_hash.dummy

@@ -56,7 +56,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
-            ; set_snapp_uri
+            ; set_zkapp_uri
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
@@ -81,7 +81,7 @@ module Accounts = struct
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
-            ; set_snapp_uri = auth_required set_snapp_uri
+            ; set_zkapp_uri = auth_required set_zkapp_uri
             ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
@@ -177,7 +177,7 @@ module Accounts = struct
               ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
         ; snapp
         ; permissions
-        ; snapp_uri = Option.value ~default:"" t.snapp_uri
+        ; zkapp_uri = Option.value ~default:"" t.zkapp_uri
         }
         : Mina_base.Account.t )
 
@@ -236,7 +236,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
-            ; set_snapp_uri
+            ; set_zkapp_uri
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
@@ -252,7 +252,7 @@ module Accounts = struct
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
-          ; set_snapp_uri = auth_required set_snapp_uri
+          ; set_zkapp_uri = auth_required set_zkapp_uri
           ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
@@ -308,7 +308,7 @@ module Accounts = struct
       ; snapp
       ; permissions
       ; token_symbol = Some account.token_symbol
-      ; snapp_uri = Some account.snapp_uri
+      ; zkapp_uri = Some account.zkapp_uri
       }
   end
 

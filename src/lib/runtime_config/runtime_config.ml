@@ -116,7 +116,7 @@ module Json_layout = struct
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
-          ; set_snapp_uri : Auth_required.t [@default None]
+          ; set_zkapp_uri : Auth_required.t [@default None]
           ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
@@ -131,7 +131,7 @@ module Json_layout = struct
            ; "set_delegate"
            ; "set_permissions"
            ; "set_verification_key"
-           ; "set_snapp_uri"
+           ; "set_zkapp_uri"
            ; "edit_sequence_state"
            ; "set_token_symbol"
            ; "increment_nonce"
@@ -242,7 +242,7 @@ module Json_layout = struct
         ; snapp : Snapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
-        ; snapp_uri : string option [@default None]
+        ; zkapp_uri : string option [@default None]
         }
       [@@deriving sexp, yojson, dhall_type]
 
@@ -260,7 +260,7 @@ module Json_layout = struct
          ; "snapp"
          ; "permissions"
          ; "token_symbol"
-         ; "snapp_uri"
+         ; "zkapp_uri"
         |]
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -279,7 +279,7 @@ module Json_layout = struct
         ; snapp = None
         ; permissions = None
         ; token_symbol = None
-        ; snapp_uri = None
+        ; zkapp_uri = None
         }
     end
 
@@ -501,7 +501,7 @@ module Accounts = struct
       ; snapp : Snapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
-      ; snapp_uri : string option
+      ; zkapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -532,7 +532,7 @@ module Accounts = struct
     ; snapp : Single.Snapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
-    ; snapp_uri : string option
+    ; zkapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]

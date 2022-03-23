@@ -10,7 +10,7 @@ struct
         Snapp_basic.Set_or_keep.Set
           { Permissions.user_default with
             set_permissions = Permissions.Auth_required.Proof
-          ; set_snapp_uri = Proof
+          ; set_zkapp_uri = Proof
           ; set_token_symbol = Proof
           ; set_voting_for = Proof
           }

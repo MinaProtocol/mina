@@ -1059,7 +1059,7 @@ module Snapp_helpers = struct
             ; set_delegate = perms_data.set_delegate
             ; set_permissions = perms_data.set_permissions
             ; set_verification_key = perms_data.set_verification_key
-            ; set_snapp_uri = perms_data.set_snapp_uri
+            ; set_zkapp_uri = perms_data.set_zkapp_uri
             ; edit_sequence_state = perms_data.edit_sequence_state
             ; set_token_symbol = perms_data.set_token_symbol
             ; increment_nonce = perms_data.increment_nonce
@@ -1070,8 +1070,8 @@ module Snapp_helpers = struct
       | None ->
           return Snapp_basic.Set_or_keep.Keep
     in
-    let snapp_uri =
-      update_data.snapp_uri |> Snapp_basic.Set_or_keep.of_option
+    let zkapp_uri =
+      update_data.zkapp_uri |> Snapp_basic.Set_or_keep.of_option
     in
     let token_symbol =
       update_data.token_symbol |> Snapp_basic.Set_or_keep.of_option
@@ -1114,7 +1114,7 @@ module Snapp_helpers = struct
       ; delegate
       ; verification_key
       ; permissions
-      ; snapp_uri
+      ; zkapp_uri
       ; token_symbol
       ; timing
       ; voting_for
