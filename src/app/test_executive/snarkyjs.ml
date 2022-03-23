@@ -122,8 +122,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           if
             Currency.Balance.(
               equal balance
-                ( initial_balance - Currency.Amount.of_string "10000000000"
-                |> Option.value_exn ))
+                ( match
+                    initial_balance - Currency.Amount.of_string "10000000000"
+                  with
+                | Some x ->
+                    x
+                | None ->
+                    failwithf
+                      "Failed to subtract initial_balance %s with amount \
+                       10000000000"
+                      (Currency.Balance.to_string initial_balance)
+                      () ))
           then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
             return () )
