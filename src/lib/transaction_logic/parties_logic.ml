@@ -793,12 +793,12 @@ module Make (Inputs : Inputs_intf) = struct
       Ps.pop_exn (Stack_frame.calls current_forest)
     in
     let party_caller = Party.caller party in
-    let is_delegate_call =
-      Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
+    let is_normal_call =
+      Token_id.equal party_caller (Stack_frame.caller current_forest)
     in
     let () =
-      let is_normal_call =
-        Token_id.equal party_caller (Stack_frame.caller current_forest)
+      let is_delegate_call =
+        Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
       in
       (* Check that party has a valid caller. *)
       assert_ Bool.(is_normal_call ||| is_delegate_call)
@@ -854,10 +854,10 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame)
         ~else_:
           (let caller =
-             Token_id.if_ is_delegate_call
-               ~then_:(Stack_frame.caller current_forest)
-               ~else_:
+             Token_id.if_ is_normal_call
+               ~then_:
                  (Account_id.derive_token_id ~owner:(Party.account_id party))
+               ~else_:(Stack_frame.caller current_forest)
            and caller_caller = party_caller in
            Stack_frame.make ~calls:party_forest ~caller ~caller_caller)
     in
@@ -1373,9 +1373,14 @@ module Make (Inputs : Inputs_intf) = struct
         assert_
           ( (not is_start')
           ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
-      (* FIXME: Allow non-default tokens again. *)
-      Bool.(assert_ (party_token_is_default &&& curr_is_default)) ;
-      Amount.add_signed_flagged local_state.excess local_delta
+      assert_ curr_is_default ;
+      let new_local_fee_excess, `Overflow overflow =
+        Amount.add_signed_flagged local_state.excess local_delta
+      in
+      ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
+          ~else_:Amount.zero
+      , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
+        `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
     (* The first party must succeed. *)
     Bool.(assert_ (not (is_start' &&& overflowed))) ;
