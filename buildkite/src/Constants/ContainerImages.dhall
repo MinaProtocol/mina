@@ -10,5 +10,6 @@
   elixirToolchain = "elixir:1.10-alpine",
   rustToolchain = "codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3",
   nodeToolchain = "node:14.13.1-stretch-slim",
-  ubuntu1804 = "ubuntu:18.04"
+  ubuntu1804 = "ubuntu:18.04",
+  xrefcheck = "serokell/xrefcheck@sha256:8fbb35a909abc353364f1bd3148614a1160ef3c111c0c4ae84e58fdf16019eeb"
 }
