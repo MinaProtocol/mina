@@ -398,10 +398,8 @@ module F = Snark_params.Tick.Field
 
 [%%endif]
 
-let invalid_public_key : Public_key.Compressed.t Lazy.t =
-  let open F in
-  let rec go i : Public_key.Compressed.t =
-    let t : Public_key.Compressed.t = { x = i; is_odd = false } in
-    if Option.is_none (Public_key.decompress t) then t else go (i + one)
-  in
-  lazy (go zero)
+let invalid_public_key : Public_key.Compressed.t =
+  { x = F.zero; is_odd = false }
+
+let%test "invalid_public_key is invalid" =
+  Option.is_none (Public_key.decompress invalid_public_key)
