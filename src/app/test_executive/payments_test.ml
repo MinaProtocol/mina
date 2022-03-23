@@ -191,7 +191,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               most %d"
              (Currency.Balance.to_int node_a_balance)
              (Currency.Amount.to_int node_a_expected)
-             (Currency.Balance.to_int node_a_balance)
+             (Currency.Balance.to_int node_b_balance)
              (Currency.Amount.to_int node_b_expected))
     in
     let%bind () =
@@ -227,7 +227,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (* expect GraphQL error due to bad nonce *)
             let err_str = Error.to_string_mach error in
             let err_str_lowercase = String.lowercase err_str in
-            if String.is_substring ~substring:"dsafsdfasfasdf" err_str_lowercase
+            if
+              String.is_substring
+                ~substring:"either different from inferred nonce"
+                err_str_lowercase
             then (
               [%log info] "Got expected bad nonce error from GraphQL" ;
               Malleable_error.return () )
