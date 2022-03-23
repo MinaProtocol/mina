@@ -312,7 +312,7 @@ struct
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t )
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t) =
-    let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
+    let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
         ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
@@ -345,7 +345,7 @@ struct
          ( _
          , _
          , _ Shifted_value.Type2.t )
-         Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+         Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     with_label "incrementally_verify_proof" (fun () ->
         let receive ty f =
           with_label "receive" (fun () ->
@@ -742,7 +742,7 @@ struct
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
 
-  module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   module Plonk_checks = struct
     include Plonk_checks
@@ -785,7 +785,7 @@ struct
         , _
         , _
         , _ )
-        Types.Dlog_based.Proof_state.Deferred_values.In_circuit.t)
+        Types.Wrap.Proof_state.Deferred_values.In_circuit.t)
       { Plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
@@ -1052,8 +1052,8 @@ struct
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            Types.Dlog_based.Statement.In_circuit.spec
-            (Types.Dlog_based.Statement.In_circuit.to_data statement))
+            Types.Wrap.Statement.In_circuit.spec
+            (Types.Wrap.Statement.In_circuit.to_data statement))
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x

@@ -175,7 +175,7 @@ let wrap_main
           , _
           , _
           , _ )
-          Types.Dlog_based.Statement.In_circuit.t
+          Types.Wrap.Statement.In_circuit.t
        -> unit) =
   Timer.clock __LOC__ ;
   let wrap_domains =
@@ -218,7 +218,7 @@ let wrap_main
         , _
         , _
         , _ )
-        Types.Dlog_based.Statement.In_circuit.t) =
+        Types.Wrap.Statement.In_circuit.t) =
     with_label __LOC__ (fun () ->
         let which_branch =
           One_hot_vector.of_index which_branch ~length:branches
@@ -444,7 +444,7 @@ let wrap_main
         with_label __LOC__ (fun () ->
             Field.Assert.equal me_only_digest
               (hash_me_only Max_branching.n
-                 { Types.Dlog_based.Proof_state.Me_only.sg = openings_proof.sg
+                 { Types.Wrap.Proof_state.Me_only.sg = openings_proof.sg
                  ; old_bulletproof_challenges = new_bulletproof_challenges
                  })) ;
         with_label __LOC__ (fun () ->

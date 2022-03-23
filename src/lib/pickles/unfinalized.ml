@@ -48,7 +48,7 @@ module Constant = struct
     let zeta = scalar_chal () in
     let chals :
         _
-        Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.t
+        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
         =
       { alpha = Common.Ipa.Wrap.endo_to_field alpha
       ; beta = Challenge.Constant.to_tock_field beta

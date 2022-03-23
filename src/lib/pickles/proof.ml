@@ -38,7 +38,7 @@ module Base = struct
     end]
   end
 
-  module Dlog_based = struct
+  module Wrap = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
@@ -62,7 +62,7 @@ module Base = struct
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Index.Stable.V1.t )
-              Types.Dlog_based.Statement.Minimal.Stable.V1.t
+              Types.Wrap.Statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t array )
@@ -86,7 +86,7 @@ module Base = struct
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
           , Index.t )
-          Types.Dlog_based.Statement.Minimal.t
+          Types.Wrap.Statement.Minimal.t
       ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
       ; proof : Tock.Proof.t
       }
@@ -96,7 +96,7 @@ end
 
 type ('s, 'mlmb, _) with_data =
   | T :
-      ( 'mlmb Base.Me_only.Dlog_based.t
+      ( 'mlmb Base.Me_only.Wrap.t
       , ( 's
         , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
@@ -105,7 +105,7 @@ type ('s, 'mlmb, _) with_data =
           , 'most_recent_width )
           Vector.t )
         Base.Me_only.Step.t )
-      Base.Dlog_based.t
+      Base.Wrap.t
       -> ('s, 'mlmb, _) with_data
 
 module With_data = struct
@@ -198,15 +198,15 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module Repr = struct
     type t =
       ( ( Tock.Inner_curve.Affine.t
-        , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
-        Dlog_based.Proof_state.Me_only.t
+        , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
+        Wrap.Proof_state.Me_only.t
       , ( unit
         , Tock.Curve.Affine.t Max_branching_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
           Max_branching_at_most.t )
         Base.Me_only.Step.t )
-      Base.Dlog_based.t
+      Base.Wrap.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
@@ -296,9 +296,9 @@ module Branching_2 = struct
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V2.t
+            , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
               Vector.Vector_2.Stable.V1.t )
-            Dlog_based.Proof_state.Me_only.Stable.V1.t
+            Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -307,7 +307,7 @@ module Branching_2 = struct
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
             Base.Me_only.Step.Stable.V1.t )
-          Base.Dlog_based.Stable.V2.t
+          Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -364,9 +364,9 @@ module Branching_max = struct
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V2.t
+            , Reduced_me_only.Wrap.Challenges_vector.Stable.V2.t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
-            Dlog_based.Proof_state.Me_only.Stable.V1.t
+            Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
@@ -376,7 +376,7 @@ module Branching_max = struct
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
             Base.Me_only.Step.Stable.V1.t )
-          Base.Dlog_based.Stable.V2.t
+          Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id

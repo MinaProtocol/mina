@@ -221,7 +221,7 @@ module Wrap = struct
 
   let input () =
     let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
-    let open Types.Dlog_based.Statement in
+    let open Types.Wrap.Statement in
     let (T (typ, f)) =
       Spec.packed_typ
         (module Impl)

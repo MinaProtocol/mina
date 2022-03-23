@@ -9,7 +9,7 @@ open Core_kernel
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
-module Dlog_based = struct
+module Wrap = struct
   module Proof_state = struct
     module Deferred_values = struct
       module Plonk = struct
@@ -638,7 +638,7 @@ module Step = struct
 
   module Proof_state = struct
     module Deferred_values = struct
-      module Plonk = Dlog_based.Proof_state.Deferred_values.Plonk
+      module Plonk = Wrap.Proof_state.Deferred_values.Plonk
 
       type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
         { plonk : 'plonk
@@ -670,8 +670,8 @@ module Step = struct
       end
     end
 
-    module Pass_through = Dlog_based.Proof_state.Me_only
-    module Me_only = Dlog_based.Pass_through
+    module Pass_through = Wrap.Proof_state.Me_only
+    module Me_only = Wrap.Pass_through
 
     module Per_proof = struct
       type ( 'plonk

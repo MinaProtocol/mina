@@ -67,7 +67,7 @@ let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
             ; old_bulletproof_challenges
             })
     in
-    { Types.Dlog_based.Statement.pass_through = prev_me_only
+    { Types.Wrap.Statement.pass_through = prev_me_only
     ; proof_state = { state with me_only = pass_through }
     }
   in

@@ -28,7 +28,7 @@ module Step = struct
     }
 end
 
-module Dlog_based = struct
+module Wrap = struct
   module Challenges_vector = struct
     [%%versioned
     module Stable = struct
@@ -65,17 +65,17 @@ module Dlog_based = struct
   type 'max_local_max_branching t =
     ( Tock.Inner_curve.Affine.t
     , (Challenges_vector.t, 'max_local_max_branching) Vector.t )
-    Dlog_based.Proof_state.Me_only.t
+    Wrap.Proof_state.Me_only.t
 
   module Prepared = struct
     type 'max_local_max_branching t =
       ( Tock.Inner_curve.Affine.t
       , (Challenges_vector.Prepared.t, 'max_local_max_branching) Vector.t )
-      Dlog_based.Proof_state.Me_only.t
+      Wrap.Proof_state.Me_only.t
   end
 
   let prepare ({ sg; old_bulletproof_challenges } : _ t) =
-    { Dlog_based.Proof_state.Me_only.sg
+    { Wrap.Proof_state.Me_only.sg
     ; old_bulletproof_challenges =
         Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
     }

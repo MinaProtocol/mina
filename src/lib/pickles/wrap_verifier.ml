@@ -425,7 +425,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 
-  module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -463,7 +463,7 @@ struct
       ~(combined_inner_product : _ Shifted_value.Type1.t) ~advice
       ~(messages : _ Messages.t) ~which_branch ~openings_proof
       ~(plonk :
-         _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+         _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_branching.eq in
     let public_input =
       Array.concat_map public_input ~f:(function
@@ -909,10 +909,10 @@ struct
      to them. *)
 
   let hash_me_only (type n) (_max_branching : n Nat.t)
-      (t : (_, (_, n) Vector.t) Types.Dlog_based.Proof_state.Me_only.t) =
+      (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)
-      (Types.Dlog_based.Proof_state.Me_only.to_field_elements
+      (Types.Wrap.Proof_state.Me_only.to_field_elements
          ~g1:Inner_curve.to_field_elements t) ;
     Sponge.squeeze_field sponge
 end

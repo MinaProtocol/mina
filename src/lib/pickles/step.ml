@@ -100,7 +100,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
         , Index.t )
-        Dlog_based.Statement.In_circuit.t
+        Wrap.Statement.In_circuit.t
     end in
     let b_poly = Tock.Field.(Wrap_verifier.b_poly ~add ~mul ~one) in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
@@ -145,7 +145,7 @@ struct
               ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
           in
           let plonk_minimal =
-            { Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
+            { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
               .Minimal
               .zeta
             ; alpha
@@ -178,7 +178,7 @@ struct
         let T = Local_max_branching.eq in
         let statement = t.statement in
         let prev_challenges =
-          (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
+          (* TODO: This is redone in the call to Wrap_reduced_me_only.prepare *)
           Vector.map ~f:Ipa.Wrap.compute_challenges
             statement.proof_state.me_only.old_bulletproof_challenges
         in
@@ -192,7 +192,7 @@ struct
             , _
             , _
             , _ )
-            Dlog_based.Statement.In_circuit.t =
+            Wrap.Statement.In_circuit.t =
           { pass_through =
               (* TODO: Only do this hashing when necessary *)
               Common.hash_step_me_only
@@ -247,7 +247,7 @@ struct
           Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
         in
         let plonk0 =
-          { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha =
+          { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
               scalar_chal O.alpha
           ; beta = O.beta o
           ; gamma = O.gamma o
@@ -304,7 +304,7 @@ struct
           else t.proof.openings.proof.sg
         in
         let witness : _ Per_proof_witness.Constant.t =
-          ( t.P.Base.Dlog_based.statement.pass_through.app_state
+          ( t.P.Base.Wrap.statement.pass_through.app_state
           , { prev_statement_with_hashes.proof_state with me_only = () }
           , t.prev_evals
           , Vector.extend_exn t.statement.pass_through.sg Local_max_branching.n
@@ -450,11 +450,11 @@ struct
       in
       let pass_through =
         let module M =
-          H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Dlog_based)
+          H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Wrap)
             (struct
               let f :
                   type a b c.
-                  (a, b, c) P.With_data.t -> b P.Base.Me_only.Dlog_based.t =
+                  (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t =
                fun (T t) -> t.statement.proof_state.me_only
             end)
         in
@@ -523,7 +523,7 @@ struct
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
         | [], m :: ms, S n ->
-            let t : _ Types.Dlog_based.Proof_state.Me_only.t =
+            let t : _ Types.Wrap.Proof_state.Me_only.t =
               { sg = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_branching.n ~f:(fun _ ->

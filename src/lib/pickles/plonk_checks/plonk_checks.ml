@@ -89,7 +89,7 @@ let evals_of_split_evals field ~zeta ~zetaw
   let e = Fn.flip (actual_evaluation field ~rounds) in
   Plonk_types.Evals.(map es1 ~f:(e zeta), map es2 ~f:(e zetaw))
 
-open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
+open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2

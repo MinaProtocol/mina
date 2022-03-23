@@ -161,7 +161,7 @@ let pad_local_max_branchings
 open Kimchi_backend
 
 module Me_only = struct
-  module Wrap = Types.Dlog_based.Proof_state.Me_only
+  module Wrap = Types.Wrap.Proof_state.Me_only
   module Step = Types.Step.Proof_state.Me_only
 end
 
@@ -179,13 +179,13 @@ let pad_pass_throughs
     (module M : Hlist.Maxes.S
       with type ns = max_local_max_branchings
        and type length = max_branching)
-    (pass_throughs : local_max_branchings H1.T(Proof_.Me_only.Dlog_based).t) =
+    (pass_throughs : local_max_branchings H1.T(Proof_.Me_only.Wrap).t) =
   let dummy_chals = Dummy.Ipa.Wrap.challenges in
   let rec go :
       type len ms ns.
          ms H1.T(Nat).t
-      -> ns H1.T(Proof_.Me_only.Dlog_based).t
-      -> ms H1.T(Proof_.Me_only.Dlog_based).t =
+      -> ns H1.T(Proof_.Me_only.Wrap).t
+      -> ms H1.T(Proof_.Me_only.Wrap).t =
    fun maxes me_onlys ->
     match (maxes, me_onlys) with
     | [], _ :: _ ->

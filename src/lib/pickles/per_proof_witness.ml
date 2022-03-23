@@ -15,7 +15,7 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
     , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
       Types.Step_bp_vec.t
     , 'local_num_branches One_hot_vector.t )
-    Types.Dlog_based.Proof_state.In_circuit.t
+    Types.Wrap.Proof_state.In_circuit.t
   * (Impl.Field.t, Impl.Field.t array) Plonk_types.All_evals.t
   * (Step_main_inputs.Inner_curve.t, 'local_max_branching) Vector.t
   * ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
@@ -35,7 +35,7 @@ module Constant = struct
       , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
         Types.Step_bp_vec.t
       , Types.Index.t )
-      Types.Dlog_based.Proof_state.In_circuit.t
+      Types.Wrap.Proof_state.In_circuit.t
     * (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
     * (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
     * ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
@@ -55,7 +55,7 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
   Snarky_backendless.Typ.tuple6 statement
-    (Types.Dlog_based.Proof_state.In_circuit.typ ~challenge:Challenge.typ
+    (Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
        ~scalar_challenge:Challenge.typ
        (Shifted_value.Type1.typ Field.typ)
        Other_field.typ
