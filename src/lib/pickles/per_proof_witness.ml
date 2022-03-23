@@ -45,7 +45,7 @@ end
 open Core_kernel
 
 let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
-    (local_max_branching : n Nat.t) (local_branches : m Nat.t) ~step_domains :
+    (local_max_branching : n Nat.t) (local_branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let open Impls.Step in
   let open Step_main_inputs in
