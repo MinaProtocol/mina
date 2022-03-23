@@ -93,8 +93,6 @@ module Digest = struct
      Chose 1 for consistency for the old uint64 based token IDs *)
   let default : t = Snark_params.Tick.Field.one
 
-  let invalid : t = Snark_params.Tick.Field.zero
-
   let gen : t Quickcheck.Generator.t = Snark_params.Tick.Field.gen
 
   let gen_non_default =

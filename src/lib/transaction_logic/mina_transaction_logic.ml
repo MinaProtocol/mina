@@ -1687,8 +1687,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ( { protocol_state = state_view; ledger; fee_excess }
       , { frame =
             ({ calls = []
-             ; caller = Token_id.invalid
-             ; caller_caller = Token_id.invalid
+             ; caller = Token_id.default
+             ; caller_caller = Token_id.default
              } : Inputs.Stack_frame.t)
         ; call_stack = []
         ; transaction_commitment = ()
