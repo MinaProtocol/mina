@@ -1002,7 +1002,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                ; delegate = _
                ; verification_key = _
                ; permissions = _
-               ; snapp_uri = _
+               ; zkapp_uri = _
                ; token_symbol = _
                ; timing = _
                ; voting_for = _
@@ -1220,7 +1220,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push_events = Party.Sequence_events.push_events
     end
 
-    module Snapp_uri = struct
+    module Zkapp_uri = struct
       type t = string
 
       let if_ = Parties.value_if
@@ -1251,8 +1251,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_verification_key : t -> Controller.t =
          fun a -> a.permissions.set_verification_key
 
-        let set_snapp_uri : t -> Controller.t =
-         fun a -> a.permissions.set_snapp_uri
+        let set_zkapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_zkapp_uri
 
         let edit_sequence_state : t -> Controller.t =
          fun a -> a.permissions.edit_sequence_state
@@ -1345,9 +1345,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
 
-      let snapp_uri (a : t) = a.snapp_uri
+      let zkapp_uri (a : t) = a.zkapp_uri
 
-      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -1468,7 +1468,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
         let sequence_events (party : t) = party.data.body.sequence_events
 
-        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+        let zkapp_uri (party : t) = party.data.body.update.zkapp_uri
 
         let token_symbol (party : t) = party.data.body.update.token_symbol
 

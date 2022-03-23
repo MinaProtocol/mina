@@ -1296,7 +1296,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -1462,7 +1462,7 @@
               "defaultValue": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1756,7 +1756,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -1842,7 +1842,7 @@
               "defaultValue": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
@@ -7962,7 +7962,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -8158,7 +8158,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -10877,7 +10877,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description":
                 "Authorization required to change the URI of the snapp associated with the account ",
               "args": [],
@@ -11393,7 +11393,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description":
                 "The URI associated with this account, usually pointing to the snapp source code",
               "args": [],

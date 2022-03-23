@@ -50,7 +50,7 @@ module Poly : sig
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
-        ; set_snapp_uri : 'controller
+        ; set_zkapp_uri : 'controller
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
