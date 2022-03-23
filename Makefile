@@ -135,7 +135,9 @@ mina_signer: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) \
 	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
 	&& dune b src/app/client_sdk/client_sdk.bc.js \
-	&& npm run --prefix=frontend/mina-signer copy-jsoo && npm run --prefix=frontend/mina-signer copy-wasm && npm run build --prefix=frontend/mina-signer
+	&& (cd frontend/mina-signer; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	cd ../..)
 	$(info Build complete)
 
 snarkyjs: ocaml_checks
