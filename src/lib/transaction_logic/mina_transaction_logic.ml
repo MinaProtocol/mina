@@ -1685,8 +1685,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ( { protocol_state = state_view; ledger; fee_excess }
       , { frame =
             ({ calls = []
-             ; caller = Token_id.invalid
-             ; caller_caller = Token_id.invalid
+             ; caller = Token_id.default
+             ; caller_caller = Token_id.default
              } : Inputs.Stack_frame.t)
         ; call_stack = []
         ; transaction_commitment = ()
@@ -1699,15 +1699,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         } )
     in
     let user_acc = f init initial_state in
-    (*
-<<<<<<< HEAD
-    let start : Inputs.Global_state.t * _ =
-      let parties = Parties.parties c in
-      M.start ~constraint_constants
-        { parties; memo_hash = Signed_command_memo.hash c.memo }
-        { perform } 
-        initial_state
-======= *)
     let%bind (start : Inputs.Global_state.t * _) =
       let parties = Parties.parties c in
       Or_error.try_with (fun () ->

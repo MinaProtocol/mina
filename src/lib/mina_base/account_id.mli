@@ -23,8 +23,6 @@ module Digest : sig
 
   val default : t
 
-  val invalid : t
-
   val gen : t Quickcheck.Generator.t
 
   val gen_non_default : t Quickcheck.Generator.t

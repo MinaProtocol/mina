@@ -1126,7 +1126,7 @@ module Predicated = struct
     let dummy : t =
       { body = Body.dummy
       ; predicate = Account_nonce.zero
-      ; caller = Token_id.invalid
+      ; caller = Token_id.default
       }
   end
 
@@ -1159,7 +1159,7 @@ module Predicated = struct
     let to_signed (t : t) : Signed.t =
       { body = Body.of_fee_payer t.body
       ; predicate = t.predicate
-      ; caller = Token_id.invalid
+      ; caller = Token_id.default
       }
 
     let deriver obj =
@@ -1186,7 +1186,7 @@ module Predicated = struct
     end]
 
     let dummy : t =
-      { body = Body.dummy; predicate = (); caller = Token_id.invalid }
+      { body = Body.dummy; predicate = (); caller = Token_id.default }
   end
 
   let of_signed ({ body; predicate; caller } : Signed.t) : t =
@@ -1195,7 +1195,7 @@ module Predicated = struct
   let of_fee_payer ({ body; predicate; caller = () } : Fee_payer.t) : t =
     { body = Body.of_fee_payer body
     ; predicate = Nonce predicate
-    ; caller = Token_id.invalid
+    ; caller = Token_id.default
     }
 end
 
@@ -1391,7 +1391,7 @@ let%test_unit "json roundtrip dummy" =
     { data =
         { body = Body.dummy
         ; predicate = Predicate.Accept
-        ; caller = Token_id.invalid
+        ; caller = Token_id.default
         }
     ; authorization = Control.dummy_of_tag Signature
     }

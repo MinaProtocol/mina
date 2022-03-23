@@ -224,7 +224,7 @@ module Call_forest = struct
     add_callers ps
       ~call_type:(fun p -> p.caller)
       ~add_caller:(fun p (caller : Token_id.t) -> { p with caller })
-      ~null_id:Token_id.invalid
+      ~null_id:Token_id.default
       ~party_id:(fun p ->
         Account_id.(
           derive_token_id ~owner:(create p.body.public_key p.body.token_id)))
@@ -288,7 +288,7 @@ module Call_forest = struct
                  }
                  : Party.t )
              , vk ))
-           ~null_id:Token_id.invalid
+           ~null_id:Token_id.default
            ~party_id:(fun (p, _) ->
              Account_id.(
                derive_token_id
@@ -384,7 +384,7 @@ module Stable = struct
                  p.data.body.call_depth)
           |> Call_forest.add_callers
                ~call_type:(fun (p : _ Party.t_) -> p.data.caller)
-               ~add_caller ~null_id:Token_id.invalid
+               ~add_caller ~null_id:Token_id.default
                ~party_id:(fun (p : _ Party.t_) ->
                  Account_id.(
                    derive_token_id
@@ -399,7 +399,7 @@ module Stable = struct
       ; other_parties =
           Call_forest.to_parties_list
             (Call_forest.remove_callers ~equal_id:Token_id.equal
-               ~add_call_type:add_caller ~null_id:Token_id.invalid
+               ~add_call_type:add_caller ~null_id:Token_id.default
                ~party_caller:(fun p -> p.data.caller)
                t.other_parties)
       }
@@ -427,7 +427,7 @@ let parties (t : t) : _ Call_forest.t =
     ; data =
         { body
         ; predicate = Party.Predicate.Nonce p.data.predicate
-        ; caller = Token_id.invalid
+        ; caller = Token_id.default
         }
     }
   in
@@ -679,7 +679,7 @@ let dummy =
     { data =
         { body = Party.Body.dummy
         ; predicate = Party.Predicate.Accept
-        ; caller = Token_id.invalid
+        ; caller = Token_id.default
         }
     ; authorization = Control.dummy_of_tag Signature
     }
