@@ -138,7 +138,7 @@ type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t_ =
 module Stable = struct
   module V2 = struct
     type t =
-      ( Snapp_state.Value.Stable.V1.t
+      ( Zkapp_state.Value.Stable.V1.t
       , ( Side_loaded_verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
@@ -168,7 +168,7 @@ let dummy_vk_hash =
 
 module Checked = struct
   type t =
-    ( Pickles.Impls.Step.Field.t Snapp_state.V.t
+    ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
     , ( Boolean.var
       , (Side_loaded_verification_key.t option, Field.t) With_hash.t
         Data_as_hash.t )
@@ -218,7 +218,7 @@ end
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
-    [ Snapp_state.typ Field.typ
+    [ Zkapp_state.typ Field.typ
     ; Flagged_option.option_typ
         ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
         (Data_as_hash.typ ~hash:With_hash.hash)
@@ -256,7 +256,7 @@ let to_input (t : t) =
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
-  { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
+  { app_state = Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
   ; snapp_version = Mina_numbers.Snapp_version.zero
   ; sequence_state =

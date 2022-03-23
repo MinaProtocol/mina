@@ -473,7 +473,7 @@ module Account = struct
           ; receipt_chain_hash : 'receipt_chain_hash
           ; public_key : 'pk
           ; delegate : 'pk
-          ; state : 'field Snapp_state.V.Stable.V1.t
+          ; state : 'field Zkapp_state.V.Stable.V1.t
           ; sequence_state : 'field
           ; proved_state : 'bool
           }
@@ -487,7 +487,7 @@ module Account = struct
           ; receipt_chain_hash : 'receipt_chain_hash
           ; public_key : 'pk
           ; delegate : 'pk
-          ; state : 'field Snapp_state.V.Stable.V1.t
+          ; state : 'field Zkapp_state.V.Stable.V1.t
           }
         [@@deriving annot, hlist, sexp, equal, yojson, hash, compare]
       end
@@ -548,7 +548,7 @@ module Account = struct
         Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
       in
       (* won't raise because length is correct *)
-      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+      Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
     let%bind sequence_state =
       let%bind n = Int.gen_uniform_incl Int.min_value Int.max_value in
@@ -573,7 +573,7 @@ module Account = struct
     ; public_key = Ignore
     ; delegate = Ignore
     ; state =
-        Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
+        Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
     ; sequence_state = Ignore
     ; proved_state = Ignore
     }
@@ -588,7 +588,7 @@ module Account = struct
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~public_key:!.(Or_ignore.deriver public_key)
       ~delegate:!.(Or_ignore.deriver public_key)
-      ~state:!.(Snapp_state.deriver @@ Or_ignore.deriver field)
+      ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
     |> finish "AccountPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
@@ -736,7 +736,7 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; public_key ()
-      ; Snapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
+      ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
           ~ignore:(Lazy.force Snapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
