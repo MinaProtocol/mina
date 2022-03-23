@@ -20,11 +20,3 @@ chmod +rwx test_executive.exe
 
 cp _build/default/src/app/logproc/logproc.exe .
 chmod +rwx logproc.exe
-
-echo "--- build JS dependencies"
-source ~/.profile
-dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=dev
-dune b src/lib/snarky_js_bindings/lib --profile=dev
-dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js --profile=dev
-make snarkyjs
-make mina_signer

@@ -10,6 +10,14 @@ if [[ "${TEST_NAME:0:4}" == "opt-" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   exit 0
 fi
 
+if [[ "$TEST_NAME" == "snarkyjs" ]]; then
+  echo "--- build JS dependencies"
+  echo "dune profile:" $DUNE_PROFILE
+  source ~/.profile
+  make snarkyjs || exit 1
+  make mina_signer || exit 1
+fi
+
 ./test_executive.exe cloud "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
