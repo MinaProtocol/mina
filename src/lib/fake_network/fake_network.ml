@@ -80,7 +80,7 @@ module Constants = struct
   let init_discovery_port = 1337
 end
 
-let setup (type n) ~logger ?(trust_system = Trust_system.null ())
+let setup (type n) ~logger
     ?(time_controller = Block_time.Controller.basic ~logger)
     ~(precomputed_values : Precomputed_values.t)
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
@@ -105,7 +105,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
   let config peer consensus_local_state =
     let open Mina_networking.Config in
     { logger
-    ; trust_system
+    ; trust_system = Trust_system.null ()
     ; time_controller
     ; consensus_local_state
     ; is_seed = Vect.is_empty peers
