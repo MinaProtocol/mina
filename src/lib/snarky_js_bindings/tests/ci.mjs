@@ -6,17 +6,18 @@ import {
   State,
   UInt64,
   PrivateKey,
-  Scalar,
   SmartContract,
   compile,
   deploy,
-  Party,
+  call,
   isReady,
   shutdown,
 } from "../snarkyjs/dist/server/index.js";
 
 await isReady;
-const initialBalance = 10_000_000;
+// TODO check if floats are converted to Field correctly
+const initialBalance = 10_000_000_000;
+const transactionFee = 10_000_000;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
@@ -44,37 +45,37 @@ declareMethodArguments(SimpleZkapp, { update: [Field] });
 let zkappPrivateKey = PrivateKey.random();
 let zkappAddress = zkappPrivateKey.toPublicKey();
 
-let [isDeploy, feePayerKey, feePayerNonce] = parseCommandLineArgs();
-let isUpdate = !isDeploy;
+let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
+feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
 
-// console.log(isDeploy ? "deploy" : "update", feePayerKey, feePayerNonce);
-
-if (isDeploy) {
+if (command === "deploy") {
   let { verificationKey } = compile(SimpleZkapp, zkappAddress);
   let partiesJson = deploy(SimpleZkapp, zkappAddress, verificationKey);
   let parties = JSON.parse(partiesJson);
 
   let client = new Client({ network: "testnet" });
-
   let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
     feePayer: feePayerAddress,
-    fee: 1_000_000,
+    fee: transactionFee + initialBalance,
     nonce: feePayerNonce,
   };
-
-  let {
-    data: { parties: signedParties },
-  } = client.signParty({ parties, feePayer }, feePayerKey);
-  console.log(signedParties);
+  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+  console.log(data.parties);
 }
 
-if (isUpdate) {
+if (command === "update") {
   // compile once more, to get the provers :'/
   let { provers } = SimpleZkapp.compile(zkappAddress);
-  let zkapp = new SimpleZkapp(zkappAddress);
-  let { proof, statement } = await zkapp.prove(provers, "update", [Field(3)]);
-  // TODO create tx during proof, add proof to it
+  let partiesJson = await call(
+    SimpleZkapp,
+    zkappAddress,
+    "update",
+    [Field(3)],
+    provers
+  );
+  // TODO add proof to tx, sign
+  console.log(partiesJson);
 }
 
 shutdown();

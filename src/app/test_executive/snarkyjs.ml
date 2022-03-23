@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Async_unix.Process.create_exn ~prog:"node"
              ~args:
                [ "src/lib/snarky_js_bindings/tests/ci.mjs"
-               ; "true"
+               ; "deploy"
                ; Signature_lib.Private_key.to_base58_check my_sk
                ; "0"
                ]
