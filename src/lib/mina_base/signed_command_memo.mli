@@ -109,7 +109,7 @@ val to_raw_exn : t -> raw
     Raises if the tag or length are invalid, or if the memo was a digest.
     Equivalent to [to_raw_exn] and then a match on [Bytes].
 *)
-val to_raw_bytes_exn : t -> raw
+val to_raw_bytes_exn : t -> string
 
 (** Convert from a raw representation.
 
