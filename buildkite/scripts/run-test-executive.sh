@@ -12,10 +12,24 @@ fi
 
 if [[ "$TEST_NAME" == "snarkyjs" ]]; then
   echo "--- build JS dependencies"
-  echo "dune profile:" $DUNE_PROFILE
   source ~/.profile
-  make snarkyjs || exit 1
-  make mina_signer || exit 1
+  # snarkyjs
+  dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=${DUNE_PROFILE} \
+  && dune b src/lib/snarky_js_bindings/lib --profile=${DUNE_PROFILE} \
+  && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js --profile=${DUNE_PROFILE} || exit 1
+  BINDINGS_PATH=src/lib/snarky_js_bindings/snarkyjs/dist/server/node_bindings/
+  mkdir -p "$BINDINGS_PATH"
+  cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$BINDINGS_PATH"
+  cp _build/default/src/lib/snarky_js_bindings/snarky_js_node*.js "$BINDINGS_PATH"
+  chmod -R 777 "$BINDINGS_PATH"
+  cd src/lib/snarky_js_bindings/snarkyjs
+  npm i && npm run build -- --bindings=./dist/server/node_bindings/
+  cd ../../../..
+  # mina-signer
+  dune b src/app/client_sdk/client_sdk.bc.js --profile=${DUNE_PROFILE} || exit 1
+  cd frontend/mina-signer
+  (npm i && npm run copy-jsoo && npm run copy-wasm && npm run build)
+  cd ../..
 fi
 
 ./test_executive.exe cloud "$TEST_NAME" \
