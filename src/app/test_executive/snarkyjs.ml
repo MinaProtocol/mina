@@ -54,7 +54,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in
     (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
-    let%bind.Deferred parties_deploy_contract, unit_with_error =
+    let%bind.Deferred ( (parties_deploy_contract_str, parties_deploy_contract)
+                      , unit_with_error ) =
       Deferred.both
         (let%bind.Deferred process =
            Async_unix.Process.create_exn ~prog:"node"
@@ -69,21 +70,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%map.Deferred output =
            Async_unix.Process.collect_output_and_wait process
          in
+         [%log info] "Stdout: $stdout"
+           ~metadata:[ ("stdout", `String output.stdout) ] ;
+         [%log warn] "Stderr: $stderr"
+           ~metadata:[ ("stdout", `String output.stderr) ] ;
          let json = output.stdout in
-         Mina_base.Parties.of_json (Yojson.Safe.from_string json))
+         (json, Mina_base.Parties.of_json (Yojson.Safe.from_string json)))
         (wait_for t (Wait_condition.node_to_initialize node))
     in
 
-    (* let uri = Integration_test_cloud_engine.Kubernetes_network.Graphql.ingress_uri node in *)
     let%bind () = Deferred.return unit_with_error in
     (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
-    let () = failwith "TODO: shell exec to send signed transaction" in
+    let uri = Network.Node.graphql_uri node in
+    let parties_query = Lazy.force Mina_base.Parties.inner_query in
+    let%bind.Deferred () =
+      let open Deferred.Let_syntax in
+      let%bind process =
+        Async_unix.Process.create_exn
+          ~prog:"./scripts/send-parties-transaction.sh"
+          ~args:[ parties_query; parties_deploy_contract_str; uri ]
+          ()
+      in
+      let%map.Deferred output =
+        Async_unix.Process.collect_output_and_wait process
+      in
+      [%log info] "Stdout: $stdout"
+        ~metadata:[ ("stdout", `String output.stdout) ] ;
+      [%log warn] "Stderr: $stderr"
+        ~metadata:[ ("stdout", `String output.stderr) ]
+    in
     let%bind () =
       section
         "Wait for smart contract transaction to be included in transition \
          frontier"
         (wait_for_zkapp parties_deploy_contract)
     in
+    (*
     let%bind manipulation_of_contract_transaction =
       failwith
         "TODO: shell exec to make/sign+send the user manipulation transction \
@@ -94,7 +116,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for manipulation transaction to be included in transition \
          frontier"
         (wait_for_zkapp manipulation_of_contract_transaction)
-    in
+    in*)
     let%bind () =
       section "Verify that the manipulation transaction did update the ledger"
         ( [%log info] "Verifying permissions for account"
@@ -104,8 +126,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           if
             Currency.Balance.(
               equal balance
-                ( initial_balance - Currency.Amount.of_string "10000000000"
-                |> Option.value_exn ))
+                ( match
+                    initial_balance - Currency.Amount.of_string "10000000000"
+                  with
+                | Some x ->
+                    x
+                | None ->
+                    failwithf
+                      "Failed to subtract initial_balance %s with amount \
+                       10000000000"
+                      (Currency.Balance.to_string initial_balance)
+                      () ))
           then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
             return () )

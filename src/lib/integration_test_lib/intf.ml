@@ -53,6 +53,8 @@ module Engine = struct
       type signed_command_result =
         { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
 
+      val graphql_uri : t -> string
+
       val send_payment :
            logger:Logger.t
         -> t
