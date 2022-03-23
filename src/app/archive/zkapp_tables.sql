@@ -1,9 +1,9 @@
-/* zkapp_tables.sql -- support tables for Snapp commands */
+/* zkapp_tables.sql -- support tables for Zkapp commands */
 
 /* Several of the tables below support the following convention, related
    to NULL values.
 
-   In OCaml, some Snapp-related types use the constructors Check, which takes a value,
+   In OCaml, some Zkapp-related types use the constructors Check, which takes a value,
    and Ignore, which is nullary. In columns following the convention, a NULL means Ignore, while
    non-NULL means Check.
 

@@ -7,41 +7,41 @@ open Integration_test_lib
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs.Engine
 
-  let send_snapp ~logger node parties =
-    [%log info] "Sending snapp"
+  let send_zkapp ~logger node parties =
+    [%log info] "Sending zkapp"
       ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
-    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
-    | Ok _snapp_id ->
-        [%log info] "Snapps transaction sent" ;
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    | Ok _zkapp_id ->
+        [%log info] "Zkapps transaction sent" ;
         Malleable_error.return ()
     | Error err ->
         let err_str = Error.to_string_mach err in
-        [%log error] "Error sending snapp"
+        [%log error] "Error sending zkapp"
           ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
+        Malleable_error.soft_error_format ~value:() "Error sending zkapp: %s"
           err_str
 
-  let send_invalid_snapp ~logger node parties substring =
-    [%log info] "Sending snapp, expected to fail" ;
-    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
-    | Ok _snapp_id ->
-        [%log error] "Snapps transaction succeeded, expected error \"%s\""
+  let send_invalid_zkapp ~logger node parties substring =
+    [%log info] "Sending zkapp, expected to fail" ;
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    | Ok _zkapp_id ->
+        [%log error] "Zkapps transaction succeeded, expected error \"%s\""
           substring ;
         Malleable_error.soft_error_format ~value:()
-          "Snapps transaction succeeded, expected error \"%s\"" substring
+          "Zkapps transaction succeeded, expected error \"%s\"" substring
     | Error err ->
         let err_str = Error.to_string_mach err in
         if String.is_substring ~substring err_str then (
-          [%log info] "Snapps transaction failed as expected"
+          [%log info] "Zkapps transaction failed as expected"
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.return () )
         else (
           [%log error]
-            "Error sending snapp, for a reason other than the expected \"%s\""
+            "Error sending zkapp, for a reason other than the expected \"%s\""
             substring
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.soft_error_format ~value:()
-            "Snapp failed: %s, but expected \"%s\"" err_str substring )
+            "Zkapp failed: %s, but expected \"%s\"" err_str substring )
 
   let get_account_permissions ~logger node account_id =
     [%log info] "Getting permissions for account"

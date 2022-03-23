@@ -235,16 +235,16 @@ module User_command = struct
     Conn.collect_list query user_cmd_id
 end
 
-module Snapp_command_ids = struct
+module Zkapp_command_ids = struct
   let query =
     Caqti_request.collect Caqti_type.string Caqti_type.int
-      (find_command_ids_query "snapp")
+      (find_command_ids_query "zkapp")
 
   let run (module Conn : Caqti_async.CONNECTION) state_hash =
     Conn.collect_list query state_hash
 end
 
-module Snapp_command = struct
+module Zkapp_command = struct
   type t =
     { fee_payer_id : int
     ; other_party_ids : int array
@@ -268,9 +268,9 @@ module Snapp_command = struct
                    blocks.id,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,fee_payer_balance,hash
 
-            FROM (SELECT * FROM snapp_commands WHERE id = ?) AS sc
+            FROM (SELECT * FROM zkapp_commands WHERE id = ?) AS sc
 
-            INNER JOIN blocks_snapp_commands AS bsc
+            INNER JOIN blocks_zkapp_commands AS bsc
 
             ON sc.id = bsc.user_command_id
 
@@ -284,8 +284,8 @@ module Snapp_command = struct
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) snapp_cmd_id =
-    Conn.collect_list query snapp_cmd_id
+  let run (module Conn : Caqti_async.CONNECTION) zkapp_cmd_id =
+    Conn.collect_list query zkapp_cmd_id
 end
 
 module Internal_command_ids = struct

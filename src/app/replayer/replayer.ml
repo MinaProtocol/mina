@@ -40,7 +40,7 @@ type output =
   }
 [@@deriving yojson]
 
-type command_type = [ `Internal_command | `User_command | `Snapp_command ]
+type command_type = [ `Internal_command | `User_command | `Zkapp_command ]
 
 module type Get_command_ids = sig
   val run :
@@ -853,10 +853,10 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise
 
-module Snapp_helpers = struct
+module Zkapp_helpers = struct
   let get_parent_state_view ~pool block_id :
       Snapp_predicate.Protocol_state.View.t Deferred.t =
-    (* when a Snapp is applied, use the protocol state associated with the parent block
+    (* when a Zkapp is applied, use the protocol state associated with the parent block
        of the block containing the transaction
     *)
     let%bind parent_id =
@@ -968,14 +968,14 @@ module Snapp_helpers = struct
     Deferred.List.map array_ids ~f:(fun array_id ->
         let%bind element_id_array =
           query_db pool
-            ~f:(fun db -> Processor.Snapp_state_data_array.load db array_id)
-            ~item:"Snapp state data array"
+            ~f:(fun db -> Processor.Zkapp_state_data_array.load db array_id)
+            ~item:"Zkapp state data array"
         in
         let element_ids = Array.to_list element_id_array in
         let%bind field_strs =
           Deferred.List.map element_ids ~f:(fun elt_id ->
-              query_db pool ~item:"Snapp field element" ~f:(fun db ->
-                  Processor.Snapp_state_data.load db elt_id))
+              query_db pool ~item:"Zkapp field element" ~f:(fun db ->
+                  Processor.Zkapp_state_data.load db elt_id))
         in
         let fields =
           List.map field_strs ~f:(fun field_str ->
@@ -991,27 +991,27 @@ module Snapp_helpers = struct
         | Some id ->
             let%map field_str =
               query_db pool
-                ~f:(fun db -> Processor.Snapp_state_data.load db id)
-                ~item:"Snapp state data"
+                ~f:(fun db -> Processor.Zkapp_state_data.load db id)
+                ~item:"Zkapp state data"
             in
             Some (Snark_params.Tick.Field.of_string field_str))
 
   let party_body_of_id ~pool body_id =
-    let%bind (body_data : Processor.Snapp_party_body.t) =
+    let%bind (body_data : Processor.Zkapp_party_body.t) =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_party_body.load db body_id)
-        ~item:"Snapp party body"
+        ~f:(fun db -> Processor.Zkapp_party_body.load db body_id)
+        ~item:"Zkapp party body"
     in
     let%bind public_key = pk_of_pk_id pool body_data.public_key_id in
     let%bind update_data =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_updates.load db body_data.update_id)
-        ~item:"snapp updates"
+        ~f:(fun db -> Processor.Zkapp_updates.load db body_data.update_id)
+        ~item:"zkapp updates"
     in
     let%bind app_state_data_ids =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_states.load db update_data.app_state_id)
-        ~item:"snapp app state ids"
+        ~f:(fun db -> Processor.Zkapp_states.load db update_data.app_state_id)
+        ~item:"zkapp app state ids"
     in
     let%bind app_state_data = state_data_of_ids ~pool app_state_data_ids in
     let app_state =
@@ -1030,10 +1030,10 @@ module Snapp_helpers = struct
       match update_data.verification_key_id with
       | Some id ->
           let%map ({ verification_key; hash }
-                    : Processor.Snapp_verification_keys.t) =
+                    : Processor.Zkapp_verification_keys.t) =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_verification_keys.load db id)
-              ~item:"snapp verification key"
+              ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
+              ~item:"zkapp verification key"
           in
           let data =
             Pickles.Side_loaded.Verification_key.of_base58_check_exn
@@ -1049,8 +1049,8 @@ module Snapp_helpers = struct
       | Some id ->
           let%map perms_data =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_permissions.load db id)
-              ~item:"snapp verification key"
+              ~f:(fun db -> Processor.Zkapp_permissions.load db id)
+              ~item:"zkapp verification key"
           in
           let perms : Mina_base.Permissions.t =
             { edit_state = perms_data.edit_state
@@ -1088,8 +1088,8 @@ module Snapp_helpers = struct
       | Some id ->
           let%map tm_info =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_timing_info.load db id)
-              ~item:"snapp timing info"
+              ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
+              ~item:"zkapp timing info"
           in
           Snapp_basic.Set_or_keep.Set
             { Party.Update.Timing_info.initial_minimum_balance =
@@ -1138,8 +1138,8 @@ module Snapp_helpers = struct
     in
     let%bind call_data_str =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_state_data.load db body_data.call_data_id)
-        ~item:"Snapp call data"
+        ~f:(fun db -> Processor.Zkapp_state_data.load db body_data.call_data_id)
+        ~item:"Zkapp call data"
     in
     let call_data = Snark_params.Tick.Field.of_string call_data_str in
     let call_depth = body_data.call_depth in
@@ -1147,8 +1147,8 @@ module Snapp_helpers = struct
       query_db pool
         ~f:(fun db ->
           Processor.Snapp_predicate_protocol_states.load db
-            body_data.snapp_predicate_protocol_state_id)
-        ~item:"Snapp predicate protocol state"
+            body_data.zkapp_predicate_protocol_state_id)
+        ~item:"Zkapp predicate protocol state"
     in
     let%bind snarked_ledger_hash =
       match protocol_state_data.snarked_ledger_hash_id with
@@ -1168,8 +1168,8 @@ module Snapp_helpers = struct
           return Snapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
-            query_db pool ~item:"Snapp timestamp bounds" ~f:(fun db ->
-                Processor.Snapp_timestamp_bounds.load db id)
+            query_db pool ~item:"Zkapp timestamp bounds" ~f:(fun db ->
+                Processor.Zkapp_timestamp_bounds.load db id)
           in
           let to_timestamp i64 = i64 |> Block_time.of_int64 in
           let lower = to_timestamp bounds.timestamp_lower_bound in
@@ -1182,8 +1182,8 @@ module Snapp_helpers = struct
           return Snapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
-            query_db pool ~item:"Snapp length bounds" ~f:(fun db ->
-                Processor.Snapp_length_bounds.load db id)
+            query_db pool ~item:"Zkapp length bounds" ~f:(fun db ->
+                Processor.Zkapp_length_bounds.load db id)
           in
           let to_length i64 =
             i64 |> Unsigned.UInt32.of_int64 |> Mina_numbers.Length.of_uint32
@@ -1204,8 +1204,8 @@ module Snapp_helpers = struct
           return Snapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
-            query_db pool ~item:"Snapp currency bounds" ~f:(fun db ->
-                Processor.Snapp_amount_bounds.load db id)
+            query_db pool ~item:"Zkapp currency bounds" ~f:(fun db ->
+                Processor.Zkapp_amount_bounds.load db id)
           in
           let to_amount i64 =
             i64 |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64
@@ -1225,8 +1225,8 @@ module Snapp_helpers = struct
           return Snapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
-            query_db pool ~item:"Snapp global slot bounds" ~f:(fun db ->
-                Processor.Snapp_global_slot_bounds.load db id)
+            query_db pool ~item:"Zkapp global slot bounds" ~f:(fun db ->
+                Processor.Zkapp_global_slot_bounds.load db id)
           in
           let to_slot i64 =
             i64 |> Unsigned.UInt32.of_int64
@@ -1245,19 +1245,19 @@ module Snapp_helpers = struct
     in
     let epoch_data_of_id id =
       let%bind epoch_data_raw =
-        query_db pool ~item:"Snapp epoch data" ~f:(fun db ->
-            Processor.Snapp_epoch_data.load db id)
+        query_db pool ~item:"Zkapp epoch data" ~f:(fun db ->
+            Processor.Zkapp_epoch_data.load db id)
       in
       let%bind ledger =
         let%bind epoch_ledger_data =
-          query_db pool ~item:"Snapp epoch ledger" ~f:(fun db ->
-              Processor.Snapp_epoch_ledger.load db id)
+          query_db pool ~item:"Zkapp epoch ledger" ~f:(fun db ->
+              Processor.Zkapp_epoch_ledger.load db id)
         in
         let%bind hash =
           Option.value_map epoch_ledger_data.hash_id
             ~default:(return Snapp_basic.Or_ignore.Ignore) ~f:(fun id ->
               let%map hash_str =
-                query_db pool ~item:"Snapp epoch ledger hash" ~f:(fun db ->
+                query_db pool ~item:"Zkapp epoch ledger hash" ~f:(fun db ->
                     Processor.Snarked_ledger_hash.load db id)
               in
               Snapp_basic.Or_ignore.Check
@@ -1355,17 +1355,17 @@ module Snapp_helpers = struct
       : Party.Body.Fee_payer.t )
 end
 
-let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
+let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     Parties.t Deferred.t =
   let%bind fee_payer_data =
     query_db pool
-      ~f:(fun db -> Processor.Snapp_fee_payers.load db cmd.fee_payer_id)
-      ~item:"Snapp fee payer"
+      ~f:(fun db -> Processor.Zkapp_fee_payers.load db cmd.fee_payer_id)
+      ~item:"Zkapp fee payer"
   in
   let%bind (fee_payer : Party.Fee_payer.t) =
     let%bind (data : Party.Predicated.Fee_payer.t) =
       let%bind (body : Party.Body.Fee_payer.t) =
-        Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
+        Zkapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
       in
       let predicate =
         fee_payer_data.nonce |> Unsigned.UInt32.of_int64
@@ -1377,40 +1377,40 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
   in
   let%bind (other_parties : Party.t list) =
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
-        let%bind snapp_party_data =
+        let%bind zkapp_party_data =
           query_db pool
-            ~f:(fun db -> Processor.Snapp_party.load db id)
-            ~item:"Snapp party"
+            ~f:(fun db -> Processor.Zkapp_party.load db id)
+            ~item:"Zkapp party"
         in
         let%bind (data : Party.Predicated.t) =
           let%bind (body : Party.Body.t) =
-            Snapp_helpers.party_body_of_id ~pool snapp_party_data.body_id
+            Zkapp_helpers.party_body_of_id ~pool zkapp_party_data.body_id
           in
           let%bind (predicate : Party.Predicate.t) =
             let%bind predicate_data =
-              query_db pool ~item:"Snapp predicate" ~f:(fun db ->
+              query_db pool ~item:"Zkapp predicate" ~f:(fun db ->
                   Processor.Snapp_predicate.load db
-                    snapp_party_data.predicate_id)
+                    zkapp_party_data.predicate_id)
             in
             match predicate_data.kind with
             | Full ->
-                let%bind snapp_account_data =
+                let%bind zkapp_account_data =
                   match predicate_data.account_id with
                   | None ->
                       failwith "Expected account id for predicate of kind Full"
                   | Some account_id ->
-                      query_db pool ~item:"Snapp account" ~f:(fun db ->
-                          Processor.Snapp_account.load db account_id)
+                      query_db pool ~item:"Zkapp account" ~f:(fun db ->
+                          Processor.Zkapp_account.load db account_id)
                 in
-                let%map snapp_account =
+                let%map zkapp_account =
                   let%bind balance =
-                    match snapp_account_data.balance_id with
+                    match zkapp_account_data.balance_id with
                     | None ->
                         return Snapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
                         let%map bounds =
-                          query_db pool ~item:"Snapp balance" ~f:(fun db ->
-                              Processor.Snapp_balance_bounds.load db balance_id)
+                          query_db pool ~item:"Zkapp balance" ~f:(fun db ->
+                              Processor.Zkapp_balance_bounds.load db balance_id)
                         in
                         let to_balance i64 =
                           i64 |> Unsigned.UInt64.of_int64
@@ -1423,13 +1423,13 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let%bind nonce =
-                    match snapp_account_data.nonce_id with
+                    match zkapp_account_data.nonce_id with
                     | None ->
                         return Snapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
                         let%map bounds =
-                          query_db pool ~item:"Snapp nonce" ~f:(fun db ->
-                              Processor.Snapp_nonce_bounds.load db balance_id)
+                          query_db pool ~item:"Zkapp nonce" ~f:(fun db ->
+                              Processor.Zkapp_nonce_bounds.load db balance_id)
                         in
                         let to_nonce i64 =
                           i64 |> Unsigned.UInt32.of_int64
@@ -1442,7 +1442,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let receipt_chain_hash =
-                    Option.value_map snapp_account_data.receipt_chain_hash
+                    Option.value_map zkapp_account_data.receipt_chain_hash
                       ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun s ->
                         Snapp_basic.Or_ignore.Check
                           (Receipt.Chain_hash.of_base58_check_exn s))
@@ -1455,31 +1455,31 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Snapp_basic.Or_ignore.Check pk)
                   in
                   let%bind public_key =
-                    pk_check_or_ignore_of_id snapp_account_data.public_key_id
+                    pk_check_or_ignore_of_id zkapp_account_data.public_key_id
                   in
                   let%bind delegate =
-                    pk_check_or_ignore_of_id snapp_account_data.delegate_id
+                    pk_check_or_ignore_of_id zkapp_account_data.delegate_id
                   in
                   let%bind state =
-                    let%bind snapp_state_ids =
-                      query_db pool ~item:"Snapp state id" ~f:(fun db ->
-                          Processor.Snapp_states.load db
-                            snapp_account_data.state_id)
+                    let%bind zkapp_state_ids =
+                      query_db pool ~item:"Zkapp state id" ~f:(fun db ->
+                          Processor.Zkapp_states.load db
+                            zkapp_account_data.state_id)
                     in
                     let%map state_data =
-                      Snapp_helpers.state_data_of_ids ~pool snapp_state_ids
+                      Zkapp_helpers.state_data_of_ids ~pool zkapp_state_ids
                     in
                     Array.map state_data ~f:Snapp_basic.Or_ignore.of_option
                     |> Array.to_list
                     |> Pickles_types.Vector.Vector_8.of_list_exn
                   in
                   let%bind sequence_state =
-                    Option.value_map snapp_account_data.sequence_state_id
+                    Option.value_map zkapp_account_data.sequence_state_id
                       ~default:(return Snapp_basic.Or_ignore.Ignore)
                       ~f:(fun state_id ->
                         let%map state_data_str =
-                          query_db pool ~item:"Snapp state data" ~f:(fun db ->
-                              Processor.Snapp_state_data.load db state_id)
+                          query_db pool ~item:"Zkapp state data" ~f:(fun db ->
+                              Processor.Zkapp_state_data.load db state_id)
                         in
                         let state_data =
                           Pickles.Backend.Tick.Field.of_string state_data_str
@@ -1487,7 +1487,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Snapp_basic.Or_ignore.Check state_data)
                   in
                   let proved_state =
-                    Option.value_map snapp_account_data.proved_state
+                    Option.value_map zkapp_account_data.proved_state
                       ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun b ->
                         Snapp_basic.Or_ignore.Check b)
                   in
@@ -1503,7 +1503,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       }
                       : Snapp_predicate.Account.t )
                 in
-                Party.Predicate.Full snapp_account
+                Party.Predicate.Full zkapp_account
             | Nonce -> (
                 match predicate_data.nonce with
                 | None ->
@@ -1520,7 +1520,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
         in
         let authorization =
           (* dummy proof, signature, don't affect replay *)
-          match snapp_party_data.authorization_kind with
+          match zkapp_party_data.authorization_kind with
           | Control.Tag.Proof ->
               let n2 = Pickles_types.Nat.N2.n in
               let proof = Pickles.Proof.dummy n2 n2 n2 in
@@ -1532,20 +1532,20 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
         in
         return ({ data; authorization } : Party.t))
   in
-  (* memo contents don't affect ability to replay snapp *)
+  (* memo contents don't affect ability to replay zkapp *)
   let memo = Mina_base.Signed_command_memo.dummy in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
-let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
-    (cmd : Sql.Snapp_command.t) =
+let run_zkapp_command ~logger ~pool ~ledger ~continue_on_error:_
+    (cmd : Sql.Zkapp_command.t) =
   [%log info]
-    "Applying Snapp command at global slot since genesis %Ld, and sequence \
+    "Applying Zkapp command at global slot since genesis %Ld, and sequence \
      number %d"
     cmd.global_slot_since_genesis cmd.sequence_no ;
   let%bind state_view =
-    Snapp_helpers.get_parent_state_view ~pool cmd.block_id
+    Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
-  let%bind parties = parties_of_snapp_command ~pool cmd in
+  let%bind parties = parties_of_zkapp_command ~pool cmd in
   match
     Ledger.apply_parties_unchecked ~constraint_constants ~state_view ledger
       parties
@@ -1553,7 +1553,7 @@ let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
   | Ok _ ->
       Deferred.unit
   | Error err ->
-      Error.tag_arg err "Snapp command failed on replay"
+      Error.tag_arg err "Zkapp command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
         , ("sequence number", cmd.sequence_no) )
         [%sexp_of: (string * int64) * (string * int)]
@@ -1727,16 +1727,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       let%bind user_cmd_ids =
         get_command_ids (module Sql.User_command_ids) "user"
       in
-      [%log info] "Loading Snapp command ids" ;
-      let%bind snapp_cmd_ids =
-        get_command_ids (module Sql.Snapp_command_ids) "Snapp"
+      [%log info] "Loading Zkapp command ids" ;
+      let%bind zkapp_cmd_ids =
+        get_command_ids (module Sql.Zkapp_command_ids) "Zkapp"
       in
       [%log info]
-        "Obtained %d user command ids, %d internal command ids, and %d Snapp \
+        "Obtained %d user command ids, %d internal command ids, and %d Zkapp \
          command ids"
         (List.length user_cmd_ids)
         (List.length internal_cmd_ids)
-        (List.length snapp_cmd_ids) ;
+        (List.length zkapp_cmd_ids) ;
       [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
@@ -1830,32 +1830,32 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2))
       in
-      [%log info] "Loading Snapp commands" ;
-      let%bind unsorted_snapp_cmds_list =
-        Deferred.List.map snapp_cmd_ids ~f:(fun id ->
+      [%log info] "Loading Zkapp commands" ;
+      let%bind unsorted_zkapp_cmds_list =
+        Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.Snapp_command.run db id) pool
+              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
             with
             | Ok [] ->
-                failwithf "Expected at least one Snapp command with id %d" id ()
-            | Ok snapp_cmds ->
-                snapp_cmds
+                failwithf "Expected at least one Zkapp command with id %d" id ()
+            | Ok zkapp_cmds ->
+                zkapp_cmds
             | Error msg ->
                 failwithf
-                  "Error querying for Snapp commands with id %d, error %s" id
+                  "Error querying for Zkapp commands with id %d, error %s" id
                   (Caqti_error.show msg) ())
       in
-      let unsorted_snapp_cmds = List.concat unsorted_snapp_cmds_list in
-      let filtered_snapp_cmds =
-        List.filter unsorted_snapp_cmds ~f:(fun (cmd : Sql.Snapp_command.t) ->
+      let unsorted_zkapp_cmds = List.concat unsorted_zkapp_cmds_list in
+      let filtered_zkapp_cmds =
+        List.filter unsorted_zkapp_cmds ~f:(fun (cmd : Sql.Zkapp_command.t) ->
             Int64.( >= ) cmd.global_slot_since_genesis
               input.start_slot_since_genesis
             && Int.Set.mem block_ids cmd.block_id)
       in
-      let sorted_snapp_cmds =
-        List.sort filtered_snapp_cmds ~compare:(fun sc1 sc2 ->
-            let tuple (sc : Sql.Snapp_command.t) =
+      let sorted_zkapp_cmds =
+        List.sort filtered_zkapp_cmds ~compare:(fun sc1 sc2 ->
+            let tuple (sc : Sql.Zkapp_command.t) =
               (sc.global_slot_since_genesis, sc.sequence_no)
             in
             [%compare: int64 * int] (tuple sc1) (tuple sc2))
@@ -1863,7 +1863,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list)
-          (snapp_cmds : Sql.Snapp_command.t list)
+          (zkapp_cmds : Sql.Zkapp_command.t list)
           ~last_global_slot_since_genesis ~last_block_id ~staking_epoch_ledger
           ~next_epoch_ledger =
         let%bind staking_epoch_ledger, staking_seed =
@@ -1934,7 +1934,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
               in
-              apply_commands ics2 user_cmds snapp_cmds
+              apply_commands ics2 user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
@@ -1944,7 +1944,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic
               in
-              apply_commands ics user_cmds snapp_cmds
+              apply_commands ics user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
@@ -1956,8 +1956,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         let get_user_cmd_sequence (uc : Sql.User_command.t) =
           (`User_command, uc.global_slot_since_genesis, uc.sequence_no)
         in
-        let get_snapp_cmd_sequence (sc : Sql.Snapp_command.t) =
-          (`Snapp_command, sc.global_slot_since_genesis, sc.sequence_no)
+        let get_zkapp_cmd_sequence (sc : Sql.Zkapp_command.t) =
+          (`Zkapp_command, sc.global_slot_since_genesis, sc.sequence_no)
         in
         let command_type_of_sequences seqs =
           let compare (_cmd_ty1, slot1, seq_no1) (_cmd_ty2, slot2, seq_no2) =
@@ -1973,20 +1973,20 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             run_user_command ~logger ~pool ~ledger ~continue_on_error
               ~repair_nonces ~set_nonces uc
           in
-          apply_commands internal_cmds ucs snapp_cmds
+          apply_commands internal_cmds ucs zkapp_cmds
             ~last_global_slot_since_genesis:uc.global_slot_since_genesis
             ~last_block_id:uc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
-        let run_snapp_commands (sc : Sql.Snapp_command.t) scs =
+        let run_zkapp_commands (sc : Sql.Zkapp_command.t) scs =
           log_on_slot_change sc.global_slot_since_genesis ;
           let%bind () =
-            run_snapp_command ~logger ~pool ~ledger ~continue_on_error sc
+            run_zkapp_command ~logger ~pool ~ledger ~continue_on_error sc
           in
           apply_commands internal_cmds user_cmds scs
             ~last_global_slot_since_genesis:sc.global_slot_since_genesis
             ~last_block_id:sc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
-        match (internal_cmds, user_cmds, snapp_cmds) with
+        match (internal_cmds, user_cmds, zkapp_cmds) with
         | [], [], [] ->
             (* all done *)
             log_ledger_hash_after_last_slot () ;
@@ -2003,30 +2003,30 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             (* only user commands *)
             run_user_commands uc ucs
         | [], [], sc :: scs ->
-            (* only Snapp commands *)
-            run_snapp_commands sc scs
+            (* only Zkapp commands *)
+            run_zkapp_commands sc scs
         | [], uc :: ucs, sc :: scs -> (
             (* no internal commands *)
             let seqs =
-              [ get_user_cmd_sequence uc; get_snapp_cmd_sequence sc ]
+              [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence sc ]
             in
             match command_type_of_sequences seqs with
             | `User_command ->
                 run_user_commands uc ucs
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                run_zkapp_commands sc scs )
         | ic :: ics, [], sc :: scs -> (
             (* no user commands *)
             let seqs =
-              [ get_internal_cmd_sequence ic; get_snapp_cmd_sequence sc ]
+              [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence sc ]
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
                 combine_or_run_internal_cmds ic ics
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                run_zkapp_commands sc scs )
         | ic :: ics, uc :: ucs, [] -> (
-            (* no Snapp commands *)
+            (* no Zkapp commands *)
             let seqs =
               [ get_internal_cmd_sequence ic; get_user_cmd_sequence uc ]
             in
@@ -2036,11 +2036,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             | `User_command ->
                 run_user_commands uc ucs )
         | ic :: ics, uc :: ucs, sc :: scs -> (
-            (* internal, user, and Snapp commands *)
+            (* internal, user, and Zkapp commands *)
             let seqs =
               [ get_internal_cmd_sequence ic
               ; get_user_cmd_sequence uc
-              ; get_snapp_cmd_sequence sc
+              ; get_zkapp_cmd_sequence sc
               ]
             in
             match command_type_of_sequences seqs with
@@ -2056,8 +2056,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                run_zkapp_commands sc scs )
       in
       let%bind unparented_ids =
         query_db pool
@@ -2107,7 +2107,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                , staking_seed
                , next_epoch_ledger
                , next_seed ) =
-        apply_commands sorted_internal_cmds sorted_user_cmds sorted_snapp_cmds
+        apply_commands sorted_internal_cmds sorted_user_cmds sorted_zkapp_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger

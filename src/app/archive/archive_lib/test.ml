@@ -111,7 +111,7 @@ let%test_module "Archive node unit tests" =
               >>| function
               | Some (`Signed_command_id signed_command_id) ->
                   Some signed_command_id
-              | Some (`Snapp_command_id _) | None ->
+              | Some (`Zkapp_command_id _) | None ->
                   None
             in
             [%test_result: int] ~expect:user_command_id
@@ -137,7 +137,7 @@ let%test_module "Archive node unit tests" =
             let%map result =
               Processor.User_command.find conn ~transaction_hash
               >>| function
-              | Some (`Snapp_command_id zkapp_command_id) ->
+              | Some (`Zkapp_command_id zkapp_command_id) ->
                   Some zkapp_command_id
               | Some (`Signed_command_id _) | None ->
                   None

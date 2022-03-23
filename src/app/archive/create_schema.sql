@@ -84,7 +84,7 @@ CREATE TABLE internal_commands
 , UNIQUE (hash,type)
 );
 
-/* import supporting Snapp-related tables */
+/* import supporting Zkapp-related tables */
 \ir zkapp_tables.sql
 
 CREATE TABLE zkapp_fee_payers

@@ -1021,7 +1021,7 @@ let pooled_user_commands =
          in
          print_string (Yojson.Safe.to_string json_response)))
 
-let pooled_snapp_commands =
+let pooled_zkapp_commands =
   let public_key_flag =
     Command.Param.(
       anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
@@ -1045,7 +1045,7 @@ let pooled_snapp_commands =
              let kvs = Yojson.Safe.Util.to_assoc raw_response in
              List.hd_exn kvs |> snd |> return
            with _ ->
-             eprintf "Failed to read result of pooled snapp commands" ;
+             eprintf "Failed to read result of pooled zkapp commands" ;
              exit 1
          in
          print_string (Yojson.Safe.to_string json_response)))
@@ -2285,7 +2285,7 @@ let advanced =
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
-    ; ("pooled-snapp-commands", pooled_snapp_commands)
+    ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
