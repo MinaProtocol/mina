@@ -48,7 +48,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
           (* choose constructor *)
           if b then
             (* Full *)
-            let open Snapp_basic in
+            let open Zkapp_basic in
             let%bind (predicate_account : Snapp_predicate.Account.t) =
               let%bind balance =
                 let%bind balance_change_int =
@@ -323,23 +323,23 @@ let gen_epoch_data_predicate
   let open Quickcheck.Let_syntax in
   let%bind ledger =
     let%bind hash =
-      Snapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
+      Zkapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
     in
     let%map total_currency =
       closed_interval_exact epoch_data.ledger.total_currency
-      |> return |> Snapp_basic.Or_ignore.gen
+      |> return |> Zkapp_basic.Or_ignore.gen
     in
     { Epoch_ledger.Poly.hash; total_currency }
   in
-  let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
+  let%bind seed = Zkapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =
-    Snapp_basic.Or_ignore.gen @@ return epoch_data.start_checkpoint
+    Zkapp_basic.Or_ignore.gen @@ return epoch_data.start_checkpoint
   in
   let%bind lock_checkpoint =
-    Snapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
+    Zkapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
   in
   let%map epoch_length =
-    Snapp_basic.Or_ignore.gen @@ return
+    Zkapp_basic.Or_ignore.gen @@ return
     @@ closed_interval_exact epoch_data.epoch_length
   in
   { Epoch_data.Poly.ledger
@@ -353,31 +353,31 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
     Snapp_predicate.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind snarked_ledger_hash =
-    Snapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
+    Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
   let%bind timestamp =
     Snapp_predicate.Closed_interval.
       { lower = psv.timestamp; upper = Block_time.max_value }
-    |> return |> Snapp_basic.Or_ignore.gen
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind blockchain_length =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.blockchain_length)
   in
   let%bind min_window_density =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.min_window_density)
   in
   let%bind total_currency =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.total_currency)
   in
   let%bind global_slot_since_hard_fork =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.global_slot_since_hard_fork)
   in
   let%bind global_slot_since_genesis =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.global_slot_since_genesis)
   in
   let%bind staking_epoch_data =

@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Snark_params.Tick
-open Snapp_basic
+open Zkapp_basic
 
 module Events = struct
   module Event = struct

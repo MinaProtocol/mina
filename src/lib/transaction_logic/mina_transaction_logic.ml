@@ -1455,9 +1455,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies false, `Signature_verifies false)
 
       module Update = struct
-        open Snapp_basic
+        open Zkapp_basic
 
-        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+        type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
@@ -1465,7 +1465,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let app_state (party : t) = party.data.body.update.app_state
 
         let verification_key (party : t) =
-          Snapp_basic.Set_or_keep.map ~f:Option.some
+          Zkapp_basic.Set_or_keep.map ~f:Option.some
             party.data.body.update.verification_key
 
         let sequence_events (party : t) = party.data.body.sequence_events
@@ -1483,7 +1483,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Set_or_keep = struct
-      include Snapp_basic.Set_or_keep
+      include Zkapp_basic.Set_or_keep
 
       let set_or_keep ~if_:_ t x = set_or_keep t x
     end

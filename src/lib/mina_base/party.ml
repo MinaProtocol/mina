@@ -174,7 +174,7 @@ module Update = struct
       |> finish "Timing" ~t_toplevel_annots
   end
 
-  open Snapp_basic
+  open Zkapp_basic
 
   [%%versioned
   module Stable = struct
@@ -278,7 +278,7 @@ module Update = struct
             , Field.Constant.t )
             With_hash.t
             Data_as_hash.t )
-          Snapp_basic.Flagged_option.t
+          Zkapp_basic.Flagged_option.t
           Set_or_keep.Checked.t
       ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
       ; zkapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
@@ -387,10 +387,10 @@ module Update = struct
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Snapp_basic.Flagged_option.data; _ } -> data))
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data))
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
-                   { Snapp_basic.Flagged_option.data
+                   { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    }))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ

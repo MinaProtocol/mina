@@ -37,7 +37,7 @@ let%test_module "Snapp payments tests" =
                   ; update =
                       { app_state =
                           Pickles_types.Vector.map new_state ~f:(fun x ->
-                              Snapp_basic.Set_or_keep.Set x)
+                              Zkapp_basic.Set_or_keep.Set x)
                       ; delegate = Keep
                       ; verification_key = Keep
                       ; permissions = Keep
