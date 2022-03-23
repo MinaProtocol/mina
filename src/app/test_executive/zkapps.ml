@@ -195,7 +195,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Quickcheck.Generator.list_with_length len
                Snark_params.Tick.Field.gen)
         in
-        List.map fields ~f:(fun field -> Snapp_basic.Set_or_keep.Set field)
+        List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
         |> Zkapp_state.V.of_list_exn
       in
       let new_delegate =
@@ -277,9 +277,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
-      | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+      | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
           true
-      | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+      | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
           equal v1 v2
       | Set _, Keep ->
           false

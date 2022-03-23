@@ -1015,16 +1015,16 @@ module Zkapp_helpers = struct
     in
     let%bind app_state_data = state_data_of_ids ~pool app_state_data_ids in
     let app_state =
-      Array.map app_state_data ~f:Snapp_basic.Set_or_keep.of_option
+      Array.map app_state_data ~f:Zkapp_basic.Set_or_keep.of_option
       |> Array.to_list |> Pickles_types.Vector.Vector_8.of_list_exn
     in
     let%bind delegate =
       match update_data.delegate_id with
       | Some id ->
           let%map pk = pk_of_pk_id pool id in
-          Snapp_basic.Set_or_keep.Set pk
+          Zkapp_basic.Set_or_keep.Set pk
       | None ->
-          return Snapp_basic.Set_or_keep.Keep
+          return Zkapp_basic.Set_or_keep.Keep
     in
     let%bind verification_key =
       match update_data.verification_key_id with
@@ -1040,9 +1040,9 @@ module Zkapp_helpers = struct
               verification_key
           in
           let hash = Snark_params.Tick.Field.of_string hash in
-          Snapp_basic.Set_or_keep.Set { With_hash.data; hash }
+          Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
       | None ->
-          return Snapp_basic.Set_or_keep.Keep
+          return Zkapp_basic.Set_or_keep.Keep
     in
     let%bind permissions =
       match update_data.permissions_id with
@@ -1066,32 +1066,32 @@ module Zkapp_helpers = struct
             ; set_voting_for = perms_data.set_voting_for
             }
           in
-          Snapp_basic.Set_or_keep.Set perms
+          Zkapp_basic.Set_or_keep.Set perms
       | None ->
-          return Snapp_basic.Set_or_keep.Keep
+          return Zkapp_basic.Set_or_keep.Keep
     in
     let zkapp_uri =
-      update_data.zkapp_uri |> Snapp_basic.Set_or_keep.of_option
+      update_data.zkapp_uri |> Zkapp_basic.Set_or_keep.of_option
     in
     let token_symbol =
-      update_data.token_symbol |> Snapp_basic.Set_or_keep.of_option
+      update_data.token_symbol |> Zkapp_basic.Set_or_keep.of_option
     in
     let voting_for =
       update_data.voting_for
       |> Option.map ~f:State_hash.of_base58_check_exn
-      |> Snapp_basic.Set_or_keep.of_option
+      |> Zkapp_basic.Set_or_keep.of_option
     in
     let%bind timing =
       match update_data.timing_id with
       | None ->
-          return Snapp_basic.Set_or_keep.Keep
+          return Zkapp_basic.Set_or_keep.Keep
       | Some id ->
           let%map tm_info =
             query_db pool
               ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
               ~item:"zkapp timing info"
           in
-          Snapp_basic.Set_or_keep.Set
+          Zkapp_basic.Set_or_keep.Set
             { Party.Update.Timing_info.initial_minimum_balance =
                 tm_info.initial_minimum_balance |> Unsigned.UInt64.of_int64
                 |> Currency.Balance.of_uint64
@@ -1165,7 +1165,7 @@ module Zkapp_helpers = struct
     let%bind timestamp =
       match protocol_state_data.timestamp_id with
       | None ->
-          return Snapp_basic.Or_ignore.Ignore
+          return Zkapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Zkapp timestamp bounds" ~f:(fun db ->
@@ -1174,12 +1174,12 @@ module Zkapp_helpers = struct
           let to_timestamp i64 = i64 |> Block_time.of_int64 in
           let lower = to_timestamp bounds.timestamp_lower_bound in
           let upper = to_timestamp bounds.timestamp_upper_bound in
-          Snapp_basic.Or_ignore.Check
+          Zkapp_basic.Or_ignore.Check
             ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let length_bounds_of_id = function
       | None ->
-          return Snapp_basic.Or_ignore.Ignore
+          return Zkapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Zkapp length bounds" ~f:(fun db ->
@@ -1190,7 +1190,7 @@ module Zkapp_helpers = struct
           in
           let lower = to_length bounds.length_lower_bound in
           let upper = to_length bounds.length_upper_bound in
-          Snapp_basic.Or_ignore.Check
+          Zkapp_basic.Or_ignore.Check
             ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind blockchain_length =
@@ -1201,7 +1201,7 @@ module Zkapp_helpers = struct
     in
     let total_currency_of_id = function
       | None ->
-          return Snapp_basic.Or_ignore.Ignore
+          return Zkapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Zkapp currency bounds" ~f:(fun db ->
@@ -1212,7 +1212,7 @@ module Zkapp_helpers = struct
           in
           let lower = to_amount bounds.amount_lower_bound in
           let upper = to_amount bounds.amount_upper_bound in
-          Snapp_basic.Or_ignore.Check
+          Zkapp_basic.Or_ignore.Check
             ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     (* TODO: this will change *)
@@ -1222,7 +1222,7 @@ module Zkapp_helpers = struct
     in
     let global_slot_of_id = function
       | None ->
-          return Snapp_basic.Or_ignore.Ignore
+          return Zkapp_basic.Or_ignore.Ignore
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Zkapp global slot bounds" ~f:(fun db ->
@@ -1234,7 +1234,7 @@ module Zkapp_helpers = struct
           in
           let lower = to_slot bounds.global_slot_lower_bound in
           let upper = to_slot bounds.global_slot_upper_bound in
-          Snapp_basic.Or_ignore.Check
+          Zkapp_basic.Or_ignore.Check
             ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
     in
     let%bind global_slot_since_hard_fork =
@@ -1255,12 +1255,12 @@ module Zkapp_helpers = struct
         in
         let%bind hash =
           Option.value_map epoch_ledger_data.hash_id
-            ~default:(return Snapp_basic.Or_ignore.Ignore) ~f:(fun id ->
+            ~default:(return Zkapp_basic.Or_ignore.Ignore) ~f:(fun id ->
               let%map hash_str =
                 query_db pool ~item:"Zkapp epoch ledger hash" ~f:(fun db ->
                     Processor.Snarked_ledger_hash.load db id)
               in
-              Snapp_basic.Or_ignore.Check
+              Zkapp_basic.Or_ignore.Check
                 (Frozen_ledger_hash.of_base58_check_exn hash_str))
         in
         let%map total_currency =
@@ -1270,12 +1270,12 @@ module Zkapp_helpers = struct
       in
       let seed =
         Option.value_map epoch_data_raw.epoch_seed
-          ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun s ->
-            Snapp_basic.Or_ignore.Check (Epoch_seed.of_base58_check_exn s))
+          ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
+            Zkapp_basic.Or_ignore.Check (Epoch_seed.of_base58_check_exn s))
       in
       let checkpoint_of_str str =
-        Option.value_map str ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun s ->
-            Snapp_basic.Or_ignore.Check (State_hash.of_base58_check_exn s))
+        Option.value_map str ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
+            Zkapp_basic.Or_ignore.Check (State_hash.of_base58_check_exn s))
       in
       let start_checkpoint =
         checkpoint_of_str epoch_data_raw.start_checkpoint
@@ -1406,7 +1406,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                   let%bind balance =
                     match zkapp_account_data.balance_id with
                     | None ->
-                        return Snapp_basic.Or_ignore.Ignore
+                        return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
                         let%map bounds =
                           query_db pool ~item:"Zkapp balance" ~f:(fun db ->
@@ -1418,14 +1418,14 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                         in
                         let lower = to_balance bounds.balance_lower_bound in
                         let upper = to_balance bounds.balance_upper_bound in
-                        Snapp_basic.Or_ignore.Check
+                        Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let%bind nonce =
                     match zkapp_account_data.nonce_id with
                     | None ->
-                        return Snapp_basic.Or_ignore.Ignore
+                        return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
                         let%map bounds =
                           query_db pool ~item:"Zkapp nonce" ~f:(fun db ->
@@ -1437,22 +1437,22 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                         in
                         let lower = to_nonce bounds.nonce_lower_bound in
                         let upper = to_nonce bounds.nonce_upper_bound in
-                        Snapp_basic.Or_ignore.Check
+                        Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let receipt_chain_hash =
                     Option.value_map zkapp_account_data.receipt_chain_hash
-                      ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun s ->
-                        Snapp_basic.Or_ignore.Check
+                      ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
+                        Zkapp_basic.Or_ignore.Check
                           (Receipt.Chain_hash.of_base58_check_exn s))
                   in
                   let pk_check_or_ignore_of_id id =
                     Option.value_map id
-                      ~default:(return Snapp_basic.Or_ignore.Ignore)
+                      ~default:(return Zkapp_basic.Or_ignore.Ignore)
                       ~f:(fun pk_id ->
                         let%map pk = pk_of_pk_id pool pk_id in
-                        Snapp_basic.Or_ignore.Check pk)
+                        Zkapp_basic.Or_ignore.Check pk)
                   in
                   let%bind public_key =
                     pk_check_or_ignore_of_id zkapp_account_data.public_key_id
@@ -1469,13 +1469,13 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                     let%map state_data =
                       Zkapp_helpers.state_data_of_ids ~pool zkapp_state_ids
                     in
-                    Array.map state_data ~f:Snapp_basic.Or_ignore.of_option
+                    Array.map state_data ~f:Zkapp_basic.Or_ignore.of_option
                     |> Array.to_list
                     |> Pickles_types.Vector.Vector_8.of_list_exn
                   in
                   let%bind sequence_state =
                     Option.value_map zkapp_account_data.sequence_state_id
-                      ~default:(return Snapp_basic.Or_ignore.Ignore)
+                      ~default:(return Zkapp_basic.Or_ignore.Ignore)
                       ~f:(fun state_id ->
                         let%map state_data_str =
                           query_db pool ~item:"Zkapp state data" ~f:(fun db ->
@@ -1484,12 +1484,12 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
                         let state_data =
                           Pickles.Backend.Tick.Field.of_string state_data_str
                         in
-                        Snapp_basic.Or_ignore.Check state_data)
+                        Zkapp_basic.Or_ignore.Check state_data)
                   in
                   let proved_state =
                     Option.value_map zkapp_account_data.proved_state
-                      ~default:Snapp_basic.Or_ignore.Ignore ~f:(fun b ->
-                        Snapp_basic.Or_ignore.Check b)
+                      ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
+                        Zkapp_basic.Or_ignore.Check b)
                   in
                   return
                     ( { balance

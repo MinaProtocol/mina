@@ -12,7 +12,7 @@ open Signature_lib
 module A = Account
 open Mina_numbers
 open Currency
-open Snapp_basic
+open Zkapp_basic
 open Pickles_types
 module Impl = Pickles.Impls.Step
 
@@ -1025,7 +1025,7 @@ module Protocol_state = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     (* TODO: pass in ledger hash, next available token *)
-    let snarked_ledger_hash = Snapp_basic.Or_ignore.Ignore in
+    let snarked_ledger_hash = Zkapp_basic.Or_ignore.Ignore in
     let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =

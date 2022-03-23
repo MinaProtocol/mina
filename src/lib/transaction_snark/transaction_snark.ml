@@ -1155,10 +1155,10 @@ module Base = struct
               , Field.Constant.t )
               With_hash.t
               Data_as_hash.t )
-            Snapp_basic.Flagged_option.t
+            Zkapp_basic.Flagged_option.t
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
-            Snapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+            Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
         module Events = struct
@@ -1434,7 +1434,7 @@ module Base = struct
         end
 
         module Opt = struct
-          open Snapp_basic
+          open Zkapp_basic
 
           type 'a t = (Bool.t, 'a) Flagged_option.t
 
@@ -1691,7 +1691,7 @@ module Base = struct
             , `Signature_verifies signature_verifies )
 
           module Update = struct
-            open Snapp_basic
+            open Zkapp_basic
 
             type 'a set_or_keep = 'a Set_or_keep.Checked.t
 
@@ -1724,7 +1724,7 @@ module Base = struct
         end
 
         module Set_or_keep = struct
-          include Snapp_basic.Set_or_keep.Checked
+          include Zkapp_basic.Set_or_keep.Checked
         end
 
         module Amount = struct
@@ -4312,15 +4312,15 @@ module For_tests = struct
        balance changes for other new snapp accounts are just the account creation fee
     *)
     assert (
-      Snapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
+      Zkapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
       || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
     ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
-        verification_key = Snapp_basic.Set_or_keep.Set vk
+        verification_key = Zkapp_basic.Set_or_keep.Set vk
       ; permissions =
-          Snapp_basic.Set_or_keep.Set
+          Zkapp_basic.Set_or_keep.Set
             { Permissions.user_default with
               edit_state = Permissions.Auth_required.Proof
             ; edit_sequence_state = Proof
@@ -4505,7 +4505,7 @@ module For_tests = struct
     let update_empty_permissions =
       let permissions =
         { Permissions.user_default with send = Permissions.Auth_required.Proof }
-        |> Snapp_basic.Set_or_keep.Set
+        |> Zkapp_basic.Set_or_keep.Set
       in
       { Party.Update.dummy with permissions }
     in

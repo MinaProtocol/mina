@@ -70,7 +70,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; new_zkapp_account = true
         ; zkapp_update =
             (let timing =
-               Snapp_basic.Set_or_keep.Set
+               Zkapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance =
                        Currency.Balance.of_int 5_000_000_000
                    ; cliff_time = Mina_numbers.Global_slot.of_int 10000
@@ -171,7 +171,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let zkapp_update : Party.Update.t =
         { Party.Update.dummy with
           timing =
-            Snapp_basic.Set_or_keep.Set
+            Zkapp_basic.Set_or_keep.Set
               { initial_minimum_balance = Currency.Balance.of_int 9_000_000_000
               ; cliff_time = Mina_numbers.Global_slot.of_int 4000
               ; cliff_amount = Currency.Amount.of_int 100_000

@@ -327,7 +327,7 @@ module Zkapp_updates = struct
       =
     let open Deferred.Result.Let_syntax in
     let%bind app_state_id =
-      Vector.map ~f:Snapp_basic.Set_or_keep.to_option update.app_state
+      Vector.map ~f:Zkapp_basic.Set_or_keep.to_option update.app_state
       |> Zkapp_states.add_if_doesn't_exist (module Conn)
     in
     let%bind delegate_id =
@@ -350,11 +350,11 @@ module Zkapp_updates = struct
         (Zkapp_timing_info.add_if_doesn't_exist (module Conn))
         update.timing
     in
-    let zkapp_uri = Snapp_basic.Set_or_keep.to_option update.zkapp_uri in
-    let token_symbol = Snapp_basic.Set_or_keep.to_option update.token_symbol in
+    let zkapp_uri = Zkapp_basic.Set_or_keep.to_option update.zkapp_uri in
+    let token_symbol = Zkapp_basic.Set_or_keep.to_option update.token_symbol in
     let voting_for =
       Option.map ~f:State_hash.to_base58_check
-        (Snapp_basic.Set_or_keep.to_option update.voting_for)
+        (Zkapp_basic.Set_or_keep.to_option update.voting_for)
     in
     let value =
       { app_state_id
@@ -494,7 +494,7 @@ module Zkapp_account = struct
         acct.delegate
     in
     let%bind state_id =
-      Vector.map ~f:Snapp_basic.Or_ignore.to_option acct.state
+      Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
       |> Zkapp_states.add_if_doesn't_exist (module Conn)
     in
     let%bind sequence_state_id =
@@ -503,10 +503,10 @@ module Zkapp_account = struct
         acct.sequence_state
     in
     let receipt_chain_hash =
-      Snapp_basic.Or_ignore.to_option acct.receipt_chain_hash
+      Zkapp_basic.Or_ignore.to_option acct.receipt_chain_hash
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
-    let proved_state = Snapp_basic.Or_ignore.to_option acct.proved_state in
+    let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
     let value =
       { balance_id
       ; nonce_id
@@ -946,15 +946,15 @@ module Zkapp_epoch_data = struct
         epoch_data.epoch_length
     in
     let epoch_seed =
-      Snapp_basic.Or_ignore.to_option epoch_data.seed
+      Zkapp_basic.Or_ignore.to_option epoch_data.seed
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let start_checkpoint =
-      Snapp_basic.Or_ignore.to_option epoch_data.start_checkpoint
+      Zkapp_basic.Or_ignore.to_option epoch_data.start_checkpoint
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let lock_checkpoint =
-      Snapp_basic.Or_ignore.to_option epoch_data.lock_checkpoint
+      Zkapp_basic.Or_ignore.to_option epoch_data.lock_checkpoint
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let value =
