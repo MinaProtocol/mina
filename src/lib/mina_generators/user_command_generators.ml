@@ -77,10 +77,10 @@ let parties_with_ledger () =
       Some
         With_hash.
           { data = Side_loaded_verification_key.dummy
-          ; hash = Snapp_account.dummy_vk_hash ()
+          ; hash = Zkapp_account.dummy_vk_hash ()
           }
     in
-    let snapp = Some { Snapp_account.default with verification_key } in
+    let snapp = Some { Zkapp_account.default with verification_key } in
     { account with permissions; snapp }
   in
   (* half Snapp accounts, half non-Snapp accounts *)

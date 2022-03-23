@@ -259,7 +259,7 @@ let%test_module "multisig_account" =
                 spec
               in
               let vk =
-                With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+                With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk
               in
               let total =
                 Option.value_exn Currency.Amount.(add (of_fee fee) amount)
@@ -288,7 +288,7 @@ let%test_module "multisig_account" =
                      { Permissions.user_default with set_permissions = Proof }
                  ; snapp =
                      Some
-                       { (Option.value ~default:Snapp_account.default a.snapp) with
+                       { (Option.value ~default:Zkapp_account.default a.snapp) with
                          verification_key = Some vk
                        }
                  }) ;

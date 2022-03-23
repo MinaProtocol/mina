@@ -75,7 +75,7 @@ let account = salt account
 
 let side_loaded_vk = salt side_loaded_vk
 
-let snapp_account = salt snapp_account
+let zkapp_account = salt zkapp_account
 
 let snapp_payload = salt snapp_payload
 

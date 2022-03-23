@@ -9,7 +9,7 @@ struct
     let new_verification_key :
         (Side_loaded.Verification_key.t, Zkapp_basic.F.t) With_hash.t =
       let data = Pickles.Side_loaded.Verification_key.dummy in
-      let hash = Snapp_account.dummy_vk_hash () in
+      let hash = Zkapp_account.dummy_vk_hash () in
       ({ data; hash } : _ With_hash.t)
     in
     { Party.Update.dummy with
