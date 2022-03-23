@@ -59,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_int 2_000_000_000 in
+    let amount = Currency.Amount.of_int 2_000_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let test_constants = Engine.Network.constraint_constants network in
     let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
@@ -159,7 +159,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (Mina_base.Account_id.create receiver_pub_key Token_id.default) *)
          in
          let node_a_expected =
-           (* 40_000_000_000_000 is the original amount, change this is original amount changes *)
+           (* 40_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
            Currency.Amount.add
              (Currency.Amount.of_int 40_000_000_000_000)
              amount
@@ -169,7 +169,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let node_b_expected =
            Currency.Amount.sub
              ( Currency.Amount.add
-                 (* 30_000_000_000_000 is the original amount, change this is original amount changes *)
+                 (* 30_000_000_000_000 is hardcoded the original amount, change this is original amount changes *)
                  (Currency.Amount.of_int 30_000_000_000_000)
                  test_constants.coinbase_amount
              |> Option.value_exn )
@@ -191,6 +191,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 40_000_000_000_000 + txn_amount *)
+           (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
