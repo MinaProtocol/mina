@@ -1629,6 +1629,8 @@ type proof = (Pickles_types.Nat.z, Pickles_types.Nat.z) Pickles.Proof.t
 
 module Statement_with_proof =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
+module Branching_0 =
+  Pickles.Proof.Make (Pickles_types.Nat.N0) (Pickles_types.Nat.N0)
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
@@ -1694,6 +1696,16 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         let key = Lazy.force Proof.verification_key in
         new%js other_verification_key_constr
           (Pickles.Verification_key.index key)
+  end
+
+let proof_to_string proof =
+  proof |> Branching_0.to_yojson |> Yojson.Safe.to_string |> Js.string
+
+let pickles =
+  object%js
+    val compile = pickles_compile
+
+    val proofToString = proof_to_string
   end
 
 module Ledger = struct
@@ -2685,7 +2697,7 @@ let export () =
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit ;
   Js.export "Ledger" Ledger.ledger_class ;
-  Js.export "picklesCompile" pickles_compile
+  Js.export "Pickles" pickles
 
 let export_global () =
   let snarky_obj =
@@ -2699,7 +2711,7 @@ let export_global () =
          ; ("Poseidon", i poseidon)
          ; ("Circuit", i Circuit.circuit)
          ; ("Ledger", i Ledger.ledger_class)
-         ; ("picklesCompile", i pickles_compile)
+         ; ("Pickles", i pickles)
         |])
   in
   Js.Unsafe.(set global (Js.string "__snarky") snarky_obj)
