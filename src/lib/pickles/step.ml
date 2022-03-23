@@ -24,7 +24,7 @@ struct
   let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
-    type t = Tock.Field.t array Dlog_plonk_types.Evals.t Double.t * Tock.Field.t
+    type t = Tock.Field.t array Plonk_types.Evals.t Double.t * Tock.Field.t
   end
 
   module Plonk_checks = struct
@@ -350,7 +350,7 @@ struct
           in
           let open As_field in
           let combine ~ft_eval (x_hat : Tock.Field.t) pt e =
-            let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
+            let a, b = Plonk_types.Evals.(to_vectors (e : _ array t)) in
             let v : (Tock.Field.t array, _) Vector.t =
               Vector.append
                 (Vector.map b_polys ~f:(fun f -> [| f pt |]))
@@ -611,7 +611,7 @@ struct
     ; prev_evals =
         Vector.extend
           (Vector.map2 prev_evals x_hats ~f:(fun (es, ft_eval1) x_hat ->
-               Dlog_plonk_types.All_evals.
+               Plonk_types.All_evals.
                  { ft_eval1
                  ; evals =
                      Double.map2 es x_hat ~f:(fun es x_hat ->

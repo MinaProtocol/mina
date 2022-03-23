@@ -270,7 +270,7 @@ struct
                    ~f:(Array.map ~f:(fun x -> `Finite x)))
                 (Vector.map with_degree_bound
                    ~f:
-                     (let open Dlog_plonk_types.Poly_comm.With_degree_bound in
+                     (let open Plonk_types.Poly_comm.With_degree_bound in
                      fun { shifted; unshifted } ->
                        let f x = `Maybe_finite x in
                        { unshifted = Array.map ~f unshifted
@@ -340,7 +340,7 @@ struct
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array)
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
-      ~(messages : _ Dlog_plonk_types.Messages.t) ~openings_proof
+      ~(messages : _ Plonk_types.Messages.t) ~openings_proof
       ~(plonk :
          ( _
          , _
@@ -354,7 +354,7 @@ struct
         in
         let sample () = squeeze_challenge sponge in
         let sample_scalar () = squeeze_scalar sponge in
-        let open Dlog_plonk_types.Messages in
+        let open Plonk_types.Messages in
         let x_hat =
           with_label "x_hat" (fun () ->
               multiscale_known
@@ -389,7 +389,7 @@ struct
            against "combined_inner_product" *)
         let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm
-            (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+            (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
         let ft_comm =
           with_label __LOC__ (fun () ->
@@ -415,7 +415,7 @@ struct
               :: [| m.psm_comm |]
               :: Vector.append w_comm
                    (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                   (snd Dlog_plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
               (snd (Branching.add num_commitments_without_degree_bound))
           in
           with_label "check_bulletproof" (fun () ->
@@ -471,7 +471,7 @@ struct
 
   let shifts ~log2_size =
     Common.tick_shifts ~log2_size
-    |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+    |> Plonk_types.Shifts.map ~f:Impl.Field.constant
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -628,7 +628,7 @@ struct
     end )
 
   module Split_evaluations = struct
-    open Dlog_plonk_types
+    open Plonk_types
 
     let mask' { Bounded.max; actual } : Boolean.var array =
       let (T max) = Nat.of_int max in
@@ -722,7 +722,7 @@ struct
         | [] ->
             failwith "empty list")
 
-  open Dlog_plonk_types
+  open Plonk_types
 
   module Opt_sponge = struct
     include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
@@ -786,7 +786,7 @@ struct
         , _
         , _ )
         Types.Dlog_based.Proof_state.Deferred_values.In_circuit.t)
-      { Dlog_plonk_types.All_evals.ft_eval1
+      { Plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
@@ -850,10 +850,8 @@ struct
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
       let zetaw_n : Field.t = pow2_pow zetaw n in
-      ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Dlog_plonk_types.Evals.map
-          ~f:(actual_evaluation ~pt_to_n:zetaw_n)
-          evals2 )
+      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
+      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
     in
     let env =
       with_label "scalars_env" (fun () ->
@@ -1039,8 +1037,8 @@ struct
     Boolean.false_
 
   let verify ~branching ~is_base_case ~sg_old
-      ~(opening : _ Pickles_types.Dlog_plonk_types.Openings.Bulletproof.t)
-      ~messages ~wrap_domain ~wrap_verification_key statement
+      ~(opening : _ Pickles_types.Plonk_types.Openings.Bulletproof.t) ~messages
+      ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
         ( _
         , _

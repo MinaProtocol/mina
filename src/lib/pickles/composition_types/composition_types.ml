@@ -616,7 +616,7 @@ module Step = struct
     end
 
     module Bulletproof = struct
-      include Dlog_plonk_types.Openings.Bulletproof
+      include Plonk_types.Openings.Bulletproof
 
       module Advice = struct
         (* This is data that can be computed in linear time from the above plus the statement.

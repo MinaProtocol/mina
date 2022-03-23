@@ -6,7 +6,7 @@ open Core_kernel
 open Util
 module SC = Scalar_challenge
 open Pickles_types
-open Dlog_plonk_types
+open Plonk_types
 open Tuple_lib
 open Import
 
@@ -487,7 +487,7 @@ struct
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
-        let open Dlog_plonk_types.Messages in
+        let open Plonk_types.Messages in
         let x_hat =
           with_label __LOC__ (fun () ->
               let domain = (which_branch, step_domains) in
@@ -543,7 +543,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Dlog_plonk_types.Poly_comm.Without_degree_bound.t =
+            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
@@ -751,7 +751,7 @@ struct
         , _ Shifted_value.Type2.t
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t)
-      { Dlog_plonk_types.All_evals.ft_eval1
+      { Plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
@@ -791,10 +791,8 @@ struct
       (* TODO: zeta_n is recomputed in [env] below *)
       let zeta_n = pow2pow plonk.zeta n in
       let zetaw_n = pow2pow zetaw n in
-      ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Dlog_plonk_types.Evals.map
-          ~f:(actual_evaluation ~pt_to_n:zetaw_n)
-          evals2 )
+      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
+      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
     in
     let env =
       Plonk_checks.scalars_env

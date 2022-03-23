@@ -176,10 +176,10 @@ module Make (Inputs : Inputs_intf) = struct
           assert false
     in
     { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Permuts.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
           ~f:(fun i -> g t.evals.sigma_comm.(i))
     ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Columns.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
           ~f:(fun i -> g t.evals.coefficients_comm.(i))
     ; generic_comm = g t.evals.generic_comm
     ; psm_comm = g t.evals.psm_comm

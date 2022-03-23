@@ -153,10 +153,10 @@ let verify_heterogenous (ts : Instance.t list) =
           (absorb sponge, squeeze)
         in
         let absorb_evals
-            { Dlog_plonk_types.All_evals.With_public_input.public_input = x_hat
+            { Plonk_types.All_evals.With_public_input.public_input = x_hat
             ; evals = e
             } =
-          let xs, ys = Dlog_plonk_types.Evals.to_vectors e in
+          let xs, ys = Plonk_types.Evals.to_vectors e in
           List.iter
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:absorb)

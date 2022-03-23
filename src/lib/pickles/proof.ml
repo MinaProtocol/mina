@@ -5,7 +5,7 @@ open Types
 open Common
 open Backend
 
-let hash_fold_array = Pickles_types.Dlog_plonk_types.hash_fold_array
+let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
 
 module Base = struct
   module Me_only = Reduced_me_only
@@ -66,7 +66,7 @@ module Base = struct
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t array )
-              Dlog_plonk_types.All_evals.Stable.V1.t
+              Plonk_types.All_evals.Stable.V1.t
           ; proof : Tock.Proof.Stable.V2.t
           }
         [@@deriving compare, sexp, yojson, hash, equal]
@@ -87,8 +87,7 @@ module Base = struct
             Step_bp_vec.t
           , Index.t )
           Types.Dlog_based.Statement.Minimal.t
-      ; prev_evals :
-          (Tick.Field.t, Tick.Field.t array) Dlog_plonk_types.All_evals.t
+      ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
       ; proof : Tock.Proof.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
@@ -180,12 +179,12 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
         }
     ; prev_evals =
         (let e () =
-           Dlog_plonk_types.Evals.map
+           Plonk_types.Evals.map
              (Evaluation_lengths.create ~of_int:Fn.id)
              ~f:tick_arr
          in
          let ex () =
-           { Dlog_plonk_types.All_evals.With_public_input.public_input = tick ()
+           { Plonk_types.All_evals.With_public_input.public_input = tick ()
            ; evals = e ()
            }
          in

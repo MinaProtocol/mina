@@ -114,8 +114,7 @@ let pack_statement max_branching t =
         (Types.Step.Statement.to_data t))
 
 let shifts ~log2_size =
-  Common.tock_shifts ~log2_size
-  |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+  Common.tock_shifts ~log2_size |> Plonk_types.Shifts.map ~f:Impl.Field.constant
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -287,7 +286,7 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Dlog_plonk_types.All_evals.typ
+                    Plonk_types.All_evals.typ
                       (Evaluation_lengths.create ~of_int:Fn.id)
                       Field.typ ~default:Field.Constant.zero
                   in
@@ -389,7 +388,7 @@ let wrap_main
         let openings_proof =
           let shift = Shifts.tick1 in
           exists
-            (Dlog_plonk_types.Openings.Bulletproof.typ
+            (Plonk_types.Openings.Bulletproof.typ
                ( Typ.transport Other_field.Packed.typ
                    ~there:(fun x ->
                      (* When storing, make it a shifted value *)
@@ -418,7 +417,7 @@ let wrap_main
           let messages =
             with_label __LOC__ (fun () ->
                 exists
-                  (Dlog_plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
+                  (Plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
                      Inner_curve.typ ~bool:Boolean.typ
                      ~commitment_lengths:
                        (Commitment_lengths.create ~of_int:Fn.id))

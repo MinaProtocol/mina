@@ -54,7 +54,7 @@ let combined_inner_product (type actual_branching) ~env ~domain ~ft_eval1
   in
   let pi = AB.add Nat.N26.n in
   let combine ~ft (x_hat : Tick.Field.t) pt e =
-    let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
+    let a, b = Plonk_types.Evals.(to_vectors (e : _ array t)) in
     let v : (Tick.Field.t array, _) Vector.t =
       Vector.append
         (Vector.map b_polys ~f:(fun f -> [| f pt |]))
@@ -93,7 +93,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       , (_, actual_branching) Vector.t
       , (_, actual_branching) Vector.t
       , max_local_max_branchings H1.T(P.Base.Me_only.Dlog_based).t
-      , ( (Tock.Field.t, Tock.Field.t array) Dlog_plonk_types.All_evals.t
+      , ( (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t
         , max_branching )
         Vector.t )
       P.Base.Step.t) =
@@ -376,9 +376,9 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   ( { proof = next_proof
     ; statement = Types.Dlog_based.Statement.to_minimal next_statement
     ; prev_evals =
-        { Dlog_plonk_types.All_evals.evals =
+        { Plonk_types.All_evals.evals =
             Double.map2 x_hat proof.openings.evals ~f:(fun p e ->
-                { Dlog_plonk_types.All_evals.With_public_input.public_input = p
+                { Plonk_types.All_evals.With_public_input.public_input = p
                 ; evals = e
                 })
         ; ft_eval1 = proof.openings.ft_eval1

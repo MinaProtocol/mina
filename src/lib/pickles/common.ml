@@ -223,8 +223,7 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     ~t_comm =
   let ( * ) x g = scale g x in
   let _, [ sigma_comm_last ] =
-    Vector.split m.sigma_comm
-      (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+    Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
     (* The poseidon and generic gates are special cases,
