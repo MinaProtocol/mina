@@ -176,6 +176,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              amount
            |> Option.value_exn
          in
+         [%log info] "coinbase_amount: %s"
+           (Currency.Amount.to_formatted_string test_constants.coinbase_amount) ;
+         [%log info] "txn_amount: %s"
+           (Currency.Amount.to_formatted_string amount) ;
+         [%log info] "node_a_expected: %s"
+           (Currency.Amount.to_formatted_string node_a_expected) ;
+         [%log info] "node_b_expected: %s"
+           (Currency.Amount.to_formatted_string node_b_expected) ;
+         [%log info] "node_a_balance: %s"
+           (Currency.Balance.to_formatted_string node_a_balance) ;
+         [%log info] "node_b_balance: %s"
+           (Currency.Balance.to_formatted_string node_b_balance) ;
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 40_000_000_000_000 + txn_amount *)
@@ -192,11 +204,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.soft_error_format ~value:()
              "Error with account balances.  receiving node_a balance is %d and \
               should be at least %d, node_b balance is %d and should be at \
-              most %d"
+              most %d.  possible coinbase_amount is %d, and txn_amount is %d"
              (Currency.Balance.to_int node_a_balance)
              (Currency.Amount.to_int node_a_expected)
              (Currency.Balance.to_int node_b_balance)
-             (Currency.Amount.to_int node_b_expected))
+             (Currency.Amount.to_int node_b_expected)
+             (Currency.Amount.to_int test_constants.coinbase_amount)
+             (Currency.Amount.to_int amount))
     in
     let%bind () =
       section
