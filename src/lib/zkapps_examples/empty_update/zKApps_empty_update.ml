@@ -165,12 +165,35 @@ module Party_under_construction = struct
   end
 end
 
+(* TODO: Move this somewhere convenient. *)
+let dummy_constraints () =
+  let open Run in
+  let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
+  let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
+  ignore
+    ( Pickles.Scalar_challenge.to_field_checked'
+        (module Impl)
+        ~num_bits:16
+        (Kimchi_backend_common.Scalar_challenge.create x)
+      : Field.t * Field.t * Field.t ) ;
+  ignore
+    ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+      : Pickles.Step_main_inputs.Inner_curve.t ) ;
+  ignore
+    ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+      : Pickles.Step_main_inputs.Inner_curve.t ) ;
+  ignore
+    ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+        (Kimchi_backend_common.Scalar_challenge.create x)
+      : Field.t * Field.t )
+
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
 let main public_key ([] : _ H1.T(Id).t)
     ({ transaction; at_party } : Snapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t =
+  dummy_constraints () ;
   let party =
     Party_under_construction.In_circuit.create
       ~public_key:(Public_key.Compressed.var_of_t public_key)

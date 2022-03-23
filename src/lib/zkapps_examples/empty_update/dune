@@ -4,9 +4,11 @@
    ;; opam libraries
    core_kernel
    ;; local libraries
+   crypto_params
    currency
    kimchi
    kimchi_backend
+   kimchi_backend_common
    kimchi_pasta
    mina_base
    pickles
@@ -16,7 +18,8 @@
    snarky.backendless
    snark_params
    sgn
-   signature_lib)
+   signature_lib
+   tuple_lib)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
