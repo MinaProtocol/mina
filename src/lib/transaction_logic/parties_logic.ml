@@ -262,7 +262,7 @@ module type Party_intf = sig
 
     type field
 
-    val app_state : t -> field set_or_keep Snapp_state.V.t
+    val app_state : t -> field set_or_keep Zkapp_state.V.t
 
     type verification_key
 
@@ -444,9 +444,9 @@ module type Account_intf = sig
 
   type field
 
-  val app_state : t -> field Snapp_state.V.t
+  val app_state : t -> field Zkapp_state.V.t
 
-  val set_app_state : field Snapp_state.V.t -> t -> t
+  val set_app_state : field Zkapp_state.V.t -> t -> t
 
   val register_verification_key : t -> unit
 

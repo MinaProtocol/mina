@@ -504,7 +504,7 @@ module Node = struct
                 |> Base.List.map ~f:(fun s ->
                        Set (Pickles.Backend.Tick.Field.of_string s))
               in
-              return (Mina_base.Snapp_state.V.of_list_exn fields)
+              return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
               fail
                 (Error.of_string

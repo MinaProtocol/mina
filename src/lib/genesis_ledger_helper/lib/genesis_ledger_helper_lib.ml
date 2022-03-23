@@ -122,14 +122,14 @@ module Accounts = struct
             } ->
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
+                Pickles_types.Vector.Nat.to_int Zkapp_state.Max_state_size.n
                 <> List.length state
               then
                 Or_error.errorf
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t (List.length state)
-              else Ok (Snapp_state.V.of_list_exn state)
+              else Ok (Zkapp_state.V.of_list_exn state)
             in
             let verification_key =
               Option.map verification_key
@@ -270,7 +270,7 @@ module Accounts = struct
                ; proved_state
                }
              ->
-            let state = Snapp_state.V.to_list app_state in
+            let state = Zkapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:With_hash.data
             in

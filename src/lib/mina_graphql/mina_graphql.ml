@@ -1324,7 +1324,7 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp
                    |> Option.map ~f:(fun snapp_account ->
-                          snapp_account.app_state |> Snapp_state.V.to_list
+                          snapp_account.app_state |> Zkapp_state.V.to_list
                           |> List.map ~f:Zkapp_basic.F.to_string))
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"

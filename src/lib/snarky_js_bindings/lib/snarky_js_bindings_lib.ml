@@ -1539,7 +1539,7 @@ type snapp_statement_js =
   ; atParty : field_class Js.t Js.readonly_prop >
   Js.t
 
-module Snapp_statement = struct
+module Zkapp_statement = struct
   type t = Field.t snapp_statement
 
   let to_field_elements = snapp_statement_to_fields
@@ -1615,7 +1615,7 @@ let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   ; main =
       (fun _ statement ->
         dummy_constraints () ;
-        main (Snapp_statement.to_js statement) ;
+        main (Zkapp_statement.to_js statement) ;
         [])
   ; main_value = (fun _ _ -> [])
   }
@@ -1634,8 +1634,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
-      (module Snapp_statement)
-      (module Snapp_statement.Constant)
+      (module Zkapp_statement)
+      (module Zkapp_statement.Constant)
       ~typ:snapp_statement_typ
       ~branches:(module Pickles_types.Nat.N1)
       ~max_branching:(module Pickles_types.Nat.N0)
@@ -1659,14 +1659,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     let prove (statement_js : snapp_statement_js) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
-      let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+      let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
+         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
       -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
     function
     | [] ->
@@ -1675,7 +1675,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         to_js_prover p :: to_js_provers ps
   in
   let verify (statement_js : snapp_statement_js) (proof : proof) =
-    let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+    let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
@@ -1927,7 +1927,7 @@ module Ledger = struct
   module Snapp_predicate = Mina_base.Snapp_predicate
   module Party = Mina_base.Party
   module Parties = Mina_base.Parties
-  module Snapp_state = Mina_base.Snapp_state
+  module Zkapp_state = Mina_base.Zkapp_state
   module Token_id = Mina_base.Token_id
   module Zkapp_basic = Mina_base.Zkapp_basic
 
@@ -2074,7 +2074,7 @@ module Ledger = struct
 
   let update (u : party_update) : Party.Update.t =
     { app_state =
-        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
             set_or_keep field (array_get_exn u##.appState i))
     ; delegate = set_or_keep public_key u##.delegate
     ; verification_key =
@@ -2161,7 +2161,7 @@ module Ledger = struct
           ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
           ; sequence_state = or_ignore field p##.sequenceState
           ; proved_state =
@@ -2191,7 +2191,7 @@ module Ledger = struct
   let account_id pk =
     Mina_base.Account_id.create (public_key pk) Token_id.default
 
-  let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+  let max_state_size = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
 
   (*
      TODO: to de-scope initial version, the following types are converted
@@ -2355,7 +2355,7 @@ module Ledger = struct
       let update : Party.Update.Checked.t =
         let u = b##.update in
         { app_state =
-            Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
         ; (* TODO *) verification_key =
@@ -2411,7 +2411,7 @@ module Ledger = struct
       ; public_key = ignore pk_dummy
       ; delegate = ignore pk_dummy
       ; state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
               ignore Field.zero)
       ; sequence_state = ignore Field.zero
       ; proved_state = ignore Boolean.false_
@@ -2437,7 +2437,7 @@ module Ledger = struct
           ; public_key = or_ignore public_key predicate##.publicKey
           ; delegate = or_ignore public_key predicate##.delegate
           ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i ->
                   or_ignore field (array_get_exn predicate##.state i))
           ; sequence_state = or_ignore field predicate##.sequenceState
