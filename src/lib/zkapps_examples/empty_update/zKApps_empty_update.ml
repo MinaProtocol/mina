@@ -1,4 +1,3 @@
-open Core_kernel
 open Pickles_types.Hlist
 open Snark_params.Tick
 open Currency
@@ -166,18 +165,15 @@ module Party_under_construction = struct
   end
 end
 
-(* TODO: Pickles should allow you to inject auxiliary values / handlers. *)
-let public_key = ref None
-
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let main ([] : _ H1.T(Id).t)
+let main public_key ([] : _ H1.T(Id).t)
     ({ transaction; at_party } : Snapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t =
   let party =
     Party_under_construction.In_circuit.create
-      ~public_key:(Option.value_exn !public_key)
+      ~public_key:(Public_key.Compressed.var_of_t public_key)
       ~token_id:Token_id.(Checked.constant default)
       ()
   in
@@ -200,5 +196,16 @@ let main_value ([] : _ H1.T(Id).t) (_ : Snapp_statement.t) :
     _ H1.T(E01(Core_kernel.Bool)).t =
   []
 
-let rule : _ Pickles.Inductive_rule.t =
-  { identifier = "Empty update"; prevs = []; main; main_value }
+let rule public_key : _ Pickles.Inductive_rule.t =
+  { identifier = "Empty update"
+  ; prevs = []
+  ; main = main public_key
+  ; main_value
+  }
+
+(* TODO: This shouldn't exist, the circuit should just return the requisite
+         value.
+*)
+let generate_party public_key =
+  Party_under_construction.create ~public_key ~token_id:Token_id.default ()
+  |> Party_under_construction.to_party

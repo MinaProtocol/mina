@@ -17,8 +17,6 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
-let () = ZKApps_empty_update.public_key := Some pk_compressed
-
 let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
   Pickles.compile ~cache:Cache_dir.cache
     (module Snapp_statement.Checked)
@@ -30,14 +28,15 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
          constraint_constants)
-    ~choices:(fun ~self -> [ ZKApps_empty_update.rule; dummy_rule self ])
+    ~choices:(fun ~self ->
+      [ ZKApps_empty_update.rule pk_compressed; dummy_rule self ])
 
 module P = (val p_module)
 
 let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
 (* TODO: This should be entirely unnecessary. *)
-let party_body = ZKApps_empty_update.generate_party ()
+let party_body = ZKApps_empty_update.generate_party pk_compressed
 
 let party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
