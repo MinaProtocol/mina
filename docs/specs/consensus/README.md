@@ -1136,20 +1136,20 @@ Simultaneously, due to Ouroboros security requirements, the distance in slots be
 ```text
 genesis ........................................................ tip
                   ^                       ^            ^
-                  c                       n            k
+                  s                       n            k
                                                        ❄
 ```
 
-Peers MUST maintain the epoch ledger of the `k`-th predecessor so that they have all information available when it is time to transition the epoch ledgers, what Mina refers to as a *root move*.  Specifically, the root move does the following
+Peers MUST maintain the epoch ledger of the `k`-th predecessor so that they have all information available when it is time to transition the epoch ledgers-- what Mina refers to as a *root move*.  Specifically, the root move does the following
 
 ```text
-c <- n        a.k.a.       staking_ledger <- next_ledger
+s <- n        a.k.a.       staking_ledger <- next_ledger
 n <- k                     next_ledger    <- final_ledger
 ```
 
 Peers MUST maintain the epoch ledger of the `k`-th predecessor from the `tip` and implement epoch ledger transitions atomically as part of chain selection, for example, in a hook.
 
-The `final_ledger` (epoch ledger of the `k`-th predecessor from the `tip`) is updated each time chain selection occurs, i.e., for every new `tip` block appended.  The *root move* update happens every `2/3*slots_per_epoch` slots.
+The `final_ledger` (epoch ledger of the `k`-th predecessor from the `tip`) is updated each time chain selection occurs, i.e., for every new `tip` block appended.  The *root move* update happens at the start of a new epoch.
 
 Note that since all of these pointers are at or beyond *the point of finality* peers are not required to handle blockchain reorganizations, i.e., single copies of the three epoch ledgers is sufficient.
 
@@ -1157,7 +1157,7 @@ Note that since all of these pointers are at or beyond *the point of finality* p
 
 **WIP**
 
-For a joining peer to discover the head of the current chain it MUST not only obtain the `tip`, but also the `min(k, tip.height - 1)`-th block hack from the tip.  For the latter the peer MUST check the block's *proof of finality*.
+For a joining peer to discover the head of the current chain it MUST not only obtain the `tip`, but also the `min(k, tip.height - 1)`-th block back from the tip.  For the latter the peer MUST check the block's *proof of finality*.
 
 Peers perform the proof of finality check by verifying a zero-knowledge proof.  Details about this are presented in the `Verification Specification`.
 
