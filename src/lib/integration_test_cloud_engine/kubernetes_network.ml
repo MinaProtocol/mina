@@ -185,7 +185,7 @@ module Node = struct
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-      ?(initial_delay_sec = 30.0) ~logger ~node ~query_name query_obj =
+      ?(initial_delay_sec = 0.) ~logger ~node ~query_name query_obj =
     let open Deferred.Let_syntax in
     if not node.config.graphql_enabled then
       Deferred.Or_error.error_string
