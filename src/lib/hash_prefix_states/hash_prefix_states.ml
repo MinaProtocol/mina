@@ -81,11 +81,11 @@ let snapp_payload = salt snapp_payload
 
 let snapp_body = salt snapp_body
 
-let snapp_predicate = salt snapp_predicate
+let zkapp_precondition = salt zkapp_precondition
 
-let snapp_predicate_account = salt snapp_predicate_account
+let zkapp_precondition_account = salt zkapp_precondition_account
 
-let snapp_predicate_protocol_state = salt snapp_predicate_protocol_state
+let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
 
 let party = salt party
 

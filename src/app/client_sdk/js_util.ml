@@ -54,7 +54,7 @@ let payload_of_fee_payer_party_js
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = Zkapp_precondition.Protocol_state.accept
           ; use_full_commitment = ()
           }
       ; predicate = nonce

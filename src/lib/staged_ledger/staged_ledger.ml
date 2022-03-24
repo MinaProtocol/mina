@@ -1987,7 +1987,7 @@ let%test_module "staged ledger tests" =
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk)
-        ~(current_state_view : Snapp_predicate.Protocol_state.View.t)
+        ~(current_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~state_and_body_hash sl txns stmt_to_work =
       let open Deferred.Let_syntax in
       let supercharge_coinbase =
@@ -2425,7 +2425,7 @@ let%test_module "staged ledger tests" =
               in
               let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
-                  Snapp_predicate.Protocol_state.digest protocol_state
+                  Zkapp_precondition.Protocol_state.digest protocol_state
                 in
                 let tx_commitment =
                   Parties.Transaction_commitment.create ~other_parties_hash
@@ -3218,7 +3218,7 @@ let%test_module "staged ledger tests" =
         -> int option list
         -> int list
         -> (State_hash.t * State_body_hash.t) list
-        -> Mina_base.Snapp_predicate.Protocol_state.View.t
+        -> Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Sl.t ref
         -> Ledger.Mask.Attached.t
         -> [ `One_prover | `Many_provers ]

@@ -311,7 +311,8 @@ let%test_module "multisig_account" =
                         ; sequence_events = []
                         ; call_data = Field.zero
                         ; call_depth = 0
-                        ; protocol_state = Snapp_predicate.Protocol_state.accept
+                        ; protocol_state =
+                            Zkapp_precondition.Protocol_state.accept
                         ; use_full_commitment = ()
                         }
                     ; predicate = sender_nonce
@@ -332,7 +333,7 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -350,13 +351,13 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Full Snapp_predicate.Account.accept
+                ; predicate = Full Zkapp_precondition.Account.accept
                 }
               in
-              let protocol_state = Snapp_predicate.Protocol_state.accept in
+              let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
@@ -368,7 +369,7 @@ let%test_module "multisig_account" =
               let other_parties_hash = Parties.Call_forest.hash ps in
               let protocol_state_predicate_hash =
                 (*FIXME: is this ok? *)
-                Snapp_predicate.Protocol_state.digest protocol_state
+                Zkapp_precondition.Protocol_state.digest protocol_state
               in
               let transaction : Parties.Transaction_commitment.t =
                 (*FIXME: is this correct? *)
