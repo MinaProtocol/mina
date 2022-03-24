@@ -4,6 +4,14 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/03/24:
+
+- Fix: When a transaction is received in the same block that a transaction is
+  sent, the nonce returned by the account-balance lookup returns an older nonce.
+  There was also another edge case that hasn't occurred yet where nonces could
+  be off-by-one, this is also now fixed.
+- Release of rosetta-v18-beta2 with above changes
+
 2022/03/18:
 
 - Ensured memo is returned in user commands from /block endpoint
