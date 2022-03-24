@@ -28,8 +28,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "8_000_000_000"; timing = Untimed }
-        ; { balance = "1_000_000_000"; timing = Untimed }
+        [ { balance = "8000000000"; timing = Untimed }
+        ; { balance = "1000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts = [ { keypair; balance = "1000" } ]
     ; num_snark_workers = 2
