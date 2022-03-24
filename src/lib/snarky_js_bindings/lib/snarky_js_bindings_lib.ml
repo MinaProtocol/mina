@@ -1621,27 +1621,42 @@ let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   ; main_value = (fun _ _ -> [])
   }
 
+let dummy_rule self =
+  { identifier = "dummy"
+  ; prevs = [ self; self ]
+  ; main_value = (fun _ _ -> [ true; true ])
+  ; main =
+      (fun _ _ ->
+        dummy_constraints () ;
+        (* unsatisfiable *)
+        let x =
+          Impl.exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+        in
+        Field.(Assert.equal x (x + one)) ;
+        Boolean.[ true_; true_ ])
+  }
+
 let other_verification_key_constr :
     (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
   Obj.magic verification_key_class
 
-type proof = (Pickles_types.Nat.z, Pickles_types.Nat.z) Pickles.Proof.t
+type proof = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
 
 module Statement_with_proof =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
-module Branching_0 =
-  Pickles.Proof.Make (Pickles_types.Nat.N0) (Pickles_types.Nat.N0)
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
-  let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
+  let choices ~self =
+    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ] |> Obj.magic
+  in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
       ~typ:snapp_statement_typ
-      ~branches:(module Pickles_types.Nat.N1)
-      ~max_branching:(module Pickles_types.Nat.N0)
+      ~branches:(module Pickles_types.Nat.N2)
+      ~max_branching:(module Pickles_types.Nat.N2)
       ~name:"smart-contract"
       ~constraint_constants:
         (* TODO these are dummy values *)
@@ -1699,7 +1714,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   end
 
 let proof_to_string proof =
-  proof |> Branching_0.to_yojson |> Yojson.Safe.to_string |> Js.string
+  proof |> Pickles.Side_loaded.Proof.to_yojson |> Yojson.Safe.to_string
+  |> Js.string
 
 let pickles =
   object%js
