@@ -21,7 +21,7 @@ end
 module Input = Random_oracle_input
 
 let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+  Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
@@ -133,8 +133,7 @@ module Checked = struct
   let update ~state xs = update params ~state xs
 
   let hash ?init xs =
-    O1trace.measure "Random_oracle.hash" (fun () ->
-        hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
+    hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
 
   let pack_input =
     Input.Chunked.pack_to_fields
@@ -206,7 +205,7 @@ module Legacy = struct
   module Input = Random_oracle_input.Legacy
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_legacy ~f:Field.of_string)
 
   module Rounds = struct
     let rounds_full = 63

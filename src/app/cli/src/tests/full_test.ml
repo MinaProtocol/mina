@@ -6,7 +6,6 @@ open Mina_base
 open Mina_state
 open Signature_lib
 open Pipe_lib
-open O1trace
 open Init
 open Mina_numbers
 
@@ -273,21 +272,15 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
-        trace_recurring "build_payment" (fun () ->
+        O1trace.sync_thread "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
               Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo ~valid_until:None
-              ~body:
-                (Payment
-                   { source_pk = signer
-                   ; receiver_pk
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+              ~memo ~valid_until:None
+              ~body:(Payment { source_pk = signer; receiver_pk; amount })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))

@@ -10,17 +10,17 @@ module Field = struct
 
   (* Converts a byterray into a [Field.t], raises an exception if the number obtained is larger than the order *)
   let of_bytes bytearray =
+    let module N = Bignum_bigint in
     let aux i acc c =
-      let big = Nat.of_int @@ int_of_char c in
-      let offset = Nat.shift_left big (Int.( * ) i 8) in
-      Nat.(acc + offset)
+      let big = N.of_int @@ int_of_char c in
+      let offset = N.shift_left big (Int.( * ) i 8) in
+      N.(acc + offset)
     in
-    let zero = Nat.of_int 0 in
+    let zero = N.of_int 0 in
     let big = Array.foldi bytearray ~init:zero ~f:aux in
-    let one = Nat.of_int 1 in
-    if Nat.(order - one < big) then
+    if N.(size - one < big) then
       failwith "the given field is larger than the order" ;
-    of_bigint big
+    Snark_params.Tick.Bigint.(to_field (of_bignum_bigint big))
 
   (* Converts a field element into an hexadecimal string (encoding the field element in little-endian) *)
   let to_hex field =
@@ -36,7 +36,7 @@ module Field = struct
         ~f:byte_of_bits
       |> String.of_char_list
     in
-    let bytearray = to_bits field |> bits_to_bytes in
+    let bytearray = unpack field |> bits_to_bytes in
     Hex.encode bytearray
 end
 
@@ -82,7 +82,7 @@ module Hash = struct
   include Sponge.Make_hash (Sponge.Poseidon (Config))
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
 
   let update ~state = update ~state params
 

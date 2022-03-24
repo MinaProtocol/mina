@@ -692,7 +692,10 @@ module Data = struct
       in
       let%bind () =
         [%with_label "Account is for the default token"]
-          Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
+          (make_checked (fun () ->
+               Token_id.(
+                 Checked.Assert.equal account.token_id
+                   (Checked.constant default))))
       in
       let%bind () =
         [%with_label "Block stake winner matches account pk"]

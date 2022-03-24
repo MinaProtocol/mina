@@ -16,6 +16,7 @@
    core_kernel
    core
    ;; local libraries
+   signature_lib
    pickles.backend
    outside_hash_image
    pickles
@@ -24,6 +25,7 @@
    genesis_constants
    block_time
    mina_base
+   mina_transaction_logic
    snark_params
    consensus
    bitstring_lib
@@ -41,5 +43,6 @@
    kimchi_backend
    mina_base.util
    mina_ledger
+   unsigned_extended
    )
 )

@@ -40,18 +40,6 @@ module Body : sig
           Poly.Stable.V1.t
         [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
       end
-
-      module V1 : sig
-        type t =
-          ( State_hash.Stable.V1.t
-          , Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving equal, ord, hash, sexp, to_yojson]
-
-        val to_latest : t -> V2.t
-      end
     end]
   end
 
@@ -85,13 +73,6 @@ module Value : sig
     module V2 : sig
       type t = (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson]
-    end
-
-    module V1 : sig
-      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, yojson]
-
-      val to_latest : t -> V2.t
     end
   end]
 

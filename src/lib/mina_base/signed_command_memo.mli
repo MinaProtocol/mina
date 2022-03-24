@@ -45,6 +45,11 @@ val of_base58_check : string -> t Or_error.t
 
 val of_base58_check_exn : string -> t
 
+(** for a memo of bytes, return a plaintext string
+    for a memo of a digest, return a hex-encoded string, prefixed by '0x'
+*)
+val to_string_hum : t -> string
+
 (** is the memo a digest *)
 val is_digest : t -> bool
 
@@ -104,6 +109,8 @@ val deriver :
           (unit -> Yojson.Safe.t Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; graphql_fields :
           Yojson.Safe.t Fields_derivers_snapps.Graphql.Fields.Input.T.t ref
+      ; graphql_query : string option ref
+      ; graphql_query_accumulator : (string * string option) list ref
       ; map : (Yojson.Safe.t -> t) ref
       ; nullable_graphql_arg :
           (   unit

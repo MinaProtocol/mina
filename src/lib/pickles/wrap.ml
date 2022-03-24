@@ -351,7 +351,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   let me_only_prepared =
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
-  let%map.Deferred next_proof =
+  let%map.Promise next_proof =
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
