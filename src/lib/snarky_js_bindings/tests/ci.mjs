@@ -67,6 +67,7 @@ if (command === "deploy") {
 if (command === "update") {
   // compile once more, to get the provers :'/
   let { provers } = SimpleZkapp.compile(zkappAddress);
+  // TODO getting length mismatch because proof to_string / of_string differ
   let partiesJson = await call(
     SimpleZkapp,
     zkappAddress,
@@ -74,7 +75,7 @@ if (command === "update") {
     [Field(3)],
     provers
   );
-  // TODO add proof to tx, sign
+  // TODO sign
   console.log(partiesJson);
 }
 

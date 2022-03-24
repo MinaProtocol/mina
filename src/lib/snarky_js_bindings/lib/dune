@@ -8,6 +8,7 @@
    integers
    sexplib0
    yojson
+   ppx_deriving_yojson.runtime
    ;; local libraries ;;
    mina_base
    mina_base.import
