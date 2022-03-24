@@ -6,11 +6,11 @@ testnetName: "testnet"
 image:
   repository: minaprotocol/mina-daemon
   pullPolicy: IfNotPresent
-  tag: 1.2.1alpha1-1f98b8b-devnet
+  tag: latest
 
 features:
   logsnarkworkgossip:
-    enabled: true
+    enabled: false
   enablepeerexchange:
     enabled: true
   runtimeConfig:
@@ -20,7 +20,12 @@ features:
     enabled: false
   exposeGraphql:
     enabled: false
-  uploadBlocksToGCloud:   # Added this
+  # requires a secret but not pulicly available - it is available in the test namespace
+  uploadBlocksToGCloud:
+    enabled: true
+  seedPeersLists:
+    enabled:  true 
+  seedPeers:
     enabled: true
   customEntrypoint:
     enabled: false
@@ -28,61 +33,54 @@ features:
   prometheus:
     enabled: true
   persistence:
+    # for every deploy the name must be unique 
     enabled: true
     name: "generic-node-volume"
     storageClass: standard-delete
     mountPath: /data/
     size: 100Gi
   privateKeySecret:
-    enabled: true
+    enabled: false
     secretName: "generic-node-devnet-bp-key"
-  daemon:
-    args:
-      - "--libp2p-metrics-port"
-      - "9000"
-      - "--log-txn-pool-gossip"
-      - "true"
-      - "--peer-list-url"
-      - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
-      - "--enable-peer-exchange"
-      - "true"
+
+daemon:
+  enabled: false
+  args:
+    - "--libp2p-metrics-port"
+    - "9000"
   seedPeers: []
 
-publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-snarkFee: "0.025"
-workSelectionAlgorithm: seq #seq OR rand
+coordinator:
+  enabled: false
+  publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+  snarkFee: "0.025"
+  workSelectionAlgorithm: seq #seq OR rand
 
 archive:
-  enabled: true
+  enabled: false
   image:
     repository: minaprotocol/mina-archive
     pullPolicy: IfNotPresent
-    tag: 1.2.1alpha1-1f98b8b-devnet
+    tag: latest
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
   enabled: false
   image:
-    repository: minaprotocol/mina-rosetta-ubuntu
+    repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
-    tag: 1.3.0alpha2-compatible-513333d-stretch
+    tag: latest
   pg_conn: 'postgres://postgresql:5432'
-  graphql_host: 'http://127.0.0.1'
+  graphql_host: 'http://127.0.0.1'  
 
-daemon:
-  enabled: false
-
-  libp2p:
+libp2p:
   seed:
     enabled: true
   staticKeypair:
-    enabled: true
+    enabled: false
     secretName: "generic-node-devnet-libp2p-key"
   loadBalancer:
-    enabled: true
-
-servicekey:
-  secretName: "faucet-service-key"
+    enabled: false
 
 ports:
   client: "8301"
@@ -97,8 +95,8 @@ ports:
 resources:
   limits:
   requests:
-    memory: "32Gi"
-    cpu: "12"
+    memory: "16Gi"
+    cpu: "8"
     rayonThreads: "6"
 
 healthcheck:
@@ -113,3 +111,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: true
+
+restartEveryMins: ""
+restartNodes: ""
+seedPeersURL: ""
+---

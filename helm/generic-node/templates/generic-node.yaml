@@ -90,7 +90,6 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
-        - "-run-snark-coordinator"
         - "$(CODA_SNARK_KEY)"
         - "-snark-worker-fee"
         - "$(CODA_SNARK_FEE)"
@@ -103,14 +102,6 @@ spec:
         - "true"
         - "--namespace"
         - ""
-        {{-  if .Values.features.enablepeerexchange.enabled}}
-        - "-enable-peer-exchange"
-        - "true"
-        {{- end }}
-        {{-  if .Values.features.logsnarkworkgossip.enabled}}
-        - "-log-snark-work-gossip"
-        - "true"
-        {{- end }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - "--discovery-keypair"
         - "/root/libp2p-keys/key"
@@ -141,6 +132,22 @@ spec:
         {{-  if .Values.features.persistence.enabled}}
         - "--config-directory"
         - "{{.Values.features.persistence.mountPath}}/.mina-config"
+        {{- end }}
+        {{-  if .Values.features.seedPeersLists.enabled}}
+        - "--peer-list-url"
+        - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
+        {{- end }}
+        {{-  if .Values.daemon.args}}
+        {{- for args in list}}
+        - {{ .| quote }}
+        {{- end }}
+        {{-  if .Values.rosetta.args}}
+        {{- for args in list}}
+        - {{ .| quote }}
+        {{- end }}
+        {{-  if .Values.archive.args}}
+        {{- for args in list}}
+        - {{ .| quote }}
         {{- end }}
         env:
         - name: DAEMON_REST_PORT
@@ -173,16 +180,10 @@ spec:
           value: {{ .Values.restartEveryMins | quote }}
         - name: "RESTART_NODES"
           value: {{ .Values.restartNodes | quote }}
-        - name: "MAKE_REPORTS"
-          value: {{ .Values.makeReports | quote }}
-        - name: "MAKE_REPORT_EVERY_MINS"
-          value: {{ .Values.makeReportEveryMins | quote }}
-        - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
-          value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
-        - name: "MAKE_REPORT_ACCOUNTS"
-          value: {{ .Values.makeReportAccounts | quote }}
         - name: "SEED_PEERS"
-          value: {{ $.Values.seedPeers | quote }}
+          value: {{ $.Values.daemon.args.seedPeers | quote }}
+        - name: "SEED_PEERS_URL"
+          value: {{ $.Values.seedPeersURL | quote }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - name: CODA_LIBP2P_PASS
           valueFrom:
