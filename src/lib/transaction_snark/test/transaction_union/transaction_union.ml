@@ -148,7 +148,7 @@ let%test_module "Transaction union tests" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~snapp_account1:None ~snapp_account2:None)
+            ~zkapp_account1:None ~zkapp_account2:None)
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -297,7 +297,7 @@ let%test_module "Transaction union tests" =
               pending_coinbase_stack
           ; target = pending_coinbase_stack_target
           }
-        ~snapp_account1:None ~snapp_account2:None
+        ~zkapp_account1:None ~zkapp_account2:None
         { transaction = txn; block_data = state_body }
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 

@@ -1394,7 +1394,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
             in
             match predicate_data.kind with
             | Full ->
-                let%bind snapp_account_data =
+                let%bind zkapp_account_data =
                   match predicate_data.account_id with
                   | None ->
                       failwith "Expected account id for predicate of kind Full"
@@ -1402,9 +1402,9 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       query_db pool ~item:"Snapp account" ~f:(fun db ->
                           Processor.Zkapp_account.load db account_id)
                 in
-                let%map snapp_account =
+                let%map zkapp_account =
                   let%bind balance =
-                    match snapp_account_data.balance_id with
+                    match zkapp_account_data.balance_id with
                     | None ->
                         return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
@@ -1423,7 +1423,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let%bind nonce =
-                    match snapp_account_data.nonce_id with
+                    match zkapp_account_data.nonce_id with
                     | None ->
                         return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
@@ -1442,7 +1442,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                             : _ Snapp_predicate.Closed_interval.t )
                   in
                   let receipt_chain_hash =
-                    Option.value_map snapp_account_data.receipt_chain_hash
+                    Option.value_map zkapp_account_data.receipt_chain_hash
                       ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
                         Zkapp_basic.Or_ignore.Check
                           (Receipt.Chain_hash.of_base58_check_exn s))
@@ -1455,16 +1455,16 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Zkapp_basic.Or_ignore.Check pk)
                   in
                   let%bind public_key =
-                    pk_check_or_ignore_of_id snapp_account_data.public_key_id
+                    pk_check_or_ignore_of_id zkapp_account_data.public_key_id
                   in
                   let%bind delegate =
-                    pk_check_or_ignore_of_id snapp_account_data.delegate_id
+                    pk_check_or_ignore_of_id zkapp_account_data.delegate_id
                   in
                   let%bind state =
                     let%bind snapp_state_ids =
                       query_db pool ~item:"Snapp state id" ~f:(fun db ->
                           Processor.Zkapp_states.load db
-                            snapp_account_data.state_id)
+                            zkapp_account_data.state_id)
                     in
                     let%map state_data =
                       Snapp_helpers.state_data_of_ids ~pool snapp_state_ids
@@ -1474,7 +1474,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                     |> Pickles_types.Vector.Vector_8.of_list_exn
                   in
                   let%bind sequence_state =
-                    Option.value_map snapp_account_data.sequence_state_id
+                    Option.value_map zkapp_account_data.sequence_state_id
                       ~default:(return Zkapp_basic.Or_ignore.Ignore)
                       ~f:(fun state_id ->
                         let%map state_data_str =
@@ -1487,7 +1487,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Zkapp_basic.Or_ignore.Check state_data)
                   in
                   let proved_state =
-                    Option.value_map snapp_account_data.proved_state
+                    Option.value_map zkapp_account_data.proved_state
                       ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
                         Zkapp_basic.Or_ignore.Check b)
                   in
@@ -1503,7 +1503,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       }
                       : Snapp_predicate.Account.t )
                 in
-                Party.Predicate.Full snapp_account
+                Party.Predicate.Full zkapp_account
             | Nonce -> (
                 match predicate_data.nonce with
                 | None ->

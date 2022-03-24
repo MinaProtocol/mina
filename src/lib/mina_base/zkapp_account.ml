@@ -208,11 +208,11 @@ module Checked = struct
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
   let digest' t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input' t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
 end
 
 let typ : (Checked.t, t) Typ.t =
@@ -268,6 +268,6 @@ let default : _ Poly.t =
 
 let digest (t : t) =
   Random_oracle.(
-    hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input t)))
+    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
 let default_digest = lazy (digest default)

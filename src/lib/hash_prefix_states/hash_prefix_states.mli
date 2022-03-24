@@ -35,7 +35,7 @@ val account : Field.t State.t
 
 val side_loaded_vk : Field.t State.t
 
-val snapp_account : Field.t State.t
+val zkapp_account : Field.t State.t
 
 val snapp_payload : Field.t State.t
 

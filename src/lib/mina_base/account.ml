@@ -320,7 +320,7 @@ module Binable_arg = struct
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V2.t
-        , Snapp_account.Stable.V2.t option
+        , Zkapp_account.Stable.V2.t option
         , string )
         (* TODO: Cache the digest of this? *)
         Poly.Stable.V2.t
@@ -395,7 +395,7 @@ type value =
   , State_hash.t
   , Timing.t
   , Permissions.t
-  , Snapp_account.t option
+  , Zkapp_account.t option
   , string )
   Poly.t
 [@@deriving sexp]
@@ -424,11 +424,11 @@ let initialize account_id : t =
   ; zkapp_uri = ""
   }
 
-let hash_snapp_account_opt = function
+let hash_zkapp_account_opt = function
   | None ->
-      Lazy.force Snapp_account.default_digest
-  | Some (a : Snapp_account.t) ->
-      Snapp_account.digest a
+      Lazy.force Zkapp_account.default_digest
+  | Some (a : Zkapp_account.t) ->
+      Zkapp_account.digest a
 
 (* This preimage cannot be attained by any string, due to the trailing [true]
    added below.
@@ -475,7 +475,7 @@ let to_input (t : t) =
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
-    ~snapp:(f (Fn.compose field hash_snapp_account_opt))
+    ~snapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
     ~zkapp_uri:(f (Fn.compose field hash_zkapp_uri))
   |> List.reduce_exn ~f:append
@@ -500,7 +500,7 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t * Snapp_account.t option As_prover.Ref.t
+  , Field.Var.t * Zkapp_account.t option As_prover.Ref.t
   (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
   , string Data_as_hash.t )
   Poly.t
@@ -534,11 +534,11 @@ let typ' snapp =
 
 let typ : (var, value) Typ.t =
   let snapp :
-      ( Field.Var.t * Snapp_account.t option As_prover.Ref.t
-      , Snapp_account.t option )
+      ( Field.Var.t * Zkapp_account.t option As_prover.Ref.t
+      , Zkapp_account.t option )
       Typ.t =
     let account :
-        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t =
+        (Zkapp_account.t option As_prover.Ref.t, Zkapp_account.t option) Typ.t =
       Typ.Internal.ref ()
     in
     let alloc =
@@ -549,7 +549,7 @@ let typ : (var, value) Typ.t =
     let read (_, y) = account.read y in
     let store y =
       let open Typ.Store in
-      let x = hash_snapp_account_opt y in
+      let x = hash_zkapp_account_opt y in
       let%map x = Typ.field.store x and y = account.store y in
       (x, y)
     in
@@ -585,7 +585,7 @@ let var_of_t
   ; voting_for = State_hash.var_of_t voting_for
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
-  ; snapp = Field.Var.constant (hash_snapp_account_opt snapp)
+  ; snapp = Field.Var.constant (hash_zkapp_account_opt snapp)
   ; zkapp_uri = Field.Var.constant (hash_zkapp_uri zkapp_uri)
   }
 
@@ -603,14 +603,14 @@ module Checked = struct
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
-      , Snapp_account.Checked.t
+      , Zkapp_account.Checked.t
       , string Data_as_hash.t )
       Poly.t
 
     let typ : (t, Stable.Latest.t) Typ.t =
       typ'
-        (Typ.transport Snapp_account.typ
-           ~there:(fun t -> Option.value t ~default:Snapp_account.default)
+        (Typ.transport Zkapp_account.typ
+           ~there:(fun t -> Option.value t ~default:Zkapp_account.default)
            ~back:(fun t -> Some t))
   end
 
