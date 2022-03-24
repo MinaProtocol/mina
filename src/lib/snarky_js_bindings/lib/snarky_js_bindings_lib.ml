@@ -1799,12 +1799,24 @@ module Ledger = struct
     type party_predicate
 
     type t =
-      < type_ : Js.js_string Js.t Js.prop ; value : party_predicate Js.prop >
+      < kind : Js.js_string Js.t Js.prop ; value : party_predicate Js.prop >
       Js.t
   end
 
-  type party =
+  module Party_authorization = struct
+    type authorization
+
+    type t =
+      < kind : Js.js_string Js.t Js.prop ; value : authorization Js.prop > Js.t
+  end
+
+  type party_predicated =
     < body : party_body Js.prop ; predicate : Party_predicate.t Js.prop > Js.t
+
+  type party =
+    < data : party_predicated Js.prop
+    ; authorization : Party_authorization.t Js.prop >
+    Js.t
 
   type fee_payer_party =
     < body : party_body Js.prop ; predicate : js_uint32 Js.prop > Js.t
@@ -2151,7 +2163,7 @@ module Ledger = struct
     }
 
   let predicate (t : Party_predicate.t) : Party.Predicate.t =
-    match Js.to_string t##.type_ with
+    match Js.to_string t##.kind with
     | "accept" ->
         Accept
     | "nonce" ->
@@ -2184,11 +2196,30 @@ module Ledger = struct
     | s ->
         failwithf "bad predicate type: %s" s ()
 
-  let party (party : party) : Party.Predicated.t =
+  let party (party : party_predicated) : Party.Predicated.t =
     { body = body party##.body; predicate = predicate party##.predicate }
 
-  (* TODO: enable proper authorization *)
-  (* the fact that we don't leads to mock tx with state update being rejected *)
+  let authorization (a : Party_authorization.t) : Mina_base.Control.t =
+    match Js.to_string a##.kind with
+    | "none" ->
+        None_given
+    | "signature" ->
+        let signature : Js.js_string Js.t = Obj.magic a##.value in
+        Signature
+          (Mina_base.Signature.of_base58_check_exn (Js.to_string signature))
+    | "proof" -> (
+        let proof_string = Js.to_string @@ Obj.magic a##.value in
+        console_log proof_string ;
+        let proof_yojson = Yojson.Safe.from_string proof_string in
+        console_log proof_yojson ;
+        match Pickles.Side_loaded.Proof.of_yojson proof_yojson with
+        | Ppx_deriving_yojson_runtime.Result.Ok p ->
+            Proof p
+        | Ppx_deriving_yojson_runtime.Result.Error s ->
+            failwith s )
+    | s ->
+        failwithf "bad authorization type: %s" s ()
+
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { data = fee_payer_party parties##.feePayer
@@ -2197,7 +2228,9 @@ module Ledger = struct
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
-               { data = party p; authorization = None_given })
+               { data = party p##.data
+               ; authorization = authorization p##.authorization
+               })
         |> Array.to_list
     ; memo = Mina_base.Signed_command_memo.empty
     }
@@ -2432,7 +2465,7 @@ module Ledger = struct
       }
 
     let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-      match Js.to_string t##.type_ with
+      match Js.to_string t##.kind with
       | "accept" ->
           predicate_accept ()
       | "nonce" ->
@@ -2460,17 +2493,18 @@ module Ledger = struct
       | s ->
           failwithf "bad predicate type: %s" s ()
 
-    let party (party : party) : Party.Predicated.Checked.t =
+    let party (party : party_predicated) : Party.Predicated.Checked.t =
       { body = body party##.body; predicate = predicate party##.predicate }
   end
 
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
-    p |> party |> Party.Predicated.digest |> Field.constant |> to_js_field
+    p##.data |> party |> Party.Predicated.digest |> Field.constant
+    |> to_js_field
 
-  let hash_party_checked p =
-    p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
+  let hash_party_checked (p : party) =
+    p##.data |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
     p |> protocol_state |> Snapp_predicate.Protocol_state.digest
