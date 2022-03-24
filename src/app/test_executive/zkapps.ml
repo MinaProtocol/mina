@@ -368,6 +368,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Send a snapp to update permissions"
         (send_snapp ~logger node parties_update_permissions)
     in
+    (* Wait for account to be set up. *)
+    let%bind () =
+      section
+        "Wait for snapp to create accounts to be included in transition \
+         frontier"
+        (wait_for_snapp parties_create_account)
+    in
+    let%bind () =
+      section
+        "Wait for snapp to update permissions to be included in transition \
+         frontier"
+        (wait_for_snapp parties_update_permissions)
+    in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
       section "Send a snapp to update all fields"
@@ -393,18 +406,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* Wait for transactions to be applied, check that the updates are correct.
     *)
-    let%bind () =
-      section
-        "Wait for snapp to create accounts to be included in transition \
-         frontier"
-        (wait_for_snapp parties_create_account)
-    in
-    let%bind () =
-      section
-        "Wait for snapp to update permissions to be included in transition \
-         frontier"
-        (wait_for_snapp parties_update_permissions)
-    in
     let%bind () =
       section "Verify that updated permissions are in ledger accounts"
         (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
