@@ -30,7 +30,7 @@ Pipeline.build
     spec = 
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/app/snapp_test_transaction"),
+        S.strictlyStart (S.contains "src/app/zkapp_test_transaction"),
         S.exactly "buildkite/src/Jobs/Test/SnappTestToolUnitTest" "dhall",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
@@ -43,6 +43,6 @@ Pipeline.build
         name = "SnappTestToolUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/app/snapp_test_transaction" Size.Small
+      buildTestCmd "dev" "src/app/zkapp_test_transaction" Size.Small
     ]
   }

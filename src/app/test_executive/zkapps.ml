@@ -112,7 +112,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fee = Currency.Fee.of_int 1_000_000 in
     let%bind parties_create_account =
-      (* construct a Parties.t, similar to snapp_test_transaction create-snapp-account *)
+      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
       let open Mina_base in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
@@ -139,7 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            parties_spec
     in
     let%bind.Deferred parties_update_permissions, permissions_updated =
-      (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
+      (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
       let open Mina_base in
       let nonce = Account.Nonce.zero in
       let memo =

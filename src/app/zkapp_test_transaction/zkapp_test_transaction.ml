@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Mina_base
 open Cli_lib.Arg_type
-open Snapp_test_transaction_lib.Commands
+open Zkapp_test_transaction_lib.Commands
 
 module Flags = struct
   open Command
