@@ -968,14 +968,14 @@ module Snapp_helpers = struct
     Deferred.List.map array_ids ~f:(fun array_id ->
         let%bind element_id_array =
           query_db pool
-            ~f:(fun db -> Processor.Snapp_state_data_array.load db array_id)
+            ~f:(fun db -> Processor.Zkapp_state_data_array.load db array_id)
             ~item:"Snapp state data array"
         in
         let element_ids = Array.to_list element_id_array in
         let%bind field_strs =
           Deferred.List.map element_ids ~f:(fun elt_id ->
               query_db pool ~item:"Snapp field element" ~f:(fun db ->
-                  Processor.Snapp_state_data.load db elt_id))
+                  Processor.Zkapp_state_data.load db elt_id))
         in
         let fields =
           List.map field_strs ~f:(fun field_str ->
@@ -991,26 +991,26 @@ module Snapp_helpers = struct
         | Some id ->
             let%map field_str =
               query_db pool
-                ~f:(fun db -> Processor.Snapp_state_data.load db id)
+                ~f:(fun db -> Processor.Zkapp_state_data.load db id)
                 ~item:"Snapp state data"
             in
             Some (Snark_params.Tick.Field.of_string field_str))
 
   let party_body_of_id ~pool body_id =
-    let%bind (body_data : Processor.Snapp_party_body.t) =
+    let%bind (body_data : Processor.Zkapp_party_body.t) =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_party_body.load db body_id)
+        ~f:(fun db -> Processor.Zkapp_party_body.load db body_id)
         ~item:"Snapp party body"
     in
     let%bind public_key = pk_of_pk_id pool body_data.public_key_id in
     let%bind update_data =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_updates.load db body_data.update_id)
+        ~f:(fun db -> Processor.Zkapp_updates.load db body_data.update_id)
         ~item:"snapp updates"
     in
     let%bind app_state_data_ids =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_states.load db update_data.app_state_id)
+        ~f:(fun db -> Processor.Zkapp_states.load db update_data.app_state_id)
         ~item:"snapp app state ids"
     in
     let%bind app_state_data = state_data_of_ids ~pool app_state_data_ids in
@@ -1030,9 +1030,9 @@ module Snapp_helpers = struct
       match update_data.verification_key_id with
       | Some id ->
           let%map ({ verification_key; hash }
-                    : Processor.Snapp_verification_keys.t) =
+                    : Processor.Zkapp_verification_keys.t) =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_verification_keys.load db id)
+              ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
               ~item:"snapp verification key"
           in
           let data =
@@ -1049,7 +1049,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map perms_data =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_permissions.load db id)
+              ~f:(fun db -> Processor.Zkapp_permissions.load db id)
               ~item:"snapp verification key"
           in
           let perms : Mina_base.Permissions.t =
@@ -1088,7 +1088,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map tm_info =
             query_db pool
-              ~f:(fun db -> Processor.Snapp_timing_info.load db id)
+              ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
               ~item:"snapp timing info"
           in
           Zkapp_basic.Set_or_keep.Set
@@ -1138,7 +1138,7 @@ module Snapp_helpers = struct
     in
     let%bind call_data_str =
       query_db pool
-        ~f:(fun db -> Processor.Snapp_state_data.load db body_data.call_data_id)
+        ~f:(fun db -> Processor.Zkapp_state_data.load db body_data.call_data_id)
         ~item:"Snapp call data"
     in
     let call_data = Snark_params.Tick.Field.of_string call_data_str in
@@ -1146,7 +1146,7 @@ module Snapp_helpers = struct
     let%bind protocol_state_data =
       query_db pool
         ~f:(fun db ->
-          Processor.Snapp_predicate_protocol_states.load db
+          Processor.Zkapp_predicate_protocol_states.load db
             body_data.snapp_predicate_protocol_state_id)
         ~item:"Snapp predicate protocol state"
     in
@@ -1169,7 +1169,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Snapp timestamp bounds" ~f:(fun db ->
-                Processor.Snapp_timestamp_bounds.load db id)
+                Processor.Zkapp_timestamp_bounds.load db id)
           in
           let to_timestamp i64 = i64 |> Block_time.of_int64 in
           let lower = to_timestamp bounds.timestamp_lower_bound in
@@ -1183,7 +1183,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Snapp length bounds" ~f:(fun db ->
-                Processor.Snapp_length_bounds.load db id)
+                Processor.Zkapp_length_bounds.load db id)
           in
           let to_length i64 =
             i64 |> Unsigned.UInt32.of_int64 |> Mina_numbers.Length.of_uint32
@@ -1205,7 +1205,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Snapp currency bounds" ~f:(fun db ->
-                Processor.Snapp_amount_bounds.load db id)
+                Processor.Zkapp_amount_bounds.load db id)
           in
           let to_amount i64 =
             i64 |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64
@@ -1226,7 +1226,7 @@ module Snapp_helpers = struct
       | Some id ->
           let%map bounds =
             query_db pool ~item:"Snapp global slot bounds" ~f:(fun db ->
-                Processor.Snapp_global_slot_bounds.load db id)
+                Processor.Zkapp_global_slot_bounds.load db id)
           in
           let to_slot i64 =
             i64 |> Unsigned.UInt32.of_int64
@@ -1246,12 +1246,12 @@ module Snapp_helpers = struct
     let epoch_data_of_id id =
       let%bind epoch_data_raw =
         query_db pool ~item:"Snapp epoch data" ~f:(fun db ->
-            Processor.Snapp_epoch_data.load db id)
+            Processor.Zkapp_epoch_data.load db id)
       in
       let%bind ledger =
         let%bind epoch_ledger_data =
           query_db pool ~item:"Snapp epoch ledger" ~f:(fun db ->
-              Processor.Snapp_epoch_ledger.load db id)
+              Processor.Zkapp_epoch_ledger.load db id)
         in
         let%bind hash =
           Option.value_map epoch_ledger_data.hash_id
@@ -1359,7 +1359,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
     Parties.t Deferred.t =
   let%bind fee_payer_data =
     query_db pool
-      ~f:(fun db -> Processor.Snapp_fee_payers.load db cmd.fee_payer_id)
+      ~f:(fun db -> Processor.Zkapp_fee_payers.load db cmd.fee_payer_id)
       ~item:"Snapp fee payer"
   in
   let%bind (fee_payer : Party.Fee_payer.t) =
@@ -1379,7 +1379,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
         let%bind snapp_party_data =
           query_db pool
-            ~f:(fun db -> Processor.Snapp_party.load db id)
+            ~f:(fun db -> Processor.Zkapp_party.load db id)
             ~item:"Snapp party"
         in
         let%bind (data : Party.Predicated.t) =
@@ -1389,7 +1389,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
           let%bind (predicate : Party.Predicate.t) =
             let%bind predicate_data =
               query_db pool ~item:"Snapp predicate" ~f:(fun db ->
-                  Processor.Snapp_predicate.load db
+                  Processor.Zkapp_predicate.load db
                     snapp_party_data.predicate_id)
             in
             match predicate_data.kind with
@@ -1400,7 +1400,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       failwith "Expected account id for predicate of kind Full"
                   | Some account_id ->
                       query_db pool ~item:"Snapp account" ~f:(fun db ->
-                          Processor.Snapp_account.load db account_id)
+                          Processor.Zkapp_account.load db account_id)
                 in
                 let%map snapp_account =
                   let%bind balance =
@@ -1410,7 +1410,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                     | Some balance_id ->
                         let%map bounds =
                           query_db pool ~item:"Snapp balance" ~f:(fun db ->
-                              Processor.Snapp_balance_bounds.load db balance_id)
+                              Processor.Zkapp_balance_bounds.load db balance_id)
                         in
                         let to_balance i64 =
                           i64 |> Unsigned.UInt64.of_int64
@@ -1429,7 +1429,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                     | Some balance_id ->
                         let%map bounds =
                           query_db pool ~item:"Snapp nonce" ~f:(fun db ->
-                              Processor.Snapp_nonce_bounds.load db balance_id)
+                              Processor.Zkapp_nonce_bounds.load db balance_id)
                         in
                         let to_nonce i64 =
                           i64 |> Unsigned.UInt32.of_int64
@@ -1463,7 +1463,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                   let%bind state =
                     let%bind snapp_state_ids =
                       query_db pool ~item:"Snapp state id" ~f:(fun db ->
-                          Processor.Snapp_states.load db
+                          Processor.Zkapp_states.load db
                             snapp_account_data.state_id)
                     in
                     let%map state_data =
@@ -1479,7 +1479,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       ~f:(fun state_id ->
                         let%map state_data_str =
                           query_db pool ~item:"Snapp state data" ~f:(fun db ->
-                              Processor.Snapp_state_data.load db state_id)
+                              Processor.Zkapp_state_data.load db state_id)
                         in
                         let state_data =
                           Pickles.Backend.Tick.Field.of_string state_data_str
