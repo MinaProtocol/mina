@@ -20,8 +20,7 @@ let%test_unit "of-quotient" =
       let precision = 32 in
       let res =
         assert (B.(a < b)) ;
-        M.run_and_check
-          (fun () ->
+        M.run_and_check (fun () ->
             let t =
               of_quotient ~m ~precision ~top:(Integer.constant ~m a)
                 ~bottom:(Integer.constant ~m b) ~top_is_less_than_bottom:()
