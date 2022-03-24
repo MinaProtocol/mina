@@ -11,7 +11,7 @@
 
 */
 
-/* the tables below named `blocks_xxx_commands`, where xxx is `user`, `internal`, or `snapps`,
+/* the tables below named `blocks_xxx_commands`, where xxx is `user`, `internal`, or `zkapps`,
    contain columns `block_id` and `xxx_command_id`
 
    this naming convention must be followed for `find_command_ids_query` in `Replayer.Sql`
@@ -84,7 +84,7 @@ CREATE TABLE internal_commands
 , UNIQUE (hash,type)
 );
 
-/* import supporting Snapp-related tables */
+/* import supporting Zkapp-related tables */
 \ir zkapp_tables.sql
 
 CREATE TABLE zkapp_fee_payers
@@ -219,7 +219,7 @@ CREATE TABLE zkapp_party_balances
    sequence_no gives the order within all transactions in the block
 
    other_parties_list_id refers to a list of balances in the same order as the other parties in the
-   snapps_command; that is, the list_index for the balances is the same as the list_index for other_parties
+   zkapps_command; that is, the list_index for the balances is the same as the list_index for other_parties
 
    Blocks command convention
 */
