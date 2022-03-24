@@ -15,7 +15,7 @@ module type S = sig
   val blake2s :
        ?personalization:string
     -> Boolean.var array
-    -> (Boolean.var array, _) Checked.t
+    -> Boolean.var array Checked.t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) :
