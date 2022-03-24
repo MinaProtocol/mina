@@ -1153,7 +1153,9 @@ struct
                               in
                               Mina_metrics.(
                                 Gauge.set Transaction_pool.pool_size
-                                  (Float.of_int (Indexed_pool.size pool''))) ;
+                                  (Float.of_int (Indexed_pool.size pool'')) ;
+                                Counter.inc_one
+                                  Transaction_pool.transactions_added_to_pool) ;
                               t.pool <- pool'' ;
                               let%bind _ =
                                 trust_record
