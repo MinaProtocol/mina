@@ -1417,8 +1417,7 @@ module Circuit = struct
         (fun (type a)
              (f : (unit -> (unit -> a) Js.callback Promise.t) Js.callback) :
              a Promise.t ->
-          Run_and_check_deferred.run_and_check
-            (fun () ->
+          Run_and_check_deferred.run_and_check (fun () ->
               let g : (unit -> a) Js.callback Promise.t = call f in
               Promise.map g ~f:(fun (p : (unit -> a) Js.callback) () -> call p))
           |> Promise.map ~f:Or_error.ok_exn) ;
