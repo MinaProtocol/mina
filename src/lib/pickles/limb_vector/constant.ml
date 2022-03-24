@@ -34,7 +34,7 @@ module Hex64 = struct
       let lo = t land of_int 0xffffff in
       let mi = (t lsr 24) land of_int 0xffffff in
       let hi = (t lsr 48) land of_int 0xffff in
-      sprintf "%08x%08x%08x" (to_int_exn hi) (to_int_exn mi) (to_int_exn lo)
+      sprintf "%04x%06x%06x" (to_int_exn hi) (to_int_exn mi) (to_int_exn lo)
 
     let of_hex h =
       let f s = Hex.of_string ("0x" ^ s) in
