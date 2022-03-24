@@ -78,7 +78,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     in
     let%bind { nonce = sender_current_nonce; _ } =
-      Network.Node.must_get_balance ~logger untimed_node_b
+      Network.Node.must_get_account_data ~logger untimed_node_b
         ~public_key:sender_pub_key
     in
     let user_command_input =
@@ -146,11 +146,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check that the account balances are what we expect after the previous \
          txn"
         (let%bind { total_balance = node_b_balance; _ } =
-           Network.Node.must_get_balance ~logger untimed_node_b
+           Network.Node.must_get_account_data ~logger untimed_node_b
              ~public_key:sender_pub_key
          in
          let%bind { total_balance = node_a_balance; _ } =
-           Network.Node.must_get_balance ~logger untimed_node_a
+           Network.Node.must_get_account_data ~logger untimed_node_a
              ~public_key:receiver_pub_key
          in
          let node_a_expected =
@@ -168,7 +168,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Currency.Amount.of_int 30_000_000_000_000)
                  test_constants.coinbase_amount
              |> Option.value_exn )
-             amount
+             ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
+             |> Option.value_exn )
            |> Option.value_exn
          in
          [%log info] "coinbase_amount: %s"
@@ -191,7 +192,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (30_000_000_000_000 + possible_coinbase_reward) - txn_amount *)
+           (* node_b_balance <= (30_000_000_000_000 + possible_coinbase_reward) - (txn_amount + txn_fee) *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected

@@ -176,7 +176,7 @@ module Node = struct
       }
     |}]
 
-    module Get_balance =
+    module Get_account_data =
     [%graphql
     {|
       query ($public_key: PublicKey) {
@@ -309,10 +309,10 @@ module Node = struct
   let must_get_best_chain ~logger t =
     get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  type get_balance_result =
+  type account_data =
     { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
 
-  let get_balance ~logger t ~public_key =
+  let get_account_data ~logger t ~public_key =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
@@ -321,7 +321,7 @@ module Node = struct
     (* let pk = Mina_base.Account_id.public_key account_id in *)
     (* let token = Mina_base.Account_id.token_id account_id in *)
     let get_balance_obj =
-      Graphql.Get_balance.make
+      Graphql.Get_account_data.make
         ~public_key:(Graphql_lib.Encoders.public_key public_key)
         (* ~token:(Graphql_lib.Encoders.token token) *)
         ()
@@ -344,8 +344,8 @@ module Node = struct
           ; total_balance = acc#balance#total
           }
 
-  let must_get_balance ~logger t ~public_key =
-    get_balance ~logger t ~public_key
+  let must_get_account_data ~logger t ~public_key =
+    get_account_data ~logger t ~public_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =
@@ -468,10 +468,7 @@ module Node = struct
           ~rawSignature:raw_signature ()
       in
       [%log info] "send_payment_obj via with $variables "
-        ~metadata:
-          [ (* ("query", (Yojson.Safe.from_string ( String.substr_replace_all send_payment_obj#query ~pattern:"\"" ~with_:"`") ) ) *)
-            ("variables", send_payment_obj#variables)
-          ] ;
+        ~metadata:[ ("variables", send_payment_obj#variables) ] ;
       exec_graphql_request ~logger ~node:t
         ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
     in
