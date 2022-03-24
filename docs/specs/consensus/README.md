@@ -68,14 +68,15 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
 - [6 Protocol](#6-protocol)
   - [6.1 Initialize consensus](#61-initialize-consensus)
     - [6.1.1 Genesis block](#611-genesis-block)
+    - [6.1.2 Bootstrap](#612-bootstrap)
   - [6.2 Select chain](#62-select-chain)
-    - [6.2.3 Bringing it all together](#623-bringing-it-all-together)
+    - [6.2.1 Bringing it all together](#621-bringing-it-all-together)
 
 <!-- /TOC depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
 # 1. Acknowledgements
 
-This document would not exist without the help of the reviewers: [Jiawei Tang](https://github.com/ghost-not-in-the-shell), [Nathan Holland](https://github.com/nholland94), [Izaak Meckler](https://math.berkeley.edu/~izaak/) and [Matthew Ryan](https://github.com/mrmr1993).  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
+This document would not exist without the help of the reviewers: [Jiawei Tang](https://github.com/ghost-not-in-the-shell), [Nathan Holland](https://github.com/nholland94), [Izaak Meckler](https://math.berkeley.edu/~izaak/), [Matthew Ryan](https://github.com/mrmr1993) and [Vanishree Rao](https://twitter.com/vanishree_rao).  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
 # 2. Notations and conventions
 
@@ -868,7 +869,7 @@ canonical: B1, B2, B3, B4, B5, ..., Bk (current minimum window density = 42)
 
 The inversion problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika, time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
 
-The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2.3](#623-bringing-it-all-together), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
+The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2.1](#621-bringing-it-all-together), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
 
 The relative minimum window density of blocks `B1` and `B2` is defined as.
 
@@ -1045,6 +1046,10 @@ The following JSON specifies the main data in the `mainnet` genesis block.
 }
 ```
 
+### 6.1.2 Bootstrap
+
+Bootstrapping consensus requires the ability to synchronize epoch ledgers from the network.  All peers MUST have the ability to load both the staking epoch ledger and next epoch ledger from disk and by downloading them.  P2P peers MUST also make these ledgers available for other peers, otherwise it is a protocol violation and the peers can be banned.  Locally the ledgers may be stored in an implementation specific representation, but when downloading or uploading the ledgers are synced over the network using a specific structure-- see the `P2P Specification`.
+
 ## 6.2 Select chain
 
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
@@ -1053,7 +1058,7 @@ In addition to the high-level idea given in [Section 5.2](#52-chain-selection-ru
 
 Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The minimum density tiebreak rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
 
-### 6.2.3 Bringing it all together
+### 6.2.1 Bringing it all together
 
 Let `P.tip` refer to the top block of peer `P`'s current best chain.  Assuming an update to either `P.tip` or `P.chains`, `P` must update its `tip` like this
 
