@@ -392,7 +392,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let needed = 12 in
         if !transactions_sent >= needed then 0 else needed - !transactions_sent
       in
-      send_padding_transactions block_producer_nodes ~fee:small_fee  ~logger
+      send_padding_transactions block_producer_nodes ~fee:small_fee ~logger
         ~n:padding_payments
     in
     let%bind () =
