@@ -1,7 +1,6 @@
 open Core
 open Async
 open Network_peer
-open O1trace
 open Pipe_lib
 open Network_peer.Rpc_intf
 
@@ -106,7 +105,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               (Network_peer.Peer.to_multiaddr_string peer)
               ()
         | `Within_capacity ->
-            handler peer ~version q
+            O1trace.thread (Printf.sprintf "handle_rpc_%s" Impl.name) (fun () ->
+                handler peer ~version q)
       in
       Impl.implement_multi handler
 
@@ -171,7 +171,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
           (fun () ->
-            trace "mina_net2" (fun () ->
+            O1trace.thread "mina_net2" (fun () ->
                 Mina_net2.create
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
@@ -287,53 +287,55 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~on_unknown_rpc:(`Call handle_unknown_rpc)
             in
             let%bind () =
-              Mina_net2.open_protocol net2 ~on_handler_error:`Raise
-                ~protocol:rpc_transport_proto (fun stream ->
-                  let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-                  let transport = prepare_stream_transport stream in
-                  let open Deferred.Let_syntax in
-                  match%bind
-                    Async_rpc_kernel.Rpc.Connection.create ~implementations
-                      ~connection_state:(Fn.const peer)
-                      ~description:
-                        (Info.of_thunk (fun () ->
-                             sprintf "stream from %s" peer.peer_id))
-                      transport
-                  with
-                  | Error handshake_error ->
-                      let%bind () =
-                        Async_rpc_kernel.Rpc.Transport.close transport
-                      in
-                      don't_wait_for
-                        (Mina_net2.reset_stream net2 stream >>| ignore) ;
-                      Trust_system.(
-                        record config.trust_system config.logger peer
-                          Actions.
-                            ( Incoming_connection_error
-                            , Some
-                                ( "Handshake error: $exn"
-                                , [ ( "exn"
-                                    , `String (Exn.to_string handshake_error) )
-                                  ] ) ))
-                  | Ok rpc_connection -> (
-                      let%bind () =
-                        Async_rpc_kernel.Rpc.Connection.close_finished
-                          rpc_connection
-                      in
-                      let%bind () =
-                        Async_rpc_kernel.Rpc.Connection.close
-                          ~reason:(Info.of_string "connection completed")
-                          rpc_connection
-                      in
-                      match%map Mina_net2.reset_stream net2 stream with
-                      | Error e ->
-                          [%log' warn config.logger]
-                            "failed to reset stream (this means it was \
-                             probably closed successfully): $error"
-                            ~metadata:
-                              [ ("error", Error_json.error_to_yojson e) ]
-                      | Ok () ->
-                          () ))
+              O1trace.thread "handle_protocol_streams" (fun () ->
+                  Mina_net2.open_protocol net2 ~on_handler_error:`Raise
+                    ~protocol:rpc_transport_proto (fun stream ->
+                      let peer = Mina_net2.Libp2p_stream.remote_peer stream in
+                      let transport = prepare_stream_transport stream in
+                      let open Deferred.Let_syntax in
+                      match%bind
+                        Async_rpc_kernel.Rpc.Connection.create ~implementations
+                          ~connection_state:(Fn.const peer)
+                          ~description:
+                            (Info.of_thunk (fun () ->
+                                 sprintf "stream from %s" peer.peer_id))
+                          transport
+                      with
+                      | Error handshake_error ->
+                          let%bind () =
+                            Async_rpc_kernel.Rpc.Transport.close transport
+                          in
+                          don't_wait_for
+                            (Mina_net2.reset_stream net2 stream >>| ignore) ;
+                          Trust_system.(
+                            record config.trust_system config.logger peer
+                              Actions.
+                                ( Incoming_connection_error
+                                , Some
+                                    ( "Handshake error: $exn"
+                                    , [ ( "exn"
+                                        , `String
+                                            (Exn.to_string handshake_error) )
+                                      ] ) ))
+                      | Ok rpc_connection -> (
+                          let%bind () =
+                            Async_rpc_kernel.Rpc.Connection.close_finished
+                              rpc_connection
+                          in
+                          let%bind () =
+                            Async_rpc_kernel.Rpc.Connection.close
+                              ~reason:(Info.of_string "connection completed")
+                              rpc_connection
+                          in
+                          match%map Mina_net2.reset_stream net2 stream with
+                          | Error e ->
+                              [%log' warn config.logger]
+                                "failed to reset stream (this means it was \
+                                 probably closed successfully): $error"
+                                ~metadata:
+                                  [ ("error", Error_json.error_to_yojson e) ]
+                          | Ok () ->
+                              () )))
             in
             let message_reader, message_writer =
               Strict_pipe.(
@@ -508,25 +510,26 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
       in
       let do_ban (banned_peer, expiration) =
-        don't_wait_for
-          ( Clock.at expiration
-          >>= fun () ->
-          let%bind net2 = !net2_ref in
-          ban_configuration :=
-            { !ban_configuration with
-              banned_peers =
-                List.filter !ban_configuration.banned_peers ~f:(fun p ->
-                    not (Peer.equal p banned_peer))
-            } ;
-          Mina_net2.set_connection_gating_config net2 !ban_configuration
-          |> Deferred.ignore_m ) ;
-        (let%bind net2 = !net2_ref in
-         ban_configuration :=
-           { !ban_configuration with
-             banned_peers = banned_peer :: !ban_configuration.banned_peers
-           } ;
-         Mina_net2.set_connection_gating_config net2 !ban_configuration)
-        |> Deferred.ignore_m
+        O1trace.thread "execute_gossip_net_bans" (fun () ->
+            don't_wait_for
+              ( Clock.at expiration
+              >>= fun () ->
+              let%bind net2 = !net2_ref in
+              ban_configuration :=
+                { !ban_configuration with
+                  banned_peers =
+                    List.filter !ban_configuration.banned_peers ~f:(fun p ->
+                        not (Peer.equal p banned_peer))
+                } ;
+              Mina_net2.set_connection_gating_config net2 !ban_configuration
+              |> Deferred.ignore_m ) ;
+            (let%bind net2 = !net2_ref in
+             ban_configuration :=
+               { !ban_configuration with
+                 banned_peers = banned_peer :: !ban_configuration.banned_peers
+               } ;
+             Mina_net2.set_connection_gating_config net2 !ban_configuration)
+            |> Deferred.ignore_m)
       in
       let%map () =
         Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
@@ -559,14 +562,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         }
       in
       Clock.every' peers_snapshot_max_staleness (fun () ->
-          let%map peers = peers t in
-          Mina_metrics.(
-            Gauge.set Network.peers (List.length peers |> Int.to_float)) ;
-          peers_snapshot :=
-            List.map peers
-              ~f:
-                (Fn.compose Mina_net2.Multiaddr.of_string
-                   Peer.to_multiaddr_string)) ;
+          O1trace.thread "snapshot_peers" (fun () ->
+              let%map peers = peers t in
+              Mina_metrics.(
+                Gauge.set Network.peers (List.length peers |> Int.to_float)) ;
+              peers_snapshot :=
+                List.map peers
+                  ~f:
+                    (Fn.compose Mina_net2.Multiaddr.of_string
+                       Peer.to_multiaddr_string))) ;
       t
 
     let set_node_status t data =

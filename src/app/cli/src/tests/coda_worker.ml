@@ -372,7 +372,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace "worker_main" (fun () ->
+      O1trace.thread "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
@@ -528,16 +528,9 @@ module T = struct
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
               let sender_pk = pk_of_sk sender_sk in
-              User_command_input.create ~fee ~fee_token:Token_id.default
-                ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
-                ~valid_until:None
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk
-                     ; receiver_pk
-                     ; token_id = Token_id.default
-                     ; amount
-                     })
+              User_command_input.create ~fee ~fee_payer_pk:sender_pk
+                ~signer:sender_pk ~memo ~valid_until:None
+                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))

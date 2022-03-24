@@ -11,9 +11,12 @@
    core
    ;; local libraries
    currency
+   signature_lib
    mina_ledger
    mina_state
    mina_base
+   mina_transaction
+   mina_transaction_logic
    kimchi_backend
    kimchi_backend.pasta
    )

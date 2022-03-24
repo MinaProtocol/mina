@@ -168,8 +168,8 @@ module Token_id = Mina_base.Token_id
 module Account_id = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_base.Account_id.Stable.V1.t
+    module V2 = struct
+      type t = Mina_base.Account_id.Stable.V2.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
@@ -184,6 +184,8 @@ module Account_id = struct
   let token_id = Mina_base.Account_id.token_id
 
   let public_key = Mina_base.Account_id.public_key
+
+  let derive_token_id = Mina_base.Account_id.derive_token_id
 
   (* TODO: Non-default tokens *)
   let gen =

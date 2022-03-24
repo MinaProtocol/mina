@@ -73,7 +73,7 @@ let%test_module "transaction logic consistency" =
 
     (* Helpers for applying transactions *)
 
-    module Sparse_txn_logic = Transaction_logic.Make (Sparse_ledger.L)
+    module Sparse_txn_logic = Mina_transaction_logic.Make (Sparse_ledger.L)
 
     let sparse_ledger ledger t =
       Or_error.try_with ~backtrace:true (fun () ->

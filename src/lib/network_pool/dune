@@ -38,6 +38,7 @@
    one_or_two
    quickcheck_lib
    mina_base
+   mina_transaction
    transaction_snark
    consensus
    network_peer

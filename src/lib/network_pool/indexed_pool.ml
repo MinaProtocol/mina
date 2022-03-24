@@ -1,6 +1,7 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 open Signature_lib
 
@@ -118,29 +119,17 @@ let currency_consumed_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> User_command.t
     -> Currency.Amount.t option =
- fun ~constraint_constants cmd ->
+ fun ~constraint_constants:_ cmd ->
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
   let amt =
     match cmd with
     | Signed_command c -> (
         match c.payload.body with
-        | Payment ({ amount; _ } as payload) ->
-            if
-              Token_id.equal c.payload.common.fee_token
-                (Payment_payload.token payload)
-            then
-              (* The fee-payer is also the sender account, include the amount. *)
-              amount
-            else (* The payment won't affect the balance of this account. *)
-              zero
+        | Payment { amount; _ } ->
+            (* The fee-payer is also the sender account, include the amount. *)
+            amount
         | Stake_delegation _ ->
-            zero
-        | Create_new_token _ ->
-            Currency.Amount.of_fee constraint_constants.account_creation_fee
-        | Create_token_account _ ->
-            Currency.Amount.of_fee constraint_constants.account_creation_fee
-        | Mint_tokens _ ->
             zero )
     | Parties _ ->
         (*TODO: document- txns succeeds with source amount insufficient in the case of snapps*)
@@ -911,8 +900,12 @@ let remove_lowest_fee :
 let get_highest_fee :
     t -> Transaction_hash.User_command_with_valid_signature.t option =
  fun t ->
-  Option.map ~f:(Fn.compose Set.min_elt_exn Tuple2.get2)
-  @@ Map.max_elt t.applicable_by_fee
+  Option.map
+    ~f:
+      (Fn.compose
+         Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
+         Tuple2.get2)
+  @@ Currency.Fee_rate.Map.max_elt t.applicable_by_fee
 
 (* Add a command that came in from gossip, or return an error. We need to check
    a whole bunch of conditions here and return the appropriate errors.
@@ -1017,10 +1010,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           let%bind () = check_expiry config unchecked in
           let%bind consumed =
             currency_consumed' ~constraint_constants unchecked
-          in
-          let%bind () =
-            if User_command.check_tokens unchecked then return ()
-            else Error Bad_token
           in
           let%map () =
             (* TODO: Proper exchange rate mechanism. *)
@@ -1365,10 +1354,9 @@ let%test_module _ =
 
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
-    let gen_cmd ?sign_type ?nonce ?fee_token ?payment_token () =
+    let gen_cmd ?sign_type ?nonce () =
       User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
-        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ?fee_token
-        ?payment_token ()
+        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ()
       |> Quickcheck.Generator.map
            ~f:Transaction_hash.User_command_with_valid_signature.create
 
@@ -1739,54 +1727,6 @@ let%test_module _ =
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds")
-
-    let%test_unit "applicable_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.applicable_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
-
-    let%test_unit "all_by_fee ordered by fee per wu" =
-      let cmds =
-        gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-        |> Sequence.to_list
-      in
-      let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
-          (Currency.Amount.of_int (500 * 10_000_000))
-        |> Result.ok |> Option.value_exn
-        |> fun (_, pool, _) -> pool
-      in
-      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      let compare cmd0 cmd1 : int =
-        Currency.Fee_rate.compare
-          (User_command.fee_per_wu cmd0)
-          (User_command.fee_per_wu cmd1)
-      in
-      pool.all_by_fee |> Map.data
-      |> List.concat_map ~f:Set.to_list
-      |> List.map ~f:Transaction_hash.User_command_with_valid_signature.command
-      |> List.is_sorted ~compare
-      |> fun is_sorted -> assert is_sorted
 
     let%test_unit "remove_lowest_fee" =
       let cmds =

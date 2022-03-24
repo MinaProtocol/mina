@@ -6,7 +6,7 @@ open Core_kernel
 open Signature_lib
 
 let keypairs =
-  let n = 120 in
+  let n = 1200 in
   let generated_keypairs =
     let sks =
       Quickcheck.(

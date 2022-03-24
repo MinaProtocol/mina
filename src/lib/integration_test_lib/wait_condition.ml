@@ -45,25 +45,29 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let nodes_to_initialize nodes =
-    let open Network_state in
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
-      if
-        List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
+      if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
+
+  let nodes_to_initialize nodes =
+    let open Network_state in
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false))
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
@@ -118,22 +122,45 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let payment_to_be_included_in_frontier ~sender_pub_key ~receiver_pub_key
-      ~amount =
+  type command_type = Send_payment | Send_delegation
+
+  let command_type_to_string command_type =
+    match command_type with
+    | Send_payment ->
+        "Send Payment"
+    | Send_delegation ->
+        "Send Delegation"
+
+  let signed_command_to_be_included_in_frontier ~sender_pub_key
+      ~receiver_pub_key ~amount ~(nonce : Mina_numbers.Account_nonce.t)
+      ~command_type =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
       | Signed_command signed_cmd -> (
           let open Signature_lib in
-          let body =
-            Signed_command.payload signed_cmd |> Signed_command_payload.body
-          in
+          let payload = Signed_command.payload signed_cmd in
+          let body = payload |> Signed_command_payload.body in
           match body with
-          | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
+          | Payment { source_pk; receiver_pk; amount = paid_amt }
             when Public_key.Compressed.equal source_pk sender_pub_key
                  && Public_key.Compressed.equal receiver_pk receiver_pub_key
-                 && Currency.Amount.equal paid_amt amount ->
-              true
+                 && Currency.Amount.equal paid_amt amount
+                 && Mina_numbers.Account_nonce.equal nonce
+                      (Signed_command_payload.nonce payload) -> (
+              match command_type with Send_payment -> true | _ -> false )
+          | Stake_delegation dl -> (
+              match dl with
+              | Set_delegate
+                  { delegator : Public_key.Compressed.t
+                  ; new_delegate : Public_key.Compressed.t
+                  }
+                when Public_key.Compressed.equal delegator sender_pub_key
+                     && Public_key.Compressed.equal new_delegate
+                          receiver_pub_key -> (
+                  match command_type with Send_delegation -> true | _ -> false )
+              | _ ->
+                  false )
           | _ ->
               false )
       | Parties _ ->
@@ -166,7 +193,8 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     { description =
-        Printf.sprintf "payment from %s to %s of amount %s"
+        Printf.sprintf "signed command of type %s from %s to %s of amount %s"
+          (command_type_to_string command_type)
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)

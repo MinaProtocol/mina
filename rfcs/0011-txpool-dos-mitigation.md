@@ -124,7 +124,7 @@ that are not valid, but they won't send us a lot of them. If a node detects it
 is substantially behind the network, it should disable gossip until it catches
 up.
 
-There was [some discussion](https://github.com/CodaProtocol/coda/pull/761#issuecomment-424456658)
+There was [some discussion](https://github.com/minaprotocol/mina/pull/761#issuecomment-424456658)
 about score decay when the RFC for banlisting was first proposed. It wasn't
 resolved and the current system doesn't implement any decay. A punishment score
 system with decay is equivalent to trust scores if you only count bad behavior.
