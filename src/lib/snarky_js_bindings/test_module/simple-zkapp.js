@@ -1,4 +1,4 @@
-import Client from "../../../../frontend/mina-signer/dist/src/MinaSigner.js";
+import Client from "mina-signer";
 import {
   Field,
   declareState,
@@ -12,7 +12,7 @@ import {
   call,
   isReady,
   shutdown,
-} from "../snarkyjs/dist/server/index.js";
+} from "snarkyjs";
 
 await isReady;
 // TODO check if floats are converted to Field correctly
