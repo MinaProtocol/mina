@@ -308,6 +308,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo = p.memo
         }
     in
+    let parties_insufficient_replace_fee =
+      let p = parties_update_all in
+      { p with
+        fee_payer =
+          { p.fee_payer with
+            data =
+              { body =
+                  { p.fee_payer.data.body with
+                    balance_change = Currency.Fee.of_int 1000
+                  }
+              ; predicate = Mina_base.Account.Nonce.of_int 4
+              }
+          }
+      }
+    in
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -509,6 +524,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a snapp with an invalid proof"
         (send_invalid_snapp ~logger node parties_invalid_proof "Invalid_proof")
+    in
+    let%bind () =
+      section "Send a snapp with a duplicate txn"
+        (send_invalid_snapp ~logger node parties_update_all
+           "Duplicate_transaction")
+    in
+    let%bind () =
+      section "Send a snapp with an insufficient replace fee"
+        (send_invalid_snapp ~logger node parties_insufficient_replace_fee
+           "Insufficient_replace_fee")
     in
     let%bind () =
       section "Wait for proof to be emitted"
