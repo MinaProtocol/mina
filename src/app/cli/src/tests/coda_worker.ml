@@ -372,7 +372,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace "worker_main" (fun () ->
+      O1trace.thread "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
@@ -494,7 +494,8 @@ module T = struct
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger coda_ref ;
+            ~child_pids:pids ~top_logger:logger ~node_error_url:None
+            ~contact_info:None coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->

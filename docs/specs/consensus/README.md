@@ -7,7 +7,7 @@ Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consens
 * Succinctness - Constant-time synchronization with full-validation and high interoperability
 * Universal composability - Proven security for interacting with other protocols, no slashing required
 
-Samasika was invented by [Joseph Bonneau](https://jbonneau.com), [Izaak Meckler](https://math.berkeley.edu/~izaak), [Vanishree Rao](https://www.linkedin.com/in/vanishree-rao) and [Evan Shapiro](https://twitter.com/evanashapiro) as the first succinct blockchain consensus algorithm.  It extends many ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
+Samasika was invented by [Joseph Bonneau](https://jbonneau.com), [Izaak Meckler](https://math.berkeley.edu/~izaak), <!-- xrefcheck: ignore link --> [Vanishree Rao](https://www.linkedin.com/in/vanishree-rao) and [Evan Shapiro](https://twitter.com/evanashapiro) as the first succinct blockchain consensus algorithm.  It extends many ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
 
 This document describes some important details not found in the original publication in addition to specifying the specific structures, algorithms and protocol details implemented in the Mina blockchain.
 
@@ -958,8 +958,8 @@ Things a peer MUST do to initialize consensus includes
 | `total_currency`                         | `805385692840039233` (= 805385692.840039233)
 | `curr_global_slot`                       | `0` |
 | `global_slot_since_genesis`              | `0` |
-| `staking_epoch_data`                     | See [Section 4.1.1.2](#4112-staking_epoch_data) |
-| `next_epoch_data`                        | See [Section 4.1.1.3](#4112-next_epoch_data) |
+| `staking_epoch_data`                     | _FIXME_ |
+| `next_epoch_data`                        | _FIXME_ |
 | `has_ancestor_in_same_checkpoint_window` | `true` |
 | `block_stake_winner`                     | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
 | `block_creator`                          | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |

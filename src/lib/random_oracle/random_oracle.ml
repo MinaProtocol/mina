@@ -132,8 +132,7 @@ module Checked = struct
   let update ~state xs = update params ~state xs
 
   let hash ?init xs =
-    O1trace.measure "Random_oracle.hash" (fun () ->
-        hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
+    hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
 
   let pack_input =
     Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
