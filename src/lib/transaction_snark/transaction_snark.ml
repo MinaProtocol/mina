@@ -516,7 +516,7 @@ let dummy_constraints () =
               (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+          ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
               (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
