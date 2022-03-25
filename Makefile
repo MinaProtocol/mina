@@ -25,11 +25,11 @@ COVERAGE_DIR=_coverage
 ## Handy variables
 
 # This commit hash
-GITHASH = $(shell git rev-parse --short=8 HEAD)
-GITLONGHASH = $(shell git rev-parse HEAD)
+GITHASH := $(shell git rev-parse --short=8 HEAD)
+GITLONGHASH := $(shell git rev-parse HEAD)
 
 # Unique signature of libp2p code tree
-LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ########################################
 ## Git hooks
