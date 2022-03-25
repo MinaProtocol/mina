@@ -1060,18 +1060,25 @@ module Make (Inputs : Inputs_intf) = struct
       let local_state =
         Local_state.add_check local_state Overflow (Bool.not failed1)
       in
-      let fee =
-        Amount.of_constant_fee constraint_constants.account_creation_fee
-      in
-      let balance_when_new, `Underflow failed2 =
-        Balance.sub_amount_flagged balance fee
-      in
       let local_state =
-        Local_state.add_check local_state Amount_insufficient_to_create_account
-          Bool.(not (account_is_new &&& failed2))
-      in
-      let balance =
-        Balance.if_ account_is_new ~then_:balance_when_new ~else_:balance
+        (* Conditionally subtract account creation fee from fee excess *)
+        let account_creation_fee =
+          Amount.of_constant_fee constraint_constants.account_creation_fee
+        in
+        let excess_minus_creation_fee, `Overflow excess_update_failed =
+          Amount.add_signed_flagged local_state.excess
+            Amount.Signed.(negate (of_unsigned account_creation_fee))
+        in
+        let local_state =
+          Local_state.add_check local_state
+            Amount_insufficient_to_create_account
+            Bool.(not (account_is_new &&& excess_update_failed))
+        in
+        { local_state with
+          excess =
+            Amount.if_ account_is_new ~then_:excess_minus_creation_fee
+              ~else_:local_state.excess
+        }
       in
       let is_receiver = Amount.Signed.is_pos balance_change in
       let local_state =
@@ -1286,7 +1293,7 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_delegate
           Bool.(
             Set_or_keep.is_keep delegate
-            ||| has_permission &&& party_token_is_default)
+            ||| (has_permission &&& party_token_is_default))
       in
       let delegate =
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
@@ -1381,16 +1388,17 @@ module Make (Inputs : Inputs_intf) = struct
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
+      (* We only allow the default token for fees. *)
+      assert_ curr_is_default ;
       Bool.(
         assert_
           ( (not is_start')
           ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
-      assert_ curr_is_default ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.add_signed_flagged local_state.excess local_delta
       in
       ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
-          ~else_:Amount.zero
+          ~else_:local_state.excess
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
         `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
