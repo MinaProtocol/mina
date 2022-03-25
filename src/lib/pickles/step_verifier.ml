@@ -12,7 +12,6 @@ module S = Sponge
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.prover_state = unit
                  and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
@@ -560,12 +559,10 @@ struct
   let%test_module "side loaded domains" =
     ( module struct
       let run k =
-        let (), y =
-          run_and_check
-            (fun () ->
+        let y =
+          run_and_check (fun () ->
               let y = k () in
               fun () -> As_prover.read_var y)
-            ()
           |> Or_error.ok_exn
         in
         y

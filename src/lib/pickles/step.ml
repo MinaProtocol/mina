@@ -589,7 +589,7 @@ struct
               Impls.Step.handle
                 (fun () : unit -> branch_data.main ~step_domains (conv x))
                 handler)
-            () next_statement_hashed)
+            next_statement_hashed)
     in
     let prev_evals =
       let module M =

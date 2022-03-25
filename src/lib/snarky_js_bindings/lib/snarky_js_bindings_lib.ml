@@ -1370,7 +1370,7 @@ module Circuit = struct
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs)
-        spec (main ~w:priv) () pub
+        spec (main ~w:priv) pub
     in
     new%js proof_constr p
 
@@ -1417,17 +1417,13 @@ module Circuit = struct
         (fun (type a)
              (f : (unit -> (unit -> a) Js.callback Promise.t) Js.callback) :
              a Promise.t ->
-          Run_and_check_deferred.run_and_check
-            (fun () ->
+          Run_and_check_deferred.run_and_check (fun () ->
               let g : (unit -> a) Js.callback Promise.t = call f in
               Promise.map g ~f:(fun (p : (unit -> a) Js.callback) () -> call p))
-            ()
-          |> Promise.map ~f:(fun r ->
-                 let (), res = Or_error.ok_exn r in
-                 res)) ;
+          |> Promise.map ~f:Or_error.ok_exn) ;
     circuit##.runAndCheckSync :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
-          Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> snd) ;
+          Impl.run_and_check (fun () -> f) |> Or_error.ok_exn) ;
 
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->

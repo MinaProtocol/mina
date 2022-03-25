@@ -39,9 +39,9 @@ module Chain_hash : sig
 
     type t = var
 
-    val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+    val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
-    val cons : Elt.t -> t -> (t, _) Checked.t
+    val cons : Elt.t -> t -> t Checked.t
   end
 
   [%%endif]
