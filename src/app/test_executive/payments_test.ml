@@ -39,9 +39,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "30000"; timing = Untimed } (* 30_000_000_000_000 *)
         ; { balance = "10000"
           ; timing =
-              make_timing ~min_balance:1_000_000_000_000 ~cliff_time:8
+              make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                 ~cliff_amount:0 ~vesting_period:4
-                ~vesting_increment:500_000_000_000
+                ~vesting_increment:5_000_000_000_000
           }
         ]
     ; num_snark_workers =
@@ -59,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_int 2_000_000_000_000 in
+    let amount = Currency.Amount.of_int 3_000_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let test_constants = Engine.Network.constraint_constants network in
     let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
@@ -308,7 +308,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 3_000_000_000_000 in
+        (let amount = Currency.Amount.of_int 30_000_000_000_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_a in
@@ -323,7 +323,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 6_900_000_000_000 in
+      (let amount = Currency.Amount.of_int 69_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_a in
