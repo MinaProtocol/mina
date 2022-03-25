@@ -12,9 +12,7 @@ module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
 module Length = Mina_numbers.Length
 
-let make_checked t =
-  let open Snark_params.Tick in
-  with_state (As_prover.return ()) (Run.make_checked t)
+let make_checked t = Snark_params.Tick.Run.make_checked t
 
 let name = "proof_of_stake"
 
@@ -3717,9 +3715,8 @@ let%test_module "Proof of stake tests" =
         let%map `Success _, var = Snark_params.Tick.handle result handler in
         As_prover.read (typ ~constraint_constants) var
       in
-      let (), checked_value =
-        Or_error.ok_exn
-        @@ Snark_params.Tick.run_and_check checked_computation ()
+      let checked_value =
+        Or_error.ok_exn @@ Snark_params.Tick.run_and_check checked_computation
       in
       let diff =
         Sexp_diff_kernel.Algo.diff

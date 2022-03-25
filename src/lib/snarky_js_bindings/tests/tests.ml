@@ -14,7 +14,7 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
           ~primary:public_inputs)
-      spec (main ?w:priv) () pub
+      spec (main ?w:priv) pub
   in
   let vk = Impl.Keypair.vk kp in
   (* TODO: make work for larger arbitrary pub spec *)
