@@ -149,7 +149,7 @@ module Local_state = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ( 'frame
+      type ( 'stack_frame
            , 'call_stack
            , 'token_id
            , 'excess
@@ -158,7 +158,7 @@ module Local_state = struct
            , 'comm
            , 'failure_status )
            t =
-        { frame : 'frame
+        { stack_frame : 'stack_frame
         ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
@@ -172,9 +172,10 @@ module Local_state = struct
     end
   end]
 
-  let typ frame call_stack token_id excess ledger bool comm failure_status =
+  let typ stack_frame call_stack token_id excess ledger bool comm failure_status
+      =
     Pickles.Impls.Step.Typ.of_hlistable
-      [ frame
+      [ stack_frame
       ; call_stack
       ; comm
       ; comm
@@ -871,7 +872,7 @@ module Make (Inputs : Inputs_intf) = struct
       =
     let open Inputs in
     let is_start' =
-      let is_start' = Ps.is_empty (Stack_frame.calls local_state.frame) in
+      let is_start' = Ps.is_empty (Stack_frame.calls local_state.stack_frame) in
       ( match is_start with
       | `Compute _ ->
           ()
@@ -906,7 +907,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~then_:
                   (Stack_frame.make ~calls:start_data.parties
                      ~caller:default_caller ~caller_caller:default_caller)
-                ~else_:local_state.frame
+                ~else_:local_state.stack_frame
             , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
         | `Yes start_data ->
@@ -914,7 +915,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~caller_caller:default_caller
             , Call_stack.empty () )
         | `No ->
-            (local_state.frame, local_state.call_stack)
+            (local_state.stack_frame, local_state.call_stack)
       in
       let party, remaining, call_stack =
         (* TODO: Make the stack frame hashed inside of the local state *)
@@ -973,7 +974,9 @@ module Make (Inputs : Inputs_intf) = struct
       in
       ((party, remaining, call_stack), to_pop, local_state, acct)
     in
-    let local_state = { local_state with frame = remaining; call_stack } in
+    let local_state =
+      { local_state with stack_frame = remaining; call_stack }
+    in
     Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a snapp proof.

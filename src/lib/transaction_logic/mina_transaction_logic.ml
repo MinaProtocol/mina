@@ -1673,7 +1673,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.frame.Stack_frame.calls then Ok user_acc
+      if List.is_empty l_state.stack_frame.Stack_frame.calls then Ok user_acc
       else
         let%bind states =
           Or_error.try_with (fun () ->
@@ -1683,7 +1683,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
-      , { frame =
+      , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
              ; caller_caller = Token_id.default

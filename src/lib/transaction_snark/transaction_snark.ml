@@ -1499,15 +1499,13 @@ module Base = struct
         type elt = Stack_frame.t
 
         module Elt = struct
-          let invalid_caller = Mina_base.Token_id.invalid
-
           type t = (Value.frame, Field.Constant.t) With_hash.t
 
           let default : t =
             { hash = Field.Constant.zero
             ; data =
-                { caller = invalid_caller
-                ; caller_caller = invalid_caller
+                { caller = Mina_base.Token_id.default
+                ; caller_caller = Mina_base.Token_id.default
                 ; calls = []
                 }
             }
@@ -2083,8 +2081,8 @@ module Base = struct
         in
         let l : _ Mina_transaction_logic.Parties_logic.Local_state.t =
           { frame =
-              Inputs.Stack_frame.unhash statement.source.local_state.frame
-                (V.create (fun () -> !witness.local_state_init.frame))
+              Inputs.Stack_frame.unhash statement.source.local_state.stack_frame
+                (V.create (fun () -> !witness.local_state_init.stack_frame))
           ; call_stack =
               { With_hash.hash = statement.source.local_state.call_stack
               ; data = V.create (fun () -> !witness.local_state_init.call_stack)
@@ -2188,7 +2186,7 @@ module Base = struct
                       | p :: ps ->
                           let should_pop =
                             Mina_base.Parties.Call_forest.is_empty
-                              (V.get local.frame.data.calls.data)
+                              (V.get local.stack_frame.data.calls.data)
                           in
                           if should_pop then (
                             As_prover.Ref.set start_parties ps ;
@@ -2199,7 +2197,7 @@ module Base = struct
                   as_prover (fun () ->
                       assert (
                         Mina_base.Parties.Call_forest.is_empty
-                          (V.get local.frame.data.calls.data) )) ;
+                          (V.get local.stack_frame.data.calls.data) )) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
@@ -2220,8 +2218,8 @@ module Base = struct
            failure, we just pretend we achieved the target hash.
         *)
         Field.if_ local.success
-          ~then_:(Inputs.Stack_frame.hash local.frame)
-          ~else_:statement.target.local_state.frame
+          ~then_:(Inputs.Stack_frame.hash local.stack_frame)
+          ~else_:statement.target.local_state.stack_frame
       in
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
@@ -3801,13 +3799,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             Some
               ( 0
               , tx_statement current_commitment current_full_commitment
-                  use_full_commitment source_local.frame.calls )
+                  use_full_commitment source_local.stack_frame.calls )
         | _ ->
             None
       in
       let start_parties, next_commitment, next_full_commitment =
         let empty_if_last (mk : unit -> field * field) : field * field =
-          match (target_local.frame.calls, target_local.call_stack) with
+          match (target_local.stack_frame.calls, target_local.call_stack) with
           | [], [] ->
               (* The commitment will be cleared, because this is the last
                  party.
@@ -3868,7 +3866,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           }
         in
         { local with
-          frame = frame local.frame
+          frame = frame local.stack_frame
         ; call_stack =
             List.map
               ~f:
@@ -3930,7 +3928,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
            transaction
            `parties` in local state is empty for the first segment*)
         let source_local_ledger =
-          if Parties.Call_forest.is_empty source_local.frame.calls then
+          if Parties.Call_forest.is_empty source_local.stack_frame.calls then
             Frozen_ledger_hash.empty_hash
           else Sparse_ledger.merkle_root source_local.ledger
         in
@@ -3939,7 +3937,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
-                  frame = Stack_frame.hash source_local.frame
+                  frame = Stack_frame.hash source_local.stack_frame
                 ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
@@ -3951,7 +3949,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   pending_coinbase_init_stack
             ; local_state =
                 { target_local with
-                  frame = Stack_frame.hash target_local.frame
+                  frame = Stack_frame.hash target_local.stack_frame
                 ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
@@ -4026,7 +4024,7 @@ struct
             in
             let open Option.Let_syntax in
             let parties : Party.t list =
-              match witness.local_state_init.frame.calls with
+              match witness.local_state_init.stack_frame.calls with
               | [] ->
                   List.concat_map witness.start_parties ~f:(fun s ->
                       Parties.Call_forest.to_list s.parties.other_parties)

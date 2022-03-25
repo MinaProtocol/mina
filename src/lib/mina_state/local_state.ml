@@ -18,7 +18,7 @@ type display =
 [@@deriving yojson]
 
 let display
-    ({ frame
+    ({ stack_frame
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
@@ -33,7 +33,7 @@ let display
     Visualization.display_prefix_of_string
       Kimchi_backend.Pasta.Basic.(Bigint256.to_hex_string (Fp.to_bigint x))
   in
-  { Mina_transaction_logic.Parties_logic.Local_state.frame = f frame
+  { Mina_transaction_logic.Parties_logic.Local_state.stack_frame = f stack_frame
   ; call_stack = f call_stack
   ; transaction_commitment = f transaction_commitment
   ; full_transaction_commitment = f full_transaction_commitment
@@ -49,7 +49,7 @@ let display
   }
 
 let dummy : t =
-  { frame = Parties.Call_forest.With_hashes.empty
+  { stack_frame = Parties.Call_forest.With_hashes.empty
   ; call_stack = Parties.Call_forest.With_hashes.empty
   ; transaction_commitment = Parties.Transaction_commitment.empty
   ; full_transaction_commitment = Parties.Transaction_commitment.empty
@@ -67,7 +67,7 @@ let gen : t Quickcheck.Generator.t =
   let%map ledger = Frozen_ledger_hash.gen
   and excess = Amount.gen
   and transaction_commitment = Impl.Field.Constant.gen
-  and frame = Impl.Field.Constant.gen
+  and stack_frame = Impl.Field.Constant.gen
   and call_stack = Impl.Field.Constant.gen
   and token_id = Token_id.gen
   and success = Bool.quickcheck_generator
@@ -75,7 +75,7 @@ let gen : t Quickcheck.Generator.t =
     let%bind failure = Transaction_status.Failure.gen in
     Quickcheck.Generator.of_list [ None; Some failure ]
   in
-  { Mina_transaction_logic.Parties_logic.Local_state.frame
+  { Mina_transaction_logic.Parties_logic.Local_state.stack_frame
   ; call_stack
   ; transaction_commitment
   ; full_transaction_commitment = transaction_commitment
@@ -87,7 +87,7 @@ let gen : t Quickcheck.Generator.t =
   }
 
 let to_input
-    ({ frame
+    ({ stack_frame
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
@@ -100,7 +100,7 @@ let to_input
       t) =
   let open Random_oracle.Input.Chunked in
   Array.reduce_exn ~f:append
-    [| field frame
+    [| field stack_frame
      ; field call_stack
      ; field transaction_commitment
      ; field full_transaction_commitment
@@ -122,7 +122,7 @@ module Checked = struct
           Core_kernel.Field.(eq (get f t1) (get f t2)))
     in
     Mina_transaction_logic.Parties_logic.Local_state.Fields.iter
-      ~frame:(f Field.Assert.equal) ~call_stack:(f Field.Assert.equal)
+      ~stack_frame:(f Field.Assert.equal) ~call_stack:(f Field.Assert.equal)
       ~transaction_commitment:(f Field.Assert.equal)
       ~full_transaction_commitment:(f Field.Assert.equal)
       ~token_id:(f Token_id.Checked.Assert.equal)
@@ -135,7 +135,7 @@ module Checked = struct
     let ( ! ) f x y = Impl.run_checked (f x y) in
     let f eq acc f = Core_kernel.Field.(eq (get f t1) (get f t2)) :: acc in
     Mina_transaction_logic.Parties_logic.Local_state.Fields.fold ~init:[]
-      ~frame:(f Field.equal) ~call_stack:(f Field.equal)
+      ~stack_frame:(f Field.equal) ~call_stack:(f Field.equal)
       ~transaction_commitment:(f Field.equal)
       ~full_transaction_commitment:(f Field.equal)
       ~token_id:(f Token_id.Checked.equal)
@@ -144,7 +144,7 @@ module Checked = struct
       ~failure_status:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
-      ({ frame
+      ({ stack_frame
        ; call_stack
        ; transaction_commitment
        ; full_transaction_commitment
@@ -158,7 +158,7 @@ module Checked = struct
     (* failure_status is the unit value, no need to represent it *)
     let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
-      [| field frame
+      [| field stack_frame
        ; field call_stack
        ; field transaction_commitment
        ; field full_transaction_commitment
