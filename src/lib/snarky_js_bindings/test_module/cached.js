@@ -1,9 +1,11 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
-import findCacheDir from "find-cache-dir";
 
-let cacheDir = findCacheDir({ name: "snarkyjs-test", create: true });
+let selfDir = path.dirname(fileURLToPath(import.meta.url));
+let cacheDir = path.resolve(selfDir, "node_modules/.cache/snarkyjs-test");
+await fs.mkdir(cacheDir, { recursive: true });
 
 /**
  * @template T
