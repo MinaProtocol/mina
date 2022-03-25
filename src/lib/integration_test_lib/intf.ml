@@ -71,6 +71,34 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> nonce:Mina_numbers.Account_nonce.t
+        -> memo:string
+        -> token:Token_id.t
+        -> valid_until:Mina_numbers.Global_slot.t
+        -> raw_signature:string
+        -> signed_command_result Deferred.Or_error.t
+
+      val must_send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> nonce:Mina_numbers.Account_nonce.t
+        -> memo:string
+        -> token:Token_id.t
+        -> valid_until:Mina_numbers.Global_slot.t
+        -> raw_signature:string
+        -> signed_command_result Malleable_error.t
+
       val send_delegation :
            logger:Logger.t
         -> t
@@ -107,41 +135,24 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val get_balance_total :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Deferred.Or_error.t
+      type account_data =
+        { nonce : Mina_numbers.Account_nonce.t
+        ; total_balance : Currency.Balance.t
+        ; liquid_balance_opt : Currency.Balance.t option
+        ; locked_balance_opt : Currency.Balance.t option
+        }
 
-      val must_get_balance_total :
+      val get_account_data :
            logger:Logger.t
         -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Malleable_error.t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_data Async_kernel.Deferred.Or_error.t
 
-      val get_balance_liquid :
+      val must_get_account_data :
            logger:Logger.t
         -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t option Deferred.Or_error.t
-
-      val must_get_balance_liquid :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t option Malleable_error.t
-
-      val get_balance_locked :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t option Deferred.Or_error.t
-
-      val must_get_balance_locked :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t option Malleable_error.t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_data Malleable_error.t
 
       val get_account_permissions :
            logger:Logger.t
