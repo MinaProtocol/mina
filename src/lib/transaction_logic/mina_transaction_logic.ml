@@ -2293,6 +2293,7 @@ module For_tests = struct
       ; sender : Keypair.t * Account_nonce.t
       ; receiver : Public_key.Compressed.t
       ; amount : Currency.Amount.t
+      ; receiver_is_new : bool
       }
     [@@deriving sexp]
 
@@ -2333,7 +2334,9 @@ module For_tests = struct
       let nonces =
         Map.set nonces ~key:sender ~data:(Account_nonce.succ nonce)
       in
-      let spec = { fee; amount; receiver; sender = (sender, nonce) } in
+      let spec =
+        { fee; amount; receiver; receiver_is_new; sender = (sender, nonce) }
+      in
       return (spec, nonces)
   end
 
@@ -2362,8 +2365,12 @@ module For_tests = struct
   end
 
   let command_send
-      { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
-      : Signed_command.t =
+      { Transaction_spec.fee
+      ; sender = sender, sender_nonce
+      ; receiver
+      ; amount
+      ; receiver_is_new = _
+      } : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
     Signed_command.sign sender
       { common =
@@ -2378,8 +2385,13 @@ module For_tests = struct
     |> Signed_command.forget_check
 
   let party_send ?(use_full_commitment = true)
-      { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
-      : Parties.t =
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      { Transaction_spec.fee
+      ; sender = sender, sender_nonce
+      ; receiver
+      ; amount
+      ; receiver_is_new
+      } : Parties.t =
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
@@ -2443,7 +2455,14 @@ module For_tests = struct
                     { public_key = receiver
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
-                    ; balance_change = Amount.Signed.(of_unsigned amount)
+                    ; balance_change =
+                        Amount.Signed.of_unsigned
+                          ( if receiver_is_new then
+                            Option.value_exn
+                              (Amount.sub amount
+                                 (Amount.of_fee
+                                    constraint_constants.account_creation_fee))
+                          else amount )
                     ; increment_nonce = false
                     ; events = []
                     ; sequence_events = []
