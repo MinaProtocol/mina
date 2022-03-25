@@ -101,6 +101,10 @@ spec:
         - "-upload-blocks-to-gcloud"
         - "true"
         {{- end }}
+        {{- range .Values.archive.args}}
+        {{- for args in list}}
+        - {{ .| quote }}
+        {{- end }}
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}
