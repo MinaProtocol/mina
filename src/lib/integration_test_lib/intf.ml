@@ -128,7 +128,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-        
       type account_data =
         { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
 
