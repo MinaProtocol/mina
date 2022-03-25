@@ -645,8 +645,7 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~expiry_ns 
-      ~frontier_broadcast_pipe =
+      ~time_controller ~expiry_ns ~frontier_broadcast_pipe =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -674,8 +673,7 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~expiry_ns 
-            ~frontier_broadcast_pipe
+            ~time_controller ~expiry_ns ~frontier_broadcast_pipe
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -1132,8 +1130,7 @@ let%test_module "random set test" =
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~expiry_ns 
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
