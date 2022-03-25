@@ -14,3 +14,4 @@ cd src/lib/snarky_js_bindings/test_module
 npm i
 cd ../../../..
 tar -chzf snarkyjs_test.tar.gz src/lib/snarky_js_bindings/test_module
+chmod 777 snarkyjs_test.tar.gz
