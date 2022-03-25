@@ -44,7 +44,7 @@ features:
     secretName: "generic-node-devnet-bp-key"
 
 daemon:
-  enabled: true
+  enabled: false
   args:
     - "--libp2p-metrics-port"
     - "9000"
