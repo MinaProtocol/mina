@@ -803,15 +803,6 @@ module Make (Inputs : Inputs_intf) = struct
       (* Check that party has a valid caller. *)
       assert_ Bool.(is_normal_call ||| is_delegate_call)
     in
-    let () =
-      (* Check that the token owner was consulted if using a non-default
-         token *)
-      let party_token_id = Party.token_id party in
-      Bool.Assert.any
-        [ Token_id.equal party_token_id Token_id.default
-        ; Token_id.equal party_token_id party_caller
-        ]
-    in
     (* Cases:
        - [party_forest] is empty, [remainder_of_current_forest] is empty.
        Pop from the call stack to get another forest, which is guaranteed to be non-empty.
@@ -928,6 +919,18 @@ module Make (Inputs : Inputs_intf) = struct
       let party, remaining, call_stack =
         (* TODO: Make the stack frame hashed inside of the local state *)
         get_next_party to_pop call_stack
+      in
+      let local_state =
+        let default_token_or_token_owner_was_caller =
+          (* Check that the token owner was consulted if using a non-default
+             token *)
+          let party_token_id = Party.token_id party in
+          Bool.( ||| )
+            (Token_id.equal party_token_id Token_id.default)
+            (Token_id.equal party_token_id (Party.caller party))
+        in
+        Local_state.add_check local_state Token_owner_not_caller
+          default_token_or_token_owner_was_caller
       in
       let ((a, inclusion_proof) as acct) =
         Inputs.Ledger.get_account party local_state.ledger
