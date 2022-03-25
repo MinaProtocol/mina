@@ -1771,6 +1771,8 @@ module Ledger = struct
     ; nextEpochData : epoch_data_predicate Js.prop >
     Js.t
 
+  type private_key = < s : scalar_class Js.t Js.prop > Js.t
+
   type public_key = < g : group_class Js.t Js.prop > Js.t
 
   type party_update =
@@ -2018,6 +2020,12 @@ module Ledger = struct
     { x = field pk##.g##.x
     ; is_odd = Bigint.(test_bit (of_field (field pk##.g##.y)) 0)
     }
+
+  let private_key (key : private_key) : Signature_lib.Private_key.t =
+    Js.Optdef.case
+      key##.s##.constantValue
+      (fun () -> failwith "invalid scalar")
+      Fn.id
 
   let uint32 (x : js_uint32) =
     Unsigned.UInt32.of_string (Field.Constant.to_string (field x##.value))
@@ -2554,6 +2562,49 @@ module Ledger = struct
       ~protocol_state_predicate_hash ~memo_hash:Field.zero
     |> to_js_field
 
+  type party_index = Fee_payer | Other_party of int
+
+  let tx_commitment ({ fee_payer; other_parties; _ } as tx : Parties.t)
+      (party_index : party_index) =
+    let commitment = Parties.commitment tx in
+    let full_commitment =
+      Parties.Transaction_commitment.with_fee_payer commitment
+        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+    in
+    let use_full_commitment =
+      match party_index with
+      | Fee_payer ->
+          true
+      | Other_party i ->
+          (List.nth_exn other_parties i).data.body.use_full_commitment
+    in
+    if use_full_commitment then full_commitment else commitment
+
+  let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
+      (party_index : party_index) =
+    let tx =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    let signature =
+      Signature_lib.Schnorr.Chunked.sign (private_key key)
+        (Random_oracle.Input.Chunked.field (tx_commitment tx party_index))
+    in
+    ( match party_index with
+    | Fee_payer ->
+        { tx with fee_payer = { tx.fee_payer with authorization = signature } }
+    | Other_party i ->
+        { tx with
+          other_parties =
+            List.mapi tx.other_parties ~f:(fun i' p ->
+                if i' = i then { p with authorization = Signature signature }
+                else p)
+        } )
+    |> Parties.to_json |> Yojson.Safe.to_string |> Js.string
+
+  let sign_fee_payer tx_json key = sign_party tx_json key Fee_payer
+
+  let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
+
   let add_account_exn (l : L.t) pk balance =
     let account_id = account_id pk in
 
@@ -2715,6 +2766,9 @@ module Ledger = struct
     static_method "hashPartyChecked" hash_party_checked ;
     static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
     static_method "hashTransactionChecked" hash_transaction_checked ;
+
+    static_method "signFeePayer" sign_fee_payer ;
+    static_method "signOtherParty" sign_other_party ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
