@@ -65,7 +65,7 @@ in
       Command.Config::{
         commands =
             -- Build js test archive
-            RunInToolchain.runInToolchainBuster [] "./buildkite/scripts/build-js-tests.sh"
+            RunInToolchain.runInToolchainBuster ([] : List Text) "./buildkite/scripts/build-js-tests.sh"
             
             #
 
