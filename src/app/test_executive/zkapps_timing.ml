@@ -249,7 +249,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind { total_balance = before_balance; _ } =
       Network.Node.must_get_account_data ~logger node
-        ~public_key:(Mina_base.Account_id.public_key timing_account_id)
+        ~account_id:timing_account_id
     in
     (* let%bind before_balance =
          get_account_balance ~logger node timing_account_id
@@ -267,7 +267,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        in *)
     let%bind { total_balance = after_balance; _ } =
       Network.Node.must_get_account_data ~logger node
-        ~public_key:(Mina_base.Account_id.public_key timing_account_id)
+        ~account_id:timing_account_id
     in
     let%bind () =
       section "Verifying balance change"
@@ -340,7 +340,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          let%bind { locked_balance_opt = locked_balance; _ } =
            Network.Node.must_get_account_data ~logger node
-             ~public_key:(Mina_base.Account_id.public_key timing_account_id)
+             ~account_id:timing_account_id
          in
          (* let%bind locked_balance =
               get_account_balance_locked ~logger node timing_account_id
@@ -367,7 +367,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in *)
         (let%bind { total_balance = after_invalid_balance; _ } =
            Network.Node.must_get_account_data ~logger node
-             ~public_key:(Mina_base.Account_id.public_key timing_account_id)
+             ~account_id:timing_account_id
          in
          let after_invalid_balance_as_amount =
            Currency.Balance.to_amount after_invalid_balance

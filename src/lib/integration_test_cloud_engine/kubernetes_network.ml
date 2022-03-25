@@ -197,21 +197,6 @@ module Node = struct
     (* TODO: temporary version *)
     module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
 
-    module Get_account_data =
-    [%graphql
-    {|
-      query ($public_key: PublicKey) {
-        account(publicKey: $public_key) {
-          nonce
-          balance {
-            total @bsDecoder(fn: "Decoders.balance")
-            liquid @bsDecoder(fn: "Decoders.optional_balance")
-            locked @bsDecoder(fn: "Decoders.optional_balance")
-          }
-        }
-      }
-    |}]
-
     module Query_peer_id =
     [%graphql
     {|
@@ -263,9 +248,9 @@ module Node = struct
     {|
       query ($public_key: PublicKey, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid
-                    locked
-                    total
+          balance { liquid @bsDecoder(fn: "Decoders.optional_balance")
+                    locked @bsDecoder(fn: "Decoders.optional_balance")
+                    total @bsDecoder(fn: "Decoders.balance")
                   }
           delegate
           nonce
@@ -412,63 +397,6 @@ module Node = struct
     get_best_chain ?max_length ~logger t
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  type account_data =
-    { nonce : Mina_numbers.Account_nonce.t
-    ; total_balance : Currency.Balance.t
-    ; liquid_balance_opt : Currency.Balance.t option
-    ; locked_balance_opt : Currency.Balance.t option
-    }
-
-  let get_account_data ~logger t ~public_key =
-    let open Deferred.Or_error.Let_syntax in
-    [%log info] "Getting account balance"
-      ~metadata:
-        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
-        :: logger_metadata t ) ;
-    (* let pk = Mina_base.Account_id.public_key account_id in *)
-    (* let token = Mina_base.Account_id.token_id account_id in *)
-    let get_account_obj =
-      Graphql.Get_account_data.make
-        ~public_key:(Graphql_lib.Encoders.public_key public_key)
-        (* ~token:(Graphql_lib.Encoders.token token) *)
-        ()
-    in
-    let%bind account_data_obj =
-      exec_graphql_request ~logger ~node:t ~query_name:"get_balance_graphql"
-        get_account_obj
-    in
-    match account_data_obj#account with
-    | None ->
-        Deferred.Or_error.errorf
-          !"Account with public_key %s not found"
-          (Signature_lib.Public_key.Compressed.to_string public_key)
-    | Some acc ->
-        return
-          { nonce =
-              acc#nonce
-              |> Option.value_exn ~message:"the nonce from get_balance is None"
-              |> Mina_numbers.Account_nonce.of_string
-          ; total_balance = acc#balance#total
-          ; liquid_balance_opt = acc#balance#liquid
-          ; locked_balance_opt = acc#balance#locked
-          }
-
-  let must_get_account_data ~logger t ~public_key =
-    get_account_data ~logger t ~public_key
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  (* let get_balance_liquid = make_get_balance ~f:(fun balance -> balance#liquid)
-
-     let must_get_balance_liquid ~logger t ~account_id =
-       get_balance_liquid ~logger t ~account_id
-       |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-     let get_balance_locked = make_get_balance ~f:(fun balance -> balance#locked)
-
-     let must_get_balance_locked ~logger t ~account_id =
-       get_balance_locked ~logger t ~account_id
-       |> Deferred.bind ~f:Malleable_error.or_hard_error *)
-
   let get_account ~logger t ~account_id =
     [%log info] "Getting account"
       ~metadata:
@@ -484,6 +412,48 @@ module Node = struct
     in
     exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
       get_account_obj
+
+  type account_data =
+    { nonce : Mina_numbers.Account_nonce.t
+    ; total_balance : Currency.Balance.t
+    ; liquid_balance_opt : Currency.Balance.t option
+    ; locked_balance_opt : Currency.Balance.t option
+    }
+
+  let get_account_data ~logger t ~account_id =
+    let open Deferred.Or_error.Let_syntax in
+    let public_key = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
+    [%log info] "Getting account data, which is its balances and nonce"
+      ~metadata:
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
+        :: logger_metadata t ) ;
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | None ->
+        Deferred.Or_error.errorf
+          !"Account with Account id %{sexp:Mina_base.Account_id.t}, public_key \
+            %s, and token %s not found"
+          account_id
+          (Signature_lib.Public_key.Compressed.to_string public_key)
+          (Mina_base.Token_id.to_string token)
+    | Some acc ->
+        return
+          { nonce =
+              acc#nonce
+              |> Option.value_exn
+                   ~message:
+                     "the nonce from get_balance is None, which should be \
+                      impossible"
+              |> Mina_numbers.Account_nonce.of_string
+          ; total_balance = acc#balance#total
+          ; liquid_balance_opt = acc#balance#liquid
+          ; locked_balance_opt = acc#balance#locked
+          }
+
+  let must_get_account_data ~logger t ~account_id =
+    get_account_data ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let permissions_of_account_permissions account_permissions :
       Mina_base.Permissions.t =

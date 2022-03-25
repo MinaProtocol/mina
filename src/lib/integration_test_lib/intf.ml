@@ -145,13 +145,13 @@ module Engine = struct
       val get_account_data :
            logger:Logger.t
         -> t
-        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_id:Mina_base.Account_id.t
         -> account_data Async_kernel.Deferred.Or_error.t
 
       val must_get_account_data :
            logger:Logger.t
         -> t
-        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_id:Mina_base.Account_id.t
         -> account_data Malleable_error.t
 
       val get_account_permissions :

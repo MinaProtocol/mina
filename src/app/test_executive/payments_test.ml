@@ -70,22 +70,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_pub_key =
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
+    let receiver_account_id =
+      Account_id.create receiver_pub_key Token_id.default
+    in
     let txn_body =
       Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key
-        ; receiver_pk = receiver_pub_key (* ; token_id = Token_id.default *)
-        ; amount
-        }
+        { source_pk = sender_pub_key; receiver_pk = receiver_pub_key; amount }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger untimed_node_b
-        ~public_key:sender_pub_key
+        ~account_id:sender_account_id
     in
     let user_command_input =
-      User_command_input.create ~fee
-        ~nonce:
-          sender_current_nonce
-          (* ~fee_token:(Signed_command_payload.Body.token txn_body) *)
+      User_command_input.create ~fee ~nonce:sender_current_nonce
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
@@ -150,11 +148,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          txn"
         (let%bind { total_balance = node_b_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          let%bind { total_balance = node_a_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_a
-             ~public_key:receiver_pub_key
+             ~account_id:receiver_account_id
          in
          let node_a_expected =
            (* 40_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
@@ -314,14 +312,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
-
+         let receiver_account_id =
+           Account_id.create receiver_pub_key Token_id.default
+         in
          let%bind { total_balance = timed_node_c_total
                   ; liquid_balance_opt = timed_node_c_liquid_opt
                   ; locked_balance_opt = timed_node_c_locked_opt
                   ; _
                   } =
            Network.Node.must_get_account_data ~logger timed_node_c
-             ~public_key:receiver_pub_key
+             ~account_id:receiver_account_id
          in
          [%log info] "timed_node_c total balance: %s"
            (Currency.Balance.to_formatted_string timed_node_c_total) ;
