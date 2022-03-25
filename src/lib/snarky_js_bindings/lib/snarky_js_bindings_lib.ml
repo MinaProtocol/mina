@@ -2225,9 +2225,7 @@ module Ledger = struct
           (Mina_base.Signature.of_base58_check_exn (Js.to_string signature))
     | "proof" -> (
         let proof_string = Js.to_string @@ Obj.magic a##.value in
-        console_log proof_string ;
         let proof_yojson = Yojson.Safe.from_string proof_string in
-        console_log proof_yojson ;
         match Pickles.Side_loaded.Proof.of_yojson proof_yojson with
         | Ppx_deriving_yojson_runtime.Result.Ok p ->
             Proof p

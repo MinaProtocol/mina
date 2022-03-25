@@ -12,7 +12,9 @@ import {
   call,
   isReady,
   shutdown,
+  PublicKey,
 } from "snarkyjs";
+import cached from "./cached.js";
 
 await isReady;
 // TODO check if floats are converted to Field correctly
@@ -41,18 +43,23 @@ class SimpleZkapp extends SmartContract {
 declareState(SimpleZkapp, { x: Field });
 declareMethodArguments(SimpleZkapp, { update: [Field] });
 
-// create new random zkapp key
-let zkappPrivateKey = PrivateKey.random();
-let zkappAddress = zkappPrivateKey.toPublicKey();
+// create new random zkapp key, or read from cache
+let keyPair = await cached(() => {
+  let privateKey = PrivateKey.random();
+  let publicKey = privateKey.toPublicKey().toJSON();
+  return { privateKey: privateKey.toJSON(), publicKey };
+});
+let zkappAddress = PublicKey.fromJSON(keyPair.publicKey);
 
 let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
 feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
 
 if (command === "deploy") {
+  // snarkyjs part
   let { verificationKey } = compile(SimpleZkapp, zkappAddress);
   let partiesJson = deploy(SimpleZkapp, zkappAddress, verificationKey);
-  let parties = JSON.parse(partiesJson);
 
+  // mina-signer part
   let client = new Client({ network: "testnet" });
   let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
@@ -60,14 +67,14 @@ if (command === "deploy") {
     fee: transactionFee + initialBalance,
     nonce: feePayerNonce,
   };
+  let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
   let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
   console.log(data.parties);
 }
 
 if (command === "update") {
-  // compile once more, to get the provers :'/
+  // snarkyjs part
   let { provers } = SimpleZkapp.compile(zkappAddress);
-  // TODO getting length mismatch because proof to_string / of_string differ
   let partiesJson = await call(
     SimpleZkapp,
     zkappAddress,
@@ -75,8 +82,18 @@ if (command === "update") {
     [Field(3)],
     provers
   );
-  // TODO sign
-  console.log(partiesJson);
+
+  // mina-signer part
+  let client = new Client({ network: "testnet" });
+  let feePayerAddress = client.derivePublicKey(feePayerKey);
+  let feePayer = {
+    feePayer: feePayerAddress,
+    fee: transactionFee,
+    nonce: feePayerNonce,
+  };
+  let parties = JSON.parse(partiesJson);
+  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+  console.log(data.parties);
 }
 
 shutdown();

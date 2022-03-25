@@ -1,9 +1,10 @@
 {
-  "name": "snarkyjs-integration-test",
+  "name": "snarkyjs-test",
   "version": "0.1.0",
   "main": "test.js",
   "type": "module",
   "dependencies": {
+    "find-cache-dir": "^3.3.2",
     "mina-signer": "file:../../../../frontend/mina-signer",
     "snarkyjs": "file:../snarkyjs"
   }
