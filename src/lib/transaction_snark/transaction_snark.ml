@@ -3677,6 +3677,9 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
          }
          witnesses
        ->
+      (*Transaction snark says nothing about failure status*)
+      let source_local = { source_local with failure_status_tbl = [] } in
+      let target_local = { target_local with failure_status_tbl = [] } in
       let current_commitment = !commitment in
       let current_full_commitment = !full_commitment in
       let snapp_stmt =
