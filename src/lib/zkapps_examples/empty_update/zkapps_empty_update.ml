@@ -8,10 +8,10 @@ open Zkapps_examples
 *)
 let main public_key =
   Zkapps_examples.party_circuit (fun () ->
-    Party_under_construction.In_circuit.create
-      ~public_key:(Public_key.Compressed.var_of_t public_key)
-      ~token_id:Token_id.(Checked.constant default)
-      () )
+      Party_under_construction.In_circuit.create
+        ~public_key:(Public_key.Compressed.var_of_t public_key)
+        ~token_id:Token_id.(Checked.constant default)
+        ())
 
 (* TODO: This shouldn't exist, the circuit should just return the requisite
          values.
