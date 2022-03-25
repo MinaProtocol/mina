@@ -1,5 +1,5 @@
 ---
-{{-  if .Values.daemon.enabled}}
+{{- if .Values.daemon.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
@@ -45,7 +45,7 @@ spec:
         command: ['sh', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/']
         volumeMounts:
         - mountPath: /libp2p-keys
-          name: source-libp2p-keys 
+          name: source-libp2p-keys
         - mountPath: /root/libp2p-keys
           name: destination-libp2p
       {{- end }}
@@ -97,8 +97,7 @@ spec:
         - "$(WORK_SELECTION)"
         - "-u"
         - "/code/watchdog.py"
-        - "/code/make_report.py" 
-        - "--incluster" 
+        - "--incluster"
         - "true"
         - "--namespace"
         - ""
@@ -138,8 +137,7 @@ spec:
         - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
         {{- end }}
         {{- range .Values.daemon.args}}
-        {{- for args in list}}
-        - {{ . | quote }}
+        - {{ .| quote }}
         {{- end }}
         env:
         - name: DAEMON_REST_PORT
@@ -232,7 +230,7 @@ spec:
         {{-  if .Values.features.persistence.enabled}}
         - name: {{.Values.features.persistence.name}}
           mountPath: "{{.Values.features.persistence.mountPath}}"
-        {{- end }}  
+        {{- end }}
       volumes:
       {{- if .Values.features.runtimeConfig.enabled}}
       - name: daemon-config

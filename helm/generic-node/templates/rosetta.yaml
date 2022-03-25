@@ -1,5 +1,5 @@
 ---
-{{-  if .Values.rosetta.enabled}}
+{{- if .Values.rosetta.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
@@ -109,7 +109,6 @@ spec:
         - "true"
         {{- end }}
         {{- range .Values.rosetta.args}}
-        {{- for args in list}}
         - {{ .| quote }}
         {{- end }}
         env:
@@ -125,8 +124,8 @@ spec:
           value: {{.Values.ports.metrics | quote}}
         - name: DAEMON_SERVER_PORT
           value: {{.Values.ports.archive | quote}}
-        - name: DAEMON_PG_CONN_PORT 
-          value: {{.Values.archive.pg_conn | quote}} 
+        - name: DAEMON_PG_CONN_PORT
+          value: {{.Values.archive.pg_conn | quote}}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_CLIENT_TRUSTLIST
@@ -155,7 +154,7 @@ spec:
         {{- end }}
         ports:
         - name: archive-port
-          protocol: TCP    
+          protocol: TCP
           containerPort: {{.Values.ports.archive}}
         - name: client-port
           protocol: TCP

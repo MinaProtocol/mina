@@ -24,7 +24,7 @@ features:
   uploadBlocksToGCloud:
     enabled: true
   seedPeersLists:
-    enabled:  true 
+    enabled: true
   seedPeers:
     enabled: true
   customEntrypoint:
@@ -115,4 +115,3 @@ nodeSelector:
 restartEveryMins: ""
 restartNodes: ""
 seedPeersURL: ""
----
