@@ -3668,8 +3668,9 @@ let%test_module "staged ledger tests" =
                       { data = invalid_command
                       ; status =
                           Transaction_status.Failed
-                            ( Transaction_status.Failure
-                              .Amount_insufficient_to_create_account
+                            ( Transaction_status.Failure.(
+                                Collection.of_single_failure
+                                  Amount_insufficient_to_create_account)
                             , Transaction_status.Balance_data.
                                 { fee_payer_balance = None
                                 ; source_balance = None

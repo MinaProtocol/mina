@@ -11,7 +11,10 @@ module Parties_templates = struct
       pooledSnappCommands(publicKey: $public_key) {
         id
         hash
-        failureReason
+        failureReason {
+                         index
+                         failures
+                       }
         parties %s
       }
     }|graphql}
@@ -23,7 +26,10 @@ module Parties_templates = struct
             internalSendSnapp(parties: $parties) {
                snapp { id
                        hash
-                       failureReason
+                       failureReason {
+                         index
+                         failures
+                       }
                        parties %s
                      }
              }

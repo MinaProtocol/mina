@@ -741,7 +741,22 @@ module Node = struct
       | None ->
           return ()
       | Some s ->
-          Deferred.Or_error.errorf "Snapp failed, reason: %s" s
+          Deferred.Or_error.errorf "Snapp failed, reason: %s"
+            ( Array.fold ~init:[] s ~f:(fun acc f ->
+                  match f with
+                  | None ->
+                      acc
+                  | Some f ->
+                      ( Int.of_string (Option.value_exn f#index)
+                      , Array.map
+                          ~f:(fun s ->
+                            Mina_base.Transaction_status.Failure.of_string s
+                            |> Result.ok_or_failwith)
+                          f#failures
+                        |> Array.to_list |> List.rev )
+                      :: acc)
+            |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
+            |> Yojson.Safe.to_string )
     in
     let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
     [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
