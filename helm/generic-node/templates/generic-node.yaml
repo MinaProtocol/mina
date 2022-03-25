@@ -171,7 +171,7 @@ spec:
         - name: "RESTART_NODES"
           value: {{ .Values.restartNodes | quote }}
         - name: "SEED_PEERS"
-          value: {{ $.Values.daemon.args.seedPeers | quote }}
+          value: {{ $.Values.daemon.seedPeers | quote }}
         - name: "SEED_PEERS_URL"
           value: {{ $.Values.seedPeersURL | quote }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
