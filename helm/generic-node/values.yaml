@@ -34,7 +34,7 @@ features:
     enabled: true
   persistence:
     # for every deploy the name must be unique
-    enabled: true
+    enabled: false
     name: "generic-node-volume"
     storageClass: standard-delete
     mountPath: /data/
@@ -44,7 +44,7 @@ features:
     secretName: "generic-node-devnet-bp-key"
 
 daemon:
-  enabled: false
+  enabled: true
   args:
     - "--libp2p-metrics-port"
     - "9000"
@@ -57,7 +57,7 @@ coordinator:
   workSelectionAlgorithm: seq #seq OR rand
 
 archive:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-archive
     pullPolicy: IfNotPresent
@@ -65,7 +65,7 @@ archive:
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent

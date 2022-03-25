@@ -1,5 +1,5 @@
 ---
-{{- if .Values.daemon.enabled}}
+{{if .Values.daemon.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
