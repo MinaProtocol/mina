@@ -58,7 +58,7 @@ in
         target = Size.Medium,
         depends_on = dependsOn,
         if = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
-      }
+      },
 
   buildJs = \() -> 
     Command.build
