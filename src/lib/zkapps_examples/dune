@@ -1,5 +1,5 @@
 (library
- (name zkapps_empty_update)
+ (name zkapps_examples)
  (libraries
    ;; opam libraries
    core_kernel
@@ -19,8 +19,7 @@
    snark_params
    sgn
    signature_lib
-   tuple_lib
-   zkapps_examples)
+   tuple_lib)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
