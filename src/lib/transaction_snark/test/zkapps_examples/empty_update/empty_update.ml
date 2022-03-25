@@ -29,14 +29,14 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
       (Genesis_constants.Constraint_constants.to_snark_keys_header
          constraint_constants)
     ~choices:(fun ~self ->
-      [ ZKApps_empty_update.rule pk_compressed; dummy_rule self ])
+      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ])
 
 module P = (val p_module)
 
 let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
 (* TODO: This should be entirely unnecessary. *)
-let party_body = ZKApps_empty_update.generate_party pk_compressed
+let party_body = Zkapps_empty_update.generate_party pk_compressed
 
 let party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
