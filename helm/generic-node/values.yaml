@@ -87,7 +87,7 @@ ports:
   graphql: "3085"
   metrics: "10001"
   p2p: "10909"
-  nodePort: "30007"
+  nodePort: "30009"
   postgres: "5432"
   archive: "3086"
   rosetta: "3087"
