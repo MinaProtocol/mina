@@ -144,7 +144,7 @@ module Base
         ; trace_label
         ; throttle
         } ->
-        O1trace.sync_thread (sprintf "handle %s gossip" trace_label)
+        O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
         let env' = Msg.convert msg in
         let cb' = Msg.convert_callback cb in

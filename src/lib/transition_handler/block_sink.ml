@@ -49,7 +49,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; log_gossip_heard
       ; consensus_constants
       } ->
-      O1trace.sync_thread "handle block gossip"
+      O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
       let%bind () = on_push () in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
