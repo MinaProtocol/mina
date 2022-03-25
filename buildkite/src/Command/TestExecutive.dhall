@@ -60,7 +60,7 @@ in
         if = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       },
 
-  buildJs = \() -> 
+  buildJs = \(duneProfile : Text) -> 
     Command.build
       Command.Config::{
         commands =
