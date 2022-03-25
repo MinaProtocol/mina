@@ -396,7 +396,7 @@ module Checked = struct
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :
-      (var, _) Checked.t =
+      var Checked.t =
     let%bind constants =
       make_checked (fun () ->
           create'
