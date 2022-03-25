@@ -37,12 +37,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         [ { balance = "40000"; timing = Untimed } (* 40_000_000_000_000 *)
         ; { balance = "30000"; timing = Untimed } (* 30_000_000_000_000 *)
-        ; { balance = "10000"
+        ; { balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
           }
+          (* 30_000_000_000_000 mina is the total. initially, the balance will be 10k mina. after 8 global slots, the cliff is hit, although the cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
         ]
     ; num_snark_workers =
         3
@@ -55,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
+    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
       Network.block_producers network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
@@ -321,11 +322,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 69_000_000_000_000 in
+      (let amount = Currency.Amount.of_int 1_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = timed_node_a in
+       let sender = timed_node_c in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
+       let%bind { total_balance = timed_node_c_total
+                ; liquid_balance_opt = timed_node_c_liquid_opt
+                ; locked_balance_opt = timed_node_c_locked_opt
+                ; _
+                } =
+         Network.Node.must_get_account_data ~logger timed_node_c
+           ~account_id:receiver_account_id
+       in
+       [%log info] "timed_node_c total balance: %s"
+         (Currency.Balance.to_formatted_string timed_node_c_total) ;
+       [%log info] "timed_node_c liquid balance: %s"
+         (Currency.Balance.to_formatted_string
+            ( timed_node_c_liquid_opt
+            |> Option.value ~default:Currency.Balance.zero )) ;
+       [%log info] "timed_node_c liquid locked: %s"
+         (Currency.Balance.to_formatted_string
+            ( timed_node_c_locked_opt
+            |> Option.value ~default:Currency.Balance.zero )) ;
+       [%log info]
+         "Attempting to send txn from timed_node_c to untimed_node_a for \
+          amount of %s"
+         (Currency.Amount.to_formatted_string amount) ;
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
        match%bind
