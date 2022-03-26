@@ -350,11 +350,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = timed_node_c in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
+       let%bind sender_pub_key = Util.pub_key_of_node timed_node_c in
+       let sender_account_id =
+         Account_id.create sender_pub_key Token_id.default
+       in
        let%bind { total_balance = timed_node_c_total; _ } =
          Network.Node.must_get_account_data ~logger timed_node_c
-           ~public_key:sender_pub_key
+           ~account_id:sender_account_id
        in
        [%log info] "timed_node_c total balance: %s"
          (Currency.Balance.to_formatted_string timed_node_c_total) ;
@@ -365,8 +367,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
        match%bind
-         Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
-           ~amount ~fee
+         Node.send_payment ~logger timed_node_c ~sender_pub_key
+           ~receiver_pub_key ~amount ~fee
        with
        | Ok _ ->
            Malleable_error.soft_error_string ~value:()

@@ -398,12 +398,12 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let get_account ~logger t ~account_id =
-    [%log info] "Getting account"
-      ~metadata:
-        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
-        :: logger_metadata t ) ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
+    [%log info] "Getting account"
+      ~metadata:
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk)
+        :: logger_metadata t ) ;
     let get_account_obj =
       Graphql.Account.make
         ~public_key:(Graphql_lib.Encoders.public_key pk)
