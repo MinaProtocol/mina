@@ -310,7 +310,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let amount = Currency.Amount.of_int 30_000_000_000_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let sender = timed_node_a in
+         let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
          let%bind { nonce; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
@@ -327,24 +327,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_c in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind { total_balance = timed_node_c_total
-                ; liquid_balance_opt = timed_node_c_liquid_opt
-                ; locked_balance_opt = timed_node_c_locked_opt
-                ; _
-                } =
+       let%bind { total_balance = timed_node_c_total; _ } =
          Network.Node.must_get_account_data ~logger timed_node_c
-           ~account_id:receiver_account_id
+           ~public_key:sender_pub_key
        in
        [%log info] "timed_node_c total balance: %s"
          (Currency.Balance.to_formatted_string timed_node_c_total) ;
-       [%log info] "timed_node_c liquid balance: %s"
-         (Currency.Balance.to_formatted_string
-            ( timed_node_c_liquid_opt
-            |> Option.value ~default:Currency.Balance.zero )) ;
-       [%log info] "timed_node_c liquid locked: %s"
-         (Currency.Balance.to_formatted_string
-            ( timed_node_c_locked_opt
-            |> Option.value ~default:Currency.Balance.zero )) ;
        [%log info]
          "Attempting to send txn from timed_node_c to untimed_node_a for \
           amount of %s"
