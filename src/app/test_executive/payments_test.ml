@@ -35,8 +35,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "40000"; timing = Untimed } (* 40_000_000_000_000 *)
-        ; { balance = "30000"; timing = Untimed } (* 30_000_000_000_000 *)
+        [ { balance = "400000"; timing = Untimed } (* 400_000_000_000_000 *)
+        ; { balance = "300000"; timing = Untimed } (* 300_000_000_000_000 *)
         ; { balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
@@ -60,7 +60,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_int 3_000_000_000_000 in
+    let amount = Currency.Amount.of_int 30_000_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let test_constants = Engine.Network.constraint_constants network in
     let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
@@ -155,9 +155,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~public_key:receiver_pub_key
          in
          let node_a_expected =
-           (* 40_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
+           (* 400_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
            Currency.Amount.add
-             (Currency.Amount.of_int 40_000_000_000_000)
+             (Currency.Amount.of_int 400_000_000_000_000)
              amount
            |> Option.value_exn
          in
@@ -165,8 +165,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let node_b_expected =
            Currency.Amount.sub
              ( Currency.Amount.add
-                 (* 30_000_000_000_000 is hardcoded the original amount, change this is original amount changes *)
-                 (Currency.Amount.of_int 30_000_000_000_000)
+                 (* 300_000_000_000_000 is hardcoded the original amount, change this is original amount changes *)
+                 (Currency.Amount.of_int 300_000_000_000_000)
                  test_constants.coinbase_amount
              |> Option.value_exn )
              ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
@@ -187,13 +187,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Currency.Balance.to_formatted_string node_b_balance) ;
          if
            (* node_a is the receiver *)
-           (* node_a_balance >= 40_000_000_000_000 + txn_amount *)
+           (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
            (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (30_000_000_000_000 + possible_coinbase_reward) - (txn_amount + txn_fee) *)
+           (* node_b_balance <= (300_000_000_000_000 + possible_coinbase_reward) - (txn_amount + txn_fee) *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected
