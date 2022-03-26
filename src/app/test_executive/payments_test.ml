@@ -195,6 +195,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              node_a_expected
            (* node_b is the sender *)
            (* node_b_balance <= (300_000_000_000_000 + 5*possible_coinbase_reward) - (txn_amount + txn_fee) *)
+           (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `5*possible_coinbase_reward` bit *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected
