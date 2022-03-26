@@ -152,9 +152,8 @@ let to_field_constant (type f) ~endo
   F.((!a * endo) + !b)
 
 let test (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run
-      with type prover_state = unit
-       and type field = f) ~(endo : f) =
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~(endo : f) =
   let open Impl in
   let module T = Internal_Basic in
   let n = 128 in
@@ -183,7 +182,7 @@ let test (type f)
         raise e)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
       val base : Impl.Field.Constant.t

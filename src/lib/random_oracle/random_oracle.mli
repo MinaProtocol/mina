@@ -48,7 +48,7 @@ val read_typ : Field.Var.t Input.Chunked.t -> Field.t Input.Chunked.t
 (** Read a value stored within a circuit. *)
 val read_typ' :
      Field.Var.t Input.Chunked.t
-  -> (Field.t Input.Chunked.t, _) Pickles.Impls.Step.Internal_Basic.As_prover.t
+  -> Field.t Input.Chunked.t Pickles.Impls.Step.Internal_Basic.As_prover.t
 
 [%%endif]
 
