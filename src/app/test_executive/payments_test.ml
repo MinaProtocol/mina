@@ -155,7 +155,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~public_key:receiver_pub_key
          in
          let node_a_expected =
-           (* 400_000_000_000_000 is hardcoded as the original amount, change this is original amount changes *)
+           (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
            Currency.Amount.add
              (Currency.Amount.of_int 400_000_000_000_000)
              amount
@@ -165,9 +165,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let node_b_expected =
            Currency.Amount.sub
              ( Currency.Amount.add
-                 (* 300_000_000_000_000 is hardcoded the original amount, change this is original amount changes *)
+                 (* 300_000_000_000_000 is hardcoded the original amount, change this if original amount changes *)
                  (Currency.Amount.of_int 300_000_000_000_000)
-                 test_constants.coinbase_amount
+                 ( Currency.Amount.scale test_constants.coinbase_amount 5
+                 |> Option.value_exn )
              |> Option.value_exn )
              ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
              |> Option.value_exn )
@@ -193,7 +194,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (300_000_000_000_000 + possible_coinbase_reward) - (txn_amount + txn_fee) *)
+           (* node_b_balance <= (300_000_000_000_000 + 5*possible_coinbase_reward) - (txn_amount + txn_fee) *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected
