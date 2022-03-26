@@ -352,6 +352,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_c in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
+       let%bind { total_balance = timed_node_c_total; _ } =
+         Network.Node.must_get_account_data ~logger timed_node_c
+           ~public_key:sender_pub_key
+       in
+       [%log info] "timed_node_c total balance: %s"
+         (Currency.Balance.to_formatted_string timed_node_c_total) ;
+       [%log info]
+         "Attempting to send txn from timed_node_c to untimed_node_a for \
+          amount of %s"
+         (Currency.Amount.to_formatted_string amount) ;
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
        match%bind

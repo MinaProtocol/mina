@@ -400,7 +400,7 @@ module Node = struct
   let get_account ~logger t ~account_id =
     [%log info] "Getting account"
       ~metadata:
-        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
         :: logger_metadata t ) ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
