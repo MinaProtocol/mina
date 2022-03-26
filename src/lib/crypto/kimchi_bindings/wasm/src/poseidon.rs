@@ -1,5 +1,5 @@
 use mina_curves::pasta::{fp::Fp, fq::Fq};
-use oracle::poseidon::{poseidon_block_cipher, PlonkSpongeConstantsKimchi};
+use oracle::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
 use wasm_bindgen::prelude::*;
 
 use crate::{

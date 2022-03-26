@@ -7,12 +7,10 @@ open Integration_test_lib
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs.Engine
 
-  let send_snapp ?(unlock = true) ~logger node parties =
+  let send_snapp ~logger node parties =
     [%log info] "Sending snapp"
       ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
-    match%bind.Deferred
-      Network.Node.send_snapp ~unlock ~logger node ~parties
-    with
+    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
     | Ok _snapp_id ->
         [%log info] "Snapps transaction sent" ;
         Malleable_error.return ()
@@ -23,11 +21,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
           err_str
 
-  let send_invalid_snapp ?(unlock = true) ~logger node parties substring =
+  let send_invalid_snapp ~logger node parties substring =
     [%log info] "Sending snapp, expected to fail" ;
-    match%bind.Deferred
-      Network.Node.send_snapp ~unlock ~logger node ~parties
-    with
+    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
     | Ok _snapp_id ->
         [%log error] "Snapps transaction succeeded, expected error \"%s\""
           substring ;

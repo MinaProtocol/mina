@@ -1078,7 +1078,10 @@ module Base = struct
 
         type failure_status = unit
 
-        let assert_with_failure_status b _failure_status = Assert.is_true b
+        type failure_status_tbl = unit
+
+        let assert_with_failure_status_tbl b _failure_status_tbl =
+          Assert.is_true b
       end
 
       module Account_id = struct
@@ -1680,8 +1683,6 @@ module Base = struct
       module Field = Impl.Field
 
       module Local_state = struct
-        type failure_status = unit
-
         type t =
           ( Stack_frame.t
           , Call_stack.t
@@ -1690,14 +1691,16 @@ module Base = struct
           , Ledger_hash.var * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t
-          , failure_status )
+          , Bool.failure_status_tbl )
           Mina_transaction_logic.Parties_logic.Local_state.t
 
         let add_check (t : t) _failure b =
           { t with success = Bool.(t.success &&& b) }
 
-        let update_failure_status (t : t) _failure_status b =
+        let update_failure_status_tbl (t : t) _failure_status b =
           add_check (t : t) () b
+
+        let add_new_failure_status_bucket t = t
       end
     end
 
@@ -1940,11 +1943,7 @@ module Base = struct
         end
 
         module Global_state = struct
-          type t = Global_state.t =
-            { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
-            ; fee_excess : Amount.Signed.t
-            ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
-            }
+          include Global_state
 
           let fee_excess { fee_excess; _ } = fee_excess
 
@@ -2080,7 +2079,7 @@ module Base = struct
           }
         in
         let l : _ Mina_transaction_logic.Parties_logic.Local_state.t =
-          { frame =
+          { stack_frame =
               Inputs.Stack_frame.unhash statement.source.local_state.stack_frame
                 (V.create (fun () -> !witness.local_state_init.stack_frame))
           ; call_stack =
@@ -2097,7 +2096,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
-          ; failure_status = ()
+          ; failure_status_tbl = ()
           }
         in
         (g, l)
@@ -2166,7 +2165,7 @@ module Base = struct
                   acc
               in
               (* replace any transaction failure with unit value *)
-              (global_state, { local_state with failure_status = () })
+              (global_state, { local_state with failure_status_tbl = () })
             in
             let acc' =
               match party_spec.is_start with
@@ -2177,7 +2176,7 @@ module Base = struct
                       acc
                   in
                   (* replace any transaction failure with unit value *)
-                  (global_state, { local_state with failure_status = () })
+                  (global_state, { local_state with failure_status_tbl = () })
               | `Compute_in_circuit ->
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
@@ -2224,7 +2223,7 @@ module Base = struct
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
             { local with
-              frame = local_state_ledger
+              stack_frame = local_state_ledger
             ; call_stack = local.call_stack.hash
             ; ledger = fst local.ledger
             }) ;
@@ -3335,9 +3334,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
                  >>= Base.main ~constraint_constants))
-              handler)
-           ())
-      : unit * unit )
+              handler))
+      : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -3387,7 +3385,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
+  generate_auxiliary_input [ Statement.With_sok.typ ] main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -3448,7 +3446,7 @@ type local_state =
   , Sparse_ledger.t
   , bool
   , unit
-  , Transaction_status.Failure.t option )
+  , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Sparse_ledger.Global_state.t
@@ -3567,8 +3565,8 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( (({ authorization = a1; _ } as p)
-        :: { authorization = a2; _ } :: parties)
+    | ( (({ authorization = (Signature _ | None_given) as a1; _ } as p)
+        :: { authorization = (Signature _ | None_given) as a2; _ } :: parties)
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3595,8 +3593,8 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( []
-        :: (({ authorization = a1; _ } as p)
-           :: { authorization = a2; _ } :: parties)
+        :: (({ authorization = (Signature _ | None_given) as a1; _ } as p)
+           :: { authorization = (Signature _ | None_given) as a2; _ } :: parties)
            :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3609,8 +3607,9 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
-    | ( [ ({ authorization = a1; _ } as p) ]
-        :: ({ authorization = a2; _ } :: parties) :: partiess
+    | ( [ ({ authorization = (Signature _ | None_given) as a1; _ } as p) ]
+        :: ({ authorization = (Signature _ | None_given) as a2; _ } :: parties)
+           :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
@@ -3636,8 +3635,10 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( []
-        :: [ ({ authorization = a1; _ } as p) ]
-           :: ({ authorization = a2; _ } :: parties) :: partiess
+        :: [ ({ authorization = (Signature _ | None_given) as a1; _ } as p) ]
+           :: ({ authorization = (Signature _ | None_given) as a2; _ }
+              :: parties)
+              :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
       ) ->
@@ -3788,6 +3789,9 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
          }
          witnesses
        ->
+      (*Transaction snark says nothing about failure status*)
+      let source_local = { source_local with failure_status_tbl = [] } in
+      let target_local = { target_local with failure_status_tbl = [] } in
       let current_commitment = !commitment in
       let current_full_commitment = !full_commitment in
       let snapp_stmt =
@@ -3860,18 +3864,20 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       in
       let hash_local_state
           (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
-        let frame (frame : Stack_frame.value) =
-          { frame with
-            calls = Parties.Call_forest.map frame.calls ~f:(fun p -> (p, ()))
+        let stack_frame (stack_frame : Stack_frame.value) =
+          { stack_frame with
+            calls =
+              Parties.Call_forest.map stack_frame.calls ~f:(fun p -> (p, ()))
           }
         in
         { local with
-          frame = frame local.stack_frame
+          stack_frame = stack_frame local.stack_frame
         ; call_stack =
             List.map
               ~f:
                 (With_stack_hash.map ~f:(fun f ->
-                     With_hash.of_data (frame f) ~hash_data:Stack_frame.hash))
+                     With_hash.of_data (stack_frame f)
+                       ~hash_data:Stack_frame.hash))
               (accumulate_call_stack_hashes ~hash_frame:Stack_frame.hash
                  local.call_stack)
         }
@@ -3937,7 +3943,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
-                  frame = Stack_frame.hash source_local.stack_frame
+                  stack_frame = Stack_frame.hash source_local.stack_frame
                 ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
@@ -3949,7 +3955,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   pending_coinbase_init_stack
             ; local_state =
                 { target_local with
-                  frame = Stack_frame.hash target_local.stack_frame
+                  stack_frame = Stack_frame.hash target_local.stack_frame
                 ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
@@ -4002,6 +4008,51 @@ struct
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
+  let first_party (witness : Transaction_witness.Parties_segment_witness.t) =
+    match witness.local_state_init.stack_frame.calls with
+    | [] ->
+        with_return (fun { return } ->
+            List.iter witness.start_parties ~f:(fun s ->
+                Parties.Call_forest.iteri
+                  ~f:(fun _i x -> return (Some x))
+                  s.parties.other_parties) ;
+            None)
+    | xs ->
+        Parties.Call_forest.hd_party xs |> Option.map ~f:fst
+
+  let party_proof (p : Party.t) =
+    match p.authorization with
+    | Proof p ->
+        Some p
+    | Signature _ | None_given ->
+        None
+
+  let snapp_proof_data ~(snapp_statement : (int * Snapp_statement.t) option)
+      ~(witness : Transaction_witness.Parties_segment_witness.t) =
+    let open Option.Let_syntax in
+    let%bind p = first_party witness in
+    let%bind tag, snapp_statement = snapp_statement in
+    let%map pi = party_proof p in
+    let vk =
+      let account_id =
+        Account_id.create p.data.body.public_key p.data.body.token_id
+      in
+      let account : Account.t =
+        Sparse_ledger.(
+          get_exn witness.local_state_init.ledger
+            (find_index_exn witness.local_state_init.ledger account_id))
+      in
+      match
+        Option.value_map ~default:None account.snapp ~f:(fun s ->
+            s.verification_key)
+      with
+      | None ->
+          failwith "No verification key found in the account"
+      | Some s ->
+          s
+    in
+    (snapp_statement, pi, vk, tag)
+
   let of_parties_segment_exn ~statement ~snapp_statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
@@ -4013,58 +4064,16 @@ struct
           opt_signed_unsigned [] statement
       | Opt_signed_opt_signed ->
           opt_signed_opt_signed [] statement
-      | Proved ->
-          let proofs =
-            let party_proof (p : Party.t) =
-              match p.authorization with
-              | Proof p ->
-                  Some p
-              | Signature _ | None_given ->
-                  None
-            in
-            let open Option.Let_syntax in
-            let parties : Party.t list =
-              match witness.local_state_init.stack_frame.calls with
-              | [] ->
-                  List.concat_map witness.start_parties ~f:(fun s ->
-                      Parties.Call_forest.to_list s.parties.other_parties)
-              | xs ->
-                  Parties.Call_forest.to_parties_list xs |> List.map ~f:fst
-            in
-            List.filter_map parties ~f:(fun p ->
-                let%bind tag, snapp_statement = snapp_statement in
-                let%map pi = party_proof p in
-                let vk =
-                  let account_id =
-                    Account_id.create p.data.body.public_key
-                      p.data.body.token_id
-                  in
-                  let account : Account.t =
-                    Sparse_ledger.(
-                      get_exn witness.local_state_init.ledger
-                        (find_index_exn witness.local_state_init.ledger
-                           account_id))
-                  in
-                  match
-                    Option.value_map ~default:None account.snapp ~f:(fun s ->
-                        s.verification_key)
-                  with
-                  | None ->
-                      failwith "No verification key found in the account"
-                  | Some s ->
-                      s
-                in
-                (snapp_statement, pi, vk, tag))
-          in
-          proved
-            ( match proofs with
-            | [ (s, p, v, tag) ] ->
-                Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                (* TODO: We should not have to pass the statement in here. *)
-                [ (s, p) ]
-            | [] | _ :: _ :: _ ->
-                failwith "of_parties_segment: Expected exactly one proof" )
-            statement
+      | Proved -> (
+          match snapp_proof_data ~snapp_statement ~witness with
+          | None ->
+              failwith "of_parties_segment: Expected exactly one proof"
+          | Some (s, p, v, tag) ->
+              (* TODO: We should not have to pass the statement in here. *)
+              proved
+                ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
+                  [ (s, p) ] )
+                statement )
     in
     let open Async in
     let%map proof = res in
@@ -4159,7 +4168,7 @@ module For_tests = struct
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
-            (unit, _) Checked.t =
+            unit Checked.t =
           Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
@@ -4561,7 +4570,7 @@ module For_tests = struct
       let sender_party = Option.value_exn sender_party in
       Parties.Call_forest.cons
         { sender_party with
-          data = { sender_party.data with caller = Token_id.invalid }
+          data = { sender_party.data with caller = Token_id.default }
         }
         parties.other_parties
     in

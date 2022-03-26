@@ -12,7 +12,6 @@ module S = Sponge
 module Make
     (Inputs : Intf.Pairing_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.prover_state = unit
                  and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
@@ -560,12 +559,10 @@ struct
   let%test_module "side loaded domains" =
     ( module struct
       let run k =
-        let (), y =
-          run_and_check
-            (fun () ->
+        let y =
+          run_and_check (fun () ->
               let y = k () in
               fun () -> As_prover.read_var y)
-            ()
           |> Or_error.ok_exn
         in
         y
@@ -713,19 +710,6 @@ struct
           if i = 0 then acc else go (Field.square acc) (i - 1)
         in
         go pt n)
-
-  let actual_evaluation (e : (Boolean.var * Field.t) array) ~(pt_to_n : Field.t)
-      : Field.t =
-    with_label "actual_evaluation" (fun () ->
-        match List.rev (Array.to_list e) with
-        | (b, e) :: es ->
-            List.fold
-              ~init:Field.((b :> t) * e)
-              es
-              ~f:(fun acc (keep, fx) ->
-                Field.if_ keep ~then_:Field.(fx + (pt_to_n * acc)) ~else_:acc)
-        | [] ->
-            failwith "empty list")
 
   let actual_evaluation (e : Field.t array) ~(pt_to_n : Field.t) : Field.t =
     with_label "actual_evaluation" (fun () ->

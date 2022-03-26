@@ -599,7 +599,7 @@ module Protocol = struct
 
       type nonrec 'PolyComm t =
         { lookup_used : lookups_used
-        ; lookup_tables : 'PolyComm array array
+        ; lookup_table : 'PolyComm array
         ; lookup_selectors : 'PolyComm array
         }
     end

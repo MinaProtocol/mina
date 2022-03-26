@@ -270,7 +270,7 @@ module Node = struct
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-      ?(initial_delay_sec = 30.0) ~logger ~node ~query_name query_obj =
+      ?(initial_delay_sec = 0.) ~logger ~node ~query_name query_obj =
     let open Deferred.Let_syntax in
     if not node.config.graphql_enabled then
       Deferred.Or_error.error_string
@@ -718,35 +718,13 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_snapp ~logger ?(unlock = true) (t : t)
-      ~(parties : Mina_base.Parties.t) =
+  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
     [%log info] "Sending a snapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let fee_payer_pk = parties.fee_payer.data.body.public_key in
-    let fee_payer_pk_str =
-      fee_payer_pk |> Signature_lib.Public_key.Compressed.to_base58_check
-    in
-    [%log info] "send_snapp: unlocking fee payer account"
-      ~metadata:[ ("fee_payer_pk", `String fee_payer_pk_str) ] ;
-    let%bind _unlock_acct_obj =
-      let unlock_sender_account_graphql () =
-        let unlock_account_obj =
-          Graphql.Unlock_account.make ~password:node_password
-            ~public_key:(Graphql_lib.Encoders.public_key fee_payer_pk)
-            ()
-        in
-        exec_graphql_request ~logger ~node:t
-          ~query_name:"unlock_fee_payer_account_graphql" unlock_account_obj
-      in
-      if unlock then
-        let%map _result = unlock_sender_account_graphql () in
-        ()
-      else return ()
-    in
     let parties_json =
       Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in

@@ -228,7 +228,7 @@ val apply_parties_unchecked :
          , t
          , bool
          , unit
-         , Transaction_status.Failure.t option )
+         , Transaction_status.Failure.Collection.t )
          Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t

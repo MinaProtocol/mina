@@ -8,12 +8,14 @@
 {
   Type = {
      image: Text,
+     shell: Optional (List Text),
      `propagate-environment`: Bool,
      `mount-buildkite-agent`: Bool,
      `mount-workdir`: Bool,
      environment: List Text
   },
   default = {
+    shell = Some ["/bin/sh", "-e", "-c"],
     `propagate-environment` = True,
     `mount-buildkite-agent` = False,
     `mount-workdir` = False,

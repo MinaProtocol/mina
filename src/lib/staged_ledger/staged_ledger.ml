@@ -3204,7 +3204,7 @@ let%test_module "staged ledger tests" =
           in
           As_prover.read Hash.typ result
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
+        let x = Or_error.ok_exn (run_and_check comp) in
         x
       in
       [%test_eq: Pending_coinbase.Hash.t] unchecked_root_after

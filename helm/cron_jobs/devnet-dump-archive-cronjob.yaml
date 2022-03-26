@@ -23,9 +23,9 @@ spec:
             echo "installed gsutil";
 
             DATE="$(date +%F_%H%M)";
-            FILENAME=devnet-archive-dump-"$DATE".sql;
+            FILENAME=devnet-archive-dump-"${DATE:: -1}0".sql;
 
-            pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive > $FILENAME;
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-1-postgresql:5432/archive_balances_migrated > $FILENAME;
 
             tar -czvf $FILENAME.tar.gz $FILENAME;
 

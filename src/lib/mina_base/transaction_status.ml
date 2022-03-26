@@ -46,6 +46,28 @@ module Failure = struct
     end
   end]
 
+  module Collection = struct
+    type display = (int * t list) list [@@deriving to_yojson]
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Stable.V2.t list list
+        [@@deriving equal, compare, yojson, sexp, hash]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_display t =
+      let _, display =
+        List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
+            if List.is_empty bucket then (index + 1, acc)
+            else (index + 1, (index, bucket) :: acc))
+      in
+      display
+  end
+
   type failure = t
 
   let failure_min = min

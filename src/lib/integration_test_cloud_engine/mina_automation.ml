@@ -85,11 +85,14 @@ module Network_config = struct
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
+        ; extra_genesis_accounts
         ; num_snark_workers
         ; num_archive_nodes
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
+        ; work_delay
+        ; transaction_capacity
         ; aux_account_balance
         } =
       test_config
@@ -131,6 +134,17 @@ module Network_config = struct
           , aux_keypairs )
       | _ ->
           failwith "there should be at least one aux keypair"
+    in
+    let extra_accounts =
+      List.map extra_genesis_accounts ~f:(fun { keypair; balance } ->
+          let default = Runtime_config.Accounts.Single.default in
+          { default with
+            pk =
+              Some
+                Public_key.(Compressed.to_string (compress keypair.public_key))
+          ; sk = None
+          ; balance = Balance.of_formatted_string balance
+          })
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
@@ -186,9 +200,9 @@ module Network_config = struct
       { Runtime_config.Proof_keys.level = Some proof_level
       ; sub_windows_per_window = None
       ; ledger_depth = None
-      ; work_delay = None
       ; block_window_duration_ms = None
-      ; transaction_capacity = None
+      ; work_delay
+      ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
@@ -215,12 +229,10 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof =
-          None
-          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
+      ; proof = Some proof_config
       ; ledger =
           Some
-            { base = Accounts (bp_accounts @ aux_accounts)
+            { base = Accounts (bp_accounts @ aux_accounts @ extra_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -250,9 +262,13 @@ module Network_config = struct
       }
     in
     let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
+    in
     let mina_archive_schema_aux_files =
-      [ "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-      ; "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/snapp_tables.sql"
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "snapp_tables.sql"
       ]
     in
     let mk_net_keypair index (pk, sk) =

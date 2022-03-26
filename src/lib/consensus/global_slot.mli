@@ -71,17 +71,17 @@ module Checked : sig
   type t =
     (Mina_numbers.Global_slot.Checked.t, Mina_numbers.Length.Checked.t) Poly.t
 
-  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( < ) : t -> t -> Boolean.var Checked.t
 
   val of_slot_number :
     constants:Constants.var -> Mina_numbers.Global_slot.Checked.t -> t
 
   val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
 
-  val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
+  val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t) Checked.t
 
   (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
-  val sub : t -> t -> (Mina_numbers.Global_slot.Checked.t, _) Checked.t
+  val sub : t -> t -> Mina_numbers.Global_slot.Checked.t Checked.t
 end
 
 val typ : (Checked.t, t) Typ.t

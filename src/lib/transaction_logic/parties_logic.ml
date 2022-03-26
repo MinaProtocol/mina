@@ -40,7 +40,9 @@ module type Bool_intf = sig
 
   type failure_status
 
-  val assert_with_failure_status : t -> failure_status -> unit
+  type failure_status_tbl
+
+  val assert_with_failure_status_tbl : t -> failure_status_tbl -> unit
 end
 
 module type Balance_intf = sig
@@ -156,7 +158,7 @@ module Local_state = struct
            , 'ledger
            , 'bool
            , 'comm
-           , 'failure_status )
+           , 'failure_status_tbl )
            t =
         { stack_frame : 'stack_frame
         ; call_stack : 'call_stack
@@ -166,14 +168,14 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
-        ; failure_status : 'failure_status
+        ; failure_status_tbl : 'failure_status_tbl
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
   end]
 
-  let typ stack_frame call_stack token_id excess ledger bool comm failure_status
-      =
+  let typ stack_frame call_stack token_id excess ledger bool comm
+      failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
       [ stack_frame
       ; call_stack
@@ -183,7 +185,7 @@ module Local_state = struct
       ; excess
       ; ledger
       ; bool
-      ; failure_status
+      ; failure_status_tbl
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -200,9 +202,9 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Transaction_status.Failure.Stable.V2.t option )
+          , Transaction_status.Failure.Collection.Stable.V1.t )
           Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving equal, compare, hash, yojson, sexp]
 
         let to_latest = Fn.id
       end
@@ -711,12 +713,14 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , Bool.failure_status )
+      , Bool.failure_status_tbl )
       Local_state.t
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
 
-    val update_failure_status : t -> Bool.failure_status -> Bool.t -> t
+    val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
+
+    val add_new_failure_status_bucket : t -> t
   end
 
   module Global_state : sig
@@ -977,6 +981,7 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       { local_state with stack_frame = remaining; call_stack }
     in
+    let local_state = Local_state.add_new_failure_status_bucket local_state in
     Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a snapp proof.
@@ -1353,14 +1358,14 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
     let local_state =
-      Local_state.update_failure_status local_state failure_status
+      Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
     in
     (* The first party must succeed. *)
     Bool.(
-      assert_with_failure_status
+      assert_with_failure_status_tbl
         ((not is_start') ||| local_state.success)
-        local_state.failure_status) ;
+        local_state.failure_status_tbl) ;
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would

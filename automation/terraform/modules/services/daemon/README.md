@@ -34,7 +34,7 @@ This is a Terraform module that will deploy a mina Daemon container as a service
 
 ## Deployment Considerations
 
-In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container. The container build is a two-step process, with the base mina dockerfile being [here](https://github.com/MinaProtocol/mina/blob/develop/dockerfiles/Dockerfile-mina-daemon) and the more deployment-specific Dockerfile [here](https://github.com/MinaProtocol/mina-automation/blob/master/services/daemon/Dockerfile).
+In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container.
 
 The manual commands to release each container are the following: 
 

@@ -27,7 +27,7 @@ use kimchi::prover::{ProverCommitments, ProverProof};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
 use oracle::{
-    poseidon::PlonkSpongeConstantsKimchi,
+    constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 
@@ -650,7 +650,7 @@ macro_rules! impl_proof {
 
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
-                let maybe_proof = ProverProof::create::<
+                let maybe_proof = ProverProof::create_recursive::<
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, index, prev);
@@ -783,8 +783,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use crate::srs::fp::WasmFpSrs as WasmSrs;
-    use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -809,8 +808,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use crate::srs::fq::WasmFqSrs as WasmSrs;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,
@@ -954,7 +952,7 @@ pub mod to_test {
         };
 
         // proof
-        ProverProof::create::<
+        ProverProof::create_recursive::<
             DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &index, vec![prev])

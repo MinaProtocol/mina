@@ -117,7 +117,7 @@ let%test_unit "value = var" =
       let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
       As_prover.read typ p
     in
-    let _, res = Or_error.ok_exn (run_and_check p_var ()) in
+    let res = Or_error.ok_exn (run_and_check p_var) in
     [%test_eq: Value.t] res protocol_constants ;
     [%test_eq: Value.t] protocol_constants
       (t_of_value protocol_constants |> value_of_t)

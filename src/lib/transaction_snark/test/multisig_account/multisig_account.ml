@@ -16,14 +16,14 @@ let%test_module "multisig_account" =
 
       (* check that two public keys are equal *)
       let eq_pk ((x0, y0) : Public_key.var) ((x1, y1) : Public_key.var) :
-          (Boolean.var, _) Checked.t =
+          Boolean.var Checked.t =
         let open Checked in
         [ Field.Checked.equal x0 x1; Field.Checked.equal y0 y1 ]
         |> Checked.List.all >>= Boolean.all
 
       (* check that two public keys are not equal *)
       let neq_pk (pk0 : Public_key.var) (pk1 : Public_key.var) :
-          (Boolean.var, _) Checked.t =
+          Boolean.var Checked.t =
         Checked.(eq_pk pk0 pk1 >>| Boolean.not)
 
       (* check that the witness has distinct public keys for each signature *)
@@ -40,7 +40,7 @@ let%test_module "multisig_account" =
       let%snarkydef distinct_public_keys x = distinct_public_keys x
 
       (* check a signature on msg against a public key *)
-      let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
+      let check_sig pk msg sigma : Boolean.var Checked.t =
         let%bind (module S) = Inner_curve.Checked.Shifted.create () in
         Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
@@ -52,7 +52,7 @@ let%test_module "multisig_account" =
             ~compute:(As_prover.return pubkeys)
         in
         let open Checked in
-        let verify_sig (sigma, pk) : (Boolean.var, _) Checked.t =
+        let verify_sig (sigma, pk) : Boolean.var Checked.t =
           Checked.List.exists pubkeys ~f:(fun pk' ->
               [ eq_pk pk pk'; check_sig pk' commitment sigma ]
               |> Checked.List.all >>= Boolean.all)
@@ -94,7 +94,7 @@ let%test_module "multisig_account" =
              let witness = [ (sigma_var, pk_var) ] in
              check_witness 1 [ pk ] msg_var witness)
             |> Checked.map ~f:As_prover.return
-            |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+            |> run_and_check |> Or_error.ok_exn)
 
       let%test_unit "2-of-2" =
         let gen =
@@ -131,7 +131,7 @@ let%test_module "multisig_account" =
              let witness = [ (sigma0_var, pk0_var); (sigma1_var, pk1_var) ] in
              check_witness 2 [ pk0; pk1 ] msg_var witness)
             |> Checked.map ~f:As_prover.return
-            |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+            |> run_and_check |> Or_error.ok_exn)
     end
 
     type _ Snarky_backendless.Request.t +=
@@ -164,7 +164,7 @@ let%test_module "multisig_account" =
               let tag, _, (module P), Pickles.Provers.[ multisig_prover; _ ] =
                 let multisig_rule : _ Pickles.Inductive_rule.t =
                   let multisig_main (tx_commitment : Snapp_statement.Checked.t)
-                      : (unit, _) Checked.t =
+                      : unit Checked.t =
                     let%bind pk0_var =
                       exists Inner_curve.typ
                         ~request:(As_prover.return @@ Pubkey 0)
@@ -299,8 +299,8 @@ let%test_module "multisig_account" =
                 { Party.Update.noop with permissions }
               in
               let sender_pk = sender.public_key |> Public_key.compress in
-              let fee_payer =
-                { Party.Fee_payer.data =
+              let fee_payer : Party.Fee_payer.t =
+                { data =
                     { body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
@@ -315,12 +315,13 @@ let%test_module "multisig_account" =
                         ; use_full_commitment = ()
                         }
                     ; predicate = sender_nonce
+                    ; caller = ()
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Predicated.t =
+              let sender_party_data : Party.Predicated.Wire.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -336,9 +337,10 @@ let%test_module "multisig_account" =
                     ; use_full_commitment = false
                     }
                 ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+                ; caller = Call
                 }
               in
-              let snapp_party_data : Party.Predicated.t =
+              let snapp_party_data : Party.Predicated.Wire.t =
                 { Party.Predicated.Poly.body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
@@ -354,15 +356,17 @@ let%test_module "multisig_account" =
                     ; use_full_commitment = false
                     }
                 ; predicate = Full Snapp_predicate.Account.accept
+                ; caller = Call
                 }
               in
               let protocol_state = Snapp_predicate.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Predicated.t) ->
+                  ~party_depth:(fun (p : Party.Predicated.Wire.t) ->
                     p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
+                |> Parties.Call_forest.add_callers'
                 |> Parties.Call_forest.accumulate_hashes_predicated
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -421,8 +425,8 @@ let%test_module "multisig_account" =
                       (Random_oracle.Input.Chunked.field txn_comm)
                 }
               in
-              let sender =
-                { Party.data = sender_party_data
+              let sender : Party.Wire.t =
+                { data = sender_party_data
                 ; authorization =
                     Signature
                       (Signature_lib.Schnorr.Chunked.sign sender.private_key
@@ -430,15 +434,15 @@ let%test_module "multisig_account" =
                 }
               in
               let parties : Parties.t =
-                { fee_payer
-                ; other_parties =
-                    [ sender
-                    ; { data = snapp_party_data; authorization = Proof pi }
-                    ]
-                ; memo
-                }
+                Parties.of_wire
+                  { fee_payer
+                  ; other_parties =
+                      [ sender
+                      ; { data = snapp_party_data; authorization = Proof pi }
+                      ]
+                  ; memo
+                  }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ])
-          |> fun ((), ()) -> ())
+              U.apply_parties ledger [ parties ]))
   end )
