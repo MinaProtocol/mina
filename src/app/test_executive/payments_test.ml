@@ -307,7 +307,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 30_000_000_000_000 in
+        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
          let receiver = untimed_node_a in
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
@@ -322,7 +322,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+      (let amount = Currency.Amount.of_int 25_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_c in
