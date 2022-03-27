@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 3 in
+    let n = 2 in
     let open Test_config in
     { default with
       requires_graphql = true

@@ -119,6 +119,7 @@ let%test_module "transaction_status" =
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~logger ~frontier_broadcast_pipe
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
