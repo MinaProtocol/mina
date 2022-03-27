@@ -120,6 +120,7 @@ let%test_module "transaction_status" =
             (Time_ns.Span.of_hr
                (Float.of_int
                   precomputed_values.genesis_constants.transaction_expiry_hr))
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)

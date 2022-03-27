@@ -64,6 +64,7 @@ let%test_module "network pool test" =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
               ~consensus_constants ~time_controller ~expiry_ns
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let%bind () =
             Mocks.Transition_frontier.refer_statements tf [ work ]
@@ -119,6 +120,7 @@ let%test_module "network pool test" =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
             ~consensus_constants ~time_controller ~expiry_ns
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->

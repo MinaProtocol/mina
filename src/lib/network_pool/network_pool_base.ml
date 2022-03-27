@@ -155,7 +155,7 @@ end)
     | Transition_frontier_extension of Resource_pool.transition_frontier_diff
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
-      ~tf_diffs =
+      ~tf_diffs ~log_gossip_heard ~on_remote_push =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       { resource_pool
@@ -166,7 +166,7 @@ end)
       }
     in
     let remote_r, remote_w, remote_rl =
-      Remote_sink.create
+      Remote_sink.create ~log_gossip_heard ~on_push:on_remote_push
         ~wrap:(fun m -> Diff m)
         ~unwrap:(function
           | Diff m -> m | _ -> failwith "unexpected message type")
@@ -249,8 +249,9 @@ end)
     go ()
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
-      ~expiry_ns ~frontier_broadcast_pipe ~logger =
-    (* Diffs from transition frontier extensions *)
+      ~expiry_ns ~frontier_broadcast_pipe ~logger ~log_gossip_heard
+      ~on_remote_push =
+    (*Diffs from tansition frontier extensions*)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Network pool transition frontier diffs" Synchronous)
@@ -260,7 +261,8 @@ end)
         (Resource_pool.create ~constraint_constants ~consensus_constants
            ~time_controller ~expiry_ns ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer)
-        ~constraint_constants ~logger ~tf_diffs:tf_diff_reader
+        ~constraint_constants ~logger ~tf_diffs:tf_diff_reader ~log_gossip_heard
+        ~on_remote_push
     in
     O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
         rebroadcast_loop t logger) ;

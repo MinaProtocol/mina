@@ -1736,6 +1736,7 @@ let%test_module _ =
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~expiry_ns ~frontier_broadcast_pipe:tf_pipe_r
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       let pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield () in
@@ -2321,7 +2322,8 @@ let%test_module _ =
           let pool_, _, _ =
             Test.create ~config ~logger ~constraint_constants
               ~consensus_constants ~time_controller ~expiry_ns
-              ~frontier_broadcast_pipe:frontier_pipe_r
+              ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
+              ~on_remote_push:(Fn.const Deferred.unit)
           in
           let pool = Test.resource_pool pool_ in
           let assert_pool_txs txs =

@@ -1598,6 +1598,9 @@ let create ?wallets (config : Config.t) =
                    (Float.of_int
                       config.precomputed_values.genesis_constants
                         .transaction_expiry_hr))
+              ~on_remote_push:notify_online
+              ~log_gossip_heard:
+                config.net_config.log_gossip_heard.transaction_pool_diff
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -1614,6 +1617,9 @@ let create ?wallets (config : Config.t) =
                    (Float.of_int
                       config.precomputed_values.genesis_constants
                         .transaction_expiry_hr))
+              ~on_remote_push:notify_online
+              ~log_gossip_heard:
+                config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create

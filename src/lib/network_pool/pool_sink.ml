@@ -19,7 +19,9 @@ module type Pool_sink = sig
   type pool
 
   val create :
-       wrap:(unwrapped_t -> 'wrapped_t)
+       ?on_push:(unit -> unit Deferred.t)
+    -> ?log_gossip_heard:bool
+    -> wrap:(unwrapped_t -> 'wrapped_t)
     -> unwrap:('wrapped_t -> unwrapped_t)
     -> trace_label:string
     -> logger:Logger.t
@@ -67,6 +69,8 @@ module Base
         ; wrap : unwrapped_t -> 'w
         ; trace_label : string
         ; throttle : unit Throttle.t
+        ; on_push : unit -> unit Deferred.t
+        ; log_gossip_heard : bool
         }
         -> t
     | Void
@@ -143,11 +147,20 @@ module Base
         ; wrap
         ; trace_label
         ; throttle
+        ; on_push
+        ; log_gossip_heard
         } ->
-        O1trace.sync_thread (sprintf "handle %s gossip" trace_label)
+        O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
+        let%bind () = on_push () in
         let env' = Msg.convert msg in
         let cb' = Msg.convert_callback cb in
+        ( match cb' with
+        | BC.External cb'' ->
+            Diff.update_metrics env' cb''
+              (Option.some_if log_gossip_heard logger)
+        | _ ->
+            () ) ;
         if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then
           [%log warn] "Ignoring push to %s: throttle is full" trace_label
         else
@@ -172,7 +185,8 @@ module Base
     | Void ->
         Deferred.unit
 
-  let create ~wrap ~unwrap ~trace_label ~logger pool =
+  let create ?(on_push = Fn.const Deferred.unit) ?(log_gossip_heard = false)
+      ~wrap ~unwrap ~trace_label ~logger pool =
     let r, writer =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered
@@ -188,7 +202,17 @@ module Base
       Throttle.create ~continue_on_error:true ~max_concurrent_jobs
     in
     ( r
-    , Sink { writer; logger; rate_limiter; pool; wrap; trace_label; throttle }
+    , Sink
+        { writer
+        ; logger
+        ; rate_limiter
+        ; pool
+        ; wrap
+        ; trace_label
+        ; throttle
+        ; on_push
+        ; log_gossip_heard
+        }
     , rate_limiter )
 
   let void = Void

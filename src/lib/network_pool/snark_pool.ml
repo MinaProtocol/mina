@@ -106,6 +106,8 @@ module type S = sig
     -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
@@ -645,7 +647,8 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~expiry_ns ~frontier_broadcast_pipe =
+      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
+      ~on_remote_push =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -666,7 +669,7 @@ struct
           in
           let res =
             of_resource_pool_and_diffs pool ~logger ~constraint_constants
-              ~tf_diffs:tf_diff_reader
+              ~tf_diffs:tf_diff_reader ~log_gossip_heard ~on_remote_push
           in
           Resource_pool.listen_to_frontier_broadcast_pipe
             frontier_broadcast_pipe pool ~tf_diff_writer ;
@@ -674,6 +677,7 @@ struct
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
             ~time_controller ~expiry_ns ~frontier_broadcast_pipe
+            ~log_gossip_heard ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -802,6 +806,7 @@ let%test_module "random set test" =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
           ~consensus_constants ~time_controller ~expiry_ns
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         (* |>  *)
       in
       let pool = Mock_snark_pool.resource_pool mock_pool in
@@ -978,6 +983,7 @@ let%test_module "random set test" =
             Mock_snark_pool.create ~config ~constraint_constants
               ~consensus_constants ~time_controller ~expiry_ns ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let priced_proof =
             { Priced_proof.proof =
@@ -1048,6 +1054,7 @@ let%test_module "random set test" =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
                 ~consensus_constants ~time_controller ~expiry_ns
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
@@ -1131,6 +1138,7 @@ let%test_module "random set test" =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
               ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =

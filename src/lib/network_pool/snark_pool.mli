@@ -47,6 +47,8 @@ module type S = sig
     -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
