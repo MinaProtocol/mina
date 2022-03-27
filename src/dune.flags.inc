@@ -3,5 +3,5 @@
     (flags (:standard
       -short-paths
       -cclib=-ljemalloc ; We use jemalloc as an allocator everywhere
-      -w @a-4-29-40-41-42-44-45-48-58-59-60-66
+      -w @a-4-29-40-41-42-44-45-48-58-59-60-66-67
 ))))

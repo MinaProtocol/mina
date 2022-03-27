@@ -1,0 +1,586 @@
+module type Security_intf = sig
+  val max_depth : [ `Finite of int | `Infinity ]
+end
+
+module type Snark_pool_proof_intf = sig
+  module Statement : sig
+    type t
+
+    val to_yojson : t -> Yojson.Safe.t
+
+    val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+
+    val t_of_sexp : Sexplib0.Sexp.t -> t
+
+    val sexp_of_t : t -> Sexplib0.Sexp.t
+
+    val bin_size_t : t Bin_prot.Size.sizer
+
+    val bin_write_t : t Bin_prot.Write.writer
+
+    val bin_read_t : t Bin_prot.Read.reader
+
+    val __bin_read_t__ : (int -> t) Bin_prot.Read.reader
+
+    val bin_shape_t : Bin_prot.Shape.t
+
+    val bin_writer_t : t Bin_prot.Type_class.writer
+
+    val bin_reader_t : t Bin_prot.Type_class.reader
+
+    val bin_t : t Bin_prot.Type_class.t
+  end
+
+  type t
+
+  val to_yojson : t -> Yojson.Safe.t
+
+  val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+
+  val t_of_sexp : Sexplib0.Sexp.t -> t
+
+  val sexp_of_t : t -> Sexplib0.Sexp.t
+
+  val bin_size_t : t Bin_prot.Size.sizer
+
+  val bin_write_t : t Bin_prot.Write.writer
+
+  val bin_read_t : t Bin_prot.Read.reader
+
+  val __bin_read_t__ : (int -> t) Bin_prot.Read.reader
+
+  val bin_shape_t : Bin_prot.Shape.t
+
+  val bin_writer_t : t Bin_prot.Type_class.writer
+
+  val bin_reader_t : t Bin_prot.Type_class.reader
+
+  val bin_t : t Bin_prot.Type_class.t
+end
+
+module type Transition_handler_validator_intf = sig
+  type unprocessed_transition_cache
+
+  type transition_frontier
+
+  val run :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> time_controller:Block_time.Controller.t
+    -> frontier:transition_frontier
+    -> transition_reader:
+         Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+         Pipe_lib.Strict_pipe.Reader.t
+    -> valid_transition_writer:
+         ( ( Mina_transition.External_transition.Initial_validated.t
+             Network_peer.Envelope.Incoming.t
+           , Mina_base.State_hash.t )
+           Cache_lib.Cached.t
+         , Pipe_lib.Strict_pipe.drop_head Pipe_lib.Strict_pipe.buffered
+         , unit )
+         Pipe_lib.Strict_pipe.Writer.t
+    -> unprocessed_transition_cache:unprocessed_transition_cache
+    -> unit
+
+  val validate_transition :
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> unprocessed_transition_cache:unprocessed_transition_cache
+    -> Mina_transition.External_transition.Initial_validated.t
+       Network_peer.Envelope.Incoming.t
+    -> ( ( Mina_transition.External_transition.Initial_validated.t
+           Network_peer.Envelope.Incoming.t
+         , Mina_base.State_hash.t )
+         Cache_lib.Cached.t
+       , [> `Disconnected
+         | `In_frontier of Mina_base.State_hash.t
+         | `In_process of Mina_base.State_hash.t Cache_lib.Intf.final_state ]
+       )
+       Core.Result.t
+end
+
+module type Breadcrumb_builder_intf = sig
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  val build_subtrees_of_breadcrumbs :
+       logger:Logger.t
+    -> verifier:Verifier.t
+    -> trust_system:Trust_system.t
+    -> frontier:transition_frontier
+    -> initial_hash:Mina_base.State_hash.t
+    -> ( Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+       , Mina_base.State_hash.t )
+       Cache_lib.Cached.t
+       Rose_tree.t
+       Core.List.t
+    -> ( transition_frontier_breadcrumb
+       , Mina_base.State_hash.t )
+       Cache_lib.Cached.t
+       Rose_tree.t
+       Core.List.t
+       Async_kernel.Deferred.Or_error.t
+end
+
+module type Transition_handler_processor_intf = sig
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  val run :
+       logger:Logger.t
+    -> verifier:Verifier.t
+    -> trust_system:Trust_system.t
+    -> time_controller:Block_time.Controller.t
+    -> frontier:transition_frontier
+    -> primary_transition_reader:
+         ( Mina_transition.External_transition.Initial_validated.t
+           Network_peer.Envelope.Incoming.t
+         , Mina_base.State_hash.t )
+         Cache_lib.Cached.t
+         Pipe_lib.Strict_pipe.Reader.t
+    -> producer_transition_reader:
+         transition_frontier_breadcrumb Pipe_lib.Strict_pipe.Reader.t
+    -> clean_up_catchup_scheduler:unit Async_kernel.Ivar.t
+    -> catchup_job_writer:
+         ( Mina_base.State_hash.t
+           * ( Mina_transition.External_transition.Initial_validated.t
+               Network_peer.Envelope.Incoming.t
+             , Mina_base.State_hash.t )
+             Cache_lib.Cached.t
+             Rose_tree.t
+             list
+         , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+         , unit )
+         Pipe_lib.Strict_pipe.Writer.t
+    -> catchup_breadcrumbs_reader:
+         ( ( transition_frontier_breadcrumb
+           , Mina_base.State_hash.t )
+           Cache_lib.Cached.t
+           Rose_tree.t
+           list
+         * [ `Catchup_scheduler | `Ledger_catchup of unit Async_kernel.Ivar.t ]
+         )
+         Pipe_lib.Strict_pipe.Reader.t
+    -> catchup_breadcrumbs_writer:
+         ( ( transition_frontier_breadcrumb
+           , Mina_base.State_hash.t )
+           Cache_lib.Cached.t
+           Rose_tree.t
+           list
+           * [ `Catchup_scheduler | `Ledger_catchup of unit Async_kernel.Ivar.t ]
+         , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+         , unit )
+         Pipe_lib.Strict_pipe.Writer.t
+    -> processed_transition_writer:
+         ( [ `Transition of Mina_transition.External_transition.Validated.t ]
+           * [ `Source of [ `Catchup | `Gossip | `Internal ] ]
+         , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+         , unit )
+         Pipe_lib.Strict_pipe.Writer.t
+    -> unit
+end
+
+module type Unprocessed_transition_cache_intf = sig
+  type t
+
+  val create : logger:Logger.t -> t
+
+  val register_exn :
+       t
+    -> Mina_transition.External_transition.Initial_validated.t
+       Network_peer.Envelope.Incoming.t
+    -> ( Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+       , Mina_base.State_hash.t )
+       Cache_lib.Cached.t
+end
+
+module type Transition_handler_intf = sig
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  module Unprocessed_transition_cache : Unprocessed_transition_cache_intf
+
+  module Breadcrumb_builder : sig
+    val build_subtrees_of_breadcrumbs :
+         logger:Logger.t
+      -> verifier:Verifier.t
+      -> trust_system:Trust_system.t
+      -> frontier:transition_frontier
+      -> initial_hash:Mina_base.State_hash.t
+      -> ( Mina_transition.External_transition.Initial_validated.t
+           Network_peer.Envelope.Incoming.t
+         , Mina_base.State_hash.t )
+         Cache_lib.Cached.t
+         Rose_tree.t
+         Core.List.t
+      -> ( transition_frontier_breadcrumb
+         , Mina_base.State_hash.t )
+         Cache_lib.Cached.t
+         Rose_tree.t
+         Core.List.t
+         Async_kernel.Deferred.Or_error.t
+  end
+
+  module Validator : sig
+    val run :
+         logger:Logger.t
+      -> trust_system:Trust_system.t
+      -> time_controller:Block_time.Controller.t
+      -> frontier:transition_frontier
+      -> transition_reader:
+           Mina_transition.External_transition.Initial_validated.t
+           Network_peer.Envelope.Incoming.t
+           Pipe_lib.Strict_pipe.Reader.t
+      -> valid_transition_writer:
+           ( ( Mina_transition.External_transition.Initial_validated.t
+               Network_peer.Envelope.Incoming.t
+             , Mina_base.State_hash.t )
+             Cache_lib.Cached.t
+           , Pipe_lib.Strict_pipe.drop_head Pipe_lib.Strict_pipe.buffered
+           , unit )
+           Pipe_lib.Strict_pipe.Writer.t
+      -> unprocessed_transition_cache:Unprocessed_transition_cache.t
+      -> unit
+
+    val validate_transition :
+         logger:Logger.t
+      -> frontier:transition_frontier
+      -> unprocessed_transition_cache:Unprocessed_transition_cache.t
+      -> Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+      -> ( ( Mina_transition.External_transition.Initial_validated.t
+             Network_peer.Envelope.Incoming.t
+           , Mina_base.State_hash.t )
+           Cache_lib.Cached.t
+         , [> `Disconnected
+           | `In_frontier of Mina_base.State_hash.t
+           | `In_process of Mina_base.State_hash.t Cache_lib.Intf.final_state
+           ] )
+         Core.Result.t
+  end
+
+  module Processor : sig
+    val run :
+         logger:Logger.t
+      -> verifier:Verifier.t
+      -> trust_system:Trust_system.t
+      -> time_controller:Block_time.Controller.t
+      -> frontier:transition_frontier
+      -> primary_transition_reader:
+           ( Mina_transition.External_transition.Initial_validated.t
+             Network_peer.Envelope.Incoming.t
+           , Mina_base.State_hash.t )
+           Cache_lib.Cached.t
+           Pipe_lib.Strict_pipe.Reader.t
+      -> producer_transition_reader:
+           transition_frontier_breadcrumb Pipe_lib.Strict_pipe.Reader.t
+      -> clean_up_catchup_scheduler:unit Async_kernel.Ivar.t
+      -> catchup_job_writer:
+           ( Mina_base.State_hash.t
+             * ( Mina_transition.External_transition.Initial_validated.t
+                 Network_peer.Envelope.Incoming.t
+               , Mina_base.State_hash.t )
+               Cache_lib.Cached.t
+               Rose_tree.t
+               list
+           , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+           , unit )
+           Pipe_lib.Strict_pipe.Writer.t
+      -> catchup_breadcrumbs_reader:
+           ( ( transition_frontier_breadcrumb
+             , Mina_base.State_hash.t )
+             Cache_lib.Cached.t
+             Rose_tree.t
+             list
+           * [ `Catchup_scheduler | `Ledger_catchup of unit Async_kernel.Ivar.t ]
+           )
+           Pipe_lib.Strict_pipe.Reader.t
+      -> catchup_breadcrumbs_writer:
+           ( ( transition_frontier_breadcrumb
+             , Mina_base.State_hash.t )
+             Cache_lib.Cached.t
+             Rose_tree.t
+             list
+             * [ `Catchup_scheduler
+               | `Ledger_catchup of unit Async_kernel.Ivar.t ]
+           , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+           , unit )
+           Pipe_lib.Strict_pipe.Writer.t
+      -> processed_transition_writer:
+           ( [ `Transition of Mina_transition.External_transition.Validated.t ]
+             * [ `Source of [ `Catchup | `Gossip | `Internal ] ]
+           , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+           , unit )
+           Pipe_lib.Strict_pipe.Writer.t
+      -> unit
+  end
+end
+
+module type Best_tip_prover_intf = sig
+  type transition_frontier
+
+  val prove :
+       logger:Logger.t
+    -> transition_frontier
+    -> ( Mina_transition.External_transition.t
+         Mina_base.State_hash.With_state_hashes.t
+       , Mina_base.State_body_hash.t list
+         * Mina_transition.External_transition.t )
+       Proof_carrying_data.t
+       option
+
+  val verify :
+       verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> ( Mina_transition.External_transition.t
+       , Mina_base.State_body_hash.t list
+         * Mina_transition.External_transition.t )
+       Proof_carrying_data.t
+    -> ( [ `Root of Mina_transition.External_transition.Initial_validated.t ]
+       * [ `Best_tip of Mina_transition.External_transition.Initial_validated.t ]
+       )
+       Async_kernel.Deferred.Or_error.t
+end
+
+module type Consensus_best_tip_prover_intf = sig
+  type transition_frontier
+
+  val prove :
+       logger:Logger.t
+    -> consensus_constants:Consensus.Constants.t
+    -> frontier:transition_frontier
+    -> Consensus.Data.Consensus_state.Value.t
+       Mina_base.State_hash.With_state_hashes.t
+    -> ( Mina_transition.External_transition.t
+       , Mina_base.State_body_hash.t list
+         * Mina_transition.External_transition.t )
+       Proof_carrying_data.t
+       option
+
+  val verify :
+       logger:Logger.t
+    -> verifier:Verifier.t
+    -> consensus_constants:Consensus.Constants.t
+    -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> Consensus.Data.Consensus_state.Value.t
+       Mina_base.State_hash.With_state_hashes.t
+    -> ( Mina_transition.External_transition.t
+       , Mina_base.State_body_hash.t list
+         * Mina_transition.External_transition.t )
+       Proof_carrying_data.t
+    -> ( [ `Root of Mina_transition.External_transition.Initial_validated.t ]
+       * [ `Best_tip of Mina_transition.External_transition.Initial_validated.t ]
+       )
+       Async_kernel.Deferred.Or_error.t
+end
+
+module type Sync_handler_intf = sig
+  type transition_frontier
+
+  val answer_query :
+       frontier:transition_frontier
+    -> Mina_base.Ledger_hash.t
+    -> Mina_base.Sync_ledger.Query.t Network_peer.Envelope.Incoming.t
+    -> logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> Mina_base.Sync_ledger.Answer.t option Async_kernel.Deferred.t
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       frontier:transition_frontier
+    -> Mina_base.State_hash.t
+    -> ( Staged_ledger.Scan_state.t
+       * Mina_base.Ledger_hash.t
+       * Mina_base.Pending_coinbase.t
+       * Mina_state.Protocol_state.value list )
+       Core.Option.t
+
+  val get_transition_chain :
+       frontier:transition_frontier
+    -> Mina_base.State_hash.t list
+    -> Mina_transition.External_transition.t list option
+
+  val best_tip_path :
+    frontier:transition_frontier -> Mina_base.State_hash.t list
+
+  module Root : sig
+    val prove :
+         logger:Logger.t
+      -> consensus_constants:Consensus.Constants.t
+      -> frontier:transition_frontier
+      -> Consensus.Data.Consensus_state.Value.t
+         Mina_base.State_hash.With_state_hashes.t
+      -> ( Mina_transition.External_transition.t
+         , Mina_base.State_body_hash.t list
+           * Mina_transition.External_transition.t )
+         Proof_carrying_data.t
+         option
+
+    val verify :
+         logger:Logger.t
+      -> verifier:Verifier.t
+      -> consensus_constants:Consensus.Constants.t
+      -> genesis_constants:Genesis_constants.t
+      -> precomputed_values:Precomputed_values.t
+      -> Consensus.Data.Consensus_state.Value.t
+         Mina_base.State_hash.With_state_hashes.t
+      -> ( Mina_transition.External_transition.t
+         , Mina_base.State_body_hash.t list
+           * Mina_transition.External_transition.t )
+         Proof_carrying_data.t
+      -> ( [ `Root of Mina_transition.External_transition.Initial_validated.t ]
+         * [ `Best_tip of
+             Mina_transition.External_transition.Initial_validated.t ] )
+         Async_kernel.Deferred.Or_error.t
+  end
+end
+
+module type Transition_chain_prover_intf = sig
+  type transition_frontier
+
+  val prove :
+       ?length:int
+    -> frontier:transition_frontier
+    -> Mina_base.State_hash.t
+    -> (Mina_base.State_hash.t * Mina_base.State_body_hash.t list) option
+end
+
+module type Bootstrap_controller_intf = sig
+  type network
+
+  type transition_frontier
+
+  type persistent_root
+
+  type persistent_frontier
+
+  val run :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> network:network
+    -> consensus_local_state:Consensus.Data.Local_state.t
+    -> transition_reader:
+         Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+         Pipe_lib.Strict_pipe.Reader.t
+    -> persistent_root:persistent_root
+    -> persistent_frontier:persistent_frontier
+    -> initial_root_transition:Mina_transition.External_transition.Validated.t
+    -> genesis_state_hash:Mina_base.State_hash.t
+    -> genesis_ledger:Mina_base.Ledger.t Core.Lazy.t
+    -> genesis_constants:Genesis_constants.t
+    -> ( transition_frontier
+       * Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+         list )
+       Async_kernel.Deferred.t
+end
+
+module type Transition_frontier_controller_intf = sig
+  type transition_frontier
+
+  type breadcrumb
+
+  type network
+
+  val run :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> network:network
+    -> time_controller:Block_time.Controller.t
+    -> collected_transitions:
+         Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+         list
+    -> frontier:transition_frontier
+    -> network_transition_reader:
+         Mina_transition.External_transition.Initial_validated.t
+         Network_peer.Envelope.Incoming.t
+         Pipe_lib.Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Pipe_lib.Strict_pipe.Reader.t
+    -> clear_reader:[ `Clear ] Pipe_lib.Strict_pipe.Reader.t
+    -> Mina_transition.External_transition.Validated.t
+       Pipe_lib.Strict_pipe.Reader.t
+end
+
+module type Initial_validator_intf = sig
+  type external_transition
+
+  type external_transition_with_initial_validation
+
+  val run :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> transition_reader:
+         ( [ `Transition of external_transition Network_peer.Envelope.Incoming.t
+           ]
+         * [ `Time_received of Block_time.t ]
+         * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
+         Pipe_lib.Strict_pipe.Reader.t
+    -> valid_transition_writer:
+         ( [ `Transition of
+             external_transition_with_initial_validation
+             Network_peer.Envelope.Incoming.t ]
+           * [ `Time_received of Block_time.t ]
+         , Pipe_lib.Strict_pipe.crash Pipe_lib.Strict_pipe.buffered
+         , unit )
+         Pipe_lib.Strict_pipe.Writer.t
+    -> genesis_state_hash:Mina_base.State_hash.t
+    -> genesis_constants:Genesis_constants.t
+    -> unit
+end
+
+module type Transition_router_intf = sig
+  type transition_frontier
+
+  type transition_frontier_persistent_root
+
+  type transition_frontier_persistent_frontier
+
+  type breadcrumb
+
+  type network
+
+  val run :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> network:network
+    -> is_seed:bool
+    -> is_demo_mode:bool
+    -> time_controller:Block_time.Controller.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
+    -> persistent_root_location:string
+    -> persistent_frontier_location:string
+    -> frontier_broadcast_pipe:
+         transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
+         * transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
+    -> network_transition_reader:
+         ( [ `Transition of
+             Mina_transition.External_transition.t
+             Network_peer.Envelope.Incoming.t ]
+         * [ `Time_received of Block_time.t ]
+         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
+         Pipe_lib.Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Pipe_lib.Strict_pipe.Reader.t
+    -> most_recent_valid_block:
+         Mina_transition.External_transition.Initial_validated.t
+         Pipe_lib.Broadcast_pipe.Reader.t
+         * Mina_transition.External_transition.Initial_validated.t
+           Pipe_lib.Broadcast_pipe.Writer.t
+    -> precomputed_values:Precomputed_values.t
+    -> catchup_mode:[ `Normal | `Super ]
+    -> ( [ `Transition of Mina_transition.External_transition.Validated.t ]
+       * [ `Source of [ `Catchup | `Gossip | `Internal ] ] )
+       Pipe_lib.Strict_pipe.Reader.t
+       * unit Async_kernel.Ivar.t
+end
