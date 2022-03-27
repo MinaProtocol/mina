@@ -122,7 +122,7 @@ module type Data_hash_intf = sig
 
   val var_to_hash_packed : var -> Field.Var.t
 
-  val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+  val equal_var : var -> var -> Boolean.var Tick.Checked.t
 
   val to_bytes : t -> string
 
@@ -291,7 +291,7 @@ module State_stack = struct
     Boolean.(b1 && b2)
 
   let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-      (var, 'a) Tick0.Checked.t =
+      var Tick0.Checked.t =
     let%bind init = Stack_hash.if_ cond ~then_:then_.init ~else_:else_.init in
     let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
     { Poly.init; curr }
@@ -664,7 +664,7 @@ module T = struct
       { t with state = State_stack.push t.state state_body_hash }
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-        (var, 'a) Tick0.Checked.t =
+        var Tick0.Checked.t =
       let%bind data =
         Coinbase_stack.Checked.if_ cond ~then_:then_.data ~else_:else_.data
       in
@@ -677,7 +677,7 @@ module T = struct
       type t = var
 
       let push_coinbase (coinbase : Coinbase_data.var) (t : t) :
-          (t, 'a) Tick0.Checked.t =
+          t Tick0.Checked.t =
         let%map data = Coinbase_stack.Checked.push t.data coinbase in
         { t with data }
 
@@ -686,7 +686,7 @@ module T = struct
         { t with state }
 
       let check_merge ~transition1:((s, t) : t * t)
-          ~transition2:((s', t') : t * t) : (Boolean.var, _) Tick0.Checked.t =
+          ~transition2:((s', t') : t * t) : Boolean.var Tick0.Checked.t =
         let%bind valid_coinbase_stacks =
           Coinbase_stack.Checked.check_merge (s.data, t.data) (s'.data, t'.data)
         in
@@ -1338,8 +1338,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
           in
           As_prover.read Stack.typ res
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Stack.equal unchecked checked))
 
@@ -1397,8 +1396,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           in
           As_prover.read Hash.typ result
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root))
 
@@ -1457,8 +1455,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           in
           As_prover.read Hash.typ result
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
       (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
@@ -1479,8 +1476,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           in
           As_prover.read Hash.typ current
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (
         Hash.equal
