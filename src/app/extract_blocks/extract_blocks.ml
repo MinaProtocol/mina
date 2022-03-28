@@ -160,7 +160,7 @@ let fill_in_user_commands pool block_state_hash =
         Option.map user_cmd.valid_until ~f:(fun valid ->
             Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32)
       in
-      let memo = user_cmd.memo |> Signed_command_memo.of_string in
+      let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
         query_db ~item:"block user commands" ~f:(fun db ->

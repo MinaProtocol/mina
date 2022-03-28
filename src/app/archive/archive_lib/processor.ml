@@ -431,7 +431,7 @@ module User_command = struct
                 |> fun amt ->
                 Currency.Fee.to_uint64 amt |> Unsigned.UInt64.to_int64 )
             ; valid_until
-            ; memo= Signed_command.memo t |> Signed_command_memo.to_string
+            ; memo= Signed_command.memo t |> Signed_command_memo.to_base58_check
             ; hash= transaction_hash |> Transaction_hash.to_base58_check }
   end
 
@@ -517,7 +517,7 @@ module User_command = struct
             ~f:
               (Fn.compose Unsigned.UInt32.to_int64
                  Mina_numbers.Global_slot.to_uint32)
-      ; memo= user_cmd.memo |> Signed_command_memo.to_string
+      ; memo= user_cmd.memo |> Signed_command_memo.to_base58_check
       ; hash= user_cmd.hash |> Transaction_hash.to_base58_check }
 
   let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
