@@ -154,21 +154,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Network.Node.must_get_account_data ~logger untimed_node_a
              ~public_key:receiver_pub_key
          in
+         let node_a_num_produced_blocks =
+           Map.find (network_state t).blocks_produced_by_node
+             (Network.Node.id untimed_node_a)
+           |> Option.value ~default:[] |> List.length
+         in
+         let node_b_num_produced_blocks =
+           Map.find (network_state t).blocks_produced_by_node
+             (Network.Node.id untimed_node_b)
+           |> Option.value ~default:[] |> List.length
+         in
          let node_a_expected =
            (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
            Currency.Amount.add
-             (Currency.Amount.of_int 400_000_000_000_000)
+             ( Currency.Amount.add
+                 (Currency.Amount.of_int 400_000_000_000_000)
+                 ( if Int.equal node_a_num_produced_blocks 0 then
+                   Currency.Amount.zero
+                 else
+                   Currency.Amount.scale test_constants.coinbase_amount
+                     (node_a_num_produced_blocks * 2)
+                   |> Option.value_exn )
+             |> Option.value_exn )
              amount
            |> Option.value_exn
          in
-
          let node_b_expected =
            Currency.Amount.sub
              ( Currency.Amount.add
                  (* 300_000_000_000_000 is hardcoded the original amount, change this if original amount changes *)
                  (Currency.Amount.of_int 300_000_000_000_000)
-                 ( Currency.Amount.scale test_constants.coinbase_amount 5
-                 |> Option.value_exn )
+                 ( if Int.equal node_a_num_produced_blocks 0 then
+                   Currency.Amount.zero
+                 else
+                   Currency.Amount.scale test_constants.coinbase_amount
+                     (node_b_num_produced_blocks * 2)
+                   |> Option.value_exn )
              |> Option.value_exn )
              ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
              |> Option.value_exn )
@@ -194,8 +215,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_amount node_a_balance)
              node_a_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (300_000_000_000_000 + 5*possible_coinbase_reward) - (txn_amount + txn_fee) *)
-           (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `5*possible_coinbase_reward` bit *)
+           (* node_b_balance <= (300_000_000_000_000 + node_b_num_produced_blocks*possible_coinbase_reward*2) - (txn_amount + txn_fee) *)
+           (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `node_b_num_produced_blocks*possible_coinbase_reward*2` bit.  the *2 is because untimed accounts get supercharged rewards *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected

@@ -26,6 +26,10 @@ module Make
           [@to_yojson map_to_yojson ~f:Gossip_state.to_yojson]
     ; best_tips_by_node : State_hash.t String.Map.t
           [@to_yojson map_to_yojson ~f:State_hash.to_yojson]
+    ; blocks_produced_by_node : State_hash.t list String.Map.t
+          [@to_yojson
+            map_to_yojson ~f:(fun ls ->
+                `List (List.map State_hash.to_yojson ls))]
     }
   [@@deriving to_yojson]
 
@@ -38,6 +42,7 @@ module Make
     ; node_initialization = String.Map.empty
     ; gossip_received = String.Map.empty
     ; best_tips_by_node = String.Map.empty
+    ; blocks_produced_by_node = String.Map.empty
     }
 
   let listen ~logger event_router =
@@ -62,6 +67,15 @@ module Make
                   let snarked_ledgers_generated =
                     if block_produced.snarked_ledger_generated then 1 else 0
                   in
+                  let node_block_list =
+                    Core.String.Map.update state.blocks_produced_by_node
+                      (Node.id node) ~f:(fun ls_opt ->
+                        match ls_opt with
+                        | None ->
+                            [ block_produced.state_hash ]
+                        | Some ls ->
+                            List.cons block_produced.state_hash ls)
+                  in
                   { state with
                     epoch = block_produced.global_slot
                   ; global_slot = block_produced.global_slot
@@ -70,6 +84,7 @@ module Make
                   ; snarked_ledgers_generated =
                       state.snarked_ledgers_generated
                       + snarked_ledgers_generated
+                  ; blocks_produced_by_node = node_block_list
                   }
                 else state))
         : _ Event_router.event_subscription ) ;

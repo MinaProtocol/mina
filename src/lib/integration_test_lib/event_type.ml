@@ -140,6 +140,7 @@ module Block_produced = struct
     ; epoch : int
     ; global_slot : int
     ; snarked_ledger_generated : bool
+    ; state_hash : State_hash.t
     }
   [@@deriving to_yojson]
 
@@ -189,6 +190,7 @@ module Block_produced = struct
         ; "protocol_state"
         ; "body"
         ; "consensus_state"
+        ; "state_hash" (* ??? *)
         ]
     in
     let%bind block_height =
@@ -197,8 +199,20 @@ module Block_produced = struct
     let%bind global_slot =
       find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
     in
+    let%bind state_hash_str =
+      find string breadcrumb_consensus_state [ "state_hash" ]
+    in
+    let%bind state_hash =
+      State_hash.of_yojson (`String state_hash_str)
+      |> fun res ->
+      match res with
+      | Ok hash ->
+          Or_error.return hash
+      | Error str ->
+          Or_error.error_string str
+    in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
-    { block_height; global_slot; epoch; snarked_ledger_generated }
+    { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
