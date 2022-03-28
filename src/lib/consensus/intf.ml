@@ -201,8 +201,7 @@ module type State_hooks = sig
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var
-       , _ )
+    -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
 
   val genesis_winner : Public_key.Compressed.t * Private_key.t
@@ -531,7 +530,7 @@ module type S = sig
 
       val is_genesis_state : Value.t -> bool
 
-      val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
+      val is_genesis_state_var : var -> Boolean.var Checked.t
 
       val supercharge_coinbase_var : var -> Boolean.var
 

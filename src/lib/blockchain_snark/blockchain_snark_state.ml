@@ -96,7 +96,7 @@ let%snarkydef step ~(logger : Logger.t)
     Hlist.HlistId.
       [ previous_state_hash
       ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t)
-      ] new_state_hash : (_, _) Tick.Checked.t =
+      ] new_state_hash : _ Tick.Checked.t =
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
@@ -306,7 +306,6 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
         in
         step ~proof_level ~constraint_constants ~logger:(Logger.create ())
           [ prev; txn_snark ] curr))
-    ()
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
