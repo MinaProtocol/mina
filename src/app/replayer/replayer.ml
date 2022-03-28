@@ -1371,9 +1371,9 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
         fee_payer_data.nonce |> Unsigned.UInt32.of_int64
         |> Mina_numbers.Account_nonce.of_uint32
       in
-      return { Party.Predicated.Poly.body; predicate }
+      return { Party.Predicated.Poly.body; predicate; caller = () }
     in
-    return { Party.Fee_payer.data; authorization = Signature.dummy }
+    return ({ data; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
   let%bind (other_parties : Party.t list) =
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
@@ -1516,7 +1516,11 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
             | Accept ->
                 return Party.Predicate.Accept
           in
-          return ({ body; predicate } : Party.Predicated.t)
+          let caller =
+            (* TODO *)
+            Token_id.default
+          in
+          return ({ body; predicate; caller } : Party.Predicated.t)
         in
         let authorization =
           (* dummy proof, signature, don't affect replay *)
@@ -1534,6 +1538,12 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
   in
   (* memo contents don't affect ability to replay snapp *)
   let memo = Mina_base.Signed_command_memo.dummy in
+  let other_parties =
+    Parties.Call_forest.of_parties_list other_parties
+      ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+    |> Parties.Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
+           Party.Predicated.digest p.data)
+  in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
 let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_

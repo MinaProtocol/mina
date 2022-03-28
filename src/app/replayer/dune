@@ -25,6 +25,7 @@
    ;; local libraries
    with_hash
    snark_params
+   crypto_params
    pickles_types
    mina_numbers
    coda_genesis_ledger
@@ -40,13 +41,17 @@
    genesis_constants
    coda_runtime_config
    logger
+   kimchi_backend
    kimchi_backend.pasta
+   kimchi_backend.common
    block_time
    data_hash_lib
    mina_base.import
    pickles
    sgn
    unsigned_extended
+   random_oracle
+   codable
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
