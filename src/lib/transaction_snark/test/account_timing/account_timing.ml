@@ -3,7 +3,6 @@ open Currency
 open Snark_params
 open Tick
 open Signature_lib
-module U = Transaction_snark_tests.Util
 open Mina_base
 
 let%test_module "account timing check" =
@@ -297,4 +296,349 @@ let%test_module "account timing check" =
             unchecked_timing unchecked_min_balance
       | _ ->
           false
+
+    (* user commands with timings *)
+
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let keypairss, keypairs =
+      (* these tests are based on relative balance/payment amounts, don't need to
+         run on multiple keypairs
+      *)
+      let length = 1 in
+      (* keypair pair (for payment sender/receiver)  *)
+      let keypairss =
+        List.init length ~f:(fun _ ->
+            (Signature_lib.Keypair.create (), Signature_lib.Keypair.create ()))
+      in
+      (* list of keypairs *)
+      let keypairs =
+        List.map keypairss ~f:(fun (kp1, kp2) -> [ kp1; kp2 ]) |> List.concat
+      in
+      (keypairss, keypairs)
+
+    (* we're testing timings, not signatures *)
+    let validate_user_command uc =
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it validated_uc)
+          =
+        Signed_command.to_valid_unsafe uc
+      in
+      validated_uc
+
+    let apply_user_commands_at_slot ledger slot
+        (txns : Mina_transaction.Transaction.t list) =
+      ignore
+        ( List.map txns ~f:(fun txn ->
+              let uc =
+                match txn with
+                | Command (Signed_command uc) ->
+                    uc
+                | _ ->
+                    failwith "Expected signed user command"
+              in
+              let validated_uc = validate_user_command uc in
+              match
+                Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:slot ledger validated_uc
+              with
+              | Ok _txn_applied ->
+                  ()
+              | Error err ->
+                  failwithf "Transaction failed: %s" (Error.to_string_hum err)
+                    ())
+          : unit list )
+
+    let%test_unit "user commands, before cliff time, sufficient balance" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int 10_000_000_000_000 in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int 50_000_000_000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_amount = Currency.Amount.of_int 100
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 10
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        (* small payment amount, relative to balances *)
+        let%map user_commands =
+          Quickcheck.Generator.all
+          @@ List.map keypairss ~f:(fun (kp1, kp2) ->
+                 let%map payment =
+                   Signed_command.Gen.payment
+                     ~key_gen:(return (kp1, kp2))
+                     ~min_amount:10_000_000_000 ~max_amount:10_000_000_000
+                     ~fee_range:0 ()
+                 in
+                 ( Mina_transaction.Transaction.Command (Signed_command payment)
+                   : Mina_transaction.Transaction.t ))
+        in
+        (ledger_init_state, user_commands)
+      in
+      (* slot 0, well before cliffs *)
+      Quickcheck.test ~seed:(`Deterministic "user command, before cliff")
+        ~sexp_of:
+          [%sexp_of:
+            Mina_ledger.Ledger.init_state * Mina_transaction.Transaction.t list]
+        ~trials:2 gen ~f:(fun (ledger_init_state, user_commands) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              apply_user_commands_at_slot ledger Mina_numbers.Global_slot.zero
+                user_commands))
+
+    let%test_unit "user command, before cliff time, min balance violation" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        (* high init min balances, payment amount enough to violate *)
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int 10_000_000_000_000 in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int 9_995_000_000_000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_amount = Currency.Amount.of_int 100
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 10
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        let%map user_command =
+          let%map payment =
+            Signed_command.Gen.payment
+              ~key_gen:(return @@ List.hd_exn keypairss)
+              ~min_amount:100_000_000_000 ~max_amount:100_000_000_000
+              ~fee_range:0 ()
+          in
+          ( Mina_transaction.Transaction.Command (Signed_command payment)
+            : Mina_transaction.Transaction.t )
+        in
+        (ledger_init_state, user_command)
+      in
+      Quickcheck.test ~seed:(`Deterministic "user command, before cliff")
+        ~trials:1 gen ~f:(fun (ledger_init_state, user_command) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let uc =
+                match user_command with
+                | Command (Signed_command uc) ->
+                    uc
+                | _ ->
+                    failwith "Expected signed user command"
+              in
+              let validated_uc = validate_user_command uc in
+              match
+                Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:Mina_numbers.Global_slot.zero ledger
+                  validated_uc
+              with
+              | Ok _txn_applied ->
+                  failwith "Should have failed with min balance violation"
+              | Error err ->
+                  let err_str = Error.to_string_hum err in
+                  if
+                    not
+                      (String.equal err_str
+                         Transaction_status.Failure.(
+                           describe Source_minimum_balance_violation))
+                  then failwithf "Unexpected transaction error: %s" err_str ()))
+
+    let%test_unit "user command, at cliff time, sufficient balance" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int 10_000_000_000_000 in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int 9_995_000_000_000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_amount = Currency.Amount.of_int 9_995_000_000_000
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 10
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        let%map user_command =
+          let%map payment =
+            Signed_command.Gen.payment
+              ~key_gen:(return @@ List.hd_exn keypairss)
+              ~min_amount:100_000_000_000 ~max_amount:100_000_000_000
+              ~fee_range:0 ()
+          in
+          ( Mina_transaction.Transaction.Command (Signed_command payment)
+            : Mina_transaction.Transaction.t )
+        in
+        (ledger_init_state, user_command)
+      in
+      Quickcheck.test ~seed:(`Deterministic "user command, at cliff") ~trials:1
+        gen ~f:(fun (ledger_init_state, user_command) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let uc =
+                match user_command with
+                | Command (Signed_command uc) ->
+                    uc
+                | _ ->
+                    failwith "Expected signed user command"
+              in
+              let validated_uc = validate_user_command uc in
+              match
+                Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:(Mina_numbers.Global_slot.of_int 10000)
+                  ledger validated_uc
+              with
+              | Ok _txn_applied ->
+                  ()
+              | Error err ->
+                  let err_str = Error.to_string_hum err in
+                  failwithf "Unexpected transaction error: %s" err_str ()))
+
+    let%test_unit "user command, after vesting, sufficient balance" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int 10_000_000_000_000 in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int 9_995_000_000_000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_amount = Currency.Amount.of_int 9_995_000_000_000
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 10
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        (* small amount, relative to balance *)
+        let%map user_command =
+          let%map payment =
+            Signed_command.Gen.payment
+              ~key_gen:(return @@ List.hd_exn keypairss)
+              ~min_amount:100_000 ~max_amount:100_000 ~fee_range:0 ()
+          in
+          ( Mina_transaction.Transaction.Command (Signed_command payment)
+            : Mina_transaction.Transaction.t )
+        in
+        (ledger_init_state, user_command)
+      in
+      Quickcheck.test ~seed:(`Deterministic "user command, after cliff")
+        ~trials:1 gen ~f:(fun (ledger_init_state, user_command) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let uc =
+                match user_command with
+                | Command (Signed_command uc) ->
+                    uc
+                | _ ->
+                    failwith "Expected signed user command"
+              in
+              let validated_uc = validate_user_command uc in
+              (* slot well past cliff *)
+              match
+                Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:(Mina_numbers.Global_slot.of_int 200000)
+                  ledger validated_uc
+              with
+              | Ok _txn_applied ->
+                  ()
+              | Error err ->
+                  let err_str = Error.to_string_hum err in
+                  failwithf "Unexpected transaction error: %s" err_str ()))
+
+    let%test_unit "user command, after vesting, insufficient balance" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int 10_000_000_000_000 in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int 9_995_000_000_000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_amount = Currency.Amount.of_int 9_995_000_000_000
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 10
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        let%map user_command =
+          let%map payment =
+            Signed_command.Gen.payment
+              ~key_gen:(return @@ List.hd_exn keypairss)
+              ~min_amount:100_000_000_000_000 ~max_amount:100_000_000_000_000
+              ~fee_range:0 ()
+          in
+          ( Mina_transaction.Transaction.Command (Signed_command payment)
+            : Mina_transaction.Transaction.t )
+        in
+        (ledger_init_state, user_command)
+      in
+      Quickcheck.test ~seed:(`Deterministic "user command, after cliff")
+        ~trials:1 gen ~f:(fun (ledger_init_state, user_command) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let uc =
+                match user_command with
+                | Command (Signed_command uc) ->
+                    uc
+                | _ ->
+                    failwith "Expected signed user command"
+              in
+              let validated_uc = validate_user_command uc in
+              (* slot well past cliff *)
+              match
+                Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                  ~txn_global_slot:(Mina_numbers.Global_slot.of_int 200000)
+                  ledger validated_uc
+              with
+              | Ok _txn_applied ->
+                  failwith "Expected failure to insufficient balance"
+              | Error err ->
+                  let err_str = Error.to_string_hum err in
+                  if
+                    not
+                      (String.equal err_str
+                         Transaction_status.Failure.(
+                           describe Source_insufficient_balance))
+                  then failwithf "Unexpected transaction error: %s" err_str ()))
   end )
