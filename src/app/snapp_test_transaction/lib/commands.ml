@@ -588,8 +588,8 @@ let%test_module "Snapps test transaction" =
                 |> Yojson.Safe.to_string )
                 ( Party.Fee_payer.to_yojson parties'.fee_payer
                 |> Yojson.Safe.to_string ) ;
-              List.iter2_exn parties.other_parties parties'.other_parties
-                ~f:(fun expected got ->
+              Parties.Call_forest.Tree.iter_forest2_exn parties.other_parties
+                parties'.other_parties ~f:(fun expected got ->
                   printf_diff ~label:"party"
                     (Party.to_yojson expected |> Yojson.Safe.to_string)
                     (Party.to_yojson got |> Yojson.Safe.to_string)) ;

@@ -30,6 +30,25 @@ module Call_forest = struct
     and fold { party; calls; party_digest = _ } ~f ~init =
       fold_forest calls ~f ~init:(f init party)
 
+    let rec fold_forest2_exn (ts1 : (_ t, _) With_stack_hash.t list)
+        (ts2 : (_ t, _) With_stack_hash.t list) ~f ~init =
+      List.fold2_exn ts1 ts2 ~init
+        ~f:(fun
+             acc
+             { elt = elt1; stack_hash = _ }
+             { elt = elt2; stack_hash = _ }
+           -> fold2_exn elt1 elt2 ~init:acc ~f)
+
+    and fold2_exn { party = party1; calls = calls1; party_digest = _ }
+        { party = party2; calls = calls2; party_digest = _ } ~f ~init =
+      fold_forest2_exn calls1 calls2 ~f ~init:(f init party1 party2)
+
+    let iter_forest2_exn ts1 ts2 ~f =
+      fold_forest2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
+
+    let iter2_exn ts1 ts2 ~f =
+      fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
+
     let rec map (t : _ t) ~f =
       { calls = map_forest t.calls ~f
       ; party = f t.party
