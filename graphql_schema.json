@@ -3352,6 +3352,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -3378,6 +3394,20 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "AccountPredicateInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -3447,7 +3477,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "ZkappPartyInput",
-          "description": "A party to a zkApp transaction",
+          "description": null,
           "fields": [
             {
               "name": "data",
@@ -7250,6 +7280,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7260,7 +7306,7 @@
         {
           "kind": "OBJECT",
           "name": "ZkappParty",
-          "description": "A party to a zkApp transaction",
+          "description": null,
           "fields": [
             {
               "name": "data",
