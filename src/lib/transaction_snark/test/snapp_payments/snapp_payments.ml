@@ -193,10 +193,13 @@ let%test_module "Snapp payments tests" =
 
     let%test_unit "snapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trails:1 U.gen_snapp_ledger
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
                   let fee = Fee.of_int 1_000_000 in
                   let spec = List.hd_exn specs in
                   let sender_pk =
@@ -245,8 +248,9 @@ let%test_module "Snapp payments tests" =
                   let parties =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  U.apply_parties_with_merges ledger [ parties ])))
+                  U.apply_parties_with_merges ledger [ parties ]
+                  (*
+                  let failures = U.apply_parties_with_failure_tbl ledger [ parties ] in 
+                  assert (List.member `Insufficient_funds failures)
+                  *))))
   end )
