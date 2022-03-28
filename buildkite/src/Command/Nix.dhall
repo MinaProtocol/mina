@@ -14,8 +14,7 @@ let runWithNix
     : List Text -> Text -> List Cmd.Type
     = \(environment : List Text) ->
       \(innerScript : Text) ->
-          [ Mina.fixPermissionsCommand ]
-        # [ Cmd.runInDocker
+          [ Cmd.runInDocker
               Cmd.Docker::{ image = Images.nix, extraEnv = environment, privileged = True }
               ''
               mkdir -p ~/.config/nix
@@ -30,7 +29,7 @@ let nixBuildAndThen
         runWithNix
           ([] : List Text)
           (''
-           nix shell nixpkgs#cachix -c cachix watch-exec mina-demo -- nix build -o $PWD/result --accept-flake-config -L "git+file://\$(pwd)?submodules=1#\${attr}"
+           nix shell nixpkgs#cachix -c cachix watch-exec mina-demo -- nix build -o $PWD/result --accept-flake-config -L "git+file://$PWD?submodules=1#${attr}"
            ${andThen}
            '')
 
