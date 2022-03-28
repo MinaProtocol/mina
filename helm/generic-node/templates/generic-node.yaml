@@ -95,8 +95,6 @@ spec:
             memory: {{.Values.resources.requests.memory}}
             cpu: {{.Values.resources.requests.cpu}}
         args:
-        - "mina-daemon"
-        - "run"
         - "daemon"
         - "--log-level"
         - "Debug"
@@ -109,18 +107,11 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
+        {{- if .Values.features.snarkcoordinator.enabled}}
         - "-run-snark-coordinator"
-        - "$(CODA_SNARK_KEY)"
         - "-snark-worker-fee"
-        - "$(CODA_SNARK_FEE)"
         - "-work-selection"
-        - "$(WORK_SELECTION)"
-        - "-u"
-        - "/code/watchdog.py"
-        - "--incluster"
-        - "true"
-        - "--namespace"
-        - ""
+        {{- end }}
         {{- if .Values.libp2p.staticKeypair.enabled}}
         - "--discovery-keypair"
         - "/root/libp2p-keys/key"

@@ -38,18 +38,6 @@ spec:
                 - key: "cloud.google.com/gke-preemptible"
                   operator: In
                   values: ["true"]
-      initContainers:
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: fix-perms
-        image: busybox:latest
-        command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
-        volumeMounts:
-        - mountPath: "/keys/"
-          name: private-keys
-          readOnly: true
-        - mountPath: /wallet-keys
-          name: wallet-keys
-      {{- end }}
       containers:
       - name: mina-rosetta
         image:  "{{.Values.rosetta.image.repository }}:{{.Values.rosetta.image.tag}}"
@@ -57,12 +45,6 @@ spec:
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
-        volumeMounts:
-        - name: destination-libp2p
-          mountPath: /root/libp2p-keys
-          readOnly: true
-        - name: config-dir
-          mountPath: "/root/.mina-config"
         {{- if .Values.features.uploadBlocksToGCloud.enabled}}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -130,45 +112,16 @@ spec:
           value: {{.Values.ports.archive | quote}}
         - name: DAEMON_PG_CONN_PORT
           value: {{.Values.archive.pg_conn | quote}}
-        - name: MINA_CLIENT_TRUSTLIST
-          value: "10.0.0.0/8"
-        - name: CODA_CLIENT_TRUSTLIST
-          value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
-        - name: GCLOUD_KEYFILE
-          value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ .Values.testnetName}}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
-        {{- if .Values.features.privateKeySecret.enabled}}
-        - name: CODA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        - name: MINA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-            - name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP
           containerPort: {{.Values.ports.archive}}
-        - name: client-port
-          protocol: TCP
-          containerPort: {{.Values.ports.client}}
-        - name: graphql-port
-          protocol: TCP
-          containerPort: {{.Values.ports.graphql}}
-        - name: postgres-port
-          protocol: TCP
-          containerPort: {{ .Values.ports.postgres }}
         - name: metrics-port
           protocol: TCP
           containerPort: {{.Values.ports.metrics}}
@@ -176,24 +129,4 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: private-keys
-        secret:
-          secretName: {{ .Values.features.privateKeySecret.secretName }}
-          defaultMode: 256
-          items:
-          - key: key
-            path: key
-          - key: pub
-            path: key.pub
-      {{- end }}
-      volumes:
-      - name: destination-libp2p
-        emptyDir: {}
-      - name: config-dir
-        emptyDir: {}
-      - name: actual-libp2p
-        emptyDir: {}
-      - name: wallet-keys
-        emptyDir: {}
 {{- end }}

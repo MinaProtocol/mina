@@ -1,11 +1,7 @@
 ---
 {{if .Values.archive.enabled}}
 apiVersion: apps/v1
-{{- if .Values.features.persistence.enabled}}
-kind: StatefulSet
-{{- else}}
 kind: Deployment
-{{- end}}
 metadata:
   name: {{.Values.name}}-archive
   labels:
@@ -38,18 +34,6 @@ spec:
                 - key: "cloud.google.com/gke-preemptible"
                   operator: In
                   values: ["true"]
-      initContainers:
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: fix-perms
-        image: busybox:latest
-        command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
-        volumeMounts:
-        - mountPath: "/keys/"
-          name: private-keys
-          readOnly: true
-        - mountPath: /wallet-keys
-          name: wallet-keys
-      {{- end }}
       containers:
       - name: mina-archive
         image:  "{{.Values.archive.image.repository }}:{{.Values.archive.image.tag}}"
@@ -57,12 +41,6 @@ spec:
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
-        volumeMounts:
-        - name: destination-libp2p
-          mountPath: /root/libp2p-keys
-          readOnly: true
-        - name: config-dir
-          mountPath: "/root/.mina-config"
         {{- if .Values.features.uploadBlocksToGCloud.enabled}}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -79,21 +57,6 @@ spec:
         - "$(DAEMON_ARCHIVE_PG_CONN_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
-        {{- if .Values.libp2p.seed.enabled}}
-        - "--seed"
-        {{- end }}
-        {{- range .Values.features.seedPeers}}
-        - "-peer"
-        - {{ . | quote }}
-        {{- end }}
-        {{- if .Values.features.privateKeySecret.enabled}}
-        - "--block-producer-key"
-        - "/root/wallet-keys/key"
-        {{- end }}
-        {{-  if .Values.features.uploadBlocksToGCloud.enabled}}
-        - "-upload-blocks-to-gcloud"
-        - "true"
-        {{- end }}
         {{- range .Values.archive.args}}
         - {{ .| quote }}
         {{- end }}
@@ -102,70 +65,13 @@ spec:
           value: {{.Values.ports.metrics | quote}}
         - name: DAEMON_ARCHIVE_PG_CONN_PORT
           value: {{.Values.archive.pg_conn | quote}}
-        - name: MINA_CLIENT_TRUSTLIST
-          value: "10.0.0.0/8"
-        - name: CODA_CLIENT_TRUSTLIST
-          value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
-        - name: GCLOUD_KEYFILE
-          value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ .Values.testnetName}}
-        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
-          value: "features_network_block_data"
-        - name: DAEMON_EXTERNAL_PORT
-          value: {{.Values.ports.p2p | quote}}
-        {{- if .Values.features.privateKeySecret.enabled}}
-        - name: CODA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        - name: MINA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP
           containerPort: {{.Values.ports.archive}}
-        - name: client-port
-          protocol: TCP
-          containerPort: {{.Values.ports.client}}
-        - name: graphql-port
-          protocol: TCP
-          containerPort: {{.Values.ports.graphql}}
-        - name: postgres-port
-          protocol: TCP
-          containerPort: {{ .Values.ports.postgres }}
         - name: metrics-port
           protocol: TCP
           containerPort: {{.Values.ports.metrics}}
-        - name: external-port
-          protocol: TCP
-          containerPort: {{.Values.ports.p2p}}
-          hostPort: {{.Values.ports.external}}
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: private-keys
-        secret:
-          secretName: {{ .Values.features.privateKeySecret.secretName }}
-          defaultMode: 256
-          items:
-          - key: key
-            path: key
-          - key: pub
-            path: key.pub
-      {{- end }}
-      volumes:
-      - name: destination-libp2p
-        emptyDir: {}
-      - name: config-dir
-        emptyDir: {}
-      - name: actual-libp2p
-        emptyDir: {}
-      - name: wallet-keys
-        emptyDir: {}
 {{- end}}
