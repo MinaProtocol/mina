@@ -2130,6 +2130,7 @@ module Ledger = struct
     { body = fee_payer_body party##.body
     ; predicate =
         uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
+    ; caller = ()
     }
 
   let predicate (t : Party_predicate.t) : Party.Predicate.t =
@@ -2166,8 +2167,14 @@ module Ledger = struct
     | s ->
         failwithf "bad predicate type: %s" s ()
 
+  let token_id (str : Js.js_string Js.t) : Token_id.t =
+    Token_id.of_string (Js.to_string str)
+
   let party (party : party) : Party.Predicated.t =
-    { body = body party##.body; predicate = predicate party##.predicate }
+    { body = body party##.body
+    ; predicate = predicate party##.predicate
+    ; caller = (* TODO *) Token_id.default
+    }
 
   (* TODO: enable proper authorization *)
   (* the fact that we don't leads to mock tx with state update being rejected *)
@@ -2181,6 +2188,10 @@ module Ledger = struct
         |> Array.map ~f:(fun p : Party.t ->
                { data = party p; authorization = None_given })
         |> Array.to_list
+        |> Parties.Call_forest.of_parties_list
+             ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+        |> Parties.Call_forest.accumulate_hashes
+             ~hash_party:(fun (p : Party.t) -> Party.Predicated.digest p.data)
     ; memo = Mina_base.Signed_command_memo.empty
     }
 
@@ -2396,6 +2407,7 @@ module Ledger = struct
         *)
         body = body party##.body
       ; predicate = nonce party##.predicate
+      ; caller = Token_id.Checked.constant Token_id.default
       }
 
     let predicate_accept () : Party.Predicate.Checked.t =
@@ -2443,7 +2455,11 @@ module Ledger = struct
           failwithf "bad predicate type: %s" s ()
 
     let party (party : party) : Party.Predicated.Checked.t =
-      { body = body party##.body; predicate = predicate party##.predicate }
+      { body = body party##.body
+      ; predicate = predicate party##.predicate
+      ; caller = (* TODO *)
+                 Token_id.Checked.constant Token_id.default
+      }
   end
 
   (* TODO hash two parties together in the correct way *)
