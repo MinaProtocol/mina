@@ -89,6 +89,8 @@ module Reflection = struct
 
     let nn_int a x = id ~typ:(non_null int) a x
 
+    let nn_int_list a x = id ~typ:(non_null (list (non_null int))) a x
+
     let int a x = id ~typ:int a x
 
     let nn_bool a x = id ~typ:(non_null bool) a x
@@ -370,6 +372,16 @@ module Types = struct
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer))
 
+    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
+      obj "Metrics" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
+               ~block_production_delay:nn_int_list
+               ~transaction_pool_diff_received:nn_int
+               ~transaction_pool_diff_broadcasted:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int)
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -396,7 +408,8 @@ module Types = struct
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int
-               ~highest_unvalidated_block_length_received:nn_int)
+               ~highest_unvalidated_block_length_received:nn_int
+               ~metrics:(id ~typ:(non_null metrics)))
   end
 
   let fee_transfer =
@@ -1615,6 +1628,11 @@ module Types = struct
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
             ~resolve:(fun _ { With_hash.data; _ } -> data.transactions)
+        ; field "commandTransactionCount" ~typ:(non_null int)
+            ~doc:"Count of user command transactions in the block"
+            ~args:Arg.[]
+            ~resolve:(fun _ { With_hash.data; _ } ->
+              List.length data.transactions.commands)
         ; field "snarkJobs"
             ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
@@ -1926,6 +1944,10 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key.")
 
+    let private_key_arg =
+      scalar "PrivateKey" ~doc:"Base58Check-encoded private key"
+        ~coerce:Signature_lib.Private_key.of_yojson
+
     let token_id_arg =
       scalar "TokenId"
         ~doc:"String representation of a token's UInt64 identifier"
@@ -2124,6 +2146,8 @@ module Types = struct
 
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
+      let amount ~doc = arg "amount" ~typ:(non_null uint64_arg) ~doc
+
       let memo =
         arg "memo" ~typ:string
           ~doc:"Short arbitrary message provided by the sender"
@@ -2146,6 +2170,19 @@ module Types = struct
             "If a signature is provided, this transaction is considered signed \
              and will be broadcasted to the network without requiring a \
              private key"
+
+      let senders =
+        arg "senders"
+          ~typ:(non_null (list (non_null private_key_arg)))
+          ~doc:"The private keys from which to sign the payments"
+
+      let repeat_count =
+        arg "repeat_count" ~typ:(non_null uint32_arg)
+          ~doc:"How many times shall transaction be repeated"
+
+      let repeat_delay_ms =
+        arg "repeat_delay_ms" ~typ:(non_null uint32_arg)
+          ~doc:"Delay with which a transaction shall be repeated"
     end
 
     let send_payment =
@@ -2157,8 +2194,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
-              ~typ:(non_null uint64_arg)
+          ; amount ~doc:"Amount of mina to send to receiver"
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
           ; memo
@@ -2911,6 +2947,77 @@ module Mutations = struct
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
 
+  let send_test_payments =
+    io_field "sendTestPayments" ~doc:"Send a series of test payments"
+      ~typ:(non_null int)
+      ~args:
+        Types.Input.Fields.
+          [ senders
+          ; receiver ~doc:"The receiver of the payments"
+          ; amount ~doc:"The amount of each payment"
+          ; fee ~doc:"The fee of each payment"
+          ; repeat_count
+          ; repeat_delay_ms
+          ]
+      ~resolve:
+        (fun { ctx = coda; _ } () senders_list receiver_pk amount fee
+             repeat_count repeat_delay_ms ->
+        let dumb_password = lazy (return (Bytes.of_string "dumb")) in
+        let senders = Array.of_list senders_list in
+        let repeat_delay =
+          Time.Span.of_ms @@ float_of_int
+          @@ Unsigned.UInt32.to_int repeat_delay_ms
+        in
+        let fee_token = Token_id.default in
+        let start = Time.now () in
+        let send_tx i =
+          let source_privkey = senders.(i % Array.length senders) in
+          let source_pk_decompressed =
+            Signature_lib.Public_key.of_private_key_exn source_privkey
+          in
+          let source_pk =
+            Signature_lib.Public_key.compress source_pk_decompressed
+          in
+          let body =
+            Signed_command_payload.Body.Payment
+              { source_pk
+              ; receiver_pk
+              ; token_id = Token_id.default
+              ; amount = Amount.of_uint64 amount
+              }
+          in
+          let memo = "" in
+          let kp =
+            Keypair.
+              { private_key = source_privkey
+              ; public_key = source_pk_decompressed
+              }
+          in
+          let%bind _ =
+            Secrets.Wallets.import_keypair (Mina_lib.wallets coda) kp
+              ~password:dumb_password
+          in
+          send_unsigned_user_command ~coda ~nonce_opt:None ~signer:source_pk
+            ~memo:(Some memo) ~fee ~fee_token ~fee_payer_pk:source_pk
+            ~valid_until:None ~body
+          |> Deferred.Result.map ~f:(const 0)
+        in
+
+        let do_ i =
+          let pause =
+            Time.diff
+              (Time.add start @@ Time.Span.scale repeat_delay @@ float_of_int i)
+            @@ Time.now ()
+          in
+          (if Time.Span.(pause > zero) then after pause else Deferred.unit)
+          >>= fun () -> send_tx i >>| const ()
+        in
+        for i = 2 to Unsigned.UInt32.to_int repeat_count do
+          don't_wait_for (do_ i)
+        done ;
+        (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
+        send_tx 1)
+
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
       ~typ:(non_null Types.Payload.create_token)
@@ -3237,6 +3344,7 @@ module Mutations = struct
     ; import_account
     ; reload_wallets
     ; send_payment
+    ; send_test_payments
     ; send_delegation
     ; create_token
     ; create_token_account
@@ -3559,7 +3667,9 @@ module Queries = struct
             } =
           (Mina_lib.config coda).precomputed_values
         in
-        let { With_hash.data = genesis_state; hash } =
+        let { With_hash.data = genesis_state
+            ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+            } =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
@@ -3865,6 +3975,18 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic)
 
+  let thread_graph =
+    field "threadGraph"
+      ~doc:
+        "A graphviz dot format representation of the deamon's internal thread \
+         graph"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun _ () ->
+        Bytes.unsafe_to_string
+          ~no_mutation_while_string_reachable:
+            (O1trace.Thread.dump_thread_graph ()))
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -3952,6 +4074,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; thread_graph
     ]
 end
 

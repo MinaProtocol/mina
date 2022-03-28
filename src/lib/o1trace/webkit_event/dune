@@ -3,4 +3,4 @@
  (name o1trace_webkit_event)
  (libraries async core webkit_trace_event webkit_trace_event.binary o1trace)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (preprocess (pps ppx_version ppx_jane)))

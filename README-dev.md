@@ -2,8 +2,7 @@
 
 Mina is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
-- [Developer homepage](https://codaprotocol.com/code.html)
-- [Roadmap](https://codaprotocol.com/docs/developers)
+- [Developer homepage](https://docs.minaprotocol.com/en/developers)
 - [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
@@ -38,7 +37,7 @@ Refer to [/dev](/dev).
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
 - Invoke `rustup toolchain install 1.52.1`
 - Invoke `make build`
-- Jump to [customizing your editor for autocomplete](#dev-env)
+- Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
 
 ### Developer Setup (Linux)
 
@@ -50,9 +49,8 @@ Refer to [/dev](/dev).
 
 Mina has a variety of opam and system dependencies.
 
-You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
-install them all in the container. To get all the opam dependencies
-you need, you run `opam switch import src/opam.export`.
+To get all the opam dependencies you need, you run `opam switch import
+src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
@@ -68,6 +66,7 @@ ocaml-rocksdb.
 - [Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
 #### Customizing your dev environment for autocomplete/merlin
+[dev-env]: #dev-env
 
 - If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
@@ -113,9 +112,6 @@ It also knows how to use Docker automatically.
 These are the most important `make` targets:
 
 - `build`: build everything
-- `docker`: build the container
-- `container`: restart the development container (or start it if it's not yet)
-- `dev`: does `docker`, `container`, and `build`
 - `test`: run the tests
 - `libp2p_helper`: build the libp2p helper
 - `web`: build the website, including the state explorer
@@ -136,28 +132,12 @@ the submodule's repository, it will be automatically re-pinned in CI.
 
 If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
-1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required; there are
-   comments that distinguish the treatment of submodules from other packages
-2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
-3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
-4. Commit your changes
-5. Rebuild the container with `make docker-toolchain`.
-6. Re-render the jinja template `make update-deps`
-7. Commit your changes again
-
-Rebuilding the docker toolchain will take a long time. Running circleci for
-macos once you've busted the cache will also take a long time. However, only
-you have to do the waiting and all other developers will get the fast path.
-
-The automatic re-pinning of modified packages does take some CI time, so eventually,
-you'll want to rebuild the Docker toolchain to save that time.
+1. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
+2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
 
 ## Common dune tasks
 
 To run unit tests for a single library, do `dune runtest lib/$LIBNAME`.
-
-You can use `dune exec coda` to build and run `coda`. This is especially useful
-in the form of `dune exec coda -- integration-tests $SOME_TEST`.
 
 You might see a build error like this:
 
@@ -169,14 +149,6 @@ Error: Files src/lib/mina_base/mina_base.objs/account.cmx
 
 You can work around it with `rm -r src/_build/default/src/$OFFENDING_PATH` and a rebuild.
 Here, the offending path is `src/lib/mina_base/mina_base.objs`.
-
-## Docker Image Family Tree
-
-Container Stages:
-
-- Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
-- Stage 1: [coda toolchain](https://github.com/MinaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
-- Stage 2: [codabuilder](https://github.com/MinaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)
 
 ## Overriding Genesis Constants
 

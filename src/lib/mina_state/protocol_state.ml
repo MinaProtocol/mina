@@ -20,12 +20,15 @@ module Poly = struct
   end]
 end
 
-let hash_abstract ~hash_body
+let hashes_abstract ~hash_body
     ({ previous_state_hash; body } : (State_hash.t, _) Poly.t) =
-  let body : State_body_hash.t = hash_body body in
-  Random_oracle.hash ~init:Hash_prefix.protocol_state
-    [| (previous_state_hash :> Field.t); (body :> Field.t) |]
-  |> State_hash.of_hash
+  let state_body_hash : State_body_hash.t = hash_body body in
+  let state_hash =
+    Random_oracle.hash ~init:Hash_prefix.protocol_state
+      [| (previous_state_hash :> Field.t); (state_body_hash :> Field.t) |]
+    |> State_hash.of_hash
+  in
+  { State_hash.State_hashes.state_hash; state_body_hash = Some state_body_hash }
 
 module Body = struct
   module Poly = struct
@@ -261,17 +264,22 @@ let genesis_state_hash_checked ~state_hash state =
 
 [%%endif]
 
-let hash = hash_abstract ~hash_body:Body.hash
+let hashes = hashes_abstract ~hash_body:Body.hash
 
-let hash_with_body t ~body_hash =
-  hash_abstract ~hash_body:Fn.id
+let hashes_with_body t ~body_hash =
+  hashes_abstract ~hash_body:Fn.id
     { Poly.previous_state_hash = t.Poly.previous_state_hash; body = body_hash }
 
 let genesis_state_hash ?(state_hash = None) state =
   (*If this is the genesis state then simply return its hash
     otherwise return its the genesis_state_hash*)
   if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
-  then match state_hash with None -> hash state | Some hash -> hash
+  then
+    match state_hash with
+    | None ->
+        (hashes state).state_hash
+    | Some hash ->
+        hash
   else state.body.genesis_state_hash
 
 [%%if call_logger]

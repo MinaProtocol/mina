@@ -1153,7 +1153,9 @@ struct
                               in
                               Mina_metrics.(
                                 Gauge.set Transaction_pool.pool_size
-                                  (Float.of_int (Indexed_pool.size pool''))) ;
+                                  (Float.of_int (Indexed_pool.size pool'')) ;
+                                Counter.inc_one
+                                  Transaction_pool.transactions_added_to_pool) ;
                               t.pool <- pool'' ;
                               let%bind _ =
                                 trust_record
@@ -1342,6 +1344,23 @@ struct
             Ok e
         | Error e ->
             Error (`Other e)
+
+      type Structured_log_events.t +=
+        | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+        [@@deriving
+          register_event
+            { msg = "Received transaction-pool diff $txns from $sender" }]
+
+      let update_metrics envelope valid_cb gossip_heard_logger_option =
+        Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+        Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
+        let diff = Envelope.Incoming.data envelope in
+        Option.iter gossip_heard_logger_option ~f:(fun logger ->
+            [%str_log debug]
+              (Transactions_received
+                 { txns = diff; sender = Envelope.Incoming.sender envelope })) ;
+        Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
+        Mina_metrics.(Counter.inc_one Network.Transaction.received)
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1545,22 +1564,16 @@ let%test_module _ =
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
-      let incoming_diff_r, _incoming_diff_w =
-        Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
-      in
-      let local_diff_r, _local_diff_w =
-        Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
-      in
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
-      let pool =
+      let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~incoming_diffs:incoming_diff_r
-          ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
-        |> Test.resource_pool
+          ~time_controller ~frontier_broadcast_pipe:tf_pipe_r
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
+      let pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
           Indexed_pool.For_tests.assert_invariants pool.pool ;
@@ -2004,24 +2017,18 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
-          let incoming_diff_r, _incoming_diff_w =
-            Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
-          in
-          let local_diff_r, _local_diff_w =
-            Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
-          in
           let trust_system = Trust_system.null () in
           let config =
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
               ~verifier
           in
-          let pool =
+          let pool_, _, _ =
             Test.create ~config ~logger ~constraint_constants
               ~consensus_constants ~time_controller
-              ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
-              ~frontier_broadcast_pipe:frontier_pipe_r
-            |> Test.resource_pool
+              ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
+              ~on_remote_push:(Fn.const Deferred.unit)
           in
+          let pool = Test.resource_pool pool_ in
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]
               ( Test.Resource_pool.transactions ~logger pool

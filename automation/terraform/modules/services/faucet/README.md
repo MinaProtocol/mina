@@ -58,8 +58,6 @@ This is a Terraform module that will deploy a service containing two tasks, a Mi
 
 In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Mina Daemon image and *(optionally)* the Faucet image if it has changed.
 
-The Mina Daemon image build is a two-step process, with the base Mina dockerfile being [here](https://github.com/MinaProtocol/mina/blob/develop/dockerfiles/Dockerfile-mina-daemon) and the more deployment-specific Dockerfile [here](https://github.com/MinaProtocol/mina/automation/blob/master/services/daemon/Dockerfile). 
-
 The manual commands to release each container are the following: 
 
 ### Mina-Daemon Container

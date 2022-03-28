@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
         ]
     ; num_snark_workers = 0
     }
@@ -31,14 +31,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
-    in
-    (* TODO: let%bind () = wait_for t (Wait_condition.nodes_to_initialize [node_a; node_b; node_c]) in *)
-    let%bind () =
-      Malleable_error.List.iter all_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let%bind _ =
       section "blocks are produced"
@@ -73,7 +68,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map all_nodes ~f:(fun node ->
              let%map chain = Network.Node.must_get_best_chain ~logger node in
-             (Node.id node, chain))
+             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain))
        in
        let (chains : string list list) =
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
