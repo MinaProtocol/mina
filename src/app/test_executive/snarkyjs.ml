@@ -54,8 +54,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in
     (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
-    let%bind.Deferred ( (parties_deploy_contract_str, parties_deploy_contract)
-                      , unit_with_error ) =
+    [%log info] "Running JS while waiting for node to initialize" ;
+    let%bind.Deferred parties_deploy_contract_str, unit_with_error =
       Deferred.both
         (let%bind.Deferred process =
            Async_unix.Process.create_exn
@@ -75,11 +75,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~metadata:[ ("stdout", `String output.stdout) ] ;
          [%log warn] "Stderr: $stderr"
            ~metadata:[ ("stdout", `String output.stderr) ] ;
-         let json = output.stdout in
-         (json, Mina_base.Parties.of_json (Yojson.Safe.from_string json)))
+         output.stdout)
         (wait_for t (Wait_condition.node_to_initialize node))
     in
-
+    let parties_deploy_contract =
+      Mina_base.Parties.of_json
+        (Yojson.Safe.from_string parties_deploy_contract_str)
+    in
     let%bind () = Deferred.return unit_with_error in
     (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
     let uri = Network.Node.graphql_uri node in
