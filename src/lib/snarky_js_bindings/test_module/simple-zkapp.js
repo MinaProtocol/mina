@@ -17,7 +17,6 @@ import {
 import cached from "./cached.js";
 
 await isReady;
-// TODO check if floats are converted to Field correctly
 const initialBalance = 10_000_000_000;
 const transactionFee = 10_000_000;
 const initialState = Field(1);
@@ -30,7 +29,7 @@ class SimpleZkapp extends SmartContract {
 
   deploy() {
     super.deploy();
-    let amount = UInt64.fromNumber(initialBalance);
+    let amount = new UInt64(Field(`${initialBalance}`));
     this.balance.addInPlace(amount);
     this.x.set(initialState);
   }
@@ -65,7 +64,7 @@ if (command === "deploy") {
   let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
     feePayer: feePayerAddress,
-    fee: transactionFee + initialBalance,
+    fee: `${transactionFee + initialBalance}`,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
