@@ -41,16 +41,15 @@ let _ =
            parties_js |> Js.to_string |> Yojson.Safe.from_string
          in
          let other_parties = Parties.other_parties_of_json other_parties_json in
-         let other_parties_data =
-           List.map (fun (party : Party.t) -> party.data) other_parties
-         in
-         let ps =
+         let other_parties =
            Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-             other_parties_data
-           |> Parties.Call_forest.accumulate_hashes_predicated
+             ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+             other_parties
+           |> Parties.Call_forest.accumulate_hashes
+                ~hash_party:(fun (p : Party.t) ->
+                  Party.Predicated.digest p.data)
          in
-         let other_parties_hash = Parties.Call_forest.hash ps in
+         let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =
            Snapp_predicate.Protocol_state.digest
              Snapp_predicate.Protocol_state.accept

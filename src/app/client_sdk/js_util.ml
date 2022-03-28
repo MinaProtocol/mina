@@ -31,7 +31,7 @@ type payload_fee_payer_party_js =
   Js.t
 
 let payload_of_fee_payer_party_js
-    (fee_payer_party_js : payload_fee_payer_party_js) =
+    (fee_payer_party_js : payload_fee_payer_party_js) : Party.Fee_payer.t =
   let fee_payer_pk =
     fee_payer_party_js##.feePayer
     |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
@@ -43,7 +43,7 @@ let payload_of_fee_payer_party_js
     fee_payer_party_js##.nonce |> Js.to_string
     |> Mina_numbers.Account_nonce.of_string
   in
-  { Party.Fee_payer.data =
+  { data =
       { body =
           { public_key = fee_payer_pk
           ; update = Party.Update.noop
@@ -58,6 +58,7 @@ let payload_of_fee_payer_party_js
           ; use_full_commitment = ()
           }
       ; predicate = nonce
+      ; caller = ()
       }
   ; authorization = Signature.dummy
   }
