@@ -53,8 +53,8 @@ FROM (
    * These are separate subqueries because there is a quirk where a transaction
    * can be received and sent in the same block and the latest nonce is not
    * quite stored properly. To work around that, we are going to query _almost_
-   * the same thing but take the MAX nonce among the most recent 255 entries
-   * (should cover the full block space).
+   * the same thing but take the MAX nonce among the most recent entries for a
+   * block.
    *
    * TODO: Properly fix this by adjusting the archive writing process to always pull the latest nonce _inclusive_ of the current block when writing the data into the tables. */
 (
@@ -379,7 +379,7 @@ AS combo GROUP BY combo.pk_id
         | None ->
           let%map result = Conn.find_opt query_canonical_fallback (address, requested_block_height) in
           (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
-          Option.map result ~f:(fun (slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
+          Option.map result ~f:(fun (slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.(succ nonce)))
       else (
         match%bind Conn.find_opt query_pending (address, requested_block_height) with
         | Some ((_pk,slot,balance,Some nonce)) ->
@@ -388,7 +388,7 @@ AS combo GROUP BY combo.pk_id
         | None ->
           let%map result = Conn.find_opt query_pending_fallback (address, requested_block_height) in
           (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
-          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
+          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.(succ nonce)))
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
