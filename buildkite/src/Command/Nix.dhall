@@ -24,11 +24,18 @@ let runWithNix
               ''
           ]
 
-let nixBuild
-    : Text -> List Cmd.Type
-    = \(attr : Text) ->
+let nixBuildAndThen
+    : Text -> Text -> List Cmd.Type
+    = \(attr: Text) -> \(andThen : Text) ->
         runWithNix
           ([] : List Text)
-          ("nix shell nixpkgs#cachix -c cachix watch-exec mina-demo -- nix build --accept-flake-config -L \"git+file://\$(pwd)?submodules=1#${attr}\"")
+          (''
+           nix shell nixpkgs#cachix -c cachix watch-exec mina-demo -- nix build -o $PWD/result --accept-flake-config -L "git+file://\$(pwd)?submodules=1#\${attr}"
+           ${andThen}
+           '')
 
-in  { runWithNix = runWithNix, nixBuild = nixBuild }
+let nixBuild
+    : Text -> List Cmd.Type
+    = \(attr : Text) -> nixBuildAndThen attr ""
+
+in  { runWithNix = runWithNix, nixBuildAndThen = nixBuildAndThen, nixBuild = nixBuild }
