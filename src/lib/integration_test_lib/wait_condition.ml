@@ -238,13 +238,21 @@ struct
           Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
+    let is_first = ref true in
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
           (Public_key.Compressed.to_base58_check
              parties.fee_payer.data.body.public_key)
-          ( List.map parties.other_parties ~f:(fun party ->
-                Public_key.Compressed.to_base58_check party.data.body.public_key)
-          |> String.concat ~sep:", " )
+          (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
+             ~f:(fun acc party ->
+               let str =
+                 Public_key.Compressed.to_base58_check
+                   party.data.body.public_key
+               in
+               if !is_first then (
+                 is_first := false ;
+                 str )
+               else acc ^ ", " ^ str))
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
