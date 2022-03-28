@@ -1,5 +1,5 @@
 module Setup_test (Backend : Snarky_backendless.Backend_intf.S) = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Backend) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Backend)
   open Impl
 
   let main x () =
@@ -50,7 +50,7 @@ let%test_module "pallas" =
       Kimchi_pasta.Pallas_based_plonk.Keypair.set_urs_info [] ;
       let _cs = Impl.constraint_system ~exposing:[ Field.typ ] main in
       let _witness =
-        Impl.generate_witness [ Field.typ ] main () (Field.Constant.of_int 4)
+        Impl.generate_witness [ Field.typ ] main (Field.Constant.of_int 4)
       in
       ()
   end )
@@ -64,7 +64,7 @@ let%test_module "vesta" =
       Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] ;
       let _cs = Impl.constraint_system ~exposing:[ Field.typ ] main in
       let _witness =
-        Impl.generate_witness [ Field.typ ] main () (Field.Constant.of_int 4)
+        Impl.generate_witness [ Field.typ ] main (Field.Constant.of_int 4)
       in
       ()
   end )
