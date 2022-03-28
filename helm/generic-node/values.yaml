@@ -1,7 +1,7 @@
 ---
 name: "generic-node"
 
-testnetName: "testnet"
+testnetName: "mainnet"
 
 image:
   repository: minaprotocol/mina-daemon
@@ -23,8 +23,6 @@ features:
   # requires a secret but not pulicly available - it is available in the test namespace
   uploadBlocksToGCloud:
     enabled: false
-  seedPeers:
-    enabled: true
   customEntrypoint:
     enabled: false
     command: ""

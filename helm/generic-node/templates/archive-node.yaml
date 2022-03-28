@@ -48,7 +48,7 @@ spec:
         args:
         - "mina-archive"
         - "run"
-        - "--archive-uri"
+        - "--postgres-uri"
         - "$(DAEMON_ARCHIVE_PG_CONN_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
