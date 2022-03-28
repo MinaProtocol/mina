@@ -11,7 +11,6 @@ spec:
   selector:
     matchLabels:
       app: {{.Values.name}}-archive
-  serviceName: "nginx"
   template:
     metadata:
       labels:
@@ -36,14 +35,10 @@ spec:
                   values: ["true"]
       containers:
       - name: mina-archive
-        image:  "{{.Values.archive.image.repository }}:{{.Values.archive.image.tag}}"
+        image: "{{.Values.archive.image.repository }}:{{.Values.archive.image.tag}}"
         imagePullPolicy: {{.Values.archive.image.pullPolicy}}
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
-        {{- end }}
-        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
-        - name: gcloud-keyfile
-          mountPath: "/gcloud/"
         {{- end }}
         resources:
           limits:

@@ -112,6 +112,14 @@ spec:
           value: {{.Values.ports.archive | quote}}
         - name: DAEMON_PG_CONN_PORT
           value: {{.Values.archive.pg_conn | quote}}
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ .Values.testnetName}}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
@@ -129,4 +137,24 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
+      {{- if .Values.features.privateKeySecret.enabled}}
+      - name: private-keys
+        secret:
+          secretName: {{ .Values.features.privateKeySecret.secretName }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
+      volumes:
+      - name: destination-libp2p
+        emptyDir: {}
+      - name: config-dir
+        emptyDir: {}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: wallet-keys
+        emptyDir: {}
 {{- end }}

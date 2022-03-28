@@ -23,8 +23,6 @@ features:
   # requires a secret but not pulicly available - it is available in the test namespace
   uploadBlocksToGCloud:
     enabled: false
-  seedPeersLists:
-    enabled: true
   seedPeers:
     enabled: true
   customEntrypoint:
@@ -32,6 +30,8 @@ features:
     command: ""
   prometheus:
     enabled: true
+  snarkcoordinator:
+    enables: false
   persistence:
     # for every deploy the name must be unique
     enabled: true
@@ -49,6 +49,9 @@ daemon:
     - "--libp2p-metrics-port"
     - "9000"
   seedPeers: []
+
+persistence:
+  enabled: false
 
 coordinator:
   enabled: false
