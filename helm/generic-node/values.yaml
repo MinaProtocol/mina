@@ -22,7 +22,7 @@ features:
     enabled: false
   # requires a secret but not pulicly available - it is available in the test namespace
   uploadBlocksToGCloud:
-    enabled: true
+    enabled: false
   seedPeersLists:
     enabled: true
   seedPeers:
@@ -36,7 +36,7 @@ features:
     # for every deploy the name must be unique
     enabled: true
     name: "generic-node-volume"
-    storageClass: standard-delete
+    storageClass: standard
     mountPath: /data/
     size: 100Gi
   privateKeySecret:
@@ -87,7 +87,7 @@ ports:
   graphql: "3085"
   metrics: "10001"
   p2p: "10909"
-  nodePort: "30009"
+  nodePort: "30011"
   postgres: "5432"
   archive: "3086"
   rosetta: "3087"
@@ -96,7 +96,7 @@ resources:
   limits:
   requests:
     memory: "16Gi"
-    cpu: "8"
+    cpu: "12"
     rayonThreads: "6"
 
 healthcheck:

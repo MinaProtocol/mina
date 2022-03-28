@@ -71,13 +71,32 @@ spec:
         - name: destination-libp2p
           mountPath: /root/libp2p-keys
           readOnly: true
+        - name: config-dir
+          mountPath: "/root/.mina-config"
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if .Values.features.runtimeConfig.enabled}}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+        {{- if .Values.libp2p.staticKeypair.enabled}}
+        - name: destination-libp2p
+          mountPath: "/root/libp2p-keys"
+        {{- end }}
+        {{-  if .Values.features.persistence.enabled}}
+        - name: {{.Values.features.persistence.name}}
+          mountPath: "{{.Values.features.persistence.mountPath}}"
+        {{- end }}
         resources:
           limits:
           requests:
             memory: {{.Values.resources.requests.memory}}
             cpu: {{.Values.resources.requests.cpu}}
-            rayonThreads: {{.Values.resources.requests.rayonThreads}}
         args:
+        - "mina-daemon"
+        - "run"
         - "daemon"
         - "--log-level"
         - "Debug"
@@ -90,6 +109,7 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
+        - "-run-snark-coordinator"
         - "$(CODA_SNARK_KEY)"
         - "-snark-worker-fee"
         - "$(CODA_SNARK_FEE)"
@@ -212,26 +232,15 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-        volumeMounts:
-        - name: config-dir
-          mountPath: "/root/.mina-config"
-        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
-        - name: gcloud-keyfile
-          mountPath: "/gcloud/"
-        {{- end }}
-        {{- if .Values.features.runtimeConfig.enabled}}
-        - name: daemon-config
-          mountPath: "/config/"
-        {{- end }}
-        {{- if .Values.libp2p.staticKeypair.enabled}}
-        - name: destination-libp2p
-          mountPath: "/root/libp2p-keys"
-        {{- end }}
-        {{-  if .Values.features.persistence.enabled}}
-        - name: {{.Values.features.persistence.name}}
-          mountPath: "{{.Values.features.persistence.mountPath}}"
-        {{- end }}
       volumes:
+      - name: destination-libp2p
+        emptyDir: {}
+      - name: config-dir
+        emptyDir: {}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: wallet-keys
+        emptyDir: {}
       {{- if .Values.features.runtimeConfig.enabled}}
       - name: daemon-config
         configMap:
@@ -268,14 +277,6 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
-      - name: destination-libp2p
-        emptyDir: {}
-      - name: config-dir
-        emptyDir: {}
-      - name: actual-libp2p
-        emptyDir: {}
-      - name: wallet-keys
-        emptyDir: {}
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim

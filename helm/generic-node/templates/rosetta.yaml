@@ -7,19 +7,19 @@ kind: StatefulSet
 kind: Deployment
 {{- end}}
 metadata:
-  name: {{.Values.name}}
+  name: {{.Values.name}}-rosetta
   labels:
-    app: {{.Values.name}}
+    app: {{.Values.name}}-rosetta
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{.Values.name}}
+      app: {{.Values.name}}-rosetta
   serviceName: "nginx"
   template:
     metadata:
       labels:
-        app: {{.Values.name}}
+        app: {{.Values.name}}-rosetta
         testnet: {{.Values.testnetName}}
         role: rosetta-node
         class: "rosetta-node"
@@ -54,7 +54,6 @@ spec:
       - name: mina-rosetta
         image:  "{{.Values.rosetta.image.repository }}:{{.Values.rosetta.image.tag}}"
         imagePullPolicy: {{.Values.rosetta.image.pullPolicy}}
-        entrypoint: "mina-rosetta"
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
@@ -62,12 +61,17 @@ spec:
         - name: destination-libp2p
           mountPath: /root/libp2p-keys
           readOnly: true
+        - name: config-dir
+          mountPath: "/root/.mina-config"
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
         resources:
           limits:
           requests:
             memory: {{.Values.resources.requests.memory}}
             cpu: {{.Values.resources.requests.cpu}}
-            rayonThreads: {{.Values.resources.requests.rayonThreads}}
         args:
         - "mina-rosetta"
         - "run"
@@ -172,13 +176,6 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-        volumeMounts:
-        - name: config-dir
-          mountPath: "/root/.mina-config"
-        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
-        - name: gcloud-keyfile
-          mountPath: "/gcloud/"
-        {{- end }}
       {{- if .Values.features.privateKeySecret.enabled}}
       - name: private-keys
         secret:
@@ -190,6 +187,7 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
+      volumes:
       - name: destination-libp2p
         emptyDir: {}
       - name: config-dir
