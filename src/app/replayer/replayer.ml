@@ -38,6 +38,16 @@ type output =
   }
 [@@deriving yojson]
 
+type command_type = [ `Internal_command | `User_command | `Snapp_command ]
+
+module type Get_command_ids = sig
+  val run :
+       Caqti_async.connection
+    -> state_hash:string
+    -> start_slot:int64
+    -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+end
+
 type balance_block_data =
   { block_id : int
   ; block_height : int64
@@ -1074,37 +1084,28 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
           "Block chain leading to target state hash does not include genesis \
            block" ;
         Core_kernel.exit 1 ) ;
-      [%log info] "Loading user command ids" ;
-      let%bind user_cmd_ids =
+      let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
           Caqti_async.Pool.use
             (fun db ->
-              Sql.User_command_ids.run db ~state_hash:target_state_hash
+              Command_ids.run db ~state_hash:target_state_hash
                 ~start_slot:input.start_slot_since_genesis)
             pool
         with
         | Ok ids ->
             return ids
         | Error msg ->
-            [%log error] "Error getting user command ids"
+            [%log error] "Error getting %s command ids" name
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
+      [%log info] "Loading user command ids" ;
+      let%bind user_cmd_ids =
+        get_command_ids (module Sql.User_command_ids) "user"
+      in
       [%log info] "Loading internal command ids" ;
       let%bind internal_cmd_ids =
-        match%bind
-          Caqti_async.Pool.use
-            (fun db ->
-              Sql.Internal_command_ids.run db ~state_hash:target_state_hash
-                ~start_slot:input.start_slot_since_genesis)
-            pool
-        with
-        | Ok ids ->
-            return ids
-        | Error msg ->
-            [%log error] "Error getting user command ids"
-              ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
-            exit 1
+        get_command_ids (module Sql.Internal_command_ids) "internal"
       in
       [%log info] "Obtained %d user command ids and %d internal command ids"
         (List.length user_cmd_ids)
