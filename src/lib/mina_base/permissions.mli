@@ -135,6 +135,7 @@ val deriver :
           ref
       ; to_json_accumulator :
           (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
+      ; skip : bool ref
       ; .. >
       as
       'a)

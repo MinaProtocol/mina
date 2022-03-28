@@ -12,7 +12,7 @@ module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
-module Pairing_main = Pairing_main
+module Step_verifier = Step_verifier
 module Common = Common
 
 module type Statement_intf = sig

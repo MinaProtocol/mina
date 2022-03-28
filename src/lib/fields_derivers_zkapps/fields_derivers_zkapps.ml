@@ -29,7 +29,11 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let contramap = ref (fun _ -> failwith "unimplemented") in
     let map = ref (fun _ -> failwith "unimplemented") in
 
+    let skip = ref false in
+
     object
+      method skip = skip
+
       method graphql_fields = graphql_fields
 
       method nullable_graphql_fields = nullable_graphql_fields
