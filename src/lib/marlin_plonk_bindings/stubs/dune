@@ -2,16 +2,16 @@
 (dirs :standard \ target) ;; Ignore target if it exists locally
 
 (rule
- (targets libmarlin_plonk_stubs.a target)
+ (targets libmarlin_plonk_stubs.a)
  (deps
    Cargo.toml
    rust-toolchain.toml
+   build.sh
    (source_tree src)
    (source_tree ../../marlin))
  (action
   (progn
-    (run cargo build --release)
-   (run cp target/release/libmarlin_plonk_stubs.a .))))
+    (run ./build.sh))))
 
 (library
  (public_name marlin_plonk_bindings.stubs)

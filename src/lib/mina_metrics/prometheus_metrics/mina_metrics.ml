@@ -104,6 +104,8 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime = struct
@@ -333,6 +335,12 @@ module Transaction_pool = struct
   let pool_size : Gauge.t =
     let help = "Number of transactions in the pool" in
     Gauge.v "size" ~help ~namespace ~subsystem
+
+  let transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of transactions added to the pool since the node start"
+    in
+    Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -1058,6 +1066,18 @@ module Block_producer = struct
   let blocks_produced : Counter.t =
     let help = "blocks produced and submitted by the daemon" in
     Counter.v "blocks_produced" ~help ~namespace ~subsystem
+
+  module Block_production_delay_histogram = Histogram (struct
+    (* First bucket: 60s, buckets with linear increase up to 3m30s *)
+    let spec = Histogram_spec.of_linear 60000. 30000. 6
+  end)
+
+  let block_production_delay =
+    let help =
+      "A histogram for delay between start of slot and time of block production"
+    in
+    Block_production_delay_histogram.v "block_production_delay" ~help ~namespace
+      ~subsystem
 end
 
 module Transition_frontier = struct
