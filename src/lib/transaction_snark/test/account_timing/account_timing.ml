@@ -64,8 +64,8 @@ let%test_module "account timing check" =
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked
       in
-      let (), equal_balances =
-        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation ()
+      let equal_balances =
+        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
       in
       equal_balances
 
@@ -77,7 +77,7 @@ let%test_module "account timing check" =
         in
         As_prover.read Account.Timing.typ checked_timing
       in
-      Or_error.is_error @@ Tick.run_and_check checked_timing_computation ()
+      Or_error.is_error @@ Tick.run_and_check checked_timing_computation
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
