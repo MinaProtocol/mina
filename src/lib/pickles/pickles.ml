@@ -187,7 +187,7 @@ let pad_pass_throughs
     | [], [] ->
         []
     | m :: maxes, [] ->
-        { sg = Lazy.force Dummy.Ipa.Step.sg
+        { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
         ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
         }
         :: go maxes []

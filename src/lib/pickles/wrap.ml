@@ -148,7 +148,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             (E01 (Step_acc))
             (struct
               let f : type a. a P.Base.Me_only.Wrap.Prepared.t -> Step_acc.t =
-               fun t -> t.sg
+               fun t -> t.challenge_polynomial_commitment
             end)
         in
         let module V = H1.To_vector (Step_acc) in
@@ -191,7 +191,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
           (E01 (Tick.Curve.Affine))
           (struct
             let f : type n. n P.Base.Me_only.Wrap.Prepared.t -> _ =
-             fun t -> t.sg
+             fun t -> t.challenge_polynomial_commitment
           end)
       in
       let module V = H1.To_vector (Tick.Curve.Affine) in
@@ -278,7 +278,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         ~plonk:tick_plonk_minimal
     in
     let me_only : _ P.Base.Me_only.Wrap.t =
-      { sg = proof.openings.proof.sg
+      { challenge_polynomial_commitment =
+          proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
               t.deferred_values.bulletproof_challenges)
@@ -349,8 +350,9 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
               ~auxiliary:auxiliary_inputs pk
               ~message:
                 ( Vector.map2
-                    (Vector.extend_exn prev_statement.proof_state.me_only.sg
-                       max_branching
+                    (Vector.extend_exn
+                       prev_statement.proof_state.me_only
+                         .challenge_polynomial_commitments max_branching
                        (Lazy.force Dummy.Ipa.Wrap.sg))
                     me_only_prepared.old_bulletproof_challenges
                     ~f:(fun sg chals ->

@@ -7,13 +7,39 @@ open Hlist
 open Import
 open Impls.Step
 open Step_main_inputs
+open Step_verifier
 module B = Inductive_rule.B
 
-let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
+(* Converts from the one hot vector representation of a number
+   0 <= i < n
+
+     0  1  ... i-1  i  i+1       n-1
+   [ 0; 0; ... 0;   1; 0;   ...; 0 ]
+
+   to the numeric representation i. *)
+
+let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
+    Field.t =
+  let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
+  Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
+
+(* Converts a one hot vector to an Index.t value *)
+let one_hot_vector_to_index v =
+  one_hot_vector_to_num v |> Types.Index.of_field (module Impl)
+
+let verify_one
+    ({ app_state
+     ; wrap_proof
+     ; proof_state
+     ; prev_proof_evals
+     ; prev_challenges
+     ; prev_challenge_polynomial_commitments
+     } :
+      _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
     (pass_through : Digest.t) (unfinalized : Unfinalized.t)
     (should_verify : B.t) : _ Vector.t * B.t =
-  let open Step_verifier in
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
+  (*
   let ( app_state
       , state
       , prev_evals
@@ -21,31 +47,29 @@ let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
       , old_bulletproof_challenges
       , (opening, messages) ) =
     p
-  in
+  in *)
   let finalized, chals =
     with_label __LOC__ (fun () ->
-        let sponge_digest = state.sponge_digest_before_evaluations in
+        let sponge_digest = proof_state.sponge_digest_before_evaluations in
         let sponge =
           let open Step_main_inputs in
           let sponge = Sponge.create sponge_params in
           Sponge.absorb sponge (`Field sponge_digest) ;
           sponge
         in
+        (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_branching ~max_width:d.max_width
           ~step_widths:d.branchings ~step_domains:d.step_domains ~sponge
-          ~old_bulletproof_challenges state.deferred_values prev_evals)
+          ~prev_challenges proof_state.deferred_values prev_proof_evals)
   in
-  let which_branch = state.deferred_values.which_branch in
-  let state =
+  let which_branch = proof_state.deferred_values.which_branch in
+  let proof_state =
     with_label __LOC__ (fun () ->
-        { state with
+        { proof_state with
           deferred_values =
-            { state.deferred_values with
+            { proof_state.deferred_values with
               which_branch =
-                Pseudo.choose
-                  ( state.deferred_values.which_branch
-                  , Vector.init d.branches ~f:Field.of_int )
-                  ~f:Fn.id
+                one_hot_vector_to_num proof_state.deferred_values.which_branch
                 |> Types.Index.of_field (module Impl)
             }
         })
@@ -63,20 +87,21 @@ let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
             ; dlog_plonk_index = d.wrap_key
-            ; sg = sg_old
-            ; old_bulletproof_challenges
+            ; challenge_polynomial_commitments =
+                prev_challenge_polynomial_commitments
+            ; old_bulletproof_challenges = prev_challenges
             })
     in
     { Types.Wrap.Statement.pass_through = prev_me_only
-    ; proof_state = { state with me_only = pass_through }
+    ; proof_state = { proof_state with me_only = pass_through }
     }
   in
   let verified =
     with_label __LOC__ (fun () ->
         verify ~branching:d.max_branching ~wrap_domain:d.wrap_domains.h
           ~is_base_case:(Boolean.not should_verify)
-          ~sg_old ~opening ~messages ~wrap_verification_key:d.wrap_key statement
-          unfinalized)
+          ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
+          ~wrap_verification_key:d.wrap_key statement unfinalized)
   in
   if debug then
     as_prover
@@ -208,12 +233,11 @@ let step_main :
             H3.Map1_to_H1 (Per_proof_witness) (Id)
               (struct
                 let f : type a b c. (a, b, c) Per_proof_witness.t -> a =
-                 fun (x, _, _, _, _, _) -> x
+                 fun acc -> acc.app_state
               end)
           in
           M.f prevs
         in
-        let open Step_verifier in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
@@ -312,7 +336,7 @@ let step_main :
               Boolean.Assert.all vs ; chalss)
         in
         let () =
-          let sgs =
+          let challenge_polynomial_commitments =
             let module M =
               H3.Map
                 (Per_proof_witness)
@@ -321,7 +345,8 @@ let step_main :
                   let f :
                       type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t
                       =
-                   fun (_, _, _, _, _, (opening, _)) -> opening.sg
+                   fun acc ->
+                    acc.wrap_proof.opening.challenge_polynomial_commitment
                 end)
             in
             let module V = H3.To_vector (Inner_curve) in
@@ -337,7 +362,7 @@ let step_main :
                 (hash_me_only
                    { app_state
                    ; dlog_plonk_index
-                   ; sg = sgs
+                   ; challenge_polynomial_commitments
                    ; old_bulletproof_challenges =
                        (* Note: the bulletproof_challenges here are unpadded! *)
                        bulletproof_challenges

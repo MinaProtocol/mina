@@ -228,17 +228,20 @@ module Wrap = struct
       module Stable = struct
         module V1 = struct
           type ('g1, 'bulletproof_challenges) t =
-            { sg : 'g1; old_bulletproof_challenges : 'bulletproof_challenges }
+            { challenge_polynomial_commitment : 'g1
+            ; old_bulletproof_challenges : 'bulletproof_challenges
+            }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
         end
       end]
 
-      let to_field_elements { sg; old_bulletproof_challenges }
+      let to_field_elements
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
           ~g1:g1_to_field_elements =
         Array.concat
           [ Vector.to_array old_bulletproof_challenges
             |> Array.concat_map ~f:Vector.to_array
-          ; Array.of_list (g1_to_field_elements sg)
+          ; Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
           ]
 
       let typ g1 chal ~length =
@@ -340,45 +343,71 @@ module Wrap = struct
   (** The component of the proof accumulation state that is only computed on by the
       "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
   module Pass_through = struct
-    type ('g, 's, 'sg, 'bulletproof_challenges) t =
+    type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
       { app_state : 's
       ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
-      ; sg : 'sg
+      ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
       ; old_bulletproof_challenges : 'bulletproof_challenges
       }
     [@@deriving sexp]
 
     let to_field_elements
-        { app_state; dlog_plonk_index; sg; old_bulletproof_challenges }
-        ~app_state:app_state_to_field_elements ~comm ~g =
+        { app_state
+        ; dlog_plonk_index
+        ; challenge_polynomial_commitments
+        ; old_bulletproof_challenges
+        } ~app_state:app_state_to_field_elements ~comm ~g =
       Array.concat
         [ index_to_field_elements ~g:comm dlog_plonk_index
         ; app_state_to_field_elements app_state
-        ; Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
+        ; Array.of_list
+            (List.concat_map ~f:g
+               (Vector.to_list challenge_polynomial_commitments))
         ; Vector.to_array old_bulletproof_challenges
           |> Array.concat_map ~f:Vector.to_array
         ]
 
     let to_field_elements_without_index
-        { app_state; dlog_plonk_index = _; sg; old_bulletproof_challenges }
-        ~app_state:app_state_to_field_elements ~g =
+        { app_state
+        ; dlog_plonk_index = _
+        ; challenge_polynomial_commitments
+        ; old_bulletproof_challenges
+        } ~app_state:app_state_to_field_elements ~g =
       Array.concat
         [ app_state_to_field_elements app_state
-        ; Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
+        ; Array.of_list
+            (List.concat_map ~f:g
+               (Vector.to_list challenge_polynomial_commitments))
         ; Vector.to_array old_bulletproof_challenges
           |> Array.concat_map ~f:Vector.to_array
         ]
 
     open Snarky_backendless.H_list
 
-    let to_hlist { app_state; dlog_plonk_index; sg; old_bulletproof_challenges }
-        =
-      [ app_state; dlog_plonk_index; sg; old_bulletproof_challenges ]
+    let to_hlist
+        { app_state
+        ; dlog_plonk_index
+        ; challenge_polynomial_commitments
+        ; old_bulletproof_challenges
+        } =
+      [ app_state
+      ; dlog_plonk_index
+      ; challenge_polynomial_commitments
+      ; old_bulletproof_challenges
+      ]
 
     let of_hlist
-        ([ app_state; dlog_plonk_index; sg; old_bulletproof_challenges ] :
+        ([ app_state
+         ; dlog_plonk_index
+         ; challenge_polynomial_commitments
+         ; old_bulletproof_challenges
+         ] :
           (unit, _) t) =
-      { app_state; dlog_plonk_index; sg; old_bulletproof_challenges }
+      { app_state
+      ; dlog_plonk_index
+      ; challenge_polynomial_commitments
+      ; old_bulletproof_challenges
+      }
 
     let typ comm g s chal branching =
       Snarky_backendless.Typ.of_hlistable

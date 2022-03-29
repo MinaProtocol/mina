@@ -349,7 +349,7 @@ struct
       (advice : _ Types.Step.Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
-        ({ lr; delta; z_1; z_2; sg } :
+        ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t) =
@@ -385,7 +385,9 @@ struct
         in
         let rhs =
           let b_u = scale_fast u advice.b in
-          let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
+          let z_1_g_plus_b_u =
+            scale_fast (challenge_polynomial_commitment + b_u) z_1
+          in
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in

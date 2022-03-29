@@ -214,8 +214,8 @@ struct
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
-      ~openings_proof:
-        ({ lr; delta; z_1; z_2; sg } :
+      ~opening:
+        ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
           , Other_field.t Shifted_value.Type2.t )
           Openings.Bulletproof.t) =
@@ -294,7 +294,9 @@ struct
         let rhs =
           with_label __LOC__ (fun () ->
               let b_u = scale_fast2 u advice.b in
-              let z_1_g_plus_b_u = scale_fast2 (sg + b_u) z_1 in
+              let z_1_g_plus_b_u =
+                scale_fast2 (challenge_polynomial_commitment + b_u) z_1
+              in
               let z2_h =
                 scale_fast2 (Inner_curve.constant (Lazy.force Generators.h)) z_2
               in
@@ -339,7 +341,7 @@ struct
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array)
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
-      ~(messages : _ Plonk_types.Messages.t) ~openings_proof
+      ~proof:({ messages; opening } : Wrap_proof.Checked.t)
       ~(plonk :
          ( _
          , _
@@ -423,7 +425,7 @@ struct
                   (Common.dlog_pcs_batch
                      (Branching.add num_commitments_without_degree_bound))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-                ~advice ~openings_proof ~polynomials:(without_degree_bound, []))
+                ~advice ~opening ~polynomials:(without_degree_bound, []))
         in
         assert_eq_deferred_values
           { alpha = plonk.alpha
@@ -768,7 +770,7 @@ struct
            Vector.t ]) ~step_widths
       ~(* TODO: Add "actual branching" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
-      sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
+      sponge ~(prev_challenges : (_, b) Vector.t)
       ({ xi
        ; combined_inner_product
        ; bulletproof_challenges
@@ -876,7 +878,7 @@ struct
       let actual_combined_inner_product =
         let sg_olds =
           with_label "sg_olds" (fun () ->
-              Vector.map old_bulletproof_challenges ~f:(fun chals ->
+              Vector.map prev_challenges ~f:(fun chals ->
                   unstage (b_poly (Vector.to_array chals))))
         in
         let combine ~ft pt x_hat e =
@@ -995,7 +997,9 @@ struct
             old_bulletproof_challenges =
               Vector.map2 mask t.old_bulletproof_challenges ~f:(fun b v ->
                   Vector.map v ~f:(fun x -> `Opt (b, x)))
-          ; sg = Vector.map2 mask t.sg ~f:(fun b g -> (b, g))
+          ; challenge_polynomial_commitments =
+              Vector.map2 mask t.challenge_polynomial_commitments ~f:(fun b g ->
+                  (b, g))
           }
         in
         let not_opt x = `Not_opt x in
@@ -1033,8 +1037,7 @@ struct
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
-  let verify ~branching ~is_base_case ~sg_old
-      ~(opening : _ Pickles_types.Plonk_types.Openings.Bulletproof.t) ~messages
+  let verify ~branching ~is_base_case ~sg_old ~(proof : Wrap_proof.Checked.t)
       ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
         ( _
@@ -1066,7 +1069,7 @@ struct
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
       incrementally_verify_proof branching ~domain:wrap_domain ~xi
         ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
-        ~combined_inner_product ~advice:{ b } ~messages ~openings_proof:opening
+        ~combined_inner_product ~advice:{ b } ~proof
         ~plonk:unfinalized.deferred_values.plonk
     in
     with_label __LOC__ (fun () ->

@@ -379,7 +379,9 @@ let wrap_main
                      will have to fix this. *)
                 let T = Nat.eq_exn max_local_max_branching Max_branching.n in
                 hash_me_only Max_branching.n
-                  { sg = sacc; old_bulletproof_challenges = chals })
+                  { challenge_polynomial_commitment = sacc
+                  ; old_bulletproof_challenges = chals
+                  })
           in
           { Types.Step.Statement.pass_through = prev_me_onlys
           ; proof_state = prev_proof_state
@@ -444,7 +446,9 @@ let wrap_main
         with_label __LOC__ (fun () ->
             Field.Assert.equal me_only_digest
               (hash_me_only Max_branching.n
-                 { Types.Wrap.Proof_state.Me_only.sg = openings_proof.sg
+                 { Types.Wrap.Proof_state.Me_only
+                   .challenge_polynomial_commitment =
+                     openings_proof.challenge_polynomial_commitment
                  ; old_bulletproof_challenges = new_bulletproof_challenges
                  })) ;
         with_label __LOC__ (fun () ->

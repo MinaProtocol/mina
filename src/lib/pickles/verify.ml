@@ -208,7 +208,7 @@ let verify_heterogenous (ts : Instance.t list) =
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
       (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
-           ( t.statement.proof_state.me_only.sg
+           ( t.statement.proof_state.me_only.challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
                t.statement.proof_state.deferred_values.bulletproof_challenges )))
   in
@@ -253,8 +253,9 @@ let verify_heterogenous (ts : Instance.t list) =
                            Vector.to_array (Ipa.Wrap.compute_challenges cs)
                        ; commitment = g
                        })
-                     (Vector.extend_exn t.statement.pass_through.sg
-                        Max_branching.n
+                     (Vector.extend_exn
+                        t.statement.pass_through
+                          .challenge_polynomial_commitments Max_branching.n
                         (Lazy.force Dummy.Ipa.Wrap.sg))
                      t.statement.proof_state.me_only.old_bulletproof_challenges))
            )))

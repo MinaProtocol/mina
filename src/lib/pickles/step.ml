@@ -103,7 +103,11 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let b_poly = Tock.Field.(Wrap_verifier.b_poly ~add ~mul ~one) in
-    let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
+    let ( challenge_polynomial_commitments
+        , unfinalized_proofs
+        , statements_with_hashes
+        , x_hats
+        , witnesses ) =
       let f :
           type var value max local_max_branching m.
              max Nat.t
@@ -216,7 +220,9 @@ struct
                         (* TODO: Get rid of this padding *)
                         Vector.extend_exn prev_challenges Max_branching.n
                           Dummy.Ipa.Wrap.challenges_computed
-                    ; sg = statement.proof_state.me_only.sg
+                    ; challenge_polynomial_commitment =
+                        statement.proof_state.me_only
+                          .challenge_polynomial_commitment
                     }
               }
           }
@@ -229,7 +235,8 @@ struct
           O.create dlog_vk
             Vector.(
               map2
-                (Vector.extend_exn statement.pass_through.sg
+                (Vector.extend_exn
+                   statement.pass_through.challenge_polynomial_commitments
                    Local_max_branching.n
                    (Lazy.force Dummy.Ipa.Wrap.sg))
                 (* This should indeed have length max_branching... No! It should have type max_branching_a. That is, the max_branching specific to a proof of this type...*)
@@ -298,22 +305,34 @@ struct
           in
           (prechals, b)
         in
-        let sg =
+        let challenge_polynomial_commitment =
           if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
-          else t.proof.openings.proof.sg
+          else t.proof.openings.proof.challenge_polynomial_commitment
         in
         let witness : _ Per_proof_witness.Constant.t =
-          ( t.P.Base.Wrap.statement.pass_through.app_state
-          , { prev_statement_with_hashes.proof_state with me_only = () }
-          , t.prev_evals
-          , Vector.extend_exn t.statement.pass_through.sg Local_max_branching.n
-              (Lazy.force Dummy.Ipa.Wrap.sg)
-            (* TODO: This computation is also redone elsewhere. *)
-          , Vector.extend_exn
-              (Vector.map t.statement.pass_through.old_bulletproof_challenges
-                 ~f:Ipa.Step.compute_challenges)
-              Local_max_branching.n Dummy.Ipa.Step.challenges_computed
-          , ({ t.proof.openings.proof with sg }, t.proof.messages) )
+          { app_state = t.P.Base.Wrap.statement.pass_through.app_state
+          ; proof_state =
+              { prev_statement_with_hashes.proof_state with me_only = () }
+          ; prev_proof_evals = t.prev_evals
+          ; prev_challenge_polynomial_commitments =
+              Vector.extend_exn
+                t.statement.pass_through.challenge_polynomial_commitments
+                Local_max_branching.n
+                (Lazy.force Dummy.Ipa.Wrap.sg)
+              (* TODO: This computation is also redone elsewhere. *)
+          ; prev_challenges =
+              Vector.extend_exn
+                (Vector.map t.statement.pass_through.old_bulletproof_challenges
+                   ~f:Ipa.Step.compute_challenges)
+                Local_max_branching.n Dummy.Ipa.Step.challenges_computed
+          ; wrap_proof =
+              { opening =
+                  { t.proof.openings.proof with
+                    challenge_polynomial_commitment
+                  }
+              ; messages = t.proof.messages
+              }
+          }
         in
         let tock_domain =
           Plonk_checks.domain
@@ -387,7 +406,7 @@ struct
         let shifted_value =
           Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
         in
-        ( `Sg sg
+        ( `Sg challenge_polynomial_commitment
         , { Types.Step.Proof_state.Per_proof.deferred_values =
               { plonk =
                   { plonk with
@@ -479,7 +498,10 @@ struct
       in
       let me_only : _ Reduced_me_only.Step.t =
         (* Have the sg be available in the opening proof and verify it. *)
-        { app_state = next_state; sg = sgs; old_bulletproof_challenges }
+        { app_state = next_state
+        ; challenge_polynomial_commitments
+        ; old_bulletproof_challenges
+        }
       in
       { proof_state =
           { unfinalized_proofs = unfinalized_proofs_extended; me_only }
@@ -523,7 +545,7 @@ struct
             x :: pad xs ms n
         | [], m :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Me_only.t =
-              { sg = Lazy.force Dummy.Ipa.Step.sg
+              { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_branching.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed)
@@ -545,14 +567,15 @@ struct
             Maxes.maxes Maxes.length
       }
     in
-    let prev_polynomials =
+    let prev_challenge_polynomial_commitments =
       let to_fold_in =
         let module M =
           H3.Map
             (P.With_data)
             (E03 (Tick.Curve.Affine))
             (struct
-              let f (T t : _ P.With_data.t) = t.statement.proof_state.me_only.sg
+              let f (T t : _ P.With_data.t) =
+                t.statement.proof_state.me_only.challenge_polynomial_commitment
             end)
         in
         let module V = H3.To_vector (Tick.Curve.Affine) in
@@ -583,7 +606,8 @@ struct
             ~f:
               (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs } ->
               Backend.Tick.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs ~message:prev_polynomials pk)
+                ~auxiliary:auxiliary_inputs
+                ~message:prev_challenge_polynomial_commitments pk)
             [ input ]
             (fun x () : unit ->
               Impls.Step.handle
