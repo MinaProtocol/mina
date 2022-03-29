@@ -180,6 +180,18 @@ module Block_produced = struct
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%bind breadcrumb = get_metadata message "breadcrumb" in
+    let%bind state_hash_str =
+      find string breadcrumb [ "validated_transition"; "hash"; "state_hash" ]
+    in
+    let%bind state_hash =
+      State_hash.of_yojson (`String state_hash_str)
+      |> fun res ->
+      match res with
+      | Ok hash ->
+          Or_error.return hash
+      | Error str ->
+          Or_error.error_string str
+    in
     let%bind snarked_ledger_generated =
       find bool breadcrumb [ "just_emitted_a_proof" ]
     in
@@ -190,7 +202,6 @@ module Block_produced = struct
         ; "protocol_state"
         ; "body"
         ; "consensus_state"
-        ; "state_hash" (* ??? *)
         ]
     in
     let%bind block_height =
@@ -198,18 +209,6 @@ module Block_produced = struct
     in
     let%bind global_slot =
       find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
-    in
-    let%bind state_hash_str =
-      find string breadcrumb_consensus_state [ "state_hash" ]
-    in
-    let%bind state_hash =
-      State_hash.of_yojson (`String state_hash_str)
-      |> fun res ->
-      match res with
-      | Ok hash ->
-          Or_error.return hash
-      | Error str ->
-          Or_error.error_string str
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
