@@ -55,7 +55,7 @@ let add_fast (type f)
       p3)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
