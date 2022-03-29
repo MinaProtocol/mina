@@ -1127,9 +1127,7 @@ As mentioned above, tiebreak logic is also needed when the candidate chains have
 
 ## 6.3 Maintaining the `k`-th predecessor epoch ledger
 
-**WIP**
-
-The staking and next epoch ledgers MUST be finalized ledgers and can only advance when there is sufficient depth to achieve finality.  Peers MUST maintain the epoch ledger of the `k`-th predecessor from the `tip`, where `k` is the [`depth of finality`](#3-constants).
+The staking and next epoch ledgers MUST be finalized ledgers and can only advance when there is sufficient depth to achieve finality.  Peers MUST maintain the epoch ledger of the `k`-th predecessor from the `tip`, where `k` is the [`depth of finality`](#3-constants).  Initially, from genesis the `k`-th predecessor does not move until the block `k + 1`.
 
 Simultaneously, due to Ouroboros security requirements, the distance in slots between the staking and next epoch ledgers may be great.  Therefore, at any point we have effectively three "pointers": staking `s`, next `n` and finality `k`.
 
@@ -1155,9 +1153,7 @@ Note that since all of these pointers are at or beyond *the point of finality* p
 
 ## 6.4 Getting the tip
 
-**WIP**
-
 For a joining peer to discover the head of the current chain it MUST not only obtain the `tip`, but also the `min(k, tip.height - 1)`-th block back from the tip.  For the latter the peer MUST check the block's *proof of finality*.
 
-Peers perform the proof of finality check by verifying a zero-knowledge proof.  Details about this are presented in the `Verification Specification`.
+Peers perform the proof of finality check by verifying two zero-knowledge proofs, one for the `tip` and one for the `root`, and a Merkle proof for the chain of protocol state hashes between them.  Details about this are presented in the `Verification Specification`.
 
