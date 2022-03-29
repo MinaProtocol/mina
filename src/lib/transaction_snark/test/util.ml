@@ -47,6 +47,8 @@ let genesis_state_body =
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
+let state_view = Mina_state.Protocol_state.Body.view genesis_state_body
+
 let init_stack = Pending_coinbase.Stack.empty
 
 let apply_parties ledger parties =
@@ -73,37 +75,6 @@ let apply_parties ledger parties =
           fun () -> ())
         ()
       |> Or_error.ok_exn)
-
-(*
-let apply_parties ledger parties =
-    let witnesses =
-    Transaction_snark.parties_witnesses_exn ~constraint_constants
-      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties
-  in
-  let open Impl in
-  let (), () =
-    List.fold ~init:((), ()) witnesses
-    ~f:(fun _ (witness, spec, statement, snapp_stmt) ->
-      run_and_check
-        (fun () ->
-          let s =
-            exists Statement.With_sok.typ ~compute:(fun () -> statement)
-          in
-          let snapp_stmt =
-            Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)) ])
-          in
-          Transaction_snark.Base.Parties_snark.main ~constraint_constants
-            (Parties_segment.Basic.to_single_list spec)
-            snapp_stmt s ~witness ;
-          fun () -> ())
-        ()
-      |> Or_error.ok_exn)
-  in
-  let failures = List.map witnesses ~f:(fun witness -> let _, _, _, statement_opt = witness in 
-  (statement_opt |> Option.value_exn |> snd).local_state.failure_tbl )
-*)
 
 let trivial_snapp =
   lazy
@@ -157,9 +128,8 @@ let apply_parties_with_merges ledger partiess =
       in
       let _p = Or_error.ok_exn p in
       let _s =
-        Ledger.apply_parties_unchecked ~constraint_constants
-          ~state_view:(Mina_state.Protocol_state.Body.view genesis_state_body)
-          ledger parties
+        Ledger.apply_parties_unchecked ~constraint_constants ~state_view ledger
+          parties
         |> Or_error.ok_exn
       in
       ())

@@ -133,7 +133,23 @@ let%test_module "Snapp payments tests" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ])
+              let (_ : unit * unit) = U.apply_parties ledger [ parties ] in
+              let _, (local_state, _) =
+                Ledger.apply_parties_unchecked ~constraint_constants
+                  ~state_view:U.state_view ledger parties
+                |> Or_error.ok_exn
+              in
+              let failure_status =
+                local_state.failure_status_tbl |> List.concat
+              in
+              let logger = Logger.create () in
+              [%log info] "failure_status"
+                ~metadata:
+                  [ ( "failure_status"
+                    , `List
+                        (List.map failure_status
+                           ~f:Transaction_status.Failure.to_yojson) )
+                  ])
           |> fun _ -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
@@ -189,68 +205,104 @@ let%test_module "Snapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
+                  let _, (local_state, _) =
+                    Ledger.apply_parties_unchecked ~constraint_constants
+                      ~state_view:U.state_view ledger parties
+                    |> Or_error.ok_exn
+                  in
+                  let failure_status =
+                    local_state.failure_status_tbl |> List.concat
+                  in
+                  let logger = Logger.create () in
+                  [%log info] "failure_status"
+                    ~metadata:
+                      [ ( "failure_status"
+                        , `List
+                            (List.map failure_status
+                               ~f:Transaction_status.Failure.to_yojson) )
+                      ] ;
                   U.apply_parties_with_merges ledger [ parties ])))
 
     let%test_unit "snapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+      Quickcheck.test U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              Async.Thread_safe.block_on_async_exn (fun () ->
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  let fee = Fee.of_int 1_000_000 in
-                  let spec = List.hd_exn specs in
-                  let sender_pk =
-                    (fst spec.sender).public_key
-                    |> Signature_lib.Public_key.compress
-                  in
-                  let sender_id : Account_id.t =
-                    Account_id.create sender_pk Token_id.default
-                  in
-                  let sender_location =
-                    Ledger.location_of_account ledger sender_id
-                    |> Option.value_exn
-                  in
-                  let sender_account =
-                    Ledger.get ledger sender_location |> Option.value_exn
-                  in
-                  let sender_balance = sender_account.balance in
-                  let amount =
-                    Amount.add
-                      Balance.(to_amount sender_balance)
-                      Amount.(of_int 1_000_000)
-                    |> Option.value_exn
-                  in
-                  let receiver_count = 3 in
-                  let new_receiver =
-                    Signature_lib.Public_key.compress new_kp.public_key
-                  in
-                  let test_spec : Spec.t =
-                    { sender = spec.sender
-                    ; fee
-                    ; receivers =
-                        (new_receiver, amount)
-                        :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
-                    ; amount
-                    ; snapp_account_keypairs = []
-                    ; memo
-                    ; new_snapp_account = false
-                    ; snapp_update = Party.Update.dummy
-                    ; current_auth = Permissions.Auth_required.Signature
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; events = []
-                    ; sequence_events = []
-                    }
-                  in
-                  let parties =
-                    Transaction_snark.For_tests.multiple_transfers test_spec
-                  in
-                  U.apply_parties_with_merges ledger [ parties ]
-                  (*
+              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+              let fee = Fee.of_int 1_000_000 in
+              let spec = List.hd_exn specs in
+              (*
+              let sender_pk =
+                (fst spec.sender).public_key
+                |> Signature_lib.Public_key.compress
+              in
+              let sender_id : Account_id.t =
+                Account_id.create sender_pk Token_id.default
+              in
+              let sender_location =
+                Ledger.location_of_account ledger sender_id |> Option.value_exn
+              in
+              let sender_account =
+                Ledger.get ledger sender_location |> Option.value_exn
+              in
+              let sender_balance = sender_account.balance in
+              let amount =
+                Amount.add
+                  Balance.(to_amount sender_balance)
+                  Amount.(of_int 1_000_000)
+                |> Option.value_exn
+              in*)
+              let amount = Amount.of_int 1_000_000 in
+              let receiver_count = 3 in
+              let new_receiver =
+                Signature_lib.Public_key.compress new_kp.public_key
+              in
+              let test_spec : Spec.t =
+                { sender = spec.sender
+                ; fee
+                ; receivers =
+                    (new_receiver, amount)
+                    :: ( List.take specs (receiver_count - 1)
+                       |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                ; amount
+                ; snapp_account_keypairs = []
+                ; memo
+                ; new_snapp_account = false
+                ; snapp_update = Party.Update.dummy
+                ; current_auth = Permissions.Auth_required.Signature
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; sequence_events = []
+                }
+              in
+              let parties =
+                Transaction_snark.For_tests.multiple_transfers test_spec
+              in
+              (U.apply_parties ledger [ parties ] : unit * unit) |> ignore ;
+              let _, (local_state, _) =
+                Ledger.apply_parties_unchecked ~constraint_constants
+                  ~state_view:U.state_view ledger parties
+                |> Or_error.ok_exn
+              in
+              let failure_status =
+                local_state.failure_status_tbl |> List.concat
+              in
+              let insufficient_funds =
+                Transaction_status.Failure.Source_insufficient_balance
+              in
+              let logger = Logger.create () in
+              [%log info] "failure_status"
+                ~metadata:
+                  [ ( "failure_status"
+                    , `List
+                        (List.map failure_status
+                           ~f:Transaction_status.Failure.to_yojson) )
+                  ] ;
+              assert (
+                List.mem failure_status insufficient_funds
+                  ~equal:Transaction_status.Failure.equal )
+              (*
                   let failures = U.apply_parties_with_failure_tbl ledger [ parties ] in 
                   assert (List.member `Insufficient_funds failures)
-                  *))))
+                  *)))
   end )
