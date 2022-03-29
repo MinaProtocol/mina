@@ -364,6 +364,7 @@ module type Transition_router_intf = sig
          * External_transition.Initial_validated.t Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
+    -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of External_transition.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ] )
        Strict_pipe.Reader.t
