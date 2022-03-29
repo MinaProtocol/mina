@@ -6,7 +6,7 @@ open Core_kernel
 open Util
 module SC = Scalar_challenge
 open Pickles_types
-open Dlog_plonk_types
+open Plonk_types
 open Tuple_lib
 open Import
 
@@ -346,7 +346,7 @@ struct
       ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Types.Pairing_based.Openings.Bulletproof.Advice.t)
+      (advice : _ Types.Step.Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
         ({ lr; delta; z_1; z_2; sg } :
@@ -425,7 +425,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 
-  module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -462,8 +462,7 @@ struct
          array) ~(sg_old : (_, Max_branching.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.Type1.t) ~advice
       ~(messages : _ Messages.t) ~which_branch ~openings_proof
-      ~(plonk :
-         _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_branching.eq in
     let public_input =
       Array.concat_map public_input ~f:(function
@@ -487,7 +486,7 @@ struct
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
-        let open Dlog_plonk_types.Messages in
+        let open Plonk_types.Messages in
         let x_hat =
           with_label __LOC__ (fun () ->
               let domain = (which_branch, step_domains) in
@@ -543,7 +542,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Dlog_plonk_types.Poly_comm.Without_degree_bound.t =
+            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
@@ -721,12 +720,10 @@ struct
     SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
 
   let map_plonk_to_field plonk =
-    Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-    .map_challenges
+    Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
       ~f:(Util.seal (module Impl))
       ~scalar:scalar_to_field plonk
-    |> Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-       .map_fields
+    |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
 
   module Plonk_checks = struct
@@ -752,8 +749,8 @@ struct
         , _
         , _ Shifted_value.Type2.t
         , _ )
-        Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
-      { Dlog_plonk_types.All_evals.ft_eval1
+        Types.Step.Proof_state.Deferred_values.In_circuit.t)
+      { Plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
@@ -793,10 +790,8 @@ struct
       (* TODO: zeta_n is recomputed in [env] below *)
       let zeta_n = pow2pow plonk.zeta n in
       let zetaw_n = pow2pow zetaw n in
-      ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Dlog_plonk_types.Evals.map
-          ~f:(actual_evaluation ~pt_to_n:zetaw_n)
-          evals2 )
+      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
+      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
     in
     let env =
       Plonk_checks.scalars_env
@@ -889,15 +884,15 @@ struct
     , bulletproof_challenges )
 
   let map_challenges
-      { Types.Pairing_based.Proof_state.Deferred_values.plonk
+      { Types.Step.Proof_state.Deferred_values.plonk
       ; combined_inner_product
       ; xi
       ; bulletproof_challenges
       ; b
       } ~f ~scalar =
-    { Types.Pairing_based.Proof_state.Deferred_values.plonk =
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-        .map_challenges plonk ~f ~scalar
+    { Types.Step.Proof_state.Deferred_values.plonk =
+        Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+          plonk ~f ~scalar
     ; combined_inner_product
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges
@@ -913,10 +908,10 @@ struct
      to them. *)
 
   let hash_me_only (type n) (_max_branching : n Nat.t)
-      (t : (_, (_, n) Vector.t) Types.Dlog_based.Proof_state.Me_only.t) =
+      (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)
-      (Types.Dlog_based.Proof_state.Me_only.to_field_elements
+      (Types.Wrap.Proof_state.Me_only.to_field_elements
          ~g1:Inner_curve.to_field_elements t) ;
     Sponge.squeeze_field sponge
 end
