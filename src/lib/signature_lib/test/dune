@@ -1,0 +1,12 @@
+(library
+ (name signature_lib_tests)
+ (libraries
+   random_oracle_input
+   signature_lib
+   snark_params)
+ (instrumentation (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps
+    ppx_inline_test
+    ppx_version)))
