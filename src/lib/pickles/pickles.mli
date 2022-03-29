@@ -85,8 +85,12 @@ module Proof : sig
       module V2 : sig
         type t = Make(Nat.N2)(Nat.N2).t
         [@@deriving sexp, compare, equal, yojson, hash]
+
+        val to_yojson_full : t -> Yojson.Safe.t
       end
     end]
+
+    val to_yojson_full : t -> Yojson.Safe.t
   end
 end
 

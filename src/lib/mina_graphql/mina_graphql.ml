@@ -1723,7 +1723,7 @@ module Types = struct
         ; field "json" ~typ:json ~doc:"JSON-encoded proof"
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
-              Some (Yojson.Safe.to_basic (Proof.to_yojson proof)))
+              Some (Yojson.Safe.to_basic (Proof.to_yojson_full proof)))
         ])
 
   let block :
