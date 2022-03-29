@@ -33,7 +33,7 @@ module Verification_key : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t
+      type t [@@deriving to_yojson]
     end
   end]
 
