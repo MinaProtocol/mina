@@ -829,7 +829,7 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp
+          ; zkapp
           ; zkapp_uri
           } =
         let open Option.Let_syntax in
@@ -842,7 +842,7 @@ module Types = struct
         let%bind voting_for = voting_for in
         let%bind timing = timing in
         let%bind permissions = permissions in
-        let%bind snapp = snapp in
+        let%bind zkapp = zkapp in
         let%map zkapp_uri = zkapp_uri in
         { Account.Poly.public_key
         ; token_id
@@ -855,7 +855,7 @@ module Types = struct
         ; voting_for
         ; timing
         ; permissions
-        ; snapp
+        ; zkapp
         ; zkapp_uri
         }
 
@@ -871,7 +871,7 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp
+          ; zkapp
           ; zkapp_uri
           } =
         { Account.Poly.public_key
@@ -890,7 +890,7 @@ module Types = struct
         ; voting_for = Some voting_for
         ; timing
         ; permissions = Some permissions
-        ; snapp
+        ; zkapp
         ; zkapp_uri = Some zkapp_uri
         }
 
@@ -927,7 +927,7 @@ module Types = struct
               ; voting_for = None
               ; timing = Timing.Untimed
               ; permissions = None
-              ; snapp = None
+              ; zkapp = None
               ; zkapp_uri = None
               }
 
@@ -1322,7 +1322,7 @@ module Types = struct
                     with this account encoded as bignum strings"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp
+                   account.Account.Poly.zkapp
                    |> Option.map ~f:(fun zkapp_account ->
                           zkapp_account.app_state |> Zkapp_state.V.to_list
                           |> List.map ~f:Zkapp_basic.F.to_string))
@@ -1340,14 +1340,14 @@ module Types = struct
                  ~doc:"Verification key associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.value_map account.Account.Poly.snapp ~default:None
+                   Option.value_map account.Account.Poly.zkapp ~default:None
                      ~f:(fun zkapp_account -> zkapp_account.verification_key))
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
                  ~typ:(list (non_null string))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map account.Account.Poly.snapp
+                   Option.map account.Account.Poly.zkapp
                      ~f:(fun zkapp_account ->
                        List.map ~f:Snark_params.Tick.Field.to_string
                          (Pickles_types.Vector.to_list

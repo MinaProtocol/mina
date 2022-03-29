@@ -232,7 +232,7 @@ module Poly = struct
            , 'state_hash
            , 'timing
            , 'permissions
-           , 'snapp_opt
+           , 'zkapp_opt
            , 'zkapp_uri )
            t =
         { public_key : 'pk
@@ -246,7 +246,7 @@ module Poly = struct
         ; voting_for : 'state_hash
         ; timing : 'timing
         ; permissions : 'permissions
-        ; snapp : 'snapp_opt
+        ; zkapp : 'zkapp_opt
         ; zkapp_uri : 'zkapp_uri
         }
       [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
@@ -335,11 +335,11 @@ end
 
 let check = Fn.id
 
-[%%if not feature_snapps]
+[%%if not feature_zkapps]
 
 let check (t : Binable_arg.t) =
   let t = check t in
-  match t.snapp with
+  match t.zkapp with
   | None ->
       t
   | Some _ ->
@@ -420,7 +420,7 @@ let initialize account_id : t =
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
-  ; snapp = None
+  ; zkapp = None
   ; zkapp_uri = ""
   }
 
@@ -475,7 +475,7 @@ let to_input (t : t) =
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
-    ~snapp:(f (Fn.compose field hash_zkapp_account_opt))
+    ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
     ~zkapp_uri:(f (Fn.compose field hash_zkapp_uri))
   |> List.reduce_exn ~f:append
@@ -508,7 +508,7 @@ type var =
 let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
-let typ' snapp =
+let typ' zkapp =
   let spec =
     Data_spec.
       [ Public_key.Compressed.typ
@@ -525,7 +525,7 @@ let typ' snapp =
       ; State_hash.typ
       ; Timing.typ
       ; Permissions.typ
-      ; snapp
+      ; zkapp
       ; Data_as_hash.typ ~hash:hash_zkapp_uri
       ]
   in
@@ -533,7 +533,7 @@ let typ' snapp =
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let typ : (var, value) Typ.t =
-  let snapp :
+  let zkapp :
       ( Field.Var.t * Zkapp_account.t option As_prover.Ref.t
       , Zkapp_account.t option )
       Typ.t =
@@ -556,7 +556,7 @@ let typ : (var, value) Typ.t =
     let check (x, _) = Typ.field.check x in
     { alloc; read; store; check }
   in
-  typ' snapp
+  typ' zkapp
 
 let var_of_t
     ({ public_key
@@ -570,7 +570,7 @@ let var_of_t
      ; voting_for
      ; timing
      ; permissions
-     ; snapp
+     ; zkapp
      ; zkapp_uri
      } :
       value) =
@@ -585,7 +585,7 @@ let var_of_t
   ; voting_for = State_hash.var_of_t voting_for
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
-  ; snapp = Field.Var.constant (hash_zkapp_account_opt snapp)
+  ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
   ; zkapp_uri = Field.Var.constant (hash_zkapp_uri zkapp_uri)
   }
 
@@ -619,7 +619,7 @@ module Checked = struct
     let open Random_oracle.Input.Chunked in
     List.reduce_exn ~f:append
       (Poly.Fields.fold ~init:[]
-         ~snapp:(f (fun (x, _) -> field x))
+         ~zkapp:(f (fun (x, _) -> field x))
          ~permissions:(f Permissions.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
          ~token_id:(f Token_id.Checked.to_input)
@@ -714,7 +714,7 @@ let empty =
   ; permissions =
       Permissions.user_default
       (* TODO: This should maybe be Permissions.empty *)
-  ; snapp = None
+  ; zkapp = None
   ; zkapp_uri = ""
   }
 
@@ -738,7 +738,7 @@ let create account_id balance =
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
-  ; snapp = None
+  ; zkapp = None
   ; zkapp_uri = ""
   }
 
@@ -766,7 +766,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       ; receipt_chain_hash = Receipt.Chain_hash.empty
       ; delegate
       ; voting_for = State_hash.dummy
-      ; snapp = None
+      ; zkapp = None
       ; permissions = Permissions.user_default
       ; timing =
           Timing.Timed

@@ -173,7 +173,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
              { a with
                snapp =
                  Some
-                   { (Option.value ~default:Zkapp_account.default a.snapp) with
+                   { (Option.value ~default:Zkapp_account.default a.zkapp) with
                      verification_key = Some vk
                    }
              }) ;

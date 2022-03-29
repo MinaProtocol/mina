@@ -1001,7 +1001,7 @@ module T = struct
       =
     ((a :> Transaction.t With_status.t list), b, c, d)
 
-  [%%if feature_snapps]
+  [%%if feature_zkapps]
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let cs =
