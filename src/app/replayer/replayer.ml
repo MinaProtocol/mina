@@ -1099,13 +1099,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
-      [%log info] "Loading user command ids" ;
-      let%bind user_cmd_ids =
-        get_command_ids (module Sql.User_command_ids) "user"
-      in
       [%log info] "Loading internal command ids" ;
       let%bind internal_cmd_ids =
         get_command_ids (module Sql.Internal_command_ids) "internal"
+      in
+      [%log info] "Loading user command ids" ;
+      let%bind user_cmd_ids =
+        get_command_ids (module Sql.User_command_ids) "user"
       in
       [%log info] "Obtained %d user command ids and %d internal command ids"
         (List.length user_cmd_ids)
