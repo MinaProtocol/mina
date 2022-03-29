@@ -203,8 +203,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      (node_b_num_produced_blocks * 2)
                    |> Option.value_exn )
              |> Option.value_exn )
-             ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
-             |> Option.value_exn )
+             amount
+           (* ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
+              |> Option.value_exn ) *)
+           (* TODO: put the fee back in *)
            |> Option.value_exn
          in
          [%log info] "coinbase_amount: %s"
@@ -231,6 +233,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (* node_b is the sender *)
            (* node_b_balance <= (300_000_000_000_000 + node_b_num_produced_blocks*possible_coinbase_reward*2) - (txn_amount + txn_fee) *)
            (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `node_b_num_produced_blocks*possible_coinbase_reward*2` bit.  the *2 is because untimed accounts get supercharged rewards *)
+           (* TODO, the fee is not calculated in at the moment *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount node_b_balance)
                 node_b_expected
