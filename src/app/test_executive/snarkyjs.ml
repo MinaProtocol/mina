@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_balance = Currency.Balance.of_string "80000000000"
+  let initial_balance = Currency.Balance.of_formatted_string "8000000"
 
   let config =
     let open Test_config in
@@ -30,11 +30,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = Currency.Balance.to_string initial_balance
+        [ { balance = Currency.Balance.to_formatted_string initial_balance
           ; timing = Untimed
           }
         ]
-    ; extra_genesis_accounts = [ { keypair; balance = "1000" } ]
+    ; extra_genesis_accounts = [ { keypair; balance = "10" } ]
     ; num_snark_workers = 0
     }
 
@@ -138,15 +138,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Currency.Balance.(
               equal balance
                 ( match
-                    initial_balance - Currency.Amount.of_string "10000000000"
+                    initial_balance - Currency.Amount.of_formatted_string "10"
                   with
                 | Some x ->
                     x
                 | None ->
                     failwithf
-                      "Failed to subtract initial_balance %s with amount \
-                       10000000000"
-                      (Currency.Balance.to_string initial_balance)
+                      "Failed to subtract initial_balance %s with amount 10.0 \
+                       MINA"
+                      (Currency.Balance.to_formatted_string initial_balance)
                       () ))
           then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
