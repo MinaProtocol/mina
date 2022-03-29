@@ -1,6 +1,6 @@
 (library
  (name mina_net2_tests)
- (libraries mina_net2)
+ (libraries mina_net2 inline_test_quiet_logs)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version))
  (inline_tests))

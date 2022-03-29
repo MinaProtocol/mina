@@ -2,15 +2,6 @@
 
 open Core_kernel
 open Import
-
-[%%ifndef consensus_mechanism]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
-
-[%%endif]
-
 open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
@@ -138,19 +129,20 @@ let check_tokens ({ payload = { common = { fee_token; _ }; body }; _ } : t) =
       (not (Token_id.(equal invalid) token_id))
       && not (Token_id.(equal default) token_id)
 
-let sign_payload (private_key : Signature_lib.Private_key.t)
+let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
-  Signature_lib.Schnorr.sign private_key (to_input payload)
+  Signature_lib.Schnorr.sign ?signature_kind private_key (to_input payload)
 
-let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+let sign ?signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; signer = kp.public_key
-  ; signature = sign_payload kp.private_key payload
+  ; signature = sign_payload ?signature_kind kp.private_key payload
   }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
-  let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+  let fake_sign ?signature_kind:_ (kp : Signature_keypair.t)
+      (payload : Payload.t) : t =
     { payload; signer = kp.public_key; signature = Signature.dummy }
 end
 
@@ -369,23 +361,10 @@ module Base58_check = Codable.Make_base58_check (Stable.Latest)
 [%%define_locally
 Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-[%%define_locally Base58_check.String_ops.(to_string, of_string)]
-
-[%%ifdef consensus_mechanism]
-
 let check_signature ?signature_kind ({ payload; signer; signature } : t) =
   Signature_lib.Schnorr.verify ?signature_kind signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
     (to_input payload)
-
-[%%else]
-
-let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-  Signature_lib_nonconsensus.Schnorr.verify ?signature_kind signature
-    (Snark_params_nonconsensus.Inner_curve.of_affine signer)
-    (to_input payload)
-
-[%%endif]
 
 let check_valid_keys t =
   let fee_payer = fee_payer_pk t in

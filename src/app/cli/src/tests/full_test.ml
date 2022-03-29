@@ -6,7 +6,6 @@ open Mina_base
 open Mina_state
 open Signature_lib
 open Pipe_lib
-open O1trace
 open Init
 open Mina_numbers
 
@@ -114,7 +113,7 @@ let run_test () : unit Deferred.t =
              (Public_key.compress keypair.public_key))
           ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            precomputed_values.protocol_state_with_hashes.hash.state_hash
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
@@ -142,10 +141,13 @@ let run_test () : unit Deferred.t =
               ; client_port
               }
           ; trust_system
+          ; min_connections = 20
           ; max_connections = 50
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
+          ; known_private_ip_nets = []
+          ; time_controller
           }
       in
       let net_config =
@@ -154,6 +156,7 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; consensus_constants = precomputed_values.consensus_constants
           ; is_seed = true
           ; genesis_ledger_hash =
               Ledger.merkle_root (Lazy.force Genesis_ledger.t)
@@ -195,7 +198,9 @@ let run_test () : unit Deferred.t =
              ~proposed_protocol_version_opt:None ~super_catchup:true
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
-             ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
+             ~block_production_keypairs:
+               (Keypair.And_compressed_pk.Set.singleton
+                  (keypair, Public_key.compress keypair.public_key))
              ~snark_worker_config:
                Mina_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key =
@@ -211,7 +216,7 @@ let run_test () : unit Deferred.t =
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
              ~precomputed_values ~start_time ~log_precomputed_blocks:false
-             ~upload_blocks_to_gcloud:false ())
+             ~upload_blocks_to_gcloud:false ~stop_time:48 ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -269,7 +274,7 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
-        trace_recurring "build_payment" (fun () ->
+        O1trace.sync_thread "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
               Signed_command_memo.create_from_string_exn

@@ -108,6 +108,7 @@ module Keypair : sig
 end
 
 module Validation_callback = Validation_callback
+module Sink = Sink
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
@@ -157,8 +158,10 @@ val configure :
   -> mina_peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
+  -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
+  -> known_private_ip_nets:Core.Unix.Cidr.t list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
@@ -169,6 +172,11 @@ val me : t -> Keypair.t Deferred.t
 
 (** List of all peers we know about. *)
 val peers : t -> Peer.t list Deferred.t
+
+val bandwidth_info :
+     t
+  -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+     Deferred.Or_error.t
 
 (** Set node status to be served to peers requesting node status. *)
 val set_node_status : t -> string -> unit Deferred.Or_error.t

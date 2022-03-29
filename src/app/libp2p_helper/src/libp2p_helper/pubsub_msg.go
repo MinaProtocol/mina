@@ -12,17 +12,25 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
+type ValidationPushT = ipc.Libp2pHelperInterface_Validation
+type ValidationPush ValidationPushT
+
+func fromValidationPush(m ipcPushMessage) (pushMessage, error) {
+	i, err := m.Validation()
+	return ValidationPush(i), err
+}
+
 // Helper type to distinguish from integer default value `0`
 // pointing to a correct validation status. Value `-1000` is
 // used because `-1` is already reserved by the libp2p library
 const ValidationUnknown = pubsub.ValidationResult(-1000)
 
-func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
+func (m ValidationPush) handle(app *app) {
 	if app.P2p == nil {
 		app.P2p.Logger.Error("handleValidation: P2p not configured")
 		return
 	}
-	vid, err := m.ValidationId()
+	vid, err := ValidationPushT(m).ValidationId()
 	if err != nil {
 		app.P2p.Logger.Errorf("handleValidation: error %w", err)
 		return
@@ -32,7 +40,7 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 	defer app.ValidatorMutex.Unlock()
 	if st, ok := app.Validators[seqno]; ok {
 		res := ValidationUnknown
-		switch m.Result() {
+		switch ValidationPushT(m).Result() {
 		case ipc.ValidationResult_accept:
 			res = pubsub.ValidationAccept
 		case ipc.ValidationResult_reject:
@@ -40,7 +48,7 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 		case ipc.ValidationResult_ignore:
 			res = pubsub.ValidationIgnore
 		default:
-			app.P2p.Logger.Warningf("handleValidation: unknown validation result %d", m.Result())
+			app.P2p.Logger.Warnf("handleValidation: unknown validation result %d", ValidationPushT(m).Result())
 		}
 		st.Completion <- res
 		if st.TimedOutAt != nil {
@@ -48,7 +56,7 @@ func (app *app) handleValidation(m ipc.Libp2pHelperInterface_Validation) {
 		}
 		delete(app.Validators, seqno)
 	} else {
-		app.P2p.Logger.Warningf("handleValidation: validation seqno %d unknown", seqno)
+		app.P2p.Logger.Warnf("handleValidation: validation seqno %d unknown", seqno)
 	}
 }
 
@@ -175,6 +183,8 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
 
+			validationTimeoutMetric.Inc()
+
 			app.ValidatorMutex.Lock()
 
 			now := time.Now()
@@ -189,6 +199,8 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 			app.P2p.Logger.Info("unvalidated :(")
 			return pubsub.ValidationReject
 		case res := <-ch:
+			validationTime := time.Since(deadline)
+			validationTimeMetric.Set(float64(validationTime.Nanoseconds()))
 			switch res {
 			case pubsub.ValidationReject:
 				app.P2p.Logger.Info("why u fail to validate :(")

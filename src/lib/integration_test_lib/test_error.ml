@@ -114,14 +114,15 @@ module Error_accumulator = struct
   let iter_contexts { from_current_context = _; contextualized_errors } ~f =
     let contexts_by_time =
       contextualized_errors |> String.Map.to_alist
-      |> List.map ~f:(fun (ctx, errors) -> (errors.introduction_time, ctx))
-      |> Time.Map.of_alist_exn
+      |> List.map ~f:(fun (ctx, errors) ->
+             (errors.introduction_time, (ctx, errors)))
+      |> Time.Map.of_alist_multi
     in
-    Time.Map.iter contexts_by_time ~f:(fun context ->
-        let { errors_by_time; _ } =
-          String.Map.find_exn contextualized_errors context
-        in
-        errors_by_time |> Time.Map.data |> List.concat |> f context)
+    let f =
+      List.iter ~f:(fun (context, { errors_by_time; _ }) ->
+          errors_by_time |> Time.Map.data |> List.concat |> f context)
+    in
+    Time.Map.iter contexts_by_time ~f
 
   let merge a b =
     let from_current_context =

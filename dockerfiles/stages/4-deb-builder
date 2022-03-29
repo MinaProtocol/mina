@@ -2,7 +2,7 @@
 # The "deb-builder" Stage
 # - builds mina and any other binaries required to run `make deb`
 #################################################################################################
-FROM opam-deps AS deb-builder
+FROM toolchain AS deb-builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=devnet
@@ -44,7 +44,6 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/rosetta/rosetta.exe \
     src/app/rosetta/rosetta_mainnet_signatures.exe \
     src/app/rosetta/rosetta_testnet_signatures.exe \
-    src/app/rosetta/test-agent/agent.exe \
     src/app/rosetta/ocaml-signer/signer.exe
 
 # --- MAKE DEB

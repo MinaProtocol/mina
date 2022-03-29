@@ -88,6 +88,17 @@ module ListPeers : sig
   val create_request : unit -> Request.t
 end
 
+module BandwidthInfo : sig
+  include
+    Rpc_intf
+      with type Request.t =
+            Builder.Libp2pHelperInterface.BandwidthInfo.Request.t
+       and type Response.t =
+            Reader.Libp2pHelperInterface.BandwidthInfo.Response.t
+
+  val create_request : unit -> Request.t
+end
+
 module GenerateKeypair : sig
   include
     Rpc_intf

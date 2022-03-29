@@ -33,6 +33,7 @@ type t =
   ; log_precomputed_blocks : bool
   ; snark_worker_fee : string
   ; snark_worker_public_key : string
+  ; aux_account_balance : string option
   }
 
 let default =
@@ -51,4 +52,5 @@ let default =
   ; snark_worker_public_key =
       (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
+  ; aux_account_balance = None
   }

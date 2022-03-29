@@ -47,8 +47,10 @@ module Scan_state : sig
   (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
   val check_required_protocol_states :
        t
-    -> protocol_states:Mina_state.Protocol_state.value list
-    -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
+    -> protocol_states:
+         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+    -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+       Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -89,6 +91,7 @@ val create_exn :
 val of_scan_state_and_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> statement_check:[ `Full | `Partial ]
   -> verifier:Verifier.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> snarked_next_available_token:Token_id.t
@@ -181,6 +184,7 @@ val can_apply_supercharged_coinbase_exn :
 
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> statement_check:[ `Full | `Partial ]
   -> t
   -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
 

@@ -3,16 +3,11 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Snark_params.Tick
 
 [%%ifdef consensus_mechanism]
 
-open Snark_params.Tick
 open Bitstring_lib
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -166,11 +161,8 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   end)
 
   [%%define_locally
-  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
-
-  [%%define_locally Base58_check.String_ops.(to_string, of_string)]
-
-  [%%define_locally Base58_check.(to_yojson, of_yojson)]
+  Base58_check.
+    (to_base58_check, of_base58_check, of_base58_check_exn, to_yojson, of_yojson)]
 
   module T = struct
     type t = Field.t [@@deriving sexp, compare, hash]

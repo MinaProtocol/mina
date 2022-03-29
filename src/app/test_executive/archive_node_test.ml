@@ -36,13 +36,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let archive_node = List.hd_exn @@ Network.archive_nodes network in
-    let block_producers = Network.block_producers network in
+    let all_nodes = Network.all_nodes network in
     (* waiting for archive_node does not seem to work *)
     [%log info] "archive node test: waiting for block producers to initialize" ;
-    let%bind () =
-      Malleable_error.List.iter block_producers ~f:(fun bp ->
-          wait_for t (Wait_condition.node_to_initialize bp))
-    in
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     [%log info] "archive node test: waiting for archive node to initialize" ;
     let%bind () = wait_for t (Wait_condition.node_to_initialize archive_node) in
     [%log info] "archive node test: running network for %0.1f minutes"
@@ -55,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "archive node test: collecting block logs" ;
     let%map () =
-      Malleable_error.List.iter block_producers ~f:(fun bp ->
+      Malleable_error.List.iter all_nodes ~f:(fun bp ->
           Network.Node.dump_precomputed_blocks ~logger bp)
     in
     [%log info] "archive node test: succesfully completed"

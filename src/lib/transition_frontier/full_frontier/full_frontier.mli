@@ -16,13 +16,13 @@ open Mina_state
 include Frontier_intf.S
 
 module Protocol_states_for_root_scan_state : sig
-  type t = Protocol_state.value State_hash.Map.t
+  type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
   val protocol_states_for_next_root_scan_state :
        t
     -> new_scan_state:Staged_ledger.Scan_state.t
-    -> old_root_state:(Protocol_state.value, State_hash.t) With_hash.t
-    -> (State_hash.t * Protocol_state.value) list
+    -> old_root_state:Protocol_state.value State_hash.With_state_hashes.t
+    -> Protocol_state.value State_hash.With_state_hashes.t list
 end
 
 val create :
@@ -32,8 +32,11 @@ val create :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
+  -> persistent_root_instance:Persistent_root.Instance.t
   -> time_controller:Block_time.Controller.t
   -> t
+
+val persistent_root_instance : t -> Persistent_root.Instance.t
 
 val close : loc:string -> t -> unit
 

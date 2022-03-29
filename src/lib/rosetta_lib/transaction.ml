@@ -1,21 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 module Field = Snark_params.Tick.Field
-
-[%%else]
-
-module Field = Snark_params_nonconsensus.Field
-module Mina_base = Mina_base_nonconsensus
-module Hex = Hex_nonconsensus.Hex
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Signature_lib = Signature_lib_nonconsensus
-
-[%%endif]
-
 module Token_id = Mina_base.Token_id
 
 module Unsigned = struct
@@ -144,9 +128,9 @@ module Unsigned = struct
           ; fee = command.fee
           ; nonce
           ; token = command.token
-          ; memo = None
+          ; memo = command.memo
           ; amount
-          ; valid_until = None
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Payment payment)
@@ -156,8 +140,8 @@ module Unsigned = struct
           ; new_delegate = un_pk command.receiver
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Delegation delegation)
@@ -167,8 +151,8 @@ module Unsigned = struct
           ; disable_new_accounts = false
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token create_token)
@@ -180,8 +164,8 @@ module Unsigned = struct
           ; account_disabled = false
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Create_token_account create_token_account)
@@ -200,8 +184,8 @@ module Unsigned = struct
           ; amount
           ; fee = command.fee
           ; nonce
-          ; memo = None
-          ; valid_until = None
+          ; memo = command.memo
+          ; valid_until = command.valid_until
           }
         in
         Result.return (`Mint_tokens mint_tokens)
@@ -275,6 +259,8 @@ module Unsigned = struct
     ; token = r.token
     ; fee = r.fee
     ; amount = Some r.amount
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_delegation (r : Rendered.Delegation.t) :
@@ -287,6 +273,8 @@ module Unsigned = struct
     ; token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_create_token (r : Rendered.Create_token.t) :
@@ -299,6 +287,8 @@ module Unsigned = struct
     ; token = Mina_base.Token_id.(default |> to_uint64)
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_create_token_account (r : Rendered.Create_token_account.t) :
@@ -311,6 +301,8 @@ module Unsigned = struct
     ; token = r.token |> Mina_base.Token_id.to_uint64
     ; fee = r.fee
     ; amount = None
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered_mint_tokens (r : Rendered.Mint_tokens.t) :
@@ -323,6 +315,8 @@ module Unsigned = struct
     ; token = r.token |> Mina_base.Token_id.to_uint64
     ; fee = r.fee
     ; amount = Some r.amount
+    ; valid_until = r.valid_until
+    ; memo = r.memo
     }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
@@ -388,12 +382,24 @@ module Unsigned = struct
              `Unsupported_operation_for_construction)
 end
 
+module Signature = struct
+  let decode signature_raw =
+    Mina_base.Signature.Raw.decode signature_raw
+    |> Result.of_option
+         ~error:
+           (Errors.create ~context:"Signed transaction un-rendering"
+              `Unsupported_operation_for_construction)
+
+  let encode = Mina_base.Signature.Raw.encode
+end
+
 module Signed = struct
   type t =
     { command : User_command_info.Partial.t
     ; nonce : Unsigned_extended.UInt32.t
-    ; signature : string
+    ; signature : Mina_base.Signature.t
     }
+  [@@deriving equal]
 
   module Rendered = struct
     type t =
@@ -409,9 +415,10 @@ module Signed = struct
 
   let render (t : t) =
     let open Result.Let_syntax in
+    let signature = Signature.encode t.signature in
     match%map Unsigned.render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = Some payment
         ; stake_delegation = None
         ; create_token = None
@@ -419,7 +426,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Delegation delegation ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = Some delegation
         ; create_token = None
@@ -427,7 +434,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Create_token create_token ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = Some create_token
@@ -435,7 +442,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Create_token_account create_token_account ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -443,7 +450,7 @@ module Signed = struct
         ; mint_tokens = None
         }
     | `Mint_tokens mint_tokens ->
-        { Rendered.signature = t.signature
+        { Rendered.signature
         ; payment = None
         ; stake_delegation = None
         ; create_token = None
@@ -452,6 +459,8 @@ module Signed = struct
         }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
+    let open Result.Let_syntax in
+    let%bind signature = Signature.decode r.signature in
     match
       ( r.payment
       , r.stake_delegation
@@ -463,103 +472,68 @@ module Signed = struct
         Result.return
           { command = Unsigned.of_rendered_payment payment
           ; nonce = payment.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, Some delegation, None, None, None ->
         Result.return
           { command = Unsigned.of_rendered_delegation delegation
           ; nonce = delegation.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, Some create_token, None, None ->
         Result.return
           { command = Unsigned.of_rendered_create_token create_token
           ; nonce = create_token.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, None, Some create_token_account, None ->
         Result.return
           { command =
               Unsigned.of_rendered_create_token_account create_token_account
           ; nonce = create_token_account.nonce
-          ; signature = r.signature
+          ; signature
           }
     | None, None, None, None, Some mint_tokens ->
         Result.return
           { command = Unsigned.of_rendered_mint_tokens mint_tokens
           ; nonce = mint_tokens.nonce
-          ; signature = r.signature
+          ; signature
           }
     | _ ->
         Result.fail
           (Errors.create ~context:"Signed transaction un-rendering"
              `Unsupported_operation_for_construction)
+
+  let to_mina_signed t =
+    Or_error.try_with_join (fun () ->
+        let open Or_error.Let_syntax in
+        let pk (`Pk x) =
+          Signature_lib.Public_key.Compressed.of_base58_check_exn x
+        in
+        let%map payload =
+          User_command_info.Partial.to_user_command_payload t.command
+            ~nonce:t.nonce
+          |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
+        in
+        let command : Mina_base.Signed_command.t =
+          { Mina_base.Signed_command.Poly.signature = t.signature
+          ; signer =
+              pk t.command.fee_payer |> Signature_lib.Public_key.decompress_exn
+          ; payload
+          }
+        in
+        command)
 end
 
 let to_mina_signed transaction_json =
   Or_error.try_with_join (fun () ->
       let open Or_error.Let_syntax in
-      let%bind rosetta_transaction_rendered =
+      let%bind rendered =
         Signed.Rendered.of_yojson transaction_json
         |> Result.map_error ~f:Error.of_string
       in
-      let%bind rosetta_transaction =
-        Signed.of_rendered rosetta_transaction_rendered
+      let%bind t =
+        Signed.of_rendered rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
-      let valid_until, memo =
-        (* This is a hack..
-           TODO: Handle these properly in rosetta.
-        *)
-        match rosetta_transaction.command.kind with
-        | `Payment ->
-            ( Option.bind rosetta_transaction_rendered.payment
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.payment
-                ~f:(fun { memo; _ } -> memo) )
-        | `Delegation ->
-            ( Option.bind rosetta_transaction_rendered.stake_delegation
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.stake_delegation
-                ~f:(fun { memo; _ } -> memo) )
-        | `Create_token ->
-            ( Option.bind rosetta_transaction_rendered.create_token
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.create_token
-                ~f:(fun { memo; _ } -> memo) )
-        | `Create_token_account ->
-            ( Option.bind rosetta_transaction_rendered.create_token_account
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.create_token_account
-                ~f:(fun { memo; _ } -> memo) )
-        | `Mint_tokens ->
-            ( Option.bind rosetta_transaction_rendered.mint_tokens
-                ~f:(fun { valid_until; _ } -> valid_until)
-            , Option.bind rosetta_transaction_rendered.mint_tokens
-                ~f:(fun { memo; _ } -> memo) )
-      in
-      let pk (`Pk x) =
-        Signature_lib.Public_key.Compressed.of_base58_check_exn x
-      in
-      let%bind payload =
-        User_command_info.Partial.to_user_command_payload
-          rosetta_transaction.command ~nonce:rosetta_transaction.nonce ?memo
-          ?valid_until
-        |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
-      in
-      let%map signature =
-        match Mina_base.Signature.Raw.decode rosetta_transaction.signature with
-        | Some signature ->
-            Ok signature
-        | None ->
-            Or_error.errorf "Could not decode signature"
-      in
-      let command : Mina_base.Signed_command.t =
-        { Mina_base.Signed_command.Poly.signature
-        ; signer =
-            pk rosetta_transaction.command.fee_payer
-            |> Signature_lib.Public_key.decompress_exn
-        ; payload
-        }
-      in
-      command)
+      Signed.to_mina_signed t)

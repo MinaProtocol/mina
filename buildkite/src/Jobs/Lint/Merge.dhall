@@ -22,7 +22,17 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "buildkite/scripts/merges-cleanly-to-develop.sh" ]
+          commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible"]
+          , label = "Check merges cleanly into compatible"
+          , key = "clean-merge-compatible"
+          , target = Size.Small
+          , docker = Some Docker::{
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
+            }
+        },
+      Command.build
+        Command.Config::{
+          commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh develop"]
           , label = "Check merges cleanly into develop"
           , key = "clean-merge-develop"
           , target = Size.Small

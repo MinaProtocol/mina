@@ -30,26 +30,26 @@ let or_error_list_map ls ~f =
       let%map h = f el in
       h :: t)
 
-let log_filter_of_event_type =
+let log_filter_of_event_type ev_existential =
   let open Event_type in
-  function
-  | Event_type Log_error ->
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
-  | Event_type t ->
-      let event_id =
-        to_structured_event_id (Event_type t)
-        |> Option.value_exn
-             ~message:
-               "could not convert event type into log filter; no structured \
-                event id configured"
-      in
+  | From_daemon_log (struct_id, _) ->
       let filter =
         Printf.sprintf "jsonPayload.event_id=\"%s\""
-          (Structured_log_events.string_of_id event_id)
+          (Structured_log_events.string_of_id struct_id)
       in
       [ filter ]
+  | From_puppeteer_log (id, _) ->
+      let filter =
+        Printf.sprintf "jsonPayload.puppeteer_event_type=\"%s\"" id
+      in
+      [ "jsonPayload.puppeteer_script_event=true"; filter ]
 
 let all_event_types_log_filter =
   let event_filters =
@@ -252,22 +252,47 @@ type t =
 
 let event_reader { event_reader; _ } = event_reader
 
-let parse_event_from_log_entry ~network log_entry =
+let parse_event_from_log_entry ~logger ~network log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
-  let%bind app_id = find string log_entry [ "labels"; "k8s-pod/app" ] in
+  let%bind pod_id =
+    find string log_entry [ "resource"; "labels"; "pod_name" ]
+  in
   let%bind node =
-    Kubernetes_network.lookup_node_by_app_id network app_id
+    Kubernetes_network.lookup_node_by_pod_id network pod_id
     |> Option.value_map ~f:Or_error.return
          ~default:
-           (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
+           (Or_error.errorf
+              "failed to find node by pod id \"%s\"; known pod ids = [%s]"
+              pod_id
+              (Kubernetes_network.all_pod_ids network |> String.concat ~sep:"; "))
   in
-  let%bind log =
-    find
-      (parser_from_of_yojson Logger.Message.of_yojson)
-      log_entry [ "jsonPayload" ]
+  let%bind payload = find json log_entry [ "jsonPayload" ] in
+  let%map event =
+    if
+      Result.ok (find bool payload [ "puppeteer_script_event" ])
+      |> Option.value ~default:false
+    then (
+      let%bind msg =
+        parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
+      in
+      [%log spam] "parsing puppeteer event, puppeteer_event_type = %s"
+        (Option.value msg.puppeteer_event_type ~default:"<NONE>") ;
+      Event_type.parse_puppeteer_event msg )
+    else
+      let%bind msg =
+        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+      in
+      [%log spam] "parsing daemon structured event, event_id = %s"
+        (Option.value
+           (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
+           ~default:"<NONE>") ;
+      match msg.event_id with
+      | Some _ ->
+          Event_type.parse_daemon_event msg
+      | None ->
+          Event_type.parse_error_log msg
   in
-  let%map event = Event_type.parse_event log in
   (node, event)
 
 let rec pull_subscription_in_background ~logger ~network ~event_writer
@@ -283,10 +308,12 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     else [%log spam] "No logs were pulled" ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
-          log_entry
-          |> parse_event_from_log_entry ~network
-          |> Or_error.ok_exn
-          |> Pipe.write_without_pushback_if_open event_writer ;
+          ( match log_entry |> parse_event_from_log_entry ~logger ~network with
+          | Ok a ->
+              Pipe.write_without_pushback_if_open event_writer a
+          | Error e ->
+              [%log warn] "Error parsing log $error"
+                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
           Deferred.unit)
     in
     let%bind () = after (Time.Span.of_ms 10000.0) in

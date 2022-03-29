@@ -5,6 +5,17 @@ open Mina_base
 open Pipe_lib
 open Signature_lib
 
+type metrics_t =
+  { block_production_delay : int list
+  ; transaction_pool_diff_received : int
+  ; transaction_pool_diff_broadcasted : int
+  ; transactions_added_to_pool : int
+  ; transaction_pool_size : int
+  }
+
+type best_chain_block =
+  { state_hash : string; command_transaction_count : int; creator_pk : string }
+
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -39,6 +50,9 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
+      type signed_command_result =
+        { id : string; hash : string; nonce : Unsigned.uint32 }
+
       val send_payment :
            logger:Logger.t
         -> t
@@ -46,12 +60,41 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
-        -> unit Deferred.Or_error.t
+        -> signed_command_result Deferred.Or_error.t
 
       val must_send_payment :
            logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> signed_command_result Malleable_error.t
+
+      val send_delegation :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> signed_command_result Deferred.Or_error.t
+
+      val must_send_delegation :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> signed_command_result Malleable_error.t
+
+      val must_send_test_payments :
+           repeat_count:Unsigned.uint32
+        -> repeat_delay_ms:Unsigned.uint32
+        -> logger:Logger.t
+        -> t
+        -> senders:Signature_lib.Private_key.t list
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
@@ -78,10 +121,16 @@ module Engine = struct
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
 
       val get_best_chain :
-        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Async_kernel.Deferred.Or_error.t
 
       val must_get_best_chain :
-        logger:Logger.t -> t -> string list Malleable_error.t
+           ?max_length:int
+        -> logger:Logger.t
+        -> t
+        -> best_chain_block list Malleable_error.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
@@ -91,6 +140,9 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
+
+      val get_metrics :
+        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
     end
 
     type t
@@ -238,14 +290,20 @@ module Dsl = struct
 
     val node_to_initialize : Engine.Network.Node.t -> t
 
+    val nodes_to_initialize : Engine.Network.Node.t list -> t
+
     val blocks_to_be_produced : int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    val payment_to_be_included_in_frontier :
+    type command_type = Send_payment | Send_delegation
+
+    val signed_command_to_be_included_in_frontier :
          sender_pub_key:Public_key.Compressed.t
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
+      -> nonce:Unsigned.uint32
+      -> command_type:command_type
       -> t
   end
 
@@ -255,6 +313,39 @@ module Dsl = struct
     val pub_key_of_node :
          Engine.Network.Node.t
       -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+
+    val check_common_prefixes :
+         tolerance:int
+      -> logger:Logger.t
+      -> string list list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Async_kernel.Deferred.t
+
+    val fetch_connectivity_data :
+         logger:Logger.t
+      -> Engine.Network.Node.t list
+      -> ( (Engine.Network.Node.t * (string * string list)) list
+           Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    val assert_peers_completely_connected :
+         (Engine.Network.Node.t * (string * string list)) list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
+
+    val assert_peers_cant_be_partitioned :
+         max_disconnections:int
+      -> (Engine.Network.Node.t * (string * string list)) list
+      -> ( unit Malleable_error.Result_accumulator.t
+         , Malleable_error.Hard_fail.t )
+         result
+         Deferred.t
   end
 
   module type S = sig

@@ -32,10 +32,14 @@ spec:
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]
-        {{- else }}
-        command: ["bash", "-c"]
         {{- end }}
-        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}'" ]
+        args: [
+          "internal", 
+          "snark-worker", 
+          "-proof-level","full",
+          "-shutdown-on-disconnect", "false", "-daemon-address",
+          "{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}"
+        ]
         env:
           - name: "RAYON_NUM_THREADS"
             value: "4"

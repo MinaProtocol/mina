@@ -14,6 +14,12 @@ module type Message_intf = sig
 
   val derive : t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
 
+  val derive_for_mainnet :
+    t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
+
+  val derive_for_testnet :
+    t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
+
   val hash : t -> public_key:curve -> r:field -> curve_scalar
 
   val hash_for_mainnet : t -> public_key:curve -> r:field -> curve_scalar
@@ -112,7 +118,11 @@ module type S = sig
 
   val compress : curve -> bool list
 
-  val sign : Private_key.t -> Message.t -> Signature.t
+  val sign :
+       ?signature_kind:Mina_signature_kind.t
+    -> Private_key.t
+    -> Message.t
+    -> Signature.t
 
   val verify :
        ?signature_kind:Mina_signature_kind.t
@@ -210,17 +220,37 @@ module Make
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
-  let sign (d_prime : Private_key.t) m =
+  let sign ?signature_kind (d_prime : Private_key.t) (m : Message.t) =
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let k_prime = Message.derive m ~public_key ~private_key:d in
+    let derive =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.derive
+      | Some Mainnet ->
+          Message.derive_for_mainnet
+      | Some Testnet ->
+          Message.derive_for_testnet
+    in
+    let k_prime = derive m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let e = Message.hash m ~public_key ~r in
+    let hash =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.hash
+      | Some Mainnet ->
+          Message.hash_for_mainnet
+      | Some Testnet ->
+          Message.hash_for_testnet
+    in
+    let e = hash m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
@@ -301,8 +331,6 @@ module Make
   end
 end
 
-open Snark_params
-
 [%%else]
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
@@ -310,7 +338,7 @@ open Snark_params
  *)
 
 module type S = sig
-  open Snark_params_nonconsensus
+  open Snark_params.Tick
 
   type curve
 
@@ -334,7 +362,11 @@ module type S = sig
     type t = curve [@@deriving sexp]
   end
 
-  val sign : Private_key.t -> Message.t -> Signature.t
+  val sign :
+       ?signature_kind:Mina_signature_kind.t
+    -> Private_key.t
+    -> Message.t
+    -> Signature.t
 
   val verify :
        ?signature_kind:Mina_signature_kind.t
@@ -345,7 +377,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : module type of Snark_params_nonconsensus) (Curve : sig
+    (Impl : module type of Snark_params.Tick) (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -395,20 +427,40 @@ module Make
 
   let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t
 
-  let sign (d_prime : Private_key.t) m =
+  let sign ?signature_kind (d_prime : Private_key.t) m =
     let public_key =
       (* TODO: Don't recompute this. *)
       Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let k_prime = Message.derive m ~public_key ~private_key:d in
+    let derive =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.derive
+      | Some Mainnet ->
+          Message.derive_for_mainnet
+      | Some Testnet ->
+          Message.derive_for_testnet
+    in
+    let k_prime = derive m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, (ry : Impl.Field.t) =
       Curve.(to_affine_exn (scale Curve.one k_prime))
     in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let e = Message.hash m ~public_key ~r in
+    let hash =
+      let open Mina_signature_kind in
+      match signature_kind with
+      | None ->
+          Message.hash
+      | Some Mainnet ->
+          Message.hash_for_mainnet
+      | Some Testnet ->
+          Message.hash_for_testnet
+    in
+    let e = hash m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
@@ -433,25 +485,27 @@ module Make
         false
 end
 
-module Tick = Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-open Hash_prefix_states_nonconsensus
-
 [%%endif]
+
+open Snark_params
 
 module Message = struct
   open Tick
 
   type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
+  let network_id_mainnet = Char.of_int_exn 1
+
+  let network_id_testnet = Char.of_int_exn 0
+
   let network_id =
     match Mina_signature_kind.t with
     | Mainnet ->
-        Char.of_int_exn 1
+        network_id_mainnet
     | Testnet ->
-        Char.of_int_exn 0
+        network_id_testnet
 
-  let derive t ~private_key ~public_key =
+  let make_derive ~network_id t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append t
@@ -467,6 +521,12 @@ module Message = struct
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
     |> Tock.Field.project
+
+  let derive = make_derive ~network_id
+
+  let derive_for_mainnet = make_derive ~network_id:network_id_mainnet
+
+  let derive_for_testnet = make_derive ~network_id:network_id_testnet
 
   let make_hash ~init t ~public_key ~r =
     let input =

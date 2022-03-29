@@ -1,18 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Hex = Hex_nonconsensus.Hex
-module Rosetta_coding = Rosetta_coding_nonconsensus
-
-[%%endif]
 
 module Arg = struct
   type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.Latest.t

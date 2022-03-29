@@ -8,7 +8,7 @@ module Breadcrumb = Transition_frontier.Breadcrumb
 module Transition_frontier = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Breadcrumb_added of
             { block:
@@ -19,7 +19,7 @@ module Transition_frontier = struct
                 (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
             }
         | Root_transitioned of
-            Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
+            Transition_frontier.Diff.Root_transition.Lite.Stable.V2.t
         | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
 
       let to_latest = Fn.id
@@ -42,9 +42,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Transition_frontier of Transition_frontier.Stable.V1.t
+      | Transition_frontier of Transition_frontier.Stable.V2.t
       | Transaction_pool of Transaction_pool.Stable.V1.t
 
     let to_latest = Fn.id
@@ -53,9 +53,10 @@ end]
 
 module Builder = struct
   let breadcrumb_added breadcrumb =
-    let ((block, _) as validated_block) =
+    let validated_block =
       Breadcrumb.validated_transition breadcrumb
     in
+    let block, _ = External_transition.Validated.Stable.V1.of_v2 validated_block in
     let commands = External_transition.Validated.commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =

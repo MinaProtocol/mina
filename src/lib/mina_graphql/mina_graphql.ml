@@ -89,6 +89,8 @@ module Reflection = struct
 
     let nn_int a x = id ~typ:(non_null int) a x
 
+    let nn_int_list a x = id ~typ:(non_null (list (non_null int))) a x
+
     let int a x = id ~typ:int a x
 
     let nn_bool a x = id ~typ:(non_null bool) a x
@@ -250,6 +252,8 @@ module Types = struct
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
                   [ of_time info.time ~consensus_constants ]
               | Produce_now info ->
@@ -262,6 +266,8 @@ module Types = struct
               (fun _ { Daemon_rpcs.Types.Status.Next_producer_timing.timing; _ } ->
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
                   []
               | Produce info ->
                   [ info.for_slot.global_slot_since_genesis ]
@@ -366,6 +372,16 @@ module Types = struct
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer))
 
+    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
+      obj "Metrics" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
+               ~block_production_delay:nn_int_list
+               ~transaction_pool_diff_received:nn_int
+               ~transaction_pool_diff_broadcasted:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int)
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -392,7 +408,8 @@ module Types = struct
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int
-               ~highest_unvalidated_block_length_received:nn_int)
+               ~highest_unvalidated_block_length_received:nn_int
+               ~metrics:(id ~typ:(non_null metrics)))
   end
 
   let fee_transfer =
@@ -515,12 +532,12 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              Frozen_ledger_hash.to_string source)
+              Frozen_ledger_hash.to_base58_check source)
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_string target)
+              Frozen_ledger_hash.to_base58_check target)
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -594,7 +611,7 @@ module Types = struct
               let snarked_ledger_hash =
                 Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
               in
-              Frozen_ledger_hash.to_string snarked_ledger_hash)
+              Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -603,7 +620,7 @@ module Types = struct
               let staged_ledger_hash =
                 Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
               in
-              Mina_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash)
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
@@ -1029,7 +1046,7 @@ module Types = struct
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map ~f:Receipt.Chain_hash.to_string
+                   Option.map ~f:Receipt.Chain_hash.to_base58_check
                      account.Account.Poly.receipt_chain_hash)
              ; field "delegate" ~typ:public_key
                  ~doc:
@@ -1227,6 +1244,10 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
+          ; abstract_field "validUntil" ~typ:(non_null uint32) ~args:[]
+              ~doc:
+                "The global slot number after which this transaction cannot be \
+                 applied"
           ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used by the command"
           ; abstract_field "amount" ~typ:(non_null uint64) ~args:[]
@@ -1318,6 +1339,11 @@ module Types = struct
           ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data))
+      ; field_no_status "validUntil" ~typ:(non_null uint32) ~args:[]
+          ~doc:
+            "The global slot number after which this transaction cannot be \
+             applied" ~resolve:(fun _ cmd ->
+            Signed_command.valid_until cmd.With_hash.data)
       ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data)
@@ -1602,6 +1628,11 @@ module Types = struct
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
             ~resolve:(fun _ { With_hash.data; _ } -> data.transactions)
+        ; field "commandTransactionCount" ~typ:(non_null int)
+            ~doc:"Count of user command transactions in the block"
+            ~args:Arg.[]
+            ~resolve:(fun _ { With_hash.data; _ } ->
+              List.length data.transactions.commands)
         ; field "snarkJobs"
             ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
@@ -1818,27 +1849,6 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
-    let set_staking =
-      obj "SetStakingPayload" ~fields:(fun _ ->
-          [ field "lastStaking"
-              ~doc:"Returns the public keys that were staking funds previously"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
-          ; field "lockedPublicKeys"
-              ~doc:
-                "List of public keys that could not be used to stake because \
-                 they were locked"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, locked, _) -> locked)
-          ; field "currentStakingKeys"
-              ~doc:"Returns the public keys that are now staking their funds"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking)
-          ])
-
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
           [ field "lastCoinbaseReceiver"
@@ -1934,6 +1944,10 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key.")
 
+    let private_key_arg =
+      scalar "PrivateKey" ~doc:"Base58Check-encoded private key"
+        ~coerce:Signature_lib.Private_key.of_yojson
+
     let token_id_arg =
       scalar "TokenId"
         ~doc:"String representation of a token's UInt64 identifier"
@@ -1990,19 +2004,19 @@ module Types = struct
                      [Unsigned.UInt*] parsers:
                      * if the absolute value is greater than [max_int], the value
                        returned is [max_int]
-                       - ["99999999999999999999999999999999999"] is [max_int]
-                       - ["-99999999999999999999999999999999999"] is [max_int]
+                   - ["99999999999999999999999999999999999"] is [max_int]
+                   - ["-99999999999999999999999999999999999"] is [max_int]
                      * if otherwise the value is negative, the value returned is
                        [max_int - (x - 1)]
-                       - ["-1"] is [max_int]
+                   - ["-1"] is [max_int]
                      * if there is a non-numeric character part-way through the
                        string, the numeric prefix is treated as a number
-                       - ["1_000_000"] is [1]
-                       - ["-1_000_000"] is [max_int]
-                       - ["1.1"] is [1]
-                       - ["0x15"] is [0]
+                   - ["1_000_000"] is [1]
+                   - ["-1_000_000"] is [max_int]
+                   - ["1.1"] is [1]
+                   - ["0x15"] is [0]
                      * leading spaces are ignored
-                       - [" 1"] is [1]
+                   - [" 1"] is [1]
                      This is annoying to document, none of these behaviors are
                      useful to users, and unexpectedly triggering one of them
                      could have nasty consequences. Thus, we raise an error
@@ -2132,6 +2146,8 @@ module Types = struct
 
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
+      let amount ~doc = arg "amount" ~typ:(non_null uint64_arg) ~doc
+
       let memo =
         arg "memo" ~typ:string
           ~doc:"Short arbitrary message provided by the sender"
@@ -2154,6 +2170,19 @@ module Types = struct
             "If a signature is provided, this transaction is considered signed \
              and will be broadcasted to the network without requiring a \
              private key"
+
+      let senders =
+        arg "senders"
+          ~typ:(non_null (list (non_null private_key_arg)))
+          ~doc:"The private keys from which to sign the payments"
+
+      let repeat_count =
+        arg "repeat_count" ~typ:(non_null uint32_arg)
+          ~doc:"How many times shall transaction be repeated"
+
+      let repeat_delay_ms =
+        arg "repeat_delay_ms" ~typ:(non_null uint32_arg)
+          ~doc:"Delay with which a transaction shall be repeated"
     end
 
     let send_payment =
@@ -2165,8 +2194,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
-              ~typ:(non_null uint64_arg)
+          ; amount ~doc:"Amount of mina to send to receiver"
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
           ; memo
@@ -2319,16 +2347,6 @@ module Types = struct
                 "Public key of sender or receiver of transactions you are \
                  looking for"
               ~typ:(non_null public_key_arg)
-          ]
-
-    let set_staking =
-      obj "SetStakingInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKeys"
-              ~typ:(non_null (list (non_null public_key_arg)))
-              ~doc:
-                "Public keys of accounts you wish to stake with - these must \
-                 be accounts that are in trackedAccounts"
           ]
 
     let set_coinbase_receiver =
@@ -2625,6 +2643,10 @@ module Mutations = struct
         Error "Could not find owned account associated with provided key"
     | Error `Bad_password ->
         Error "Wrong password provided"
+    | Error (`Key_read_error e) ->
+        Error
+          (sprintf "Error reading the secret key file: %s"
+             (Secrets.Privkey_error.to_string e))
     | Ok () ->
         Ok pk
 
@@ -2723,6 +2745,10 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = coda; _ } () privkey_path password ->
         let open Deferred.Result.Let_syntax in
+        (* the Keypair.read zeroes the password, so copy for use in import step below *)
+        let saved_password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
         let password =
           Lazy.return (Deferred.return (Bytes.of_string password))
         in
@@ -2737,7 +2763,8 @@ module Mutations = struct
             return (pk, true)
         | None ->
             let%map.Async.Deferred pk =
-              Secrets.Wallets.import_keypair wallets keypair ~password
+              Secrets.Wallets.import_keypair wallets keypair
+                ~password:saved_password
             in
             Ok (pk, false))
 
@@ -2793,6 +2820,8 @@ module Mutations = struct
       Result.ok_if_true
         Currency.Fee.(fee >= Signed_command.minimum_fee)
         ~error:
+          (* IMPORTANT! Do not change the content of this error without
+           * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
@@ -2917,6 +2946,77 @@ module Mutations = struct
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command)
+
+  let send_test_payments =
+    io_field "sendTestPayments" ~doc:"Send a series of test payments"
+      ~typ:(non_null int)
+      ~args:
+        Types.Input.Fields.
+          [ senders
+          ; receiver ~doc:"The receiver of the payments"
+          ; amount ~doc:"The amount of each payment"
+          ; fee ~doc:"The fee of each payment"
+          ; repeat_count
+          ; repeat_delay_ms
+          ]
+      ~resolve:
+        (fun { ctx = coda; _ } () senders_list receiver_pk amount fee
+             repeat_count repeat_delay_ms ->
+        let dumb_password = lazy (return (Bytes.of_string "dumb")) in
+        let senders = Array.of_list senders_list in
+        let repeat_delay =
+          Time.Span.of_ms @@ float_of_int
+          @@ Unsigned.UInt32.to_int repeat_delay_ms
+        in
+        let fee_token = Token_id.default in
+        let start = Time.now () in
+        let send_tx i =
+          let source_privkey = senders.(i % Array.length senders) in
+          let source_pk_decompressed =
+            Signature_lib.Public_key.of_private_key_exn source_privkey
+          in
+          let source_pk =
+            Signature_lib.Public_key.compress source_pk_decompressed
+          in
+          let body =
+            Signed_command_payload.Body.Payment
+              { source_pk
+              ; receiver_pk
+              ; token_id = Token_id.default
+              ; amount = Amount.of_uint64 amount
+              }
+          in
+          let memo = "" in
+          let kp =
+            Keypair.
+              { private_key = source_privkey
+              ; public_key = source_pk_decompressed
+              }
+          in
+          let%bind _ =
+            Secrets.Wallets.import_keypair (Mina_lib.wallets coda) kp
+              ~password:dumb_password
+          in
+          send_unsigned_user_command ~coda ~nonce_opt:None ~signer:source_pk
+            ~memo:(Some memo) ~fee ~fee_token ~fee_payer_pk:source_pk
+            ~valid_until:None ~body
+          |> Deferred.Result.map ~f:(const 0)
+        in
+
+        let do_ i =
+          let pause =
+            Time.diff
+              (Time.add start @@ Time.Span.scale repeat_delay @@ float_of_int i)
+            @@ Time.now ()
+          in
+          (if Time.Span.(pause > zero) then after pause else Deferred.unit)
+          >>= fun () -> send_tx i >>| const ()
+        in
+        for i = 2 to Unsigned.UInt32.to_int repeat_count do
+          don't_wait_for (do_ i)
+        done ;
+        (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
+        send_tx 1)
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
@@ -3063,47 +3163,6 @@ module Mutations = struct
         let%map result = export_logs ~coda basename_opt in
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson))
-
-  let set_staking =
-    field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_staking) ]
-      ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun { ctx = coda; _ } () pks ->
-        let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk)
-        in
-        let unlocked_pks = List.map unlocked ~f:(fun (_kp, pk) -> pk) in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] unlocked_pks)
-            ]
-          "Block production key replacement; old: $old, new: $new" ;
-        if not (List.is_empty locked) then
-          [%log' warn (Mina_lib.top_level_logger coda)]
-            "Some public keys are locked and unavailable as block production \
-             keys"
-            ~metadata:
-              [ ("locked_pks", [%to_yojson: Public_key.Compressed.t list] locked)
-              ] ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-        , List.map ~f:Tuple.T2.get2 unlocked ))
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
@@ -3285,12 +3344,12 @@ module Mutations = struct
     ; import_account
     ; reload_wallets
     ; send_payment
+    ; send_test_payments
     ; send_delegation
     ; create_token
     ; create_token_account
     ; mint_tokens
     ; export_logs
-    ; set_staking
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee
@@ -3493,6 +3552,13 @@ module Queries = struct
           ]
       ~resolve:account_resolver
 
+  let get_ledger_and_breadcrumb coda =
+    coda |> Mina_lib.best_tip |> Participating_state.active
+    |> Option.map ~f:(fun tip ->
+           ( Transition_frontier.Breadcrumb.staged_ledger tip
+             |> Staged_ledger.ledger
+           , tip ))
+
   let account =
     field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
@@ -3505,10 +3571,15 @@ module Queries = struct
               ~typ:Types.Input.token_id_arg ~default:Token_id.default
           ]
       ~resolve:(fun { ctx = coda; _ } () pk token ->
-        Some
-          ( Account_id.create pk token
-          |> Types.AccountObj.Partial_account.of_account_id coda
-          |> Types.AccountObj.lift coda pk ))
+        Option.bind (get_ledger_and_breadcrumb coda)
+          ~f:(fun (ledger, breadcrumb) ->
+            let open Option.Let_syntax in
+            let%bind location =
+              Ledger.location_of_account ledger (Account_id.create pk token)
+            in
+            let%map account = Ledger.get ledger location in
+            Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
+            |> Types.AccountObj.lift coda pk))
 
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
@@ -3519,13 +3590,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg)
           ]
       ~resolve:(fun { ctx = coda; _ } () pk ->
-        match
-          coda |> Mina_lib.best_tip |> Participating_state.active
-          |> Option.map ~f:(fun tip ->
-                 ( Transition_frontier.Breadcrumb.staged_ledger tip
-                   |> Staged_ledger.ledger
-                 , tip ))
-        with
+        match get_ledger_and_breadcrumb coda with
         | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
@@ -3602,7 +3667,9 @@ module Queries = struct
             } =
           (Mina_lib.config coda).precomputed_values
         in
-        let { With_hash.data = genesis_state; hash } =
+        let { With_hash.data = genesis_state
+            ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+            } =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
@@ -3731,8 +3798,8 @@ module Queries = struct
           let height_uint32 =
             (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
-                 - the number is negative
-                 - the number is not representable using 32 bits
+               - the number is negative
+               - the number is not representable using 32 bits
             *)
             Unsigned.UInt32.of_int height
           in
@@ -3908,6 +3975,18 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic)
 
+  let thread_graph =
+    field "threadGraph"
+      ~doc:
+        "A graphviz dot format representation of the deamon's internal thread \
+         graph"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun _ () ->
+        Bytes.unsafe_to_string
+          ~no_mutation_while_string_reachable:
+            (O1trace.Thread.dump_thread_graph ()))
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -3995,6 +4074,7 @@ module Queries = struct
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
+    ; thread_graph
     ]
 end
 

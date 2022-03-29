@@ -32,6 +32,8 @@ module Get_transactions_by_hash =
         fee @bsDecoder(fn: "Decoders.uint64")
         kind
         feeToken @bsDecoder(fn: "Decoders.uint64")
+        validUntil @bsDecoder(fn: "Decoders.optional_uint32")
+        memo
         feePayer {
           publicKey
         }
@@ -258,6 +260,8 @@ module Transaction = struct
       ; fee_token= obj#feeToken
       ; nonce= Unsigned.UInt32.of_int obj#nonce
       ; amount= Some obj#amount
+      ; valid_until= obj#validUntil
+      ; memo = if String.equal obj#memo "" then None else Some obj#memo
       ; failure_status= None
       ; hash= obj#hash }
 
@@ -316,6 +320,7 @@ let router ~graphql_uri ~logger (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /mempool/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
+  [%log info] "Mempool query" ~metadata:[("query",body)];
   match route with
   | [] | [""] ->
       let%bind req =

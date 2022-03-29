@@ -116,18 +116,6 @@ query pendingSnarkWork {
   }
 |}]
 
-module Set_staking =
-[%graphql
-{|
-mutation ($public_key: PublicKey) {
-  setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
-    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
-    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
-    }
-  }
-|}]
-
 module Set_coinbase_receiver =
 [%graphql
 {|
@@ -381,5 +369,11 @@ mutation ($path: String!, $password: String!) {
 module Runtime_config = [%graphql {|
 query {
   runtimeConfig
+}
+|}]
+
+module Thread_graph = [%graphql {|
+query {
+  threadGraph
 }
 |}]

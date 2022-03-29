@@ -174,6 +174,50 @@ let to_yojson =
            ( state
            , (State_hash.Set.length hashes, State_hash.Set.to_list hashes) ) )
 
+type job_states =
+  { finished : int
+  ; failed : int
+  ; to_download : int
+  ; to_initial_validate : int
+  ; wait_for_parent : int
+  ; to_verify : int
+  ; to_build_breadcrumb : int
+  }
+[@@deriving to_yojson]
+
+let to_node_status_report =
+  fun (t : t) ->
+    let init =
+      { finished = 0
+      ; failed = 0
+      ; to_download = 0
+      ; to_initial_validate = 0
+      ; to_verify = 0
+      ; wait_for_parent = 0
+      ; to_build_breadcrumb = 0
+      }
+    in
+    Hashtbl.fold t.states ~init ~f:(fun ~key ~data acc -> 
+      let n = Set.length data in
+      match key with 
+      | Finished -> 
+        { acc with finished = n }
+      | Failed -> 
+        { acc with failed = n }
+      | To_download -> 
+        { acc with to_download = n }
+      | To_initial_validate -> 
+        { acc with to_initial_validate = n }
+      | To_verify -> 
+        { acc with to_verify = n }
+      | Wait_for_parent -> 
+        { acc with wait_for_parent = n }
+      | To_build_breadcrumb -> 
+        { acc with to_build_breadcrumb = n }
+      | Root -> 
+        acc ) 
+
+
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
   let lengths = State_hash.Table.create () in
@@ -289,9 +333,9 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
   List.iter ds ~f:(function
     | E (New_node (Full b)) ->
         breadcrumb_added t b
-    | E (Root_transitioned {new_root; garbage= Full hs}) ->
+    | E (Root_transitioned {new_root; garbage= Full hs; _}) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = Root_data.Limited.hash new_root in
+        let h = (Root_data.Limited.hashes new_root).state_hash in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]

@@ -5,4 +5,4 @@
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf)))
+ (preprocess (pps ppx_version ppx_let ppx_inline_test ppx_custom_printf)))

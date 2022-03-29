@@ -83,6 +83,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
   let timestamp = Block_time.of_int64 block.timestamp in
+  let chain_status = Chain_status.of_string block.chain_status in
   (* commands to be filled in later *)
   return
     { Extensional.Block.state_hash
@@ -101,6 +102,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; timestamp
     ; user_cmds = []
     ; internal_cmds = []
+    ; chain_status
     }
 
 let fill_in_user_commands pool block_state_hash =
@@ -110,7 +112,7 @@ let fill_in_user_commands pool block_state_hash =
     Public_key.Compressed.of_base58_check_exn pk_str
   in
   let balance_of_id id ~item =
-    let%map _pk_id, balance =
+    let%map { balance; _ } =
       query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
     in
     balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
@@ -252,7 +254,7 @@ let fill_in_internal_commands pool block_state_hash =
          ; receiver_balance_id
          }
        ->
-      let%bind _pubkey, receiver_balance_int64 =
+      let%bind { balance = receiver_balance_int64; _ } =
         query_db ~item:"receiver balance" ~f:(fun db ->
             Processor.Balance.load db ~id:receiver_balance_id)
       in
@@ -430,7 +432,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
-            let output_file = State_hash.to_string block.state_hash ^ ".json" in
+            let output_file =
+              State_hash.to_base58_check block.state_hash ^ ".json"
+            in
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"
