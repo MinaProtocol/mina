@@ -242,11 +242,12 @@ module Gossip = struct
 
     let name = "Block_gossip"
 
-    let id = Mina_networking.block_received_structured_events_id
+    let id = Transition_handler.Block_sink.block_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Block_received { state_hash; sender = _ } ->
+      | Transition_handler.Block_sink.Block_received { state_hash; sender = _ }
+        ->
           Ok ({ state_hash }, Direction.Received)
       | Mina_networking.Gossip_new_state { state_hash } ->
           Ok ({ state_hash }, Sent)
@@ -264,11 +265,14 @@ module Gossip = struct
 
     let name = "Snark_work_gossip"
 
-    let id = Mina_networking.snark_work_received_structured_events_id
+    let id =
+      Network_pool.Snark_pool.Resource_pool.Diff
+      .snark_work_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Snark_work_received { work; sender = _ } ->
+      | Network_pool.Snark_pool.Resource_pool.Diff.Snark_work_received
+          { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
       | Mina_networking.Gossip_snark_pool_diff { work } ->
           Ok ({ work }, Direction.Received)
@@ -287,11 +291,14 @@ module Gossip = struct
 
     let name = "Transactions_gossip"
 
-    let id = Mina_networking.transactions_received_structured_events_id
+    let id =
+      Network_pool.Transaction_pool.Resource_pool.Diff
+      .transactions_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Transactions_received { txns; sender = _ } ->
+      | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
+          { txns; sender = _ } ->
           Ok ({ txns }, Direction.Received)
       | Mina_networking.Gossip_transaction_pool_diff { txns } ->
           Ok ({ txns }, Sent)
