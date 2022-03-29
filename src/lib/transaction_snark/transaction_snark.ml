@@ -516,7 +516,7 @@ let dummy_constraints () =
               (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+          ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
               (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
@@ -3230,9 +3230,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
                  >>= Base.main ~constraint_constants))
-              handler)
-           ())
-      : unit * unit )
+              handler))
+      : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -3282,7 +3281,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
+  generate_auxiliary_input [ Statement.With_sok.typ ] main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -4124,7 +4123,7 @@ module For_tests = struct
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
-            (unit, _) Checked.t =
+            unit Checked.t =
           Impl.run_checked (dummy_constraints ())
           |> fun () ->
           Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment

@@ -32,22 +32,19 @@ let wrap_domains =
          Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
   }
 
-let hash_pairing_me_only ~app_state
-    (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
+let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
+    (Types.Step.Proof_state.Me_only.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state)
 
 let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
     (t :
-      ( Tick.Curve.Affine.t
-      , (_, n) Vector.t )
-      Types.Dlog_based.Proof_state.Me_only.t) =
+      (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
   Tock_field_sponge.digest Tock_field_sponge.params
-    (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
+    (Types.Wrap.Proof_state.Me_only.to_field_elements t
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]))
 
 let dlog_pcs_batch (type n_branching total)
@@ -200,7 +197,7 @@ let tock_unpadded_public_input_of_statement prev_statement =
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
-    (prev_statement : _ Types.Pairing_based.Statement.t) =
+    (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv)) =
       Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
@@ -220,12 +217,11 @@ let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
 
 let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
-    ~(plonk : _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t)
+    ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
   let ( * ) x g = scale g x in
   let _, [ sigma_comm_last ] =
-    Vector.split m.sigma_comm
-      (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+    Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
   let f_comm =
     (* The poseidon and generic gates are special cases,

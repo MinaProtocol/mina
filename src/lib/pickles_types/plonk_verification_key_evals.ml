@@ -7,8 +7,8 @@ let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 module Stable = struct
   module V2 = struct
     type 'comm t =
-      { sigma_comm : 'comm Dlog_plonk_types.Permuts_vec.Stable.V1.t
-      ; coefficients_comm : 'comm Dlog_plonk_types.Columns_vec.Stable.V1.t
+      { sigma_comm : 'comm Plonk_types.Permuts_vec.Stable.V1.t
+      ; coefficients_comm : 'comm Plonk_types.Columns_vec.Stable.V1.t
       ; generic_comm : 'comm
       ; psm_comm : 'comm
       ; complete_add_comm : 'comm
@@ -53,8 +53,8 @@ let map2 t1 t2 ~f =
 
 let typ g =
   Snarky_backendless.Typ.of_hlistable
-    [ Vector.typ g Dlog_plonk_types.Permuts.n
-    ; Vector.typ g Dlog_plonk_types.Columns.n
+    [ Vector.typ g Plonk_types.Permuts.n
+    ; Vector.typ g Plonk_types.Columns.n
     ; g
     ; g
     ; g

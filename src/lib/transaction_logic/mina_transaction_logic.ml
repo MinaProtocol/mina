@@ -2252,9 +2252,9 @@ module For_tests = struct
     [@@deriving sexp, compare]
   end
 
-  let min_init_balance = 8_000_000_000
+  let min_init_balance = Int64.of_string "8000000000"
 
-  let max_init_balance = 8_000_000_000_000
+  let max_init_balance = Int64.of_string "8000000000000"
 
   let num_accounts = 10
 
@@ -2263,7 +2263,7 @@ module For_tests = struct
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
   module Init_ledger = struct
-    type t = (Keypair.t * int) array [@@deriving sexp]
+    type t = (Keypair.t * int64) array [@@deriving sexp]
 
     let init (type l) (module L : Ledger_intf.S with type t = l)
         (init_ledger : t) (l : L.t) =
@@ -2275,7 +2275,11 @@ module For_tests = struct
                  Token_id.default)
             |> Or_error.ok_exn
           in
-          L.set l loc { account with balance = Currency.Balance.of_int amount })
+          L.set l loc
+            { account with
+              balance =
+                Currency.Balance.of_uint64 (Unsigned.UInt64.of_int64 amount)
+            })
 
     let gen () : t Quickcheck.Generator.t =
       let tbl = Public_key.Compressed.Hash_set.create () in
@@ -2287,7 +2291,7 @@ module For_tests = struct
           let%bind kp =
             filter Keypair.gen ~f:(fun kp ->
                 not (Hash_set.mem tbl (Public_key.compress kp.public_key)))
-          and amount = Int.gen_incl min_init_balance max_init_balance in
+          and amount = Int64.gen_incl min_init_balance max_init_balance in
           Hash_set.add tbl (Public_key.compress kp.public_key) ;
           go ((kp, amount) :: acc) (n - 1)
       in

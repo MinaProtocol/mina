@@ -357,7 +357,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_snapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
