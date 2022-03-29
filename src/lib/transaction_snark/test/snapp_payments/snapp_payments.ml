@@ -133,23 +133,7 @@ let%test_module "Snapp payments tests" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              let (_ : unit * unit) = U.apply_parties ledger [ parties ] in
-              let _, (local_state, _) =
-                Ledger.apply_parties_unchecked ~constraint_constants
-                  ~state_view:U.state_view ledger parties
-                |> Or_error.ok_exn
-              in
-              let failure_status =
-                local_state.failure_status_tbl |> List.concat
-              in
-              let logger = Logger.create () in
-              [%log info] "failure_status"
-                ~metadata:
-                  [ ( "failure_status"
-                    , `List
-                        (List.map failure_status
-                           ~f:Transaction_status.Failure.to_yojson) )
-                  ])
+              U.apply_parties ledger [ parties ])
           |> fun _ -> ())
 
     let%test_unit "Consecutive snapps-based payments" =
@@ -205,22 +189,6 @@ let%test_module "Snapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  let _, (local_state, _) =
-                    Ledger.apply_parties_unchecked ~constraint_constants
-                      ~state_view:U.state_view ledger parties
-                    |> Or_error.ok_exn
-                  in
-                  let failure_status =
-                    local_state.failure_status_tbl |> List.concat
-                  in
-                  let logger = Logger.create () in
-                  [%log info] "failure_status"
-                    ~metadata:
-                      [ ( "failure_status"
-                        , `List
-                            (List.map failure_status
-                               ~f:Transaction_status.Failure.to_yojson) )
-                      ] ;
                   U.apply_parties_with_merges ledger [ parties ])))
 
     let%test_unit "snapps payments failed due to insufficient funds" =
@@ -231,7 +199,6 @@ let%test_module "Snapp payments tests" =
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               let fee = Fee.of_int 1_000_000 in
               let spec = List.hd_exn specs in
-              (*
               let sender_pk =
                 (fst spec.sender).public_key
                 |> Signature_lib.Public_key.compress
@@ -251,8 +218,7 @@ let%test_module "Snapp payments tests" =
                   Balance.(to_amount sender_balance)
                   Amount.(of_int 1_000_000)
                 |> Option.value_exn
-              in*)
-              let amount = Amount.of_int 1_000_000 in
+              in
               let receiver_count = 3 in
               let new_receiver =
                 Signature_lib.Public_key.compress new_kp.public_key
@@ -287,9 +253,6 @@ let%test_module "Snapp payments tests" =
               let failure_status =
                 local_state.failure_status_tbl |> List.concat
               in
-              let insufficient_funds =
-                Transaction_status.Failure.Source_insufficient_balance
-              in
               let logger = Logger.create () in
               [%log info] "failure_status"
                 ~metadata:
@@ -299,10 +262,6 @@ let%test_module "Snapp payments tests" =
                            ~f:Transaction_status.Failure.to_yojson) )
                   ] ;
               assert (
-                List.mem failure_status insufficient_funds
-                  ~equal:Transaction_status.Failure.equal )
-              (*
-                  let failures = U.apply_parties_with_failure_tbl ledger [ parties ] in 
-                  assert (List.member `Insufficient_funds failures)
-                  *)))
+                List.mem failure_status Transaction_status.Failure.Overflow
+                  ~equal:Transaction_status.Failure.equal )))
   end )
