@@ -47,13 +47,48 @@ let genesis_state_body =
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
+let genesis_state_body_hash =
+  Mina_state.Protocol_state.Body.hash genesis_state_body
+
 let init_stack = Pending_coinbase.Stack.empty
 
+let pending_coinbase_state_stack =
+  { Transaction_snark.Pending_coinbase_stack_state.source = init_stack
+  ; target =
+      Pending_coinbase.Stack.push_state genesis_state_body_hash init_stack
+  }
+
 let apply_parties ledger parties =
+  let parties =
+    match parties with
+    | [ ps ] ->
+        [ ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement pending_coinbase_state_stack
+          , ps )
+        ]
+    | ps1 :: ps2 :: rest ->
+        let ps1 =
+          ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement pending_coinbase_state_stack
+          , ps1 )
+        in
+        let unchanged_stack_state ps =
+          ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement
+              { pending_coinbase_state_stack with
+                source = pending_coinbase_state_stack.target
+              }
+          , ps )
+        in
+        let ps2 = unchanged_stack_state ps2 in
+        ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
+    | [] ->
+        []
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties
+      (`Ledger ledger) parties
   in
   let open Impl in
   List.fold ~init:((), ()) witnesses
@@ -86,8 +121,11 @@ let apply_parties_with_merges ledger partiess =
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
                 ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-                ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
-                [ parties ])
+                (`Ledger ledger)
+                [ ( `Pending_coinbase_init_stack init_stack
+                  , `Pending_coinbase_of_statement pending_coinbase_state_stack
+                  , parties )
+                ])
         with
         | Ok a ->
             a
@@ -265,9 +303,6 @@ module Wallet = struct
       ~receiver_pk:(Account.public_key receiver.account)
       amt fee nonce memo
 end
-
-let genesis_state_body_hash =
-  Mina_state.Protocol_state.Body.hash genesis_state_body
 
 (** Each transaction pushes the previous protocol state (used to validate
     the transaction) to the pending coinbase stack of protocol states*)

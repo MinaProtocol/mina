@@ -109,8 +109,18 @@ module Inputs = struct
                                   ~constraint_constants:M.constraint_constants
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
-                                  ~pending_coinbase_init_stack:w.init_stack
-                                  (`Sparse_ledger w.ledger) [ parties ]
+                                  (`Sparse_ledger w.ledger)
+                                  [ ( `Pending_coinbase_init_stack w.init_stack
+                                    , `Pending_coinbase_of_statement
+                                        { Transaction_snark
+                                          .Pending_coinbase_stack_state
+                                          .source =
+                                            input.source.pending_coinbase_stack
+                                        ; target =
+                                            input.target.pending_coinbase_stack
+                                        }
+                                    , parties )
+                                  ]
                                 |> List.rev)
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf

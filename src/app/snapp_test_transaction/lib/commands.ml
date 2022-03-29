@@ -83,11 +83,23 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
@@ -163,11 +175,23 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct

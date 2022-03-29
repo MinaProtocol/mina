@@ -26,6 +26,9 @@ val genesis_state_body_hash : State_hash.t
 
 val init_stack : Pending_coinbase.Stack_versioned.t
 
+val pending_coinbase_state_stack :
+  Transaction_snark.Pending_coinbase_stack_state.t
+
 val apply_parties : Ledger.t -> Parties.t list -> unit * unit
 
 val dummy_rule :

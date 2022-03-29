@@ -170,9 +170,12 @@ let%test_module "Fee payer tests" =
                 Or_error.try_with (fun () ->
                     Transaction_snark.parties_witnesses_exn
                       ~constraint_constants ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero
-                      ~pending_coinbase_init_stack:U.init_stack (`Ledger ledger)
-                      [ parties ])
+                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+                      [ ( `Pending_coinbase_init_stack U.init_stack
+                        , `Pending_coinbase_of_statement
+                            U.pending_coinbase_state_stack
+                        , parties )
+                      ])
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"
