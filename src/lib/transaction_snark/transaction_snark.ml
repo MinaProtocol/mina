@@ -3692,6 +3692,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
     in
     ref partiess
   in
+  let pending_coinbase_init_stack = ref Pending_coinbase.Stack.empty in
+  let pending_coinbase_stack_state =
+    ref
+      { Pending_coinbase_stack_state.source = Pending_coinbase.Stack.empty
+      ; target = Pending_coinbase.Stack.empty
+      }
+  in
   List.fold_right states_rev ~init:[]
     ~f:(fun
          { Parties_intermediate_state.kind
@@ -3753,25 +3760,15 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               empty_if_last (fun () ->
                   (current_commitment, current_full_commitment))
             in
-            let pending_coinbase_init_stack, pending_coinbase_stack_state =
-              match !remaining_parties with
-              | ( `Pending_coinbase_init_stack pending_coinbase_init_stack
-                , `Pending_coinbase_of_statement pending_coinbase_stack_state
-                , _parties )
-                :: _rest ->
-                  (pending_coinbase_init_stack, pending_coinbase_stack_state)
-              | _ ->
-                  failwith "Not enough remaining parties"
-            in
             ( []
             , next_commitment
             , next_full_commitment
-            , pending_coinbase_init_stack
-            , pending_coinbase_stack_state )
+            , !pending_coinbase_init_stack
+            , !pending_coinbase_stack_state )
         | `New -> (
             match !remaining_parties with
-            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack
-              , `Pending_coinbase_of_statement pending_coinbase_stack_state
+            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
               , parties )
               :: rest ->
                 let commitment', full_commitment' =
@@ -3780,11 +3777,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                 remaining_parties := rest ;
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
                 ( [ parties ]
                 , commitment'
                 , full_commitment'
-                , pending_coinbase_init_stack
-                , pending_coinbase_stack_state )
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
         | `Two_new -> (
@@ -3803,15 +3802,18 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
                 (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
-                ( [ parties1; parties2 ]
-                , commitment'
-                , full_commitment'
-                , pending_coinbase_init_stack1
-                , { pending_coinbase_stack_state1 with
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state :=
+                  { pending_coinbase_stack_state1 with
                     Pending_coinbase_stack_state.target =
                       pending_coinbase_stack_state2
                         .Pending_coinbase_stack_state.target
-                  } )
+                  } ;
+                ( [ parties1; parties2 ]
+                , commitment'
+                , full_commitment'
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
       in
