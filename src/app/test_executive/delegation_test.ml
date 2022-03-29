@@ -53,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~sender_pub_key:delegation_sender_pub_key
               ~receiver_pub_key:delegation_receiver_pub_key ~amount ~nonce
-              ~command_type:Send_delegation))
+              ~command_type:Send_delegation ~node_included_in:`Any_node))
     in
     Malleable_error.return ()
 end

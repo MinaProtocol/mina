@@ -336,6 +336,7 @@ module Dsl = struct
       -> amount:Amount.t
       -> nonce:Unsigned.uint32
       -> command_type:command_type
+      -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
   end
 

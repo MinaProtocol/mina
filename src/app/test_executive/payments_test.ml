@@ -141,6 +141,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ( Wait_condition.signed_command_to_be_included_in_frontier
                ~sender_pub_key ~receiver_pub_key ~amount ~nonce
                ~command_type:Send_payment
+               ~node_included_in:(`Node untimed_node_b)
            |> Wait_condition.with_timeouts
                 ~soft_timeout:
                   (Network_time_span.Literal
@@ -355,7 +356,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            ( Wait_condition.signed_command_to_be_included_in_frontier
                ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-               ~command_type:Send_payment
+               ~command_type:Send_payment ~node_included_in:(`Node timed_node_c)
            |> Wait_condition.with_timeouts
                 ~soft_timeout:
                   (Network_time_span.Literal
