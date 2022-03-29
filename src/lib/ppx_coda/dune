@@ -2,7 +2,22 @@
  (name ppx_coda)
  (public_name ppx_coda)
  (kind ppx_deriver)
- (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot ppx_register_event ppx_to_enum ppx_representatives core_kernel)
+ (libraries
+   ;; opam libraries
+   ocaml-migrate-parsetree
+   ppxlib.ast
+   ppx_deriving.api
+   compiler-libs.common
+   ppxlib
+   ppx_bin_prot
+   core_kernel
+   base
+   base.caml
+   ;; local libraries
+   ppx_representatives
+   ppx_register_event
+   ppx_to_enum
+)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))

@@ -1,7 +1,16 @@
 (library
  (name snark_keys)
  (public_name snark_keys)
- (libraries async transaction_snark blockchain_snark core)
+ (libraries
+   ;; opam libraries 
+   core
+   async
+   core_kernel
+   ;; local libraries
+   pickles
+   blockchain_snark
+   transaction_snark
+ )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx)))
