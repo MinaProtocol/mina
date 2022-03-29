@@ -828,7 +828,7 @@ module Node = struct
           ~validUntil:(Graphql_lib.Encoders.nonce valid_until)
           ~rawSignature:raw_signature ()
       in
-      [%log info] "send_payment_obj via with $variables "
+      [%log info] "send_payment_obj with $variables "
         ~metadata:[ ("variables", send_payment_obj#variables) ] ;
       exec_graphql_request ~logger ~node:t
         ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
