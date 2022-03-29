@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_int 30_000_000_000_000 in
-    let fee = Currency.Fee.of_int 10_000_000 in
+    let fee = Currency.Fee.of_int 1_000_000_000 in
     let test_constants = Engine.Network.constraint_constants network in
     let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
     let sender_kp =
@@ -138,9 +138,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
          in
          wait_for t
-           (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-              ~command_type:Send_payment))
+           ( Wait_condition.signed_command_to_be_included_in_frontier
+               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+               ~command_type:Send_payment
+           |> Wait_condition.with_timeouts
+                ~soft_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_sec (8. *. 3. *. 60.)))
+                  (* 8 slots, 3 minutes per slot.  timeouts are hardcoded because the intg test configurations aren't registering.  hardcoding should be removed when that's fixed *)
+                ~hard_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_sec (16. *. 3. *. 60.)))
+              (* 16 slots, 3 minutes per slot *) ))
     in
     let%bind () =
       section
@@ -164,6 +173,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.id untimed_node_b)
            |> Option.value ~default:[] |> List.length
          in
+         let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in
+         (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let node_a_expected =
            (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
            Currency.Amount.add
@@ -172,7 +183,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ( if Int.equal node_a_num_produced_blocks 0 then
                    Currency.Amount.zero
                  else
-                   Currency.Amount.scale test_constants.coinbase_amount
+                   Currency.Amount.scale coinbase_reward
                      (node_a_num_produced_blocks * 2)
                    |> Option.value_exn )
              |> Option.value_exn )
@@ -187,7 +198,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ( if Int.equal node_b_num_produced_blocks 0 then
                    Currency.Amount.zero
                  else
-                   Currency.Amount.scale test_constants.coinbase_amount
+                   Currency.Amount.scale coinbase_reward
                      (node_b_num_produced_blocks * 2)
                    |> Option.value_exn )
              |> Option.value_exn )
@@ -196,7 +207,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Option.value_exn
          in
          [%log info] "coinbase_amount: %s"
-           (Currency.Amount.to_formatted_string test_constants.coinbase_amount) ;
+           (Currency.Amount.to_formatted_string coinbase_reward) ;
          [%log info] "txn_amount: %s"
            (Currency.Amount.to_formatted_string amount) ;
          [%log info] "node_a_expected: %s"
@@ -232,7 +243,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Amount.to_int node_a_expected)
              (Currency.Balance.to_int node_b_balance)
              (Currency.Amount.to_int node_b_expected)
-             (Currency.Amount.to_int test_constants.coinbase_amount)
+             (Currency.Amount.to_int coinbase_reward)
              (Currency.Amount.to_int amount))
     in
     let%bind () =
@@ -342,9 +353,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-              ~command_type:Send_payment))
+           ( Wait_condition.signed_command_to_be_included_in_frontier
+               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+               ~command_type:Send_payment
+           |> Wait_condition.with_timeouts
+                ~soft_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_sec (8. *. 3. *. 60.)))
+                  (* 8 slots, 3 minutes per slot *)
+                ~hard_timeout:
+                  (Network_time_span.Literal
+                     (Time.Span.of_sec (16. *. 3. *. 60.)))
+              (* 16 slots, 3 minutes per slot *) ))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
