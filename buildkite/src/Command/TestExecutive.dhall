@@ -82,10 +82,6 @@ in
               Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
               Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
               Cmd.run "artifact-cache-helper.sh snarkyjs_test.tar.gz && tar -xzf snarkyjs_test.tar.gz",
-              Cmd.run (
-                  "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID " ++
-                      "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
-              ),
 
               -- Execute test based on BUILD image
               Cmd.run "MINA_DEB_CODENAME=buster ; source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
