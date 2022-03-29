@@ -23,6 +23,8 @@ features:
   # requires a secret but not pulicly available - it is available in the test namespace
   uploadBlocksToGCloud:
     enabled: false
+  seedPeersLists:
+    enabled: true
   customEntrypoint:
     enabled: false
     command: ""
