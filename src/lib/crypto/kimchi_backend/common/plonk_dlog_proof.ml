@@ -164,25 +164,24 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
           , Fq.Stable.V1.t array )
-          Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
+          Pickles_types.Plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let id = "plong_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
-             messages:
-               G.Affine.t Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
+             messages:G.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
                , Fq.t array )
-               Pickles_types.Dlog_plonk_types.Openings.Stable.V2.t
+               Pickles_types.Plonk_types.Openings.Stable.V2.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Dlog_plonk_types.Proof in
+          let open Pickles_types.Plonk_types.Proof in
           { messages; openings }
       end
 
@@ -225,7 +224,7 @@ module Make (Inputs : Inputs_intf) = struct
       (g g1, g g2)
     in
     let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
-    { Pickles_types.Dlog_plonk_types.Openings.Bulletproof.lr =
+    { Pickles_types.Plonk_types.Openings.Bulletproof.lr =
         Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
@@ -239,7 +238,7 @@ module Make (Inputs : Inputs_intf) = struct
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
-             Pickles_types.Dlog_plonk_types.Evals.
+             Pickles_types.Plonk_types.Evals.
                { w = tuple15_to_vec e.w
                ; z = e.z
                ; s = tuple6_to_vec e.s
@@ -266,7 +265,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
   let eval_to_backend
-      { Pickles_types.Dlog_plonk_types.Evals.w
+      { Pickles_types.Plonk_types.Evals.w
       ; z
       ; s
       ; generic_selector

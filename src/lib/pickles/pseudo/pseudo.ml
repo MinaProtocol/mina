@@ -40,13 +40,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   end
 
   module Domain = struct
-    let num_shifts = Nat.to_int Pickles_types.Dlog_plonk_types.Permuts.n
+    let num_shifts = Nat.to_int Pickles_types.Plonk_types.Permuts.n
 
     let shifts (type n) ((which, log2s) : (int, n) t)
         ~(shifts : log2_size:int -> Field.t array) :
-        Field.t Pickles_types.Dlog_plonk_types.Shifts.t =
+        Field.t Pickles_types.Plonk_types.Shifts.t =
       let shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
-      let open Pickles_types.Dlog_plonk_types.Shifts in
+      let open Pickles_types.Plonk_types.Shifts in
       let mk f = mask which (Vector.map shifts ~f) in
       Array.init num_shifts ~f:(fun i -> mk (fun a -> a.(i)))
 

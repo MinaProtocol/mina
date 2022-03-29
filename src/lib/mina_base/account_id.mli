@@ -100,9 +100,9 @@ module Checked : sig
   val to_input :
     var -> Snark_params.Tick.Field.Var.t Random_oracle.Input.Chunked.t
 
-  val equal : var -> var -> (Boolean.var, _) Checked.t
+  val equal : var -> var -> Boolean.var Checked.t
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
 
 [%%endif]

@@ -113,8 +113,7 @@ module Chain_hash = struct
             in
             As_prover.read typ res
           in
-          let (), x = Or_error.ok_exn (run_and_check comp ()) in
-          x
+          Or_error.ok_exn (run_and_check comp)
         in
         assert (equal unchecked checked))
 
