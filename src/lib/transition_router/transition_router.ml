@@ -138,12 +138,12 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         ~clear_reader ~collected_transitions ~transition_reader_ref
         ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier)
 
-let download_best_tip ~logger ~network ~verifier ~trust_system
+let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
   let num_peers = 16 in
   let%bind peers = Mina_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
-  let%map tips =
+  let%bind tips =
     Deferred.List.filter_map ~how:`Parallel peers ~f:(fun peer ->
         let open Deferred.Let_syntax in
         match%bind
@@ -204,11 +204,11 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
     ~metadata:
       [ ("actual", `Int (List.length tips)); ("expected", `Int num_peers) ]
     "Finished requesting tips. Got $actual / $expected" ;
+  let%map () = notify_online () in
   let res =
     List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
         Option.merge acc (Option.return enveloped_candidate_best_tip)
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
-            Mina_networking.fill_first_received_message_signal network ;
             let f x =
               External_transition.Validation.forget_validation_with_hash x
               |> With_hash.map ~f:External_transition.consensus_state
@@ -306,7 +306,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~precomputed_values ~catchup_mode =
+    ~consensus_local_state ~precomputed_values ~catchup_mode ~notify_online =
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -316,7 +316,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
   in
   match%bind
     Deferred.both
-      (download_best_tip ~logger ~network ~verifier ~trust_system
+      (download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
          ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values)
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
          ~consensus_local_state ~precomputed_values ~catchup_mode)
@@ -467,7 +467,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~precomputed_values ~catchup_mode =
+    ~precomputed_values ~catchup_mode ~notify_online =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -539,7 +539,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
-          ~consensus_local_state ~precomputed_values
+          ~consensus_local_state ~precomputed_values ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =

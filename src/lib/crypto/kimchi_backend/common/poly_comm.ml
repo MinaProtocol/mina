@@ -38,10 +38,9 @@ end
 type 'a t =
   [ `With_degree_bound of
     ('a * 'a) Pickles_types.Or_infinity.t
-    Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t
+    Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
-    ('a * 'a) Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-  ]
+    ('a * 'a) Pickles_types.Plonk_types.Poly_comm.Without_degree_bound.t ]
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
@@ -74,8 +73,7 @@ module Make (Inputs : Inputs_intf) = struct
   let with_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
-        Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t) :
-      Backend.t =
+        Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
     Backend.make
       (Array.map ~f:or_infinity_to_backend commitment.unshifted)
       (Some (or_infinity_to_backend commitment.shifted))
@@ -83,8 +81,8 @@ module Make (Inputs : Inputs_intf) = struct
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
-        Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t) :
-      Backend.t =
+        Pickles_types.Plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t
+      =
     Backend.make
       (Array.map
          ~f:(fun x -> Kimchi.Foundations.Finite (fst x, snd x))
@@ -103,7 +101,7 @@ module Make (Inputs : Inputs_intf) = struct
     , Option.map (Backend.shifted t) ~f:Curve.Affine.of_backend )
 
   let of_backend_with_degree_bound (t : Backend.t) : t =
-    let open Pickles_types.Dlog_plonk_types.Poly_comm in
+    let open Pickles_types.Plonk_types.Poly_comm in
     match Backend.shifted t with
     | None ->
         assert false
@@ -118,14 +116,14 @@ module Make (Inputs : Inputs_intf) = struct
      type 'a t =
        [ `With_degree_bound of
          ('a * 'a) Pickles_types.Or_infinity.t
-         Pickles_types.Dlog_plonk_types.Poly_comm.With_degree_bound.t
+         Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t
        | `Without_degree_bound of
-         ('a * 'a) Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
+         ('a * 'a) Pickles_types.Plonk_types.Poly_comm.Without_degree_bound.t
        ]
   *)
 
   let of_backend_without_degree_bound (t : Backend.t) =
-    let open Pickles_types.Dlog_plonk_types.Poly_comm in
+    let open Pickles_types.Plonk_types.Poly_comm in
     let unshifted = Backend.unshifted t in
     match Backend.shifted t with
     | None ->

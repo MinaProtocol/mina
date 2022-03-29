@@ -182,8 +182,7 @@ module Statement : sig
     module Checked : sig
       type t = var
 
-      val to_input :
-        var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
+      val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
 
       (* This is actually a checked function. *)
       val to_field_elements : var -> Field.Var.t array
@@ -454,12 +453,12 @@ val constraint_system_digests :
 
 (* Every circuit must have at least 1 of each type of constraint.
    This function can be used to add the missing constraints *)
-val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
+val dummy_constraints : unit -> unit Tick.Checked.t
 
 module Base : sig
   val check_timing :
-       balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
-    -> timed_balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+       balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
+    -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
     -> account:
          ( 'b
          , 'c
@@ -482,12 +481,11 @@ module Base : sig
     -> txn_amount:Currency.Amount.var option
     -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
     -> ( [> `Min_balance of Currency.Balance.var ]
-         * ( Tick.Boolean.var
-           , Mina_numbers.Global_slot.Checked.var
-           , Currency.Balance.var
-           , Currency.Amount.var )
-           Account_timing.As_record.t
-       , 'a )
+       * ( Tick.Boolean.var
+         , Mina_numbers.Global_slot.Checked.var
+         , Currency.Balance.var
+         , Currency.Amount.var )
+         Account_timing.As_record.t )
        Tick.Checked.t
 
   module Parties_snark : sig
