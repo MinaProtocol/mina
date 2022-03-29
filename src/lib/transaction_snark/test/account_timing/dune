@@ -22,6 +22,7 @@
    mina_ledger
    mina_base
    mina_transaction
+   mina_compile_config
    currency
    mina_state
    signature_lib
