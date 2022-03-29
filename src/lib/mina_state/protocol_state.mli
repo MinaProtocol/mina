@@ -58,7 +58,7 @@ module Body : sig
 
   val hash : Value.t -> State_body_hash.t
 
-  val hash_checked : var -> (State_body_hash.var, _) Checked.t
+  val hash_checked : var -> State_body_hash.var Checked.t
 
   val consensus_state : (_, _, 'a, _) Poly.t -> 'a
 
@@ -115,7 +115,7 @@ val genesis_state_hash :
   ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
 val genesis_state_hash_checked :
-  state_hash:State_hash.var -> var -> (State_hash.var, _) Checked.t
+  state_hash:State_hash.var -> var -> State_hash.var Checked.t
 
 val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
 
@@ -128,7 +128,7 @@ val negative_one :
   -> consensus_constants:Consensus.Constants.t
   -> Value.t
 
-val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
+val hash_checked : var -> (State_hash.var * State_body_hash.var) Checked.t
 
 val hashes : Value.t -> State_hash.State_hashes.t
 

@@ -94,7 +94,7 @@ module Stable = struct
 end]
 
 let dummy_commitments g =
-  let open Dlog_plonk_types in
+  let open Plonk_types in
   { Plonk_verification_key_evals.sigma_comm =
       Vector.init Permuts.n ~f:(fun _ -> g)
   ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
