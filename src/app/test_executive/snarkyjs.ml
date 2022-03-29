@@ -38,14 +38,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
+  let wait_and_stdout ~logger process =
+    let open Deferred.Let_syntax in
+    let%map output = Async_unix.Process.collect_output_and_wait process in
+    let stdout = String.strip output.stdout in
+    [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
+    if not (String.is_empty output.stderr) then
+      [%log warn] "Stderr: $stderr"
+        ~metadata:[ ("stdout", `String output.stderr) ] ;
+    stdout
+
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let wait_for_zkapp parties =
       let with_timeout =
-        let soft_slots = 3 in
-        let soft_timeout = Network_time_span.Slots soft_slots in
-        let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+        let soft_timeout = Network_time_span.Slots 3 in
+        let hard_timeout = Network_time_span.Slots 4 in
         Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
       in
       let%map () =
@@ -76,14 +85,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                ]
              ()
          in
-         let%map.Deferred output =
-           Async_unix.Process.collect_output_and_wait process
-         in
-         [%log info] "Stdout: $stdout"
-           ~metadata:[ ("stdout", `String output.stdout) ] ;
-         [%log warn] "Stderr: $stderr"
-           ~metadata:[ ("stdout", `String output.stderr) ] ;
-         output.stdout)
+         wait_and_stdout ~logger process)
         (wait_for t (Wait_condition.node_to_initialize node))
     in
     let parties_deploy_contract =
@@ -102,13 +104,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~args:[ parties_query; parties_deploy_contract_str; uri ]
           ()
       in
-      let%map.Deferred output =
-        Async_unix.Process.collect_output_and_wait process
-      in
-      [%log info] "Stdout: $stdout"
-        ~metadata:[ ("stdout", `String output.stdout) ] ;
-      [%log warn] "Stderr: $stderr"
-        ~metadata:[ ("stdout", `String output.stderr) ]
+      let%map _stdout = wait_and_stdout ~logger process in
+      ()
     in
     let%bind () =
       section
