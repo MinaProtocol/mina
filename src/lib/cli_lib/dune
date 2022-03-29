@@ -3,9 +3,45 @@
  (public_name cli_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
-            mina_base secrets work_selector graphql_lib rosetta_coding
-            rosetta_lib)
+ (libraries
+   ;; opam libraries
+   result
+   sexplib0
+   async.async_command
+   base.caml
+   async_kernel
+   async.async_rpc
+   core_kernel
+   yojson
+   sodium
+   core
+   async_unix
+   ppx_deriving_yojson.runtime
+   async
+   uri
+   async_rpc_kernel
+   bin_prot.shape
+   stdio
+   ;; local libraries
+   genesis_constants
+   random_oracle
+   pickles
+   mina_numbers
+   signature_lib
+   currency
+   rosetta_lib
+   secrets
+   mina_base
+   work_selector
+   rosetta_coding
+   logger
+   interpolator_lib
+   mina_compile_config
+   snark_params
+   pickles.backend
+   consensus.vrf
+   error_json
+   kimchi_backend.pasta)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))

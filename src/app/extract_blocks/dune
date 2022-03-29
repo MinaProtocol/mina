@@ -3,16 +3,33 @@
  (name extract_blocks)
  (public_name extract_blocks)
  (libraries
+   ;; opam libraries
+   async_unix
+   core
+   base
+   integers
+   caqti-async
+   caqti-driver-postgresql
    async
    core_kernel
    caqti
-   caqti-async
-   caqti-driver-postgresql
+   async_kernel
+   uri
+   async.async_command
+   ;; local libraries
    archive_lib
+   data_hash_lib
+   signature_lib
+   logger
+   mina_caqti
    block_time
    mina_numbers
-   logger
-   mina_base)
+   mina_base
+   mina_transaction
+   currency
+   unsigned_extended
+   error_json
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))

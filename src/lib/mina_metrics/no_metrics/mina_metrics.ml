@@ -265,6 +265,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -451,6 +453,14 @@ module Block_latency = struct
   end
 
   module Inclusion_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
+
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()

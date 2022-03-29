@@ -117,7 +117,12 @@ module Compressed = struct
   let empty = Poly.{ x = Field.zero; is_odd = false }
 
   let to_input { Poly.x; is_odd } =
-    { Random_oracle.Input.field_elements = [| x |]
+    { Random_oracle.Input.Chunked.field_elements = [| x |]
+    ; packeds = [| (Field.project [ is_odd ], 1) |]
+    }
+
+  let to_input_legacy { Poly.x; is_odd } =
+    { Random_oracle.Input.Legacy.field_elements = [| x |]
     ; bitstrings = [| [ is_odd ] |]
     }
 
@@ -146,7 +151,12 @@ module Compressed = struct
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
-    let to_input = to_input
+    let to_input ({ x; is_odd } : var) =
+      { Random_oracle.Input.Chunked.field_elements = [| x |]
+      ; packeds = [| ((is_odd :> Field.Var.t), 1) |]
+      }
+
+    let to_input_legacy = to_input_legacy
 
     let if_ cond ~then_:t1 ~else_:t2 =
       let%map x = Field.Checked.if_ cond ~then_:t1.Poly.x ~else_:t2.Poly.x
@@ -292,7 +302,7 @@ module Uncompressed = struct
     and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
     (x, y)
 
-  let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+  let%snarkydef compress_var ((x, y) : var) : Compressed.var Checked.t =
     let open Compressed_poly in
     let%map is_odd = parity_var y in
     { Poly.x; is_odd }

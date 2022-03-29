@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Mina_base_import
 module Payload = Signed_command_payload
 
 module Poly : sig
@@ -17,9 +17,9 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
@@ -31,8 +31,7 @@ module Stable : sig
 
     include Hashable.S with type t := t
 
-    val accounts_accessed :
-      next_available_token:Token_id.t -> t -> Account_id.t list
+    val accounts_accessed : t -> Account_id.t list
   end
 end]
 

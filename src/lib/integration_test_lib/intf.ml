@@ -51,7 +51,7 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       type signed_command_result =
-        { id : string; hash : string; nonce : Unsigned.uint32 }
+        { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
 
       val send_payment :
            logger:Logger.t
@@ -89,9 +89,16 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      (** returned string is the transaction id *)
+      val send_snapp :
+           logger:Logger.t
+        -> t
+        -> parties:Mina_base.Parties.t
+        -> string Deferred.Or_error.t
+
       val must_send_test_payments :
-           repeat_count:Unsigned.uint32
-        -> repeat_delay_ms:Unsigned.uint32
+           repeat_count:Unsigned.UInt32.t
+        -> repeat_delay_ms:Unsigned.UInt32.t
         -> logger:Logger.t
         -> t
         -> senders:Signature_lib.Private_key.t list
@@ -100,17 +107,56 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val get_balance :
+      val get_balance_total :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+        -> Currency.Balance.t Deferred.Or_error.t
 
-      val must_get_balance :
+      val must_get_balance_total :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
+
+      val get_balance_liquid :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Deferred.Or_error.t
+
+      val must_get_balance_liquid :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Malleable_error.t
+
+      val get_balance_locked :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Deferred.Or_error.t
+
+      val must_get_balance_locked :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t option Malleable_error.t
+
+      val get_account_permissions :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Permissions.t Deferred.Or_error.t
+
+      (** the returned Update.t is constructed from the fields of the
+          given account, as if it had been applied to the account
+      *)
+      val get_account_update :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Party.Update.t Deferred.Or_error.t
 
       val get_peer_id :
            logger:Logger.t
@@ -302,9 +348,15 @@ module Dsl = struct
          sender_pub_key:Public_key.Compressed.t
       -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
-      -> nonce:Unsigned.uint32
+      -> nonce:Mina_numbers.Account_nonce.t
       -> command_type:command_type
       -> t
+
+    val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
+
+    (** generates a wait condition based on the network state with soft timeout
+    of 1hr and hard timeout of 2hrs*)
+    val network_state : description:string -> f:(Network_state.t -> bool) -> t
   end
 
   module type Util_intf = sig
@@ -313,6 +365,9 @@ module Dsl = struct
     val pub_key_of_node :
          Engine.Network.Node.t
       -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+
+    val priv_key_of_node :
+      Engine.Network.Node.t -> Signature_lib.Private_key.t Malleable_error.t
 
     val check_common_prefixes :
          tolerance:int

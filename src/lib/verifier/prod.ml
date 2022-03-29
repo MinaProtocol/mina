@@ -6,6 +6,10 @@ open Mina_base
 open Mina_state
 open Blockchain_snark
 
+type invalid = Common.invalid [@@deriving bin_io_unversioned]
+
+let invalid_to_string = Common.invalid_to_string
+
 type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
@@ -16,12 +20,12 @@ module Worker_state = struct
     val verify_commands :
          Mina_base.User_command.Verifiable.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
-         | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
-           list ]
+           list
+         | invalid ]
          list
          Deferred.t
 
@@ -67,10 +71,13 @@ module Worker_state = struct
                  List.concat_map cs ~f:(function
                    | `Valid _ ->
                        []
-                   | `Invalid ->
-                       []
                    | `Valid_assuming (_, xs) ->
-                       xs)
+                       xs
+                   | `Invalid_keys _
+                   | `Invalid_signature _
+                   | `Invalid_proof
+                   | `Missing_verification_key _ ->
+                       [])
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify
@@ -80,10 +87,16 @@ module Worker_state = struct
                List.map cs ~f:(function
                  | `Valid c ->
                      `Valid c
-                 | `Invalid ->
-                     `Invalid
                  | `Valid_assuming (c, xs) ->
-                     if all_verified then `Valid c else `Valid_assuming xs)
+                     if all_verified then `Valid c else `Valid_assuming xs
+                 | `Invalid_keys keys ->
+                     `Invalid_keys keys
+                 | `Invalid_signature keys ->
+                     `Invalid_signature keys
+                 | `Invalid_proof ->
+                     `Invalid_proof
+                 | `Missing_verification_key keys ->
+                     `Missing_verification_key keys)
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -107,10 +120,16 @@ module Worker_state = struct
                    match Common.check c with
                    | `Valid c ->
                        `Valid c
-                   | `Invalid ->
-                       `Invalid
                    | `Valid_assuming (c, _) ->
-                       `Valid c)
+                       `Valid c
+                   | `Invalid_keys keys ->
+                       `Invalid_keys keys
+                   | `Invalid_signature keys ->
+                       `Invalid_signature keys
+                   | `Invalid_proof ->
+                       `Invalid_proof
+                   | `Missing_verification_key keys ->
+                       `Missing_verification_key keys)
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return true
@@ -133,12 +152,12 @@ module Worker = struct
           ( 'w
           , User_command.Verifiable.t list
           , [ `Valid of User_command.Valid.t
-            | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Snapp_statement.t
               * Pickles.Side_loaded.Proof.t )
-              list ]
+              list
+            | invalid ]
             list )
           F.t
       }
@@ -196,12 +215,12 @@ module Worker = struct
               ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
-                  | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Snapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
-                    list ]
+                    list
+                  | invalid ]
                   list]
               , verify_commands )
         }
@@ -214,7 +233,7 @@ module Worker = struct
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
-              (Logger.Transport.File_system.dumb_logrotate
+              (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;

@@ -1,6 +1,15 @@
 (library
  (public_name mina_plugins)
  (name mina_plugins)
- (libraries core_kernel dynlink mina_lib)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   dynlink
+   core
+   base
+   ;; local libraries
+   mina_lib
+   logger
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version)))
