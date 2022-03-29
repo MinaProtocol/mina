@@ -1005,7 +1005,7 @@ module Zkapp_predicate_protocol_states = struct
         ; int
         ]
 
-  let table_name = "zkapp_predicate_protocol_states"
+  let table_name = "zkapp_precondition_protocol_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1086,7 +1086,7 @@ module Zkapp_party_body = struct
     ; sequence_events_ids : int array
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_predicate_protocol_state_id : int
+    ; zkapp_precondition_protocol_state_id : int
     ; use_full_commitment : bool
     }
   [@@deriving fields, hlist]
@@ -1131,7 +1131,7 @@ module Zkapp_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_predicate_protocol_state_id =
+    let%bind zkapp_precondition_protocol_state_id =
       Zkapp_predicate_protocol_states.add_if_doesn't_exist
         (module Conn)
         body.protocol_state
@@ -1160,7 +1160,7 @@ module Zkapp_party_body = struct
       ; sequence_events_ids
       ; call_data_id
       ; call_depth
-      ; zkapp_predicate_protocol_state_id
+      ; zkapp_precondition_protocol_state_id
       ; use_full_commitment
       }
     in
