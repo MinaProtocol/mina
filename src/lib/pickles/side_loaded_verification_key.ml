@@ -287,9 +287,8 @@ let dummy : t =
   ; max_width = Width.zero
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
-       { sigma_comm = Vector.init Dlog_plonk_types.Permuts.n ~f:(fun _ -> g)
-       ; coefficients_comm =
-           Vector.init Dlog_plonk_types.Columns.n ~f:(fun _ -> g)
+       { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
+       ; coefficients_comm = Vector.init Plonk_types.Columns.n ~f:(fun _ -> g)
        ; generic_comm = g
        ; psm_comm = g
        ; complete_add_comm = g

@@ -124,8 +124,7 @@ module Checked = struct
        ; Length.Checked.to_input var.slots_per_epoch
       |]
 
-  let to_epoch_and_slot (t : t) :
-      (Epoch.Checked.t * Slot.Checked.t, _) Checked.t =
+  let to_epoch_and_slot (t : t) : (Epoch.Checked.t * Slot.Checked.t) Checked.t =
     let%map epoch, slot =
       T.Checked.div_mod t.slot_number
         (T.Checked.Unsafe.of_field (Length.Checked.to_field t.slots_per_epoch))

@@ -151,7 +151,7 @@ let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
   }
 
 let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
- fun _ x -> (x, read_typ input)
+ fun _ -> read_typ input
 
 [%%endif]
 

@@ -9,6 +9,7 @@ module Graphql_raw = struct
           < graphql_arg : (unit -> 'ty Schema.Arg.arg_typ) ref
           ; nullable_graphql_arg : (unit -> 'nullable Schema.Arg.arg_typ) ref
           ; map : ('ty -> 'result) ref
+          ; skip : bool ref
           ; .. >
           as
           'row
@@ -64,7 +65,7 @@ module Graphql_raw = struct
         in
         let () =
           let inner_acc = acc#graphql_arg_accumulator in
-          if annotations.skip then ()
+          if annotations.skip || !(f_input#skip) then ()
           else
             let arg =
               Schema.Arg.arg name ?doc:annotations.doc
@@ -104,7 +105,7 @@ module Graphql_raw = struct
         ( (fun _creator_input ->
             !(f_input#map)
             @@
-            if annotations.skip then
+            if annotations.skip || !(f_input#skip) then
               match skip_data with
               | Some data ->
                   data
@@ -153,6 +154,7 @@ module Graphql_raw = struct
         acc
 
       let skip obj =
+        obj#skip := true ;
         (obj#graphql_arg :=
            fun () ->
              failwith "Unexpected: This obj#graphql_arg should be skipped") ;
@@ -254,7 +256,7 @@ module Graphql_raw = struct
         acc#graphql_fields_accumulator :=
           { Accumulator.T.run =
               (fun () ->
-                if annotations.skip then None
+                if annotations.skip || !(t_field#skip) then None
                 else
                   Schema.field
                     (Option.value annotations.name
@@ -432,7 +434,7 @@ module Graphql_query = struct
     in
     let rest = !(acc_obj#graphql_query_accumulator) in
     acc_obj#graphql_query_accumulator :=
-      ( if annotations.skip then None
+      ( if annotations.skip || !(t_field#skip) then None
       else
         Some
           ( Option.value annotations.name
@@ -562,7 +564,10 @@ let%test_module "Test" =
       let graphql_creator = ref (fun _ -> failwith "unimplemented7") in
       let graphql_query = ref None in
       let graphql_query_accumulator = ref [] in
+      let skip = ref false in
       object
+        method skip = skip
+
         method graphql_fields = graphql_fields
 
         method graphql_arg = graphql_arg

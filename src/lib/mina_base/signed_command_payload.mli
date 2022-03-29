@@ -96,8 +96,7 @@ module Common : sig
   module Checked : sig
     val to_input_legacy :
          var
-      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
-         , _ )
+      -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
          Snark_params.Tick.Checked.t
 
     val constant : t -> var
