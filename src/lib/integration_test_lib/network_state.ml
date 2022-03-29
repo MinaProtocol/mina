@@ -67,7 +67,7 @@ module Make
                   let snarked_ledgers_generated =
                     if block_produced.snarked_ledger_generated then 1 else 0
                   in
-                  let node_block_list =
+                  let blocks_produced_by_node_map =
                     Core.String.Map.update state.blocks_produced_by_node
                       (Node.id node) ~f:(fun ls_opt ->
                         match ls_opt with
@@ -84,7 +84,7 @@ module Make
                   ; snarked_ledgers_generated =
                       state.snarked_ledgers_generated
                       + snarked_ledgers_generated
-                  ; blocks_produced_by_node = node_block_list
+                  ; blocks_produced_by_node = blocks_produced_by_node_map
                   }
                 else state))
         : _ Event_router.event_subscription ) ;

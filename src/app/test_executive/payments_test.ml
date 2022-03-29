@@ -184,7 +184,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ( Currency.Amount.add
                  (* 300_000_000_000_000 is hardcoded the original amount, change this if original amount changes *)
                  (Currency.Amount.of_int 300_000_000_000_000)
-                 ( if Int.equal node_a_num_produced_blocks 0 then
+                 ( if Int.equal node_b_num_produced_blocks 0 then
                    Currency.Amount.zero
                  else
                    Currency.Amount.scale test_constants.coinbase_amount
@@ -201,19 +201,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Currency.Amount.to_formatted_string amount) ;
          [%log info] "node_a_expected: %s"
            (Currency.Amount.to_formatted_string node_a_expected) ;
-          [%log info] "node_a_balance: %s"
+         [%log info] "node_a_balance: %s"
            (Currency.Balance.to_formatted_string node_a_balance) ;
-           [%log info] "node_a_num_produced_blocks: %d"
-           ( node_a_num_produced_blocks) ;
+         [%log info] "node_a_num_produced_blocks: %d" node_a_num_produced_blocks ;
          [%log info] "node_b_expected: %s"
            (Currency.Amount.to_formatted_string node_b_expected) ;
          [%log info] "node_b_balance: %s"
            (Currency.Balance.to_formatted_string node_b_balance) ;
-           [%log info] "node_b_num_produced_blocks: %d"
-           ( node_b_num_produced_blocks) ;
+         [%log info] "node_b_num_produced_blocks: %d" node_b_num_produced_blocks ;
          if
            (* node_a is the receiver *)
-           (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
+           (* node_a_balance >= 400_000_000_000_000 + node_a_num_produced_blocks*possible_coinbase_reward*2 + txn_amount *)
            (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount node_a_balance)
