@@ -1,5 +1,5 @@
 ---
-{{-  if .Values.rosetta.enabled}}
+{{- if .Values.rosetta.enabled}}
 apiVersion: apps/v1
 {{- if .Values.features.persistence.enabled}}
 kind: StatefulSet
@@ -7,19 +7,19 @@ kind: StatefulSet
 kind: Deployment
 {{- end}}
 metadata:
-  name: {{.Values.name}}
+  name: {{.Values.name}}-rosetta
   labels:
-    app: {{.Values.name}}
+    app: {{.Values.name}}-rosetta
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{.Values.name}}
+      app: {{.Values.name}}-rosetta
   serviceName: "nginx"
   template:
     metadata:
       labels:
-        app: {{.Values.name}}
+        app: {{.Values.name}}-rosetta
         testnet: {{.Values.testnetName}}
         role: rosetta-node
         class: "rosetta-node"
@@ -38,36 +38,22 @@ spec:
                 - key: "cloud.google.com/gke-preemptible"
                   operator: In
                   values: ["true"]
-      initContainers:
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: fix-perms
-        image: busybox:latest
-        command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
-        volumeMounts:
-        - mountPath: "/keys/"
-          name: private-keys
-          readOnly: true
-        - mountPath: /wallet-keys
-          name: wallet-keys
-      {{- end }}
       containers:
       - name: mina-rosetta
         image:  "{{.Values.rosetta.image.repository }}:{{.Values.rosetta.image.tag}}"
         imagePullPolicy: {{.Values.rosetta.image.pullPolicy}}
-        entrypoint: "mina-rosetta"
         {{- if .Values.features.customEntrypoint.enabled}}
         command: [ {{ .Values.features.customEntrypoint.command}} ]
         {{- end }}
-        volumeMounts:
-        - name: destination-libp2p
-          mountPath: /root/libp2p-keys
-          readOnly: true
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
         resources:
           limits:
           requests:
             memory: {{.Values.resources.requests.memory}}
             cpu: {{.Values.resources.requests.cpu}}
-            rayonThreads: {{.Values.resources.requests.rayonThreads}}
         args:
         - "mina-rosetta"
         - "run"
@@ -108,6 +94,9 @@ spec:
         - "-upload-blocks-to-gcloud"
         - "true"
         {{- end }}
+        {{- range .Values.rosetta.args}}
+        - {{ .| quote }}
+        {{- end }}
         env:
         - name: DAEMON_REST_PORT
           value: {{.Values.ports.graphql | quote}}
@@ -121,8 +110,8 @@ spec:
           value: {{.Values.ports.metrics | quote}}
         - name: DAEMON_SERVER_PORT
           value: {{.Values.ports.archive | quote}}
-        - name: DAEMON_PG_CONN_PORT 
-          value: {{.Values.archive.pg_conn | quote}} 
+        - name: DAEMON_PG_CONN_PORT
+          value: {{.Values.archive.pg_conn | quote}}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_CLIENT_TRUSTLIST
@@ -137,31 +126,10 @@ spec:
           value: "features_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
-        {{- if .Values.features.privateKeySecret.enabled}}
-        - name: CODA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        - name: MINA_PRIVKEY_PASS
-          valueFrom:
-            secretKeyRef:
-            - name: {{ .Values.features.privateKeySecret.secretName | quote}}
-              key: password
-        {{- end }}
         ports:
         - name: archive-port
-          protocol: TCP    
+          protocol: TCP
           containerPort: {{.Values.ports.archive}}
-        - name: client-port
-          protocol: TCP
-          containerPort: {{.Values.ports.client}}
-        - name: graphql-port
-          protocol: TCP
-          containerPort: {{.Values.ports.graphql}}
-        - name: postgres-port
-          protocol: TCP
-          containerPort: {{ .Values.ports.postgres }}
         - name: metrics-port
           protocol: TCP
           containerPort: {{.Values.ports.metrics}}
@@ -169,13 +137,6 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-        volumeMounts:
-        - name: config-dir
-          mountPath: "/root/.mina-config"
-        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
-        - name: gcloud-keyfile
-          mountPath: "/gcloud/"
-        {{- end }}
       {{- if .Values.features.privateKeySecret.enabled}}
       - name: private-keys
         secret:
@@ -187,6 +148,7 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
+      volumes:
       - name: destination-libp2p
         emptyDir: {}
       - name: config-dir

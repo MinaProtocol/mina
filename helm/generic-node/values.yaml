@@ -1,7 +1,7 @@
 ---
 name: "generic-node"
 
-testnetName: "testnet"
+testnetName: "mainnet"
 
 image:
   repository: minaprotocol/mina-daemon
@@ -22,21 +22,19 @@ features:
     enabled: false
   # requires a secret but not pulicly available - it is available in the test namespace
   uploadBlocksToGCloud:
-    enabled: true
-  seedPeersLists:
-    enabled:  true 
-  seedPeers:
-    enabled: true
+    enabled: false
   customEntrypoint:
     enabled: false
     command: ""
   prometheus:
     enabled: true
+  snarkcoordinator:
+    enables: false
   persistence:
-    # for every deploy the name must be unique 
+    # for every deploy the name must be unique
     enabled: true
     name: "generic-node-volume"
-    storageClass: standard-delete
+    storageClass: standard
     mountPath: /data/
     size: 100Gi
   privateKeySecret:
@@ -44,11 +42,14 @@ features:
     secretName: "generic-node-devnet-bp-key"
 
 daemon:
-  enabled: false
+  enabled: true
   args:
     - "--libp2p-metrics-port"
     - "9000"
   seedPeers: []
+
+persistence:
+  enabled: false
 
 coordinator:
   enabled: false
@@ -57,7 +58,7 @@ coordinator:
   workSelectionAlgorithm: seq #seq OR rand
 
 archive:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-archive
     pullPolicy: IfNotPresent
@@ -65,13 +66,13 @@ archive:
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
     tag: latest
   pg_conn: 'postgres://postgresql:5432'
-  graphql_host: 'http://127.0.0.1'  
+  graphql_host: 'http://127.0.0.1'
 
 libp2p:
   seed:
@@ -80,14 +81,14 @@ libp2p:
     enabled: false
     secretName: "generic-node-devnet-libp2p-key"
   loadBalancer:
-    enabled: false
+    enabled: true
 
 ports:
   client: "8301"
   graphql: "3085"
   metrics: "10001"
   p2p: "10909"
-  nodePort: "30004"
+  nodePort: "30011"
   postgres: "5432"
   archive: "3086"
   rosetta: "3087"
@@ -96,7 +97,7 @@ resources:
   limits:
   requests:
     memory: "16Gi"
-    cpu: "8"
+    cpu: "12"
     rayonThreads: "6"
 
 healthcheck:
@@ -115,4 +116,3 @@ nodeSelector:
 restartEveryMins: ""
 restartNodes: ""
 seedPeersURL: ""
----
