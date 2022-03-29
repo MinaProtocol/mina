@@ -138,18 +138,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-               ~command_type:Send_payment
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot.  timeouts are hardcoded because the intg test configurations aren't registering.  hardcoding should be removed when that's fixed *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+              ~command_type:Send_payment))
     in
     let%bind () =
       section
@@ -173,7 +164,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.id untimed_node_b)
            |> Option.value ~default:[] |> List.length
          in
-         let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in
+         let coinbase_reward = test_constants.coinbase_amount in
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let node_a_expected =
            (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
@@ -378,18 +369,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-               ~command_type:Send_payment
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+              ~command_type:Send_payment))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
