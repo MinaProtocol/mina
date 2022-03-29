@@ -107,28 +107,20 @@ let%test_module "transaction_status" =
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
     let create_pool ~frontier_broadcast_pipe =
-      let pool_reader, _ =
-        Strict_pipe.(
-          create ~name:"transaction_status incomming diff" Synchronous)
-      in
-      let local_reader, local_writer =
-        Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
-      in
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
           ~verifier
       in
-      let transaction_pool =
+      let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~time_controller
+          ~time_controller ~logger ~frontier_broadcast_pipe
           ~expiry_ns:
             (Time_ns.Span.of_hr
                (Float.of_int
                   precomputed_values.genesis_constants.transaction_expiry_hr))
-          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
-          ~frontier_broadcast_pipe
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -144,7 +136,7 @@ let%test_module "transaction_status" =
              Deferred.unit) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-      (transaction_pool, local_writer)
+      (transaction_pool, local_sink)
 
     let%test_unit "If the transition frontier currently doesn't exist, the \
                    status of a sent transaction will be unknown" =
@@ -156,7 +148,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
+                Transaction_pool.Local_sink.push local_diffs_writer
                   ([ Signed_command user_command ], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -180,7 +172,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
+                Transaction_pool.Local_sink.push local_diffs_writer
                   ([ Signed_command user_command ], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -217,7 +209,7 @@ let%test_module "transaction_status" =
                 Non_empty_list.uncons user_commands
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
+                Transaction_pool.Local_sink.push local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
                         User_command.Signed_command x)
                   , Fn.const () )

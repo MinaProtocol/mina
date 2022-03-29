@@ -3,16 +3,15 @@ open Core_kernel
 module SC = Scalar_challenge
 open Import
 open Util
-open Types.Pairing_based
+open Types.Step
 open Pickles_types
 open Common
 open Import
 module S = Sponge
 
 module Make
-    (Inputs : Intf.Pairing_main_inputs.S
+    (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.prover_state = unit
                  and type Impl.Bigint.t = Backend.Tick.Bigint.R.t
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
@@ -270,7 +269,7 @@ struct
                    ~f:(Array.map ~f:(fun x -> `Finite x)))
                 (Vector.map with_degree_bound
                    ~f:
-                     (let open Dlog_plonk_types.Poly_comm.With_degree_bound in
+                     (let open Plonk_types.Poly_comm.With_degree_bound in
                      fun { shifted; unshifted } ->
                        let f x = `Maybe_finite x in
                        { unshifted = Array.map ~f unshifted
@@ -307,12 +306,12 @@ struct
       (m1 :
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t )
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t)
+        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t)
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t )
-        Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
-    let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
+        Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t) =
+    let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal ({ SC.SC.inner = t1 } : _ Import.Scalar_challenge.t)
         ({ SC.SC.inner = t2 } : _ Import.Scalar_challenge.t) =
@@ -340,12 +339,12 @@ struct
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array)
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
-      ~(messages : _ Dlog_plonk_types.Messages.t) ~openings_proof
+      ~(messages : _ Plonk_types.Messages.t) ~openings_proof
       ~(plonk :
          ( _
          , _
          , _ Shifted_value.Type2.t )
-         Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+         Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     with_label "incrementally_verify_proof" (fun () ->
         let receive ty f =
           with_label "receive" (fun () ->
@@ -354,7 +353,7 @@ struct
         in
         let sample () = squeeze_challenge sponge in
         let sample_scalar () = squeeze_scalar sponge in
-        let open Dlog_plonk_types.Messages in
+        let open Plonk_types.Messages in
         let x_hat =
           with_label "x_hat" (fun () ->
               multiscale_known
@@ -389,7 +388,7 @@ struct
            against "combined_inner_product" *)
         let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm
-            (snd (Dlog_plonk_types.Permuts_minus_1.add Nat.N1.n))
+            (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
         let ft_comm =
           with_label __LOC__ (fun () ->
@@ -415,7 +414,7 @@ struct
               :: [| m.psm_comm |]
               :: Vector.append w_comm
                    (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
-                   (snd Dlog_plonk_types.(Columns.add Permuts_minus_1.n)) )
+                   (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
               (snd (Branching.add num_commitments_without_degree_bound))
           in
           with_label "check_bulletproof" (fun () ->
@@ -440,7 +439,7 @@ struct
         Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
             scalar prechallenge))
 
-  let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~one)
+  let b_poly = Field.(Wrap_verifier.b_poly ~add ~mul ~one)
 
   module Pseudo = Pseudo.Make (Impl)
 
@@ -471,7 +470,7 @@ struct
 
   let shifts ~log2_size =
     Common.tick_shifts ~log2_size
-    |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+    |> Plonk_types.Shifts.map ~f:Impl.Field.constant
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -560,12 +559,10 @@ struct
   let%test_module "side loaded domains" =
     ( module struct
       let run k =
-        let (), y =
-          run_and_check
-            (fun () ->
+        let y =
+          run_and_check (fun () ->
               let y = k () in
               fun () -> As_prover.read_var y)
-            ()
           |> Or_error.ok_exn
         in
         y
@@ -628,7 +625,7 @@ struct
     end )
 
   module Split_evaluations = struct
-    open Dlog_plonk_types
+    open Plonk_types
 
     let mask' { Bounded.max; actual } : Boolean.var array =
       let (T max) = Nat.of_int max in
@@ -722,7 +719,7 @@ struct
         | [] ->
             failwith "empty list")
 
-  open Dlog_plonk_types
+  open Plonk_types
 
   module Opt_sponge = struct
     include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
@@ -742,7 +739,7 @@ struct
   let%test_unit "endo scalar" =
     SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
 
-  module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   module Plonk_checks = struct
     include Plonk_checks
@@ -785,8 +782,8 @@ struct
         , _
         , _
         , _ )
-        Types.Dlog_based.Proof_state.Deferred_values.In_circuit.t)
-      { Dlog_plonk_types.All_evals.ft_eval1
+        Types.Wrap.Proof_state.Deferred_values.In_circuit.t)
+      { Plonk_types.All_evals.ft_eval1
       ; evals =
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
@@ -831,8 +828,8 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-      .map_challenges ~f:Fn.id ~scalar plonk
+      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+        ~f:Fn.id ~scalar plonk
     in
     let domain =
       match step_domains with
@@ -850,10 +847,8 @@ struct
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
       let zetaw_n : Field.t = pow2_pow zetaw n in
-      ( Dlog_plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Dlog_plonk_types.Evals.map
-          ~f:(actual_evaluation ~pt_to_n:zetaw_n)
-          evals2 )
+      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
+      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
     in
     let env =
       with_label "scalars_env" (fun () ->
@@ -917,8 +912,8 @@ struct
           (module Field)
           ~shift:shift1 combined_inner_product
       in
-      print_fp "pairing_main cip expected" expected ;
-      print_fp "pairing_main cip actual" actual_combined_inner_product ;
+      print_fp "step_main cip expected" expected ;
+      print_fp "step_main cip actual" actual_combined_inner_product ;
       equal expected actual_combined_inner_product
     in
     let bulletproof_challenges =
@@ -955,7 +950,7 @@ struct
 
   let hash_me_only (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Pairing_based.Proof_state.Me_only in
+    let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
       Array.iter
@@ -966,7 +961,7 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun (t : _ Types.Pairing_based.Proof_state.Me_only.t) ->
+    stage (fun (t : _ Types.Step.Proof_state.Me_only.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -976,7 +971,7 @@ struct
 
   let hash_me_only_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Pairing_based.Proof_state.Me_only in
+    let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
       Array.iter
@@ -1033,9 +1028,14 @@ struct
         | `Opt sponge ->
             Opt_sponge.squeeze sponge)
 
+  let accumulation_verifier
+      (accumulator_verification_key : _ Types_map.For_step.t) prev_accumulators
+      proof new_accumulator : Boolean.var =
+    Boolean.false_
+
   let verify ~branching ~is_base_case ~sg_old
-      ~(opening : _ Pickles_types.Dlog_plonk_types.Openings.Bulletproof.t)
-      ~messages ~wrap_domain ~wrap_verification_key statement
+      ~(opening : _ Pickles_types.Plonk_types.Openings.Bulletproof.t) ~messages
+      ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
         ( _
         , _
@@ -1043,18 +1043,14 @@ struct
         , _
         , _
         , _ )
-        Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =
+        Types.Step.Proof_state.Per_proof.In_circuit.t) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
-      (*
-      let fp (Shifted_value.Shifted_value ((s_div_2, s_odd): Other_field.t)) =
-        [| (s_div_2, Field.size_in_bits - 1); ((s_odd :> Field.t), 1) |]
-      in *)
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            Types.Dlog_based.Statement.In_circuit.spec
-            (Types.Dlog_based.Statement.In_circuit.to_data statement))
+            Types.Wrap.Statement.In_circuit.spec
+            (Types.Wrap.Statement.In_circuit.to_data statement))
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x
@@ -1062,10 +1058,8 @@ struct
                `Packed_bits (x, n))
     in
     let sponge = Sponge.create sponge_params in
-    let { Types.Pairing_based.Proof_state.Deferred_values.xi
-        ; combined_inner_product
-        ; b
-        } =
+    let { Types.Step.Proof_state.Deferred_values.xi; combined_inner_product; b }
+        =
       unfinalized.deferred_values
     in
     let ( sponge_digest_before_evaluations_actual

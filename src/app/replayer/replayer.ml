@@ -1147,7 +1147,7 @@ module Snapp_helpers = struct
       query_db pool
         ~f:(fun db ->
           Processor.Zkapp_predicate_protocol_states.load db
-            body_data.snapp_predicate_protocol_state_id)
+            body_data.zkapp_predicate_protocol_state_id)
         ~item:"Snapp predicate protocol state"
     in
     let%bind snarked_ledger_hash =
