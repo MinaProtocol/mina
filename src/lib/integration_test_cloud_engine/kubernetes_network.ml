@@ -163,7 +163,7 @@ module Node = struct
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
+    module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
 
     module Get_balance =
     [%graphql
@@ -249,7 +249,7 @@ module Node = struct
                         setVotingFor
                       }
           sequenceEvents
-          snappState
+          zkappState
           zkappUri
           timing { cliffTime
                    cliffAmount
@@ -497,7 +497,7 @@ module Node = struct
     | Some account ->
         let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
-          match account#snappState with
+          match account#zkappState with
           | Some strs ->
               let fields =
                 Array.to_list strs
@@ -509,7 +509,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with an app state for public key \
+                      "Expected zkApp account with an app state for public key \
                        %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -540,7 +540,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with a verification key for \
+                      "Expected zkApp account with a verification key for \
                        public_key %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -557,7 +557,7 @@ module Node = struct
           | Some s ->
               return @@ Set s
           | None ->
-              fail (Error.of_string "Expected snapp URI in account")
+              fail (Error.of_string "Expected zkApp URI in account")
         in
         let%bind token_symbol =
           match account#tokenSymbol with
@@ -718,8 +718,8 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
-    [%log info] "Sending a snapp"
+  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+    [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
@@ -728,24 +728,24 @@ module Node = struct
     let parties_json =
       Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
-    let send_snapp_graphql () =
-      let send_snapp_obj =
-        Graphql.Send_test_snapp.make ~parties:parties_json ()
+    let send_zkapp_graphql () =
+      let send_zkapp_obj =
+        Graphql.Send_test_zkapp.make ~parties:parties_json ()
       in
-      exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
-        send_snapp_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
+        send_zkapp_obj
     in
-    let%bind sent_snapp_obj = send_snapp_graphql () in
+    let%bind sent_zkapp_obj = send_zkapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
+      match sent_zkapp_obj#internalSendZkapp#zkapp#failureReason with
       | None ->
           return ()
       | Some s ->
-          Deferred.Or_error.errorf "Snapp failed, reason: %s" s
+          Deferred.Or_error.errorf "Zkapp failed, reason: %s" s
     in
-    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
-    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
-    return snapp_id
+    let zkapp_id = sent_zkapp_obj#internalSendZkapp#zkapp#id in
+    [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
+    return zkapp_id
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;

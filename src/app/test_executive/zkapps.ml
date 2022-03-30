@@ -41,9 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let transactions_sent = ref 0
 
-  let send_snapp ~logger node parties =
+  let send_zkapp ~logger node parties =
     incr transactions_sent ;
-    send_snapp ~logger node parties
+    send_zkapp ~logger node parties
 
   (* An event which fires when [n] ledger proofs have been emitted *)
   let ledger_proofs_emitted ~logger ~num_proofs =
@@ -360,7 +360,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp to create snapp accounts"
-        (send_snapp ~logger node parties_create_account)
+        (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
       section
@@ -370,7 +370,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp to update permissions"
-        (send_snapp ~logger node parties_update_permissions)
+        (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
       section
@@ -408,7 +408,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
       section "Send a snapp to update all fields"
-        (send_snapp ~logger node parties_update_all)
+        (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
       section
@@ -455,11 +455,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp with an invalid nonce"
-        (send_invalid_snapp ~logger node parties_invalid_nonce "Invalid_nonce")
+        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
       section "Send a snapp with an invalid signature"
-        (send_invalid_snapp ~logger node parties_invalid_signature
+        (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
     let%bind () =
