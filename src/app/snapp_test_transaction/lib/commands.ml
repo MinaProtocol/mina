@@ -23,20 +23,8 @@ let parse_field_element_or_hash_string s ~f =
   match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
   | Ok field ->
       f field
-  | Error e1 -> (
-      match Signed_command_memo.create_from_string s with
-      | Ok memo ->
-          Random_oracle.Legacy.(
-            hash ~init:Hash_prefix.snapp_test
-              ( Signed_command_memo.to_bits memo
-              |> Random_oracle_input.Legacy.bitstring |> pack_input ))
-          |> f
-      | Error e2 ->
-          failwith
-            (sprintf
-               "Neither a field element nor a suitable memo string: Errors \
-                (%s, %s)"
-               (Error.to_string_hum e1) (Error.to_string_hum e2)) )
+  | Error e1 ->
+      Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
 let `VK vk, `Prover snapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()

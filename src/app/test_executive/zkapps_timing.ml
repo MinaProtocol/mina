@@ -248,9 +248,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 "Ledger update and requested update with timing are \
                  incompatible") ))
     in
-    let%bind before_balance =
-      get_account_balance ~logger node timing_account_id
+    let%bind { total_balance = before_balance; _ } =
+      Network.Node.must_get_account_data ~logger node
+        ~account_id:timing_account_id
     in
+    (* let%bind before_balance =
+         get_account_balance ~logger node timing_account_id
+       in *)
     let%bind () =
       section "Send a snapp with transfer from timed account that succeeds"
         (send_snapp ~logger node parties_transfer_from_timed_account)
@@ -259,8 +263,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "Waiting for snapp with transfer from timed account that succeeds"
         (wait_for_snapp ~has_failures:false parties_transfer_from_timed_account)
     in
-    let%bind after_balance =
-      get_account_balance ~logger node timing_account_id
+    (* let%bind after_balance =
+         get_account_balance ~logger node timing_account_id
+       in *)
+    let%bind { total_balance = after_balance; _ } =
+      Network.Node.must_get_account_data ~logger node
+        ~account_id:timing_account_id
     in
     let%bind () =
       section "Verifying balance change"
@@ -331,9 +339,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            | None ->
                failwith "Amount to debit more than timed account balance"
          in
-         let%bind locked_balance =
-           get_account_balance_locked ~logger node timing_account_id
+         let%bind { locked_balance_opt = locked_balance; _ } =
+           Network.Node.must_get_account_data ~logger node
+             ~account_id:timing_account_id
          in
+         (* let%bind locked_balance =
+              get_account_balance_locked ~logger node timing_account_id
+            in *)
          (* but proposed balance is less than min ("locked") balance *)
          assert (
            Currency.Amount.( < ) proposed_balance
@@ -352,8 +364,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let%bind () =
       section "Invalid transfer from timed account did not transfer funds"
-        (let%bind after_invalid_balance =
-           get_account_balance ~logger node timing_account_id
+        (* let%bind after_invalid_balance =
+             get_account_balance ~logger node timing_account_id
+           in *)
+        (let%bind { total_balance = after_invalid_balance; _ } =
+           Network.Node.must_get_account_data ~logger node
+             ~account_id:timing_account_id
          in
          let after_invalid_balance_as_amount =
            Currency.Balance.to_amount after_invalid_balance
