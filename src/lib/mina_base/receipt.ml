@@ -55,7 +55,7 @@ module Chain_hash = struct
           , Transaction_union_payload.(
               to_input_legacy (of_user_command_payload payload)) )
       | Parties s ->
-          (receipt_chain_snapp, Input.field s)
+          (receipt_chain_zkapp, Input.field s)
     in
     Input.(append x (field (t :> Field.t)))
     |> pack_input |> hash ~init |> of_hash
@@ -88,7 +88,7 @@ module Chain_hash = struct
             in
             (receipt_chain_user_command, payload)
         | Parties s ->
-            Let_syntax.return (receipt_chain_snapp, Input.field s)
+            Let_syntax.return (receipt_chain_zkapp, Input.field s)
       in
       make_checked (fun () ->
           hash ~init

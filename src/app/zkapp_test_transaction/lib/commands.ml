@@ -27,7 +27,7 @@ let parse_field_element_or_hash_string s ~f =
       match Signed_command_memo.create_from_string s with
       | Ok memo ->
           Random_oracle.Legacy.(
-            hash ~init:Hash_prefix.snapp_test
+            hash ~init:Hash_prefix.zkapp_test
               ( Signed_command_memo.to_bits memo
               |> Random_oracle_input.Legacy.bitstring |> pack_input ))
           |> f
