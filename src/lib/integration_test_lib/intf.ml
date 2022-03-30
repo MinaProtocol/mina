@@ -362,6 +362,7 @@ module Dsl = struct
       -> amount:Amount.t
       -> nonce:Mina_numbers.Account_nonce.t
       -> command_type:command_type
+      -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
     val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
