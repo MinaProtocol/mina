@@ -355,54 +355,55 @@ var plonk_wasm = new Proxy({
     return 8;
   },
   caml_bigint_256_of_bytes: function(arr) {
-    return bytesToBigInt(arr);
+    return [bytesToBigInt(arr)];
   },
   caml_bigint_256_of_decimal_string: function(s) {
-    return BigInt_(s);
+    return [BigInt_(s)];
   },
   caml_bigint_256_to_string: function(b) {
-    return b.toString();
+    return b[0].toString();
   },
   caml_bigint_256_to_bytes: function(b) {
-    return bigIntToBytes(b, 32);
+    return bigIntToBytes(b[0], 32);
   },
-  caml_bigint_256_test_bit: function(arr, i) {
-    return Number(!!(arr & (BigInt_(1) << BigInt_(i))))
+  caml_bigint_256_test_bit: function(b, i) {
+    return Number(!!(b[0] & (BigInt_(1) << BigInt_(i))))
   },
   caml_bigint_256_compare: function(x, y) {
+    x = x[0], y = y[0];
     if (x < y) return -1;
     if (x === y) return 0;
     return 1;
   },
   caml_pasta_fp_size: function() {
-    return caml_pasta_p_bigint;
+    return [caml_pasta_p_bigint];
   },
   caml_pasta_fq_size: function() {
-    return caml_pasta_q_bigint;
+    return [caml_pasta_q_bigint];
   },
   caml_pasta_fp_add: function(x, y) {
-    return caml_bigint_modulo(x + y, caml_pasta_p_bigint);
+    return [caml_bigint_modulo(x[0] + y[0], caml_pasta_p_bigint)];
   },
   caml_pasta_fq_add: function(x, y) {
-    return caml_bigint_modulo(x + y, caml_pasta_q_bigint);
+    return [caml_bigint_modulo(x[0] + y[0], caml_pasta_q_bigint)];
   },
   caml_pasta_fp_negate: function(x) {
-    return caml_pasta_p_bigint - x;
+    return [caml_pasta_p_bigint - x[0]];
   },
   caml_pasta_fq_negate: function(x) {
-    return caml_pasta_q_bigint - x;
+    return [caml_pasta_q_bigint - x[0]];
   },
   caml_pasta_fp_sub: function(x, y) {
-    return caml_bigint_modulo(x - y, caml_pasta_p_bigint);
+    return [caml_bigint_modulo(x[0] - y[0], caml_pasta_p_bigint)];
   },
   caml_pasta_fq_sub: function(x, y) {
-    return caml_bigint_modulo(x - y, caml_pasta_q_bigint);
+    return [caml_bigint_modulo(x[0] - y[0], caml_pasta_q_bigint)];
   },
   caml_pasta_fp_mul: function(x, y) {
-    return caml_bigint_modulo(x * y, caml_pasta_p_bigint);
+    return [caml_bigint_modulo(x[0] * y[0], caml_pasta_p_bigint)];
   },
   caml_pasta_fq_mul: function(x, y) {
-    return caml_bigint_modulo(x * y, caml_pasta_q_bigint);
+    return [caml_bigint_modulo(x[0] * y[0], caml_pasta_q_bigint)];
   },
   caml_pasta_fp_square: function(x) {
     return plonk_wasm.caml_pasta_fp_mul(x, x);
@@ -411,38 +412,40 @@ var plonk_wasm = new Proxy({
     return plonk_wasm.caml_pasta_fq_mul(x, x);
   },
   caml_pasta_fp_is_square: function(x) {
+    x = x[0];
     if (x === _0n) return 1;
     var sqrt_1 = caml_finite_field_power(x, (caml_pasta_p_bigint - _1n) / _2n, caml_pasta_p_bigint);
     return Number(sqrt_1 === _1n);
   },
   caml_pasta_fq_is_square: function(x) {
+    x = x[0];
     if (x === _0n) return 1;
     var sqrt_1 = caml_finite_field_power(x, (caml_pasta_q_bigint - _1n) / _2n, caml_pasta_q_bigint);
     return Number(sqrt_1 === _1n);
   },
   caml_pasta_fp_sqrt: function(x) {
-    return caml_finite_field_sqrt(x, caml_pasta_p_bigint, caml_pasta_pm1_odd_factor, caml_twoadic_root_fp)
+    return [caml_finite_field_sqrt(x[0], caml_pasta_p_bigint, caml_pasta_pm1_odd_factor, caml_twoadic_root_fp)];
   },
   caml_pasta_fq_sqrt: function(x) {
-    return caml_finite_field_sqrt(x, caml_pasta_q_bigint, caml_pasta_qm1_odd_factor, caml_twoadic_root_fq)
+    return [caml_finite_field_sqrt(x[0], caml_pasta_q_bigint, caml_pasta_qm1_odd_factor, caml_twoadic_root_fq)];
   },
   caml_pasta_fp_inv: function(x) {
-    return caml_finite_field_inverse(x, caml_pasta_p_bigint);
+    return [caml_finite_field_inverse(x[0], caml_pasta_p_bigint)];
   },
   caml_pasta_fq_inv: function(x) {
-    return caml_finite_field_inverse(x, caml_pasta_q_bigint);
+    return [caml_finite_field_inverse(x[0], caml_pasta_q_bigint)];
   },
   caml_pasta_fp_div: function(x, y) {
-    return caml_bigint_modulo(x * caml_finite_field_inverse(y, caml_pasta_p_bigint), caml_pasta_p_bigint);
+    return [caml_bigint_modulo(x[0] * caml_finite_field_inverse(y[0], caml_pasta_p_bigint), caml_pasta_p_bigint)];
   },
   caml_pasta_fq_div: function(x, y) {
-    return caml_bigint_modulo(x * caml_finite_field_inverse(y, caml_pasta_q_bigint), caml_pasta_q_bigint);
+    return [caml_bigint_modulo(x[0] * caml_finite_field_inverse(y[0], caml_pasta_q_bigint), caml_pasta_q_bigint)];
   },
   caml_pasta_fp_equal: function(x, y) {
-    return Number(plonk_wasm.caml_pasta_fp_sub(x, y) === BigInt_(0));
+    return Number(plonk_wasm.caml_pasta_fp_sub(x, y)[0] === _0n);
   },
   caml_pasta_fq_equal: function(x, y) {
-    return Number(plonk_wasm.caml_pasta_fq_sub(x, y) === BigInt_(0));
+    return Number(plonk_wasm.caml_pasta_fq_sub(x, y)[0] === _0n);
   },
   caml_pasta_fp_size_in_bits: function() {
     return 255;
@@ -451,10 +454,10 @@ var plonk_wasm = new Proxy({
     return 255;
   },
   caml_pasta_fp_of_int: function(i) {
-    return BigInt_(i);
+    return [BigInt_(i)];
   },
   caml_pasta_fq_of_int: function(i) {
-    return BigInt_(i);
+    return [BigInt_(i)];
   },
   caml_pasta_fp_of_bigint: function(x) {
     return x;
@@ -467,6 +470,12 @@ var plonk_wasm = new Proxy({
   },
   caml_pasta_fq_to_bigint: function(x) {
     return x;
+  },
+  caml_pasta_fp_to_string: function(x) {
+    return x[0].toString();
+  },
+  caml_pasta_fq_to_string: function(x) {
+    return x[0].toString();
   },
   caml_vesta_one: function() {
     return new GroupProjective(caml_vesta_generator_projective);
@@ -493,22 +502,22 @@ var plonk_wasm = new Proxy({
     return caml_group_projective_sub(x, y, caml_pasta_p_bigint);
   },
   caml_vesta_scale: function(g, x) {
-    return caml_group_projective_scale(g, x, caml_pasta_q_bigint);
+    return caml_group_projective_scale(g, x[0], caml_pasta_q_bigint);
   },
   caml_pallas_scale: function(g, x) {
-    return caml_group_projective_scale(g, x, caml_pasta_p_bigint);
+    return caml_group_projective_scale(g, x[0], caml_pasta_p_bigint);
   },
   caml_vesta_endo_base: function() {
-    return bytesToBigInt(caml_vesta_endo_base_const);
+    return [bytesToBigInt(caml_vesta_endo_base_const)];
   },
   caml_pallas_endo_base: function() {
-    return bytesToBigInt(caml_pallas_endo_base_const);
+    return [bytesToBigInt(caml_pallas_endo_base_const)];
   },
   caml_vesta_endo_scalar: function() {
-    return bytesToBigInt(caml_vesta_endo_scalar_const);
+    return [bytesToBigInt(caml_vesta_endo_scalar_const)];
   },
   caml_pallas_endo_scalar: function() {
-    return bytesToBigInt(caml_pallas_endo_scalar_const);
+    return [bytesToBigInt(caml_pallas_endo_scalar_const)];
   },
   caml_vesta_to_affine: function(g) {
     return caml_group_projective_to_affine(g, caml_pasta_q_bigint);
@@ -517,26 +526,26 @@ var plonk_wasm = new Proxy({
     return caml_group_projective_to_affine(g, caml_pasta_p_bigint);
   },
   caml_vesta_of_affine_coordinates: function (x, y) {
-    return new GroupProjective({ x: x, y: y, z: _1n });
+    return new GroupProjective({ x: x[0], y: y[0], z: _1n });
   },
   caml_pallas_of_affine_coordinates: function (x, y) {
-    return new GroupProjective({ x: x, y: y, z: _1n });
+    return new GroupProjective({ x: x[0], y: y[0], z: _1n });
   },
   // TODO
   caml_pasta_fp_plonk_verifier_index_shifts: function() {
-    return {s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
+    return {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
   },
   caml_pasta_fq_plonk_verifier_index_shifts: function() {
-    return {s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
+    return {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
   },
   caml_pasta_fp_domain_generator: function(_i) {
     // TODO: this should take an int i <= 32 and return the primitive 2^ith root of unity, i.e. a number w with
     // w^(2^i) = 1, w^(2^(i-1)) = -1
     // computed by taking the 2^32th root and squaring 32-i times
-    return _1n;
+    return [_1n];
   },
   caml_pasta_fq_domain_generator: function(_i) {
-    return _1n;
+    return [_1n];
   },
   // caml_pasta_fp_poseidon_block_cipher: function(x) {
   //   return x;
@@ -570,8 +579,8 @@ var _ = (function test() {
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
   console.assert(caml_bigint_from_hex_limbs(["0x992d30ed00000001","0x224698fc094cf91b","0x0","0x4000000000000000"]) === caml_pasta_p_bigint);
 
-  console.assert(plonk_wasm.caml_pasta_fp_is_square(caml_twoadic_root_fp) === 0);
-  console.assert(plonk_wasm.caml_pasta_fq_is_square(caml_twoadic_root_fq) === 0);
+  console.assert(plonk_wasm.caml_pasta_fp_is_square([caml_twoadic_root_fp]) === 0);
+  console.assert(plonk_wasm.caml_pasta_fq_is_square([caml_twoadic_root_fq]) === 0);
 
   // console.log(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint));
   // console.log(caml_pasta_p_bigint);

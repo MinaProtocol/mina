@@ -80,9 +80,7 @@ var caml_bigint_256_of_bytes = function(ocaml_bytes) {
 
 // Provides: caml_pasta_fp_copy
 var caml_pasta_fp_copy = function(x, y) {
-    for (var i = 0, l = x.length; i < l; i++) {
-        x[i] = y[i];
-    }
+    x[0] = y[0];
 };
 
 // Provides: caml_pasta_fp_option
@@ -221,9 +219,7 @@ var caml_pasta_fp_of_bytes = function(ocaml_bytes) {
 
 // Provides: caml_pasta_fq_copy
 var caml_pasta_fq_copy = function(x, y) {
-    for (var i = 0, l = x.length; i < l; i++) {
-        x[i] = y[i];
-    }
+    x[0] = y[0];
 };
 
 // Provides: caml_pasta_fq_option
@@ -394,7 +390,7 @@ var caml_fq_vector_of_rust = function (v) { return v; }
 // Provides: rust_affine_to_caml_affine
 var rust_affine_to_caml_affine = function(g) {
     if (g.infinity) return 0;
-    return [0, [0, g.x, g.y]];
+    return [0, [0, [g.x], [g.y]]];
 };
 
 // Provides: caml_pallas_one
