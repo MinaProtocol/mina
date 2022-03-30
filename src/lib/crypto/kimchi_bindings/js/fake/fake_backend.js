@@ -11,6 +11,8 @@ var _0n = joo_global_object.BigInt(0);
 var _1n = joo_global_object.BigInt(1);
 // Provides: _2n
 var _2n = joo_global_object.BigInt(2);
+// Provides: _8n
+var _8n = joo_global_object.BigInt(8);
 // Provides: _32n
 var _32n = joo_global_object.BigInt(32);
 
@@ -94,10 +96,10 @@ var caml_pallas_endo_scalar_const = new Uint8Array([
 ]);
 
 // Provides: bigIntToBytes
-// Requires: BigInt_, Uint8Array
+// Requires: BigInt_, Uint8Array, _8n
 function bigIntToBytes(x, length) {
   var bytes = [];
-  for (; x > 0; x >>= BigInt_(8)) {
+  for (; x > 0; x >>= _8n) {
     bytes.push(Number(x & BigInt_(0xff)));
   }
   var array = new Uint8Array(bytes);
@@ -109,13 +111,13 @@ function bigIntToBytes(x, length) {
   return sizedArray;
 }
 // Provides: bytesToBigInt
-// Requires: BigInt_, _0n
+// Requires: BigInt_, _0n, _8n
 function bytesToBigInt(bytes) {
   var x = _0n;
   var bitPosition = _0n;
   for (var i = 0; i < bytes.length; i++) {
     x += BigInt_(bytes[i]) << bitPosition;
-    bitPosition += BigInt_(8);
+    bitPosition += _8n;
   }
   return x;
 }
@@ -152,6 +154,12 @@ var GroupAffine = (function() {
   return GroupAffine;
 })();
 
+// Provides: caml_group_projective_zero
+// Requires: GroupProjective, _0n, _1n
+function caml_group_projective_zero() {
+  return new GroupProjective({ x: _1n, y: _1n, z: _0n });
+}
+
 // Provides: caml_group_projective_neg
 // Requires: GroupProjective
 function caml_group_projective_neg(g, p) {
@@ -159,8 +167,10 @@ function caml_group_projective_neg(g, p) {
 }
 
 // Provides: caml_group_projective_add
-// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _2n
+// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _2n, _0n
 function caml_group_projective_add(g, h, p) {
+  if (g.z === _0n) return new GroupProjective(h);
+  if (h.z === _0n) return new GroupProjective(g);
   var X1 = g.x, Y1 = g.y, Z1 = g.z, X2 = h.x, Y2 = h.y, Z2 = h.z;
   // http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#addition-add-2007-bl
   // Z1Z1 = Z1^2
@@ -190,7 +200,35 @@ function caml_group_projective_add(g, h, p) {
   // Y3 = r*(V-X3)-2*S1*J
   var Y3 = caml_bigint_modulo(r*(V - X3) - _2n*S1*J, p);
   // Z3 = ((Z1+Z2)^2-Z1Z1-Z2Z2)*H
-  var Z3 = caml_bigint_modulo((Z1 + Z2)*(Z1 + Z2) - Z1Z1 - Z2Z2, p);
+  var Z3 = caml_bigint_modulo(((Z1 + Z2)*(Z1 + Z2) - Z1Z1 - Z2Z2)*H, p);
+  return new GroupProjective({ x: X3, y: Y3, z: Z3 });
+}
+
+// Provides: caml_group_projective_double
+// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _2n, _8n
+function caml_group_projective_double(g, p) {
+  if (g.z === _0n) return new GroupProjective(g);
+  var X1 = g.x, Y1 = g.y, Z1 = g.z;
+  // http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-0.html#doubling-dbl-2009-l
+  // !!! formula depends on a === 0 in the curve equation y^2 = x^3 + ax + b !!!
+  // A = X1^2
+  var A = caml_bigint_modulo(X1*X1, p);
+  // B = Y1^2
+  var B = caml_bigint_modulo(Y1*Y1, p);
+  // C = B^2
+  var C = caml_bigint_modulo(B*B, p);
+  // D = 2*((X1+B)^2-A-C)
+  var D = caml_bigint_modulo(_2n*((X1 + B)*(X1 + B) - A - C), p);
+  // E = 3*A
+  var E = BigInt_(3)*A;
+  // F = E^2
+  var F = caml_bigint_modulo(E*E, p);
+  // X3 = F-2*D
+  var X3 = caml_bigint_modulo(F - _2n*D, p);
+  // Y3 = E*(D-X3)-8*C
+  var Y3 = caml_bigint_modulo(E*(D - X3) - _8n*C, p);
+  // Z3 = 2*Y1*Z1
+  var Z3 = caml_bigint_modulo(_2n*Y1*Z1, p);
   return new GroupProjective({ x: X3, y: Y3, z: Z3 });
 }
 
@@ -200,25 +238,17 @@ function caml_group_projective_sub(g, h, p) {
   return caml_group_projective_add(g, caml_group_projective_neg(h, p), p);
 }
 
-
-//   if p.is_zero() { // z == 0
-//     GroupAffine::zero()
-// } else if p.z.is_one() {
-//     // If Z is one, the point is already normalized.
-//     GroupAffine::new(p.x, p.y, false)
-// } else {
-//     // Z is nonzero, so it must have an inverse in a field.
-//     let zinv = p.z.inverse().unwrap();
-//     let zinv_squared = zinv.square();
-
-//     // X/Z^2
-//     let x = p.x * &zinv_squared;
-
-//     // Y/Z^3
-//     let y = p.y * &(zinv_squared * &zinv);
-
-//     GroupAffine::new(x, y, false)
-// }
+// Provides: caml_group_projective_scale
+// Requires: caml_group_projective_add, caml_group_projective_double, caml_group_projective_zero, _1n, _0n
+function caml_group_projective_scale(g, x, p) {
+  var h = caml_group_projective_zero();
+  while (x > _0n) {
+    if (x & _1n) h = caml_group_projective_add(h, g, p);
+    g = caml_group_projective_double(g, p);
+    x >>= _1n;
+  }
+  return h;
+}
 
 // Provides: caml_group_projective_to_affine
 // Requires: caml_finite_field_inverse, caml_bigint_modulo, GroupAffine
@@ -234,7 +264,7 @@ function caml_group_projective_to_affine(g, p) {
     // x/z^2
     var x = caml_bigint_modulo(g.x * zinv_squared, p);
     // y/z^3
-    var y = caml_bigint_modulo(g.x * zinv * zinv_squared, p);
+    var y = caml_bigint_modulo(g.y * zinv * zinv_squared, p);
     return new GroupAffine({ x: x, y: y, infinity: false });
   }
 }
@@ -258,8 +288,9 @@ function caml_finite_field_power(a, n, p) {
 // Provides: caml_finite_field_inverse
 // Requires: caml_bigint_modulo, _0n, _1n
 function caml_finite_field_inverse(a, p) {
-  if (a === _0n) throw Error("cannot invert 0");
+  var a_orig = a;
   a = caml_bigint_modulo(a, p);
+  if (a === _0n) throw Error("cannot invert 0");
   var b = p;
   var x = _0n;
   var y = _1n;
@@ -278,6 +309,7 @@ function caml_finite_field_inverse(a, p) {
     v = n;
   }
   if (b !== _1n) throw Error("inverting failed (no inverse)");
+  if (caml_bigint_modulo(x * a_orig, p) !== _1n) throw Error("caml_finite_field_inverse has a bug");
   return caml_bigint_modulo(x, p);
 }
 
@@ -291,7 +323,10 @@ function caml_finite_field_sqrt(n, p, pm1_odd, fp_root) {
   var R = caml_finite_field_power(n, (pm1_odd + _1n) / _2n, p); // n^((Q + 1)/2)
   while (true) {
     if (t === _0n) return _0n;
-    if (t === _1n) return R;
+    if (t === _1n) {
+      if (caml_bigint_modulo(R * R - n, p) !== _0n) throw Error("caml_finite_field_sqrt has a bug");
+      return R;
+    }
     // use repeated squaring to find the least i, 0 < i < M, such that t^(2^i) = 1
     var i = _0n;
     var s = t;
@@ -439,11 +474,29 @@ var plonk_wasm = new Proxy({
   caml_pallas_one: function() {
     return new GroupProjective(caml_pallas_generator_projective);
   },
+  caml_vesta_add: function(g, h) {
+    return caml_group_projective_add(g, h, caml_pasta_q_bigint);
+  },
+  caml_pallas_add: function(g, h) {
+    return caml_group_projective_add(g, h, caml_pasta_p_bigint);
+  },
+  caml_vesta_negate: function(g) {
+    return caml_group_projective_neg(g, caml_pasta_q_bigint);
+  },
+  caml_pallas_negate: function(g) {
+    return caml_group_projective_neg(g, caml_pasta_p_bigint);
+  },
   caml_vesta_sub: function(x, y) {
     return caml_group_projective_sub(x, y, caml_pasta_q_bigint);
   },
   caml_pallas_sub: function(x, y) {
     return caml_group_projective_sub(x, y, caml_pasta_p_bigint);
+  },
+  caml_vesta_scale: function(g, x) {
+    return caml_group_projective_scale(g, x, caml_pasta_q_bigint);
+  },
+  caml_pallas_scale: function(g, x) {
+    return caml_group_projective_scale(g, x, caml_pasta_p_bigint);
   },
   caml_vesta_endo_base: function() {
     return bytesToBigInt(caml_vesta_endo_base_const);
@@ -457,31 +510,40 @@ var plonk_wasm = new Proxy({
   caml_pallas_endo_scalar: function() {
     return bytesToBigInt(caml_pallas_endo_scalar_const);
   },
-  caml_pallas_to_affine: function(g) {
-    return caml_group_projective_to_affine(g, caml_pasta_p_bigint);
-  },
   caml_vesta_to_affine: function(g) {
     return caml_group_projective_to_affine(g, caml_pasta_q_bigint);
   },
+  caml_pallas_to_affine: function(g) {
+    return caml_group_projective_to_affine(g, caml_pasta_p_bigint);
+  },
+  caml_vesta_of_affine_coordinates: function (x, y) {
+    return new GroupProjective({ x: x, y: y, z: _1n });
+  },
+  caml_pallas_of_affine_coordinates: function (x, y) {
+    return new GroupProjective({ x: x, y: y, z: _1n });
+  },
   // TODO
   caml_pasta_fp_plonk_verifier_index_shifts: function() {
-    return {free: function(){}, s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
+    return {s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
   },
   caml_pasta_fq_plonk_verifier_index_shifts: function() {
-    return {free: function(){}, s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
+    return {s0: _0n, s1: _0n, s2: _0n, s3: _0n, s4: _0n, s5: _0n, s6: _0n};
   },
-  caml_pasta_fp_domain_generator: function() {
+  caml_pasta_fp_domain_generator: function(_i) {
+    // TODO: this should take an int i <= 32 and return the primitive 2^ith root of unity, i.e. a number w with
+    // w^(2^i) = 1, w^(2^(i-1)) = -1
+    // computed by taking the 2^32th root and squaring 32-i times
     return _1n;
   },
-  caml_pasta_fq_domain_generator: function() {
+  caml_pasta_fq_domain_generator: function(_i) {
     return _1n;
   },
-  caml_pasta_fp_poseidon_block_cipher: function(x) {
-    return x;
-  },
-  caml_pasta_fq_poseidon_block_cipher: function(x) {
-    return x;
-  }
+  // caml_pasta_fp_poseidon_block_cipher: function(x) {
+  //   return x;
+  // },
+  // caml_pasta_fq_poseidon_block_cipher: function(x) {
+  //   return x;
+  // }
 }, {
   get: function(target, prop, receiver) {
     var fun = Reflect.get(target, prop, receiver);
@@ -508,12 +570,15 @@ var _ = (function test() {
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
   console.assert(caml_bigint_from_hex_limbs(["0x992d30ed00000001","0x224698fc094cf91b","0x0","0x4000000000000000"]) === caml_pasta_p_bigint);
 
-  console.log(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint));
-  console.log(caml_pasta_p_bigint);
-  console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint) === _1n);
-  console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint) === -_1n);
+  console.assert(plonk_wasm.caml_pasta_fp_is_square(caml_twoadic_root_fp) === 0);
+  console.assert(plonk_wasm.caml_pasta_fq_is_square(caml_twoadic_root_fq) === 0);
 
-  console.log(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint));
-  console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint) === _1n);
-  console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << BigInt_(31)), caml_pasta_q_bigint) === -_1n);
+  // console.log(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint));
+  // console.log(caml_pasta_p_bigint);
+  // console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint) === _1n);
+  // console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint) === -_1n);
+
+  // console.log(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint));
+  // console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint) === _1n);
+  // console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << BigInt_(31)), caml_pasta_q_bigint) === -_1n);
 })()

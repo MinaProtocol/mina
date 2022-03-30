@@ -199,10 +199,6 @@ var caml_pasta_fp_to_bigint = plonk_wasm.caml_pasta_fp_to_bigint
 // Requires: plonk_wasm
 var caml_pasta_fp_of_bigint = plonk_wasm.caml_pasta_fp_of_bigint
 
-// Provides: caml_pasta_fp_two_adic_root_of_unity
-// Requires: plonk_wasm
-var caml_pasta_fp_two_adic_root_of_unity = plonk_wasm.caml_pasta_fp_two_adic_root_of_unity
-
 // Provides: caml_pasta_fp_domain_generator
 // Requires: plonk_wasm
 var caml_pasta_fp_domain_generator = plonk_wasm.caml_pasta_fp_domain_generator
@@ -343,10 +339,6 @@ var caml_pasta_fq_to_bigint = plonk_wasm.caml_pasta_fq_to_bigint
 // Requires: plonk_wasm
 var caml_pasta_fq_of_bigint = plonk_wasm.caml_pasta_fq_of_bigint
 
-// Provides: caml_pasta_fq_two_adic_root_of_unity
-// Requires: plonk_wasm
-var caml_pasta_fq_two_adic_root_of_unity = plonk_wasm.caml_pasta_fq_two_adic_root_of_unity
-
 // Provides: caml_pasta_fq_domain_generator
 // Requires: plonk_wasm
 var caml_pasta_fq_domain_generator = plonk_wasm.caml_pasta_fq_domain_generator
@@ -408,12 +400,18 @@ var rust_affine_to_caml_affine = function(g) {
 // Provides: caml_pallas_one
 // Requires: plonk_wasm
 var caml_pallas_one = plonk_wasm.caml_pallas_one
+// Provides: caml_pallas_negate
+// Requires: plonk_wasm
+var caml_pallas_negate = plonk_wasm.caml_pallas_negate;
 // Provides: caml_pallas_add
 // Requires: plonk_wasm
 var caml_pallas_add = plonk_wasm.caml_pallas_add;
 // Provides: caml_pallas_sub
 // Requires: plonk_wasm
 var caml_pallas_sub = plonk_wasm.caml_pallas_sub
+// Provides: caml_pallas_scale
+// Requires: plonk_wasm
+var caml_pallas_scale = plonk_wasm.caml_pallas_scale
 
 // Provides: caml_pallas_to_affine
 // Requires: plonk_wasm, rust_affine_to_caml_affine
@@ -421,6 +419,9 @@ var caml_pallas_to_affine = function(pt) {
     var res = plonk_wasm.caml_pallas_to_affine(pt);
     return rust_affine_to_caml_affine(res);
 };
+// Provides: caml_pallas_of_affine_coordinates
+// Requires: plonk_wasm
+var caml_pallas_of_affine_coordinates = plonk_wasm.caml_pallas_of_affine_coordinates
 
 // Provides: caml_pallas_endo_base
 // Requires: plonk_wasm
@@ -432,13 +433,19 @@ var caml_pallas_endo_scalar = plonk_wasm.caml_pallas_endo_scalar;
 
 // Provides: caml_vesta_one
 // Requires: plonk_wasm
-var caml_vesta_one = plonk_wasm.caml_vesta_one
+var caml_vesta_one = plonk_wasm.caml_vesta_one;
+// Provides: caml_vesta_negate
+// Requires: plonk_wasm
+var caml_vesta_negate = plonk_wasm.caml_vesta_negate;
 // Provides: caml_vesta_add
 // Requires: plonk_wasm
-var caml_vesta_add = plonk_wasm.caml_vesta_add
+var caml_vesta_add = plonk_wasm.caml_vesta_add;
 // Provides: caml_vesta_sub
 // Requires: plonk_wasm
-var caml_vesta_sub = plonk_wasm.caml_vesta_sub
+var caml_vesta_sub = plonk_wasm.caml_vesta_sub;
+// Provides: caml_vesta_scale
+// Requires: plonk_wasm
+var caml_vesta_scale = plonk_wasm.caml_vesta_scale;
 
 // Provides: caml_vesta_to_affine
 // Requires: plonk_wasm, rust_affine_to_caml_affine
@@ -446,6 +453,10 @@ var caml_vesta_to_affine = function(pt) {
     var res = plonk_wasm.caml_vesta_to_affine(pt);
     return rust_affine_to_caml_affine(res);
 };
+
+// Provides: caml_vesta_of_affine_coordinates
+// Requires: plonk_wasm
+var caml_vesta_of_affine_coordinates = plonk_wasm.caml_vesta_of_affine_coordinates
 
 // Provides: caml_vesta_endo_base
 // Requires: plonk_wasm
@@ -458,9 +469,7 @@ var caml_vesta_endo_scalar = plonk_wasm.caml_vesta_endo_scalar;
 
 // Provides: caml_plonk_verification_shifts_of_rust
 var caml_plonk_verification_shifts_of_rust = function(x) {
-    var res = [0, x.s0, x.s1, x.s2, x.s3, x.s4, x.s5, x.s6]; 
-    x.free();
-    return res;
+    return [0, x.s0, x.s1, x.s2, x.s3, x.s4, x.s5, x.s6];
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_shifts
