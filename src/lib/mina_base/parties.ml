@@ -185,8 +185,9 @@ module Call_forest = struct
 
   let cons ?(calls = []) (party : Party.t) (xs : _ t) : _ t =
     let party_digest = Party.Predicated.digest party.data in
-    { elt = { party; party_digest; calls }
-    ; stack_hash = hash_cons party_digest (hash xs)
+    let tree: _ Tree.t = { party; party_digest; calls } in
+    { elt = tree
+    ; stack_hash = Tree.hash tree
     }
     :: xs
 
