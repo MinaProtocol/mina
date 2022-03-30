@@ -142,6 +142,29 @@ let dummy = (create_by_digesting_string_exn "" :> t)
 
 let empty = create_from_string_exn ""
 
+type raw = Digest of string | Bytes of string
+
+let to_raw_exn memo =
+  let tag = tag memo in
+  if Char.equal tag digest_tag then Digest (to_base58_check memo)
+  else if Char.equal tag bytes_tag then
+    let len = length memo in
+    Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
+  else failwithf "Unknown memo tag %c" tag ()
+
+let to_raw_bytes_exn memo =
+  match to_raw_exn memo with
+  | Digest _ ->
+      failwith "Cannot convert a digest to raw bytes"
+  | Bytes str ->
+      str
+
+let of_raw_exn = function
+  | Digest base58_check ->
+      of_base58_check_exn base58_check
+  | Bytes str ->
+      of_base58_check_exn str
+
 let fold_bits t =
   { Fold_lib.Fold.fold =
       (fun ~init ~f ->
