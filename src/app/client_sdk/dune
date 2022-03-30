@@ -32,6 +32,7 @@
   kimchi_backend.pasta
   snarky.backendless
   random_oracle
+  random_oracle.permutation.ocaml
   signature_lib
   string_sign
   hex

@@ -547,12 +547,6 @@ var plonk_wasm = new Proxy({
   caml_pasta_fq_domain_generator: function(_i) {
     return [_1n];
   },
-  // caml_pasta_fp_poseidon_block_cipher: function(x) {
-  //   return x;
-  // },
-  // caml_pasta_fq_poseidon_block_cipher: function(x) {
-  //   return x;
-  // }
 }, {
   get: function(target, prop, receiver) {
     var fun = Reflect.get(target, prop, receiver);
