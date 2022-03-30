@@ -85,18 +85,11 @@ var caml_pasta_fp_copy = function(x, y) {
     }
 };
 
-// FIXME
 // Provides: caml_pasta_fp_option
 var caml_pasta_fp_option = function(x) {
-    // We encode 'none' in WASM as a biginteger formed from a series of
-    // max-size u64s, which gets split into u8s. This value is never returned
-    // as a valid field element, since it is larger than the field's modulus.
-    for (var i = 0, l = x.length; i < l; i++) {
-        if (x[i] != 255) {
-            return [0, x]; // Some(x)
-        }
-    }
-    return 0;
+    // We encode 'none' in JS as undefined
+    if (x === undefined) return 0; // None
+    return [0, x]; // Some(x)
 };
 
 // Provides: caml_pasta_fp_size_in_bits
@@ -237,20 +230,11 @@ var caml_pasta_fq_copy = function(x, y) {
     }
 };
 
-// FIXME
 // Provides: caml_pasta_fq_option
 var caml_pasta_fq_option = function(x) {
-    // We encode 'none' in WASM as a biginteger formed from a series of
-    // max-size u64s, which gets split into u8s. This value is never returned
-    // as a valid field element, since it is larger than the field's modulus.
-    console.log("caml_pasta_fq_option", x)
-    for (var i = 0, l = x.length; i < l; i++) {
-        if (x[i] != 255) {
-            return [0, x]; // Some(x)
-        }
-    }
-    console.log("caml_pasta_fq_option returning", 0)
-    return 0;
+    // We encode 'none' in JS as undefined
+    if (x === undefined) return 0; // None
+    return [0, x]; // Some(x)
 };
 
 // Provides: caml_pasta_fq_size_in_bits

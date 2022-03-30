@@ -4,5 +4,3 @@ var mina =
 console.log("Running client SDK unit tests");
 mina.runUnitTests()();
 console.log("Done.");
-
-mina.shutdown();
