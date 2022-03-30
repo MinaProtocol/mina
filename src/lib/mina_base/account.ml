@@ -335,7 +335,7 @@ end
 
 let check = Fn.id
 
-[%%if not feature_snapps]
+[%%if not feature_zkapps]
 
 let check (t : Binable_arg.t) =
   let t = check t in

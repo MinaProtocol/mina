@@ -288,7 +288,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   (* TODO: remove this or move to a %test_module once the deriver code is stable *)
   (* Can be used to print the graphql schema, like this:
-     Fields_derivers_snapps.Test.print_schema full ;
+     Fields_derivers_zkapps.Test.print_schema full ;
   *)
   module Test = struct
     module M = struct
