@@ -364,24 +364,15 @@ let%test_module "account timing check" =
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
-      let state_body =
+      let state_body0 =
         Mina_state.(
           With_hash.data precomputed_values.protocol_state_with_hashes
           |> Protocol_state.body)
       in
-      let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-      let txn_state_view0 = Mina_state.Protocol_state.Body.view state_body in
-      let coinbase_stack_target =
-        let stack_with_state =
-          Pending_coinbase.Stack.(
-            push_state state_body_hash Pending_coinbase.Stack.empty)
-        in
-        match transaction with
-        | Coinbase c ->
-            Pending_coinbase.(Stack.push_coinbase c stack_with_state)
-        | _ ->
-            stack_with_state
+      let consensus_state0 =
+        Mina_state.Protocol_state.Body.consensus_state state_body0
       in
+      let txn_state_view0 = Mina_state.Protocol_state.Body.view state_body0 in
       (* based on Sparse_ledger.handler
          don't need a reference to the ledger, it's mutated
       *)
@@ -423,6 +414,15 @@ let%test_module "account timing check" =
       (* copy ledger, apply_transaction mutates it *)
       let ledger_before_txn = copy_ledger ledger in
       (* use given slot *)
+      let consensus_state =
+        Consensus.Data.Consensus_state.Value.For_tests
+        .with_global_slot_since_genesis consensus_state0 txn_global_slot
+      in
+      let state_body =
+        Mina_state.Protocol_state.Body.For_tests.with_consensus_state
+          state_body0 consensus_state
+      in
+      let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
       let txn_state_view =
         { txn_state_view0 with global_slot_since_genesis = txn_global_slot }
       in
@@ -436,6 +436,17 @@ let%test_module "account timing check" =
           failwithf
             "When checking transaction snark, applying transaction failed: %s"
             (Error.to_string_hum err) () ) ;
+      let coinbase_stack_target =
+        let stack_with_state =
+          Pending_coinbase.Stack.(
+            push_state state_body_hash Pending_coinbase.Stack.empty)
+        in
+        match transaction with
+        | Coinbase c ->
+            Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+        | _ ->
+            stack_with_state
+      in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
         ~source:(Mina_ledger.Ledger.merkle_root ledger_before_txn)
         ~target:(Mina_ledger.Ledger.merkle_root ledger)
@@ -467,12 +478,21 @@ let%test_module "account timing check" =
                 Mina_ledger.Ledger.apply_user_command ~constraint_constants
                   ~txn_global_slot:slot ledger validated_uc
               with
-              | Ok _txn_applied ->
+              | Ok txn_applied ->
+                  ( match With_status.status txn_applied.common.user_command with
+                  | Applied _ ->
+                      ()
+                  | Failed (failure, _balance_data) ->
+                      failwithf "Transaction failed: %s"
+                        (Transaction_status.Failure.to_string failure)
+                        () ) ;
                   check_transaction_snark ~txn_global_slot:slot ledger_copy txn
               | Error err ->
-                  failwithf "Transaction failed: %s" (Error.to_string_hum err)
-                    ())
+                  failwithf "Error when applying transaction: %s"
+                    (Error.to_string_hum err) ())
           : unit list )
+
+    (* for tests where we expect payments to succeed, use real signature, fake otherwise *)
 
     let%test_unit "user commands, before cliff time, sufficient balance" =
       let gen =
@@ -501,7 +521,7 @@ let%test_module "account timing check" =
           Quickcheck.Generator.all
           @@ List.map keypairss ~f:(fun (kp1, kp2) ->
                  let%map payment =
-                   Signed_command.Gen.payment
+                   Signed_command.Gen.payment ~sign_type:`Real
                      ~key_gen:(return (kp1, kp2))
                      ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
                  in
@@ -549,7 +569,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment
+            Signed_command.Gen.payment ~sign_type:`Fake
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -611,7 +631,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment
+          Signed_command.Gen.payment ~sign_type:`Fake
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -665,7 +685,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment
+            Signed_command.Gen.payment ~sign_type:`Real
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -722,7 +742,7 @@ let%test_module "account timing check" =
         in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment
+            Signed_command.Gen.payment ~sign_type:`Real
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -731,7 +751,7 @@ let%test_module "account timing check" =
         in
         (ledger_init_state, user_command)
       in
-      Quickcheck.test ~seed:(`Deterministic "user command, after cliff")
+      Quickcheck.test ~seed:(`Deterministic "user command, while vesting")
         ~trials:1
         ~sexp_of:
           [%sexp_of:
@@ -771,7 +791,7 @@ let%test_module "account timing check" =
         let amount = 100_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment
+            Signed_command.Gen.payment ~sign_type:`Real
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -780,7 +800,7 @@ let%test_module "account timing check" =
         in
         (ledger_init_state, user_command)
       in
-      Quickcheck.test ~seed:(`Deterministic "user command, after cliff")
+      Quickcheck.test ~seed:(`Deterministic "user command, while vesting")
         ~trials:1
         ~sexp_of:
           [%sexp_of:
@@ -817,13 +837,13 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment
+          Signed_command.Gen.payment ~sign_type:`Fake
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
         (ledger_init_state, user_command)
       in
-      Quickcheck.test ~seed:(`Deterministic "user command, after cliff")
+      Quickcheck.test ~seed:(`Deterministic "user command, after vesting")
         ~trials:1 gen ~f:(fun (ledger_init_state, user_command) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
