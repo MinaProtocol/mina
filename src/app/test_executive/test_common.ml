@@ -73,36 +73,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error (Error.of_string err_str)
 
-  let get_account_balance ~logger node account_id =
-    [%log info] "Getting balance for account"
-      ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-    match%bind.Deferred
-      Network.Node.get_balance_total ~logger node ~account_id
-    with
-    | Ok balance ->
-        [%log info] "Got account balance" ;
-        Malleable_error.return balance
-    | Error err ->
-        let err_str = Error.to_string_mach err in
-        [%log error] "Error getting account balance"
-          ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error (Error.of_string err_str)
-
-  let get_account_balance_locked ~logger node account_id =
-    [%log info] "Getting locked balance for account"
-      ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-    match%bind.Deferred
-      Network.Node.get_balance_locked ~logger node ~account_id
-    with
-    | Ok balance ->
-        [%log info] "Got account balance" ;
-        Malleable_error.return balance
-    | Error err ->
-        let err_str = Error.to_string_mach err in
-        [%log error] "Error getting account balance"
-          ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error (Error.of_string err_str)
-
   let compatible_item req_item ledg_item ~equal =
     match (req_item, ledg_item) with
     | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
