@@ -2,7 +2,16 @@
  (name command_line_tests)
  (public_name command_line_tests)
  (inline_tests)
- (libraries core async cache_dir)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   ppx_inline_test.config
+   async
+   core
+   async_unix
+   stdio
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
 )

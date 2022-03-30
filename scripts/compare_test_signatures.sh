@@ -16,7 +16,8 @@ echo "Running"
 
 # js/nonconsensus
 echo "Building nonconsensus JS code..."
-make client_sdk
+dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=dev
+dune b src/app/client_sdk/client_sdk.bc.js --profile=dev
 echo "Running"
 node src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
 

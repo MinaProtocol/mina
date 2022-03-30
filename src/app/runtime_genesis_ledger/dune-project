@@ -1,2 +1,3 @@
 (lang dune 2.7)
 (name runtime_genesis_ledger)
+(implicit_transitive_deps false)

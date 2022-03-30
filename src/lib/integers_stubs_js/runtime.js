@@ -150,66 +150,75 @@ function integers_uint32_to_string(i) {
    return caml_new_string(i.value.toString());
 }
 
+//Provides: UInt64 const
+var UInt64 = (function () {
+    var UInt64 = function (x) {
+      this.value = x; // x is an MlInt64
+    };
+    UInt64.prototype.caml_custom = "integers:uint64";
+    return UInt64;
+})();
+
 //Provides: integers_uint64_add
-//Requires: caml_int64_add
+//Requires: caml_int64_add, UInt64
 function integers_uint64_add(x, y) {
-    return caml_int64_add(x, y);
+    return new UInt64(caml_int64_add(x.value, y.value));
 }
 
 //Provides: integers_uint64_div
-//Requires: caml_raise_zero_divide
+//Requires: caml_raise_zero_divide, UInt64
 function integers_uint64_div(x, y) {
-    if (y.isZero()) {
+    if (y.value.isZero()) {
         caml_raise_zero_divide();
     }
     // Coerce the high parts to be unsigned before division.
-    x.hi = x.hi >>> 0;
-    y.hi = y.hi >>> 0;
-    return x.udivmod(y).quotient;
+    x.value.hi = x.value.hi >>> 0;
+    y.value.hi = y.value.hi >>> 0;
+    return new UInt64(x.value.udivmod(y.value).quotient);
 }
 
 //Provides: integers_uint64_logand
-//Requires: caml_int64_and
+//Requires: caml_int64_and, UInt64
 function integers_uint64_logand(x, y) {
-    return caml_int64_and(x, y);
+    return new UInt64(caml_int64_and(x.value, y.value));
 }
 
 //Provides: integers_uint64_logor
-//Requires: caml_int64_or
+//Requires: caml_int64_or, UInt64
 function integers_uint64_logor(x, y) {
-    return caml_int64_or(x, y);
+    return new UInt64(caml_int64_or(x.value, y.value));
 }
 
 //Provides: integers_uint64_logxor
-//Requires: caml_int64_xor
+//Requires: caml_int64_xor, UInt64
 function integers_uint64_logxor(x, y) {
-    return caml_int64_xor(x, y);
+    return new UInt64(caml_int64_xor(x.value, y.value));
 }
 
 //Provides: integers_uint64_max
-//Requires: caml_int64_create_lo_mi_hi
+//Requires: caml_int64_create_lo_mi_hi, UInt64
 function integers_uint64_max(unit) {
     var x = caml_int64_create_lo_mi_hi(0xffffff, 0xffffff, 0xffff);
     x.hi = x.hi >>> 0;
-    return x;
+    return new UInt64(x);
 }
 
 //Provides: integers_uint64_mul
-//Requires: caml_int64_mul
+//Requires: caml_int64_mul, UInt64
 function integers_uint64_mul(x, y) {
-    return caml_int64_mul(x, y);
+    return new UInt64(caml_int64_mul(x.value, y.value));
 }
 
 //Provides: integers_uint64_of_int
-//Requires: caml_int64_of_int32
+//Requires: caml_int64_of_int32, UInt64
 function integers_uint64_of_int(i) {
-    return caml_int64_of_int32(i);
+    return new UInt64(caml_int64_of_int32(i));
 }
 
 //Provides: integers_uint64_of_int64
-//Requires: caml_int64_create_lo_mi_hi
+//Requires: caml_int64_create_lo_mi_hi, UInt64
 function integers_uint64_of_int64(i) {
-    return caml_int64_create_lo_mi_hi(i.lo, i.mi, i.hi >>> 0);
+    return new UInt64(caml_int64_create_lo_mi_hi(i.lo, i.mi, i.hi >>> 0));
 }
 
 //Provides: integers_uint_of_string
@@ -268,58 +277,77 @@ function integers_uint_of_string(s, max_val) {
 }
 
 //Provides: integers_uint64_of_string
-//Requires: integers_uint_of_string, caml_int64_create_lo_mi_hi
+//Requires: integers_uint_of_string, caml_int64_create_lo_mi_hi, UInt64
 function integers_uint64_of_string(s) {
   var max_val = caml_int64_create_lo_mi_hi(0xffffff, 0xffffff, 0xffff);
-  return integers_uint_of_string(s, max_val);
+  return new UInt64(integers_uint_of_string(s, max_val));
 }
 
 //Provides: integers_uint64_rem
-//Requires: caml_raise_zero_divide, caml_int64_is_zero
+//Requires: caml_raise_zero_divide, caml_int64_is_zero, UInt64
 function integers_uint64_rem(x, y) {
-    if (y.isZero()) {
+    if (y.value.isZero()) {
         caml_raise_zero_divide();
     }
     // Coerce the high parts to be unsigned before division.
-    x.hi = x.hi >>> 0;
-    y.hi = y.hi >>> 0;
-    return x.udivmod(y).modulus;
+    x.value.hi = x.value.hi >>> 0;
+    y.value.hi = y.value.hi >>> 0;
+    return new UInt64(x.value.udivmod(y.value).modulus);
 }
 
 //Provides: integers_uint64_shift_left
-//Requires: caml_int64_shift_left
+//Requires: caml_int64_shift_left, UInt64
 function integers_uint64_shift_left(x, y) {
-    return caml_int64_shift_left(x, y);
+    return new UInt64(caml_int64_shift_left(x.value, y));
 }
 
 //Provides: integers_uint64_shift_right
-//Requires: caml_int64_shift_right_unsigned
+//Requires: caml_int64_shift_right_unsigned, UInt64
 function integers_uint64_shift_right(x, y) {
-    return caml_int64_shift_right_unsigned(x, y);
+    return new UInt64(caml_int64_shift_right_unsigned(x.value, y));
 }
 
 //Provides: integers_uint64_sub
-//Requires: caml_int64_sub
+//Requires: caml_int64_sub, UInt64
 function integers_uint64_sub(x, y) {
-    return caml_int64_sub(x, y);
+    return new UInt64(caml_int64_sub(x.value, y.value));
 }
 
 //Provides: integers_uint64_to_int
 //Requires: caml_int64_to_int32
 function integers_uint64_to_int(i) {
-    return caml_int64_to_int32(i);
+    return caml_int64_to_int32(i.value);
 }
 
 //Provides: integers_uint64_to_int64
 //Requires: caml_int64_create_lo_mi_hi
 function integers_uint64_to_int64(i) {
+    i = i.value;
     return caml_int64_create_lo_mi_hi(i.lo, i.mi, i.hi | 0);
 }
 
 //Provides: integers_uint64_to_string
 //Requires: caml_int64_format, caml_new_string
 function integers_uint64_to_string(i) {
-    return caml_int64_format(caml_new_string("%u"), i);
+    return caml_int64_format(caml_new_string("%u"), i.value);
+}
+
+//Provides: integers_uint64_unmarshal
+//Requires: caml_int64_unmarshal, UInt64
+function integers_uint64_unmarshal(reader, size){
+    return new UInt64(caml_int64_unmarshal(reader, size));
+}
+  
+//Provides: integers_uint64_marshal
+//Requires: caml_int64_marshal
+function integers_uint64_marshal(writer, v, sizes) {
+    caml_int64_marshal(writer, v.value, sizes);
+}
+
+//Provides: integers_uint64_hash
+//Requires: caml_int64_hash
+function integers_uint64_hash(v) {
+    return caml_int64_hash(v.value);
 }
 
 //Provides: integers_uint8_of_string
@@ -345,7 +373,7 @@ function integers_ulonglong_size(unit) {
 }
 
 //Provides: integers_unsigned_init
-//Requires: caml_custom_ops, integers_uint8_deserialize, integers_uint16_deserialize, integers_uint32_serialize, integers_uint32_deserialize, integers_uint32_hash, integers_uint32_compare, caml_int64_marshal, caml_int64_unmarshal, caml_int64_hash, integers_uint64_compare
+//Requires: caml_custom_ops, integers_uint8_deserialize, integers_uint16_deserialize, integers_uint32_serialize, integers_uint32_deserialize, integers_uint32_hash, integers_uint32_compare, integers_uint64_compare, integers_uint64_hash, integers_uint64_marshal, integers_uint64_unmarshal
 function integers_unsigned_init(unit) {
     caml_custom_ops["integers:uint8"] =
     { deserialize: integers_uint8_deserialize
@@ -360,9 +388,9 @@ function integers_unsigned_init(unit) {
     , hash: integers_uint32_hash
     , compare: integers_uint32_compare };
     caml_custom_ops["integers:uint64"] =
-    { serialize: caml_int64_marshal
-    , deserialize: caml_int64_unmarshal
-    , hash: caml_int64_hash
+    { serialize: integers_uint64_marshal
+    , deserialize: integers_uint64_unmarshal
+    , hash: integers_uint64_hash
     , compare: integers_uint64_compare };
     return unit;
 }
@@ -413,7 +441,7 @@ function integers_uint32_compare(x, y) {
 //Provides: integers_uint64_compare
 //Requires: caml_int64_compare
 function integers_uint64_compare(x, y) {
-    x.hi = x.hi >>> 0;
-    y.hi = y.hi >>> 0;
-    return x.ucompare(y);
+    x.value.hi = x.value.hi >>> 0;
+    y.value.hi = y.value.hi >>> 0;
+    return x.value.ucompare(y.value);
 }

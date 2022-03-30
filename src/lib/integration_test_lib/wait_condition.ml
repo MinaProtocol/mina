@@ -45,25 +45,29 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let nodes_to_initialize nodes =
-    let open Network_state in
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
-      if
-        List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
+      if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
+
+  let nodes_to_initialize nodes =
+    let open Network_state in
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false))
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
@@ -138,7 +142,7 @@ struct
           let payload = Signed_command.payload signed_cmd in
           let body = payload |> Signed_command_payload.body in
           match body with
-          | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
+          | Payment { source_pk; receiver_pk; amount = paid_amt }
             when Public_key.Compressed.equal source_pk sender_pub_key
                  && Public_key.Compressed.equal receiver_pk receiver_pub_key
                  && Currency.Amount.equal paid_amt amount
@@ -159,7 +163,7 @@ struct
                   false )
           | _ ->
               false )
-      | Snapp_command _ ->
+      | Parties _ ->
           false
     in
     let check () node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
@@ -203,6 +207,53 @@ struct
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)
+    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let snapp_to_be_included_in_frontier ~parties =
+    let command_matches_parties cmd =
+      let open User_command in
+      match cmd with
+      | Parties p ->
+          Parties.equal p parties
+      | Signed_command _ ->
+          false
+    in
+    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let snapp_opt =
+        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
+            cmd_with_status.With_status.data |> User_command.forget_check
+            |> command_matches_parties)
+      in
+      match snapp_opt with
+      | Some cmd_with_status ->
+          let actual_status = cmd_with_status.With_status.status in
+          let was_applied =
+            match actual_status with
+            | Transaction_status.Applied _ ->
+                true
+            | _ ->
+                false
+          in
+          if was_applied then Predicate_passed
+          else
+            Predicate_failure
+              (Error.createf "Unexpected status in matching payment: %s"
+                 ( Transaction_status.to_yojson actual_status
+                 |> Yojson.Safe.to_string ))
+      | None ->
+          Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 8 in
+    { description =
+        sprintf "snapp with fee payer %s and other parties (%s)"
+          (Public_key.Compressed.to_base58_check
+             parties.fee_payer.data.body.public_key)
+          ( List.map parties.other_parties ~f:(fun party ->
+                Public_key.Compressed.to_base58_check party.data.body.public_key)
+          |> String.concat ~sep:", " )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

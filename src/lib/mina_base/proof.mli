@@ -10,7 +10,7 @@ val transaction_dummy : t
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type nonrec t = t [@@deriving compare, sexp, yojson]
   end
 end]

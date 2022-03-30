@@ -9,7 +9,7 @@ open Snark_params.Tick
 module Elt = struct
   type t =
     | Signed_command of Signed_command.Payload.t
-    | Snapp_command of Random_oracle.Digest.t
+    | Parties of Random_oracle.Digest.t
 end
 
 module Chain_hash = struct
@@ -46,19 +46,19 @@ module Chain_hash = struct
   let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
 
   let cons (e : Elt.t) (t : t) =
-    let open Random_oracle in
-    let init, x =
-      let open Hash_prefix in
+    let open Random_oracle.Legacy in
+    let x =
       match e with
       | Signed_command payload ->
-          ( receipt_chain_user_command
-          , Transaction_union_payload.(
-              to_input (of_user_command_payload payload)) )
-      | Snapp_command s ->
-          (receipt_chain_snapp, Input.field s)
+          Transaction_union_payload.(
+            to_input_legacy (of_user_command_payload payload))
+      | Parties s ->
+          Input.field s
     in
     Input.(append x (field (t :> Field.t)))
-    |> pack_input |> hash ~init |> of_hash
+    |> pack_input
+    |> hash ~init:Hash_prefix.receipt_chain_user_command
+    |> of_hash
 
   [%%if defined consensus_mechanism]
 
@@ -66,7 +66,7 @@ module Chain_hash = struct
     module Elt = struct
       type t =
         | Signed_command of Transaction_union_payload.var
-        | Snapp_command of Random_oracle.Checked.Digest.t
+        | Parties of Random_oracle.Checked.Digest.t
     end
 
     let constant (t : t) =
@@ -77,21 +77,21 @@ module Chain_hash = struct
     let if_ = if_
 
     let cons (e : Elt.t) t =
-      let open Random_oracle in
+      let open Random_oracle.Legacy in
       let open Checked in
-      let open Hash_prefix in
-      let%bind init, x =
+      let%bind x =
         match e with
         | Signed_command payload ->
             let%map payload =
-              Transaction_union_payload.Checked.to_input payload
+              Transaction_union_payload.Checked.to_input_legacy payload
             in
-            (receipt_chain_user_command, payload)
-        | Snapp_command s ->
-            Let_syntax.return (receipt_chain_snapp, Input.field s)
+            payload
+        | Parties s ->
+            Let_syntax.return (Input.field s)
       in
       make_checked (fun () ->
-          hash ~init (pack_input Input.(append x (var_to_input t)))
+          hash ~init:Hash_prefix.receipt_chain_user_command
+            (pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed)
   end
 
@@ -112,8 +112,7 @@ module Chain_hash = struct
             in
             As_prover.read typ res
           in
-          let (), x = Or_error.ok_exn (run_and_check comp ()) in
-          x
+          Or_error.ok_exn (run_and_check comp)
         in
         assert (equal unchecked checked))
 

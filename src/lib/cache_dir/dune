@@ -2,10 +2,12 @@
  (name cache_dir)
  (public_name cache_dir)
  (libraries
-   ; opam deps
+   ;; opam libraries
    async_kernel
-   ; libs
-   key_cache)
+   ;; local libraries
+   key_cache
+   logger
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules cache_dir)

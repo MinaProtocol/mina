@@ -40,7 +40,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           in
           [%log info] "gossip_consistency test: payment #%d sent with nonce %d."
             n
-            (Unsigned.UInt32.to_int nonce) ;
+            (Mina_numbers.Account_nonce.to_int nonce) ;
           nonce
         in
         go (n - 1) (List.append noncelist [ nonce ])
@@ -66,7 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             "gossip_consistency test: payment #%d with nonce %d successfully \
              included in frontier."
             n
-            (Unsigned.UInt32.to_int nonce) ;
+            (Mina_numbers.Account_nonce.to_int nonce) ;
           ()
         in
         go (n - 1) (List.tl_exn noncelist)

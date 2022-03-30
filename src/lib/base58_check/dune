@@ -2,7 +2,14 @@
  (name base58_check)
  (public_name base58_check)
  (inline_tests)
- (libraries digestif core_kernel base58)
+ (libraries
+   ;; opam libraries
+   digestif
+   core_kernel
+   base58
+   base
+   ppx_inline_test.config
+ )
  (library_flags (-linkall))
  (preprocess
   (pps

@@ -26,7 +26,7 @@ val typ : (var, t) Typ.t
 
 val var_of_t : t -> var
 
-val assert_equal : var -> var -> (unit, 'a) Checked.t
+val assert_equal : var -> var -> unit Checked.t
 
 [%%endif]
 
@@ -70,7 +70,9 @@ module Compressed : sig
 
   include Hashable.S_binable with type t := t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
+
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_string : t -> string
 
@@ -89,14 +91,17 @@ module Compressed : sig
   val var_of_t : t -> var
 
   module Checked : sig
-    val equal : var -> var -> (Boolean.var, _) Checked.t
+    val equal : var -> var -> Boolean.var Checked.t
 
-    val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    val to_input_legacy :
+      var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+    val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
     module Assert : sig
-      val equal : var -> var -> (unit, _) Checked.t
+      val equal : var -> var -> unit Checked.t
     end
   end
 
@@ -120,8 +125,8 @@ val of_base58_check_decompress_exn : string -> Compressed.t
 
 [%%ifdef consensus_mechanism]
 
-val compress_var : var -> (Compressed.var, _) Checked.t
+val compress_var : var -> Compressed.var Checked.t
 
-val decompress_var : Compressed.var -> (var, _) Checked.t
+val decompress_var : Compressed.var -> var Checked.t
 
 [%%endif]

@@ -64,9 +64,9 @@ let validate_keypair =
         Mina_base.Signed_command.sign_payload keypair.Keypair.private_key
           dummy_payload
       in
-      let message = Mina_base.Signed_command.to_input dummy_payload in
+      let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
       let verified =
-        Schnorr.verify signature
+        Schnorr.Legacy.verify signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in

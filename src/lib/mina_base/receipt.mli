@@ -8,7 +8,7 @@ open Snark_params.Tick
 module Elt : sig
   type t =
     | Signed_command of Signed_command.Payload.t
-    | Snapp_command of Random_oracle.Digest.t
+    | Parties of Random_oracle.Digest.t
 end
 
 module Chain_hash : sig
@@ -32,16 +32,16 @@ module Chain_hash : sig
     module Elt : sig
       type t =
         | Signed_command of Transaction_union_payload.var
-        | Snapp_command of Random_oracle.Checked.Digest.t
+        | Parties of Random_oracle.Checked.Digest.t
     end
 
     val constant : t -> var
 
     type t = var
 
-    val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+    val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
-    val cons : Elt.t -> t -> (t, _) Checked.t
+    val cons : Elt.t -> t -> t Checked.t
   end
 
   [%%endif]
