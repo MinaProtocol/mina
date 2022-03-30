@@ -2,15 +2,16 @@ open Core_kernel
 
 let or_error_list_bind ls ~f =
   let open Or_error.Let_syntax in
-  let rec loop = function
+  let rec loop ls acc =
+    let%bind acc' = acc in
+    match ls with
     | [] ->
-        return []
+        return acc'
     | h :: t ->
         let%bind r = f h in
-        let%map t' = loop t in
-        r :: t'
+        loop t (return (r :: acc'))
   in
-  loop ls >>| List.concat
+  loop ls (return []) >>| List.rev >>| List.concat
 
 type link = Blake2.t
 
@@ -18,13 +19,25 @@ let link_size = Blake2.digest_size_in_bytes
 
 let absolute_max_links_per_block = Stdint.Uint16.(to_int max_int)
 
+(** A bitswap block schema consists of a series of branch-blocks and leaf-blocks.
+ *  A branch-block contains both links to successive blocks, as well as data. A
+ *  leaf-block contains only data, and no links. Of the branch-blocks, there will
+ *  be either 0 or 1 block that has less links than the rest of the branch-blocks.
+ *  We refer to this block as the partial-branch-block, and the other branch-blocks
+ *  ar referred to as full-branch-blocks.
+ *)
 type schema =
-  { total_blocks : int
-  ; full_link_blocks : int
-  ; non_max_link_block_count : int
-  ; last_block_data_size : int
-  ; max_block_size : int
+  { num_total_blocks : int  (** the total number of blocks *)
+  ; num_full_branch_blocks : int
+        (** the number of link-blocks which contain the maximum number of links *)
+  ; num_links_in_partial_branch_block : int
+        (** the number of links in the non-full link block (if it is 0, there is no non-full link block *)
+  ; last_leaf_block_data_size : int
+        (** the size of data (in bytes) contained in the last block *)
+  ; max_block_data_size : int
+        (** the maximum data size (in bytes) that a block contains *)
   ; max_links_per_block : int
+        (** the maximum number of links that can be stored in a block (all link-blocks except the non-full-link-block will have this number of links) *)
   }
 [@@deriving compare, eq, sexp]
 
@@ -33,25 +46,29 @@ let required_bitswap_block_count ~max_block_size data_length =
   else
     let n1 = data_length - link_size in
     let n2 = max_block_size - link_size - 2 in
-    (n1 / n2) + if n1 mod n2 > 0 then 1 else 0
+    (n1 + n2 - 1) / n2
 
 let max_links_per_block ~max_block_size =
   let links_per_block = (max_block_size - 2) / link_size in
   min links_per_block absolute_max_links_per_block
 
 let create_schema ~max_block_size data_length =
-  let total_blocks = required_bitswap_block_count ~max_block_size data_length in
-  let last_block_data_size =
-    data_length - ((max_block_size - link_size - 2) * (total_blocks - 1))
+  let num_total_blocks =
+    required_bitswap_block_count ~max_block_size data_length
+  in
+  let last_leaf_block_data_size =
+    data_length - ((max_block_size - link_size - 2) * (num_total_blocks - 1))
   in
   let max_links_per_block = max_links_per_block ~max_block_size in
-  let non_max_link_block_count = (total_blocks - 1) mod max_links_per_block in
-  let full_link_blocks = (total_blocks - 1) / max_links_per_block in
-  { total_blocks
-  ; last_block_data_size
-  ; full_link_blocks
-  ; non_max_link_block_count
-  ; max_block_size
+  let num_full_branch_blocks = (num_total_blocks - 1) / max_links_per_block in
+  let num_links_in_partial_branch_block =
+    num_total_blocks - 1 - (num_full_branch_blocks * max_links_per_block)
+  in
+  { num_total_blocks
+  ; num_full_branch_blocks
+  ; last_leaf_block_data_size
+  ; num_links_in_partial_branch_block
+  ; max_block_data_size = max_block_size
   ; max_links_per_block
   }
 
@@ -92,6 +109,7 @@ let blocks_of_data ~max_block_size data =
       failwith "invalid block produced" ;
     let block = Bigstring.create size in
     Bigstring.set_uint16_le_exn block ~pos:0 num_links ;
+    (* Printf.printf "writing links: [%s]\n" (String.concat ~sep:"; " @@ List.map links ~f:(Fn.compose Base64.encode_string Blake2.to_raw_string)) ; *)
     List.iteri links ~f:(fun i link ->
         let link_buf = Bigstring.of_string (Blake2.to_raw_string link) in
         Bigstring.blit ~src:link_buf ~src_pos:0 ~dst:block
@@ -102,34 +120,38 @@ let blocks_of_data ~max_block_size data =
       ~len:chunk_size ;
     let hash = Blake2.digest_bigstring block in
     Hashtbl.set blocks ~key:hash ~data:block ;
+    (* Printf.printf "created block %s containing data: %s\n" (Base64.encode_string (Blake2.to_raw_string hash)) (Bigstring.to_string chunk) ; *)
     Queue.enqueue link_queue hash
   in
   (* create the last block *)
-  create_block [] schema.last_block_data_size ;
-  if schema.total_blocks > 1 then (
+  create_block [] schema.last_leaf_block_data_size ;
+  if schema.num_total_blocks > 1 then (
     (* create the data-only blocks *)
     let num_data_only_blocks =
-      schema.total_blocks - schema.full_link_blocks - 1
-      - if schema.non_max_link_block_count > 0 then 1 else 0
+      schema.num_total_blocks - schema.num_full_branch_blocks - 1
+      - if schema.num_links_in_partial_branch_block > 0 then 1 else 0
     in
     for _ = 1 to num_data_only_blocks do
       create_block [] max_data_chunk_size
     done ;
     (* create the non max link block, if there is one *)
-    if schema.non_max_link_block_count > 0 then (
+    ( if schema.num_links_in_partial_branch_block > 0 then
       let chunk_size =
-        max_block_size - 2 - (schema.non_max_link_block_count * link_size)
+        max_block_size - 2
+        - (schema.num_links_in_partial_branch_block * link_size)
       in
-      create_block (dequeue_links schema.non_max_link_block_count) chunk_size ;
-      (* create the max link blocks *)
-      let full_link_chunk_size =
-        max_block_size - 2 - (schema.max_links_per_block * link_size)
-      in
-      for _ = 1 to schema.full_link_blocks do
-        create_block
-          (dequeue_links schema.max_links_per_block)
-          full_link_chunk_size
-      done ) ) ;
+      create_block
+        (dequeue_links schema.num_links_in_partial_branch_block)
+        chunk_size ) ;
+    (* create the max link blocks *)
+    let full_link_chunk_size =
+      max_block_size - 2 - (schema.max_links_per_block * link_size)
+    in
+    for _ = 1 to schema.num_full_branch_blocks do
+      create_block
+        (dequeue_links schema.max_links_per_block)
+        full_link_chunk_size
+    done ) ;
   assert (!remaining_data = 0) ;
   assert (Queue.length link_queue = 1) ;
   ( Blake2.Map.of_alist_exn (Hashtbl.to_alist blocks)
@@ -154,73 +176,96 @@ let parse_block block =
       Ok (links, data)
 
 let data_of_blocks blocks root_hash =
-  let open Or_error.Let_syntax in
-  let rec parse_chunks hash =
-    let%bind raw_block_data =
-      match Map.find blocks hash with
-      | Some data ->
-          return data
-      | None ->
-          Or_error.error_string "required block not found"
-    in
-    let%bind links, data = parse_block raw_block_data in
-    let%map tail = or_error_list_bind links ~f:parse_chunks in
-    data :: tail
+  let links = Queue.of_list [ root_hash ] in
+  let chunks = Queue.create () in
+  let%map.Or_error () =
+    with_return (fun { return } ->
+        while Queue.length links > 0 do
+          let hash = Queue.dequeue_exn links in
+          let block =
+            match Map.find blocks hash with
+            | None ->
+                return (Or_error.error_string "required block not found")
+            | Some data ->
+                data
+          in
+          let successive_links, chunk =
+            match parse_block block with
+            | Error error ->
+                return (Error error)
+            | Ok x ->
+                x
+          in
+          List.iter successive_links ~f:(Queue.enqueue links) ;
+          Queue.enqueue chunks chunk
+        done ;
+        Ok ())
   in
-  let%map chunks = parse_chunks root_hash in
-  let total_data_size = List.sum (module Int) chunks ~f:Bigstring.length in
+  let total_data_size = Queue.sum (module Int) chunks ~f:Bigstring.length in
   let data = Bigstring.create total_data_size in
   ignore
-    ( List.fold_left chunks ~init:0 ~f:(fun i chunk ->
-          Bigstring.blit ~src:chunk ~src_pos:0 ~dst:data ~dst_pos:i
+    ( Queue.fold chunks ~init:0 ~f:(fun dst_pos chunk ->
+          Bigstring.blit ~src:chunk ~src_pos:0 ~dst:data ~dst_pos
             ~len:(Bigstring.length chunk) ;
-          i + Bigstring.length chunk)
+          dst_pos + Bigstring.length chunk)
       : int ) ;
   data
 
 let%test_module "bitswap blocks" =
   ( module struct
     let schema_of_blocks ~max_block_size blocks root_hash =
-      let total_blocks = Map.length blocks in
-      let full_link_blocks = ref 0 in
-      let non_max_link_block_count = ref None in
-      let last_block_data_size = ref 0 in
+      let num_total_blocks = Map.length blocks in
+      let num_full_branch_blocks = ref 0 in
+      let num_links_in_partial_branch_block = ref None in
+      let last_leaf_block_data_size = ref 0 in
       let max_links_per_block = max_links_per_block ~max_block_size in
       let rec crawl hash =
         let block = Map.find_exn blocks hash in
         let links, chunk = Or_error.ok_exn (parse_block block) in
-        let num_links = List.length links in
-        last_block_data_size := Bigstring.length chunk ;
-        ( if num_links > 0 then
-          if num_links = max_links_per_block then incr full_link_blocks
-          else
-            match !non_max_link_block_count with
+        ( match List.length links with
+        | 0 ->
+            let size = Bigstring.length chunk in
+            last_leaf_block_data_size :=
+              if !last_leaf_block_data_size = 0 then size
+              else min !last_leaf_block_data_size size
+        | n when n = max_links_per_block ->
+            incr num_full_branch_blocks
+        | n -> (
+            match !num_links_in_partial_branch_block with
             | Some _ ->
                 failwith
                   "invalid blocks: only expected one outlying block with \
                    differing number of links"
             | None ->
-                non_max_link_block_count := Some num_links ) ;
+                num_links_in_partial_branch_block := Some n ) ) ;
         List.iter links ~f:crawl
       in
       crawl root_hash ;
-      { total_blocks
-      ; full_link_blocks = !full_link_blocks
-      ; non_max_link_block_count =
-          Option.value !non_max_link_block_count ~default:0
-      ; last_block_data_size = !last_block_data_size
-      ; max_block_size
+      { num_total_blocks
+      ; num_full_branch_blocks = !num_full_branch_blocks
+      ; num_links_in_partial_branch_block =
+          Option.value !num_links_in_partial_branch_block ~default:0
+      ; last_leaf_block_data_size = !last_leaf_block_data_size
+      ; max_block_data_size = max_block_size
       ; max_links_per_block
       }
 
     let gen =
-      let open Quickcheck.Generator in
-      let gen_max_block_size = Int.gen_uniform_incl 256 (Int.pow 1024 2) in
-      let gen_bigstring = String.quickcheck_generator >>| Bigstring.of_string in
-      tuple2 gen_max_block_size gen_bigstring
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind max_block_size = Int.gen_uniform_incl 256 1024 in
+      let%bind data_length = Int.gen_log_uniform_incl 1 (Int.pow 1024 2) in
+      let%map data =
+        String.gen_with_length data_length Char.quickcheck_generator
+        >>| Bigstring.of_string
+      in
+      (max_block_size, data)
 
     let%test_unit "forall x: data_of_blocks (blocks_of_data x) = x" =
-      Quickcheck.test gen ~f:(fun (max_block_size, data) ->
+      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
+          (*
+          let schema = create_schema ~max_block_size (Bigstring.length data) in
+          Printf.printf !"schema: %{Sexp}\n" (sexp_of_schema schema) ;
+          *)
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           let result =
             Or_error.ok_exn (data_of_blocks blocks root_block_hash)
@@ -229,9 +274,118 @@ let%test_module "bitswap blocks" =
 
     let%test_unit "forall x: schema_of_blocks (blocks_of_data x) = \
                    create_schema x" =
-      Quickcheck.test gen ~f:(fun (max_block_size, data) ->
+      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
           let schema = create_schema ~max_block_size (Bigstring.length data) in
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           [%test_eq: schema] schema
             (schema_of_blocks ~max_block_size blocks root_block_hash))
+
+    let%test_unit "when x is aligned (has no partial branch block): \
+                   data_of_blocks (blocks_of_data x) = x" =
+      let max_block_size = 100 in
+      let data_length = max_block_size * 10 in
+      let data =
+        Quickcheck.Generator.generate ~size:1
+          ~random:(Splittable_random.State.of_int 0)
+          (String.gen_with_length data_length Char.quickcheck_generator)
+        |> Bigstring.of_string
+      in
+      assert (Bigstring.length data = data_length) ;
+      let blocks, root_block_hash = blocks_of_data ~max_block_size data in
+      let result = Or_error.ok_exn (data_of_blocks blocks root_block_hash) in
+      (*
+      Printf.printf "data size: %d, result size: %d\n" (Bigstring.length data) (Bigstring.length result) ;
+      let get hash = Or_error.ok_exn @@ parse_block @@ Map.find_exn blocks hash in
+      let get_link hash i = List.nth_exn (fst @@ get hash) i in
+      let search is = get @@ List.fold_left is ~init:root_block_hash ~f:(fun hash i -> get_link hash i) in
+      let fmt_links = Fn.compose (String.concat ~sep:"; ") (List.map ~f:(Fn.compose Base64.encode_string Blake2.to_raw_string)) in
+      let fmt_data = Bigstring.to_string in
+      Printf.printf "[] links: [%s]\n" (fmt_links @@ fst @@ get root_block_hash) ;
+      Printf.printf "[] data: %s\n" (fmt_data @@ snd @@ get root_block_hash) ;
+      Printf.printf "[0] links: [%s]\n" (fmt_links @@ fst @@ search [0]) ;
+      Printf.printf "[0] data: %s\n" (fmt_data @@ snd @@ search [0]) ;
+      Printf.printf "[0;0] links: [%s]\n" (fmt_links @@ fst @@ search [0;0]) ;
+      Printf.printf "[0;0] data: %s\n" (fmt_data @@ snd @@ search [0;0]) ;
+      *)
+      Out_channel.flush Out_channel.stdout ;
+      [%test_eq: Bigstring.t] data result
+
+    let with_libp2p_helper f =
+      let open Async in
+      let logger = Logger.null () in
+      let pids = Pid.Table.create () in
+      let handle_push_message _ = failwith "ama istimiyorum" in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind conf_dir = Unix.mkdtemp "bitswap_block_test" in
+          let%bind helper =
+            Libp2p_helper.spawn ~logger ~pids ~conf_dir ~handle_push_message
+            >>| Or_error.ok_exn
+          in
+          Monitor.protect
+            (fun () -> f helper)
+            ~finally:(fun () ->
+              let%bind () = Libp2p_helper.shutdown helper in
+              File_system.remove_dir conf_dir))
+
+    let%test_unit "forall x: libp2p_helper#decode (daemon#encode x) = x" =
+      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
+          let blocks, root_block_hash = blocks_of_data ~max_block_size data in
+          let result =
+            with_libp2p_helper (fun helper ->
+                let open Libp2p_ipc.Rpcs in
+                let request =
+                  TestDecodeBitswapBlocks.create_request
+                    ~blocks:
+                      (blocks |> Map.map ~f:Bigstring.to_string |> Map.to_alist)
+                    ~root_block_hash
+                in
+                Libp2p_helper.do_rpc helper
+                  (module TestDecodeBitswapBlocks)
+                  request)
+            |> Or_error.ok_exn
+            |> Libp2p_ipc.Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks
+               .Response
+               .decoded_data_get |> Bigstring.of_string
+          in
+          [%test_eq: Bigstring.t] data result)
+
+    let%test_unit "forall x: daemon#decode (libp2p_helper#encode x) = x" =
+      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
+          let blocks, root_block_hash =
+            let resp =
+              with_libp2p_helper (fun helper ->
+                  let open Libp2p_ipc.Rpcs in
+                  let request =
+                    TestEncodeBitswapBlocks.create_request ~max_block_size
+                      ~data:(Bigstring.to_string data)
+                  in
+                  Libp2p_helper.do_rpc helper
+                    (module TestEncodeBitswapBlocks)
+                    request)
+              |> Or_error.ok_exn
+            in
+            let open Libp2p_ipc.Reader in
+            let open Libp2pHelperInterface.TestEncodeBitswapBlocks in
+            let blocks =
+              Capnp.Array.map_list (Response.blocks_get resp)
+                ~f:(fun block_with_id ->
+                  let hash =
+                    Blake2.of_raw_string
+                    @@ BlockWithId.blake2b_hash_get block_with_id
+                  in
+                  let block =
+                    Bigstring.of_string @@ BlockWithId.block_get block_with_id
+                  in
+                  (hash, block))
+            in
+            let root_block_hash =
+              Blake2.of_raw_string @@ RootBlockId.blake2b_hash_get
+              @@ Response.root_block_id_get resp
+            in
+            (Blake2.Map.of_alist_exn blocks, root_block_hash)
+          in
+          let result =
+            Or_error.ok_exn (data_of_blocks blocks root_block_hash)
+          in
+          [%test_eq: Bigstring.t] data result)
   end )

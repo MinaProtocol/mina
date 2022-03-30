@@ -224,6 +224,10 @@ let rpc_request_body_set req body =
       ignore @@ set_node_status_set_builder req b
   | GetPeerNodeStatus b ->
       ignore @@ get_peer_node_status_set_builder req b
+  | TestDecodeBitswapBlocks b ->
+      ignore @@ test_decode_bitswap_blocks_set_builder req b
+  | TestEncodeBitswapBlocks b ->
+      ignore @@ test_encode_bitswap_blocks_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 

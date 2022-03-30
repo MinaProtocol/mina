@@ -77,7 +77,7 @@ module Go_log = struct
     | _ ->
         Error (prefix ^ "Expected a JSON object")
 
-  let record_to_message r =
+  let _record_to_message r =
     Logger.Message.
       { timestamp = Time.of_string r.ts
       ; level = ours_of_go r.level
@@ -245,6 +245,9 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
         (fun () ->
           Child_processes.stderr process
           |> Strict_pipe.Reader.iter ~f:(fun line ->
+                 Printf.printf "%s\n" line ;
+                 Deferred.unit
+                 (*
                  Mina_metrics.(
                    Counter.inc_one Mina_metrics.Network.ipc_logs_received_total) ;
                  let record_result =
@@ -265,7 +268,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                        "failed to parse record over libp2p_helper stderr: \
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;
-                 Deferred.unit)) ;
+                 Deferred.unit*))) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
