@@ -541,13 +541,13 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash = make_hash ~init:Hash_prefix_states.signature
+    let hash = make_hash ~init:Hash_prefix_states.signature_legacy
 
     let hash_for_mainnet =
-      make_hash ~init:Hash_prefix_states.signature_for_mainnet
+      make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
 
     let hash_for_testnet =
-      make_hash ~init:Hash_prefix_states.signature_for_testnet
+      make_hash ~init:Hash_prefix_states.signature_for_testnet_legacy
 
     [%%ifdef consensus_mechanism]
 
@@ -561,7 +561,7 @@ module Message = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
-          hash ~init:Hash_prefix_states.signature (pack_input input)
+          hash ~init:Hash_prefix_states.signature_legacy (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list)
 

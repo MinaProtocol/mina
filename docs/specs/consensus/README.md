@@ -68,14 +68,16 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
 - [6 Protocol](#6-protocol)
   - [6.1 Initialize consensus](#61-initialize-consensus)
     - [6.1.1 Genesis block](#611-genesis-block)
+    - [6.1.2 Bootstrap](#612-bootstrap)
   - [6.2 Select chain](#62-select-chain)
-    - [6.2.3 Bringing it all together](#623-bringing-it-all-together)
+  - [6.3 Maintaining the `k`-th predecessor epoch ledger](#63-maintaining-the-k-th-predecessor-epoch-ledger)
+  - [6.4 Getting the tip](#64-getting-the-tip)
 
 <!-- /TOC depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
 # 1. Acknowledgements
 
-This document would not exist without the help of the reviewers: [Jiawei Tang](https://github.com/ghost-not-in-the-shell), [Nathan Holland](https://github.com/nholland94), [Izaak Meckler](https://math.berkeley.edu/~izaak/) and [Matthew Ryan](https://github.com/mrmr1993).  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
+This document would not exist without the help of the reviewers: [Jiawei Tang](https://github.com/ghost-not-in-the-shell), [Nathan Holland](https://github.com/nholland94), [Izaak Meckler](https://math.berkeley.edu/~izaak/), [Matthew Ryan](https://github.com/mrmr1993) and [Vanishree Rao](https://twitter.com/vanishree_rao).  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
 # 2. Notations and conventions
 
@@ -98,7 +100,7 @@ These are the `mainnet` parameters Mina uses for Samasika
 | Field | Value | Description |
 | - | - | - |
 | `delta`                         | `0`                     | Maximum permissable delay of packets (in slots after the current) |
-| `k`                             | `290`                   | Point of finality (number of confirmations) |
+| `k`                             | `290`                   | Depth of finality (number of confirmations) |
 | `slots_per_epoch`               | `7140`                  | Number of slots per epoch |
 | `slots_duration`                | `180000` (= 3m)         | Slot duration in ms |
 | `epoch_duration`                | `1285200000` (= 14d21h) | Duration of an epoch in ms |
@@ -190,8 +192,8 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | Field              | Type                     | Description |
 | - | - | - |
 | `version`          | `u8` (= 0x01)            | Block structure version |
-| `ledger`           | `Epoch_ledger.Value.Stable.V1.t` | |
-| `seed`             | `Epoch_seed.Stable.V1.t` | |
+| `ledger`           | `Epoch_ledger.Value.Stable.V1.t` | Structure containing the hash and metadata about the corresponding epoch ledger |
+| `seed`             | `Epoch_seed.Stable.V1.t` | Used to seed VRF |
 | `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 5.3](#53-decentralized-checkpointing))|
 | `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 5.3](#53-decentralized-checkpointing)) excluding the current state |
 | `epoch_length`     | `Length.Stable.V1.t` | |
@@ -443,8 +445,6 @@ else {
 The above pseudocode is only to provide intuition about how the chain selection rules work.  A detailed description of the succinct sliding window structure is described in section [Section 5.4](#54-sliding-window-density) and the actual chain selection algorithm is specified in [Section 6.2](#62-select-chain).
 
 ## 5.3 Decentralized checkpointing
-
-**IN REVIEW**
 
 Samasika uses decentralized checkpointing to determine whether a fork is short- or long-range.  Each epoch is split into three parts with an equal number of slots.  The first 2/3 are called the *seed update range* because this is when the VRF is seeded.
 
@@ -868,7 +868,7 @@ canonical: B1, B2, B3, B4, B5, ..., Bk (current minimum window density = 42)
 
 The inversion problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika, time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
 
-The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2.3](#623-bringing-it-all-together), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
+The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2](#62-select-chain), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
 
 The relative minimum window density of blocks `B1` and `B2` is defined as.
 
@@ -922,12 +922,15 @@ This section specifies the consensus protocol in terms of events and how they MU
 
 Additionally there are certain local data members that all peers MUST maintain in order to participate in consensus.
 
-| Parameter   | Description |
+| Data   | Description |
 | - | - |
-| `genesis_block` | The initial block in the blockchain |
-| `neighbors`     | Set of connections to neighboring peers |
-| `chains`        | Set of known (succinct) candidate chains |
-| `tip`           | Currently selected chain according to the chain selection algorithm (i.e. secure chain) |
+| `genesis_block`  | The initial block in the blockchain |
+| `neighbors`      | Set of connections to neighboring peers |
+| `staking_ledger` | The staking epoch ledger |
+| `next_ledger`    | The next staking epoch ledger |
+| `final_ledger`    | The epoch ledger for the `k`-th predecessor from the `tip`, where `k` is the [`depth of finality`](#3-constants) |
+| `chains`         | Set of known (succinct) candidate chains |
+| `tip`            | Currently selected chain according to the chain selection algorithm (i.e. secure chain) |
 
 How these are represented is up to the implementation, but careful consideration must be given to scalability.
 
@@ -938,7 +941,7 @@ In the following description we use _dot notation_ to refer the local data membe
 Things a peer MUST do to initialize consensus includes
 
 * Load the genesis block
-* Get head of the current chain
+* Get the tip
 * Bootstrap
 * Catchup
 
@@ -957,8 +960,8 @@ Things a peer MUST do to initialize consensus includes
 | `total_currency`                         | `805385692840039233` (= 805385692.840039233)
 | `curr_global_slot`                       | `0` |
 | `global_slot_since_genesis`              | `0` |
-| `staking_epoch_data`                     | _FIXME_ |
-| `next_epoch_data`                        | _FIXME_ |
+| `staking_epoch_data`                     | (See below) |
+| `next_epoch_data`                        | (See below) |
 | `has_ancestor_in_same_checkpoint_window` | `true` |
 | `block_stake_winner`                     | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
 | `block_creator`                          | `Public_key::from_b58("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg")` |
@@ -1045,6 +1048,10 @@ The following JSON specifies the main data in the `mainnet` genesis block.
 }
 ```
 
+### 6.1.2 Bootstrap
+
+Bootstrapping consensus requires the ability to synchronize epoch ledgers from the network.  All peers MUST have the ability to load both the staking epoch ledger and next epoch ledger from disk and by downloading them.  P2P peers MUST also make these ledgers available for other peers, otherwise it is a protocol violation and the peers can be banned.  Locally the ledgers may be stored in an implementation specific representation, but when downloading or uploading the ledgers are synced over the network using a specific structure-- see the `P2P Specification`.
+
 ## 6.2 Select chain
 
 The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
@@ -1053,7 +1060,7 @@ In addition to the high-level idea given in [Section 5.2](#52-chain-selection-ru
 
 Additional tiebreak logic is needed when comparing chains of equal length or equal minimum density.  The minimum density tiebreak rule is simple-- if we are applying the long-range rule and two chains have equal minimum window density, then we apply the short-range rule (i.e. select the longer chain).
 
-### 6.2.3 Bringing it all together
+**Bringing it all together**
 
 Let `P.tip` refer to the top block of peer `P`'s current best chain.  Assuming an update to either `P.tip` or `P.chains`, `P` must update its `tip` like this
 
@@ -1117,3 +1124,36 @@ fn selectLongerChain(tip, candidate) -> Chain
 ```
 
 As mentioned above, tiebreak logic is also needed when the candidate chains have equal length.  In this case the tie is broken using the hashes of the last VRF output ([`hashLastVRF`](#516-hashlastvrf)).  If there is still a tie, we use the protocol state hashes to decide ([`hashState`](#517-hashstate)).  Note that collisions here are overwhelmingly unlikely.
+
+## 6.3 Maintaining the `k`-th predecessor epoch ledger
+
+The staking and next epoch ledgers MUST be finalized ledgers and can only advance when there is sufficient depth to achieve finality.  Peers MUST maintain the epoch ledger of the `k`-th predecessor from the `tip`, where `k` is the [`depth of finality`](#3-constants).  Initially, from genesis the `k`-th predecessor does not move until the block `k + 1`.
+
+Simultaneously, due to Ouroboros security requirements, the distance in slots between the staking and next epoch ledgers may be great.  Therefore, at any point we have effectively three "pointers": staking `s`, next `n` and finality `k`.
+
+```text
+genesis ........................................................ tip
+                  ^                       ^            ^
+                  s                       n            k
+                                                       ❄
+```
+
+Peers MUST maintain the epoch ledger of the `k`-th predecessor so that they have all information available when it is time to transition the epoch ledgers-- what Mina refers to as a *root move*.  Specifically, the root move does the following
+
+```text
+s <- n        a.k.a.       staking_ledger <- next_ledger
+n <- k                     next_ledger    <- final_ledger
+```
+
+Peers MUST maintain the epoch ledger of the `k`-th predecessor from the `tip` and implement epoch ledger transitions atomically as part of chain selection, for example, in a hook.
+
+The `final_ledger` (epoch ledger of the `k`-th predecessor from the `tip`) is updated each time chain selection occurs, i.e., for every new `tip` block appended.  The *root move* update happens at the start of a new epoch.
+
+Note that since all of these pointers are at or beyond *the point of finality* peers are not required to handle blockchain reorganizations, i.e., single copies of the three epoch ledgers is sufficient.
+
+## 6.4 Getting the tip
+
+For a joining peer to discover the head of the current chain it MUST not only obtain the `tip`, but also the `min(k, tip.height - 1)`-th block back from the tip.  For the latter the peer MUST check the block's *proof of finality*.
+
+Peers perform the proof of finality check by verifying two zero-knowledge proofs, one for the `tip` and one for the `root`, and a Merkle proof for the chain of protocol state hashes between them.  Details about this are presented in the `Verification Specification`.
+
