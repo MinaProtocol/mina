@@ -247,13 +247,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   O1trace.background_thread "initially_validate_blocks" (fun () ->
-      Reader.iter transition_reader ~f:(fun network_transition ->
+      Reader.iter transition_reader
+        ~f:(fun
+             ( `Transition transition_env
+             , `Time_received time_received
+             , `Valid_cb valid_cb )
+           ->
           if Ivar.is_full initialization_finish_signal then (
-            let ( `Transition transition_env
-                , `Time_received time_received
-                , `Valid_cb valid_cb ) =
-              network_transition
-            in
             let blockchain_length =
               Envelope.Incoming.data transition_env
               |> External_transition.consensus_state

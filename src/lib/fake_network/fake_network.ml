@@ -110,6 +110,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
         Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
+    ; consensus_constants = precomputed_values.consensus_constants
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -128,6 +129,10 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~sinks:
+                  ( Transition_handler.Block_sink.void
+                  , Network_pool.Transaction_pool.Remote_sink.void
+                  , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   state.get_staged_ledger_aux_and_pending_coinbases_at_hash
                 ~get_some_initial_peers:state.get_some_initial_peers
