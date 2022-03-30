@@ -204,10 +204,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
-    let wait_for_snapp parties =
+    let wait_for_snapp ~has_failures parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
@@ -219,7 +220,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Wait for snapp to create account with timing to be included in \
          transition frontier"
-        (wait_for_snapp parties_create_account_with_timing)
+        (wait_for_snapp ~has_failures:false parties_create_account_with_timing)
     in
     let%bind () =
       section "Verify snapp timing in ledger"
@@ -260,7 +261,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Waiting for snapp with transfer from timed account that succeeds"
-        (wait_for_snapp parties_transfer_from_timed_account)
+        (wait_for_snapp ~has_failures:false parties_transfer_from_timed_account)
     in
     (* let%bind after_balance =
          get_account_balance ~logger node timing_account_id
@@ -355,7 +356,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Waiting for snapp with transfer from timed account that fails due to \
          min balance"
-        (wait_for_snapp parties_invalid_transfer_from_timed_account)
+        (wait_for_snapp ~has_failures:true
+           parties_invalid_transfer_from_timed_account)
     in
     (* TODO: use transaction status to see that the transaction failed
        as things are, we examine the balance of the sender to see that no funds were transferred
@@ -401,7 +403,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Wait for snapp with invalid timing update"
-        (wait_for_snapp parties_update_timing)
+        (wait_for_snapp ~has_failures:true parties_update_timing)
     in
     let%bind () =
       section "Verify timing has not changed"

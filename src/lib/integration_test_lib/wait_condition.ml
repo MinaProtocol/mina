@@ -212,7 +212,7 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let snapp_to_be_included_in_frontier ~parties =
+  let snapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -230,14 +230,14 @@ struct
       match snapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
+          let successful =
             match actual_status with
             | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
+                not has_failures
+            | Failed _ ->
+                has_failures
           in
-          if was_applied then Predicate_passed
+          if successful then Predicate_passed
           else
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"
