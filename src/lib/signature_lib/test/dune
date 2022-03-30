@@ -1,6 +1,7 @@
 (library
  (name signature_lib_tests)
  (libraries
+   mina_base
    random_oracle_input
    signature_lib
    snark_params)
@@ -8,5 +9,6 @@
  (inline_tests)
  (preprocess
   (pps
+    ppx_assert
     ppx_inline_test
     ppx_version)))
