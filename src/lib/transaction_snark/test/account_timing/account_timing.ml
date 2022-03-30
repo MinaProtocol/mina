@@ -325,6 +325,131 @@ let%test_module "account timing check" =
       in
       validated_uc
 
+    (* Mina_ledger.Ledger.copy does not actually copy *)
+    let copy_ledger (ledger : Mina_ledger.Ledger.t) =
+      let ledger_copy =
+        Mina_ledger.Ledger.create ~depth:(Mina_ledger.Ledger.depth ledger) ()
+      in
+      let accounts = Mina_ledger.Ledger.to_list ledger in
+      List.iter accounts ~f:(fun account ->
+          let pk = Account.public_key account in
+          let token = Account.token account in
+          let account_id = Account_id.create pk token in
+          match
+            Mina_ledger.Ledger.get_or_create_account ledger_copy account_id
+              account
+          with
+          | Ok (`Added, _loc) ->
+              ()
+          | Ok (`Existed, _loc) ->
+              failwithf
+                "When creating ledger, account with public key %s and token %s \
+                 already existed"
+                (Signature_lib.Public_key.Compressed.to_string pk)
+                (Token_id.to_string token) ()
+          | Error err ->
+              failwithf
+                "When creating ledger, error adding account with public key %s \
+                 and token %s: %s"
+                (Signature_lib.Public_key.Compressed.to_string pk)
+                (Token_id.to_string token) (Error.to_string_hum err) ()) ;
+      ledger_copy
+
+    let check_transaction_snark ~(txn_global_slot : Mina_numbers.Global_slot.t)
+        (ledger : Mina_ledger.Ledger.t)
+        (transaction : Mina_transaction.Transaction.t) =
+      let sok_message =
+        Sok_message.create ~fee:Currency.Fee.zero
+          ~prover:
+            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+      in
+      let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
+      let state_body =
+        Mina_state.(
+          With_hash.data precomputed_values.protocol_state_with_hashes
+          |> Protocol_state.body)
+      in
+      let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+      let txn_state_view0 = Mina_state.Protocol_state.Body.view state_body in
+      let coinbase_stack_target =
+        let stack_with_state =
+          Pending_coinbase.Stack.(
+            push_state state_body_hash Pending_coinbase.Stack.empty)
+        in
+        match transaction with
+        | Coinbase c ->
+            Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+        | _ ->
+            stack_with_state
+      in
+      (* based on Sparse_ledger.handler
+         don't need a reference to the ledger, it's mutated
+      *)
+      let handler ledger =
+        let path_exn idx =
+          List.map (Mina_ledger.Ledger.merkle_path_at_index_exn ledger idx)
+            ~f:(function
+            | `Left h ->
+                h
+            | `Right h ->
+                h)
+        in
+        stage (fun (With { request; respond }) ->
+            match request with
+            | Ledger_hash.Get_element idx ->
+                let elt = Mina_ledger.Ledger.get_at_index_exn ledger idx in
+                let path = (path_exn idx :> Random_oracle.Digest.t list) in
+                respond (Provide (elt, path))
+            | Ledger_hash.Get_path idx ->
+                let path = (path_exn idx :> Random_oracle.Digest.t list) in
+                respond (Provide path)
+            | Ledger_hash.Set (idx, account) ->
+                Mina_ledger.Ledger.set_at_index_exn ledger idx account ;
+                respond (Provide ())
+            | Ledger_hash.Find_index pk ->
+                let index = Mina_ledger.Ledger.index_of_account_exn ledger pk in
+                respond (Provide index)
+            | _ ->
+                unhandled)
+      in
+      let validated_transaction =
+        match transaction with
+        | Command (Signed_command uc) ->
+            Mina_transaction.Transaction.Command
+              (User_command.Signed_command (validate_user_command uc))
+        | _ ->
+            failwith "Expected signed user command"
+      in
+      (* copy ledger, apply_transaction mutates it *)
+      let ledger_before_txn = copy_ledger ledger in
+      (* use given slot *)
+      let txn_state_view =
+        { txn_state_view0 with global_slot_since_genesis = txn_global_slot }
+      in
+      ( match
+          Mina_ledger.Ledger.apply_transaction ~constraint_constants
+            ~txn_state_view ledger transaction
+        with
+      | Ok _txn_applied ->
+          ()
+      | Error err ->
+          failwithf
+            "When checking transaction snark, applying transaction failed: %s"
+            (Error.to_string_hum err) () ) ;
+      Transaction_snark.check_transaction ~constraint_constants ~sok_message
+        ~source:(Mina_ledger.Ledger.merkle_root ledger_before_txn)
+        ~target:(Mina_ledger.Ledger.merkle_root ledger)
+        ~init_stack:Pending_coinbase.Stack.empty
+        ~pending_coinbase_stack_state:
+          { source = Pending_coinbase.Stack.empty
+          ; target = coinbase_stack_target
+          }
+        ~snapp_account1:None ~snapp_account2:None
+        { Transaction_protocol_state.Poly.block_data = state_body
+        ; transaction = validated_transaction
+        }
+        (unstage (handler ledger_before_txn))
+
     let apply_user_commands_at_slot ledger slot
         (txns : Mina_transaction.Transaction.t list) =
       ignore
@@ -337,12 +462,13 @@ let%test_module "account timing check" =
                     failwith "Expected signed user command"
               in
               let validated_uc = validate_user_command uc in
+              let ledger_copy = copy_ledger ledger in
               match
                 Mina_ledger.Ledger.apply_user_command ~constraint_constants
                   ~txn_global_slot:slot ledger validated_uc
               with
               | Ok _txn_applied ->
-                  ()
+                  check_transaction_snark ~txn_global_slot:slot ledger_copy txn
               | Error err ->
                   failwithf "Transaction failed: %s" (Error.to_string_hum err)
                     ())
