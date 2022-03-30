@@ -1060,6 +1060,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   end
 
   module Inputs = struct
+    let with_label ~label:_ f = f ()
+
     module First_party = Party.Signed
     module Global_state = Global_state
 

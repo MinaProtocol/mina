@@ -580,6 +580,8 @@ end
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 
 module type Inputs_intf = sig
+  val with_label : label:string -> (unit -> 'a) -> 'a
+
   module Bool : Bool_intf
 
   module Field : Iffable with type bool := Bool.t
@@ -802,11 +804,13 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.equal party_caller (Stack_frame.caller current_forest)
     in
     let () =
-      let is_delegate_call =
-        Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
-      in
-      (* Check that party has a valid caller. *)
-      assert_ Bool.(is_normal_call ||| is_delegate_call)
+      with_label ~label:"check valid caller" (fun () ->
+          let is_delegate_call =
+            Token_id.equal party_caller
+              (Stack_frame.caller_caller current_forest)
+          in
+          (* Check that party has a valid caller. *)
+          assert_ Bool.(is_normal_call ||| is_delegate_call))
     in
     (* Cases:
        - [party_forest] is empty, [remainder_of_current_forest] is empty.
@@ -922,23 +926,26 @@ module Make (Inputs : Inputs_intf) = struct
             (local_state.stack_frame, local_state.call_stack)
       in
       let party, remaining, call_stack =
-        (* TODO: Make the stack frame hashed inside of the local state *)
-        get_next_party to_pop call_stack
+        with_label ~label:"get next party" (fun () ->
+            (* TODO: Make the stack frame hashed inside of the local state *)
+            get_next_party to_pop call_stack)
       in
       let local_state =
-        let default_token_or_token_owner_was_caller =
-          (* Check that the token owner was consulted if using a non-default
-             token *)
-          let party_token_id = Party.token_id party in
-          Bool.( ||| )
-            (Token_id.equal party_token_id Token_id.default)
-            (Token_id.equal party_token_id (Party.caller party))
-        in
-        Local_state.add_check local_state Token_owner_not_caller
-          default_token_or_token_owner_was_caller
+        with_label ~label:"token owner not caller" (fun () ->
+            let default_token_or_token_owner_was_caller =
+              (* Check that the token owner was consulted if using a non-default
+                 token *)
+              let party_token_id = Party.token_id party in
+              Bool.( ||| )
+                (Token_id.equal party_token_id Token_id.default)
+                (Token_id.equal party_token_id (Party.caller party))
+            in
+            Local_state.add_check local_state Token_owner_not_caller
+              default_token_or_token_owner_was_caller)
       in
       let ((a, inclusion_proof) as acct) =
-        Inputs.Ledger.get_account party local_state.ledger
+        with_label ~label:"get account" (fun () ->
+            Inputs.Ledger.get_account party local_state.ledger)
       in
       Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
       let transaction_commitment, full_transaction_commitment =
@@ -1361,6 +1368,7 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
     in
+    (*Format.eprintf "About to check success of first party@." ;*)
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status_tbl
@@ -1377,6 +1385,7 @@ module Make (Inputs : Inputs_intf) = struct
       *)
       Amount.Signed.negate (Party.balance_change party)
     in
+    (*Format.eprintf "Checked success of first party@." ;*)
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
@@ -1401,6 +1410,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; success = Bool.(local_state.success &&& not overflowed)
       }
     in
+    (*Format.eprintf "No overflow@." ;*)
 
     (* If a's token ID differs from that in the local state, then
        the local state excess gets moved into the execution state's fee excess.

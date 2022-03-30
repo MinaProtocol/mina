@@ -58,10 +58,17 @@ module Call_forest = struct
     and map_forest x ~f = List.map x ~f:(With_stack_hash.map ~f:(map ~f))
 
     let hash { party = _; calls; party_digest } =
+      let stack_hash =
+        match calls with [] -> empty | e :: _ -> e.stack_hash
+      in
+      Caml.Format.eprintf "Parties.Tree.hash:@.%s@.%s@."
+        (Snark_params.Tick.Field.to_string party_digest)
+        (Snark_params.Tick.Field.to_string stack_hash) ;
       Random_oracle.hash ~init:Hash_prefix_states.party_node
-        [| party_digest
-         ; (match calls with [] -> empty | e :: _ -> e.stack_hash)
-        |]
+        [| party_digest; stack_hash |]
+      |> fun x ->
+      Caml.Format.eprintf "%s@." (Snark_params.Tick.Field.to_string x) ;
+      x
   end
 
   let fold = Tree.fold_forest
@@ -177,7 +184,14 @@ module Call_forest = struct
     List.rev (collect xs [])
 
   let hash_cons hash h_tl =
+    (*Caml.Format.eprintf "%s@." (Stdlib.Printexc.get_callstack 10 |> Stdlib.Printexc.raw_backtrace_to_string) ;*)
+    Caml.Format.eprintf "Parties.Call_stack.hash_cons:@.%s@.%s@."
+      (Snark_params.Tick.Field.to_string hash)
+      (Snark_params.Tick.Field.to_string h_tl) ;
     Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
+    |> fun x ->
+    Caml.Format.eprintf "%s@." (Snark_params.Tick.Field.to_string x) ;
+    x
 
   let hash = function [] -> empty | x :: _ -> With_stack_hash.stack_hash x
 

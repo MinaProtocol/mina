@@ -1373,50 +1373,74 @@ module Base = struct
             [| hash; h_tl |]
 
         let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
-          let hd_r =
-            V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
-          in
-          let party = V.create (fun () -> (V.get hd_r).party |> fst) in
-          let caller =
-            exists Mina_base.Token_id.typ ~compute:(fun () ->
-                (V.get party).data.caller)
-          in
-          let body =
-            exists (Party.Body.typ ()) ~compute:(fun () ->
-                (V.get party).data.body)
-          in
-          let predicate : Party.Predicate.Checked.t =
-            exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                (V.get party).data.predicate)
-          in
-          let auth = V.(create (fun () -> (V.get party).authorization)) in
-          let party : Party.Predicated.Checked.t =
-            { body; predicate; caller }
-          in
-          let party =
-            With_hash.of_data party ~hash_data:Party.Predicated.Checked.digest
-          in
-          let subforest : t =
-            let subforest = V.create (fun () -> (V.get hd_r).calls) in
-            let subforest_hash =
-              exists Field.typ ~compute:(fun () ->
-                  Parties.Call_forest.hash (V.get subforest))
-            in
-            { hash = subforest_hash; data = subforest }
-          in
-          let tl_hash =
-            exists Field.typ ~compute:(fun () ->
-                V.get r |> List.tl_exn |> Parties.Call_forest.hash)
-          in
-          let tree_hash =
-            Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
-              [| party.hash; subforest.hash |]
-          in
-          Field.Assert.equal tree_hash h ;
-          ( ({ party; control = auth }, subforest)
-          , { hash = tl_hash
-            ; data = V.(create (fun () -> List.tl_exn (get r)))
-            } )
+          with_label "Parties.pop_exn" (fun () ->
+              let hd_r =
+                V.create (fun () ->
+                    V.get r |> List.hd_exn |> With_stack_hash.elt)
+              in
+              let party = V.create (fun () -> (V.get hd_r).party |> fst) in
+              let caller =
+                exists Mina_base.Token_id.typ ~compute:(fun () ->
+                    (V.get party).data.caller)
+              in
+              let body =
+                exists (Party.Body.typ ()) ~compute:(fun () ->
+                    (V.get party).data.body)
+              in
+              let predicate : Party.Predicate.Checked.t =
+                exists (Party.Predicate.typ ()) ~compute:(fun () ->
+                    (V.get party).data.predicate)
+              in
+              let auth = V.(create (fun () -> (V.get party).authorization)) in
+              let party : Party.Predicated.Checked.t =
+                { body; predicate; caller }
+              in
+              let party =
+                With_hash.of_data party
+                  ~hash_data:Party.Predicated.Checked.digest
+              in
+              let subforest : t =
+                let subforest = V.create (fun () -> (V.get hd_r).calls) in
+                let subforest_hash =
+                  exists Field.typ ~compute:(fun () ->
+                      Parties.Call_forest.hash (V.get subforest))
+                in
+                { hash = subforest_hash; data = subforest }
+              in
+              let tl_hash =
+                exists Field.typ ~compute:(fun () ->
+                    V.get r |> List.tl_exn |> Parties.Call_forest.hash)
+              in
+              as_prover (fun () ->
+                  let party_digest = As_prover.read Field.typ party.hash in
+                  let stack_hash = As_prover.read Field.typ subforest.hash in
+                  Caml.Format.eprintf "pop_exn:@.%s@.%s@."
+                    (Snark_params.Tick.Field.to_string party_digest)
+                    (Snark_params.Tick.Field.to_string stack_hash)) ;
+              let tree_hash = hash_cons party.hash subforest.hash in
+              as_prover (fun () ->
+                  let tree_hash = As_prover.read Field.typ tree_hash in
+                  let h = As_prover.read Field.typ h in
+                  Caml.Format.eprintf "%s@.%s@."
+                    (Snark_params.Tick.Field.to_string tree_hash)
+                    (Snark_params.Tick.Field.to_string h)) ;
+              let hash_cons = hash_cons tree_hash tl_hash in
+                as_prover (fun () ->
+                    let tree_hash = As_prover.read Field.typ tree_hash in
+                    let tl_hash = As_prover.read Field.typ tl_hash in
+                    let h = As_prover.read Field.typ h in
+                    let hash_cons = As_prover.read Field.typ hash_cons in
+                    Caml.Format.eprintf "hash_cons:@.%s@.%s@.%s@.%s@."
+                      (Snark_params.Tick.Field.to_string tree_hash)
+                      (Snark_params.Tick.Field.to_string tl_hash)
+                      (Snark_params.Tick.Field.to_string h)
+                      (Snark_params.Tick.Field.to_string hash_cons)) ;
+              Field.Assert.equal hash_cons h ;
+              ( ( ({ party; control = auth }, subforest)
+                , { hash = tl_hash
+                  ; data = V.(create (fun () -> List.tl_exn (get r)))
+                  } )
+                : (party * t) * t ))
       end
 
       module Stack_frame = struct
@@ -1467,24 +1491,26 @@ module Base = struct
               , unit Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t) : t =
-          let frame : frame =
-            { caller =
-                exists Token_id.typ ~compute:(fun () -> (V.get frame).caller)
-            ; caller_caller =
-                exists Token_id.typ ~compute:(fun () ->
-                    (V.get frame).caller_caller)
-            ; calls =
-                { hash =
-                    exists Field.typ ~compute:(fun () ->
-                        (V.get frame).calls
-                        |> Mina_base.Parties.Call_forest.hash)
-                ; data = V.map frame ~f:(fun frame -> frame.calls)
+          with_label "unhash" (fun () ->
+              let frame : frame =
+                { caller =
+                    exists Token_id.typ ~compute:(fun () ->
+                        (V.get frame).caller)
+                ; caller_caller =
+                    exists Token_id.typ ~compute:(fun () ->
+                        (V.get frame).caller_caller)
+                ; calls =
+                    { hash =
+                        exists Field.typ ~compute:(fun () ->
+                            (V.get frame).calls
+                            |> Mina_base.Parties.Call_forest.hash)
+                    ; data = V.map frame ~f:(fun frame -> frame.calls)
+                    }
                 }
-            }
-          in
-          let t = of_frame frame in
-          Field.Assert.equal (hash (of_frame frame)) h ;
-          t
+              in
+              let t = of_frame frame in
+              Field.Assert.equal (hash (of_frame frame)) h ;
+              t)
       end
 
       module Call_stack = struct
@@ -1587,7 +1613,18 @@ module Base = struct
           let stack =
             exists Field.typ ~compute:(fun () -> stack_hash (V.get tl_r))
           in
-          let h' = hash_cons (Stack_frame.hash elt) stack in
+          let stack_frame_hash = Stack_frame.hash elt in
+          let h' = hash_cons stack_frame_hash stack in
+          as_prover (fun () ->
+              let stack_frame_hash = As_prover.read Field.typ stack_frame_hash in
+              let stack = As_prover.read Field.typ stack in
+              let h' = As_prover.read Field.typ h' in
+              let h = As_prover.read Field.typ h in
+              Caml.Format.eprintf "Call_stack.hash_cons:@.%s@.%s@.%s@.%s@."
+                (Snark_params.Tick.Field.to_string stack_frame_hash)
+                (Snark_params.Tick.Field.to_string stack)
+                (Snark_params.Tick.Field.to_string h')
+                (Snark_params.Tick.Field.to_string h)) ;
           with_label __LOC__ (fun () ->
               Boolean.Assert.any [ input_is_empty; Field.equal h h' ]) ;
           { is_some = Boolean.not input_is_empty
@@ -1695,10 +1732,13 @@ module Base = struct
           Mina_transaction_logic.Parties_logic.Local_state.t
 
         let add_check (t : t) _failure b =
+          (*as_prover (fun () ->
+            Format.eprintf "%s: %b@." (Transaction_status.Failure.to_string _failure) (As_prover.read Boolean.typ b)
+          ) ;*)
           { t with success = Bool.(t.success &&& b) }
 
         let update_failure_status_tbl (t : t) _failure_status b =
-          add_check (t : t) () b
+          add_check (t : t) Transaction_status.Failure.Update_not_permitted_voting_for b
 
         let add_new_failure_status_bucket t = t
       end
@@ -1959,6 +1999,8 @@ module Base = struct
           let global_slot_since_genesis { protocol_state; _ } =
             protocol_state.global_slot_since_genesis
         end
+
+        let with_label ~label f = with_label label f
       end
 
       module Env = struct
@@ -2152,17 +2194,18 @@ module Base = struct
                 }
               in
               let global_state, local_state =
-                S.apply ~constraint_constants
-                  ~is_start:
-                    ( match party_spec.is_start with
-                    | `No ->
-                        `No
-                    | `Yes ->
-                        `Yes start_data
-                    | `Compute_in_circuit ->
-                        `Compute start_data )
-                  S.{ perform }
-                  acc
+                with_label "apply" (fun () ->
+                    S.apply ~constraint_constants
+                      ~is_start:
+                        ( match party_spec.is_start with
+                        | `No ->
+                            `No
+                        | `Yes ->
+                            `Yes start_data
+                        | `Compute_in_circuit ->
+                            `Compute start_data )
+                      S.{ perform }
+                      acc)
               in
               (* replace any transaction failure with unit value *)
               (global_state, { local_state with failure_status_tbl = () })
