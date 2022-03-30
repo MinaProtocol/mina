@@ -55,8 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
         end in
         network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
-         ~hard_timeout:(Slots 10)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
+         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
