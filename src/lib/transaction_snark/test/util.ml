@@ -61,6 +61,8 @@ let pending_coinbase_state_stack =
 let apply_parties ledger parties =
   let parties =
     match parties with
+    | [] ->
+        []
     | [ ps ] ->
         [ ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement pending_coinbase_state_stack
@@ -82,8 +84,6 @@ let apply_parties ledger parties =
         in
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
-    | [] ->
-        []
   in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants

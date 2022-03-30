@@ -118,7 +118,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp create account"
       in
-      let fee = Currency.Fee.of_int 2_000_000 in
+      let fee = Currency.Fee.of_int 20_000_000 in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
@@ -146,7 +146,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Snapp update permissions"
       in
       (*Lower fee so that parties_create_account gets applied first*)
-      let fee = Currency.Fee.of_int 1_000_000 in
+      let fee = Currency.Fee.of_int 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
@@ -190,7 +190,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
-      let fee = Currency.Fee.of_int 1_000_000 in
+      let fee = Currency.Fee.of_int 10_000_000 in
       let app_state =
         let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
@@ -371,6 +371,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_snapp ~logger node parties_update_permissions)
     in
     let%bind () =
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 12 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
+    in
+    let%bind () =
       section
         "Wait for snapp to create accounts to be included in transition \
          frontier"
@@ -419,16 +429,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for snapp to update all fields to be included in transition \
          frontier"
         (wait_for_snapp parties_update_all)
-    in
-    let%bind () =
-      let padding_payments =
-        (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 12 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
-      let fee = Currency.Fee.of_int 1_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
     in
     let%bind () =
       section "Send a snapp with an invalid nonce"
