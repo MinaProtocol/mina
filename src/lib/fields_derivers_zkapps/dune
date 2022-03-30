@@ -1,29 +1,30 @@
 (library
- (name fields_derivers_snapps)
- (public_name fields_derivers_snapps_nonconsensus)
- (library_flags -linkall)
- (inline_tests)
+ (name fields_derivers_zkapps)
+ (public_name fields_derivers.zkapps)
  (libraries
-   ;;opam libraries
-   sexplib0
-   graphql_parser
+   ;; opam libraries
+   result
+   ppx_inline_test.config
    integers
    graphql
    fieldslib
    core_kernel
    base.caml
    base
-   ppx_inline_test.config
-   result
-   ;;local libraries
-   fields_derivers.json
+   sexplib0
+   graphql_parser
+   ;; local libraries
+   signature_lib
    fields_derivers.graphql
+   fields_derivers.json
+   currency
+   snark_params
+   pickles
    fields_derivers
-   unsigned_extended_nonconsensus
-   signature_lib_nonconsensus
-   currency_nonconsensus
-   snark_params_nonconsensus
+   unsigned_extended
+   with_hash
  )
+ (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess

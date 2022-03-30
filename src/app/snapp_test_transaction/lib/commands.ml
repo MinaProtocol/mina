@@ -602,7 +602,7 @@ let%test_module "Snapps test transaction" =
       | Error e ->
           Error e
 
-    let%test_unit "snapps transaction graphql round trip" =
+    let%test_unit "zkapps transaction graphql round trip" =
       Quickcheck.test ~trials:20
         (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (user_cmd, _, _, _) ->
