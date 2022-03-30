@@ -1369,7 +1369,7 @@ module Base = struct
         let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
         let hash_cons hash h_tl =
-          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
+          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
             [| hash; h_tl |]
 
         let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
@@ -1412,7 +1412,7 @@ module Base = struct
             Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
               [| party.hash; subforest.hash |]
           in
-          Field.Assert.equal (hash_cons tree_hash tl_hash) h ;
+          Field.Assert.equal tree_hash h ;
           ( ({ party; control = auth }, subforest)
           , { hash = tl_hash
             ; data = V.(create (fun () -> List.tl_exn (get r)))
