@@ -156,13 +156,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "check that the account balances are what we expect after the previous \
          txn"
-        (let%bind { total_balance = node_b_balance; _ } =
+        (let%bind { total_balance = node_a_balance; _ } =
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~public_key:receiver_pub_key
+         in
+         let%bind { total_balance = node_b_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
              ~public_key:sender_pub_key
-         in
-         let%bind { total_balance = node_a_balance; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
-             ~public_key:receiver_pub_key
          in
          let node_a_num_produced_blocks =
            Map.find (network_state t).blocks_produced_by_node
@@ -179,15 +179,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let node_a_expected =
            (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
            Currency.Amount.add
-             ( Currency.Amount.add
-                 (Currency.Amount.of_int 400_000_000_000_000)
-                 ( if Int.equal node_a_num_produced_blocks 0 then
-                   Currency.Amount.zero
-                 else
-                   Currency.Amount.scale coinbase_reward
-                     (node_a_num_produced_blocks * 2)
-                   |> Option.value_exn )
-             |> Option.value_exn )
+             (Currency.Amount.of_int 400_000_000_000_000)
              amount
            |> Option.value_exn
          in
@@ -225,7 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info] "node_b_num_produced_blocks: %d" node_b_num_produced_blocks ;
          if
            (* node_a is the receiver *)
-           (* node_a_balance >= 400_000_000_000_000 + node_a_num_produced_blocks*possible_coinbase_reward*2 + txn_amount *)
+           (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
            (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount node_a_balance)
