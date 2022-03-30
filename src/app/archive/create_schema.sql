@@ -84,22 +84,22 @@ CREATE TABLE internal_commands
 , UNIQUE (hash,type)
 );
 
-/* import supporting Snapp-related tables */
-\ir snapp_tables.sql
+/* import supporting Zkapp-related tables */
+\ir zkapp_tables.sql
 
-CREATE TABLE snapp_fee_payers
+CREATE TABLE zkapp_fee_payers
 ( id                       serial           PRIMARY KEY
-, body_id                  int              NOT NULL REFERENCES snapp_party_body(id)
+, body_id                  int              NOT NULL REFERENCES zkapp_party_body(id)
 , nonce                    bigint           NOT NULL
 );
 
-/* snapp_other_parties_ids refers to a list of ids in snapp_party.
-   The values in snapp_other_parties_ids are unenforced foreign keys, and
+/* zkapp_other_parties_ids refers to a list of ids in zkapp_party.
+   The values in zkapp_other_parties_ids are unenforced foreign keys, and
    not NULL. */
-CREATE TABLE snapp_commands
+CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
-, snapp_fee_payer_id                    int            NOT NULL REFERENCES snapp_fee_payers(id)
-, snapp_other_parties_ids               int[]          NOT NULL
+, zkapp_fee_payer_id                    int            NOT NULL REFERENCES zkapp_fee_payers(id)
+, zkapp_other_parties_ids               int[]          NOT NULL
 , hash                                  text           NOT NULL UNIQUE
 );
 
@@ -208,14 +208,14 @@ CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(b
 CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
 CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
 
-/* in this file because reference to balances doesn't work if in snapp_tables.sql */
-CREATE TABLE snapp_party_balances
+/* in this file because reference to balances doesn't work if in zkapp_tables.sql */
+CREATE TABLE zkapp_party_balances
 ( list_id                  int  NOT NULL
 , list_index               int  NOT NULL
 , balance_id               int  NOT NULL REFERENCES balances(id)
 );
 
-/* a join table between blocks and snapp_commands, with some additional information
+/* a join table between blocks and zkapp_commands, with some additional information
    sequence_no gives the order within all transactions in the block
 
    other_parties_list_id refers to a list of balances in the same order as the other parties in the
@@ -224,15 +224,15 @@ CREATE TABLE snapp_party_balances
    Blocks command convention
 */
 
-CREATE TABLE blocks_snapp_commands
+CREATE TABLE blocks_zkapp_commands
 ( block_id                        int  NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, snapp_command_id                int  NOT NULL REFERENCES snapp_commands(id) ON DELETE CASCADE
+, zkapp_command_id                int  NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
 , sequence_no                     int  NOT NULL
 , fee_payer_balance_id            int  NOT NULL REFERENCES balances(id)
 , other_parties_balances_list_id  int  NOT NULL
-, PRIMARY KEY (block_id, snapp_command_id, sequence_no)
+, PRIMARY KEY (block_id, zkapp_command_id, sequence_no)
 );
 
-CREATE INDEX idx_blocks_snapp_commands_block_id ON blocks_snapp_commands(block_id);
-CREATE INDEX idx_blocks_snapp_commands_snapp_command_id ON blocks_snapp_commands(snapp_command_id);
-CREATE INDEX idx_blocks_snapp_commands_sequence_no ON blocks_snapp_commands(sequence_no);
+CREATE INDEX idx_blocks_zkapp_commands_block_id ON blocks_zkapp_commands(block_id);
+CREATE INDEX idx_blocks_zkapp_commands_zkapp_command_id ON blocks_zkapp_commands(zkapp_command_id);
+CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequence_no);

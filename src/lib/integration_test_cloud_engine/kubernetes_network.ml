@@ -261,14 +261,14 @@ module Node = struct
                         send
                         setDelegate
                         setPermissions
-                        setSnappUri
+                        setZkappUri
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
                       }
           sequenceEvents
           snappState
-          snappUri
+          zkappUri
           timing { cliffTime
                    cliffAmount
                    vestingPeriod
@@ -478,7 +478,7 @@ module Node = struct
     ; send = to_auth_required account_permissions#send
     ; set_delegate = to_auth_required account_permissions#setDelegate
     ; set_permissions = to_auth_required account_permissions#setPermissions
-    ; set_snapp_uri = to_auth_required account_permissions#setSnappUri
+    ; set_zkapp_uri = to_auth_required account_permissions#setZkappUri
     ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
     ; set_verification_key =
         to_auth_required account_permissions#setVerificationKey
@@ -568,8 +568,8 @@ module Node = struct
           | None ->
               fail (Error.of_string "Expected permissions in account")
         in
-        let%bind snapp_uri =
-          match account#snappUri with
+        let%bind zkapp_uri =
+          match account#zkappUri with
           | Some s ->
               return @@ Set s
           | None ->
@@ -670,7 +670,7 @@ module Node = struct
             ; delegate
             ; verification_key
             ; permissions
-            ; snapp_uri
+            ; zkapp_uri
             ; token_symbol
             ; timing
             ; voting_for

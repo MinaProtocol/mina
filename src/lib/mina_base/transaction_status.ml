@@ -30,7 +30,7 @@ module Failure = struct
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
         | Update_not_permitted_sequence_state
-        | Update_not_permitted_snapp_uri
+        | Update_not_permitted_zkapp_uri
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
@@ -130,8 +130,8 @@ module Failure = struct
         "Update_not_permitted_verification_key"
     | Update_not_permitted_sequence_state ->
         "Update_not_permitted_sequence_state"
-    | Update_not_permitted_snapp_uri ->
-        "Update_not_permitted_snapp_uri"
+    | Update_not_permitted_zkapp_uri ->
+        "Update_not_permitted_zkapp_uri"
     | Update_not_permitted_token_symbol ->
         "Update_not_permitted_token_symbol"
     | Update_not_permitted_permissions ->
@@ -192,8 +192,8 @@ module Failure = struct
         Ok Update_not_permitted_verification_key
     | "Update_not_permitted_sequence_state" ->
         Ok Update_not_permitted_sequence_state
-    | "Update_not_permitted_snapp_uri" ->
-        Ok Update_not_permitted_snapp_uri
+    | "Update_not_permitted_zkapp_uri" ->
+        Ok Update_not_permitted_zkapp_uri
     | "Update_not_permitted_token_symbol" ->
         Ok Update_not_permitted_token_symbol
     | "Update_not_permitted_permissions" ->
@@ -271,7 +271,7 @@ module Failure = struct
     | Update_not_permitted_sequence_state ->
         "The authentication for an account didn't allow the requested update \
          to its sequence state"
-    | Update_not_permitted_snapp_uri ->
+    | Update_not_permitted_zkapp_uri ->
         "The authentication for an account didn't allow the requested update \
          to its snapp URI"
     | Update_not_permitted_token_symbol ->

@@ -1956,7 +1956,7 @@ let%test_module _ =
         ; timing = Account.Timing.Untimed
         ; permissions = Permissions.user_default
         ; snapp = None
-        ; snapp_uri = ""
+        ; zkapp_uri = ""
         } )
 
     let mk_remove_and_add_test assert_pool_txs pool best_tip_diff_w best_tip_ref
