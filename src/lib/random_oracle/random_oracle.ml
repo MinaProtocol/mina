@@ -88,10 +88,10 @@ module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
   let params = Kimchi_pasta_fp_poseidon.create ()
 
   let block_cipher _params (s : Field.t array) =
-    let v = Kimchi.FieldVectors.Fp.create () in
-    Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
+    let v = Kimchi_bindings.FieldVectors.Fp.create () in
+    Array.iter s ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back v) ;
     Kimchi_pasta_fp_poseidon.block_cipher params v ;
-    Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
+    Array.init (Array.length s) ~f:(Kimchi_bindings.FieldVectors.Fp.get v)
 end
 
 [%%else]
