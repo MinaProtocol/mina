@@ -47,11 +47,12 @@ let find_command_ids_query s =
   sprintf
     {sql| WITH RECURSIVE chain AS (
 
-            SELECT id,parent_id FROM blocks b WHERE b.state_hash = ?
+            SELECT id,parent_id,global_slot_since_genesis FROM blocks b
+            WHERE b.state_hash = $1
 
             UNION ALL
 
-            SELECT b.id,b.parent_id FROM blocks b
+            SELECT b.id,b.parent_id,b.global_slot_since_genesis FROM blocks b
 
             INNER JOIN chain
 
@@ -63,6 +64,8 @@ let find_command_ids_query s =
           INNER JOIN blocks_%s_commands bc
 
           ON bc.block_id = c.id
+
+          WHERE c.global_slot_since_genesis >= $2
 
      |sql}
     s s
@@ -153,11 +156,13 @@ end
 
 module User_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
       (find_command_ids_query "user")
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
 end
 
 module User_command = struct
@@ -215,7 +220,7 @@ module User_command = struct
                    sequence_no,status,created_token,
                    fee_payer_balance, source_balance, receiver_balance
 
-            FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
+            FROM (SELECT * FROM user_commands WHERE id = $1) AS uc
 
             INNER JOIN blocks_user_commands AS buc
 
@@ -237,11 +242,13 @@ end
 
 module Snapp_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
       (find_command_ids_query "snapp")
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
 end
 
 module Snapp_command = struct
@@ -290,11 +297,13 @@ end
 
 module Internal_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
       (find_command_ids_query "internal")
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
 end
 
 module Internal_command = struct
@@ -341,7 +350,7 @@ module Internal_command = struct
                    receiver_account_creation_fee_paid,
                    sequence_no,secondary_sequence_no
 
-            FROM (SELECT * FROM internal_commands WHERE id = ?) AS ic
+            FROM (SELECT * FROM internal_commands WHERE id = $1) AS ic
 
             INNER JOIN blocks_internal_commands AS bic
 
