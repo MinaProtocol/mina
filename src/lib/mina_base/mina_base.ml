@@ -3,6 +3,7 @@ module Util = Mina_base_util
 module Account = Account
 module Account_id = Account_id
 module Account_timing = Account_timing
+module Call_stack_digest = Call_stack_digest
 module Coinbase = Coinbase
 module Coinbase_fee_transfer = Coinbase_fee_transfer
 module Control = Control
