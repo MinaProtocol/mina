@@ -2191,7 +2191,8 @@ module Ledger = struct
         |> Parties.Call_forest.of_parties_list
              ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
         |> Parties.Call_forest.accumulate_hashes
-             ~hash_party:(fun (p : Party.t) -> Party.Predicated.digest p.data)
+             ~hash_party:(fun (p : Party.t) ->
+               Parties.Digest.Party.create p.data)
     ; memo = Mina_base.Signed_command_memo.empty
     }
 
@@ -2478,10 +2479,18 @@ module Ledger = struct
     p |> Checked.protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
     |> to_js_field
 
+  let forest_digest_of_field : Field.Constant.t -> Parties.Digest.Forest.t =
+    Obj.magic
+
+  let forest_digest_of_field_checked :
+      Field.t -> Parties.Digest.Forest.Checked.t =
+    Obj.magic
+
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> to_unchecked
+      |> forest_digest_of_field
     in
     let protocol_state_predicate_hash =
       protocol_state_predicate_hash |> of_js_field |> to_unchecked
@@ -2492,7 +2501,9 @@ module Ledger = struct
 
   let hash_transaction_checked other_parties_hash protocol_state_predicate_hash
       =
-    let other_parties_hash = other_parties_hash |> of_js_field in
+    let other_parties_hash =
+      other_parties_hash |> of_js_field |> forest_digest_of_field_checked
+    in
     let protocol_state_predicate_hash =
       protocol_state_predicate_hash |> of_js_field
     in
