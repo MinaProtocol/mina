@@ -8,8 +8,6 @@ val empty : t
 
 val gen : t Quickcheck.Generator.t
 
-open Pickles.Impls.Step
-
 module Checked : sig
   include Digest_intf.S_checked
 
