@@ -125,19 +125,9 @@ client_sdk_test_sigs: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=mainnet
 	$(info Build complete)
 
-client_sdk_test_sigs_nonconsensus: ocaml_checks
-	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
-	$(info Build complete)
-
 rosetta_lib_encodings: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
-	$(info Build complete)
-
-rosetta_lib_encodings_nonconsensus: ocaml_checks
-	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/nonconsensus/rosetta_lib/test/test_encodings.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
 dhall_types: ocaml_checks
