@@ -379,8 +379,8 @@ AS combo GROUP BY combo.pk_id
         | None ->
           let%map result = Conn.find_opt query_canonical_fallback (address, requested_block_height) in
           (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
-          Option.map result ~f:(fun (slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.(succ nonce)))
-      else (
+          Option.map result ~f:(fun (slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.succ nonce))
+      ) else (
         match%bind Conn.find_opt query_pending (address, requested_block_height) with
         | Some ((_pk,slot,balance,Some nonce)) ->
             return @@ Some (slot, balance, Some nonce)
@@ -388,7 +388,7 @@ AS combo GROUP BY combo.pk_id
         | None ->
           let%map result = Conn.find_opt query_pending_fallback (address, requested_block_height) in
           (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
-          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.(succ nonce)))
+          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.succ nonce)))
   end
 
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
