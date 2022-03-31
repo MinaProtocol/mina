@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
-    let keypair =
+    let keypair () =
       let private_key = Signature_lib.Private_key.create () in
       let public_key =
         Signature_lib.Public_key.of_private_key_exn private_key
@@ -31,7 +31,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "8000000000"; timing = Untimed }
         ; { balance = "1000000000"; timing = Untimed }
         ]
-    ; extra_genesis_accounts = [ { keypair; balance = "1000" } ]
+    ; extra_genesis_accounts =
+        [ { keypair = keypair (); balance = "1000" }
+        ; { keypair = keypair (); balance = "1000" }
+        ]
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
     ; work_delay = Some 1
@@ -92,14 +95,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
-    let%bind fee_payer_pk = Util.pub_key_of_node node in
-    let%bind fee_payer_sk = Util.priv_key_of_node node in
     let (keypair : Signature_lib.Keypair.t) =
-      { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
-      ; private_key = fee_payer_sk
-      }
+      (List.nth_exn config.extra_genesis_accounts 0).keypair
     in
-    let keypair2 = (List.hd_exn config.extra_genesis_accounts).keypair in
+    let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
     let num_snapp_accounts = 3 in
     let snapp_keypairs =
       List.init num_snapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
