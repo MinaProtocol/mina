@@ -100,6 +100,8 @@ let party_with_protocol_state_predicate =
 
 let party_stack_frame = salt party_stack_frame
 
+let party_stack_frame_cons = salt party_stack_frame_cons
+
 let snapp_uri = salt snapp_uri
 
 let snapp_event = salt snapp_event
