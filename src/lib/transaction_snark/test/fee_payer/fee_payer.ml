@@ -16,8 +16,8 @@ let%test_module "Fee payer tests" =
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
-              Snapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
       }
 
     let%test_unit "update a snapp account with signature and fee paid by the \

@@ -53,7 +53,7 @@ end
    `'{0, 1, 2}'` for postgresql. There is no need to add the single quotes,
    as caqti does this when using a string representation.
    type annotations are necessary for int array values in postgresql, eg.
-   `SELECT id FROM snapp_states WHERE element_ids = '{0,1,2,...}'::int[]` *)
+   `SELECT id FROM zkapp_states WHERE element_ids = '{0,1,2,...}'::int[]` *)
 let () =
   let open Caqti_type.Field in
   let rep = Caqti_type.String in
@@ -92,7 +92,7 @@ let () =
   define_coding Array_nullable_int { get_coding }
 
 (* this type may require type annotations in queries, eg.
-  `SELECT id FROM snapp_states WHERE element_ids = ?::int[]`
+  `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
 *)
 let array_nullable_int_typ : int option array Caqti_type.t =
   Caqti_type.field Array_nullable_int
@@ -141,13 +141,13 @@ let add_if_some (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg option -> ('res option, 'err) Deferred.Result.t =
   Fn.compose deferred_result_lift_opt @@ Option.map ~f
 
-let add_if_snapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Snapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Snapp_basic.Set_or_keep.to_option
+let add_if_zkapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
+    'arg Zkapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
+  Fn.compose (add_if_some f) Zkapp_basic.Set_or_keep.to_option
 
-let add_if_snapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Snapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Snapp_basic.Or_ignore.to_option
+let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
+    'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
+  Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
 
 (* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...]`
    creates the string

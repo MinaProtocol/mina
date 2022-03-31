@@ -6,7 +6,7 @@ struct
 
   let snapp_update =
     { Party.Update.dummy with
-      token_symbol = Snapp_basic.Set_or_keep.Set "Zoozoo"
+      token_symbol = Zkapp_basic.Set_or_keep.Set "Zoozoo"
     }
 end
 

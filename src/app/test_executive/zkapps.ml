@@ -55,8 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
         end in
         network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
-         ~hard_timeout:(Slots 10)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
+         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -152,7 +152,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
-        ; set_snapp_uri = Proof
+        ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
         }
@@ -189,14 +189,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
       let app_state =
-        let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
+        let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
                Snark_params.Tick.Field.gen)
         in
-        List.map fields ~f:(fun field -> Snapp_basic.Set_or_keep.Set field)
-        |> Snapp_state.V.of_list_exn
+        List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
+        |> Zkapp_state.V.of_list_exn
       in
       let new_delegate =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -209,7 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
       in
-      let new_snapp_uri = "https://www.minaprotocol.com" in
+      let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
       let snapp_update : Party.Update.t =
@@ -217,7 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
         ; permissions = Set new_permissions
-        ; snapp_uri = Set new_snapp_uri
+        ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
         ; timing = (* timing can't be updated for an existing account *)
                    Keep
@@ -277,9 +277,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
-      | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+      | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
           true
-      | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+      | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
           equal v1 v2
       | Set _, Keep ->
           false
@@ -323,8 +323,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         compatible requested_update.permissions ledger_update.permissions
           ~equal:Mina_base.Permissions.equal
       in
-      let snapp_uris_compat =
-        compatible requested_update.snapp_uri ledger_update.snapp_uri
+      let zkapp_uris_compat =
+        compatible requested_update.zkapp_uri ledger_update.zkapp_uri
           ~equal:String.equal
       in
       let token_symbols_compat =
@@ -344,7 +344,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegates_compat
         ; verification_keys_compat
         ; permissions_compat
-        ; snapp_uris_compat
+        ; zkapp_uris_compat
         ; token_symbols_compat
         ; timings_compat
         ; voting_fors_compat
@@ -354,7 +354,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_snapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in

@@ -25,7 +25,7 @@ module Base = struct
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Snapp_statement.t
+           * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
          | invalid ]

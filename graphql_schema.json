@@ -1296,7 +1296,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -1462,7 +1462,7 @@
               "defaultValue": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1756,7 +1756,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -1842,7 +1842,7 @@
               "defaultValue": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
@@ -6711,6 +6711,50 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "PartiesFailureReason",
+          "description": null,
+          "fields": [
+            {
+              "name": "index",
+              "description": "List index of the party that failed",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "failures",
+              "description":
+                "Failure reason for the party or any nested parties",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Memo",
           "description": null,
@@ -7962,7 +8006,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -8158,7 +8202,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -8579,7 +8623,15 @@
               "description":
                 "The reason for the snapp transaction failure; null means success or the status is unknown",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "PartiesFailureReason",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -10877,7 +10929,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description":
                 "Authorization required to change the URI of the snapp associated with the account ",
               "args": [],
@@ -11393,7 +11445,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description":
                 "The URI associated with this account, usually pointing to the snapp source code",
               "args": [],
