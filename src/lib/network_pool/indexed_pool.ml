@@ -132,7 +132,7 @@ let currency_consumed_unchecked :
         | Stake_delegation _ ->
             zero )
     | Parties _ ->
-        (*TODO: document- txns succeeds with source amount insufficient in the case of snapps*)
+        (*TODO: document- txns succeeds with source amount insufficient in the case of zkapps*)
         zero
   in
   fee_amt + amt

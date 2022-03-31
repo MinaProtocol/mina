@@ -7,7 +7,7 @@ struct
   let snapp_update : Party.Update.t =
     { Party.Update.dummy with
       voting_for =
-        Snapp_basic.Set_or_keep.Set
+        Zkapp_basic.Set_or_keep.Set
           (Async.Quickcheck.random_value State_hash.gen)
     }
 end

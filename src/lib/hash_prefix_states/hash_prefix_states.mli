@@ -83,7 +83,7 @@ val merge_snark : Field.t State.t
 
 val base_snark : Field.t State.t
 
-val snapp_uri : Field.t State.t
+val zkapp_uri : Field.t State.t
 
 val snapp_event : Field.t State.t
 

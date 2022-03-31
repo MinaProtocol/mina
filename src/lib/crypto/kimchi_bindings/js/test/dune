@@ -9,7 +9,9 @@
    digestif
    integers_stubs_js
    js_of_ocaml
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    kimchi_backend
    kimchi_backend.common
    kimchi_pasta

@@ -75,9 +75,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let compatible_item req_item ledg_item ~equal =
     match (req_item, ledg_item) with
-    | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+    | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
         true
-    | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+    | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
         equal v1 v2
     | Set _, Keep ->
         false
@@ -121,8 +121,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       compatible_item requested_update.permissions ledger_update.permissions
         ~equal:Mina_base.Permissions.equal
     in
-    let snapp_uris_compat =
-      compatible_item requested_update.snapp_uri ledger_update.snapp_uri
+    let zkapp_uris_compat =
+      compatible_item requested_update.zkapp_uri ledger_update.zkapp_uri
         ~equal:String.equal
     in
     let token_symbols_compat =
@@ -142,7 +142,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; delegates_compat
       ; verification_keys_compat
       ; permissions_compat
-      ; snapp_uris_compat
+      ; zkapp_uris_compat
       ; token_symbols_compat
       ; timings_compat
       ; voting_fors_compat

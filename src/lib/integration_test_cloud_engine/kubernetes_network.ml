@@ -261,14 +261,14 @@ module Node = struct
                         send
                         setDelegate
                         setPermissions
-                        setSnappUri
+                        setZkappUri
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
                       }
           sequenceEvents
           snappState
-          snappUri
+          zkappUri
           timing { cliffTime
                    cliffAmount
                    vestingPeriod
@@ -478,7 +478,7 @@ module Node = struct
     ; send = to_auth_required account_permissions#send
     ; set_delegate = to_auth_required account_permissions#setDelegate
     ; set_permissions = to_auth_required account_permissions#setPermissions
-    ; set_snapp_uri = to_auth_required account_permissions#setSnappUri
+    ; set_zkapp_uri = to_auth_required account_permissions#setZkappUri
     ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
     ; set_verification_key =
         to_auth_required account_permissions#setVerificationKey
@@ -511,7 +511,7 @@ module Node = struct
     let%bind account_obj = get_account ~logger t ~account_id in
     match account_obj#account with
     | Some account ->
-        let open Mina_base.Snapp_basic.Set_or_keep in
+        let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
           match account#snappState with
           | Some strs ->
@@ -520,7 +520,7 @@ module Node = struct
                 |> Base.List.map ~f:(fun s ->
                        Set (Pickles.Backend.Tick.Field.of_string s))
               in
-              return (Mina_base.Snapp_state.V.of_list_exn fields)
+              return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
               fail
                 (Error.of_string
@@ -568,8 +568,8 @@ module Node = struct
           | None ->
               fail (Error.of_string "Expected permissions in account")
         in
-        let%bind snapp_uri =
-          match account#snappUri with
+        let%bind zkapp_uri =
+          match account#zkappUri with
           | Some s ->
               return @@ Set s
           | None ->
@@ -670,7 +670,7 @@ module Node = struct
             ; delegate
             ; verification_key
             ; permissions
-            ; snapp_uri
+            ; zkapp_uri
             ; token_symbol
             ; timing
             ; voting_for
