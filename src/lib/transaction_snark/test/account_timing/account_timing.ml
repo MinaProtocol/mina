@@ -373,36 +373,6 @@ let%test_module "account timing check" =
         Mina_state.Protocol_state.Body.consensus_state state_body0
       in
       let txn_state_view0 = Mina_state.Protocol_state.Body.view state_body0 in
-      (* based on Sparse_ledger.handler
-         don't need a reference to the ledger, it's mutated
-      *)
-      let handler ledger =
-        let path_exn idx =
-          List.map (Mina_ledger.Ledger.merkle_path_at_index_exn ledger idx)
-            ~f:(function
-            | `Left h ->
-                h
-            | `Right h ->
-                h)
-        in
-        stage (fun (With { request; respond }) ->
-            match request with
-            | Ledger_hash.Get_element idx ->
-                let elt = Mina_ledger.Ledger.get_at_index_exn ledger idx in
-                let path = (path_exn idx :> Random_oracle.Digest.t list) in
-                respond (Provide (elt, path))
-            | Ledger_hash.Get_path idx ->
-                let path = (path_exn idx :> Random_oracle.Digest.t list) in
-                respond (Provide path)
-            | Ledger_hash.Set (idx, account) ->
-                Mina_ledger.Ledger.set_at_index_exn ledger idx account ;
-                respond (Provide ())
-            | Ledger_hash.Find_index pk ->
-                let index = Mina_ledger.Ledger.index_of_account_exn ledger pk in
-                respond (Provide index)
-            | _ ->
-                unhandled)
-      in
       let validated_transaction =
         match transaction with
         | Command (Signed_command uc) ->
@@ -411,8 +381,6 @@ let%test_module "account timing check" =
         | _ ->
             failwith "Expected signed user command"
       in
-      (* copy ledger, apply_transaction mutates it *)
-      let ledger_before_txn = copy_ledger ledger in
       (* use given slot *)
       let consensus_state =
         Consensus.Data.Consensus_state.Value.For_tests
@@ -426,16 +394,19 @@ let%test_module "account timing check" =
       let txn_state_view =
         { txn_state_view0 with global_slot_since_genesis = txn_global_slot }
       in
-      ( match
-          Mina_ledger.Ledger.apply_transaction ~constraint_constants
-            ~txn_state_view ledger transaction
-        with
-      | Ok _txn_applied ->
-          ()
-      | Error err ->
-          failwithf
-            "When checking transaction snark, applying transaction failed: %s"
-            (Error.to_string_hum err) () ) ;
+      let account_ids =
+        Mina_ledger.Ledger.to_list ledger
+        |> List.map ~f:(fun acct ->
+               Account_id.create acct.public_key acct.token_id)
+      in
+      let sparse_ledger_before =
+        Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger account_ids
+      in
+      let sparse_ledger_after, _ =
+        Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
+          ~txn_state_view sparse_ledger_before transaction
+        |> Or_error.ok_exn
+      in
       let coinbase_stack_target =
         let stack_with_state =
           Pending_coinbase.Stack.(
@@ -448,8 +419,8 @@ let%test_module "account timing check" =
             stack_with_state
       in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
-        ~source:(Mina_ledger.Ledger.merkle_root ledger_before_txn)
-        ~target:(Mina_ledger.Ledger.merkle_root ledger)
+        ~source:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
+        ~target:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
         ~init_stack:Pending_coinbase.Stack.empty
         ~pending_coinbase_stack_state:
           { source = Pending_coinbase.Stack.empty
@@ -459,7 +430,7 @@ let%test_module "account timing check" =
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         }
-        (unstage (handler ledger_before_txn))
+        (unstage (Mina_ledger.Sparse_ledger.handler sparse_ledger_before))
 
     let apply_user_commands_at_slot ledger slot
         (txns : Mina_transaction.Transaction.t list) =
