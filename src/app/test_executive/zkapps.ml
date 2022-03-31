@@ -189,14 +189,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
       let app_state =
-        let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
+        let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
                Snark_params.Tick.Field.gen)
         in
         List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
-        |> Snapp_state.V.of_list_exn
+        |> Zkapp_state.V.of_list_exn
       in
       let new_delegate =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen

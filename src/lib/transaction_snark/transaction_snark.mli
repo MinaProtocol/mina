@@ -342,7 +342,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Snapp_statement.t) option
+    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -436,7 +436,7 @@ val parties_witnesses_exn :
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) option )
+     * (int * Zkapp_statement.t) option )
      list
 
 module Make (Inputs : sig
@@ -493,7 +493,7 @@ module Base : sig
          ?witness:Parties_segment.Witness.t
       -> Parties_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> (int * Snapp_statement.Checked.t) list
+      -> (int * Zkapp_statement.Checked.t) list
       -> Statement.With_sok.var
       -> unit
   end
@@ -529,7 +529,7 @@ module For_tests : sig
          ( unit
          , unit
          , unit
-         , Snapp_statement.t
+         , Zkapp_statement.t
          , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -559,7 +559,7 @@ module For_tests : sig
             ( unit
             , unit
             , unit
-            , Snapp_statement.t
+            , Zkapp_statement.t
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 

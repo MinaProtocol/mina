@@ -27,8 +27,8 @@ let%test_module "Snapp payments tests" =
       in
       let acct1 = wallets.(i) in
       let acct2 = wallets.(j) in
-      let new_state : _ Snapp_state.V.t =
-        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
+      let new_state : _ Zkapp_state.V.t =
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
       { fee_payer =
           { Party.Fee_payer.data =
