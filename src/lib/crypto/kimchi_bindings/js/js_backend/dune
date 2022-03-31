@@ -1,6 +1,6 @@
 (library
- (name fake_backend)
+ (name js_backend)
  (js_of_ocaml
-  (javascript_files fake_backend.js fake_bindings.js))
+  (javascript_files js_backend.js bindings.js))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
