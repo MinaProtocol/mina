@@ -10,19 +10,25 @@ var caml_pasta_p_bigint = BigInt_('0x40000000000000000000000000000000224698fc094
 var caml_pasta_q_bigint = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001');
 // Provides: caml_pasta_pm1_odd_factor
 // Requires: BigInt_
-var caml_pasta_pm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc094cf91b992d30ed')
+var caml_pasta_pm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc094cf91b992d30ed');
 // Provides: caml_pasta_qm1_odd_factor
 // Requires: BigInt_
-var caml_pasta_qm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb21')
+var caml_pasta_qm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb21');
+// Provides: caml_generator_fp
+// Requires: BigInt_
+var caml_generator_fp = BigInt_('0x3ffffffffffffffffffffffffffffffd74c2a54b4f4982f3a1a55e68ffffffed');
+// Provides: caml_generator_fq
+// Requires: BigInt_
+var caml_generator_fq = BigInt_('0x3ffffffffffffffffffffffffffffffd74c2a54b49f7778e96bc8c8cffffffed');
 
-// TODO: twoadic_roots taken from Rust don't give 1 when taken to the power of 2^32
-
+// roots were computed as
+// caml_generator_fp ^ caml_pasta_pm1_odd_factor
 // Provides: caml_twoadic_root_fp
 // Requires: BigInt_
-var caml_twoadic_root_fp = BigInt_('0x3ec928747b89c6dafba6b9ca9dc8448e9083cd03d3b539dfa28db849bad6dbf0');
+var caml_twoadic_root_fp = BigInt_('0x36af506de441e63f43e174a0d0486218e8d45c8e1e4e2aeafee6f241e866a1e2');
 // Provides: caml_twoadic_root_fq
 // Requires: BigInt_
-var caml_twoadic_root_fq = BigInt_('0x0b79fa897f2db056ac2e5d27b2efbee2cc49578921b60494218077428c9942de')
+var caml_twoadic_root_fq = BigInt_('0x208eb64428e3a2437f41103ce0bc78da9219cac2ca68b3377bb6a48c528523b2')
 
 // Provides: caml_bigint_modulo
 function caml_bigint_modulo(x, p) {
@@ -386,15 +392,22 @@ var _test_finite_field = caml_bindings_debug && (function test() {
   console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
 
+  // var generator = BigInt_(5); // works for both fp and fq
+  // var alt_root_fp = caml_finite_field_power(generator, caml_pasta_pm1_odd_factor, caml_pasta_p_bigint);
+  // console.log(alt_root_fp.toString(16));
+  // var alt_root_fq = caml_finite_field_power(generator_fq, caml_pasta_qm1_odd_factor, caml_pasta_q_bigint);
+  // console.log(alt_root_fq.toString(16));
+
+  var should_be_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint);
+  var should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint);
+  console.assert(should_be_1 === _1n);
+  console.assert(should_be_minus_1 + _1n === caml_pasta_p_bigint);
+
+  should_be_1 = caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint);
+  should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fq, (_1n << BigInt_(31)), caml_pasta_q_bigint);
+  console.assert(should_be_1 === _1n);
+  console.assert(should_be_minus_1 + _1n === caml_pasta_q_bigint);
+
   console.assert(caml_pasta_fp_is_square([caml_twoadic_root_fp]) === 0);
   console.assert(caml_pasta_fq_is_square([caml_twoadic_root_fq]) === 0);
-
-  // console.log(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint));
-  // console.log(caml_pasta_p_bigint);
-  // console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint) === _1n);
-  // console.assert(caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint) === -_1n);
-
-  // console.log(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint));
-  // console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << _32n), caml_pasta_q_bigint) === _1n);
-  // console.assert(caml_finite_field_power(caml_twoadic_root_fq, (_1n << BigInt_(31)), caml_pasta_q_bigint) === -_1n);
 })()
