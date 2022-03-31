@@ -47,7 +47,7 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBuster
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
@@ -60,7 +60,7 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBuster
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]

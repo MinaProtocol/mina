@@ -24,7 +24,7 @@ Pipeline.build
     , steps =
       [ Command.build
           Command.Config::
-            { commands = RunInToolchain.runInToolchainBuster ([] : List Text) "./buildkite/scripts/compare_test_signatures.sh"
+            { commands = RunInToolchain.runInToolchain ([] : List Text) "./buildkite/scripts/compare_test_signatures.sh"
             , label = "Compare test signatures"
             , key = "compare-test-signatures"
             , target = Size.Medium

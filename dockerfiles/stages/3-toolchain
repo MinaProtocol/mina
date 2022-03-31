@@ -59,9 +59,9 @@ RUN apt-get update --yes \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# -- Debian Buster python dependencies (largely installed above from apt)
+# -- Debian Bullseye python dependencies (largely installed above from apt)
 # Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
-RUN test "$deb_codename" = "buster" \
+RUN test "$deb_codename" = "bullseye" \
       && apt-get install --yes --no-install-recommends \
           python3-sexpdata \
       && rm -rf /var/lib/apt/lists/* \

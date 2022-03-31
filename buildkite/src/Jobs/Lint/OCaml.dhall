@@ -36,7 +36,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBuster
+                RunInToolchain.runInToolchain
                   ([] : List Text)
                   (     "./buildkite/scripts/lint-check-format.sh && "
                     ++  "./scripts/require-ppxs.py"

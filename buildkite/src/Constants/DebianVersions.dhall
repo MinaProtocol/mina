@@ -23,22 +23,24 @@ let lowerName = \(debVersion : DebVersion) ->
   } debVersion
 
 --- Bionic and Stretch are so similar that they share a toolchain image
+--- Same with Bullseye and Focal
 let toolchainRunner = \(debVersion : DebVersion) ->
   merge {
     Bullseye = RunInToolchain.runInToolchainBullseye
     , Buster = RunInToolchain.runInToolchainBuster
     , Stretch = RunInToolchain.runInToolchainStretch
-    , Focal = RunInToolchain.runInToolchainFocal
+    , Focal = RunInToolchain.runInToolchainBullseye
     , Bionic = RunInToolchain.runInToolchainStretch
   } debVersion
 
 --- Bionic and Stretch are so similar that they share a toolchain image
+--- Same with Bullseye and Focal
 let toolchainImage = \(debVersion : DebVersion) ->
   merge { 
     Bullseye = ContainerImages.minaToolchainBullseye
     , Buster = ContainerImages.minaToolchainBuster
     , Stretch = ContainerImages.minaToolchainStretch
-    , Focal = ContainerImages.minaToolchainFocal
+    , Focal = ContainerImages.minaToolchainBullseye
     , Bionic = ContainerImages.minaToolchainStretch
   } debVersion
 
