@@ -195,8 +195,8 @@ module Local_state = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Parties.Digest.Stable.V1.t
-          , Parties.Digest.Stable.V1.t
+          ( Mina_base.Stack_frame.Digest.Stable.V1.t
+          , Mina_base.Call_stack_digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
@@ -215,8 +215,8 @@ module Local_state = struct
     open Pickles.Impls.Step
 
     type t =
-      ( Field.t
-      , Field.t
+      ( Stack_frame.Digest.Checked.t
+      , Call_stack_digest.Checked.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
       , Ledger_hash.var
@@ -1410,6 +1410,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; success = Bool.(local_state.success &&& not overflowed)
       }
     in
+
     (*Format.eprintf "No overflow@." ;*)
 
     (* If a's token ID differs from that in the local state, then

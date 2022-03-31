@@ -1451,7 +1451,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, Parties.Digest.t) Parties.Call_forest.t
+      type parties =
+        ( Party.t
+        , Parties.Digest.Party.t
+        , Parties.Digest.Forest.t )
+        Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1544,7 +1548,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Parties = struct
-      type t = (Party.t, Parties.Digest.t) Parties.Call_forest.t
+      type t = Party.parties
 
       let empty () = []
 
@@ -2475,7 +2479,7 @@ module For_tests = struct
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
         ~fee_payer_hash:
-          (Party.Predicated.digest
+          (Parties.Digest.Party.create
              (Party.Predicated.of_fee_payer parties.fee_payer.data))
     in
     let other_parties_signature =
