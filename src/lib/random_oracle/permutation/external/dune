@@ -13,8 +13,8 @@
    sponge
    pickles
    pickles.backend
-   kimchi.pasta_fp_poseidon
-   kimchi
+   kimchi_bindings.pasta_fp_poseidon
+   kimchi_bindings
    kimchi_backend
    kimchi_backend.common
    kimchi_backend.pasta
