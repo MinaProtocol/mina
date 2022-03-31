@@ -15,28 +15,14 @@ var caml_pasta_pm1_odd_factor = BigInt_('0x4000000000000000000000000000000022469
 // Requires: BigInt_
 var caml_pasta_qm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb21')
 
-// helper to easily copy over values from Rust
-// Provides: caml_bigint_from_hex_limbs
-// Requires: BigInt_, _1n
-function caml_bigint_from_hex_limbs(limbs) {
-  return BigInt_(limbs[0]) + 
-    (_1n << BigInt_(1 * 64)) * BigInt_(limbs[1]) + 
-    (_1n << BigInt_(2 * 64)) * BigInt_(limbs[2]) + 
-    (_1n << BigInt_(3 * 64)) * BigInt_(limbs[3])
-}
-
-// TODO: twoadic_roots don't give 1 when taken to the power of 2^32
+// TODO: twoadic_roots taken from Rust don't give 1 when taken to the power of 2^32
 
 // Provides: caml_twoadic_root_fp
-// Requires: caml_bigint_from_hex_limbs
-var caml_twoadic_root_fp = caml_bigint_from_hex_limbs([
-  "0xa28db849bad6dbf0", "0x9083cd03d3b539df", "0xfba6b9ca9dc8448e", "0x3ec928747b89c6da"
-]);
+// Requires: BigInt_
+var caml_twoadic_root_fp = BigInt_('0x3ec928747b89c6dafba6b9ca9dc8448e9083cd03d3b539dfa28db849bad6dbf0');
 // Provides: caml_twoadic_root_fq
-// Requires: caml_bigint_from_hex_limbs
-var caml_twoadic_root_fq = caml_bigint_from_hex_limbs([
-  "0x218077428c9942de", "0xcc49578921b60494", "0xac2e5d27b2efbee2", "0x0b79fa897f2db056"
-]);
+// Requires: BigInt_
+var caml_twoadic_root_fq = BigInt_('0x0b79fa897f2db056ac2e5d27b2efbee2cc49578921b60494218077428c9942de')
 
 // Provides: caml_bigint_modulo
 function caml_bigint_modulo(x, p) {
@@ -394,12 +380,11 @@ var caml_bindings_debug = false;
 
 // TODO fix failing assertions
 // Provides: _test_finite_field
-// Requires: caml_bindings_debug, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_bigint_from_hex_limbs, caml_pasta_fp_is_square, caml_pasta_fq_is_square
+// Requires: caml_bindings_debug, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_pasta_fp_is_square, caml_pasta_fq_is_square
 var _test_finite_field = caml_bindings_debug && (function test() {
   var console = joo_global_object.console;
   console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
-  console.assert(caml_bigint_from_hex_limbs(["0x992d30ed00000001","0x224698fc094cf91b","0x0","0x4000000000000000"]) === caml_pasta_p_bigint);
 
   console.assert(caml_pasta_fp_is_square([caml_twoadic_root_fp]) === 0);
   console.assert(caml_pasta_fq_is_square([caml_twoadic_root_fq]) === 0);
