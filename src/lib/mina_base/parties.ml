@@ -1,5 +1,4 @@
 open Core_kernel
-module Digest = Kimchi_backend.Pasta.Basic.Fp
 
 let add_caller (p : _ Party.t_) (caller : 'c) : 'c Party.t_ =
   { authorization = p.authorization; data = { p.data with caller } }
@@ -58,10 +57,147 @@ module Call_forest = struct
     and map_forest x ~f = List.map x ~f:(With_stack_hash.map ~f:(map ~f))
 
     let hash { party = _; calls; party_digest } =
+      let stack_hash =
+        match calls with [] -> empty | e :: _ -> e.stack_hash
+      in
       Random_oracle.hash ~init:Hash_prefix_states.party_node
-        [| party_digest
-         ; (match calls with [] -> empty | e :: _ -> e.stack_hash)
-        |]
+        [| party_digest; stack_hash |]
+  end
+
+  type ('a, 'b, 'c) tree = ('a, 'b, 'c) Tree.t
+
+  module Digest : sig
+    module Party : sig
+      include Digest_intf.S
+
+      module Checked : sig
+        include Digest_intf.S_checked
+
+        val create : Party.Predicated.Checked.t -> t
+      end
+
+      include Digest_intf.S_aux with type t := t and type checked := Checked.t
+
+      val create : Party.Predicated.t -> t
+    end
+
+    module rec Forest : sig
+      include Digest_intf.S
+
+      module Checked : sig
+        include Digest_intf.S_checked
+
+        val cons : Tree.Checked.t -> t -> t
+      end
+
+      include Digest_intf.S_aux with type t := t and type checked := Checked.t
+
+      val empty : t
+
+      val cons : Tree.t -> Forest.t -> Forest.t
+    end
+
+    and Tree : sig
+      include Digest_intf.S
+
+      module Checked : sig
+        include Digest_intf.S_checked
+
+        val create :
+          party:Party.Checked.t -> calls:Forest.Checked.t -> Tree.Checked.t
+      end
+
+      include Digest_intf.S_aux with type t := t and type checked := Checked.t
+
+      val create : (_, Party.t, Forest.t) tree -> Tree.t
+    end
+  end = struct
+    module M = struct
+      open Pickles.Impls.Step.Field
+      module Checked = Pickles.Impls.Step.Field
+
+      let typ = typ
+
+      let constant = constant
+    end
+
+    module Party = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      include M
+
+      module Checked = struct
+        include Checked
+
+        let create = Party.Predicated.Checked.digest
+      end
+
+      let create : Party.Predicated.t -> t = Party.Predicated.digest
+    end
+
+    module Forest = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      include M
+
+      module Checked = struct
+        include Checked
+
+        let cons hash h_tl =
+          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
+            [| hash; h_tl |]
+      end
+
+      let empty = empty
+
+      let cons hash h_tl =
+        Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
+    end
+
+    module Tree = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      include M
+
+      module Checked = struct
+        include Checked
+
+        let create ~(party : Party.Checked.t) ~(calls : Forest.Checked.t) =
+          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
+            [| (party :> t); (calls :> t) |]
+      end
+
+      let create ({ party = _; calls; party_digest } : _ tree) =
+        let stack_hash =
+          match calls with [] -> empty | e :: _ -> e.stack_hash
+        in
+        Random_oracle.hash ~init:Hash_prefix_states.party_node
+          [| party_digest; stack_hash |]
+    end
   end
 
   let fold = Tree.fold_forest
