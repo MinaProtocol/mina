@@ -477,14 +477,14 @@ struct
 end
 
 type evaluation =
-  ( Kimchi.Pallas.t
-  , Kimchi.Foundations.Fq.t
+  ( Pasta_bindings.Pallas.t
+  , Pasta_bindings.Fq.t
     Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Kimchi.Foundations.Fp.t, int) Message.t
-  , Kimchi.Pallas.t )
+  ( (Unsigned.uint32, Pasta_bindings.Fp.t, int) Message.t
+  , Pasta_bindings.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct

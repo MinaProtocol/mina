@@ -60,7 +60,7 @@ module Inputs = struct
     ( Transaction_witness.Parties_segment_witness.t
     * Transaction_snark.Parties_segment.Basic.t
     * Transaction_snark.Statement.With_sok.t
-    * (int * Snapp_statement.t) option )
+    * (int * Zkapp_statement.t) option )
     list
   [@@deriving sexp, to_yojson]
 

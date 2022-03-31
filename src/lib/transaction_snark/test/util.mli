@@ -32,8 +32,8 @@ val pending_coinbase_state_stack :
 val apply_parties : Ledger.t -> Parties.t list -> unit
 
 val dummy_rule :
-     (Snapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
-  -> ( Snapp_statement.Checked.t * (Snapp_statement.Checked.t * unit)
+     (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
+  -> ( Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit)
      , 'a * ('a * unit)
      , 'b * ('b * unit)
      , 'c * ('c * unit)
@@ -52,7 +52,7 @@ val trivial_snapp :
        ( unit
        , unit
        , unit
-       , Snapp_statement.t
+       , Zkapp_statement.t
        , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
          Async.Deferred.t )
        Pickles.Prover.t ] )
@@ -69,7 +69,7 @@ val test_snapp_update :
        ( unit
        , unit
        , unit
-       , Snapp_statement.t
+       , Zkapp_statement.t
        , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
          Async.Deferred.t )
        Pickles.Prover.t

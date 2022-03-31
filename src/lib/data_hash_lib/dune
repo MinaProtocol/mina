@@ -29,7 +29,7 @@
    random_oracle
    base58_check
    snarky.intf
-   fields_derivers.snapps
+   fields_derivers.zkapps
    fields_derivers.json
  )
  (preprocessor_deps ../../config.mlh)

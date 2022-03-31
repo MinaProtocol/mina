@@ -36,10 +36,10 @@ type _ Snarky_backendless.Request.t +=
 
 let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
     _ Pickles.Inductive_rule.t =
-  let ring_sig_main (tx_commitment : Snapp_statement.Checked.t) : unit Checked.t
+  let ring_sig_main (tx_commitment : Zkapp_statement.Checked.t) : unit Checked.t
       =
     let msg_var =
-      Snapp_statement.Checked.to_field_elements tx_commitment
+      Zkapp_statement.Checked.to_field_elements tx_commitment
       |> Random_oracle_input.Chunked.field_elements
     in
     let%bind sigma_var =
@@ -125,9 +125,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
             Pickles.compile ~cache:Cache_dir.cache
-              (module Snapp_statement.Checked)
-              (module Snapp_statement)
-              ~typ:Snapp_statement.typ
+              (module Zkapp_statement.Checked)
+              (module Zkapp_statement)
+              ~typ:Zkapp_statement.typ
               ~branches:(module Nat.N2)
               ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
               ~name:"ringsig"
@@ -251,9 +251,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               ~protocol_state_predicate_hash ~memo_hash
           in
           let at_party = Parties.Call_forest.hash ps in
-          let tx_statement : Snapp_statement.t = { transaction; at_party } in
+          let tx_statement : Zkapp_statement.t = { transaction; at_party } in
           let msg =
-            tx_statement |> Snapp_statement.to_field_elements
+            tx_statement |> Zkapp_statement.to_field_elements
             |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in

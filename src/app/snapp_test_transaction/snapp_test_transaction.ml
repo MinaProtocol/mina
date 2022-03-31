@@ -87,11 +87,11 @@ let create_snapp_account =
 
 let upgrade_snapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~verification_key ~snapp_uri ~auth () =
+      ~verification_key ~zkapp_uri ~auth () =
     let open Deferred.Let_syntax in
     let%map parties =
       upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~verification_key ~snapp_uri ~auth
+        ~verification_key ~zkapp_uri ~auth
     in
     Util.print_snapp_transaction parties ;
     ()
@@ -109,7 +109,7 @@ let upgrade_snapp =
          Param.flag "--verification-key"
            ~doc:"VERIFICATION_KEY the verification key for the snapp account"
            Param.(required string)
-       and snapp_uri_str =
+       and zkapp_uri_str =
          Param.flag "--snapp-uri" ~doc:"URI the URI for the snapp account"
            Param.(optional string)
        and auth =
@@ -125,9 +125,9 @@ let upgrade_snapp =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       let snapp_uri = Snapp_basic.Set_or_keep.of_option snapp_uri_str in
+       let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~verification_key ~snapp_uri ~auth))
+         ~verification_key ~zkapp_uri ~auth))
 
 let transfer_funds =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
@@ -228,13 +228,13 @@ let update_state =
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~app_state))
 
-let update_snapp_uri =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
+let update_zkapp_uri =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
       ~auth () =
     let open Deferred.Let_syntax in
     let%map parties =
-      update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~snapp_uri ~auth
+      update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+        ~zkapp_uri ~auth
     in
     Util.print_snapp_transaction parties ;
     ()
@@ -248,7 +248,7 @@ let update_snapp_uri =
          Param.flag "--snapp-account-key"
            ~doc:"KEYFILE Private key file to create a new snapp account"
            Param.(required string)
-       and snapp_uri =
+       and zkapp_uri =
          Param.flag "--snapp-uri"
            ~doc:"SNAPP_URI The string to be used as the updated snapp uri"
            Param.(required string)
@@ -266,7 +266,7 @@ let update_snapp_uri =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~snapp_uri ~auth))
+         ~zkapp_uri ~auth))
 
 let update_sequence_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
@@ -415,7 +415,7 @@ let update_permissions =
        and set_verification_key =
          Param.flag "--set-verification-key" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
-       and set_snapp_uri =
+       and set_zkapp_uri =
          Param.flag "--set-snapp-uri" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and edit_sequence_state =
@@ -438,15 +438,15 @@ let update_permissions =
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let permissions : Permissions.t Snapp_basic.Set_or_keep.t =
-         Snapp_basic.Set_or_keep.Set
+       let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
+         Zkapp_basic.Set_or_keep.Set
            { Permissions.Poly.edit_state = Util.auth_of_string edit_state
            ; send = Util.auth_of_string send
            ; receive = Util.auth_of_string receive
            ; set_permissions = Util.auth_of_string set_permissions
            ; set_delegate = Util.auth_of_string set_delegate
            ; set_verification_key = Util.auth_of_string set_verification_key
-           ; set_snapp_uri = Util.auth_of_string set_snapp_uri
+           ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
            ; edit_sequence_state = Util.auth_of_string edit_sequence_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
            ; increment_nonce = Util.auth_of_string increment_nonce
@@ -491,7 +491,7 @@ let txn_commands =
   ; ("upgrade-snapp", upgrade_snapp)
   ; ("transfer-funds", transfer_funds)
   ; ("update-state", update_state)
-  ; ("update-snapp-uri", update_snapp_uri)
+  ; ("update-snapp-uri", update_zkapp_uri)
   ; ("update-sequence-state", update_sequence_state)
   ; ("update-token-symbol", update_token_symbol)
   ; ("update-permissions", update_permissions)
