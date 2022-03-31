@@ -203,6 +203,7 @@ let%test_unit "check rust implementation of block-cipher" =
 
 module Legacy = struct
   module Input = Random_oracle_input.Legacy
+  module State = State
 
   let params : Field.t Sponge.Params.t =
     Sponge.Params.(map pasta_p_legacy ~f:Field.of_string)

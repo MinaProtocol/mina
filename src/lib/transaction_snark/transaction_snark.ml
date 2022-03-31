@@ -985,7 +985,7 @@ module Base = struct
                  ; delegate = _
                  ; verification_key = _
                  ; permissions = _
-                 ; snapp_uri = _
+                 ; zkapp_uri = _
                  ; token_symbol = _
                  ; timing = _
                  ; voting_for = _
@@ -1158,10 +1158,10 @@ module Base = struct
               , Field.Constant.t )
               With_hash.t
               Data_as_hash.t )
-            Snapp_basic.Flagged_option.t
+            Zkapp_basic.Flagged_option.t
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
-            Snapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+            Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
         module Events = struct
@@ -1172,7 +1172,7 @@ module Base = struct
           let push_events = Party.Sequence_events.push_events_checked
         end
 
-        module Snapp_uri = struct
+        module Zkapp_uri = struct
           type t = string Data_as_hash.t
 
           let if_ = Data_as_hash.if_
@@ -1205,8 +1205,8 @@ module Base = struct
             let set_verification_key : t -> Controller.t =
              fun a -> a.data.permissions.set_verification_key
 
-            let set_snapp_uri : t -> Controller.t =
-             fun a -> a.data.permissions.set_snapp_uri
+            let set_zkapp_uri : t -> Controller.t =
+             fun a -> a.data.permissions.set_zkapp_uri
 
             let edit_sequence_state : t -> Controller.t =
              fun a -> a.data.permissions.edit_sequence_state
@@ -1315,10 +1315,10 @@ module Base = struct
           let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
             { data = { a with snapp = { a.snapp with sequence_state } }; hash }
 
-          let snapp_uri (a : t) = a.data.snapp_uri
+          let zkapp_uri (a : t) = a.data.zkapp_uri
 
-          let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
-            { data = { a with snapp_uri }; hash }
+          let set_zkapp_uri zkapp_uri ({ data = a; hash } : t) : t =
+            { data = { a with zkapp_uri }; hash }
 
           let token_symbol (a : t) = a.data.token_symbol
 
@@ -1437,7 +1437,7 @@ module Base = struct
         end
 
         module Opt = struct
-          open Snapp_basic
+          open Zkapp_basic
 
           type 'a t = (Bool.t, 'a) Flagged_option.t
 
@@ -1694,7 +1694,7 @@ module Base = struct
             , `Signature_verifies signature_verifies )
 
           module Update = struct
-            open Snapp_basic
+            open Zkapp_basic
 
             type 'a set_or_keep = 'a Set_or_keep.Checked.t
 
@@ -1711,7 +1711,7 @@ module Base = struct
             let sequence_events ({ party; _ } : t) =
               party.data.body.sequence_events
 
-            let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
+            let zkapp_uri ({ party; _ } : t) = party.data.body.update.zkapp_uri
 
             let token_symbol ({ party; _ } : t) =
               party.data.body.update.token_symbol
@@ -1727,7 +1727,7 @@ module Base = struct
         end
 
         module Set_or_keep = struct
-          include Snapp_basic.Set_or_keep.Checked
+          include Zkapp_basic.Set_or_keep.Checked
         end
 
         module Amount = struct
@@ -2131,7 +2131,7 @@ module Base = struct
                }
              in
              Fee_excess.assert_equal_checked expected got)) ;
-      let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
+      let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
 
@@ -2557,7 +2557,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind receiver_increase =
@@ -2744,7 +2744,7 @@ module Base = struct
              ; timing = account.timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind user_command_fails =
@@ -2858,7 +2858,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind fee_excess =
@@ -4319,15 +4319,15 @@ module For_tests = struct
        balance changes for other new snapp accounts are just the account creation fee
     *)
     assert (
-      Snapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
+      Zkapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
       || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
     ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
-        verification_key = Snapp_basic.Set_or_keep.Set vk
+        verification_key = Zkapp_basic.Set_or_keep.Set vk
       ; permissions =
-          Snapp_basic.Set_or_keep.Set
+          Zkapp_basic.Set_or_keep.Set
             { Permissions.user_default with
               edit_state = Permissions.Auth_required.Proof
             ; edit_sequence_state = Proof
@@ -4512,7 +4512,7 @@ module For_tests = struct
     let update_empty_permissions =
       let permissions =
         { Permissions.user_default with send = Permissions.Auth_required.Proof }
-        |> Snapp_basic.Set_or_keep.Set
+        |> Zkapp_basic.Set_or_keep.Set
       in
       { Party.Update.dummy with permissions }
     in

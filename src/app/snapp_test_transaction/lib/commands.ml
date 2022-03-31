@@ -23,20 +23,8 @@ let parse_field_element_or_hash_string s ~f =
   match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
   | Ok field ->
       f field
-  | Error e1 -> (
-      match Signed_command_memo.create_from_string s with
-      | Ok memo ->
-          Random_oracle.Legacy.(
-            hash ~init:Hash_prefix.snapp_test
-              ( Signed_command_memo.to_bits memo
-              |> Random_oracle_input.Legacy.bitstring |> pack_input ))
-          |> f
-      | Error e2 ->
-          failwith
-            (sprintf
-               "Neither a field element nor a suitable memo string: Errors \
-                (%s, %s)"
-               (Error.to_string_hum e1) (Error.to_string_hum e2)) )
+  | Error e1 ->
+      Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
 let `VK vk, `Prover snapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -61,7 +49,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
               { Permissions.user_default with
                 edit_state = Proof
               ; set_verification_key = Proof
-              ; set_snapp_uri = Proof
+              ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
           ; snapp =
@@ -196,13 +184,13 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
 module App_state = struct
   type t = Snark_params.Tick.Field.t
 
-  let of_string str : t Snapp_basic.Set_or_keep.t =
+  let of_string str : t Zkapp_basic.Set_or_keep.t =
     match str with
     | "" ->
-        Snapp_basic.Set_or_keep.Keep
+        Zkapp_basic.Set_or_keep.Keep
     | _ ->
         parse_field_element_or_hash_string str ~f:(fun result ->
-            Snapp_basic.Set_or_keep.Set result)
+            Zkapp_basic.Set_or_keep.Set result)
 end
 
 module Events = struct
@@ -240,7 +228,7 @@ module Util = struct
     List.append app_state
       (List.init
          (8 - List.length app_state)
-         ~f:(fun _ -> Snapp_basic.Set_or_keep.Keep))
+         ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep))
     |> Snapp_state.V.of_list_exn
 
   let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
@@ -315,7 +303,7 @@ let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
   parties
 
 let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-    ~verification_key ~snapp_uri ~auth =
+    ~verification_key ~zkapp_uri ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
@@ -324,7 +312,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       Side_loaded_verification_key.of_base58_check_exn verification_key
     in
     let hash = Snapp_account.digest_vk data in
-    Snapp_basic.Set_or_keep.Set { With_hash.data; hash }
+    Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
   in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -334,7 +322,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
-    ; snapp_update = { Party.Update.dummy with verification_key; snapp_uri }
+    ; snapp_update = { Party.Update.dummy with verification_key; zkapp_uri }
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
@@ -418,12 +406,12 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   in
   parties
 
-let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
+let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
-  let snapp_uri = Snapp_basic.Set_or_keep.Set snapp_uri in
+  let zkapp_uri = Zkapp_basic.Set_or_keep.Set zkapp_uri in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
@@ -432,7 +420,7 @@ let update_snapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~snapp_uri
     ; snapp_account_keypairs = [ snapp_account_keypair ]
     ; memo = Util.memo memo
     ; new_snapp_account = false
-    ; snapp_update = { Party.Update.dummy with snapp_uri }
+    ; snapp_update = { Party.Update.dummy with zkapp_uri }
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
@@ -493,7 +481,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
-  let token_symbol = Snapp_basic.Set_or_keep.Set token_symbol in
+  let token_symbol = Zkapp_basic.Set_or_keep.Set token_symbol in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
@@ -614,7 +602,7 @@ let%test_module "Snapps test transaction" =
       | Error e ->
           Error e
 
-    let%test_unit "snapps transaction graphql round trip" =
+    let%test_unit "zkapps transaction graphql round trip" =
       Quickcheck.test ~trials:20
         (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (user_cmd, _, _, _) ->

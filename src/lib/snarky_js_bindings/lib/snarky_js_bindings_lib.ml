@@ -1864,7 +1864,7 @@ module Ledger = struct
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
-    ; set_snapp_uri = None
+    ; set_zkapp_uri = None
     ; edit_sequence_state = None
     ; set_token_symbol = None
     ; increment_nonce = None
@@ -1973,7 +1973,7 @@ module Ledger = struct
   module Parties = Mina_base.Parties
   module Snapp_state = Mina_base.Snapp_state
   module Token_id = Mina_base.Token_id
-  module Snapp_basic = Mina_base.Snapp_basic
+  module Zkapp_basic = Mina_base.Zkapp_basic
 
   let max_uint32 = Field.constant @@ Field.Constant.of_string "4294967295"
 
@@ -2046,7 +2046,7 @@ module Ledger = struct
 
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
-      Snapp_basic.Or_ignore.Check (elt x##.value)
+      Zkapp_basic.Or_ignore.Check (elt x##.value)
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
@@ -2112,7 +2112,7 @@ module Ledger = struct
 
   let set_or_keep (type a) elt (x : a set_or_keep) =
     if Js.to_bool x##.set##toBoolean then
-      Snapp_basic.Set_or_keep.Set (elt x##.value)
+      Zkapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
   let verification_key_with_hash (vk_artifact : Js.js_string Js.t) =
@@ -2130,7 +2130,7 @@ module Ledger = struct
     ; verification_key =
         set_or_keep verification_key_with_hash u##.verificationKey
     ; permissions = Keep
-    ; snapp_uri = Keep
+    ; zkapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
@@ -2308,32 +2308,32 @@ module Ledger = struct
         ~sgn:Sgn.Checked.pos
 
     let or_ignore (type a b) (transform : a -> b) (x : a or_ignore) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit
         x##.check##.value
         (transform x##.value)
 
     let ignore (dummy : 'a) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.false_ dummy
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.false_ dummy
 
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
 
     let numeric_equal (type a b) (transform : a -> b) (x : a) =
       let x' = transform x in
-      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
-        b Snapp_basic.Set_or_keep.Checked.t =
-      Snapp_basic.Set_or_keep.Checked.make_unsafe
+        b Zkapp_basic.Set_or_keep.Checked.t =
+      Zkapp_basic.Set_or_keep.Checked.make_unsafe
         x##.set##.value
         (transform x##.value)
 
-    let keep dummy : 'a Snapp_basic.Set_or_keep.Checked.t =
-      Snapp_basic.Set_or_keep.Checked.make_unsafe Boolean.false_ dummy
+    let keep dummy : 'a Zkapp_basic.Set_or_keep.Checked.t =
+      Zkapp_basic.Set_or_keep.Checked.make_unsafe Boolean.false_ dummy
 
     let amount x = Currency.Amount.Checked.Unsafe.of_field @@ uint64 x
 
@@ -2429,7 +2429,7 @@ module Ledger = struct
         ; delegate = set_or_keep public_key u##.delegate
         ; (* TODO *) verification_key =
             keep
-              { Snapp_basic.Flagged_option.is_some = Boolean.false_
+              { Zkapp_basic.Flagged_option.is_some = Boolean.false_
               ; data =
                   Mina_base.Data_as_hash.make_unsafe
                     (Field.constant @@ Mina_base.Snapp_account.dummy_vk_hash ())
@@ -2437,14 +2437,14 @@ module Ledger = struct
                          { With_hash.data = None; hash = Field.Constant.zero }))
               }
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
-        ; snapp_uri =
+        ; zkapp_uri =
             keep
               (Mina_base.Data_as_hash.make_unsafe Field.zero
                  (As_prover.Ref.create (fun () -> "")))
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
         ; voting_for =
-            Snapp_basic.Set_or_keep.Checked.map
+            Zkapp_basic.Set_or_keep.Checked.map
               (set_or_keep field u##.votingFor)
               ~f:Mina_base.State_hash.var_of_hash_packed
         }
@@ -2716,7 +2716,7 @@ module Ledger = struct
     ; next_epoch_data = epoch_data
     }
 
-  let deriver () = Parties.deriver @@ Fields_derivers_snapps.Derivers.o ()
+  let deriver () = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o ()
 
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
@@ -2738,8 +2738,16 @@ module Ledger = struct
       match command.status with
       | Applied (_aux_data, _balance) ->
           ()
-      | Failed (failure, _balance) ->
-          raise_error (Mina_base.Transaction_status.Failure.to_string failure)
+      | Failed (failures, _balance) ->
+          let concat_commas = String.concat ~sep:"," in
+          raise_error
+            (sprintf "[ %s ]"
+               ( List.map failures ~f:(fun l ->
+                     sprintf "[ %s ]"
+                       ( List.map l
+                           ~f:Mina_base.Transaction_status.Failure.to_string
+                       |> concat_commas ))
+               |> concat_commas ))
     in
     let account_list =
       List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
@@ -2752,6 +2760,10 @@ module Ledger = struct
     in
     let method_ name (f : ledger_class Js.t -> _) =
       method_ ledger_class name f
+    in
+    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
+    let parties_to_json ps =
+      parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
     in
     static_method "create" create ;
 

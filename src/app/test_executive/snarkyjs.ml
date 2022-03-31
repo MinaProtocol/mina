@@ -59,7 +59,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
@@ -130,7 +131,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ( [%log info] "Verifying permissions for account"
             ~metadata:
               [ ("account_id", Mina_base.Account_id.to_yojson my_account_id) ] ;
-          let%bind balance = get_account_balance ~logger node my_account_id in
+          let%bind { total_balance = balance; _ } =
+            Network.Node.must_get_account_data ~logger node
+              ~account_id:my_account_id
+          in
           if
             Currency.Balance.(
               equal balance

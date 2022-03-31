@@ -139,7 +139,7 @@ let%test_module "multisig_account" =
       | Sigma : int -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
     (* test with a 2-of-3 multisig *)
-    let%test_unit "snapps-based proved transaction" =
+    let%test_unit "zkapps-based proved transaction" =
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -294,7 +294,7 @@ let%test_module "multisig_account" =
                  }) ;
               let update_empty_permissions =
                 let permissions =
-                  Snapp_basic.Set_or_keep.Set Permissions.empty
+                  Zkapp_basic.Set_or_keep.Set Permissions.empty
                 in
                 { Party.Update.noop with permissions }
               in

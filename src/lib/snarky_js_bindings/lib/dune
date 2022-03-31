@@ -26,7 +26,7 @@
    currency
    data_hash_lib
    fields_derivers
-   fields_derivers_snapps
+   fields_derivers_zkapps
    genesis_constants
    mina_numbers
    mina_transaction

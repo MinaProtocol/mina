@@ -975,7 +975,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           { applied_common with
             user_command =
               { data = user_command
-              ; status = Failed (failure, compute_balances ())
+              ; status =
+                  Failed
+                    ( Transaction_status.Failure.Collection.of_single_failure
+                        failure
+                    , compute_balances () )
               }
           }
         in
@@ -1002,7 +1006,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                ; delegate = _
                ; verification_key = _
                ; permissions = _
-               ; snapp_uri = _
+               ; zkapp_uri = _
                ; token_symbol = _
                ; timing = _
                ; voting_for = _
@@ -1222,7 +1226,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push_events = Party.Sequence_events.push_events
     end
 
-    module Snapp_uri = struct
+    module Zkapp_uri = struct
       type t = string
 
       let if_ = Parties.value_if
@@ -1253,8 +1257,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_verification_key : t -> Controller.t =
          fun a -> a.permissions.set_verification_key
 
-        let set_snapp_uri : t -> Controller.t =
-         fun a -> a.permissions.set_snapp_uri
+        let set_zkapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_zkapp_uri
 
         let edit_sequence_state : t -> Controller.t =
          fun a -> a.permissions.edit_sequence_state
@@ -1347,9 +1351,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
 
-      let snapp_uri (a : t) = a.snapp_uri
+      let zkapp_uri (a : t) = a.zkapp_uri
 
-      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -1455,9 +1459,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies false, `Signature_verifies false)
 
       module Update = struct
-        open Snapp_basic
+        open Zkapp_basic
 
-        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+        type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
@@ -1465,12 +1469,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let app_state (party : t) = party.data.body.update.app_state
 
         let verification_key (party : t) =
-          Snapp_basic.Set_or_keep.map ~f:Option.some
+          Zkapp_basic.Set_or_keep.map ~f:Option.some
             party.data.body.update.verification_key
 
         let sequence_events (party : t) = party.data.body.sequence_events
 
-        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+        let zkapp_uri (party : t) = party.data.body.update.zkapp_uri
 
         let token_symbol (party : t) = party.data.body.update.token_symbol
 
@@ -1483,7 +1487,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Set_or_keep = struct
-      include Snapp_basic.Set_or_keep
+      include Zkapp_basic.Set_or_keep
 
       let set_or_keep ~if_:_ t x = set_or_keep t x
     end
@@ -1659,8 +1663,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
-        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.parties then Ok user_acc
+        , (l_state : _ Parties_logic.Local_state.t) ) :
+        (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
+      if List.is_empty l_state.parties then
+        Ok (user_acc, l_state.failure_status_tbl)
       else
         let%bind states =
           Or_error.try_with (fun () ->
@@ -1705,21 +1711,32 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok s ->
+    | Ok (s, failure_status_tbl) ->
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
                     (* TODO *)
-                    Applied
-                      ( { fee_payer_account_creation_fee_paid = None
-                        ; receiver_account_creation_fee_paid = None
-                        }
-                      , { fee_payer_balance = None
-                        ; source_balance = None
-                        ; receiver_balance = None
-                        } )
+                    ( if
+                      Transaction_status.Failure.Collection.is_empty
+                        failure_status_tbl
+                    then
+                      Applied
+                        ( { fee_payer_account_creation_fee_paid = None
+                          ; receiver_account_creation_fee_paid = None
+                          }
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } )
+                    else
+                      Failed
+                        ( failure_status_tbl
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } ) )
                 }
             }
           , s )

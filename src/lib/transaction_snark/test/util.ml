@@ -190,31 +190,31 @@ let permissions_from_update (update : Party.Update.t) ~auth =
     edit_state =
       ( if
         Snapp_state.V.to_list update.app_state
-        |> List.exists ~f:Snapp_basic.Set_or_keep.is_set
+        |> List.exists ~f:Zkapp_basic.Set_or_keep.is_set
       then auth
       else default.edit_state )
   ; set_delegate =
-      ( if Snapp_basic.Set_or_keep.is_keep update.delegate then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.delegate then
         default.set_delegate
       else auth )
   ; set_verification_key =
-      ( if Snapp_basic.Set_or_keep.is_keep update.verification_key then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
       else auth )
   ; set_permissions =
-      ( if Snapp_basic.Set_or_keep.is_keep update.permissions then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions
       else auth )
-  ; set_snapp_uri =
-      ( if Snapp_basic.Set_or_keep.is_keep update.snapp_uri then
-        default.set_snapp_uri
+  ; set_zkapp_uri =
+      ( if Zkapp_basic.Set_or_keep.is_keep update.zkapp_uri then
+        default.set_zkapp_uri
       else auth )
   ; set_token_symbol =
-      ( if Snapp_basic.Set_or_keep.is_keep update.token_symbol then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.token_symbol then
         default.set_token_symbol
       else auth )
   ; set_voting_for =
-      ( if Snapp_basic.Set_or_keep.is_keep update.voting_for then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.voting_for then
         default.set_voting_for
       else auth )
   }

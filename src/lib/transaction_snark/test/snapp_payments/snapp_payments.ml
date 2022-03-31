@@ -37,11 +37,11 @@ let%test_module "Snapp payments tests" =
                   ; update =
                       { app_state =
                           Pickles_types.Vector.map new_state ~f:(fun x ->
-                              Snapp_basic.Set_or_keep.Set x)
+                              Zkapp_basic.Set_or_keep.Set x)
                       ; delegate = Keep
                       ; verification_key = Keep
                       ; permissions = Keep
-                      ; snapp_uri = Keep
+                      ; zkapp_uri = Keep
                       ; token_symbol = Keep
                       ; timing = Keep
                       ; voting_for = Keep
@@ -127,7 +127,7 @@ let%test_module "Snapp payments tests" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
 
-    let%test_unit "snapps-based payment" =
+    let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -136,7 +136,7 @@ let%test_module "Snapp payments tests" =
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
 
-    let%test_unit "Consecutive snapps-based payments" =
+    let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
