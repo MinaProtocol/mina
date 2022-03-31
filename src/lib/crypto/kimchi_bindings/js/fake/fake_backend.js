@@ -343,10 +343,41 @@ function caml_finite_field_sqrt(n, p, pm1_odd, fp_root) {
   }
 }
 
+// Provides: caml_random_bytes
+var caml_random_bytes = (function() {
+  // have to use platform-dependent secure randomness
+  if (typeof crypto !== "undefined" && crypto.getRandomValues !== undefined) {
+    // browser / deno
+    return function randomBytes(n) {
+      return crypto.getRandomValues(new Uint8Array(n));
+    }
+  } else if (typeof require !== "undefined") {
+    // node (common JS)
+    var crypto = require("node:crypto");
+    return function randomBytes(n) {
+      return new Uint8Array(crypto.randomBytes(n));
+    }
+  } else {
+    throw Error("don't know how to find random number generator for this platform without breaking other platforms");
+  }
+})();
+
+// Provides: caml_finite_field_random
+// Requires: caml_random_bytes, bytesToBigInt
+function caml_finite_field_random(p) {
+  // strategy: find random 255-bit bigints and use the first that's smaller than p
+  while (true) {
+    var bytes = caml_random_bytes(32);
+    bytes[31] &= 0x7f; // zero highest bit, so we get 255 random bits
+    var x = bytesToBigInt(bytes);
+    if (x < p) return x;
+  }
+}
+
 var i = 0;
 
 // Provides: plonk_wasm
-// Requires: bigIntToBytes, bytesToBigInt, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_bindings_debug
+// Requires: bigIntToBytes, bytesToBigInt, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_bindings_debug, caml_finite_field_random
 var plonk_wasm = new Proxy({
   caml_bigint_256_num_limbs: function() {
     return 4;
@@ -446,6 +477,12 @@ var plonk_wasm = new Proxy({
   },
   caml_pasta_fq_equal: function(x, y) {
     return Number(plonk_wasm.caml_pasta_fq_sub(x, y)[0] === _0n);
+  },
+  caml_pasta_fp_random: function() {
+    return [caml_finite_field_random(caml_pasta_p_bigint)];
+  },
+  caml_pasta_fq_random: function() {
+    return [caml_finite_field_random(caml_pasta_q_bigint)];
   },
   caml_pasta_fp_size_in_bits: function() {
     return 255;

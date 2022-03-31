@@ -201,6 +201,10 @@ var caml_pasta_fp_of_bigint = plonk_wasm.caml_pasta_fp_of_bigint
 // Requires: plonk_wasm
 var caml_pasta_fp_domain_generator = plonk_wasm.caml_pasta_fp_domain_generator
 
+// Provides: caml_pasta_fp_random
+// Requires: plonk_wasm
+var caml_pasta_fp_random = plonk_wasm.caml_pasta_fp_random;
+
 // Provides: caml_pasta_fp_to_bytes
 // Requires: plonk_wasm, caml_bytes_of_uint8array
 var caml_pasta_fp_to_bytes = function(x) {
@@ -338,6 +342,10 @@ var caml_pasta_fq_of_bigint = plonk_wasm.caml_pasta_fq_of_bigint
 // Provides: caml_pasta_fq_domain_generator
 // Requires: plonk_wasm
 var caml_pasta_fq_domain_generator = plonk_wasm.caml_pasta_fq_domain_generator
+
+// Provides: caml_pasta_fq_random
+// Requires: plonk_wasm
+var caml_pasta_fq_random = plonk_wasm.caml_pasta_fq_random;
 
 // Provides: caml_pasta_fq_to_bytes
 // Requires: plonk_wasm, caml_bytes_of_uint8array
