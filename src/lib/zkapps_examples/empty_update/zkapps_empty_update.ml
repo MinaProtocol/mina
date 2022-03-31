@@ -19,7 +19,7 @@ module Party_under_construction = struct
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
-            ; snapp_uri = Keep
+            ; zkapp_uri = Keep
             ; token_symbol = Keep
             ; timing = Keep
             ; voting_for = Keep
@@ -95,7 +95,7 @@ module Party_under_construction = struct
                 ; delegate = Keep
                 ; verification_key = Keep
                 ; permissions = Keep
-                ; snapp_uri = Keep
+                ; zkapp_uri = Keep
                 ; token_symbol = Keep
                 ; timing = Keep
                 ; voting_for = Keep
@@ -183,7 +183,7 @@ let dummy_constraints () =
     ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
       : Pickles.Step_main_inputs.Inner_curve.t ) ;
   ignore
-    ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+    ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
@@ -191,7 +191,7 @@ let dummy_constraints () =
          Modify snarky to do this.
 *)
 let main public_key ([] : _ H1.T(Id).t)
-    ({ transaction; at_party } : Snapp_statement.Checked.t) :
+    ({ transaction; at_party } : Zkapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t =
   dummy_constraints () ;
   let party =
@@ -215,7 +215,7 @@ let main public_key ([] : _ H1.T(Id).t)
 (* TODO: This shouldn't exist, the circuit should just return the requisite
          values.
 *)
-let main_value ([] : _ H1.T(Id).t) (_ : Snapp_statement.t) :
+let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
     _ H1.T(E01(Core_kernel.Bool)).t =
   []
 
