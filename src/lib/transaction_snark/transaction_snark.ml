@@ -153,12 +153,12 @@ module Statement = struct
           { ledger = source
           ; pending_coinbase_stack =
               pending_coinbase_stack_state.Pending_coinbase_stack_state.source
-          ; local_state = Local_state.empty
+          ; local_state = Local_state.empty ()
           }
       ; target =
           { ledger = target
           ; pending_coinbase_stack = pending_coinbase_stack_state.target
-          ; local_state = Local_state.empty
+          ; local_state = Local_state.empty ()
           }
       }
 
@@ -1040,7 +1040,10 @@ module Base = struct
     end
 
     type party =
-      { party : (Party.Predicated.Checked.t, Impl.Field.t) With_hash.t
+      { party :
+          ( Party.Predicated.Checked.t
+          , Parties.Digest.Party.Checked.t )
+          With_hash.t
       ; control : Control.t Prover_value.t
       }
 
@@ -1055,8 +1058,12 @@ module Base = struct
 
         let empty = Field.constant Parties.Transaction_commitment.empty
 
-        let commitment ~party:{ party; _ }
-            ~other_parties:{ With_hash.hash = other_parties; _ } ~memo_hash =
+        let commitment ~party:({ party; _ } : party)
+            ~other_parties:
+              { With_hash.hash =
+                  (other_parties : Parties.Digest.Forest.Checked.t)
+              ; _
+              } ~memo_hash =
           Parties.Transaction_commitment.Checked.create
             ~other_parties_hash:other_parties
             ~protocol_state_predicate_hash:
@@ -1352,25 +1359,28 @@ module Base = struct
       end
 
       module Parties = struct
+        module F = Parties.Digest.Forest.Checked
+
         type t =
-          ( (Party.t * unit, Parties.Digest.t) Parties.Call_forest.t V.t
-          , Field.t )
+          ( ( Party.t * unit
+            , Parties.Digest.Party.t
+            , Parties.Digest.Forest.t )
+            Parties.Call_forest.t
+            V.t
+          , F.t )
           With_hash.t
 
         let if_ b ~then_:(t : t) ~else_:(e : t) : t =
-          { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+          { hash = F.if_ b ~then_:t.hash ~else_:e.hash
           ; data = V.if_ b ~then_:t.data ~else_:e.data
           }
 
-        let empty = Field.constant Parties.Call_forest.With_hashes.empty
+        let empty =
+          Parties.Digest.Forest.constant Parties.Call_forest.With_hashes.empty
 
-        let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+        let is_empty ({ hash = x; _ } : t) = F.equal empty x
 
         let empty () : t = { hash = empty; data = V.create (fun () -> []) }
-
-        let hash_cons hash h_tl =
-          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_node
-            [| hash; h_tl |]
 
         let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
           with_label "Parties.pop_exn" (fun () ->
@@ -1397,45 +1407,62 @@ module Base = struct
               in
               let party =
                 With_hash.of_data party
-                  ~hash_data:Party.Predicated.Checked.digest
+                  ~hash_data:Parties.Digest.Party.Checked.create
               in
               let subforest : t =
                 let subforest = V.create (fun () -> (V.get hd_r).calls) in
                 let subforest_hash =
-                  exists Field.typ ~compute:(fun () ->
+                  exists Parties.Digest.Forest.typ ~compute:(fun () ->
                       Parties.Call_forest.hash (V.get subforest))
                 in
                 { hash = subforest_hash; data = subforest }
               in
               let tl_hash =
-                exists Field.typ ~compute:(fun () ->
+                exists Parties.Digest.Forest.typ ~compute:(fun () ->
                     V.get r |> List.tl_exn |> Parties.Call_forest.hash)
               in
               as_prover (fun () ->
-                  let party_digest = As_prover.read Field.typ party.hash in
-                  let stack_hash = As_prover.read Field.typ subforest.hash in
+                  let party_digest =
+                    As_prover.read Parties.Digest.Party.typ party.hash
+                  in
+                  let stack_hash =
+                    As_prover.read Parties.Digest.Forest.typ subforest.hash
+                  in
                   Caml.Format.eprintf "pop_exn:@.%s@.%s@."
-                    (Snark_params.Tick.Field.to_string party_digest)
-                    (Snark_params.Tick.Field.to_string stack_hash)) ;
-              let tree_hash = hash_cons party.hash subforest.hash in
+                    Snark_params.Tick.Field.(to_string (party_digest :> t))
+                    Snark_params.Tick.Field.(to_string (stack_hash :> t))) ;
+              let tree_hash =
+                Parties.Digest.Tree.Checked.create ~party:party.hash
+                  ~calls:subforest.hash
+              in
               as_prover (fun () ->
-                  let tree_hash = As_prover.read Field.typ tree_hash in
-                  let h = As_prover.read Field.typ h in
+                  let tree_hash =
+                    As_prover.read Parties.Digest.Tree.typ tree_hash
+                  in
+                  let h = As_prover.read Parties.Digest.Forest.typ h in
                   Caml.Format.eprintf "%s@.%s@."
-                    (Snark_params.Tick.Field.to_string tree_hash)
-                    (Snark_params.Tick.Field.to_string h)) ;
-              let hash_cons = hash_cons tree_hash tl_hash in
-                as_prover (fun () ->
-                    let tree_hash = As_prover.read Field.typ tree_hash in
-                    let tl_hash = As_prover.read Field.typ tl_hash in
-                    let h = As_prover.read Field.typ h in
-                    let hash_cons = As_prover.read Field.typ hash_cons in
-                    Caml.Format.eprintf "hash_cons:@.%s@.%s@.%s@.%s@."
-                      (Snark_params.Tick.Field.to_string tree_hash)
-                      (Snark_params.Tick.Field.to_string tl_hash)
-                      (Snark_params.Tick.Field.to_string h)
-                      (Snark_params.Tick.Field.to_string hash_cons)) ;
-              Field.Assert.equal hash_cons h ;
+                    Snark_params.Tick.Field.(to_string (tree_hash :> t))
+                    Snark_params.Tick.Field.(to_string (h :> t))) ;
+              let hash_cons =
+                Parties.Digest.Forest.Checked.cons tree_hash tl_hash
+              in
+              as_prover (fun () ->
+                  let tree_hash =
+                    As_prover.read Parties.Digest.Tree.typ tree_hash
+                  in
+                  let tl_hash =
+                    As_prover.read Parties.Digest.Forest.typ tl_hash
+                  in
+                  let h = As_prover.read Parties.Digest.Forest.typ h in
+                  let hash_cons =
+                    As_prover.read Parties.Digest.Forest.typ hash_cons
+                  in
+                  Caml.Format.eprintf "hash_cons:@.%s@.%s@.%s@.%s@."
+                    Snark_params.Tick.Field.(to_string (tree_hash :> t))
+                    Snark_params.Tick.Field.(to_string (tl_hash :> t))
+                    Snark_params.Tick.Field.(to_string (h :> t))
+                    Snark_params.Tick.Field.(to_string (hash_cons :> t))) ;
+              F.Assert.equal hash_cons h ;
               ( ( ({ party; control = auth }, subforest)
                 , { hash = tl_hash
                   ; data = V.(create (fun () -> List.tl_exn (get r)))
@@ -1446,12 +1473,12 @@ module Base = struct
       module Stack_frame = struct
         type frame = (Token_id.Checked.t, Parties.t) Stack_frame.t
 
-        type t = (frame, Field.t Lazy.t) With_hash.t
+        type t = (frame, Stack_frame.Digest.Checked.t Lazy.t) With_hash.t
 
         let if_ b ~then_:(t1 : t) ~else_:(t2 : t) : t =
           { With_hash.hash =
               lazy
-                (Field.if_ b ~then_:(Lazy.force t1.hash)
+                (Stack_frame.Digest.Checked.if_ b ~then_:(Lazy.force t1.hash)
                    ~else_:(Lazy.force t2.hash))
           ; data =
               Stack_frame.Checked.if_ Parties.if_ b ~then_:t1.data
@@ -1464,28 +1491,21 @@ module Base = struct
 
         let calls (t : t) = t.data.calls
 
-        let frame_to_input ({ caller; caller_caller; calls } : frame) =
-          List.reduce_exn ~f:Random_oracle.Input.Chunked.append
-            [ Token_id.Checked.to_input caller
-            ; Token_id.Checked.to_input caller_caller
-            ; Random_oracle.Input.Chunked.field calls.hash
-            ]
-
         let of_frame (frame : frame) : t =
           { data = frame
           ; hash =
               lazy
-                (Random_oracle.Checked.hash
-                   ~init:Hash_prefix_states.party_stack_frame
-                   (Random_oracle.Checked.pack_input (frame_to_input frame)))
+                (Stack_frame.Digest.Checked.create
+                   ~hash_parties:(fun (calls : Parties.t) -> calls.hash)
+                   frame)
           }
 
         let make ~caller ~caller_caller ~calls : t =
           Stack_frame.make ~caller ~caller_caller ~calls |> of_frame
 
-        let hash (t : t) : Field.t = Lazy.force t.hash
+        let hash (t : t) : Stack_frame.Digest.Checked.t = Lazy.force t.hash
 
-        let unhash (h : Field.t)
+        let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
               ( Mina_base.Token_id.Stable.V1.t
               , unit Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
@@ -1501,7 +1521,8 @@ module Base = struct
                         (V.get frame).caller_caller)
                 ; calls =
                     { hash =
-                        exists Field.typ ~compute:(fun () ->
+                        exists Mina_base.Parties.Digest.Forest.typ
+                          ~compute:(fun () ->
                             (V.get frame).calls
                             |> Mina_base.Parties.Call_forest.hash)
                     ; data = V.map frame ~f:(fun frame -> frame.calls)
@@ -1509,7 +1530,7 @@ module Base = struct
                 }
               in
               let t = of_frame frame in
-              Field.Assert.equal (hash (of_frame frame)) h ;
+              Stack_frame.Digest.Checked.Assert.equal (hash (of_frame frame)) h ;
               t)
       end
 
@@ -1521,49 +1542,46 @@ module Base = struct
 
           type frame =
             ( caller
-            , (Party.t * unit, Parties.Digest.t) Parties.Call_forest.t )
+            , ( Party.t * unit
+              , Parties.Digest.Party.t
+              , Parties.Digest.Forest.t )
+              Parties.Call_forest.t )
             Stack_frame.t
         end
 
         type elt = Stack_frame.t
 
         module Elt = struct
-          type t = (Value.frame, Field.Constant.t) With_hash.t
+          type t = (Value.frame, Mina_base.Stack_frame.Digest.t) With_hash.t
 
-          let default : t =
-            { hash = Field.Constant.zero
-            ; data =
-                { caller = Mina_base.Token_id.default
-                ; caller_caller = Mina_base.Token_id.default
-                ; calls = []
-                }
-            }
+          let default : unit -> t =
+            Memo.unit (fun () : t ->
+                With_hash.of_data ~hash_data:Mina_base.Stack_frame.Digest.create
+                  ( { caller = Mina_base.Token_id.default
+                    ; caller_caller = Mina_base.Token_id.default
+                    ; calls = []
+                    }
+                    : Value.frame ))
         end
 
-        let empty_constant = Mina_base.Parties.Call_forest.With_hashes.empty
-
-        let hash_cons hash h_tl =
-          Random_oracle.Checked.hash ~init:Hash_prefix_states.party_cons
-            [| hash; h_tl |]
-
-        let stack_hash (type a)
-            (xs : (a, Field.Constant.t) With_stack_hash.t list) :
-            Field.Constant.t =
-          Mina_base.Parties.Call_forest.hash xs
+        let hash (type a) (xs : (a, Call_stack_digest.t) With_stack_hash.t list)
+            : Call_stack_digest.t =
+          match xs with [] -> Call_stack_digest.empty | x :: _ -> x.stack_hash
 
         type t =
-          ( (Elt.t, Field.Constant.t) With_stack_hash.t list V.t
-          , Field.t )
+          ( (Elt.t, Call_stack_digest.t) With_stack_hash.t list V.t
+          , Call_stack_digest.Checked.t )
           With_hash.t
 
         let if_ b ~then_:(t : t) ~else_:(e : t) : t =
-          { hash = Field.if_ b ~then_:t.hash ~else_:e.hash
+          { hash = Call_stack_digest.Checked.if_ b ~then_:t.hash ~else_:e.hash
           ; data = V.if_ b ~then_:t.data ~else_:e.data
           }
 
-        let empty = Field.constant empty_constant
+        let empty = Call_stack_digest.(constant empty)
 
-        let is_empty ({ hash = x; _ } : t) = Field.equal empty x
+        let is_empty ({ hash = x; _ } : t) =
+          Call_stack_digest.Checked.equal empty x
 
         let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
@@ -1572,7 +1590,7 @@ module Base = struct
           let elt : Stack_frame.frame =
             let calls : Parties.t =
               { hash =
-                  exists Field.typ ~compute:(fun () ->
+                  exists Mina_base.Parties.Digest.Forest.typ ~compute:(fun () ->
                       (V.get elt_ref).data.calls
                       |> Mina_base.Parties.Call_forest.hash)
               ; data = V.map elt_ref ~f:(fun frame -> frame.data.calls)
@@ -1593,46 +1611,57 @@ module Base = struct
           let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
           let elt : Stack_frame.t = exists_elt hd_r in
           let stack =
-            exists Field.typ ~compute:(fun () -> stack_hash (V.get tl_r))
+            exists Call_stack_digest.typ ~compute:(fun () -> hash (V.get tl_r))
           in
-          let h' = hash_cons (Stack_frame.hash elt) stack in
-          with_label __LOC__ (fun () -> Field.Assert.equal h h') ;
+          let h' =
+            Call_stack_digest.Checked.cons (Stack_frame.hash elt) stack
+          in
+          with_label __LOC__ (fun () ->
+              Call_stack_digest.Checked.Assert.equal h h') ;
           (elt, { hash = stack; data = tl_r })
 
         let pop ({ hash = h; data = r } as t : t) : (elt * t) Opt.t =
           let input_is_empty = is_empty t in
           let hd_r =
             V.create (fun () ->
-                V.get r |> List.hd
-                |> Option.value_map ~default:Elt.default ~f:(fun x -> x.elt))
+                match V.get r |> List.hd with
+                | None ->
+                    Elt.default ()
+                | Some x ->
+                    x.elt)
           in
           let tl_r =
             V.create (fun () -> V.get r |> List.tl |> Option.value ~default:[])
           in
           let elt = exists_elt hd_r in
           let stack =
-            exists Field.typ ~compute:(fun () -> stack_hash (V.get tl_r))
+            exists Call_stack_digest.typ ~compute:(fun () -> hash (V.get tl_r))
           in
           let stack_frame_hash = Stack_frame.hash elt in
-          let h' = hash_cons stack_frame_hash stack in
+          let h' = Call_stack_digest.Checked.cons stack_frame_hash stack in
           as_prover (fun () ->
-              let stack_frame_hash = As_prover.read Field.typ stack_frame_hash in
-              let stack = As_prover.read Field.typ stack in
-              let h' = As_prover.read Field.typ h' in
-              let h = As_prover.read Field.typ h in
+              let stack_frame_hash =
+                As_prover.read Mina_base.Stack_frame.Digest.typ stack_frame_hash
+              in
+              let stack = As_prover.read Call_stack_digest.typ stack in
+              let h' = As_prover.read Call_stack_digest.typ h' in
+              let h = As_prover.read Call_stack_digest.typ h in
               Caml.Format.eprintf "Call_stack.hash_cons:@.%s@.%s@.%s@.%s@."
-                (Snark_params.Tick.Field.to_string stack_frame_hash)
-                (Snark_params.Tick.Field.to_string stack)
-                (Snark_params.Tick.Field.to_string h')
-                (Snark_params.Tick.Field.to_string h)) ;
+                Snark_params.Tick.Field.(to_string (stack_frame_hash :> t))
+                Snark_params.Tick.Field.(to_string (stack :> t))
+                Snark_params.Tick.Field.(to_string (h' :> t))
+                Snark_params.Tick.Field.(to_string (h :> t))) ;
           with_label __LOC__ (fun () ->
-              Boolean.Assert.any [ input_is_empty; Field.equal h h' ]) ;
+              Boolean.Assert.any
+                [ input_is_empty; Call_stack_digest.Checked.equal h h' ]) ;
           { is_some = Boolean.not input_is_empty
           ; data = (elt, { hash = stack; data = tl_r })
           }
 
         let read_elt (frame : elt) : Elt.t =
-          { hash = As_prover.read Field.typ (Stack_frame.hash frame)
+          { hash =
+              As_prover.read Mina_base.Stack_frame.Digest.typ
+                (Stack_frame.hash frame)
           ; data =
               { calls = V.get frame.data.calls.data
               ; caller = As_prover.read Token_id.typ frame.data.caller
@@ -1642,13 +1671,14 @@ module Base = struct
           }
 
         let push (elt : elt) ~onto:({ hash = h_tl; data = r_tl } : t) : t =
-          let h = hash_cons (Stack_frame.hash elt) h_tl in
+          let h = Call_stack_digest.Checked.cons (Stack_frame.hash elt) h_tl in
           let r =
             V.create
-              (fun () : (Elt.t, Field.Constant.t) With_stack_hash.t list ->
+              (fun () : (Elt.t, Call_stack_digest.t) With_stack_hash.t list ->
                 let hd = read_elt elt in
                 let tl = V.get r_tl in
-                { With_stack_hash.stack_hash = As_prover.read Field.typ h
+                { With_stack_hash.stack_hash =
+                    As_prover.read Call_stack_digest.typ h
                 ; elt = hd
                 }
                 :: tl)
@@ -1733,12 +1763,14 @@ module Base = struct
 
         let add_check (t : t) _failure b =
           (*as_prover (fun () ->
-            Format.eprintf "%s: %b@." (Transaction_status.Failure.to_string _failure) (As_prover.read Boolean.typ b)
-          ) ;*)
+              Format.eprintf "%s: %b@." (Transaction_status.Failure.to_string _failure) (As_prover.read Boolean.typ b)
+            ) ;*)
           { t with success = Bool.(t.success &&& b) }
 
         let update_failure_status_tbl (t : t) _failure_status b =
-          add_check (t : t) Transaction_status.Failure.Update_not_permitted_voting_for b
+          add_check
+            (t : t)
+            Transaction_status.Failure.Update_not_permitted_voting_for b
 
         let add_new_failure_status_bucket t = t
       end
@@ -1909,7 +1941,9 @@ module Base = struct
               | Proof, Some (_i, s) ->
                   with_label __LOC__ (fun () ->
                       Snapp_statement.Checked.Assert.equal
-                        { transaction = commitment; at_party }
+                        { transaction = commitment
+                        ; at_party = (at_party :> Field.t)
+                        }
                         s) ;
                   Boolean.true_
               | (Signature | None_given), None ->
@@ -2178,7 +2212,7 @@ module Base = struct
                       |> Parties.Call_forest.map ~f:(fun party -> (party, ())))
               in
               let h =
-                exists Field.typ ~compute:(fun () ->
+                exists Parties.Digest.Forest.typ ~compute:(fun () ->
                     Parties.Call_forest.hash (V.get ps))
               in
               let start_data =
@@ -2259,7 +2293,7 @@ module Base = struct
            it will never be upgraded to the global ledger. If we have such a
            failure, we just pretend we achieved the target hash.
         *)
-        Field.if_ local.success
+        Stack_frame.Digest.Checked.if_ local.success
           ~then_:(Inputs.Stack_frame.hash local.stack_frame)
           ~else_:statement.target.local_state.stack_frame
       in
@@ -3755,8 +3789,9 @@ let group_by_parties_rev (partiess : Party.t list list)
   in
   group_by_parties_rev partiess stmtss []
 
-let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
-    (frames : 'frame list) : ('frame, field) With_stack_hash.t list =
+let rec accumulate_call_stack_hashes
+    ~(hash_frame : 'frame -> Stack_frame.Digest.t) (frames : 'frame list) :
+    ('frame, Call_stack_digest.t) With_stack_hash.t list =
   match frames with
   | [] ->
       []
@@ -3764,9 +3799,9 @@ let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
       let h_f = hash_frame f in
       let tl = accumulate_call_stack_hashes ~hash_frame fs in
       let h_tl =
-        match tl with [] -> Parties.Call_forest.empty | t :: _ -> t.stack_hash
+        match tl with [] -> Call_stack_digest.empty | t :: _ -> t.stack_hash
       in
-      { stack_hash = Parties.Call_forest.hash_cons h_f h_tl; elt = f } :: tl
+      { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
 let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
     ~pending_coinbase_init_stack ledger (partiess : Parties.t list) =
@@ -3798,7 +3833,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
   let tx_statement commitment full_commitment use_full_commitment
-      (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
+      (remaining_parties : (Party.t, _, _) Parties.Call_forest.t) :
       Snapp_statement.t =
     let at_party =
       Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
@@ -3810,10 +3845,12 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       | _ ->
           failwith "Expected `Proof for party that has a proof"
     in
-    { transaction; at_party }
+    { transaction; at_party = (at_party :> Field.t) }
   in
-  let commitment = ref Local_state.dummy.transaction_commitment in
-  let full_commitment = ref Local_state.dummy.full_transaction_commitment in
+  let commitment = ref (Local_state.dummy ()).transaction_commitment in
+  let full_commitment =
+    ref (Local_state.dummy ()).full_transaction_commitment
+  in
   let remaining_parties =
     let partiess =
       List.map partiess
@@ -3865,7 +3902,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           empty_if_last (fun () ->
               let next_commitment = Parties.commitment parties in
               let fee_payer_hash =
-                Party.Predicated.(digest @@ of_fee_payer parties.fee_payer.data)
+                Parties.Digest.Party.create
+                  (Party.Predicated.of_fee_payer parties.fee_payer.data)
               in
               let next_full_commitment =
                 Parties.Transaction_commitment.with_fee_payer next_commitment
@@ -3906,7 +3944,16 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                 failwith "Not enough remaining parties" )
       in
       let hash_local_state
-          (local : _ Mina_transaction_logic.Parties_logic.Local_state.t) =
+          (local :
+            ( Stack_frame.value
+            , Stack_frame.value list
+            , _
+            , _
+            , _
+            , _
+            , _
+            , _ )
+            Mina_transaction_logic.Parties_logic.Local_state.t) =
         let stack_frame (stack_frame : Stack_frame.value) =
           { stack_frame with
             calls =
@@ -3916,13 +3963,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         { local with
           stack_frame = stack_frame local.stack_frame
         ; call_stack =
-            List.map
-              ~f:
-                (With_stack_hash.map ~f:(fun f ->
-                     With_hash.of_data (stack_frame f)
-                       ~hash_data:Stack_frame.hash))
-              (accumulate_call_stack_hashes ~hash_frame:Stack_frame.hash
-                 local.call_stack)
+            List.map local.call_stack ~f:(fun f ->
+                With_hash.of_data (stack_frame f)
+                  ~hash_data:Stack_frame.Digest.create)
+            |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
+                   x.With_hash.hash)
         }
       in
       let source_local =
@@ -3969,7 +4014,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
       in
       let call_stack_hash s =
         List.hd s
-        |> Option.value_map ~default:Parties.Call_forest.empty
+        |> Option.value_map ~default:Call_stack_digest.empty
              ~f:With_stack_hash.stack_hash
       in
       let statement : Statement.With_sok.t =
@@ -3986,7 +4031,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             ; pending_coinbase_stack = pending_coinbase_init_stack
             ; local_state =
                 { source_local with
-                  stack_frame = Stack_frame.hash source_local.stack_frame
+                  stack_frame =
+                    Stack_frame.Digest.create source_local.stack_frame
                 ; call_stack = call_stack_hash source_local.call_stack
                 ; ledger = source_local_ledger
                 }
@@ -3998,7 +4044,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
                   pending_coinbase_init_stack
             ; local_state =
                 { target_local with
-                  stack_frame = Stack_frame.hash target_local.stack_frame
+                  stack_frame =
+                    Stack_frame.Digest.create target_local.stack_frame
                 ; call_stack = call_stack_hash target_local.call_stack
                 ; ledger = Sparse_ledger.merkle_root target_local.ledger
                 }
@@ -4433,7 +4480,9 @@ module For_tests = struct
     in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create
+             (Party.Predicated.of_fee_payer fee_payer.data))
     in
     let fee_payer =
       let fee_payer_signature_auth =
@@ -4548,7 +4597,9 @@ module For_tests = struct
                     full_commitment
                   else commitment
                 in
-                { transaction = commitment; at_party = proof_party }
+                { transaction = commitment
+                ; at_party = (proof_party :> Field.t)
+                }
               in
               let handler (Snarky_backendless.Request.With { request; respond })
                   =
@@ -4755,7 +4806,7 @@ module For_tests = struct
       Parties.Call_forest.hash ps
     in
     let tx_statement : Snapp_statement.t =
-      { transaction; at_party = proof_party }
+      { transaction; at_party = (proof_party :> Field.t) }
     in
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
@@ -4767,7 +4818,8 @@ module For_tests = struct
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
           ~fee_payer_hash:
-            Party.Predicated.(digest (of_fee_payer fee_payer.data))
+            (Parties.Digest.Party.create
+               (Party.Predicated.of_fee_payer fee_payer.data))
       in
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field txn_comm)

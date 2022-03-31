@@ -251,7 +251,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               ~protocol_state_predicate_hash ~memo_hash
           in
           let at_party = Parties.Call_forest.hash ps in
-          let tx_statement : Snapp_statement.t = { transaction; at_party } in
+          let tx_statement : Snapp_statement.t =
+            { transaction; at_party = (at_party :> field) }
+          in
           let msg =
             tx_statement |> Snapp_statement.to_field_elements
             |> Random_oracle_input.Chunked.field_elements
@@ -273,7 +275,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             let txn_comm =
               Parties.Transaction_commitment.with_fee_payer transaction
                 ~fee_payer_hash:
-                  Party.Predicated.(digest (of_fee_payer fee_payer.data))
+                  (Parties.Digest.Party.create
+                     (Party.Predicated.of_fee_payer fee_payer.data))
             in
             { fee_payer with
               authorization =
