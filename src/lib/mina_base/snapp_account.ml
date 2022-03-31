@@ -125,7 +125,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V2.t
+      , ( Pickles.Side_loaded.Verification_key.Stable.V2.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option
@@ -142,19 +142,19 @@ end]
 
 open Pickles_types
 
-let digest_vk (t : Side_loaded_verification_key.t) =
+let digest_vk (t : Pickles.Side_loaded.Verification_key.t) =
   Random_oracle.(
     hash ~init:Hash_prefix_states.side_loaded_vk
-      (pack_input (Side_loaded_verification_key.to_input t)))
+      (pack_input (Pickles.Side_loaded.Verification_key.to_input t)))
 
 let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
+  Memo.unit (fun () -> digest_vk Pickles.Side_loaded.Verification_key.dummy)
 
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Snapp_state.V.t
     , ( Boolean.var
-      , (Side_loaded_verification_key.t option, Field.t) With_hash.t
+      , (Pickles.Side_loaded.Verification_key.t option, Field.t) With_hash.t
         Data_as_hash.t )
       Flagged_option.t
     , Mina_numbers.Snapp_version.Checked.t

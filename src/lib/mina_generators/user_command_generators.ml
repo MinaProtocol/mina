@@ -76,7 +76,7 @@ let parties_with_ledger () =
     let verification_key =
       Some
         With_hash.
-          { data = Side_loaded_verification_key.dummy
+          { data = Pickles.Side_loaded.Verification_key.dummy
           ; hash = Snapp_account.dummy_vk_hash ()
           }
     in

@@ -546,7 +546,7 @@ module For_tests : sig
 
   val create_trivial_snapp_account :
        ?permissions:Permissions.t
-    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> vk:(Pickles.Side_loaded.Verification_key.t, Tick.Field.t) With_hash.t
     -> ledger:Mina_ledger.Ledger.t
     -> Account.key
     -> unit
@@ -554,7 +554,8 @@ module For_tests : sig
   val create_trivial_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
-    -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+    -> [> `VK of
+          (Pickles.Side_loaded.Verification_key.t, Tick.Field.t) With_hash.t ]
        * [> `Prover of
             ( unit
             , unit

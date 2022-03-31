@@ -44,7 +44,8 @@ val apply_parties_with_merges :
 
 (** Verification key of a trivial smart contract *)
 val trivial_snapp :
-  ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+  ( [> `VK of (Pickles.Side_loaded.Verification_key.t, Tick.Field.t) With_hash.t
+    ]
   * [> `Prover of
        ( unit
        , unit
@@ -61,7 +62,7 @@ val gen_snapp_ledger :
 
 val test_snapp_update :
      ?snapp_permissions:Permissions.t
-  -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+  -> vk:(Pickles.Side_loaded.Verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:
        ( unit
        , unit

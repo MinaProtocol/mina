@@ -34,7 +34,6 @@ module Permissions = Permissions
 module Proof = Proof
 module Protocol_constants_checked = Protocol_constants_checked
 module Receipt = Receipt
-module Side_loaded_verification_key = Side_loaded_verification_key
 module Signature = Signature
 module Signature_poly = Signature_poly
 module Signed_command = Signed_command

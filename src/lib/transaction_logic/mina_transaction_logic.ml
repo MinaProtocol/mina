@@ -1213,7 +1213,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Verification_key = struct
-      type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+      type t =
+        (Pickles.Side_loaded.Verification_key.t, Field.t) With_hash.t option
 
       let if_ = Parties.value_if
     end

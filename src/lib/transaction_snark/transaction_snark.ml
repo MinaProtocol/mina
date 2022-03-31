@@ -420,7 +420,7 @@ module Parties_segment = struct
   end
 
   module Basic = struct
-    module N = Side_loaded_verification_key.Max_branches
+    module N = Pickles.Side_loaded.Verification_key.Max_branches
 
     [%%versioned
     module Stable = struct
@@ -1154,7 +1154,7 @@ module Base = struct
         module Verification_key = struct
           type t =
             ( Boolean.var
-            , ( Side_loaded_verification_key.t option
+            , ( Pickles.Side_loaded.Verification_key.t option
               , Field.Constant.t )
               With_hash.t
               Data_as_hash.t )
@@ -1280,7 +1280,8 @@ module Base = struct
           let register_verification_key ({ data = a; _ } : t) =
             Option.iter snapp_statement ~f:(fun (tag, _) ->
                 let vk =
-                  exists Side_loaded_verification_key.typ ~compute:(fun () ->
+                  exists Pickles.Side_loaded.Verification_key.typ
+                    ~compute:(fun () ->
                       Option.value_exn
                         (As_prover.Ref.get
                            (Data_as_hash.ref a.snapp.verification_key.data))

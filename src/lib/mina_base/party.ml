@@ -266,7 +266,7 @@ module Update = struct
       ; delegate : Public_key.Compressed.var Set_or_keep.Checked.t
       ; verification_key :
           ( Boolean.var
-          , ( Side_loaded_verification_key.t option
+          , ( Pickles.Side_loaded.Verification_key.t option
             , Field.Constant.t )
             With_hash.t
             Data_as_hash.t )

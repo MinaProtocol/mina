@@ -139,7 +139,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then
-            Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
+            Binable.to_string
+              (module Pickles.Side_loaded.Verification_key.Stable.V2)
+              vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
