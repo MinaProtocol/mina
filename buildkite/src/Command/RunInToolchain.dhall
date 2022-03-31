@@ -37,7 +37,7 @@ let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
 in
 
 {
-  runInToolchain = runIntoolchainBullseye
+  runInToolchain = runInToolchainBullseye
   , runInToolchainBullseye = runInToolchainBullseye
   , runInToolchainBuster = runInToolchainBuster
   , runInToolchainStretch = runInToolchainStretch
