@@ -92,7 +92,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t * (int * \
-               Snapp_statement.t)option) }%!"
+               Zkapp_statement.t)option) }%!"
              w) ;
         let%map _ =
           T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
@@ -172,7 +172,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t * (int * \
-               Snapp_statement.t)option) }%!"
+               Zkapp_statement.t)option) }%!"
              w) ;
         let%map _ =
           T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
@@ -229,7 +229,7 @@ module Util = struct
       (List.init
          (8 - List.length app_state)
          ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep))
-    |> Snapp_state.V.of_list_exn
+    |> Zkapp_state.V.of_list_exn
 
   let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
     List.map ~f:Events.of_string_array array_lst

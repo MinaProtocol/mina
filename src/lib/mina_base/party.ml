@@ -182,7 +182,7 @@ module Update = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t =
         { app_state :
-            F.Stable.V1.t Set_or_keep.Stable.V1.t Snapp_state.V.Stable.V1.t
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             ( Pickles.Side_loaded.Verification_key.Stable.V2.t
@@ -211,7 +211,7 @@ module Update = struct
         Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
       in
       (* won't raise because length is correct *)
-      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+      Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
@@ -270,7 +270,7 @@ module Update = struct
     open Pickles.Impls.Step
 
     type t =
-      { app_state : Field.t Set_or_keep.Checked.t Snapp_state.V.t
+      { app_state : Field.t Set_or_keep.Checked.t Zkapp_state.V.t
       ; delegate : Public_key.Compressed.var Set_or_keep.Checked.t
       ; verification_key :
           ( Boolean.var
@@ -301,7 +301,7 @@ module Update = struct
           t) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
-        [ Snapp_state.to_input app_state
+        [ Zkapp_state.to_input app_state
             ~f:(Set_or_keep.Checked.to_input ~f:field)
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
@@ -319,7 +319,7 @@ module Update = struct
 
   let noop : t =
     { app_state =
-        Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
+        Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
@@ -344,7 +344,7 @@ module Update = struct
         t) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
-      [ Snapp_state.to_input app_state
+      [ Zkapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
       ; Set_or_keep.to_input delegate
           ~dummy:(Snapp_predicate.Eq_data.Tc.public_key ()).default
@@ -369,7 +369,7 @@ module Update = struct
   let typ () : (Checked.t, t) Typ.t =
     let open Pickles.Impls.Step in
     Typ.of_hlistable
-      [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
+      [ Zkapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
       ; Set_or_keep.typ ~dummy:Public_key.Compressed.empty
           Public_key.Compressed.typ
       ; Set_or_keep.optional_typ
@@ -412,7 +412,7 @@ module Update = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
-         ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
+         ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
@@ -424,7 +424,7 @@ module Update = struct
 
   let%test_unit "json roundtrip" =
     let app_state =
-      Snapp_state.V.of_list_exn
+      Zkapp_state.V.of_list_exn
         Set_or_keep.
           [ Set (F.negate F.one); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
     in

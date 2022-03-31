@@ -113,11 +113,11 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                 match snapp with
                 | None ->
                     let len =
-                      Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+                      Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
                     in
                     (* won't raise, correct length given *)
                     let state =
-                      Snapp_state.V.of_list_exn
+                      Zkapp_state.V.of_list_exn
                         (List.init len ~f:(fun _ -> Or_ignore.Ignore))
                     in
                     let sequence_state = Or_ignore.Ignore in
@@ -125,7 +125,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return (state, sequence_state, proved_state)
                 | Some { app_state; sequence_state; proved_state; _ } ->
                     let state =
-                      Snapp_state.V.map app_state ~f:(fun field ->
+                      Zkapp_state.V.map app_state ~f:(fun field ->
                           Quickcheck.random_value (Or_ignore.gen (return field)))
                     in
                     let%bind sequence_state =
@@ -214,14 +214,14 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return { predicate_account with delegate }
                 | State ->
                     let fields =
-                      Snapp_state.V.to_list predicate_account.state
+                      Zkapp_state.V.to_list predicate_account.state
                       |> Array.of_list
                     in
                     let%bind ndx = Int.gen_incl 0 (Array.length fields - 1) in
                     let%bind field = Snark_params.Tick.Field.gen in
                     fields.(ndx) <- Or_ignore.Check field ;
                     let state =
-                      Snapp_state.V.of_list_exn (Array.to_list fields)
+                      Zkapp_state.V.of_list_exn (Array.to_list fields)
                     in
                     return { predicate_account with state }
                 | Sequence_state ->

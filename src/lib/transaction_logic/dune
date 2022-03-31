@@ -23,7 +23,9 @@
    data_hash_lib
    debug_assert
    genesis_constants
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    kimchi_backend.common
    kimchi_backend
    kimchi_pasta

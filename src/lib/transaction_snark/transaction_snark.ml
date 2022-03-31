@@ -472,8 +472,8 @@ module Parties_segment = struct
       | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
       | Opt_signed : (unit, unit, unit, unit) t_typed
       | Proved
-          : ( Snapp_statement.Checked.t * unit
-            , Snapp_statement.t * unit
+          : ( Zkapp_statement.Checked.t * unit
+            , Zkapp_statement.t * unit
             , Nat.N2.n * unit
             , N.n * unit )
             t_typed
@@ -915,7 +915,7 @@ module Base = struct
     Memo.of_comparable
       (module Int)
       (fun i ->
-        let open Snapp_statement in
+        let open Zkapp_statement in
         Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
           ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
           ~value_to_field_elements:to_field_elements
@@ -1035,7 +1035,7 @@ module Base = struct
 
       val spec : single
 
-      val snapp_statement : (int * Snapp_statement.Checked.t) option
+      val snapp_statement : (int * Zkapp_statement.Checked.t) option
     end
 
     type party =
@@ -1656,7 +1656,7 @@ module Base = struct
               match (auth_type, snapp_statement) with
               | Proof, Some (_i, s) ->
                   with_label __LOC__ (fun () ->
-                      Snapp_statement.Checked.Assert.equal
+                      Zkapp_statement.Checked.Assert.equal
                         { transaction = commitment; at_party }
                         s) ;
                   Boolean.true_
@@ -3184,7 +3184,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Snapp_statement.t) option
+    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -3644,7 +3644,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   in
   let tx_statement commitment full_commitment use_full_commitment
       (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
-      Snapp_statement.t =
+      Zkapp_statement.t =
     let at_party =
       Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
     in
@@ -3919,7 +3919,7 @@ struct
     | Signature _ | None_given ->
         None
 
-  let snapp_proof_data ~(snapp_statement : (int * Snapp_statement.t) option)
+  let snapp_proof_data ~(snapp_statement : (int * Zkapp_statement.t) option)
       ~(witness : Transaction_witness.Parties_segment_witness.t) =
     let open Option.Let_syntax in
     let%bind p = first_party witness in
@@ -4059,11 +4059,11 @@ module For_tests = struct
   let create_trivial_snapp ~constraint_constants () =
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
-        let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
+        let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
             unit Checked.t =
           Impl.run_checked (dummy_constraints ())
           |> fun () ->
-          Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
+          Zkapp_statement.Checked.Assert.equal tx_commitment tx_commitment
           |> return
         in
         { identifier = "trivial-rule"
@@ -4081,9 +4081,9 @@ module For_tests = struct
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
-        (module Snapp_statement.Checked)
-        (module Snapp_statement)
-        ~typ:Snapp_statement.typ
+        (module Zkapp_statement.Checked)
+        (module Zkapp_statement)
+        ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N2)
         ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4105,8 +4105,8 @@ module For_tests = struct
                   |> fun s ->
                   Run.Field.(Assert.equal s (s + one))
                   |> fun () :
-                         ( Snapp_statement.Checked.t
-                         * (Snapp_statement.Checked.t * unit) )
+                         ( Zkapp_statement.Checked.t
+                         * (Zkapp_statement.Checked.t * unit) )
                          Pickles_types.Hlist0.H1
                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                          .t ->
@@ -4392,7 +4392,7 @@ module For_tests = struct
                 in
                 Parties.Call_forest.hash ps
               in
-              let tx_statement : Snapp_statement.t =
+              let tx_statement : Zkapp_statement.t =
                 let commitment =
                   if snapp_party.data.body.use_full_commitment then
                     full_commitment
@@ -4599,7 +4599,7 @@ module For_tests = struct
       in
       Parties.Call_forest.hash ps
     in
-    let tx_statement : Snapp_statement.t =
+    let tx_statement : Zkapp_statement.t =
       { transaction; at_party = proof_party }
     in
     let handler (Snarky_backendless.Request.With { request; respond }) =

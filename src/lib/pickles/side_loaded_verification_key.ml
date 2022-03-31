@@ -220,8 +220,7 @@ module Stable = struct
               ; srs = Backend.Tock.Keypair.load_urs ()
               ; evals =
                   (let g (x, y) =
-                     { Kimchi.Protocol.unshifted =
-                         [| Kimchi.Foundations.Finite (x, y) |]
+                     { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
                      ; shifted = None
                      }
                    in
