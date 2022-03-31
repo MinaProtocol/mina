@@ -139,6 +139,38 @@ module Node = struct
       }
     |}]
 
+    module Send_payment_with_raw_sig =
+    [%graphql
+    {|
+      mutation (
+        $sender: PublicKey!,
+        $receiver: PublicKey!,
+        $amount: UInt64!,
+        $token: UInt64!,
+        $fee: UInt64!,
+        $nonce: UInt32!,
+        $memo: String!,
+        $validUntil: UInt32!,
+        $rawSignature: String!
+      )
+      {
+        sendPayment(
+          input:
+          {
+            from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo, validUntil: $validUntil
+          },
+          signature: {rawSignature: $rawSignature}
+        )
+        {
+          payment {
+            id
+            nonce
+            hash
+          }
+        }
+      }
+    |}]
+
     module Send_delegation =
     [%graphql
     {|
@@ -160,11 +192,12 @@ module Node = struct
       }
     |}]
 
-    module Get_balance =
+    module Get_account_data =
     [%graphql
     {|
-      query ($public_key: PublicKey, $token: UInt64) {
-        account(publicKey: $public_key, token: $token) {
+      query ($public_key: PublicKey) {
+        account(publicKey: $public_key) {
+          nonce
           balance {
             total @bsDecoder(fn: "Decoders.balance")
           }
@@ -330,18 +363,21 @@ module Node = struct
     get_best_chain ?max_length ~logger t
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let get_balance ~logger t ~account_id =
+  type account_data =
+    { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+
+  let get_account_data ~logger t ~public_key =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
-        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
         :: logger_metadata t ) ;
-    let pk = Mina_base.Account_id.public_key account_id in
-    let token = Mina_base.Account_id.token_id account_id in
+    (* let pk = Mina_base.Account_id.public_key account_id in *)
+    (* let token = Mina_base.Account_id.token_id account_id in *)
     let get_balance_obj =
-      Graphql.Get_balance.make
-        ~public_key:(Graphql_lib.Encoders.public_key pk)
-        ~token:(Graphql_lib.Encoders.token token)
+      Graphql.Get_account_data.make
+        ~public_key:(Graphql_lib.Encoders.public_key public_key)
+        (* ~token:(Graphql_lib.Encoders.token token) *)
         ()
     in
     let%bind balance_obj =
@@ -351,13 +387,19 @@ module Node = struct
     match balance_obj#account with
     | None ->
         Deferred.Or_error.errorf
-          !"Account with %{sexp:Mina_base.Account_id.t} not found"
-          account_id
+          !"Account with public_key %s not found"
+          (Signature_lib.Public_key.Compressed.to_string public_key)
     | Some acc ->
-        return acc#balance#total
+        return
+          { nonce =
+              acc#nonce
+              |> Option.value_exn ~message:"the nonce from get_balance is None"
+              |> Unsigned.UInt32.of_string
+          ; total_balance = acc#balance#total
+          }
 
-  let must_get_balance ~logger t ~account_id =
-    get_balance ~logger t ~account_id
+  let must_get_account_data ~logger t ~public_key =
+    get_account_data ~logger t ~public_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =
@@ -460,6 +502,51 @@ module Node = struct
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
+
+  let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
+    [%log info] "Sending a payment with raw signature"
+      ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let send_payment_graphql () =
+      let send_payment_obj =
+        Graphql.Send_payment_with_raw_sig.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~token:(Graphql_lib.Encoders.token token)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ~nonce:(Graphql_lib.Encoders.nonce nonce)
+          ~memo
+          ~validUntil:(Graphql_lib.Encoders.uint32 valid_until)
+          ~rawSignature:raw_signature ()
+      in
+      [%log info] "send_payment_obj with $variables "
+        ~metadata:[ ("variables", send_payment_obj#variables) ] ;
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
+    in
+    let%map sent_payment_obj = send_payment_graphql () in
+    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let res =
+      { id = return_obj#id
+      ; hash = return_obj#hash
+      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      }
+    in
+    [%log info] "Sent payment"
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String res.hash)
+        ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
+        ] ;
+    res
+
+  let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
+    send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =
