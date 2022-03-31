@@ -265,7 +265,7 @@ module type Party_intf = sig
 
     type field
 
-    val app_state : t -> field set_or_keep Snapp_state.V.t
+    val app_state : t -> field set_or_keep Zkapp_state.V.t
 
     type verification_key
 
@@ -275,9 +275,9 @@ module type Party_intf = sig
 
     val sequence_events : t -> events
 
-    type snapp_uri
+    type zkapp_uri
 
-    val snapp_uri : t -> snapp_uri set_or_keep
+    val zkapp_uri : t -> zkapp_uri set_or_keep
 
     type token_symbol
 
@@ -401,7 +401,7 @@ module type Account_intf = sig
 
     val set_verification_key : t -> controller
 
-    val set_snapp_uri : t -> controller
+    val set_zkapp_uri : t -> controller
 
     val edit_sequence_state : t -> controller
 
@@ -447,9 +447,9 @@ module type Account_intf = sig
 
   type field
 
-  val app_state : t -> field Snapp_state.V.t
+  val app_state : t -> field Zkapp_state.V.t
 
-  val set_app_state : field Snapp_state.V.t -> t -> t
+  val set_app_state : field Zkapp_state.V.t -> t -> t
 
   val register_verification_key : t -> unit
 
@@ -467,11 +467,11 @@ module type Account_intf = sig
 
   val set_sequence_state : field Pickles_types.Vector.Vector_5.t -> t -> t
 
-  type snapp_uri
+  type zkapp_uri
 
-  val snapp_uri : t -> snapp_uri
+  val zkapp_uri : t -> zkapp_uri
 
-  val set_snapp_uri : snapp_uri -> t -> t
+  val set_zkapp_uri : zkapp_uri -> t -> t
 
   type token_symbol
 
@@ -575,7 +575,7 @@ module type Inputs_intf = sig
 
   module Verification_key : Iffable with type bool := Bool.t
 
-  module Snapp_uri : Iffable with type bool := Bool.t
+  module Zkapp_uri : Iffable with type bool := Bool.t
 
   module Token_symbol : Iffable with type bool := Bool.t
 
@@ -588,7 +588,7 @@ module type Inputs_intf = sig
        and type global_slot := Global_slot.t
        and type field := Field.t
        and type verification_key := Verification_key.t
-       and type snapp_uri := Snapp_uri.t
+       and type zkapp_uri := Zkapp_uri.t
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
        and type nonce := Nonce.t
@@ -609,7 +609,7 @@ module type Inputs_intf = sig
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
        and type Update.events := Events.t
-       and type Update.snapp_uri := Snapp_uri.t
+       and type Update.zkapp_uri := Zkapp_uri.t
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
        and type Update.permissions := Account.Permissions.t
@@ -1109,20 +1109,20 @@ module Make (Inputs : Inputs_intf) = struct
     let a = Account.unmake_snapp a in
     (* Update snapp URI. *)
     let a, local_state =
-      let snapp_uri = Party.Update.snapp_uri party in
+      let zkapp_uri = Party.Update.zkapp_uri party in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_snapp_uri a)
+          (Account.Permissions.set_zkapp_uri a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_snapp_uri
-          Bool.(Set_or_keep.is_keep snapp_uri ||| has_permission)
+        Local_state.add_check local_state Update_not_permitted_zkapp_uri
+          Bool.(Set_or_keep.is_keep zkapp_uri ||| has_permission)
       in
-      let snapp_uri =
-        Set_or_keep.set_or_keep ~if_:Snapp_uri.if_ snapp_uri
-          (Account.snapp_uri a)
+      let zkapp_uri =
+        Set_or_keep.set_or_keep ~if_:Zkapp_uri.if_ zkapp_uri
+          (Account.zkapp_uri a)
       in
-      let a = Account.set_snapp_uri snapp_uri a in
+      let a = Account.set_zkapp_uri zkapp_uri a in
       (a, local_state)
     in
     (* Update token symbol. *)

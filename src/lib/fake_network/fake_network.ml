@@ -15,20 +15,20 @@ type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; get_staged_ledger_aux_and_pending_coinbases_at_hash :
-         Kimchi.Foundations.Fp.t Envelope.Incoming.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
       -> ( Staged_ledger.Scan_state.t
-         * Kimchi.Foundations.Fp.t
+         * Pasta_bindings.Fp.t
          * Pending_coinbase.t
          * Mina_state.Protocol_state.value list )
          option
          Deferred.t
   ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
   ; answer_sync_ledger_query :
-         (Kimchi.Foundations.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
+         (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
       -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
   ; get_ancestry :
          ( Consensus.Data.Consensus_state.Value.t
-         , Kimchi.Foundations.Fp.t )
+         , Pasta_bindings.Fp.t )
          With_hash.t
          Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
@@ -39,8 +39,7 @@ type peer_state =
   ; get_best_tip :
          unit Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
-         , Kimchi.Foundations.Fp.t list * Mina_transition.External_transition.t
-         )
+         , Pasta_bindings.Fp.t list * Mina_transition.External_transition.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -49,13 +48,12 @@ type peer_state =
       -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
          Deferred.t
   ; get_transition_knowledge :
-      unit Envelope.Incoming.t -> Kimchi.Foundations.Fp.t list Deferred.t
+      unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Kimchi.Foundations.Fp.t Envelope.Incoming.t
-      -> (Kimchi.Foundations.Fp.t * Kimchi.Foundations.Fp.t list) option
-         Deferred.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
+      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
   ; get_transition_chain :
-         Kimchi.Foundations.Fp.t list Envelope.Incoming.t
+         Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_transition.External_transition.t list option Deferred.t
   }
 
@@ -110,6 +108,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
         Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
+    ; consensus_constants = precomputed_values.consensus_constants
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -128,6 +127,10 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~sinks:
+                  ( Transition_handler.Block_sink.void
+                  , Network_pool.Transaction_pool.Remote_sink.void
+                  , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   state.get_staged_ledger_aux_and_pending_coinbases_at_hash
                 ~get_some_initial_peers:state.get_some_initial_peers

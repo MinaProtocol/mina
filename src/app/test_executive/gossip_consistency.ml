@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 3 in
+    let n = 2 in
     let open Test_config in
     { default with
       requires_graphql = true
@@ -60,7 +60,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             wait_for dsl
               (Wait_condition.signed_command_to_be_included_in_frontier
                  ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-                 ~command_type:Send_payment)
+                 ~command_type:Send_payment ~node_included_in:`Any_node)
           in
           [%log info]
             "gossip_consistency test: payment #%d with nonce %d successfully \

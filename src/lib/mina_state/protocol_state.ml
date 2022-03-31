@@ -162,6 +162,11 @@ module Body = struct
     ; staking_epoch_data = C.staking_epoch_data cs
     ; next_epoch_data = C.next_epoch_data cs
     }
+
+  module For_tests = struct
+    let with_consensus_state (t : Value.t) consensus_state =
+      { t with consensus_state }
+  end
 end
 
 module Value = struct

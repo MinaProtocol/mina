@@ -58,8 +58,7 @@ module Stable = struct
         ; srs
         ; evals =
             (let g (x, y) =
-               { Kimchi.Protocol.unshifted =
-                   [| Kimchi.Foundations.Finite (x, y) |]
+               { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
                ; shifted = None
                }
              in
@@ -94,7 +93,7 @@ module Stable = struct
 end]
 
 let dummy_commitments g =
-  let open Dlog_plonk_types in
+  let open Plonk_types in
   { Plonk_verification_key_evals.sigma_comm =
       Vector.init Permuts.n ~f:(fun _ -> g)
   ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
@@ -114,4 +113,4 @@ let dummy =
      ; step_domains = [||]
      ; data = { constraints = rows }
      }
-     |> Stable.Latest.of_repr (Kimchi.Protocol.SRS.Fq.create 1))
+     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1))

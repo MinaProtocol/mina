@@ -248,7 +248,7 @@ module Transaction_pool = struct
     | `Valid_assuming of
       User_command.Verifiable.t
       * ( Pickles.Side_loaded.Verification_key.t
-        * Snapp_statement.t
+        * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
         list ]
   [@@deriving sexp]

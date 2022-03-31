@@ -472,8 +472,8 @@ module Parties_segment = struct
       | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
       | Opt_signed : (unit, unit, unit, unit) t_typed
       | Proved
-          : ( Snapp_statement.Checked.t * unit
-            , Snapp_statement.t * unit
+          : ( Zkapp_statement.Checked.t * unit
+            , Zkapp_statement.t * unit
             , Nat.N2.n * unit
             , N.n * unit )
             t_typed
@@ -516,7 +516,7 @@ let dummy_constraints () =
               (Shifted_value x)
             : Pickles.Step_main_inputs.Inner_curve.t ) ;
         ignore
-          ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+          ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
               (Kimchi_backend_common.Scalar_challenge.create x)
             : Field.t * Field.t ))
 
@@ -915,7 +915,7 @@ module Base = struct
     Memo.of_comparable
       (module Int)
       (fun i ->
-        let open Snapp_statement in
+        let open Zkapp_statement in
         Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
           ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
           ~value_to_field_elements:to_field_elements
@@ -985,7 +985,7 @@ module Base = struct
                  ; delegate = _
                  ; verification_key = _
                  ; permissions = _
-                 ; snapp_uri = _
+                 ; zkapp_uri = _
                  ; token_symbol = _
                  ; timing = _
                  ; voting_for = _
@@ -1035,7 +1035,7 @@ module Base = struct
 
       val spec : single
 
-      val snapp_statement : (int * Snapp_statement.Checked.t) option
+      val snapp_statement : (int * Zkapp_statement.Checked.t) option
     end
 
     type party =
@@ -1158,10 +1158,10 @@ module Base = struct
               , Field.Constant.t )
               With_hash.t
               Data_as_hash.t )
-            Snapp_basic.Flagged_option.t
+            Zkapp_basic.Flagged_option.t
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
-            Snapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+            Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
         module Events = struct
@@ -1172,7 +1172,7 @@ module Base = struct
           let push_events = Party.Sequence_events.push_events_checked
         end
 
-        module Snapp_uri = struct
+        module Zkapp_uri = struct
           type t = string Data_as_hash.t
 
           let if_ = Data_as_hash.if_
@@ -1205,8 +1205,8 @@ module Base = struct
             let set_verification_key : t -> Controller.t =
              fun a -> a.data.permissions.set_verification_key
 
-            let set_snapp_uri : t -> Controller.t =
-             fun a -> a.data.permissions.set_snapp_uri
+            let set_zkapp_uri : t -> Controller.t =
+             fun a -> a.data.permissions.set_zkapp_uri
 
             let edit_sequence_state : t -> Controller.t =
              fun a -> a.data.permissions.edit_sequence_state
@@ -1315,10 +1315,10 @@ module Base = struct
           let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
             { data = { a with snapp = { a.snapp with sequence_state } }; hash }
 
-          let snapp_uri (a : t) = a.data.snapp_uri
+          let zkapp_uri (a : t) = a.data.zkapp_uri
 
-          let set_snapp_uri snapp_uri ({ data = a; hash } : t) : t =
-            { data = { a with snapp_uri }; hash }
+          let set_zkapp_uri zkapp_uri ({ data = a; hash } : t) : t =
+            { data = { a with zkapp_uri }; hash }
 
           let token_symbol (a : t) = a.data.token_symbol
 
@@ -1437,7 +1437,7 @@ module Base = struct
         end
 
         module Opt = struct
-          open Snapp_basic
+          open Zkapp_basic
 
           type 'a t = (Bool.t, 'a) Flagged_option.t
 
@@ -1656,7 +1656,7 @@ module Base = struct
               match (auth_type, snapp_statement) with
               | Proof, Some (_i, s) ->
                   with_label __LOC__ (fun () ->
-                      Snapp_statement.Checked.Assert.equal
+                      Zkapp_statement.Checked.Assert.equal
                         { transaction = commitment; at_party }
                         s) ;
                   Boolean.true_
@@ -1694,7 +1694,7 @@ module Base = struct
             , `Signature_verifies signature_verifies )
 
           module Update = struct
-            open Snapp_basic
+            open Zkapp_basic
 
             type 'a set_or_keep = 'a Set_or_keep.Checked.t
 
@@ -1711,7 +1711,7 @@ module Base = struct
             let sequence_events ({ party; _ } : t) =
               party.data.body.sequence_events
 
-            let snapp_uri ({ party; _ } : t) = party.data.body.update.snapp_uri
+            let zkapp_uri ({ party; _ } : t) = party.data.body.update.zkapp_uri
 
             let token_symbol ({ party; _ } : t) =
               party.data.body.update.token_symbol
@@ -1727,7 +1727,7 @@ module Base = struct
         end
 
         module Set_or_keep = struct
-          include Snapp_basic.Set_or_keep.Checked
+          include Zkapp_basic.Set_or_keep.Checked
         end
 
         module Amount = struct
@@ -2131,7 +2131,7 @@ module Base = struct
                }
              in
              Fee_excess.assert_equal_checked expected got)) ;
-      let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
+      let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
 
@@ -2557,7 +2557,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind receiver_increase =
@@ -2744,7 +2744,7 @@ module Base = struct
              ; timing = account.timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind user_command_fails =
@@ -2858,7 +2858,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             ; snapp_uri = account.snapp_uri
+             ; zkapp_uri = account.zkapp_uri
              }))
     in
     let%bind fee_excess =
@@ -3184,7 +3184,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Snapp_statement.t) option
+    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -3218,9 +3218,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
                  >>= Base.main ~constraint_constants))
-              handler)
-           ())
-      : unit * unit )
+              handler))
+      : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -3270,7 +3269,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
+  generate_auxiliary_input [ Statement.With_sok.typ ] main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
@@ -3645,7 +3644,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   in
   let tx_statement commitment full_commitment use_full_commitment
       (remaining_parties : (Party.t, _) Parties.Call_forest.t) :
-      Snapp_statement.t =
+      Zkapp_statement.t =
     let at_party =
       Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
     in
@@ -3920,7 +3919,7 @@ struct
     | Signature _ | None_given ->
         None
 
-  let snapp_proof_data ~(snapp_statement : (int * Snapp_statement.t) option)
+  let snapp_proof_data ~(snapp_statement : (int * Zkapp_statement.t) option)
       ~(witness : Transaction_witness.Parties_segment_witness.t) =
     let open Option.Let_syntax in
     let%bind p = first_party witness in
@@ -4060,11 +4059,11 @@ module For_tests = struct
   let create_trivial_snapp ~constraint_constants () =
     let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
-        let trivial_main (tx_commitment : Snapp_statement.Checked.t) :
-            (unit, _) Checked.t =
+        let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
+            unit Checked.t =
           Impl.run_checked (dummy_constraints ())
           |> fun () ->
-          Snapp_statement.Checked.Assert.equal tx_commitment tx_commitment
+          Zkapp_statement.Checked.Assert.equal tx_commitment tx_commitment
           |> return
         in
         { identifier = "trivial-rule"
@@ -4082,9 +4081,9 @@ module For_tests = struct
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
-        (module Snapp_statement.Checked)
-        (module Snapp_statement)
-        ~typ:Snapp_statement.typ
+        (module Zkapp_statement.Checked)
+        (module Zkapp_statement)
+        ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N2)
         ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4106,8 +4105,8 @@ module For_tests = struct
                   |> fun s ->
                   Run.Field.(Assert.equal s (s + one))
                   |> fun () :
-                         ( Snapp_statement.Checked.t
-                         * (Snapp_statement.Checked.t * unit) )
+                         ( Zkapp_statement.Checked.t
+                         * (Zkapp_statement.Checked.t * unit) )
                          Pickles_types.Hlist0.H1
                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                          .t ->
@@ -4320,15 +4319,15 @@ module For_tests = struct
        balance changes for other new snapp accounts are just the account creation fee
     *)
     assert (
-      Snapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
+      Zkapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
       || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
     ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
-        verification_key = Snapp_basic.Set_or_keep.Set vk
+        verification_key = Zkapp_basic.Set_or_keep.Set vk
       ; permissions =
-          Snapp_basic.Set_or_keep.Set
+          Zkapp_basic.Set_or_keep.Set
             { Permissions.user_default with
               edit_state = Permissions.Auth_required.Proof
             ; edit_sequence_state = Proof
@@ -4393,7 +4392,7 @@ module For_tests = struct
                 in
                 Parties.Call_forest.hash ps
               in
-              let tx_statement : Snapp_statement.t =
+              let tx_statement : Zkapp_statement.t =
                 let commitment =
                   if snapp_party.data.body.use_full_commitment then
                     full_commitment
@@ -4513,7 +4512,7 @@ module For_tests = struct
     let update_empty_permissions =
       let permissions =
         { Permissions.user_default with send = Permissions.Auth_required.Proof }
-        |> Snapp_basic.Set_or_keep.Set
+        |> Zkapp_basic.Set_or_keep.Set
       in
       { Party.Update.dummy with permissions }
     in
@@ -4600,7 +4599,7 @@ module For_tests = struct
       in
       Parties.Call_forest.hash ps
     in
-    let tx_statement : Snapp_statement.t =
+    let tx_statement : Zkapp_statement.t =
       { transaction; at_party = proof_party }
     in
     let handler (Snarky_backendless.Request.With { request; respond }) =
