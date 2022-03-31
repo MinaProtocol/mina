@@ -1,6 +1,12 @@
 (library
  (name js_backend)
  (js_of_ocaml
-  (javascript_files js_backend.js bindings.js))
+  (javascript_files
+    js_backend.js
+    bindings.js
+    bigint_helpers.js
+    vector.js
+    unimplemented.js
+  ))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))

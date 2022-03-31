@@ -1,19 +1,7 @@
-/* global joo_global_object */
+/* global joo_global_object, Uint8Array_, BigInt_, _0n, _1n, _2n, _8n, _32n,
+   caml_bigint_to_bytes, caml_bigint_of_bytes
+*/
 
-// Provides: BigInt_
-var BigInt_ = joo_global_object.BigInt;
-// Provides: Uint8Array_
-var Uint8Array_ = joo_global_object.Uint8Array;
-// Provides: _0n
-var _0n = joo_global_object.BigInt(0);
-// Provides: _1n
-var _1n = joo_global_object.BigInt(1);
-// Provides: _2n
-var _2n = joo_global_object.BigInt(2);
-// Provides: _8n
-var _8n = joo_global_object.BigInt(8);
-// Provides: _32n
-var _32n = joo_global_object.BigInt(32);
 
 // Provides: caml_pasta_p_bigint
 // Requires: BigInt_
@@ -98,32 +86,6 @@ var caml_pallas_endo_scalar_const = new Uint8Array_([
   113, 173, 193, 215, 167, 101, 126,  57
 ]);
 
-// Provides: bigIntToBytes
-// Requires: BigInt_, Uint8Array_, _8n
-function bigIntToBytes(x, length) {
-  var bytes = [];
-  for (; x > 0; x >>= _8n) {
-    bytes.push(Number(x & BigInt_(0xff)));
-  }
-  var array = new Uint8Array_(bytes);
-  if (length === undefined) return array;
-  if (array.length > length)
-    throw Error("bigint doesn't fit into" + length + " bytes.");
-  var sizedArray = new Uint8Array_(length);
-  sizedArray.set(array);
-  return sizedArray;
-}
-// Provides: bytesToBigInt
-// Requires: BigInt_, _0n, _8n
-function bytesToBigInt(bytes) {
-  var x = _0n;
-  var bitPosition = _0n;
-  for (var i = 0; i < bytes.length; i++) {
-    x += BigInt_(bytes[i]) << bitPosition;
-    bitPosition += _8n;
-  }
-  return x;
-}
 // Provides: caml_bigint_modulo
 function caml_bigint_modulo(x, p) {
   x = x % p;
@@ -368,13 +330,13 @@ var caml_random_bytes = (function() {
 })();
 
 // Provides: caml_finite_field_random
-// Requires: caml_random_bytes, bytesToBigInt
+// Requires: caml_random_bytes, caml_bigint_of_bytes
 function caml_finite_field_random(p) {
   // strategy: find random 255-bit bigints and use the first that's smaller than p
   while (true) {
     var bytes = caml_random_bytes(32);
     bytes[31] &= 0x7f; // zero highest bit, so we get 255 random bits
-    var x = bytesToBigInt(bytes);
+    var x = caml_bigint_of_bytes(bytes);
     if (x < p) return x;
   }
 }
@@ -382,7 +344,7 @@ function caml_finite_field_random(p) {
 var i = 0;
 
 // Provides: plonk_wasm
-// Requires: bigIntToBytes, bytesToBigInt, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array_, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_finite_field_random, caml_group_projective_add, caml_group_projective_neg, caml_group_projective_scale, caml_group_projective_to_affine
+// Requires: caml_bigint_to_bytes, caml_bigint_of_bytes, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array_, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_finite_field_random, caml_group_projective_add, caml_group_projective_neg, caml_group_projective_scale, caml_group_projective_to_affine
 var plonk_wasm = {
   caml_bigint_256_num_limbs: function() {
     return 4;
@@ -391,7 +353,7 @@ var plonk_wasm = {
     return 8;
   },
   caml_bigint_256_of_bytes: function(arr) {
-    return [bytesToBigInt(arr)];
+    return [caml_bigint_of_bytes(arr)];
   },
   caml_bigint_256_of_decimal_string: function(s) {
     return [BigInt_(s)];
@@ -400,7 +362,7 @@ var plonk_wasm = {
     return b[0].toString();
   },
   caml_bigint_256_to_bytes: function(b) {
-    return bigIntToBytes(b[0], 32);
+    return caml_bigint_to_bytes(b[0], 32);
   },
   caml_bigint_256_test_bit: function(b, i) {
     return Number(!!(b[0] & (BigInt_(1) << BigInt_(i))))
@@ -550,16 +512,16 @@ var plonk_wasm = {
     return caml_group_projective_scale(g, x[0], caml_pasta_p_bigint);
   },
   caml_vesta_endo_base: function() {
-    return [bytesToBigInt(caml_vesta_endo_base_const)];
+    return [caml_bigint_of_bytes(caml_vesta_endo_base_const)];
   },
   caml_pallas_endo_base: function() {
-    return [bytesToBigInt(caml_pallas_endo_base_const)];
+    return [caml_bigint_of_bytes(caml_pallas_endo_base_const)];
   },
   caml_vesta_endo_scalar: function() {
-    return [bytesToBigInt(caml_vesta_endo_scalar_const)];
+    return [caml_bigint_of_bytes(caml_vesta_endo_scalar_const)];
   },
   caml_pallas_endo_scalar: function() {
-    return [bytesToBigInt(caml_pallas_endo_scalar_const)];
+    return [caml_bigint_of_bytes(caml_pallas_endo_scalar_const)];
   },
   caml_vesta_to_affine: function(g) {
     return caml_group_projective_to_affine(g, caml_pasta_q_bigint);
@@ -573,26 +535,7 @@ var plonk_wasm = {
   caml_pallas_of_affine_coordinates: function (x, y) {
     return new GroupProjective({ x: x[0], y: y[0], z: _1n });
   },
-  // TODO
-  caml_pasta_fp_plonk_verifier_index_shifts: function() {
-    return {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
-  },
-  caml_pasta_fq_plonk_verifier_index_shifts: function() {
-    return {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
-  },
-  caml_pasta_fp_domain_generator: function(_i) {
-    // TODO: this should take an int i <= 32 and return the primitive 2^ith root of unity, i.e. a number w with
-    // w^(2^i) = 1, w^(2^(i-1)) = -1
-    // computed by taking the 2^32th root and squaring 32-i times
-    return [_1n];
-  },
-  caml_pasta_fq_domain_generator: function(_i) {
-    return [_1n];
-  },
 };
-
-// Provides: startWorkers
-function startWorkers() {}
 
 // Provides: caml_bindings_debug
 var caml_bindings_debug = false;
@@ -600,7 +543,7 @@ var caml_bindings_debug = false;
 // TODO fix failing assertions
 // Provides: _test_js_backend
 // Requires: caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_bigint_from_hex_limbs, plonk_wasm, caml_bindings_debug
-var _test_js_backend = (caml_bindings_debug && function test() {
+var _test_js_backend = caml_bindings_debug && (function test() {
   var console = joo_global_object.console;
   console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);

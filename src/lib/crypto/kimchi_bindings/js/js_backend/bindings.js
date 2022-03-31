@@ -1,31 +1,6 @@
-/* global joo_global_object, plonk_wasm, caml_js_to_bool, caml_jsstring_of_string,
-    caml_string_of_jsstring
-    caml_create_bytes, caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length
+/* global plonk_wasm, caml_js_to_bool, caml_jsstring_of_string, caml_string_of_jsstring,
+   caml_bytes_of_uint8array, caml_bytes_to_uint8array
 */
-
-// Provides: caml_bytes_of_uint8array
-// Requires: caml_create_bytes, caml_bytes_unsafe_set
-var caml_bytes_of_uint8array = function(uint8array) {
-    var length = uint8array.length;
-    var ocaml_bytes = caml_create_bytes(length);
-    for (var i = 0; i < length; i++) {
-        // No need to convert here: OCaml Char.t is just an int under the hood.
-        caml_bytes_unsafe_set(ocaml_bytes, i, uint8array[i]);
-    }
-    return ocaml_bytes;
-};
-
-// Provides: caml_bytes_to_uint8array
-// Requires: caml_ml_bytes_length, caml_bytes_unsafe_get
-var caml_bytes_to_uint8array = function(ocaml_bytes) {
-    var length = caml_ml_bytes_length(ocaml_bytes);
-    var bytes = new joo_global_object.Uint8Array(length);
-    for (var i = 0; i < length; i++) {
-        // No need to convert here: OCaml Char.t is just an int under the hood.
-        bytes[i] = caml_bytes_unsafe_get(ocaml_bytes, i);
-    }
-    return bytes;
-};
 
 // Provides: caml_bigint_256_of_decimal_string
 // Requires: plonk_wasm, caml_jsstring_of_string
@@ -197,10 +172,6 @@ var caml_pasta_fp_to_bigint = plonk_wasm.caml_pasta_fp_to_bigint
 // Requires: plonk_wasm
 var caml_pasta_fp_of_bigint = plonk_wasm.caml_pasta_fp_of_bigint
 
-// Provides: caml_pasta_fp_domain_generator
-// Requires: plonk_wasm
-var caml_pasta_fp_domain_generator = plonk_wasm.caml_pasta_fp_domain_generator
-
 // Provides: caml_pasta_fp_random
 // Requires: plonk_wasm
 var caml_pasta_fp_random = plonk_wasm.caml_pasta_fp_random;
@@ -339,10 +310,6 @@ var caml_pasta_fq_to_bigint = plonk_wasm.caml_pasta_fq_to_bigint
 // Requires: plonk_wasm
 var caml_pasta_fq_of_bigint = plonk_wasm.caml_pasta_fq_of_bigint
 
-// Provides: caml_pasta_fq_domain_generator
-// Requires: plonk_wasm
-var caml_pasta_fq_domain_generator = plonk_wasm.caml_pasta_fq_domain_generator
-
 // Provides: caml_pasta_fq_random
 // Requires: plonk_wasm
 var caml_pasta_fq_random = plonk_wasm.caml_pasta_fq_random;
@@ -359,39 +326,6 @@ var caml_pasta_fq_to_bytes = function(x) {
 var caml_pasta_fq_of_bytes = function(ocaml_bytes) {
     return plonk_wasm.caml_pasta_fq_of_bytes(caml_bytes_to_uint8array(ocaml_bytes));
 };
-
-
-
-
-
-// Provides: caml_fp_vector_create
-var caml_fp_vector_create = function() { return []; };
-// Provides: caml_fp_vector_length
-var caml_fp_vector_length = function (v) { return v.length; };
-// Provides: caml_fp_vector_emplace_back
-var caml_fp_vector_emplace_back = function (v, x) { v.push(x); }
-// Provides: caml_fp_vector_get
-var caml_fp_vector_get = function (v, i) { return v[i]; }
-// Provides: caml_fp_vector_to_rust
-var caml_fp_vector_to_rust = function (v) { return v; }
-// Provides: caml_fp_vector_of_rust
-var caml_fp_vector_of_rust = function (v) { return v; }
-
-// Provides: caml_fq_vector_create
-var caml_fq_vector_create = function() { return []; };
-// Provides: caml_fq_vector_length
-var caml_fq_vector_length = function (v) { return v.length; };
-// Provides: caml_fq_vector_emplace_back
-var caml_fq_vector_emplace_back = function (v, x) { v.push(x); }
-// Provides: caml_fq_vector_get
-var caml_fq_vector_get = function (v, i) { return v[i]; }
-// Provides: caml_fq_vector_to_rust
-var caml_fq_vector_to_rust = function (v) { return v; }
-// Provides: caml_fq_vector_of_rust
-var caml_fq_vector_of_rust = function (v) { return v; }
-
-
-
 
 
 
@@ -468,22 +402,3 @@ var caml_vesta_endo_base = plonk_wasm.caml_vesta_endo_base;
 // Provides: caml_vesta_endo_scalar
 // Requires: plonk_wasm
 var caml_vesta_endo_scalar = plonk_wasm.caml_vesta_endo_scalar;
-
-
-
-// Provides: caml_plonk_verification_shifts_of_rust
-var caml_plonk_verification_shifts_of_rust = function(x) {
-    return [0, x.s0, x.s1, x.s2, x.s3, x.s4, x.s5, x.s6];
-};
-
-// Provides: caml_pasta_fp_plonk_verifier_index_shifts
-// Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust
-var caml_pasta_fp_plonk_verifier_index_shifts = function(log2_size) {
-    return caml_plonk_verification_shifts_of_rust(plonk_wasm.caml_pasta_fp_plonk_verifier_index_shifts(log2_size));
-};
-
-// Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust
-var caml_pasta_fq_plonk_verifier_index_shifts = function(log2_size) {
-    return caml_plonk_verification_shifts_of_rust(plonk_wasm.caml_pasta_fq_plonk_verifier_index_shifts(log2_size));
-};
