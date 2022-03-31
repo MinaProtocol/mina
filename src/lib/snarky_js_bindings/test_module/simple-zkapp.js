@@ -17,8 +17,8 @@ import {
 import cached from "./cached.js";
 
 await isReady;
-const initialBalance = 10_000_000_000;
 const transactionFee = 10_000_000;
+const initialBalance = 10_000_000_000 - transactionFee;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
