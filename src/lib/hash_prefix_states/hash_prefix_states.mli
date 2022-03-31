@@ -8,6 +8,12 @@ val signature_for_mainnet : Field.t State.t
 
 val signature_for_testnet : Field.t State.t
 
+val signature_legacy : Field.t Legacy.State.t
+
+val signature_for_mainnet_legacy : Field.t Legacy.State.t
+
+val signature_for_testnet_legacy : Field.t Legacy.State.t
+
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
     This function performs caching: all prefixes up to the given depth will be
@@ -57,7 +63,7 @@ val party_node : Field.t State.t
 
 val party_with_protocol_state_predicate : Field.t State.t
 
-val receipt_chain_user_command : Field.t State.t
+val receipt_chain_user_command : Field.t Legacy.State.t
 
 val receipt_chain_snapp : Field.t State.t
 
@@ -77,7 +83,7 @@ val merge_snark : Field.t State.t
 
 val base_snark : Field.t State.t
 
-val snapp_uri : Field.t State.t
+val zkapp_uri : Field.t State.t
 
 val snapp_event : Field.t State.t
 

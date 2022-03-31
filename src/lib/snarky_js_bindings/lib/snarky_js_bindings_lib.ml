@@ -1816,7 +1816,7 @@ module Ledger = struct
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
-    ; set_snapp_uri = None
+    ; set_zkapp_uri = None
     ; edit_sequence_state = None
     ; set_token_symbol = None
     ; increment_nonce = None
@@ -2076,7 +2076,7 @@ module Ledger = struct
     ; verification_key =
         set_or_keep verification_key_with_hash u##.verificationKey
     ; permissions = Keep
-    ; snapp_uri = Keep
+    ; zkapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
@@ -2364,7 +2364,7 @@ module Ledger = struct
                          { With_hash.data = None; hash = Field.Constant.zero }))
               }
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
-        ; snapp_uri =
+        ; zkapp_uri =
             keep
               (Mina_base.Data_as_hash.make_unsafe Field.zero
                  (As_prover.Ref.create (fun () -> "")))
@@ -2614,7 +2614,7 @@ module Ledger = struct
           (Command (Parties (parties p)))
         |> Or_error.ok_exn |> ignore) ;
 
-    let full = Parties.deriver @@ Fields_derivers_snapps.Derivers.o () in
+    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
     let parties_to_json ps =
       parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
     in

@@ -205,9 +205,9 @@ let permissions_from_update (update : Party.Update.t) ~auth =
       ( if Snapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions
       else auth )
-  ; set_snapp_uri =
-      ( if Snapp_basic.Set_or_keep.is_keep update.snapp_uri then
-        default.set_snapp_uri
+  ; set_zkapp_uri =
+      ( if Snapp_basic.Set_or_keep.is_keep update.zkapp_uri then
+        default.set_zkapp_uri
       else auth )
   ; set_token_symbol =
       ( if Snapp_basic.Set_or_keep.is_keep update.token_symbol then

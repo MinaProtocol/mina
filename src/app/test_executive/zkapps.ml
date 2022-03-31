@@ -55,8 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
         end in
         network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
-         ~hard_timeout:(Slots 10)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
+         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -152,7 +152,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
-        ; set_snapp_uri = Proof
+        ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
         }
@@ -209,7 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
       in
-      let new_snapp_uri = "https://www.minaprotocol.com" in
+      let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
       let snapp_update : Party.Update.t =
@@ -217,7 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
         ; permissions = Set new_permissions
-        ; snapp_uri = Set new_snapp_uri
+        ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
         ; timing = (* timing can't be updated for an existing account *)
                    Keep
@@ -323,8 +323,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         compatible requested_update.permissions ledger_update.permissions
           ~equal:Mina_base.Permissions.equal
       in
-      let snapp_uris_compat =
-        compatible requested_update.snapp_uri ledger_update.snapp_uri
+      let zkapp_uris_compat =
+        compatible requested_update.zkapp_uri ledger_update.zkapp_uri
           ~equal:String.equal
       in
       let token_symbols_compat =
@@ -344,7 +344,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegates_compat
         ; verification_keys_compat
         ; permissions_compat
-        ; snapp_uris_compat
+        ; zkapp_uris_compat
         ; token_symbols_compat
         ; timings_compat
         ; voting_fors_compat
@@ -354,7 +354,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_snapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
