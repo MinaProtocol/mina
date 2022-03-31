@@ -482,9 +482,11 @@ let%test_module "account timing check" =
                   ( match With_status.status txn_applied.common.user_command with
                   | Applied _ ->
                       ()
-                  | Failed (failure, _balance_data) ->
+                  | Failed (failures, _balance_data) ->
                       failwithf "Transaction failed: %s"
-                        (Transaction_status.Failure.to_string failure)
+                        ( List.map (List.concat failures) ~f:(fun failure ->
+                              Transaction_status.Failure.to_string failure)
+                        |> String.concat ~sep:"," )
                         () ) ;
                   check_transaction_snark ~txn_global_slot:slot ledger_copy txn
               | Error err ->
