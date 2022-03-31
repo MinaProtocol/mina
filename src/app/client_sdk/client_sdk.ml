@@ -47,7 +47,7 @@ let _ =
              other_parties
            |> Parties.Call_forest.accumulate_hashes
                 ~hash_party:(fun (p : Party.t) ->
-                  Party.Predicated.digest p.data)
+                  Parties.Digest.Party.create p.data)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =
@@ -67,7 +67,8 @@ let _ =
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
-               Party.Predicated.(digest (of_fee_payer fee_payer.data))
+               (Parties.Digest.Party.create
+                  (Party.Predicated.of_fee_payer fee_payer.data))
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
