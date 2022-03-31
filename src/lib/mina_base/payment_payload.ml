@@ -1,7 +1,5 @@
 (* payment_payload.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Signature_lib
 module Amount = Currency.Amount
@@ -36,8 +34,6 @@ let dummy =
     ; amount = Amount.zero
     }
 
-[%%ifdef consensus_mechanism]
-
 type var = (Public_key.Compressed.var, Amount.var) Poly.t
 
 let var_of_t ({ source_pk; receiver_pk; amount } : t) : var =
@@ -45,8 +41,6 @@ let var_of_t ({ source_pk; receiver_pk; amount } : t) : var =
   ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
   ; amount = Amount.var_of_t amount
   }
-
-[%%endif]
 
 let gen_aux ?source_pk ~max_amount =
   let open Quickcheck.Generator.Let_syntax in

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 open Tuple_lib
@@ -58,8 +56,6 @@ module type S_unchecked = sig
 
   val fold : t -> bool Triple.t Fold.t
 end
-
-[%%ifdef consensus_mechanism]
 
 module type S_checked = sig
   type unchecked
@@ -133,19 +129,13 @@ module type S_checked = sig
   end
 end
 
-[%%endif]
-
 module type S = sig
   include S_unchecked
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : S_checked with type unchecked := t
 
   (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
-
-  [%%endif]
 end
 
 module type UInt32 = sig
@@ -193,12 +183,8 @@ module type F = functor
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits
 
-[%%ifdef consensus_mechanism]
-
 module type F_checked = functor
   (N : Unsigned_extended.S)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S_checked with type unchecked := N.t
 [@@warning "-67"]
-
-[%%endif]

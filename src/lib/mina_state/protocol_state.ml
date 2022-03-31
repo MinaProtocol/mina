@@ -2,12 +2,7 @@
 
 open Core_kernel
 open Mina_base
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 module Poly = struct
   [%%versioned
@@ -67,8 +62,6 @@ module Body = struct
     ('state_hash, 'blockchain_state, 'consensus_state, 'constants) Poly.t
 
   type value = Value.t [@@deriving sexp, yojson]
-
-  [%%ifdef consensus_mechanism]
 
   type var =
     ( State_hash.var
@@ -141,8 +134,6 @@ module Body = struct
     ; next_epoch_data = C.next_epoch_data_var cs
     }
 
-  [%%endif]
-
   let hash s =
     Random_oracle.hash ~init:Hash_prefix.protocol_state_body
       (Random_oracle.pack_input (to_input s))
@@ -180,11 +171,7 @@ end
 
 type value = Value.t [@@deriving sexp, yojson]
 
-[%%ifdef consensus_mechanism]
-
 type var = (State_hash.var, Body.var) Poly.t
-
-[%%endif]
 
 module Proof = Proof
 module Hash = State_hash
@@ -221,8 +208,6 @@ let consensus_state
 let constants { Poly.Stable.Latest.body = { Body.Poly.constants; _ }; _ } =
   constants
 
-[%%ifdef consensus_mechanism]
-
 let create_var = create'
 
 let data_spec ~constraint_constants =
@@ -255,8 +240,6 @@ let genesis_state_hash_checked ~state_hash state =
     genesis state*)
   State_hash.if_ is_genesis ~then_:state_hash
     ~else_:state.body.genesis_state_hash
-
-[%%endif]
 
 let hashes = hashes_abstract ~hash_body:Body.hash
 

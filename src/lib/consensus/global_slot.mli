@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 module Poly : sig
@@ -61,8 +59,6 @@ val of_time_exn : constants:Constants.t -> Block_time.t -> t
 
 val diff : constants:Constants.t -> t -> Epoch.t * Slot.t -> t
 
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
 module Checked : sig
@@ -85,8 +81,6 @@ module Checked : sig
 end
 
 val typ : (Checked.t, t) Typ.t
-
-[%%endif]
 
 val slot_number : ('a, _) Poly.t -> 'a
 

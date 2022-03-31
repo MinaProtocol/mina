@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_import
 open Mina_numbers

@@ -1,12 +1,8 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
 open Snark_bits
-
-[%%ifdef consensus_mechanism]
 
 module Make_checked
     (N : Unsigned_extended.S)
@@ -181,8 +177,6 @@ struct
   let zero = Field.Var.constant Field.zero
 end
 
-[%%endif]
-
 open Snark_params.Tick
 
 module Make (N : sig
@@ -207,14 +201,10 @@ struct
 
   let sub x y = if x < y then None else Some (N.sub x y)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Make_checked (N) (Bits)
 
   (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
-
-  [%%endif]
 
   module Bits = Bits
 

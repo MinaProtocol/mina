@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 module T = Mina_numbers.Length
@@ -75,8 +73,6 @@ let to_input (t : value) =
      ; Block_time.to_input t.genesis_state_timestamp
     |]
 
-[%%if defined consensus_mechanism]
-
 type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
 let data_spec =
@@ -124,5 +120,3 @@ let%test_unit "value = var" =
   in
   Quickcheck.test ~trials:100 Value.gen ~examples:[ value_of_t compiled ]
     ~f:test
-
-[%%endif]

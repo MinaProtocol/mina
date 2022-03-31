@@ -3,15 +3,7 @@
 open Core_kernel
 open Snark_params.Tick
 
-[%%ifdef consensus_mechanism]
-
 let parity y = Bigint.(test_bit (of_field y) 0)
-
-[%%else]
-
-let parity y = Field.parity y
-
-[%%endif]
 
 let gen_uncompressed =
   Quickcheck.Generator.filter_map Field.gen_uniform ~f:(fun x ->
@@ -126,8 +118,6 @@ module Compressed = struct
     ; bitstrings = [| [ is_odd ] |]
     }
 
-  [%%ifdef consensus_mechanism]
-
   (* snarky-dependent *)
 
   type var = (Field.Var.t, Boolean.var) Poly.t
@@ -172,7 +162,6 @@ module Compressed = struct
   end
 
   (* end snarky-dependent *)
-  [%%endif]
 end
 
 module Uncompressed = struct
@@ -268,8 +257,6 @@ module Uncompressed = struct
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk))
 
-  [%%ifdef consensus_mechanism]
-
   (* snarky-dependent *)
 
   type var = Field.Var.t * Field.Var.t
@@ -308,7 +295,6 @@ module Uncompressed = struct
     { Poly.x; is_odd }
 
   (* end snarky-dependent *)
-  [%%endif]
 end
 
 include Uncompressed

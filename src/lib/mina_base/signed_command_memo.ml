@@ -1,7 +1,5 @@
 (* signed_command_memo.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 
@@ -208,8 +206,6 @@ let to_string_hum (memo : t) =
       | Error _ ->
           "(Invalid memo, neither text nor a digest)" )
 
-[%%ifdef consensus_mechanism]
-
 module Boolean = Tick.Boolean
 module Typ = Tick.Typ
 
@@ -236,8 +232,6 @@ let typ : (Checked.t, t) Typ.t =
     (Typ.array ~length:length_in_bits Boolean.typ)
     ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
     ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
-
-[%%endif]
 
 let deriver obj =
   Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
@@ -273,8 +267,6 @@ let%test_module "user_command_memo" =
         false
       with Too_long_user_memo_input -> true
 
-    [%%ifdef consensus_mechanism]
-
     let%test_unit "typ is identity" =
       let s = "this is a string" in
       let memo = create_by_digesting_string_exn s in
@@ -292,6 +284,4 @@ let%test_module "user_command_memo" =
         Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
       in
       [%test_eq: string] memo memo_read
-
-    [%%endif]
   end )

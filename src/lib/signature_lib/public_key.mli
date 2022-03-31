@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -18,8 +16,6 @@ end
 
 include Comparable.S_binable with type t := t
 
-[%%ifdef consensus_mechanism]
-
 type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
@@ -27,8 +23,6 @@ val typ : (var, t) Typ.t
 val var_of_t : t -> var
 
 val assert_equal : var -> var -> unit Checked.t
-
-[%%endif]
 
 val of_private_key_exn : Private_key.t -> t
 
@@ -82,8 +76,6 @@ module Compressed : sig
 
   val of_base58_check : string -> t Or_error.t
 
-  [%%ifdef consensus_mechanism]
-
   type var = (Field.Var.t, Boolean.var) Poly.t
 
   val typ : (var, t) Typ.t
@@ -104,8 +96,6 @@ module Compressed : sig
       val equal : var -> var -> unit Checked.t
     end
   end
-
-  [%%endif]
 end
 
 val gen : t Quickcheck.Generator.t
@@ -123,10 +113,6 @@ val decompress_exn : Compressed.t -> t
 (** Same as [Compressed.of_base58_check_exn] except that [of_base58_check_decompress_exn] fails if [decompress_exn] fails *)
 val of_base58_check_decompress_exn : string -> Compressed.t
 
-[%%ifdef consensus_mechanism]
-
 val compress_var : var -> Compressed.var Checked.t
 
 val decompress_var : Compressed.var -> var Checked.t
-
-[%%endif]

@@ -63,8 +63,6 @@ module Index = struct
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
-  [%%ifdef consensus_mechanism]
-
   module Unpacked = struct
     type var = Tick.Boolean.var list
 
@@ -79,8 +77,6 @@ module Index = struct
         (Typ.list ~length:ledger_depth Boolean.typ)
         ~there:(to_bits ~ledger_depth) ~back:of_bits
   end
-
-  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -181,8 +177,6 @@ module Token_symbol = struct
   let to_input (x : t) =
     Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t
 
   let range_check (t : var) =
@@ -213,8 +207,6 @@ module Token_symbol = struct
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
-
-  [%%endif]
 end
 
 module Poly = struct
@@ -486,8 +478,6 @@ let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
 
-[%%ifdef consensus_mechanism]
-
 type var =
   ( Public_key.Compressed.var
   , Token_id.Checked.t
@@ -695,8 +685,6 @@ module Checked = struct
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
 end
-
-[%%endif]
 
 let digest = crypto_hash
 

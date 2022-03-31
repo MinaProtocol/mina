@@ -1,16 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Pickles.Impls.Step.Internal_Basic
-
-[%%else]
-
-open Snark_params.Tick
-
-[%%endif]
 
 module State = struct
   include Array
@@ -59,8 +48,6 @@ let pow2 =
   let rec pow2 acc n = if n = 0 then acc else pow2 Field.(acc + acc) (n - 1) in
   Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   module Inputs = Pickles.Step_main_inputs.Sponge.Permutation
 
@@ -102,8 +89,6 @@ let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
 let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
  fun _ -> read_typ input
 
-[%%endif]
-
 let pack_input = Input.Chunked.pack_to_fields ~pow2 (module Field)
 
 let prefix_to_field (s : string) =
@@ -124,8 +109,6 @@ let%test_unit "iterativeness" =
   in
   [%test_eq: Field.t array] s_full s_it
 
-[%%ifdef consensus_mechanism]
-
 let%test_unit "sponge checked-unchecked" =
   let open Pickles.Impls.Step in
   let module T = Internal_Basic in
@@ -137,8 +120,6 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> make_checked (fun () -> Checked.hash [| x; y |]))
     (fun (x, y) -> hash [| x; y |])
     (x, y)
-
-[%%endif]
 
 module Legacy = struct
   module Input = Random_oracle_input.Legacy
@@ -184,8 +165,6 @@ module Legacy = struct
     Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
 
   module Digest = Digest
-
-  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     let pack_input =
@@ -238,6 +217,4 @@ module Legacy = struct
     let hash ?init xs =
       hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
   end
-
-  [%%endif]
 end

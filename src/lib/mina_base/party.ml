@@ -1,14 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers

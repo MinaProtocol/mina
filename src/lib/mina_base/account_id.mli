@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_import
 
@@ -27,8 +25,6 @@ module Digest : sig
 
   val gen_non_default : t Quickcheck.Generator.t
 
-  [%%ifdef consensus_mechanism]
-
   module Checked : sig
     open Pickles.Impls.Step
 
@@ -50,8 +46,6 @@ module Digest : sig
   end
 
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
-
-  [%%endif]
 end
 
 [%%versioned:
@@ -79,8 +73,6 @@ include Comparable.S with type t := t
 
 include Hashable.S_binable with type t := t
 
-[%%ifdef consensus_mechanism]
-
 type var
 
 val typ : (var, t) Snark_params.Tick.Typ.t
@@ -104,5 +96,3 @@ module Checked : sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
-
-[%%endif]

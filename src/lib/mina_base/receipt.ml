@@ -1,7 +1,5 @@
 (* receipt.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module B58_lib = Base58_check
 open Snark_params.Tick
@@ -60,8 +58,6 @@ module Chain_hash = struct
     |> hash ~init:Hash_prefix.receipt_chain_user_command
     |> of_hash
 
-  [%%if defined consensus_mechanism]
-
   module Checked = struct
     module Elt = struct
       type t =
@@ -119,6 +115,4 @@ module Chain_hash = struct
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
         assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t))
-
-  [%%endif]
 end

@@ -1,12 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 module Poly = struct
   [%%versioned
@@ -34,8 +27,6 @@ end]
 
 let to_field_elements : t -> _ = Poly.to_field_elements
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t = Parties.Transaction_commitment.Checked.t Poly.t
 
@@ -56,5 +47,3 @@ let typ =
     Parties.Transaction_commitment.[ typ; typ ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]

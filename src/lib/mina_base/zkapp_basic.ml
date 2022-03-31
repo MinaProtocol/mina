@@ -1,15 +1,9 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 let field_of_bool = Mina_base_util.field_of_bool
 
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 open Signature_lib
-
-[%%endif]
 
 let int_to_bits ~length x = List.init length ~f:(fun i -> (x lsr i) land 1 = 1)
 
@@ -28,25 +22,17 @@ module Transition = struct
   let to_input { prev; next } ~f =
     Random_oracle_input.Chunked.append (f prev) (f next)
 
-  [%%ifdef consensus_mechanism]
-
   let typ t =
     Typ.of_hlistable [ t; t ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-  [%%endif]
 end
 
 module Flagged_data = struct
   type ('flag, 'a) t = { flag : 'flag; data : 'a } [@@deriving hlist, fields]
 
-  [%%ifdef consensus_mechanism]
-
   let typ flag t =
     Typ.of_hlistable [ flag; t ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-  [%%endif]
 
   let to_input' { flag; data } ~flag:f ~data:d =
     Random_oracle_input.Chunked.(append (f flag) (d data))
@@ -74,8 +60,6 @@ module Flagged_option = struct
 
   let map ~f { is_some; data } = { is_some; data = f data }
 
-  [%%ifdef consensus_mechanism]
-
   let if_ ~(if_ : 'b -> then_:'var -> else_:'var -> 'var) b ~then_ ~else_ =
     { is_some =
         Run.run_checked
@@ -89,8 +73,6 @@ module Flagged_option = struct
 
   let option_typ ~default t =
     Typ.transport (typ t) ~there:(of_option ~default) ~back:to_option
-
-  [%%endif]
 end
 
 module Set_or_keep = struct
@@ -128,8 +110,6 @@ module Set_or_keep = struct
       let%bind a = gen_a in
       return (Set a)
     else return Keep
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -209,8 +189,6 @@ module Set_or_keep = struct
 
   let optional_typ = Checked.optional_typ
 
-  [%%endif]
-
   let to_input t ~dummy:default ~f =
     Flagged_option.to_input ~default ~f ~field_of_bool
       (Flagged_option.of_option ~default (to_option t))
@@ -243,8 +221,6 @@ module Or_ignore = struct
     iso ~map:of_option ~contramap:to_option
       ((option @@ inner @@ o ()) (o ()))
       obj
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -313,8 +289,6 @@ module Or_ignore = struct
   let typ_implicit = Checked.typ_implicit
 
   let typ_explicit = Checked.typ_explicit
-
-  [%%endif]
 end
 
 module Account_state = struct
@@ -361,8 +335,6 @@ module Account_state = struct
     | _ ->
         Or_error.error_string "Bad account_type"
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = struct
     open Pickles.Impls.Step
 
@@ -384,11 +356,7 @@ module Account_state = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
     |> Typ.transport ~there:encode ~back:decode
-
-  [%%endif]
 end
-
-[%%ifdef consensus_mechanism]
 
 module F = Pickles.Backend.Tick.Field
 
@@ -402,9 +370,3 @@ let invalid_public_key : Public_key.Compressed.t Lazy.t =
     if not (is_square (f i)) then { x = i; is_odd = false } else go (i + one)
   in
   lazy (go zero)
-
-[%%else]
-
-module F = Snark_params.Tick.Field
-
-[%%endif]

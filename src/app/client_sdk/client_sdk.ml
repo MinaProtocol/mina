@@ -1,7 +1,5 @@
 (* client_sdk.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Js_of_ocaml
 open Signature_lib
 open Mina_base

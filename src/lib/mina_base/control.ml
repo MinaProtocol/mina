@@ -1,9 +1,4 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-(* TODO: temporary hack *)
-[%%ifdef consensus_mechanism]
 
 [%%versioned
 module Stable = struct
@@ -30,40 +25,6 @@ let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
         let dummy_signature = Signature Signature.dummy in
         [ dummy_proof; dummy_signature; None_given ]))
 
-[%%else]
-
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type t = Proof of unit | Signature of Signature.Stable.V1.t | None_given
-    [@@deriving sexp, equal, yojson, hash, compare]
-
-    let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      | Proof of unit
-      | Signature of Signature.Stable.V1.t
-      | Both of { signature : Signature.Stable.V1.t; proof : unit }
-      | None_given
-    [@@deriving sexp, equal, yojson, hash, compare]
-
-    let to_latest : t -> V2.t = function
-      | Proof proof ->
-          Proof proof
-      | Signature signature ->
-          Signature signature
-      | None_given ->
-          None_given
-      | Both _ ->
-          failwith
-            "Control.Stable.V1.to_latest: Both variant is no longer supported"
-  end
-end]
-
-[%%endif]
-
 module Tag = struct
   type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
 
@@ -77,8 +38,6 @@ let tag : t -> Tag.t = function
       Signature
   | None_given ->
       None_given
-
-[%%ifdef consensus_mechanism]
 
 let dummy_of_tag : Tag.t -> t = function
   | Proof ->
@@ -136,5 +95,3 @@ let%test_unit "json rountrip" =
   let full = deriver (Fd.o ()) in
   let control = dummy_of_tag Proof in
   [%test_eq: t] control (control |> Fd.to_json full |> Fd.of_json full)
-
-[%%endif]

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 open Zkapp_basic
@@ -11,14 +9,10 @@ module Events = struct
 
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
 
-    [%%ifdef consensus_mechanism]
-
     type var = Field.Var.t array
 
     let hash_var (x : Field.Var.t array) =
       Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
-
-    [%%endif]
   end
 
   type t = Event.t list
@@ -33,8 +27,6 @@ module Events = struct
   let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
 
   let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
-
-  [%%ifdef consensus_mechanism]
 
   type var = t Data_as_hash.t
 
@@ -79,8 +71,6 @@ module Events = struct
          [| Data_as_hash.hash events; Event.hash_var e |])
       (Data_as_hash.hash res) ;
     res
-
-  [%%endif]
 end
 
 module Sequence_events = struct
@@ -92,13 +82,9 @@ module Sequence_events = struct
 
   let push_events acc events = push_hash acc (Events.hash events)
 
-  [%%ifdef consensus_mechanism]
-
   let push_events_checked x (e : Events.var) =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_sequence_events
       [| x; Data_as_hash.hash e |]
-
-  [%%endif]
 end
 
 module Poly = struct
@@ -163,8 +149,6 @@ let digest_vk (t : Side_loaded_verification_key.t) =
 
 let dummy_vk_hash =
   Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
-
-[%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t =
@@ -233,8 +217,6 @@ let typ : (Checked.t, t) Typ.t =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]
 
 let to_input (t : t) =
   let open Random_oracle.Input.Chunked in

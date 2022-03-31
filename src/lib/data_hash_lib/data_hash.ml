@@ -1,15 +1,9 @@
 (* data_hash.ml *)
-
 [%%import "/src/config.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
-
-[%%ifdef consensus_mechanism]
-
 open Bitstring_lib
-
-[%%endif]
 
 module type Full_size = Data_hash_intf.Full_size
 
@@ -29,8 +23,6 @@ struct
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
   let to_input t = Random_oracle.Input.Chunked.field t
-
-  [%%ifdef consensus_mechanism]
 
   (* this is in consensus code, because Bigint comes
      from snarky functors
@@ -100,8 +92,6 @@ struct
     Typ.transport_var Typ.field
       ~there:(fun { digest; bits = _ } -> digest)
       ~back:(fun digest -> { digest; bits = None })
-
-  [%%endif]
 end
 
 module T0 = struct
@@ -173,8 +163,6 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
-  [%%ifdef consensus_mechanism]
-
   let var_of_hash_packed digest = { digest; bits = None }
 
   let if_ cond ~then_ ~else_ =
@@ -182,6 +170,4 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
     { digest; bits = None }
-
-  [%%endif]
 end

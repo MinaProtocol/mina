@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -26,8 +24,6 @@ let to_input t =
         [ false; account_disabled ]
   in
   Random_oracle.Input.Chunked.packed (Field.project bs, List.length bs)
-
-[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -79,8 +75,6 @@ let typ : (var, t) Typ.t =
 let var_to_input { token_owner; token_locked } =
   let bs = [ token_owner; token_locked ] in
   Random_oracle.Input.Chunked.packed (Field.Var.project bs, List.length bs)
-
-[%%endif]
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in

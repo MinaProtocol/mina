@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_bits
 open Snark_params.Tick
@@ -50,8 +48,6 @@ module type Basic = sig
 
   val of_uint64 : uint64 -> t
 
-  [%%ifdef consensus_mechanism]
-
   type var
 
   val typ : (var, t) Typ.t
@@ -69,8 +65,6 @@ module type Basic = sig
   val equal_var : var -> var -> Boolean.var Checked.t
 
   val pack_var : var -> Field.Var.t
-
-  [%%endif]
 end
 
 module type Arithmetic_intf = sig
@@ -96,11 +90,7 @@ module type Signed_intf = sig
 
   type signed_fee
 
-  [%%ifdef consensus_mechanism]
-
   type magnitude_var
-
-  [%%endif]
 
   type t = (magnitude, Sgn.t) Signed_poly.t
   [@@deriving sexp, hash, compare, equal, yojson]
@@ -139,8 +129,6 @@ module type Signed_intf = sig
   val to_fee : t -> signed_fee
 
   val of_fee : signed_fee -> t
-
-  [%%ifdef consensus_mechanism]
 
   type var (* = (magnitude_var, Sgn.var) Signed_poly.t *)
 
@@ -187,11 +175,7 @@ module type Signed_intf = sig
 
     type t = var
   end
-
-  [%%endif]
 end
-
-[%%ifdef consensus_mechanism]
 
 module type Checked_arithmetic_intf = sig
   type value
@@ -241,14 +225,10 @@ module type Checked_arithmetic_intf = sig
   val scale : Field.Var.t -> var -> var Checked.t
 end
 
-[%%endif]
-
 module type S = sig
   include Basic
 
   include Arithmetic_intf with type t := t
-
-  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
@@ -258,12 +238,6 @@ module type S = sig
       with type var := var
        and type signed_var := Signed.var
        and type value := t
-
-  [%%else]
-
-  module Signed : Signed_intf with type magnitude := t
-
-  [%%endif]
 
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end

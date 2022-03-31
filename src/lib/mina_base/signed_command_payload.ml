@@ -1,7 +1,5 @@
 (* user_command_payload.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 open Signature_lib
@@ -20,16 +18,12 @@ module Legacy_token_id = struct
     let one = true :: List.init 63 ~f:(fun _ -> false) in
     Random_oracle_input.Legacy.bitstring one
 
-  [%%ifdef consensus_mechanism]
-
   let default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
       =
     { field_elements = Array.map default.field_elements ~f:Field.Var.constant
     ; bitstrings =
         Array.map default.bitstrings ~f:(List.map ~f:Boolean.var_of_value)
     }
-
-  [%%endif]
 end
 
 module Common = struct
@@ -106,8 +100,6 @@ module Common = struct
     in
     Poly.{ fee; fee_payer_pk; nonce; valid_until; memo }
 
-  [%%ifdef consensus_mechanism]
-
   type var =
     ( Currency.Fee.var
     , Public_key.Compressed.var
@@ -152,8 +144,6 @@ module Common = struct
              (Array.to_list (memo :> Boolean.var array))
         |]
   end
-
-  [%%endif]
 end
 
 module Body = struct

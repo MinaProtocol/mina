@@ -68,11 +68,7 @@ module Raw = struct
         [%test_eq: t option] (Some signature) (encode signature |> decode))
 end
 
-[%%ifdef consensus_mechanism]
-
 type var = Field.Var.t * Inner_curve.Scalar.var
-
-[%%endif]
 
 [%%define_locally
 Stable.Latest.

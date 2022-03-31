@@ -1,7 +1,5 @@
 (* receipt.mli *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -24,8 +22,6 @@ module Chain_hash : sig
 
   val cons : Elt.t -> t -> t
 
-  [%%ifdef consensus_mechanism]
-
   val gen : t Quickcheck.Generator.t
 
   module Checked : sig
@@ -43,8 +39,6 @@ module Chain_hash : sig
 
     val cons : Elt.t -> t -> t Checked.t
   end
-
-  [%%endif]
 
   [%%versioned:
   module Stable : sig

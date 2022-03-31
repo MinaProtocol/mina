@@ -1,7 +1,5 @@
 (* user_command_intf.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Mina_base_import
 open Core_kernel
 open Snark_params.Tick

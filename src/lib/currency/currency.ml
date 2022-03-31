@@ -1,23 +1,13 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_bits
 open Snark_params
 open Tick
-
-[%%ifdef consensus_mechanism]
-
 open Bitstring_lib
 open Let_syntax
-
-[%%endif]
-
 open Intf
 module Signed_poly = Signed_poly
 
 type uint64 = Unsigned.uint64
-
-[%%ifdef consensus_mechanism]
 
 module Signed_var = struct
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
@@ -26,8 +16,6 @@ module Signed_var = struct
   type nonrec 'mag t =
     { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
 end
-
-[%%endif]
 
 module Make (Unsigned : sig
   include Unsigned_extended.S
@@ -38,8 +26,6 @@ module Make (Unsigned : sig
 end) (M : sig
   val length : int
 end) : sig
-  [%%ifdef consensus_mechanism]
-
   include
     S
       with type t = Unsigned.t
@@ -49,15 +35,6 @@ end) : sig
        and type Signed.Checked.signed_fee_var = Field.Var.t Signed_var.t
 
   val pack_var : var -> Field.Var.t
-
-  [%%else]
-
-  include
-    S
-      with type t = Unsigned.t
-       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
-
-  [%%endif]
 
   val scale : t -> int -> t option
 end = struct
@@ -149,8 +126,6 @@ end = struct
   module B = Bits.Vector.Make (Vector)
 
   include (B : Bits_intf.Convertible_bits with type t := t)
-
-  [%%ifdef consensus_mechanism]
 
   type var = Field.Var.t
 
@@ -327,8 +302,6 @@ end = struct
       { Field.typ with check = range_check }
       ~there:to_field ~back:of_field
 
-  [%%endif]
-
   let zero = Unsigned.zero
 
   let one = Unsigned.one
@@ -479,8 +452,6 @@ end = struct
     let to_fee = Fn.id
 
     let of_fee = Fn.id
-
-    [%%ifdef consensus_mechanism]
 
     type signed_fee = t
 
@@ -706,11 +677,7 @@ end = struct
 
       let of_fee = Fn.id
     end
-
-    [%%endif]
   end
-
-  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     module N = Mina_numbers.Nat.Make_checked (Unsigned) (B)
@@ -919,8 +886,6 @@ end = struct
                           num (to_formatted_string num)))))
       end )
   end
-
-  [%%endif]
 end
 
 let currency_length = 64
@@ -960,20 +925,12 @@ module Amount = struct
         let length = currency_length
       end)
 
-  [%%ifdef consensus_mechanism]
-
   include (
     T :
       module type of T
         with type var = T.var
          and module Signed = T.Signed
          and module Checked := T.Checked )
-
-  [%%else]
-
-  include (T : module type of T with module Signed = T.Signed)
-
-  [%%endif]
 
   [%%versioned
   module Stable = struct
@@ -995,8 +952,6 @@ module Amount = struct
 
   let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = struct
     include T.Checked
 
@@ -1008,8 +963,6 @@ module Amount = struct
       let of_field : Field.Var.t -> var = Fn.id
     end
   end
-
-  [%%endif]
 end
 
 module Balance = struct
@@ -1026,15 +979,7 @@ module Balance = struct
     end
   end]
 
-  [%%ifdef consensus_mechanism]
-
   include (Amount : Basic with type t := t with type var = Amount.var)
-
-  [%%else]
-
-  include (Amount : Basic with type t := t)
-
-  [%%endif]
 
   let to_amount = Fn.id
 
@@ -1051,8 +996,6 @@ module Balance = struct
   let ( + ) = add_amount
 
   let ( - ) = sub_amount
-
-  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     include Amount.Checked
@@ -1079,8 +1022,6 @@ module Balance = struct
 
     let ( - ) = sub_amount
   end
-
-  [%%endif]
 end
 
 module Fee_rate = struct
@@ -1168,8 +1109,6 @@ end
 
 let%test_module "sub_flagged module" =
   ( module struct
-    [%%ifdef consensus_mechanism]
-
     open Tick
 
     module type Sub_flagged_S = sig
@@ -1221,6 +1160,4 @@ let%test_module "sub_flagged module" =
     let%test_unit "fee sub_flagged" = run_test (module Fee)
 
     let%test_unit "amount sub_flagged" = run_test (module Amount)
-
-    [%%endif]
   end )

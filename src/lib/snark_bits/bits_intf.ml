@@ -1,7 +1,5 @@
 (* bits_intf.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Fold_lib
 
 module type Basic = sig
@@ -25,8 +23,6 @@ module type Convertible_bits = sig
 
   val of_bits : bool list -> t
 end
-
-[%%ifdef consensus_mechanism]
 
 open Tuple_lib
 
@@ -121,5 +117,3 @@ module Snarkable = struct
       -> Unpacked.var checked
   end
 end
-
-[%%endif]

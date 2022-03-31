@@ -1,13 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
-
-[%%ifdef consensus_mechanism]
-
 open Snark_bits
-
-[%%endif]
 
 module type Data_hash_descriptor = sig
   val version_byte : char
@@ -21,8 +14,6 @@ module type Basic = sig
   val to_decimal_string : t -> string
 
   val to_bytes : t -> string
-
-  [%%ifdef consensus_mechanism]
 
   val gen : t Quickcheck.Generator.t
 
@@ -47,8 +38,6 @@ module type Basic = sig
   *)
   include Bits_intf.S with type t := t
 
-  [%%endif]
-
   val to_base58_check : t -> string
 
   val of_base58_check : string -> t Base.Or_error.t
@@ -65,13 +54,9 @@ module type Full_size = sig
 
   include Hashable with type t := t
 
-  [%%ifdef consensus_mechanism]
-
   val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
   val var_of_hash_packed : Random_oracle.Checked.Digest.t -> var
-
-  [%%endif]
 
   val of_hash : Field.t -> t
 end

@@ -1,14 +1,7 @@
 (* transaction_union_tag.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 type t =
   | Payment
@@ -26,8 +19,6 @@ val gen : t Quickcheck.Generator.t
 val to_bits : t -> bool list
 
 val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
-
-[%%ifdef consensus_mechanism]
 
 module Bits : sig
   (** Bits-only representation. To be used for hashing, where the actual value
@@ -74,5 +65,3 @@ end
 val unpacked_of_t : t -> Unpacked.var
 
 val unpacked_typ : (Unpacked.var, t) Typ.t
-
-[%%endif]

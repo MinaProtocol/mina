@@ -84,16 +84,7 @@ module Constraint_constants = struct
   *)
   include (
     struct
-      [%%ifdef consensus_mechanism]
-
       [%%inject "sub_windows_per_window", sub_windows_per_window]
-
-      [%%else]
-
-      (* Invalid value, this should not be used by nonconsensus nodes. *)
-      let sub_windows_per_window = -1
-
-      [%%endif]
 
       [%%inject "ledger_depth", ledger_depth]
 

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Snark_params.Tick
 
 module Auth_required : sig
@@ -14,8 +12,6 @@ module Auth_required : sig
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
   val check : t -> Control.Tag.t -> bool
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type t
@@ -35,8 +31,6 @@ module Auth_required : sig
   end
 
   val typ : (Checked.t, t) Typ.t
-
-  [%%endif]
 end
 
 module Poly : sig
@@ -76,8 +70,6 @@ val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
-[%%ifdef consensus_mechanism]
-
 module Checked : sig
   type t = Auth_required.Checked.t Poly.Stable.Latest.t
 
@@ -89,8 +81,6 @@ module Checked : sig
 end
 
 val typ : (Checked.t, t) Typ.t
-
-[%%endif]
 
 val user_default : t
 

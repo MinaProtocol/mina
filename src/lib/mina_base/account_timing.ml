@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -113,8 +111,6 @@ let to_input t =
      ; Global_slot.to_input vesting_period
      ; Amount.to_input vesting_increment
     |]
-
-[%%ifdef consensus_mechanism]
 
 type var =
   (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
@@ -262,5 +258,3 @@ let if_ b ~(then_ : var) ~(else_ : var) =
     ; vesting_period
     ; vesting_increment
     }
-
-[%%endif]

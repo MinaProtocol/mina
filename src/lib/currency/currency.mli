@@ -1,10 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Intf
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
 module Signed_var : sig
@@ -14,8 +9,6 @@ module Signed_var : sig
   type nonrec 'mag t =
     { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
 end
-
-[%%endif]
 
 type uint64 = Unsigned.uint64
 
@@ -39,7 +32,6 @@ module Fee : sig
   include Codable.S with type t := t
 
   (* TODO: Get rid of signed fee, use signed amount *)
-  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf
@@ -47,17 +39,6 @@ module Fee : sig
        and type magnitude_var := var
        and type signed_fee := (t, Sgn.t) Signed_poly.t
        and type Checked.signed_fee_var := Field.Var.t Signed_var.t
-
-  [%%else]
-
-  module Signed :
-    Signed_intf
-      with type magnitude := t
-       and type signed_fee := (t, Sgn.t) Signed_poly.t
-
-  [%%endif]
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     include
@@ -68,8 +49,6 @@ module Fee : sig
 
     val add_signed : var -> Signed.var -> var Checked.t
   end
-
-  [%%endif]
 end
 [@@warning "-32"]
 
@@ -90,21 +69,12 @@ module Amount : sig
 
   include Codable.S with type t := t
 
-  [%%ifdef consensus_mechanism]
-
   module Signed :
     Signed_intf
       with type magnitude := t
        and type magnitude_var := var
        and type signed_fee := Fee.Signed.t
        and type Checked.signed_fee_var := Fee.Signed.Checked.t
-
-  [%%else]
-
-  module Signed :
-    Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
-
-  [%%endif]
 
   (* TODO: Delete these functions *)
 
@@ -113,8 +83,6 @@ module Amount : sig
   val to_fee : t -> Fee.t
 
   val add_fee : t -> Fee.t -> t option
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     include
@@ -133,8 +101,6 @@ module Amount : sig
       val of_field : Field.Var.t -> t
     end
   end
-
-  [%%endif]
 end
 [@@warning "-32"]
 
@@ -167,8 +133,6 @@ module Balance : sig
   val ( + ) : t -> Amount.t -> t option
 
   val ( - ) : t -> Amount.t -> t option
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type t = var
@@ -214,8 +178,6 @@ module Balance : sig
       val of_field : Field.Var.t -> var
     end
   end
-
-  [%%endif]
 end
 [@@warning "-32"]
 
