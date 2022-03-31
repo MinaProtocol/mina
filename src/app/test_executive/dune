@@ -10,6 +10,8 @@
    cmdliner
    base.caml
    async_unix
+   integers
+   unsigned_extended
    ;; local libraries
    with_hash
    data_hash_lib
@@ -33,7 +35,8 @@
    snark_params
    pickles.backend
    pipe_lib
-   integers
+   user_command_input
+   participating_state
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))
