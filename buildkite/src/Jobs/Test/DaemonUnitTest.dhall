@@ -30,7 +30,6 @@ Pipeline.build
     spec = 
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
         S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
         S.exactly "scripts/link-coredumps" "sh",

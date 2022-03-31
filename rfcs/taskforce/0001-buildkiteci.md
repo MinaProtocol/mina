@@ -30,7 +30,7 @@ friction points.
 We run the following sorts of jobs:
 
 1. Linting
-2. Non-consensus / Consensus compatibility
+2. Native / JavaScript compatibility
 3. Trace tool
 4. Update branch protection on GitHub (only on develop)
 5. Building the wallet + bots (macos)
@@ -40,7 +40,7 @@ We run the following sorts of jobs:
 9. Build client-sdk
 10. Artifact build
 11. Unit tests
-12. Nonconsensus unit tests
+12. JavaScript unit tests
 13. Various integration tests
 14. Nightly builds with larger configurations that we don't pay attention to
 

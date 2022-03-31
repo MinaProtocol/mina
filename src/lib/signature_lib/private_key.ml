@@ -22,9 +22,7 @@ module Stable = struct
   end
 
   module Tests = struct
-    (* these tests check not only whether the serialization of the version-asserted type has changed,
-       but also whether the serializations for the consensus and nonconsensus code are identical
-    *)
+    (* these tests check whether the serialization of the version-asserted type has changed *)
 
     [%%if curve_size = 255]
 

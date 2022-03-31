@@ -9,7 +9,6 @@ run_unit_tests_with_coverage() {
   fi
   NPROC=${NPROC:-$(nproc --all)} # Linux-specific
   # force to make sure all coverage files generated
-  # don't test nonconsensus code
   if [ -z $@ ] ; then
       echo "Creating coverage files for all libraries"
       dune runtest --instrument-with bisect_ppx --force src/lib --profile=${DUNE_PROFILE} -j${NPROC}
