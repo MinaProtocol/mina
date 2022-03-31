@@ -93,3 +93,27 @@ val create_from_string : string -> t Or_error.t
 (** convert a memo to a list of bools
  *)
 val to_bits : t -> bool list
+
+type raw =
+  | Digest of string  (** The digest of the string, encoded by base58-check *)
+  | Bytes of string  (** A string containing the raw bytes in the memo. *)
+
+(** Convert into a raw representation.
+
+    Raises if the tag or length are invalid.
+*)
+val to_raw_exn : t -> raw
+
+(** Convert back into the raw input bytes.
+
+    Raises if the tag or length are invalid, or if the memo was a digest.
+    Equivalent to [to_raw_exn] and then a match on [Bytes].
+*)
+val to_raw_bytes_exn : t -> string
+
+(** Convert from a raw representation.
+
+    Raises if the digest is not a valid base58-check string, or if the bytes
+    string is too long.
+*)
+val of_raw_exn : raw -> t

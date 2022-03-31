@@ -71,6 +71,34 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> nonce:Mina_numbers.Account_nonce.t
+        -> memo:string
+        -> token:Token_id.t
+        -> valid_until:Mina_numbers.Global_slot.t
+        -> raw_signature:string
+        -> signed_command_result Deferred.Or_error.t
+
+      val must_send_payment_with_raw_sig :
+           logger:Logger.t
+        -> t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
+        -> nonce:Mina_numbers.Account_nonce.t
+        -> memo:string
+        -> token:Token_id.t
+        -> valid_until:Mina_numbers.Global_slot.t
+        -> raw_signature:string
+        -> signed_command_result Malleable_error.t
+
       val send_delegation :
            logger:Logger.t
         -> t
@@ -100,17 +128,20 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      val get_balance :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+      type account_data =
+        { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
 
-      val must_get_balance :
+      val get_account_data :
            logger:Logger.t
         -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Malleable_error.t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_data Async_kernel.Deferred.Or_error.t
+
+      val must_get_account_data :
+           logger:Logger.t
+        -> t
+        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_data Malleable_error.t
 
       val get_peer_id :
            logger:Logger.t
@@ -262,6 +293,7 @@ module Dsl = struct
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
+      ; blocks_produced_by_node : State_hash.t list String.Map.t
       }
 
     val listen :
@@ -304,6 +336,7 @@ module Dsl = struct
       -> amount:Amount.t
       -> nonce:Unsigned.uint32
       -> command_type:command_type
+      -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
   end
 
