@@ -946,7 +946,7 @@ let gen_parties_from ?(succeed = true)
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
     Party.Predicated.of_fee_payer parties_dummy_signatures.fee_payer.data
-    |> Party.Predicated.digest
+    |> Parties.Digest.Party.create
   in
   let fee_payer_signature =
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key

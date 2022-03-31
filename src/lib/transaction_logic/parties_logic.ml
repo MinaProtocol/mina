@@ -195,8 +195,8 @@ module Local_state = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Parties.Digest.Stable.V1.t
-          , Parties.Digest.Stable.V1.t
+          ( Mina_base.Stack_frame.Digest.Stable.V1.t
+          , Mina_base.Call_stack_digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
@@ -215,8 +215,8 @@ module Local_state = struct
     open Pickles.Impls.Step
 
     type t =
-      ( Field.t
-      , Field.t
+      ( Stack_frame.Digest.Checked.t
+      , Call_stack_digest.Checked.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
       , Ledger_hash.var
@@ -580,6 +580,8 @@ end
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 
 module type Inputs_intf = sig
+  val with_label : label:string -> (unit -> 'a) -> 'a
+
   module Bool : Bool_intf
 
   module Field : Iffable with type bool := Bool.t
@@ -802,11 +804,13 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.equal party_caller (Stack_frame.caller current_forest)
     in
     let () =
-      let is_delegate_call =
-        Token_id.equal party_caller (Stack_frame.caller_caller current_forest)
-      in
-      (* Check that party has a valid caller. *)
-      assert_ Bool.(is_normal_call ||| is_delegate_call)
+      with_label ~label:"check valid caller" (fun () ->
+          let is_delegate_call =
+            Token_id.equal party_caller
+              (Stack_frame.caller_caller current_forest)
+          in
+          (* Check that party has a valid caller. *)
+          assert_ Bool.(is_normal_call ||| is_delegate_call))
     in
     (* Cases:
        - [party_forest] is empty, [remainder_of_current_forest] is empty.
@@ -922,23 +926,26 @@ module Make (Inputs : Inputs_intf) = struct
             (local_state.stack_frame, local_state.call_stack)
       in
       let party, remaining, call_stack =
-        (* TODO: Make the stack frame hashed inside of the local state *)
-        get_next_party to_pop call_stack
+        with_label ~label:"get next party" (fun () ->
+            (* TODO: Make the stack frame hashed inside of the local state *)
+            get_next_party to_pop call_stack)
       in
       let local_state =
-        let default_token_or_token_owner_was_caller =
-          (* Check that the token owner was consulted if using a non-default
-             token *)
-          let party_token_id = Party.token_id party in
-          Bool.( ||| )
-            (Token_id.equal party_token_id Token_id.default)
-            (Token_id.equal party_token_id (Party.caller party))
-        in
-        Local_state.add_check local_state Token_owner_not_caller
-          default_token_or_token_owner_was_caller
+        with_label ~label:"token owner not caller" (fun () ->
+            let default_token_or_token_owner_was_caller =
+              (* Check that the token owner was consulted if using a non-default
+                 token *)
+              let party_token_id = Party.token_id party in
+              Bool.( ||| )
+                (Token_id.equal party_token_id Token_id.default)
+                (Token_id.equal party_token_id (Party.caller party))
+            in
+            Local_state.add_check local_state Token_owner_not_caller
+              default_token_or_token_owner_was_caller)
       in
       let ((a, inclusion_proof) as acct) =
-        Inputs.Ledger.get_account party local_state.ledger
+        with_label ~label:"get account" (fun () ->
+            Inputs.Ledger.get_account party local_state.ledger)
       in
       Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
       let transaction_commitment, full_transaction_commitment =

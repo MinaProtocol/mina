@@ -244,7 +244,7 @@ module T = struct
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
-      ; local_state = Mina_state.Local_state.empty
+      ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
     in
@@ -281,7 +281,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -307,7 +307,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -516,7 +516,7 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let empty_local_state = Mina_state.Local_state.empty in
+    let empty_local_state = Mina_state.Local_state.empty () in
     let%map applied_txn =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
@@ -2405,7 +2405,7 @@ let%test_module "staged ledger tests" =
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
                 Party.Predicated.of_fee_payer parties.fee_payer.data
-                |> Party.Predicated.digest
+                |> Parties.Digest.Party.create
               in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
