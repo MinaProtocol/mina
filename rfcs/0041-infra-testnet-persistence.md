@@ -360,7 +360,9 @@ The impact of not implementing a persistent-storage solution such as what's prop
 
 [prior-art]: #prior-art
 
+<!-- xrefcheck: ignore link -->
 * [Refactor](https://github.com/MinaProtocol/coda-automation/issues/352) Block Producer Helm Chart should use StatefulSet
+<!-- xrefcheck: ignore link -->
 * Persistence investigations for [testing various chain scenarios](https://github.com/MinaProtocol/coda-automation/issues/391)
 
 ## Unresolved questions

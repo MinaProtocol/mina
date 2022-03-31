@@ -45,25 +45,29 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let nodes_to_initialize nodes =
-    let open Network_state in
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
-      if
-        List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
+      if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
+
+  let nodes_to_initialize nodes =
+    let open Network_state in
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false))
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
@@ -128,8 +132,8 @@ struct
         "Send Delegation"
 
   let signed_command_to_be_included_in_frontier ~sender_pub_key
-      ~receiver_pub_key ~amount ~(nonce : Mina_numbers.Account_nonce.t)
-      ~command_type =
+      ~receiver_pub_key ~amount ~nonce ~command_type
+      ~(node_included_in : [ `Any_node | `Node of Node.t ]) =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
@@ -162,30 +166,39 @@ struct
       | Parties _ ->
           false
     in
-    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let payment_opt =
-        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-            cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_payment)
+    let check () node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let check_helper (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+        let payment_opt =
+          List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
+              cmd_with_status.With_status.data |> User_command.forget_check
+              |> command_matches_payment)
+        in
+        match payment_opt with
+        | Some cmd_with_status ->
+            let actual_status = cmd_with_status.With_status.status in
+            let was_applied =
+              match actual_status with
+              | Transaction_status.Applied _ ->
+                  true
+              | _ ->
+                  false
+            in
+            if was_applied then Predicate_passed
+            else
+              Predicate_failure
+                (Error.createf "Unexpected status in matching payment: %s"
+                   ( Transaction_status.to_yojson actual_status
+                   |> Yojson.Safe.to_string ))
+        | None ->
+            Predicate_continuation ()
       in
-      match payment_opt with
-      | Some cmd_with_status ->
-          let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
-            match actual_status with
-            | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
-          in
-          if was_applied then Predicate_passed
-          else
-            Predicate_failure
-              (Error.createf "Unexpected status in matching payment: %s"
-                 ( Transaction_status.to_yojson actual_status
-                 |> Yojson.Safe.to_string ))
-      | None ->
-          Predicate_continuation ()
+      match node_included_in with
+      | `Any_node ->
+          check_helper breadcrumb_added
+      | `Node n ->
+          if String.equal (Node.id node) (Node.id n) then
+            check_helper breadcrumb_added
+          else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
     { description =
@@ -199,7 +212,7 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let snapp_to_be_included_in_frontier ~parties =
+  let snapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -217,14 +230,14 @@ struct
       match snapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
+          let successful =
             match actual_status with
             | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
+                not has_failures
+            | Failed _ ->
+                has_failures
           in
-          if was_applied then Predicate_passed
+          if successful then Predicate_passed
           else
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"

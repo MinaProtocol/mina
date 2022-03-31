@@ -29,7 +29,11 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let contramap = ref (fun _ -> failwith "unimplemented") in
     let map = ref (fun _ -> failwith "unimplemented") in
 
+    let skip = ref false in
+
     object
+      method skip = skip
+
       method graphql_fields = graphql_fields
 
       method nullable_graphql_fields = nullable_graphql_fields
@@ -284,7 +288,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   (* TODO: remove this or move to a %test_module once the deriver code is stable *)
   (* Can be used to print the graphql schema, like this:
-     Fields_derivers_snapps.Test.print_schema full ;
+     Fields_derivers_zkapps.Test.print_schema full ;
   *)
   module Test = struct
     module M = struct

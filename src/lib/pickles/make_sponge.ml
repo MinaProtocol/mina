@@ -71,7 +71,7 @@ end
 module T (M : Sponge.Intf.T) = M
 
 module Test
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (S_constant : Sponge.Intf.Sponge
                     with module Field := T(Impl.Field.Constant)
                      and module State := Sponge.State

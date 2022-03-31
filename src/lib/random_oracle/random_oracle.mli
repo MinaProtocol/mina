@@ -48,12 +48,20 @@ val read_typ : Field.Var.t Input.Chunked.t -> Field.t Input.Chunked.t
 (** Read a value stored within a circuit. *)
 val read_typ' :
      Field.Var.t Input.Chunked.t
-  -> (Field.t Input.Chunked.t, _) Pickles.Impls.Step.Internal_Basic.As_prover.t
+  -> Field.t Input.Chunked.t Pickles.Impls.Step.Internal_Basic.As_prover.t
 
 [%%endif]
 
 module Legacy : sig
   module Input = Random_oracle_input.Legacy
+
+  module State : sig
+    type 'a t [@@deriving equal, sexp, compare]
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+  end
 
   include
     Intf.S

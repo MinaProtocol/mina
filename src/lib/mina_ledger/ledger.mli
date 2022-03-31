@@ -228,7 +228,7 @@ val apply_parties_unchecked :
          , t
          , bool
          , unit
-         , Transaction_status.Failure.t option )
+         , Transaction_status.Failure.Collection.t )
          Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
@@ -264,17 +264,6 @@ val create_empty_exn : t -> Account_id.t -> Path.t * Account.t
 
 val num_accounts : t -> int
 
-(** Generate an initial ledger state. There can't be a regular Quickcheck
-    generator for this type because you need to detach a mask from it's parent
-    when you're done with it - the GC doesn't take care of that. *)
-val gen_initial_ledger_state :
-  ( Signature_lib.Keypair.t
-  * Currency.Amount.t
-  * Mina_numbers.Account_nonce.t
-  * Account_timing.t )
-  array
-  Quickcheck.Generator.t
-
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
@@ -282,6 +271,11 @@ type init_state =
   * Account_timing.t )
   array
 [@@deriving sexp_of]
+
+(** Generate an initial ledger state. There can't be a regular Quickcheck
+    generator for this type because you need to detach a mask from it's parent
+    when you're done with it - the GC doesn't take care of that. *)
+val gen_initial_ledger_state : init_state Quickcheck.Generator.t
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit

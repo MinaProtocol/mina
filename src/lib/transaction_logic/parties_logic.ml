@@ -36,7 +36,9 @@ module type Bool_intf = sig
 
   type failure_status
 
-  val assert_with_failure_status : t -> failure_status -> unit
+  type failure_status_tbl
+
+  val assert_with_failure_status_tbl : t -> failure_status_tbl -> unit
 end
 
 module type Balance_intf = sig
@@ -136,7 +138,7 @@ module Local_state = struct
            , 'ledger
            , 'bool
            , 'comm
-           , 'failure_status )
+           , 'failure_status_tbl )
            t =
         { parties : 'parties
         ; call_stack : 'call_stack
@@ -146,13 +148,14 @@ module Local_state = struct
         ; excess : 'excess
         ; ledger : 'ledger
         ; success : 'bool
-        ; failure_status : 'failure_status
+        ; failure_status_tbl : 'failure_status_tbl
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
   end]
 
-  let typ parties call_stack token_id excess ledger bool comm failure_status =
+  let typ parties call_stack token_id excess ledger bool comm failure_status_tbl
+      =
     Pickles.Impls.Step.Typ.of_hlistable
       [ parties
       ; call_stack
@@ -162,7 +165,7 @@ module Local_state = struct
       ; excess
       ; ledger
       ; bool
-      ; failure_status
+      ; failure_status_tbl
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -179,9 +182,9 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Transaction_status.Failure.Stable.V2.t option )
+          , Transaction_status.Failure.Collection.Stable.V1.t )
           Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving equal, compare, hash, yojson, sexp]
 
         let to_latest = Fn.id
       end
@@ -262,7 +265,7 @@ module type Party_intf = sig
 
     type field
 
-    val app_state : t -> field set_or_keep Snapp_state.V.t
+    val app_state : t -> field set_or_keep Zkapp_state.V.t
 
     type verification_key
 
@@ -272,9 +275,9 @@ module type Party_intf = sig
 
     val sequence_events : t -> events
 
-    type snapp_uri
+    type zkapp_uri
 
-    val snapp_uri : t -> snapp_uri set_or_keep
+    val zkapp_uri : t -> zkapp_uri set_or_keep
 
     type token_symbol
 
@@ -398,7 +401,7 @@ module type Account_intf = sig
 
     val set_verification_key : t -> controller
 
-    val set_snapp_uri : t -> controller
+    val set_zkapp_uri : t -> controller
 
     val edit_sequence_state : t -> controller
 
@@ -444,9 +447,9 @@ module type Account_intf = sig
 
   type field
 
-  val app_state : t -> field Snapp_state.V.t
+  val app_state : t -> field Zkapp_state.V.t
 
-  val set_app_state : field Snapp_state.V.t -> t -> t
+  val set_app_state : field Zkapp_state.V.t -> t -> t
 
   val register_verification_key : t -> unit
 
@@ -464,11 +467,11 @@ module type Account_intf = sig
 
   val set_sequence_state : field Pickles_types.Vector.Vector_5.t -> t -> t
 
-  type snapp_uri
+  type zkapp_uri
 
-  val snapp_uri : t -> snapp_uri
+  val zkapp_uri : t -> zkapp_uri
 
-  val set_snapp_uri : snapp_uri -> t -> t
+  val set_zkapp_uri : zkapp_uri -> t -> t
 
   type token_symbol
 
@@ -572,7 +575,7 @@ module type Inputs_intf = sig
 
   module Verification_key : Iffable with type bool := Bool.t
 
-  module Snapp_uri : Iffable with type bool := Bool.t
+  module Zkapp_uri : Iffable with type bool := Bool.t
 
   module Token_symbol : Iffable with type bool := Bool.t
 
@@ -585,7 +588,7 @@ module type Inputs_intf = sig
        and type global_slot := Global_slot.t
        and type field := Field.t
        and type verification_key := Verification_key.t
-       and type snapp_uri := Snapp_uri.t
+       and type zkapp_uri := Zkapp_uri.t
        and type token_symbol := Token_symbol.t
        and type public_key := Public_key.t
        and type nonce := Nonce.t
@@ -606,7 +609,7 @@ module type Inputs_intf = sig
        and type Update.field := Field.t
        and type Update.verification_key := Verification_key.t
        and type Update.events := Events.t
-       and type Update.snapp_uri := Snapp_uri.t
+       and type Update.zkapp_uri := Zkapp_uri.t
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
        and type Update.permissions := Account.Permissions.t
@@ -655,12 +658,14 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , Bool.failure_status )
+      , Bool.failure_status_tbl )
       Local_state.t
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
 
-    val update_failure_status : t -> Bool.failure_status -> Bool.t -> t
+    val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
+
+    val add_new_failure_status_bucket : t -> t
   end
 
   module Global_state : sig
@@ -856,6 +861,7 @@ module Make (Inputs : Inputs_intf) = struct
       ((party, remaining, call_stack), to_pop, local_state)
     in
     let local_state = { local_state with parties = remaining; call_stack } in
+    let local_state = Local_state.add_new_failure_status_bucket local_state in
     let a, inclusion_proof =
       Inputs.Ledger.get_account party local_state.ledger
     in
@@ -1103,20 +1109,20 @@ module Make (Inputs : Inputs_intf) = struct
     let a = Account.unmake_snapp a in
     (* Update snapp URI. *)
     let a, local_state =
-      let snapp_uri = Party.Update.snapp_uri party in
+      let zkapp_uri = Party.Update.zkapp_uri party in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_snapp_uri a)
+          (Account.Permissions.set_zkapp_uri a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_snapp_uri
-          Bool.(Set_or_keep.is_keep snapp_uri ||| has_permission)
+        Local_state.add_check local_state Update_not_permitted_zkapp_uri
+          Bool.(Set_or_keep.is_keep zkapp_uri ||| has_permission)
       in
-      let snapp_uri =
-        Set_or_keep.set_or_keep ~if_:Snapp_uri.if_ snapp_uri
-          (Account.snapp_uri a)
+      let zkapp_uri =
+        Set_or_keep.set_or_keep ~if_:Zkapp_uri.if_ zkapp_uri
+          (Account.zkapp_uri a)
       in
-      let a = Account.set_snapp_uri snapp_uri a in
+      let a = Account.set_zkapp_uri zkapp_uri a in
       (a, local_state)
     in
     (* Update token symbol. *)
@@ -1233,14 +1239,14 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform (Check_auth { is_start = is_start'; party; account = a })
     in
     let local_state =
-      Local_state.update_failure_status local_state failure_status
+      Local_state.update_failure_status_tbl local_state failure_status
         update_permitted
     in
     (* The first party must succeed. *)
     Bool.(
-      assert_with_failure_status
+      assert_with_failure_status_tbl
         ((not is_start') ||| local_state.success)
-        local_state.failure_status) ;
+        local_state.failure_status_tbl) ;
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
