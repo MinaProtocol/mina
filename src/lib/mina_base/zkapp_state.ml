@@ -67,7 +67,7 @@ let to_input (t : _ V.t) ~f =
   Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
 
 let deriver inner obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   iso ~map:V.of_list_exn ~contramap:V.to_list
     ((list @@ inner @@ o ()) (o ()))
     obj

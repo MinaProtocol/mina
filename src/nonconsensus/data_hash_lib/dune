@@ -24,7 +24,7 @@
    outside_hash_image_nonconsensus
    snark_params_nonconsensus
    random_oracle_nonconsensus
-   fields_derivers_snapps_nonconsensus
+   fields_derivers_zkapps_nonconsensus
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
