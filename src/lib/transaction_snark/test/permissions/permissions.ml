@@ -7,7 +7,7 @@ struct
   let snapp_update =
     { Party.Update.dummy with
       permissions =
-        Snapp_basic.Set_or_keep.Set
+        Zkapp_basic.Set_or_keep.Set
           { Permissions.user_default with
             set_permissions = Permissions.Auth_required.Proof
           ; set_zkapp_uri = Proof

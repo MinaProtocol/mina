@@ -184,13 +184,13 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
 module App_state = struct
   type t = Snark_params.Tick.Field.t
 
-  let of_string str : t Snapp_basic.Set_or_keep.t =
+  let of_string str : t Zkapp_basic.Set_or_keep.t =
     match str with
     | "" ->
-        Snapp_basic.Set_or_keep.Keep
+        Zkapp_basic.Set_or_keep.Keep
     | _ ->
         parse_field_element_or_hash_string str ~f:(fun result ->
-            Snapp_basic.Set_or_keep.Set result)
+            Zkapp_basic.Set_or_keep.Set result)
 end
 
 module Events = struct
@@ -228,7 +228,7 @@ module Util = struct
     List.append app_state
       (List.init
          (8 - List.length app_state)
-         ~f:(fun _ -> Snapp_basic.Set_or_keep.Keep))
+         ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep))
     |> Snapp_state.V.of_list_exn
 
   let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
@@ -312,7 +312,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       Side_loaded_verification_key.of_base58_check_exn verification_key
     in
     let hash = Snapp_account.digest_vk data in
-    Snapp_basic.Set_or_keep.Set { With_hash.data; hash }
+    Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
   in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -411,7 +411,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
-  let zkapp_uri = Snapp_basic.Set_or_keep.Set zkapp_uri in
+  let zkapp_uri = Zkapp_basic.Set_or_keep.Set zkapp_uri in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
@@ -481,7 +481,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
-  let token_symbol = Snapp_basic.Set_or_keep.Set token_symbol in
+  let token_symbol = Zkapp_basic.Set_or_keep.Set token_symbol in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee

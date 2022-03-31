@@ -75,9 +75,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let compatible_item req_item ledg_item ~equal =
     match (req_item, ledg_item) with
-    | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+    | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
         true
-    | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+    | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
         equal v1 v2
     | Set _, Keep ->
         false

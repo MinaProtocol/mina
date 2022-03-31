@@ -511,7 +511,7 @@ module Node = struct
     let%bind account_obj = get_account ~logger t ~account_id in
     match account_obj#account with
     | Some account ->
-        let open Mina_base.Snapp_basic.Set_or_keep in
+        let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
           match account#snappState with
           | Some strs ->

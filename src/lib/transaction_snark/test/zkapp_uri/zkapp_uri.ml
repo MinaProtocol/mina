@@ -6,7 +6,7 @@ struct
 
   let snapp_update =
     { Party.Update.dummy with
-      zkapp_uri = Snapp_basic.Set_or_keep.Set "https://www.minaprotocol.com"
+      zkapp_uri = Zkapp_basic.Set_or_keep.Set "https://www.minaprotocol.com"
     }
 end
 

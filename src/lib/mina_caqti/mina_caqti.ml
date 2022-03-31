@@ -142,12 +142,12 @@ let add_if_some (f : 'arg -> ('res, 'err) Deferred.Result.t) :
   Fn.compose deferred_result_lift_opt @@ Option.map ~f
 
 let add_if_zkapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Snapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Snapp_basic.Set_or_keep.to_option
+    'arg Zkapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
+  Fn.compose (add_if_some f) Zkapp_basic.Set_or_keep.to_option
 
 let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Snapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Snapp_basic.Or_ignore.to_option
+    'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
+  Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
 
 (* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...]`
    creates the string

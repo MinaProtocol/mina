@@ -294,7 +294,7 @@ let%test_module "multisig_account" =
                  }) ;
               let update_empty_permissions =
                 let permissions =
-                  Snapp_basic.Set_or_keep.Set Permissions.empty
+                  Zkapp_basic.Set_or_keep.Set Permissions.empty
                 in
                 { Party.Update.noop with permissions }
               in

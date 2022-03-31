@@ -125,7 +125,7 @@ let upgrade_snapp =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       let zkapp_uri = Snapp_basic.Set_or_keep.of_option zkapp_uri_str in
+       let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~verification_key ~zkapp_uri ~auth))
 
@@ -438,8 +438,8 @@ let update_permissions =
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let permissions : Permissions.t Snapp_basic.Set_or_keep.t =
-         Snapp_basic.Set_or_keep.Set
+       let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
+         Zkapp_basic.Set_or_keep.Set
            { Permissions.Poly.edit_state = Util.auth_of_string edit_state
            ; send = Util.auth_of_string send
            ; receive = Util.auth_of_string receive
