@@ -346,14 +346,15 @@ function caml_finite_field_sqrt(n, p, pm1_odd, fp_root) {
 // Provides: caml_random_bytes
 var caml_random_bytes = (function() {
   // have to use platform-dependent secure randomness
-  if (typeof crypto !== "undefined" && crypto.getRandomValues !== undefined) {
+  var crypto = joo_global_object.crypto;
+  if (crypto !== undefined && crypto.getRandomValues !== undefined) {
     // browser / deno
     return function randomBytes(n) {
       return crypto.getRandomValues(new Uint8Array(n));
     }
   } else if (typeof require !== "undefined") {
     // node (common JS)
-    var crypto = require("node:crypto");
+    crypto = require("node:crypto");
     return function randomBytes(n) {
       return new Uint8Array(crypto.randomBytes(n));
     }
