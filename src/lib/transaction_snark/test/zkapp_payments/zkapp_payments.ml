@@ -7,9 +7,9 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
 
-let%test_module "Snapp payments tests" =
+let%test_module "Zkapp payments tests" =
   ( module struct
-    let memo = Signed_command_memo.create_from_string_exn "Snapp payments tests"
+    let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     let merkle_root_after_parties_exn t ~txn_state_view txn =
       let hash =
@@ -127,7 +127,7 @@ let%test_module "Snapp payments tests" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
 
-    let%test_unit "snapps-based payment" =
+    let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -136,7 +136,7 @@ let%test_module "Snapp payments tests" =
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
 
-    let%test_unit "Consecutive snapps-based payments" =
+    let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -162,6 +162,9 @@ let%test_module "Snapp payments tests" =
                   let amount = Amount.of_int 1_000_000_000 in
                   let spec = List.hd_exn specs in
                   let receiver_count = 3 in
+                  let total_amount =
+                    Amount.scale amount receiver_count |> Option.value_exn
+                  in
                   let new_receiver =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
@@ -172,7 +175,7 @@ let%test_module "Snapp payments tests" =
                         (new_receiver, amount)
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
-                    ; amount
+                    ; amount = total_amount
                     ; snapp_account_keypairs = []
                     ; memo
                     ; new_snapp_account = false
@@ -220,6 +223,9 @@ let%test_module "Snapp payments tests" =
                 |> Option.value_exn
               in
               let receiver_count = 3 in
+              let total_amount =
+                Amount.scale amount receiver_count |> Option.value_exn
+              in
               let new_receiver =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
@@ -230,7 +236,7 @@ let%test_module "Snapp payments tests" =
                     (new_receiver, amount)
                     :: ( List.take specs (receiver_count - 1)
                        |> List.map ~f:(fun s -> (s.receiver, amount)) )
-                ; amount
+                ; amount = total_amount
                 ; snapp_account_keypairs = []
                 ; memo
                 ; new_snapp_account = false
@@ -262,6 +268,6 @@ let%test_module "Snapp payments tests" =
                            ~f:Transaction_status.Failure.to_yojson) )
                   ] ;
               assert (
-                List.mem failure_status Transaction_status.Failure.Overflow
-                  ~equal:Transaction_status.Failure.equal )))
+                List.equal Transaction_status.Failure.equal failure_status
+                  [ Transaction_status.Failure.Overflow ] )))
   end )

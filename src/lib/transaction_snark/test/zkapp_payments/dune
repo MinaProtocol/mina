@@ -1,5 +1,5 @@
 (library
-  (name snapp_payments_tests)
+  (name zkapp_payments_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
