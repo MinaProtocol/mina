@@ -22,6 +22,7 @@ module type Gen_intf = sig
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
       -> fee_range:int
       -> unit
@@ -37,6 +38,7 @@ module type Gen_intf = sig
          ?sign_type:[ `Fake | `Real ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
       -> fee_range:int
       -> unit
