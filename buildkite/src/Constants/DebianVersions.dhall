@@ -1,6 +1,8 @@
 let Prelude = ../External/Prelude.dhall
 let RunInToolchain = ../Command/RunInToolchain.dhall
 let ContainerImages = ./ContainerImages.dhall
+let S = ../Lib/SelectFiles.dhall
+let D = S.PathPattern
 
 let DebVersion = < Bullseye | Buster | Stretch | Focal | Bionic >
 

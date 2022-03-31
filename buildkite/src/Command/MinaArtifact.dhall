@@ -1,8 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 
 let Cmd = ../Lib/Cmds.dhall
-let S = ../Lib/SelectFiles.dhall
-let D = S.PathPattern
 
 let Pipeline = ../Pipeline/Dsl.dhall
 let JobSpec = ../Pipeline/JobSpec.dhall
