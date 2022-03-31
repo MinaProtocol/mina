@@ -10,11 +10,14 @@ module Call_forest = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('party, 'digest) t =
+        type ('party, 'party_digest, 'digest) t =
           { party : 'party
-          ; party_digest : 'digest
+          ; party_digest : 'party_digest
           ; calls :
-              (('party, 'digest) t, 'digest) With_stack_hash.Stable.V1.t list
+              ( ('party, 'party_digest, 'digest) t
+              , 'digest )
+              With_stack_hash.Stable.V1.t
+              list
           }
         [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -209,8 +212,8 @@ module Call_forest = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('party, 'digest) t =
-        ( ('party, 'digest) Tree.Stable.V1.t
+      type ('party, 'party_digest, 'digest) t =
+        ( ('party, 'party_digest, 'digest) Tree.Stable.V1.t
         , 'digest )
         With_stack_hash.Stable.V1.t
         list
@@ -221,7 +224,7 @@ module Call_forest = struct
   end]
 
   let rec of_parties_list ~(party_depth : 'p -> int) (parties : 'p list) :
-      ('p, unit) t =
+      ('p, unit, unit) t =
     match parties with
     | [] ->
         []
@@ -263,11 +266,11 @@ module Call_forest = struct
       ; stack_hash = ()
       }
     in
-    let parties_list_1_res : (int, unit) t =
+    let parties_list_1_res : (int, unit, unit) t =
       let n0 = node 0 [] in
       [ n0; n0; n0; n0 ]
     in
-    [%test_eq: (int, unit) t]
+    [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_1)
       parties_list_1_res ;
     [%test_eq: int list]
@@ -275,7 +278,7 @@ module Call_forest = struct
       parties_list_1 ;
     let parties_list_2 = [ 0; 0; 1; 1 ] in
     let parties_list_2_res = [ node 0 []; node 0 [ node 1 []; node 1 [] ] ] in
-    [%test_eq: (int, unit) t]
+    [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_2)
       parties_list_2_res ;
     [%test_eq: int list]
@@ -283,7 +286,7 @@ module Call_forest = struct
       parties_list_2 ;
     let parties_list_3 = [ 0; 0; 1; 0 ] in
     let parties_list_3_res = [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ] in
-    [%test_eq: (int, unit) t]
+    [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_3)
       parties_list_3_res ;
     [%test_eq: int list]
@@ -295,7 +298,7 @@ module Call_forest = struct
       ; node 0 []
       ]
     in
-    [%test_eq: (int, unit) t]
+    [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_4)
       parties_list_4_res ;
     [%test_eq: int list]
@@ -315,14 +318,21 @@ module Call_forest = struct
   let hash_cons hash h_tl =
     Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
 
-  let hash = function [] -> empty | x :: _ -> With_stack_hash.stack_hash x
+  let hash = function
+    | [] ->
+        Digest.Forest.empty
+    | x :: _ ->
+        With_stack_hash.stack_hash x
 
   let map = Tree.map_forest
 
   let cons ?(calls = []) (party : Party.t) (xs : _ t) : _ t =
-    let party_digest = Party.Predicated.digest party.data in
+    let party_digest = Digest.Party.create party.data in
     let tree : _ Tree.t = { party; party_digest; calls } in
-    { elt = tree; stack_hash = Tree.hash tree } :: xs
+    { elt = tree
+    ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash xs)
+    }
+    :: xs
 
   let rec accumulate_hashes ~hash_party (xs : _ t) =
     let go = accumulate_hashes ~hash_party in
@@ -333,23 +343,25 @@ module Call_forest = struct
         let calls = go calls in
         let xs = go xs in
         let node = { Tree.party; calls; party_digest = hash_party party } in
-        let node_hash = Tree.hash node in
-        { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
+        let node_hash = Digest.Tree.create node in
+        { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) }
+        :: xs
 
-  let accumulate_hashes' (type a) (xs : (Party.t, a) t) : (Party.t, Digest.t) t
-      =
-    let hash_party (p : Party.t) = Party.Predicated.digest p.data in
+  let accumulate_hashes' (type a b) (xs : (Party.t, a, b) t) :
+      (Party.t, Digest.Party.t, Digest.Forest.t) t =
+    let hash_party (p : Party.t) = Digest.Party.create p.data in
     accumulate_hashes ~hash_party xs
 
   let accumulate_hashes_predicated xs =
-    accumulate_hashes ~hash_party:Party.Predicated.digest xs
+    accumulate_hashes ~hash_party:Digest.Party.create xs
 
   (* Delegate_call means, preserve the current caller.
   *)
-  let add_callers (type party party_with_caller digest id)
-      (ps : (party, digest) t) ~(call_type : party -> Party.Call_type.t)
+  let add_callers (type party party_with_caller party_digest digest id)
+      (ps : (party, party_digest, digest) t)
+      ~(call_type : party -> Party.Call_type.t)
       ~(add_caller : party -> id -> party_with_caller) ~(null_id : id)
-      ~(party_id : party -> id) : (party_with_caller, digest) t =
+      ~(party_id : party -> id) : (party_with_caller, party_digest, digest) t =
     let module Context = struct
       type t = { caller : id; self : id }
     end in
@@ -379,8 +391,8 @@ module Call_forest = struct
     in
     go { caller = null_id; self = null_id } ps
 
-  let add_callers' (type h) (ps : (Party.Predicated.Wire.t, h) t) :
-      (Party.Predicated.t, h) t =
+  let add_callers' (type h1 h2) (ps : (Party.Predicated.Wire.t, h1, h2) t) :
+      (Party.Predicated.t, h1, h2) t =
     add_callers ps
       ~call_type:(fun p -> p.caller)
       ~add_caller:(fun p (caller : Token_id.t) -> { p with caller })
@@ -389,12 +401,12 @@ module Call_forest = struct
         Account_id.(
           derive_token_id ~owner:(create p.body.public_key p.body.token_id)))
 
-  let remove_callers (type party_with_caller party_without_sender digest id)
-      (ps : (party_with_caller, digest) t) ~(equal_id : id -> id -> bool)
+  let remove_callers (type party_with_caller party_without_sender h1 h2 id)
+      (ps : (party_with_caller, h1, h2) t) ~(equal_id : id -> id -> bool)
       ~(add_call_type :
          party_with_caller -> Party.Call_type.t -> party_without_sender)
       ~(null_id : id) ~(party_caller : party_with_caller -> id) :
-      (party_without_sender, digest) t =
+      (party_without_sender, h1, h2) t =
     let rec go parent_caller ps =
       let call_type_for_party p : Party.Call_type.t =
         if equal_id parent_caller (party_caller p) then Delegate_call else Call
@@ -423,16 +435,19 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type 'data t =
-          (Party.Stable.V1.t * 'data, Digest.Stable.V1.t) Stable.V1.t
+          ( Party.Stable.V1.t * 'data
+          , Digest.Party.Stable.V1.t
+          , Digest.Forest.Stable.V1.t )
+          Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    let empty = empty
+    let empty = Digest.Forest.empty
 
-    let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data
+    let hash_party ((p : Party.t), _) = Digest.Party.create p.data
 
     let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
 
@@ -467,10 +482,10 @@ module Call_forest = struct
 
   let is_empty : _ t -> bool = List.is_empty
 
-  let to_list (type p) (t : (p, _) t) : p list =
+  let to_list (type p) (t : (p, _, _) t) : p list =
     fold t ~init:[] ~f:(fun acc p -> p :: acc)
 
-  let exists (type p) (t : (p, _) t) ~(f : p -> bool) : bool =
+  let exists (type p) (t : (p, _, _) t) ~(f : p -> bool) : bool =
     with_return (fun { return } ->
         fold t ~init:() ~f:(fun () p -> if f p then return true else ()) ;
         false)
@@ -518,13 +533,18 @@ module Wire = struct
   let check (t : t) : bool = check_depths t
 end
 
+module Digest = Call_forest.Digest
+
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
     type t =
       { fee_payer : Party.Fee_payer.Stable.V1.t
       ; other_parties :
-          (Party.Stable.V1.t, Digest.Stable.V1.t) Call_forest.Stable.V1.t
+          ( Party.Stable.V1.t
+          , Digest.Party.Stable.V1.t
+          , Digest.Forest.Stable.V1.t )
+          Call_forest.Stable.V1.t
       ; memo : Signed_command_memo.Stable.V1.t
       }
     [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
@@ -550,7 +570,7 @@ module Stable = struct
                    derive_token_id
                      ~owner:(create p.data.body.public_key p.data.body.token_id)))
           |> Call_forest.accumulate_hashes ~hash_party:(fun (p : _ Party.t_) ->
-                 Party.Predicated.digest p.data)
+                 Digest.Party.create p.data)
       }
 
     let to_wire (t : t) : Wire.t =
@@ -732,24 +752,33 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash : t =
+  let create ~(other_parties_hash : Digest.Forest.t)
+      ~protocol_state_predicate_hash ~memo_hash : t =
     Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
+      [| protocol_state_predicate_hash
+       ; (other_parties_hash :> Pickles.Impls.Step.Field.Constant.t)
+       ; memo_hash
+      |]
 
-  let with_fee_payer (t : t) ~fee_payer_hash =
-    Random_oracle.hash ~init:Hash_prefix.party_cons [| fee_payer_hash; t |]
+  let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.t) =
+    Random_oracle.hash ~init:Hash_prefix.party_cons
+      [| (fee_payer_hash :> t); t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash =
+    let create ~(other_parties_hash : Digest.Forest.Checked.t)
+        ~protocol_state_predicate_hash ~memo_hash =
       Random_oracle.Checked.hash
         ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
+        [| protocol_state_predicate_hash
+         ; (other_parties_hash :> t)
+         ; memo_hash
+        |]
 
-    let with_fee_payer (t : t) ~fee_payer_hash =
+    let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.Checked.t) =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
-        [| fee_payer_hash; t |]
+        [| (fee_payer_hash :> t); t |]
   end
 end
 
@@ -774,7 +803,7 @@ module Weight = struct
 
   let fee_payer (_fp : Party.Fee_payer.t) : int = 1
 
-  let other_parties : (_ Party.t_, _) Call_forest.t -> int =
+  let other_parties : (_ Party.t_, _, _) Call_forest.t -> int =
     Call_forest.fold ~init:0 ~f:(fun acc p -> acc + party p)
 
   let memo : Signed_command_memo.t -> int = fun _ -> 0
@@ -801,7 +830,7 @@ include Codable.Make_base58_check (Stable.Latest)
 (* shadow the definitions from Make_base58_check *)
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
-type other_parties = (Party.t, Digest.t) Call_forest.t
+type other_parties = (Party.t, Digest.Party.t, Digest.Forest.t) Call_forest.t
 
 let other_parties_deriver obj =
   let of_parties_with_depth (ps : Party.t list) : other_parties =
