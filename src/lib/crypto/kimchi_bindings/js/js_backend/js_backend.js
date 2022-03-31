@@ -1,3 +1,5 @@
+/* global joo_global_object */
+
 // Provides: BigInt_
 var BigInt_ = joo_global_object.BigInt;
 // Provides: Uint8Array_
