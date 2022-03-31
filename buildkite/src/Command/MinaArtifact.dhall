@@ -34,7 +34,7 @@ let bullseyeDirtyWhen = [
   S.strictly (S.contains "Makefile"),
   S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
   S.strictlyStart (S.contains "buildkite/src/Jobs/Test"),
-] # dirtyWhen
+] # [ dirtyWhen ]
 
 in
 
@@ -42,7 +42,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = if debVersion == Bullseye then bullseyeDirtyWhen else sharedDirtyWhen,
+          dirtyWhen = if debVersion == Bullseye then bullseyeDirtyWhen else dirtyWhen,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
