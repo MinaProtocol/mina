@@ -11,8 +11,7 @@ INPUT_ARGS="$@"
 
 # stderr is mostly used to print "reading password from environment varible ..."
 # prover and verifier logs are also sparse, mostly memory stats and debug info
-# mina-best-tip.log is useful for organizing a hard fork and is one way to monitor new blocks as they are added, but not critical
-declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
+declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
 for script in /entrypoint.d/*; do
@@ -83,7 +82,11 @@ done
 # TODO: have a better way to intersperse log files like we used to, without infinite disk use
 # For now, tail the last 20 lines of the verbose log files when the node shuts down
 if [[ ${VERBOSE} ]]; then
+  # Tail verbose log files
   tail -n 20 "${VERBOSE_LOG_FILES[@]}"
+  # Proccess .mina-config/mina-best-tip.log with jq for a short display of the last 5 blocks that the node considered "best tip"
+  CONSENSUS_STATE='.protocol_state.body.consensus_state'
+  tail -n 5 ".mina-config/mina-best-tip.log" | jq -rc '.metadata.added_transitions[0] | {state_hash: .state_hash, height: '${CONSENSUS_STATE}'.blockchain_length, slot: '${CONSENSUS_STATE}'.global_slot_since_genesis}'
 fi
 
 sleep 15 # to allow all mina proccesses to quit, cleanup, and finish logging
