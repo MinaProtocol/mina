@@ -395,9 +395,7 @@ let%test_module "account timing check" =
         { txn_state_view0 with global_slot_since_genesis = txn_global_slot }
       in
       let account_ids =
-        Mina_ledger.Ledger.to_list ledger
-        |> List.map ~f:(fun acct ->
-               Account_id.create acct.public_key acct.token_id)
+        Mina_transaction.Transaction.accounts_accessed transaction
       in
       let sparse_ledger_before =
         Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger account_ids
