@@ -14,35 +14,13 @@ let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 
--- Most debian builds are only used for public releases
--- so they don't need to be triggered by dirtyWhen on every change
--- these files representing changing the logic of the job, in which case test every platform
-let dirtyWhen = [
-  S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
-  S.exactly "buildkite/scripts/build-artifact" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Constants"),
-  S.strictlyStart (S.contains "buildkite/src/Command"),
-  S.strictlyStart (S.contains "dockerfiles"),
-  S.strictlyStart (S.contains "scripts")
-]
-
--- Bullseye is the default debian version, used in all downstream CI jobs
--- so the jobs must also trigger whenever src changes
-let bullseyeDirtyWhen = [
-  S.strictlyStart (S.contains "src"),
-  S.strictlyStart (S.contains "automation"),
-  S.strictly (S.contains "Makefile"),
-  S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
-] # dirtyWhen
-
 in
 
 let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = if debVersion == Bullseye then bullseyeDirtyWhen else dirtyWhen,
+          dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
@@ -126,5 +104,4 @@ in
   , stretch = pipeline DebianVersions.DebVersion.Stretch
   , bionic = pipeline DebianVersions.DebVersion.Bionic
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , dirtyWhen = dirtyWhen
 }
