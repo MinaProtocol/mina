@@ -1542,7 +1542,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
     Parties.Call_forest.of_parties_list other_parties
       ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
     |> Parties.Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-           Party.Predicated.digest p.data)
+           Parties.Digest.Party.create p.data)
   in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
