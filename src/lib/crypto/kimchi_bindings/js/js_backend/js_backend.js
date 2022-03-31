@@ -1,10 +1,7 @@
-// Provides: caml_bindings_debug
-var caml_bindings_debug = false;
-
 // Provides: BigInt_
 var BigInt_ = joo_global_object.BigInt;
-// Provides: Uint8Array
-var Uint8Array = joo_global_object.Uint8Array;
+// Provides: Uint8Array_
+var Uint8Array_ = joo_global_object.Uint8Array;
 // Provides: _0n
 var _0n = joo_global_object.BigInt(0);
 // Provides: _1n
@@ -51,44 +48,48 @@ var caml_twoadic_root_fq = caml_bigint_from_hex_limbs([
 ]);
 
 // Provides: caml_pallas_generator_projective
-// Requires: BigInt_, caml_pasta_p_bigint
+// Requires: BigInt_, _1n
 var caml_pallas_generator_projective = {
-  x: BigInt_(1),
+  x: _1n,
   y: BigInt_("12418654782883325593414442427049395787963493412651469444558597405572177144507"),
-  z: BigInt_(1)
+  z: _1n
 }
 // Provides: caml_vesta_generator_projective
-// Requires: BigInt_, caml_pasta_q_bigint
+// Requires: BigInt_, _1n
 var caml_vesta_generator_projective = {
-  x: BigInt_(1),
+  x: _1n,
   y: BigInt_("11426906929455361843568202299992114520848200991084027513389447476559454104162"),
-  z: BigInt_(1)
+  z: _1n
 }
 
 // TODO check if these really should be hardcoded, otherwise compute them
 // Provides: caml_vesta_endo_base_const
-var caml_vesta_endo_base_const = new Uint8Array([
+// Requires: Uint8Array_
+var caml_vesta_endo_base_const = new Uint8Array_([
   79, 14, 170, 80, 224, 210, 169, 42,
 175, 51, 192, 71, 125,  70, 237, 15,
   90, 15, 247, 28, 216, 180,  29, 81,
 142, 82,  62, 40,  88, 154, 129,  6
 ]);
 // Provides: caml_pallas_endo_base_const
-var caml_pallas_endo_base_const = new Uint8Array([
+// Requires: Uint8Array_
+var caml_pallas_endo_base_const = new Uint8Array_([
   71, 181,   1,   2,  47, 210, 127, 123,
  210, 199, 159, 209,  41,  13,  39,   5,
   80,  78,  85, 168,  35,  42,  85, 211,
  142,  69,  50, 181, 124,  53,  51,  45
 ]);
 // Provides: caml_vesta_endo_scalar_const
-var caml_vesta_endo_scalar_const = new Uint8Array([
+// Requires: Uint8Array_
+var caml_vesta_endo_scalar_const = new Uint8Array_([
   185,  74, 254, 253, 189,  94, 173, 29,
    73,  49, 173,  55, 210, 139,  31, 29,
   176, 177, 170,  87, 220, 213, 170, 44,
   113, 186, 205,  74, 131, 202, 204, 18
 ]);
 // Provides: caml_pallas_endo_scalar_const
-var caml_pallas_endo_scalar_const = new Uint8Array([
+// Requires: Uint8Array_
+var caml_pallas_endo_scalar_const = new Uint8Array_([
   177, 241,  85, 175,  64,  24, 157,  97,
    46, 117, 212, 193, 126,  82,  89,  18,
   166, 240,   8, 227,  39,  75, 226, 174,
@@ -96,17 +97,17 @@ var caml_pallas_endo_scalar_const = new Uint8Array([
 ]);
 
 // Provides: bigIntToBytes
-// Requires: BigInt_, Uint8Array, _8n
+// Requires: BigInt_, Uint8Array_, _8n
 function bigIntToBytes(x, length) {
   var bytes = [];
   for (; x > 0; x >>= _8n) {
     bytes.push(Number(x & BigInt_(0xff)));
   }
-  var array = new Uint8Array(bytes);
+  var array = new Uint8Array_(bytes);
   if (length === undefined) return array;
   if (array.length > length)
     throw Error("bigint doesn't fit into" + length + " bytes.");
-  var sizedArray = new Uint8Array(length);
+  var sizedArray = new Uint8Array_(length);
   sizedArray.set(array);
   return sizedArray;
 }
@@ -205,7 +206,7 @@ function caml_group_projective_add(g, h, p) {
 }
 
 // Provides: caml_group_projective_double
-// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _2n, _8n
+// Requires: BigInt_, GroupProjective, caml_bigint_modulo, _0n, _2n, _8n
 function caml_group_projective_double(g, p) {
   if (g.z === _0n) return new GroupProjective(g);
   var X1 = g.x, Y1 = g.y, Z1 = g.z;
@@ -251,7 +252,7 @@ function caml_group_projective_scale(g, x, p) {
 }
 
 // Provides: caml_group_projective_to_affine
-// Requires: caml_finite_field_inverse, caml_bigint_modulo, GroupAffine
+// Requires: caml_finite_field_inverse, caml_bigint_modulo, GroupAffine, _0n, _1n
 function caml_group_projective_to_affine(g, p) {
   var z = g.z;
   if (z === _0n) { // infinity
@@ -344,19 +345,20 @@ function caml_finite_field_sqrt(n, p, pm1_odd, fp_root) {
 }
 
 // Provides: caml_random_bytes
+// Requires: Uint8Array_
 var caml_random_bytes = (function() {
   // have to use platform-dependent secure randomness
   var crypto = joo_global_object.crypto;
   if (crypto !== undefined && crypto.getRandomValues !== undefined) {
     // browser / deno
     return function randomBytes(n) {
-      return crypto.getRandomValues(new Uint8Array(n));
+      return crypto.getRandomValues(new Uint8Array_(n));
     }
   } else if (typeof require !== "undefined") {
     // node (common JS)
     crypto = require("node:crypto");
     return function randomBytes(n) {
-      return new Uint8Array(crypto.randomBytes(n));
+      return new Uint8Array_(crypto.randomBytes(n));
     }
   } else {
     throw Error("don't know how to find random number generator for this platform without breaking other platforms");
@@ -378,8 +380,8 @@ function caml_finite_field_random(p) {
 var i = 0;
 
 // Provides: plonk_wasm
-// Requires: bigIntToBytes, bytesToBigInt, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_bindings_debug, caml_finite_field_random
-var plonk_wasm = new Proxy({
+// Requires: bigIntToBytes, bytesToBigInt, caml_bigint_modulo, caml_pasta_p_bigint, caml_pasta_q_bigint, BigInt_, Uint8Array_, GroupProjective, caml_pallas_generator_projective, caml_vesta_generator_projective, caml_group_projective_sub, _0n, _1n, _2n, caml_finite_field_inverse, caml_finite_field_power, caml_finite_field_sqrt, caml_pallas_endo_base_const, caml_pallas_endo_scalar_const, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_vesta_endo_base_const, caml_vesta_endo_scalar_const, caml_finite_field_random, caml_group_projective_add, caml_group_projective_neg, caml_group_projective_scale, caml_group_projective_to_affine
+var plonk_wasm = {
   caml_bigint_256_num_limbs: function() {
     return 4;
   },
@@ -585,28 +587,19 @@ var plonk_wasm = new Proxy({
   caml_pasta_fq_domain_generator: function(_i) {
     return [_1n];
   },
-}, {
-  get: function(target, prop, receiver) {
-    var fun = Reflect.get(target, prop, receiver);
-    if (caml_bindings_debug && typeof fun === "function") {
-      return function() {
-        if (caml_bindings_debug) console.log('call', i++, prop, Array.from(arguments));
-        return fun.apply(null, arguments);
-      }
-    } else {
-      if (caml_bindings_debug) console.log('access', i++, prop);
-      return fun;
-    }
-  }
-});
+};
 
 // Provides: startWorkers
 function startWorkers() {}
 
+// Provides: caml_bindings_debug
+var caml_bindings_debug = false;
+
 // TODO fix failing assertions
-// Provides: _
-// Requires: caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_bigint_from_hex_limbs
-var _ = (function test() {
+// Provides: _test_js_backend
+// Requires: caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_bigint_from_hex_limbs, plonk_wasm, caml_bindings_debug
+var _test_js_backend = (caml_bindings_debug && function test() {
+  var console = joo_global_object.console;
   console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
   console.assert(caml_bigint_from_hex_limbs(["0x992d30ed00000001","0x224698fc094cf91b","0x0","0x4000000000000000"]) === caml_pasta_p_bigint);
