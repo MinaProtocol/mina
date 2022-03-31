@@ -19,14 +19,14 @@ function caml_pasta_fq_domain_generator(_i) {
 // TODO verification shifts
 
 // Provides: caml_pasta_fp_plonk_verifier_index_shifts
-// Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust, _0n
+// Requires: caml_plonk_verification_shifts_of_rust, _0n
 function caml_pasta_fp_plonk_verifier_index_shifts(_log2_size) {
   var shifts = {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
   return caml_plonk_verification_shifts_of_rust(shifts);
 }
 
 // Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: plonk_wasm, caml_plonk_verification_shifts_of_rust, _0n
+// Requires: caml_plonk_verification_shifts_of_rust, _0n
 function caml_pasta_fq_plonk_verifier_index_shifts(_log2_size) {
   var shifts = {s0: [_0n], s1: [_0n], s2: [_0n], s3: [_0n], s4: [_0n], s5: [_0n], s6: [_0n]};
   return caml_plonk_verification_shifts_of_rust(shifts);

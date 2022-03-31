@@ -50,8 +50,8 @@ var caml_bytes_of_uint8array = function(uint8array) {
   var length = uint8array.length;
   var ocaml_bytes = caml_create_bytes(length);
   for (var i = 0; i < length; i++) {
-      // No need to convert here: OCaml Char.t is just an int under the hood.
-      caml_bytes_unsafe_set(ocaml_bytes, i, uint8array[i]);
+    // No need to convert here: OCaml Char.t is just an int under the hood.
+    caml_bytes_unsafe_set(ocaml_bytes, i, uint8array[i]);
   }
   return ocaml_bytes;
 };
@@ -62,8 +62,8 @@ var caml_bytes_to_uint8array = function(ocaml_bytes) {
   var length = caml_ml_bytes_length(ocaml_bytes);
   var bytes = new joo_global_object.Uint8Array(length);
   for (var i = 0; i < length; i++) {
-      // No need to convert here: OCaml Char.t is just an int under the hood.
-      bytes[i] = caml_bytes_unsafe_get(ocaml_bytes, i);
+    // No need to convert here: OCaml Char.t is just an int under the hood.
+    bytes[i] = caml_bytes_unsafe_get(ocaml_bytes, i);
   }
   return bytes;
 };
