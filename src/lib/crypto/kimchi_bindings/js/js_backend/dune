@@ -4,6 +4,7 @@
   (javascript_files
     js_backend.js
     bindings.js
+    elliptic_curve.js
     bigint_helpers.js
     vector.js
     unimplemented.js
