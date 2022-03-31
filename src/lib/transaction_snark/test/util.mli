@@ -9,7 +9,7 @@ val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
 
-(* For tests, monkey patch ledger and sparse ledger to freeze their 
+(* For tests, monkey patch ledger and sparse ledger to freeze their
    ledger_hashes.
    The nominal type prevents using this in non-test code. *)
 module Ledger : module type of Mina_ledger.Ledger
@@ -38,9 +38,20 @@ val dummy_rule :
      , 'e )
      Pickles.Inductive_rule.t
 
-(** Generates base and merge snarks of all the party segments*)
-val apply_parties_with_merges :
-  Ledger.t -> Parties.t list -> unit Async.Deferred.t
+(** Generates base and merge snarks of all the party segments
+
+    if apply is true, then also run unchecked apply
+
+    raises if either the snark generation or application fails
+    but does not examine the failure table created by the application
+*)
+val check_parties_with_merges_exn :
+     ?state_body:Transaction_protocol_state.Block_data.t
+  -> ?state_view:Snapp_predicate.Protocol_state.View.t
+  -> ?apply:bool
+  -> Ledger.t
+  -> Parties.t list
+  -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
 val trivial_snapp :
