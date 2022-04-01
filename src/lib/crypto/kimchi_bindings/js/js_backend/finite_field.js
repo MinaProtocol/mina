@@ -2,33 +2,29 @@
    caml_bigint_of_bytes, caml_js_to_bool, caml_string_of_jsstring
 */
 
+// the modulus. called `p` in most of our code.
 // Provides: caml_pasta_p_bigint
 // Requires: BigInt_
 var caml_pasta_p_bigint = BigInt_('0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001');
 // Provides: caml_pasta_q_bigint
 // Requires: BigInt_
 var caml_pasta_q_bigint = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001');
+
+// this is `t`, where p = 2^32 * t + 1
 // Provides: caml_pasta_pm1_odd_factor
 // Requires: BigInt_
 var caml_pasta_pm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc094cf91b992d30ed');
 // Provides: caml_pasta_qm1_odd_factor
 // Requires: BigInt_
 var caml_pasta_qm1_odd_factor = BigInt_('0x40000000000000000000000000000000224698fc0994a8dd8c46eb21');
-// Provides: caml_generator_fp
-// Requires: BigInt_
-var caml_generator_fp = BigInt_('0x3ffffffffffffffffffffffffffffffd74c2a54b4f4982f3a1a55e68ffffffed');
-// Provides: caml_generator_fq
-// Requires: BigInt_
-var caml_generator_fq = BigInt_('0x3ffffffffffffffffffffffffffffffd74c2a54b49f7778e96bc8c8cffffffed');
 
-// roots were computed as
-// caml_generator_fp ^ caml_pasta_pm1_odd_factor
+// primitive roots of unity, computed as (5^t mod p). this works because 5 generates the multiplicative group mod p
 // Provides: caml_twoadic_root_fp
 // Requires: BigInt_
-var caml_twoadic_root_fp = BigInt_('0x36af506de441e63f43e174a0d0486218e8d45c8e1e4e2aeafee6f241e866a1e2');
+var caml_twoadic_root_fp = BigInt_('0x2bce74deac30ebda362120830561f81aea322bf2b7bb7584bdad6fabd87ea32f');
 // Provides: caml_twoadic_root_fq
 // Requires: BigInt_
-var caml_twoadic_root_fq = BigInt_('0x208eb64428e3a2437f41103ce0bc78da9219cac2ca68b3377bb6a48c528523b2')
+var caml_twoadic_root_fq = BigInt_('0x2de6a9b8746d3f589e5c4dfd492ae26e9bb97ea3c106f049a70e2c1102b6d05f')
 
 // Provides: caml_bigint_modulo
 function caml_bigint_modulo(x, p) {
@@ -81,14 +77,17 @@ function caml_finite_field_inverse(a, p) {
   return caml_bigint_modulo(x, p);
 }
 
-// https://en.wikipedia.org/wiki/Tonelli-Shanks_algorithm#The_algorithm
 // Provides: caml_finite_field_sqrt
 // Requires: _32n, _0n, _1n, _2n, caml_finite_field_power, caml_bigint_modulo
-function caml_finite_field_sqrt(n, p, pm1_odd, fp_root) {
+function caml_finite_field_sqrt(n, p, Q, z) {
+  // https://en.wikipedia.org/wiki/Tonelli-Shanks_algorithm#The_algorithm
+  // variable naming is the same as in that link ^
+  // Q is what we call `t` elsewhere - the odd factor in p - 1
+  // z is a known non-square mod p. we pass in the primitive root of unity
   var M = _32n;
-  var c = caml_finite_field_power(fp_root, pm1_odd, p); // z^Q
-  var t = caml_finite_field_power(n, pm1_odd, p); // n^Q
-  var R = caml_finite_field_power(n, (pm1_odd + _1n) / _2n, p); // n^((Q + 1)/2)
+  var c = caml_finite_field_power(z, Q, p); // z^Q
+  var t = caml_finite_field_power(n, Q, p); // n^Q
+  var R = caml_finite_field_power(n, (Q + _1n) / _2n, p); // n^((Q + 1)/2)
   while (true) {
     if (t === _0n) return _0n;
     if (t === _1n) {
@@ -384,20 +383,23 @@ function caml_pasta_fq_mut_square(x) {
 // Provides: caml_bindings_debug
 var caml_bindings_debug = false;
 
-// TODO fix failing assertions
 // Provides: _test_finite_field
 // Requires: caml_bindings_debug, caml_pasta_p_bigint, caml_pasta_q_bigint, caml_pasta_pm1_odd_factor, caml_pasta_qm1_odd_factor, BigInt_, _1n, _32n, caml_twoadic_root_fp, caml_twoadic_root_fq, caml_finite_field_power, caml_pasta_fp_is_square, caml_pasta_fq_is_square
 var _test_finite_field = caml_bindings_debug && (function test() {
   var console = joo_global_object.console;
+  // t is computed correctly from p = 2^32 * t + 1
   console.assert(caml_pasta_pm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_p_bigint);
   console.assert(caml_pasta_qm1_odd_factor * (_1n << _32n) + _1n === caml_pasta_q_bigint);
 
-  // var generator = BigInt_(5); // works for both fp and fq
-  // var alt_root_fp = caml_finite_field_power(generator, caml_pasta_pm1_odd_factor, caml_pasta_p_bigint);
-  // console.log(alt_root_fp.toString(16));
-  // var alt_root_fq = caml_finite_field_power(generator_fq, caml_pasta_qm1_odd_factor, caml_pasta_q_bigint);
-  // console.log(alt_root_fq.toString(16));
+  // the primitive root of unity is computed correctly as 5^t
+  var generator = BigInt_(5);
+  var root_fp = caml_finite_field_power(generator, caml_pasta_pm1_odd_factor, caml_pasta_p_bigint);
+  console.assert(root_fp === caml_twoadic_root_fp);
+  var root_fq = caml_finite_field_power(generator, caml_pasta_qm1_odd_factor, caml_pasta_q_bigint);
+  console.assert(root_fq === caml_twoadic_root_fq);
 
+  // the primitive roots of unity `r` actually satisfy the equations defining them:
+  // r^(2^32) = 1, r^(2^31) != 1
   var should_be_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << _32n), caml_pasta_p_bigint);
   var should_be_minus_1 = caml_finite_field_power(caml_twoadic_root_fp, (_1n << BigInt_(31)), caml_pasta_p_bigint);
   console.assert(should_be_1 === _1n);
@@ -408,6 +410,8 @@ var _test_finite_field = caml_bindings_debug && (function test() {
   console.assert(should_be_1 === _1n);
   console.assert(should_be_minus_1 + _1n === caml_pasta_q_bigint);
 
+  // the primitive roots of unity are non-squares
+  // -> verifies that the two-adicity is 32, and that they can be used as non-squares in the sqrt algorithm
   console.assert(caml_pasta_fp_is_square([caml_twoadic_root_fp]) === 0);
   console.assert(caml_pasta_fq_is_square([caml_twoadic_root_fq]) === 0);
 })()
