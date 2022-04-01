@@ -286,9 +286,9 @@ let%test_module "multisig_account" =
                  { a with
                    permissions =
                      { Permissions.user_default with set_permissions = Proof }
-                 ; snapp =
+                 ; zkapp =
                      Some
-                       { (Option.value ~default:Zkapp_account.default a.snapp) with
+                       { (Option.value ~default:Zkapp_account.default a.zkapp) with
                          verification_key = Some vk
                        }
                  }) ;
