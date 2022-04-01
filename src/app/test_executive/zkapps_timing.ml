@@ -65,9 +65,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = [ snapp_keypair ]
+        ; zkapp_account_keypairs = [ snapp_keypair ]
         ; memo
-        ; new_snapp_account = true
+        ; new_zkapp_account = true
         ; snapp_update =
             (let timing =
                Zkapp_basic.Set_or_keep.Set
@@ -117,9 +117,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = [ (receiver_key, amount) ]
         ; amount
-        ; snapp_account_keypairs = []
+        ; zkapp_account_keypairs = []
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -147,9 +147,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = [ (receiver_key, amount) ]
         ; amount
-        ; snapp_account_keypairs = []
+        ; zkapp_account_keypairs = []
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -185,9 +185,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = [ timed_account_keypair ]
+        ; zkapp_account_keypairs = [ timed_account_keypair ]
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero

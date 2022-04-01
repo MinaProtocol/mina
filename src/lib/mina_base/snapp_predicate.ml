@@ -305,7 +305,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Lazy.force Snapp_account.Sequence_events.empty_hash
+          ; default = Lazy.force Zkapp_account.Sequence_events.empty_hash
           ; to_input = field
           ; to_input_checked = field
           }
@@ -705,7 +705,7 @@ module Account = struct
          ; sequence_state
          ; proved_state
          } :
-          t) (snapp : Snapp_account.Checked.t) =
+          t) (snapp : Zkapp_account.Checked.t) =
       Boolean.any
         Vector.(
           to_list
@@ -738,7 +738,7 @@ module Account = struct
       ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-          ~ignore:(Lazy.force Snapp_account.Sequence_events.empty_hash)
+          ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

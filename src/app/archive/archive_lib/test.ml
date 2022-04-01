@@ -79,7 +79,7 @@ let%test_module "Archive node unit tests" =
       |> Or_error.ok_exn
       |> fun _ ->
       let%map (parties : Parties.t) =
-        Mina_generators.Snapp_generators.gen_parties_from ~fee_payer_keypair
+        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
           ~keymap ~ledger ()
       in
       User_command.Parties parties

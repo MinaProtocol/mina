@@ -33,9 +33,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
           ; call_data = Snark_params.Tick.Field.zero
@@ -56,9 +56,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
           ; call_data = Snark_params.Tick.Field.zero
@@ -83,9 +83,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.None
           ; call_data = Snark_params.Tick.Field.zero
@@ -110,9 +110,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
           ; call_data = Snark_params.Tick.Field.zero
@@ -136,9 +136,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
           ; call_data = Snark_params.Tick.Field.zero
@@ -163,9 +163,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Signature
           ; call_data = Snark_params.Tick.Field.zero
@@ -190,9 +190,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.Proof
           ; call_data = Snark_params.Tick.Field.zero
@@ -217,9 +217,9 @@ module Make (Input : Input_intf) = struct
           ; fee
           ; receivers = []
           ; amount
-          ; snapp_account_keypairs = [ new_kp ]
+          ; zkapp_account_keypairs = [ new_kp ]
           ; memo
-          ; new_snapp_account = false
+          ; new_zkapp_account = false
           ; snapp_update
           ; current_auth = Permissions.Auth_required.None
           ; call_data = Snark_params.Tick.Field.zero
@@ -246,9 +246,9 @@ module Make (Input : Input_intf) = struct
               ; fee
               ; receivers = []
               ; amount
-              ; snapp_account_keypairs = [ new_kp ]
+              ; zkapp_account_keypairs = [ new_kp ]
               ; memo
-              ; new_snapp_account = false
+              ; new_zkapp_account = false
               ; snapp_update
               ; current_auth = Permissions.Auth_required.Signature
               ; call_data = Snark_params.Tick.Field.zero
@@ -266,7 +266,7 @@ module Make (Input : Input_intf) = struct
             in
             Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
             (*Create snapp transaction*)
-            Transaction_snark.For_tests.create_trivial_snapp_account
+            Transaction_snark.For_tests.create_trivial_zkapp_account
               ~permissions:(U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~ledger snapp_pk ;
             ( match
