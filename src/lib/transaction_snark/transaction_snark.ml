@@ -1000,30 +1000,30 @@ module Base = struct
              ; protocol_state = _
              ; use_full_commitment
              }
-         ; predicate
+         ; account_precondition
          } :
-          Party.Predicated.Checked.t) (a : Account.Checked.Unhashed.t) :
+          Party.Preconditioned.Checked.t) (a : Account.Checked.Unhashed.t) :
         Account.Checked.Unhashed.t * _ =
       let open Impl in
       let r = ref [] in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
 
-      (* enforce that either the predicate is `Accept`,
+      (* enforce that either the account_precondition is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
-      let predicate_is_accept =
+      let account_precondition_is_accept =
         let accept_digest =
           Zkapp_precondition.Account.digest Zkapp_precondition.Account.accept
           |> Field.constant
         in
-        let predicate_digest =
-          Zkapp_precondition.Account.Checked.digest predicate
+        let account_precondition_digest =
+          Zkapp_precondition.Account.Checked.digest account_precondition
         in
-        Field.equal accept_digest predicate_digest
+        Field.equal accept_digest account_precondition_digest
       in
       with_label __LOC__ (fun () ->
           Boolean.Assert.any
-            [ predicate_is_accept
+            [ account_precondition_is_accept
             ; increment_nonce
             ; Boolean.(use_full_commitment &&& not is_start)
             ]) ;
@@ -1039,7 +1039,7 @@ module Base = struct
     end
 
     type party =
-      { party : (Party.Predicated.Checked.t, Impl.Field.t) With_hash.t
+      { party : (Party.Preconditioned.Checked.t, Impl.Field.t) With_hash.t
       ; control : Control.t Prover_value.t
       }
 
@@ -1582,14 +1582,17 @@ module Base = struct
               exists (Party.Body.typ ()) ~compute:(fun () ->
                   (V.get party).data.body)
             in
-            let predicate : Party.Predicate.Checked.t =
-              exists (Party.Predicate.typ ()) ~compute:(fun () ->
-                  (V.get party).data.predicate)
+            let account_precondition : Party.Account_precondition.Checked.t =
+              exists (Party.Account_precondition.typ ()) ~compute:(fun () ->
+                  (V.get party).data.account_precondition)
             in
             let auth = V.(create (fun () -> (V.get party).authorization)) in
-            let party : Party.Predicated.Checked.t = { body; predicate } in
+            let party : Party.Preconditioned.Checked.t =
+              { body; account_precondition }
+            in
             let party =
-              With_hash.of_data party ~hash_data:Party.Predicated.Checked.digest
+              With_hash.of_data party
+                ~hash_data:Party.Preconditioned.Checked.digest
             in
             let subforest : t =
               let subforest = V.create (fun () -> (V.get hd_r).calls) in
@@ -1882,9 +1885,10 @@ module Base = struct
           ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_predicate (_is_start, { party; _ }, account, _global) ->
-            Zkapp_precondition.Account.Checked.check party.data.predicate
-              account.data
+        | Check_account_precondition (_is_start, { party; _ }, account, _global)
+          ->
+            Zkapp_precondition.Account.Checked.check
+              party.data.account_precondition account.data
         | Check_auth { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
             let account', `proof_must_verify proof_must_verify =
@@ -3711,7 +3715,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
           empty_if_last (fun () ->
               let next_commitment = Parties.commitment parties in
               let fee_payer_hash =
-                Party.Predicated.(digest @@ of_fee_payer parties.fee_payer.data)
+                Party.Preconditioned.(
+                  digest @@ of_fee_payer parties.fee_payer.data)
               in
               let next_full_commitment =
                 Parties.Transaction_commitment.with_fee_payer next_commitment
@@ -4119,7 +4124,7 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties spec ~update ~predicate =
+  let create_parties spec ~update ~account_precondition =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; receivers
@@ -4150,14 +4155,14 @@ module For_tests = struct
               ; protocol_state = Zkapp_precondition.Protocol_state.accept
               ; use_full_commitment = ()
               }
-          ; predicate = sender_nonce
+          ; account_precondition = sender_nonce
           }
           (*To be updated later*)
       ; authorization = Signature.dummy
       }
     in
     let sender_party : Party.t option =
-      let sender_party_data : Party.Predicated.t =
+      let sender_party_data : Party.Preconditioned.t =
         { body =
             { public_key = sender_pk
             ; update = Party.Update.noop
@@ -4171,7 +4176,7 @@ module For_tests = struct
             ; protocol_state = Zkapp_precondition.Protocol_state.accept
             ; use_full_commitment = false
             }
-        ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+        ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
         }
       in
       Option.some_if
@@ -4233,7 +4238,7 @@ module For_tests = struct
                   ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = true
                   }
-              ; predicate
+              ; account_precondition
               }
           ; authorization =
               Control.Signature Signature.dummy (*To be updated later*)
@@ -4255,7 +4260,7 @@ module For_tests = struct
                   ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = false
                   }
-              ; predicate = Accept
+              ; account_precondition = Accept
               }
           ; authorization = Control.None_given
           })
@@ -4271,7 +4276,7 @@ module For_tests = struct
     in
     let ps =
       Parties.Call_forest.of_parties_list
-        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+        ~party_depth:(fun (p : Party.Preconditioned.t) -> p.body.call_depth)
         other_parties_data
       |> Parties.Call_forest.accumulate_hashes_predicated
     in
@@ -4283,7 +4288,8 @@ module For_tests = struct
     in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+        ~fee_payer_hash:
+          Party.Preconditioned.(digest (of_fee_payer fee_payer.data))
     in
     let fee_payer =
       let fee_payer_signature_auth =
@@ -4340,7 +4346,8 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~update:update_vk ~predicate:Party.Predicate.Accept
+      create_parties spec ~update:update_vk
+        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4370,7 +4377,7 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:spec.snapp_update
-        ~predicate:Party.Predicate.Accept
+        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4386,7 +4393,7 @@ module For_tests = struct
               let proof_party =
                 let ps =
                   Parties.Call_forest.of_parties_list
-                    ~party_depth:(fun (p : Party.Predicated.t) ->
+                    ~party_depth:(fun (p : Party.Preconditioned.t) ->
                       p.body.call_depth)
                     (List.map (List.drop snapp_parties ndx) ~f:(fun p -> p.data))
                   |> Parties.Call_forest.accumulate_hashes_predicated
@@ -4451,7 +4458,7 @@ module For_tests = struct
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
       create_parties spec ~update:spec.snapp_update
-        ~predicate:Party.Predicate.Accept
+        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
@@ -4533,13 +4540,13 @@ module For_tests = struct
               ; protocol_state = protocol_state_predicate
               ; use_full_commitment = ()
               }
-          ; predicate = sender_nonce
+          ; account_precondition = sender_nonce
           }
           (* Real signature added in below *)
       ; authorization = Signature.dummy
       }
     in
-    let sender_party_data : Party.Predicated.t =
+    let sender_party_data : Party.Preconditioned.t =
       { body =
           { public_key = sender_pk
           ; update = Party.Update.noop
@@ -4553,10 +4560,10 @@ module For_tests = struct
           ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
-      ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+      ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
       }
     in
-    let snapp_party_data : Party.Predicated.t =
+    let snapp_party_data : Party.Preconditioned.t =
       { body =
           { public_key = trivial_account_pk
           ; update = update_empty_permissions
@@ -4570,13 +4577,13 @@ module For_tests = struct
           ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
-      ; predicate = Full Zkapp_precondition.Account.accept
+      ; account_precondition = Full Zkapp_precondition.Account.accept
       }
     in
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Call_forest.of_parties_list
-        ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+        ~party_depth:(fun (p : Party.Preconditioned.t) -> p.body.call_depth)
         [ sender_party_data; snapp_party_data ]
       |> Parties.Call_forest.accumulate_hashes_predicated
     in
@@ -4594,7 +4601,7 @@ module For_tests = struct
     let proof_party =
       let ps =
         Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Preconditioned.t) -> p.body.call_depth)
           [ snapp_party_data ]
         |> Parties.Call_forest.accumulate_hashes_predicated
       in
@@ -4613,7 +4620,7 @@ module For_tests = struct
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
           ~fee_payer_hash:
-            Party.Predicated.(digest (of_fee_payer fee_payer.data))
+            Party.Preconditioned.(digest (of_fee_payer fee_payer.data))
       in
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field txn_comm)

@@ -8,8 +8,8 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
-  (* construct predicate using pk and ledger
+let gen_account_precondition_from ?(succeed = true) ~account_id ~ledger () =
+  (* construct account_precondition using pk and ledger
      don't return Accept, which would ignore those inputs
   *)
   let open Quickcheck.Let_syntax in
@@ -18,8 +18,8 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
       (* account not in the ledger, can't create meaningful Full or Nonce *)
       if succeed then
         failwithf
-          "gen_predicate_from: account id with public key %s and token id %s \
-           not in ledger"
+          "gen_account_precondition_from: account id with public key %s and \
+           token id %s not in ledger"
           (Signature_lib.Public_key.Compressed.to_base58_check
              (Account_id.public_key account_id))
           (Account_id.token_id account_id |> Token_id.to_string)
@@ -27,12 +27,13 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
       else
         (* nonce not connected with any particular account *)
         let%map nonce = Account.Nonce.gen in
-        Party.Predicate.Nonce nonce
+        Party.Account_precondition.Nonce nonce
   | Some loc -> (
       match Ledger.get ledger loc with
       | None ->
           failwith
-            "gen_predicate_from: could not find account with known location"
+            "gen_account_precondition_from: could not find account with known \
+             location"
       | Some account ->
           let%bind b = Quickcheck.Generator.bool in
           let { Account.Poly.public_key
@@ -90,8 +91,8 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                   | None ->
                       (* unreachable *)
                       failwith
-                        "gen_predicate_from: nonce subtraction failed \
-                         unexpectedly"
+                        "gen_account_precondition_from: nonce subtraction \
+                         failed unexpectedly"
                   | Some n ->
                       if Account.Nonce.( < ) n nonce then
                         Account.Nonce.max_value
@@ -152,7 +153,8 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                 ; proved_state
                 }
             in
-            if succeed then return (Party.Predicate.Full predicate_account)
+            if succeed then
+              return (Party.Account_precondition.Full predicate_account)
             else
               let module Tamperable = struct
                 type t =
@@ -238,12 +240,14 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     in
                     return { predicate_account with proved_state }
               in
-              return (Party.Predicate.Full faulty_predicate_account)
+              return (Party.Account_precondition.Full faulty_predicate_account)
           else
             (* Nonce *)
             let { Account.Poly.nonce; _ } = account in
-            if succeed then return (Party.Predicate.Nonce nonce)
-            else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
+            if succeed then return (Party.Account_precondition.Nonce nonce)
+            else
+              return
+                (Party.Account_precondition.Nonce (Account.Nonce.succ nonce)) )
 
 let gen_fee (account : Account.t) =
   let lo_fee = Mina_compile_config.minimum_user_command_fee in
@@ -696,8 +700,10 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
   let account_id =
     Account_id.create body.Party.Body.public_key body.Party.Body.token_id
   in
-  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  { Party.Predicated.Poly.body; predicate }
+  let%map account_precondition =
+    gen_account_precondition_from ~succeed ~account_id ~ledger ()
+  in
+  { Party.Preconditioned.Poly.body; account_precondition }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
@@ -728,7 +734,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
 (* takes an account id, if we want to sign this data *)
 let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
     ?protocol_state_view () :
-    Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
+    Party.Preconditioned.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body_components =
     gen_party_body_components ?permissions_auth ~account_id ~is_fee_payer:true
@@ -758,8 +764,8 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
         | Some account ->
             account )
   in
-  let predicate = account.nonce in
-  { Party.Predicated.Poly.body; predicate }
+  let account_precondition = account.nonce in
+  { Party.Preconditioned.Poly.body; account_precondition }
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =
@@ -945,8 +951,8 @@ let gen_parties_from ?(succeed = true)
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
-    Party.Predicated.of_fee_payer parties_dummy_signatures.fee_payer.data
-    |> Party.Predicated.digest
+    Party.Preconditioned.of_fee_payer parties_dummy_signatures.fee_payer.data
+    |> Party.Preconditioned.digest
   in
   let fee_payer_signature =
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key

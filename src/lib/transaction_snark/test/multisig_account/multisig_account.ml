@@ -315,13 +315,13 @@ let%test_module "multisig_account" =
                             Zkapp_precondition.Protocol_state.accept
                         ; use_full_commitment = ()
                         }
-                    ; predicate = sender_nonce
+                    ; account_precondition = sender_nonce
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Predicated.t =
+              let sender_party_data : Party.Preconditioned.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -336,11 +336,11 @@ let%test_module "multisig_account" =
                     ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+                ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
                 }
               in
-              let snapp_party_data : Party.Predicated.t =
-                { Party.Predicated.Poly.body =
+              let snapp_party_data : Party.Preconditioned.t =
+                { Party.Preconditioned.Poly.body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
                     ; token_id = Token_id.default
@@ -354,14 +354,14 @@ let%test_module "multisig_account" =
                     ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Full Zkapp_precondition.Account.accept
+                ; account_precondition = Full Zkapp_precondition.Account.accept
                 }
               in
               let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Predicated.t) ->
+                  ~party_depth:(fun (p : Party.Preconditioned.t) ->
                     p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
                 |> Parties.Call_forest.accumulate_hashes_predicated
@@ -414,7 +414,8 @@ let%test_module "multisig_account" =
                 let txn_comm =
                   Parties.Transaction_commitment.with_fee_payer transaction
                     ~fee_payer_hash:
-                      Party.Predicated.(digest (of_fee_payer fee_payer.data))
+                      Party.Preconditioned.(
+                        digest (of_fee_payer fee_payer.data))
                 in
                 { fee_payer with
                   authorization =

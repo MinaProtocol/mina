@@ -847,7 +847,7 @@ module Body = struct
   end
 end
 
-module Predicate = struct
+module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -903,20 +903,22 @@ module Predicate = struct
       Zkapp_precondition.Account.deriver obj
 
   let%test_unit "json roundtrip accept" =
-    let predicate : t = Accept in
+    let account_precondition : t = Accept in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip nonce" =
-    let predicate : t = Nonce (Account_nonce.of_int 928472) in
+    let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip full" =
     let n = Account_nonce.of_int 4513 in
-    let predicate : t =
+    let account_precondition : t =
       Full
         { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
@@ -925,14 +927,15 @@ module Predicate = struct
     in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "to_json" =
-    let predicate : t = Nonce (Account_nonce.of_int 34928) in
+    let account_precondition : t = Nonce (Account_nonce.of_int 34928) in
     let module Fd = Fields_derivers_snapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: string]
-      (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
+      (account_precondition |> Fd.to_json full |> Yojson.Safe.to_string)
       ( {json|{
           balance: null,
           nonce: {lower: "34928", upper: "34928"},
@@ -945,7 +948,7 @@ module Predicate = struct
   let digest (t : t) =
     let digest x =
       Random_oracle.(
-        hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+        hash ~init:Hash_prefix_states.party_account_precondition (pack_input x))
     in
     to_full t |> Zkapp_precondition.Account.to_input |> digest
 
@@ -955,7 +958,8 @@ module Predicate = struct
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
-          hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+          hash ~init:Hash_prefix_states.party_account_precondition
+            (pack_input x))
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
   end
@@ -965,12 +969,13 @@ module Predicate = struct
       ~back:(fun s -> Full s)
 end
 
-module Predicated = struct
+module Preconditioned = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
+        type ('body, 'account_precondition) t =
+          { body : 'body; account_precondition : 'account_precondition }
         [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
@@ -979,7 +984,8 @@ module Predicated = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (Body.Stable.V1.t, Predicate.Stable.V1.t) Poly.Stable.V1.t
+      type t =
+        (Body.Stable.V1.t, Account_precondition.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -990,13 +996,15 @@ module Predicated = struct
     let open Fields_derivers_snapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
-      ~predicate:!.Predicate.deriver
-    |> finish "SnappPartyPredicated" ~t_toplevel_annots:Poly.t_toplevel_annots
+      ~account_precondition:!.Account_precondition.deriver
+    |> finish "ZkappPartyPreconditioned"
+         ~t_toplevel_annots:Poly.t_toplevel_annots
 
-  let to_input ({ body; predicate } : t) =
+  let to_input ({ body; account_precondition } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
-      ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
+      ; Random_oracle_input.Chunked.field
+          (Account_precondition.digest account_precondition)
       ]
 
   let digest (t : t) =
@@ -1005,17 +1013,18 @@ module Predicated = struct
   let typ () : (_, t) Typ.t =
     let open Poly in
     Typ.of_hlistable
-      [ Body.typ (); Predicate.typ () ]
+      [ Body.typ (); Account_precondition.typ () ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   module Checked = struct
-    type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
+    type t = (Body.Checked.t, Account_precondition.Checked.t) Poly.t
 
-    let to_input ({ body; predicate } : t) =
+    let to_input ({ body; account_precondition } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
-        ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
+        ; Random_oracle_input.Chunked.field
+            (Account_precondition.Checked.digest account_precondition)
         ]
 
     let digest (t : t) =
@@ -1065,7 +1074,8 @@ module Predicated = struct
       type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
     end
 
-    let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
+    let dummy : t =
+      { body = Body.dummy; account_precondition = Account_nonce.zero }
   end
 
   module Fee_payer = struct
@@ -1087,16 +1097,18 @@ module Predicated = struct
     end
 
     let dummy : t =
-      { body = Body.Fee_payer.dummy; predicate = Account_nonce.zero }
+      { body = Body.Fee_payer.dummy; account_precondition = Account_nonce.zero }
 
     let to_signed (t : t) : Signed.t =
-      { body = Body.of_fee_payer t.body; predicate = t.predicate }
+      { body = Body.of_fee_payer t.body
+      ; account_precondition = t.account_precondition
+      }
 
     let deriver obj =
       let open Fields_derivers_snapps.Derivers in
       let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
-        ~predicate:!.uint32
+        ~account_precondition:!.uint32
       |> finish "ZkappPartyPredicatedFeePayer"
            ~t_toplevel_annots:Poly.t_toplevel_annots
   end
@@ -1112,16 +1124,18 @@ module Predicated = struct
       end
     end]
 
-    let dummy : t = { body = Body.dummy; predicate = () }
+    let dummy : t = { body = Body.dummy; account_precondition = () }
 
-    let create body : t = { body; predicate = () }
+    let create body : t = { body; account_precondition = () }
   end
 
-  let of_signed ({ body; predicate } : Signed.t) : t =
-    { body; predicate = Nonce predicate }
+  let of_signed ({ body; account_precondition } : Signed.t) : t =
+    { body; account_precondition = Nonce account_precondition }
 
-  let of_fee_payer ({ body; predicate } : Fee_payer.t) : t =
-    { body = Body.of_fee_payer body; predicate = Nonce predicate }
+  let of_fee_payer ({ body; account_precondition } : Fee_payer.t) : t =
+    { body = Body.of_fee_payer body
+    ; account_precondition = Nonce account_precondition
+    }
 end
 
 module Poly (Data : Type) (Auth : Type) = struct
@@ -1133,10 +1147,10 @@ module Proved = struct
   module Stable = struct
     module V1 = struct
       type t =
-            Poly(Predicated.Proved.Stable.V1)
+            Poly(Preconditioned.Proved.Stable.V1)
               (Pickles.Side_loaded.Proof.Stable.V2)
             .t =
-        { data : Predicated.Proved.Stable.V1.t
+        { data : Preconditioned.Proved.Stable.V1.t
         ; authorization : Pickles.Side_loaded.Proof.Stable.V2.t
         }
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1150,8 +1164,8 @@ module Signed = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Signed.Stable.V1)(Signature.Stable.V1).t =
-        { data : Predicated.Signed.Stable.V1.t
+      type t = Poly(Preconditioned.Signed.Stable.V1)(Signature.Stable.V1).t =
+        { data : Preconditioned.Signed.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1168,8 +1182,8 @@ module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
-        { data : Predicated.Fee_payer.Stable.V1.t
+      type t = Poly(Preconditioned.Fee_payer.Stable.V1)(Signature.Stable.V1).t =
+        { data : Preconditioned.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -1183,20 +1197,20 @@ module Fee_payer = struct
 
   let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
-    ; data = Predicated.Fee_payer.to_signed t.data
+    ; data = Preconditioned.Fee_payer.to_signed t.data
     }
 
   let deriver obj =
     let open Fields_derivers_snapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~data:!.Predicated.Fee_payer.deriver
+      ~data:!.Preconditioned.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
     |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
-      { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+      { data = Preconditioned.Fee_payer.dummy; authorization = Signature.dummy }
     in
     let open Fields_derivers_snapps.Derivers in
     let full = o () in
@@ -1208,8 +1222,8 @@ module Empty = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
-        { data : Predicated.Empty.Stable.V1.t; authorization : unit }
+      type t = Poly(Preconditioned.Empty.Stable.V1)(Unit.Stable.V1).t =
+        { data : Preconditioned.Empty.Stable.V1.t; authorization : unit }
       [@@deriving annot, sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -1221,8 +1235,8 @@ end
 module Stable = struct
   module V1 = struct
     (** A party to a zkApp transaction *)
-    type t = Poly(Predicated.Stable.V1)(Control.Stable.V2).t =
-      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V2.t }
+    type t = Poly(Preconditioned.Stable.V1)(Control.Stable.V2).t =
+      { data : Preconditioned.Stable.V1.t; authorization : Control.Stable.V2.t }
     [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
     let to_latest = Fn.id
@@ -1233,11 +1247,13 @@ let account_id (t : t) : Account_id.t =
   Account_id.create t.data.body.public_key t.data.body.token_id
 
 let of_signed ({ data; authorization } : Signed.t) : t =
-  { authorization = Signature authorization; data = Predicated.of_signed data }
+  { authorization = Signature authorization
+  ; data = Preconditioned.of_signed data
+  }
 
 let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization
-  ; data = Predicated.of_fee_payer data
+  ; data = Preconditioned.of_fee_payer data
   }
 
 (** The change in balance to apply to the target account of this party.
@@ -1262,13 +1278,16 @@ let increment_nonce (t : t) : bool = t.data.body.increment_nonce
 let deriver obj =
   let open Fields_derivers_snapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
-  Fields.make_creator obj ~data:!.Predicated.deriver
+  Fields.make_creator obj ~data:!.Preconditioned.deriver
     ~authorization:!.Control.deriver
   |> finish "ZkappParty" ~t_toplevel_annots
 
 let%test_unit "json roundtrip dummy" =
   let dummy : t =
-    { data = { body = Body.dummy; predicate = Predicate.Accept }
+    { data =
+        { body = Body.dummy
+        ; account_precondition = Account_precondition.Accept
+        }
     ; authorization = Control.dummy_of_tag Signature
     }
   in

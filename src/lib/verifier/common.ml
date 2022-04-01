@@ -53,8 +53,8 @@ let check :
           let full_tx_commitment =
             Parties.Transaction_commitment.with_fee_payer tx_commitment
               ~fee_payer_hash:
-                (Party.Predicated.digest
-                   (Party.Predicated.of_fee_payer fee_payer.data))
+                (Party.Preconditioned.digest
+                   (Party.Preconditioned.of_fee_payer fee_payer.data))
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with

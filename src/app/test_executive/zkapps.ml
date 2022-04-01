@@ -252,7 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { p.fee_payer with
             data =
               { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 42
+                account_precondition = Mina_base.Account.Nonce.of_int 42
               }
           }
       }
@@ -263,7 +263,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { data =
               { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 2
+                account_precondition = Mina_base.Account.Nonce.of_int 2
               }
           ; authorization = Mina_base.Signature.dummy
           }

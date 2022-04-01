@@ -1146,9 +1146,9 @@ module Snapp_helpers = struct
     let%bind protocol_state_data =
       query_db pool
         ~f:(fun db ->
-          Processor.Zkapp_predicate_protocol_states.load db
+          Processor.Zkapp_account_precondition_protocol_states.load db
             body_data.zkapp_precondition_protocol_state_id)
-        ~item:"Snapp predicate protocol state"
+        ~item:"Snapp account_precondition protocol state"
     in
     let%bind snarked_ledger_hash =
       match protocol_state_data.snarked_ledger_hash_id with
@@ -1363,15 +1363,15 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
       ~item:"Snapp fee payer"
   in
   let%bind (fee_payer : Party.Fee_payer.t) =
-    let%bind (data : Party.Predicated.Fee_payer.t) =
+    let%bind (data : Party.Preconditioned.Fee_payer.t) =
       let%bind (body : Party.Body.Fee_payer.t) =
         Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
       in
-      let predicate =
+      let account_precondition =
         fee_payer_data.nonce |> Unsigned.UInt32.of_int64
         |> Mina_numbers.Account_nonce.of_uint32
       in
-      return { Party.Predicated.Poly.body; predicate }
+      return { Party.Preconditioned.Poly.body; account_precondition }
     in
     return { Party.Fee_payer.data; authorization = Signature.dummy }
   in
@@ -1382,22 +1382,24 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
             ~f:(fun db -> Processor.Zkapp_party.load db id)
             ~item:"Snapp party"
         in
-        let%bind (data : Party.Predicated.t) =
+        let%bind (data : Party.Preconditioned.t) =
           let%bind (body : Party.Body.t) =
             Snapp_helpers.party_body_of_id ~pool snapp_party_data.body_id
           in
-          let%bind (predicate : Party.Predicate.t) =
-            let%bind predicate_data =
-              query_db pool ~item:"Snapp predicate" ~f:(fun db ->
-                  Processor.Zkapp_predicate.load db
-                    snapp_party_data.predicate_id)
+          let%bind (account_precondition : Party.Account_precondition.t) =
+            let%bind account_precondition_data =
+              query_db pool ~item:"Snapp account precondition" ~f:(fun db ->
+                  Processor.Zkapp_account_precondition.load db
+                    snapp_party_data.account_precondition_id)
             in
-            match predicate_data.kind with
+            match account_precondition_data.kind with
             | Full ->
                 let%bind zkapp_account_data =
-                  match predicate_data.account_id with
+                  match account_precondition_data.account_id with
                   | None ->
-                      failwith "Expected account id for predicate of kind Full"
+                      failwith
+                        "Expected account id for account precondition of kind \
+                         Full"
                   | Some account_id ->
                       query_db pool ~item:"Snapp account" ~f:(fun db ->
                           Processor.Zkapp_account.load db account_id)
@@ -1503,20 +1505,21 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       }
                       : Zkapp_precondition.Account.t )
                 in
-                Party.Predicate.Full zkapp_account
+                Party.Account_precondition.Full zkapp_account
             | Nonce -> (
-                match predicate_data.nonce with
+                match account_precondition_data.nonce with
                 | None ->
-                    failwith "Expected nonce for predicate of kind Nonce"
+                    failwith
+                      "Expected nonce for account precondition of kind Nonce"
                 | Some nonce ->
                     return
-                      (Party.Predicate.Nonce
+                      (Party.Account_precondition.Nonce
                          (Mina_numbers.Account_nonce.of_uint32
                             (Unsigned.UInt32.of_int64 nonce))) )
             | Accept ->
-                return Party.Predicate.Accept
+                return Party.Account_precondition.Accept
           in
-          return ({ body; predicate } : Party.Predicated.t)
+          return ({ body; account_precondition } : Party.Preconditioned.t)
         in
         let authorization =
           (* dummy proof, signature, don't affect replay *)

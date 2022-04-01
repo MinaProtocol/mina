@@ -1000,7 +1000,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -1032,7 +1032,7 @@
               "defaultValue": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -3318,7 +3318,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedInput",
+          "name": "ZkappPartyPreconditionedInput",
           "description": null,
           "fields": [
             {
@@ -3338,7 +3338,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -3370,7 +3370,7 @@
               "defaultValue": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -3458,7 +3458,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "ZkappPartyPreconditionedInput",
                   "ofType": null
                 }
               },
@@ -3491,7 +3491,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "ZkappPartyPreconditionedInput",
                   "ofType": null
                 }
               },
@@ -7216,7 +7216,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyPredicated",
+          "name": "ZkappPartyPreconditioned",
           "description": null,
           "fields": [
             {
@@ -7236,7 +7236,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -7271,7 +7271,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyPredicated",
+                  "name": "ZkappPartyPreconditioned",
                   "ofType": null
                 }
               },
@@ -8394,7 +8394,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {

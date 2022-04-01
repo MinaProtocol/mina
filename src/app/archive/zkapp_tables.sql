@@ -107,7 +107,7 @@ CREATE TABLE zkapp_nonce_bounds
 , nonce_upper_bound        bigint           NOT NULL
 );
 
-CREATE TYPE zkapp_predicate_type AS ENUM ('full', 'nonce', 'accept');
+CREATE TYPE zkapp_account_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
 CREATE TABLE zkapp_account
@@ -125,9 +125,9 @@ CREATE TABLE zkapp_account
 /* invariants: account id is not NULL iff kind is 'full'
                nonce is not NULL iff kind is 'nonce'
 */
-CREATE TABLE zkapp_predicate
+CREATE TABLE zkapp_account_precondition
 ( id               serial                 PRIMARY KEY
-, kind             zkapp_predicate_type   NOT NULL
+, kind             zkapp_account_precondition_type   NOT NULL
 , account_id       int                    REFERENCES zkapp_account(id)
 , nonce            bigint
 );
@@ -216,6 +216,6 @@ CREATE TABLE zkapp_party_body
 CREATE TABLE zkapp_party
 ( id                       serial                          NOT NULL PRIMARY KEY
 , body_id                  int                             NOT NULL REFERENCES zkapp_party_body(id)
-, predicate_id             int                             NOT NULL REFERENCES zkapp_predicate(id)
+, account_precondition_id             int                             NOT NULL REFERENCES zkapp_account_precondition(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );

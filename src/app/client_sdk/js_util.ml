@@ -57,7 +57,7 @@ let payload_of_fee_payer_party_js
           ; protocol_state = Zkapp_precondition.Protocol_state.accept
           ; use_full_commitment = ()
           }
-      ; predicate = nonce
+      ; account_precondition = nonce
       }
   ; authorization = Signature.dummy
   }

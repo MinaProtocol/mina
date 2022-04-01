@@ -77,11 +77,13 @@ let bowe_gabizon_hash = create "CodaTockBGHash"
 
 let zkapp_precondition = create "CodaZkappPred"
 
+(*for Zkapp_precondition.Account.t*)
 let zkapp_precondition_account = create "CodaZkappPredAcct"
 
 let zkapp_precondition_protocol_state = create "CodaZkappPredPS"
 
-let party_predicate = create "MinaPartyPredicate"
+(*for Party.Account_precondition.t*)
+let party_account_precondition = create "MinaPartyAccountPred"
 
 let party = create "MinaParty"
 
