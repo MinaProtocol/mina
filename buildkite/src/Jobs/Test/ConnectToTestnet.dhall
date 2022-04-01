@@ -6,7 +6,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let dependsOnStretch = [
-  { name = "MinaArtifactStretch", key = "daemon-mainnet-stretch-docker-image" }
+  { name = "MinaArtifactBullseye", key = "daemon-mainnet-bullseye-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{

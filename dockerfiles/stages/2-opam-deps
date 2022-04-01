@@ -45,6 +45,4 @@ RUN opam switch import src/opam.export --quiet
 # Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
-  && opam clean --logs -cs --quiet \
-  && rm -rf .graphql_ppx_cache/ \
-  && rm -rf .ppx
+  && opam clean --logs -cs --quiet

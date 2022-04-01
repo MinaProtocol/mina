@@ -16,7 +16,7 @@ export BUILD_NUM=${BUILDKITE_BUILD_NUM}
 export BUILD_URL=${BUILDKITE_BUILD_URL}
 set -u
 
-export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=stretch}
+export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
