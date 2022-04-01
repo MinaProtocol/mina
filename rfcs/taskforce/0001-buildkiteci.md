@@ -83,8 +83,6 @@ Engineers who are iterating on build rules can run nodes locally or spin up inst
 
 ### Description of pipelines
 
-<div id="pipeline-automatic-dhall">
-
 Pipeline are configured with Dhall rather than jinja-templated yaml. Dynamic pipelines support this as a first-class citizen, we do not require running the equivalent "`test.py`" before pushing. I have already implemented this on a [side project](https://github.com/bkase/gameboy/blob/master/.buildkite). Notice that there is a small `pipeline.yaml` to bootstrap the `pipeline.dhall` -- `pipeline.dhall` is rendered at _build_ time, not commit time.
 
 **General Pipeline Writing Things**
@@ -136,7 +134,7 @@ P2.2 → We can choose whatever machines we want
 
 P2.3 → We use dynamic pipelines to expand work based on files touched
 
-P3 → Manual adhoc template expansion is replaced with [automatic](#pipeline-automatic-dhall) expansion using Dhall
+P3 → Manual adhoc template expansion is replaced with [automatic](#description-of-pipelines) expansion using Dhall
 
 P4 → BuildKite agents can be installed and tagged locally (or on your own instances) to iterate on builds on your own hardware before putting it into production
 

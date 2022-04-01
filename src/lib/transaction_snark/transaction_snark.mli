@@ -182,8 +182,7 @@ module Statement : sig
     module Checked : sig
       type t = var
 
-      val to_input :
-        var -> (Field.Var.t Random_oracle.Input.Chunked.t, _) Checked.t
+      val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
 
       (* This is actually a checked function. *)
       val to_field_elements : var -> Field.Var.t array
@@ -343,7 +342,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Snapp_statement.t) option
+    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -360,7 +359,7 @@ type local_state =
   , Mina_ledger.Sparse_ledger.t
   , bool
   , unit
-  , Transaction_status.Failure.t option )
+  , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 
 type global_state = Mina_ledger.Sparse_ledger.Global_state.t
@@ -437,7 +436,7 @@ val parties_witnesses_exn :
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) option )
+     * (int * Zkapp_statement.t) option )
      list
 
 module Make (Inputs : sig
@@ -454,12 +453,12 @@ val constraint_system_digests :
 
 (* Every circuit must have at least 1 of each type of constraint.
    This function can be used to add the missing constraints *)
-val dummy_constraints : unit -> (unit, 'a) Tick.Checked.t
+val dummy_constraints : unit -> unit Tick.Checked.t
 
 module Base : sig
   val check_timing :
-       balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
-    -> timed_balance_check:(Tick.Boolean.var -> (unit, 'a) Tick.Checked.t)
+       balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
+    -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
     -> account:
          ( 'b
          , 'c
@@ -482,12 +481,11 @@ module Base : sig
     -> txn_amount:Currency.Amount.var option
     -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
     -> ( [> `Min_balance of Currency.Balance.var ]
-         * ( Tick.Boolean.var
-           , Mina_numbers.Global_slot.Checked.var
-           , Currency.Balance.var
-           , Currency.Amount.var )
-           Account_timing.As_record.t
-       , 'a )
+       * ( Tick.Boolean.var
+         , Mina_numbers.Global_slot.Checked.var
+         , Currency.Balance.var
+         , Currency.Amount.var )
+         Account_timing.As_record.t )
        Tick.Checked.t
 
   module Parties_snark : sig
@@ -495,7 +493,7 @@ module Base : sig
          ?witness:Parties_segment.Witness.t
       -> Parties_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> (int * Snapp_statement.Checked.t) list
+      -> (int * Zkapp_statement.Checked.t) list
       -> Statement.With_sok.var
       -> unit
   end
@@ -531,7 +529,7 @@ module For_tests : sig
          ( unit
          , unit
          , unit
-         , Snapp_statement.t
+         , Zkapp_statement.t
          , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -561,7 +559,7 @@ module For_tests : sig
             ( unit
             , unit
             , unit
-            , Snapp_statement.t
+            , Zkapp_statement.t
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 

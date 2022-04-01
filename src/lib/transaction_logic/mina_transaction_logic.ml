@@ -309,7 +309,7 @@ module type S = sig
            , ledger
            , bool
            , unit
-           , Transaction_status.Failure.t option )
+           , Transaction_status.Failure.Collection.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
        Or_error.t
@@ -342,7 +342,7 @@ module type S = sig
                , ledger
                , bool
                , unit
-               , Transaction_status.Failure.t option )
+               , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
           -> 'acc)
     -> ?fee_excess:Amount.Signed.t
@@ -975,7 +975,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           { applied_common with
             user_command =
               { data = user_command
-              ; status = Failed (failure, compute_balances ())
+              ; status =
+                  Failed
+                    ( Transaction_status.Failure.Collection.of_single_failure
+                        failure
+                    , compute_balances () )
               }
           }
         in
@@ -1002,7 +1006,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                ; delegate = _
                ; verification_key = _
                ; permissions = _
-               ; snapp_uri = _
+               ; zkapp_uri = _
                ; token_symbol = _
                ; timing = _
                ; voting_for = _
@@ -1060,6 +1064,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   end
 
   module Inputs = struct
+    let with_label ~label:_ f = f ()
+
     module First_party = Party.Signed
     module Global_state = Global_state
 
@@ -1098,16 +1104,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type failure_status = Transaction_status.Failure.t option
 
-      let assert_with_failure_status b failure_status =
-        match (b, failure_status) with
-        | false, Some failure ->
-            (* Raise a more useful error message if we have a failure
-               description.
-            *)
-            Error.raise
-              (Error.of_string @@ Transaction_status.Failure.to_string failure)
-        | _ ->
-            assert b
+      type failure_status_tbl = Transaction_status.Failure.Collection.t
+
+      let is_empty t = List.join t |> List.is_empty
+
+      let assert_with_failure_status_tbl b failure_status_tbl =
+        if (not b) && not (is_empty failure_status_tbl) then
+          (* Raise a more useful error message if we have a failure
+             description. *)
+          Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
+          @@ Transaction_status.Failure.Collection.display_to_yojson
+          @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
+        else assert b
     end
 
     module Account_id = struct
@@ -1231,7 +1239,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push_events = Party.Sequence_events.push_events
     end
 
-    module Snapp_uri = struct
+    module Zkapp_uri = struct
       type t = string
 
       let if_ = Parties.value_if
@@ -1262,8 +1270,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_verification_key : t -> Controller.t =
          fun a -> a.permissions.set_verification_key
 
-        let set_snapp_uri : t -> Controller.t =
-         fun a -> a.permissions.set_snapp_uri
+        let set_zkapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_zkapp_uri
 
         let edit_sequence_state : t -> Controller.t =
          fun a -> a.permissions.edit_sequence_state
@@ -1358,9 +1366,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
 
-      let snapp_uri (a : t) = a.snapp_uri
+      let zkapp_uri (a : t) = a.zkapp_uri
 
-      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -1449,7 +1457,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
-      type parties = (Party.t, Parties.Digest.t) Parties.Call_forest.t
+      type parties =
+        ( Party.t
+        , Parties.Digest.Party.t
+        , Parties.Digest.Forest.t )
+        Parties.Call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1468,9 +1480,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies false, `Signature_verifies false)
 
       module Update = struct
-        open Snapp_basic
+        open Zkapp_basic
 
-        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+        type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
@@ -1478,12 +1490,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let app_state (party : t) = party.data.body.update.app_state
 
         let verification_key (party : t) =
-          Snapp_basic.Set_or_keep.map ~f:Option.some
+          Zkapp_basic.Set_or_keep.map ~f:Option.some
             party.data.body.update.verification_key
 
         let sequence_events (party : t) = party.data.body.sequence_events
 
-        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+        let zkapp_uri (party : t) = party.data.body.update.zkapp_uri
 
         let token_symbol (party : t) = party.data.body.update.token_symbol
 
@@ -1496,7 +1508,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Set_or_keep = struct
-      include Snapp_basic.Set_or_keep
+      include Zkapp_basic.Set_or_keep
 
       let set_or_keep ~if_:_ t x = set_or_keep t x
     end
@@ -1542,7 +1554,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Parties = struct
-      type t = (Party.t, Parties.Digest.t) Parties.Call_forest.t
+      type t = Party.parties
 
       let empty () = []
 
@@ -1578,25 +1590,28 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
-        , Bool.failure_status )
+        , Bool.failure_status_tbl )
         Parties_logic.Local_state.t
 
       let add_check (t : t) failure b =
-        let failure_status =
-          match t.failure_status with
-          | None when not b ->
-              Some failure
-          | old_failure_status ->
-              old_failure_status
+        let failure_status_tbl =
+          match t.failure_status_tbl with
+          | hd :: tl when not b ->
+              (failure :: hd) :: tl
+          | old_failure_status_tbl ->
+              old_failure_status_tbl
         in
-        { t with failure_status; success = t.success && b }
+        { t with failure_status_tbl; success = t.success && b }
 
-      let update_failure_status (t : t) failure_status b =
+      let update_failure_status_tbl (t : t) failure_status b =
         match failure_status with
         | None ->
             { t with success = t.success && b }
         | Some failure ->
-            add_check (t : t) failure b
+            add_check t failure b
+
+      let add_new_failure_status_bucket (t : t) =
+        { t with failure_status_tbl = [] :: t.failure_status_tbl }
     end
   end
 
@@ -1674,8 +1689,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
-        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.frame.Stack_frame.calls then Ok user_acc
+        , (l_state : _ Parties_logic.Local_state.t) ) :
+        (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
+      if List.is_empty l_state.stack_frame.Stack_frame.calls then
+        Ok (user_acc, l_state.failure_status_tbl)
       else
         let%bind states =
           Or_error.try_with (fun () ->
@@ -1685,7 +1702,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
       ( { protocol_state = state_view; ledger; fee_excess }
-      , { frame =
+      , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
              ; caller_caller = Token_id.default
@@ -1697,7 +1714,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; excess = Currency.Amount.zero
         ; ledger
         ; success = true
-        ; failure_status = None
+        ; failure_status_tbl = []
         } )
     in
     let user_acc = f init initial_state in
@@ -1715,21 +1732,32 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok s ->
+    | Ok (s, failure_status_tbl) ->
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
                     (* TODO *)
-                    Applied
-                      ( { fee_payer_account_creation_fee_paid = None
-                        ; receiver_account_creation_fee_paid = None
-                        }
-                      , { fee_payer_balance = None
-                        ; source_balance = None
-                        ; receiver_balance = None
-                        } )
+                    ( if
+                      Transaction_status.Failure.Collection.is_empty
+                        failure_status_tbl
+                    then
+                      Applied
+                        ( { fee_payer_account_creation_fee_paid = None
+                          ; receiver_account_creation_fee_paid = None
+                          }
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } )
+                    else
+                      Failed
+                        ( failure_status_tbl
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } ) )
                 }
             }
           , s )
@@ -2245,9 +2273,9 @@ module For_tests = struct
     [@@deriving sexp, compare]
   end
 
-  let min_init_balance = 8_000_000_000
+  let min_init_balance = Int64.of_string "8000000000"
 
-  let max_init_balance = 8_000_000_000_000
+  let max_init_balance = Int64.of_string "8000000000000"
 
   let num_accounts = 10
 
@@ -2256,7 +2284,7 @@ module For_tests = struct
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
   module Init_ledger = struct
-    type t = (Keypair.t * int) array [@@deriving sexp]
+    type t = (Keypair.t * int64) array [@@deriving sexp]
 
     let init (type l) (module L : Ledger_intf.S with type t = l)
         (init_ledger : t) (l : L.t) =
@@ -2268,7 +2296,11 @@ module For_tests = struct
                  Token_id.default)
             |> Or_error.ok_exn
           in
-          L.set l loc { account with balance = Currency.Balance.of_int amount })
+          L.set l loc
+            { account with
+              balance =
+                Currency.Balance.of_uint64 (Unsigned.UInt64.of_int64 amount)
+            })
 
     let gen () : t Quickcheck.Generator.t =
       let tbl = Public_key.Compressed.Hash_set.create () in
@@ -2280,7 +2312,7 @@ module For_tests = struct
           let%bind kp =
             filter Keypair.gen ~f:(fun kp ->
                 not (Hash_set.mem tbl (Public_key.compress kp.public_key)))
-          and amount = Int.gen_incl min_init_balance max_init_balance in
+          and amount = Int64.gen_incl min_init_balance max_init_balance in
           Hash_set.add tbl (Public_key.compress kp.public_key) ;
           go ((kp, amount) :: acc) (n - 1)
       in
@@ -2485,7 +2517,7 @@ module For_tests = struct
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
         ~fee_payer_hash:
-          (Party.Predicated.digest
+          (Parties.Digest.Party.create
              (Party.Predicated.of_fee_payer parties.fee_payer.data))
     in
     let other_parties_signature =

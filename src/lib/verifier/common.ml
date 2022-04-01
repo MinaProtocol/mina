@@ -53,7 +53,7 @@ let check :
           let full_tx_commitment =
             Parties.Transaction_commitment.with_fee_payer tx_commitment
               ~fee_payer_hash:
-                (Party.Predicated.digest
+                (Parties.Digest.Party.create
                    (Party.Predicated.of_fee_payer fee_payer.data))
           in
           let check_signature s pk msg =
@@ -99,8 +99,8 @@ let check :
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         let stmt =
-                          { Snapp_statement.Poly.transaction = commitment
-                          ; at_party
+                          { Zkapp_statement.Poly.transaction = commitment
+                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
                         Some (vk, stmt, pi) ))

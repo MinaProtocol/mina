@@ -4,12 +4,11 @@ module Make_test (F : Intf.Basic) = struct
   let test arg_typ gen_arg sexp_of_arg label unchecked checked =
     let open F.Impl in
     let converted x =
-      let (), r =
+      let r =
         run_and_check
           (let open Checked.Let_syntax in
           let%bind x = exists arg_typ ~compute:(As_prover.return x) in
           checked x >>| As_prover.read F.typ)
-          ()
         |> Or_error.ok_exn
       in
       r

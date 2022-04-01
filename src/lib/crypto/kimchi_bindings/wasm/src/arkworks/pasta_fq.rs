@@ -12,6 +12,7 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct WasmPastaFq(pub Fq);
 
@@ -19,7 +20,7 @@ impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
     const FLATTENED_SIZE: usize = std::mem::size_of::<Fq>();
     fn flatten(self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::with_capacity(Self::FLATTENED_SIZE);
-        self.0.write(&mut bytes);
+        self.0.write(&mut bytes).unwrap();
         bytes
     }
     fn unflatten(flat: Vec<u8>) -> Self {
@@ -63,7 +64,7 @@ impl IntoWasmAbi for WasmPastaFq {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     fn into_abi(self) -> Self::Abi {
         let mut bytes: Vec<u8> = vec![];
-        self.0.write(&mut bytes);
+        self.0.write(&mut bytes).unwrap();
         bytes.into_abi()
     }
 }

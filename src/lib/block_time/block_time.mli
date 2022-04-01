@@ -76,15 +76,15 @@ module Time : sig
 
     val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
-    val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+    val ( = ) : t -> t -> Boolean.var Checked.t
 
-    val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+    val ( < ) : t -> t -> Boolean.var Checked.t
 
-    val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+    val ( > ) : t -> t -> Boolean.var Checked.t
 
-    val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+    val ( <= ) : t -> t -> Boolean.var Checked.t
 
-    val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+    val ( >= ) : t -> t -> Boolean.var Checked.t
 
     val to_field : t -> Field.Var.t
 
@@ -161,11 +161,10 @@ module Time : sig
     end
   end
 
-  val field_var_to_unpacked :
-    Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
+  val field_var_to_unpacked : Tick.Field.Var.t -> Unpacked.var Tick.Checked.t
 
   val diff_checked :
-    Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t
+    Unpacked.var -> Unpacked.var -> Span.Unpacked.var Tick.Checked.t
 
   val unpacked_to_number : Span.Unpacked.var -> Tick.Number.t
 

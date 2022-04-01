@@ -27,81 +27,85 @@ let%test_module "Snapp payments tests" =
       in
       let acct1 = wallets.(i) in
       let acct2 = wallets.(j) in
-      let new_state : _ Snapp_state.V.t =
-        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
+      let new_state : _ Zkapp_state.V.t =
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      { fee_payer =
-          { Party.Fee_payer.data =
-              { body =
-                  { public_key = acct1.account.public_key
-                  ; update =
-                      { app_state =
-                          Pickles_types.Vector.map new_state ~f:(fun x ->
-                              Snapp_basic.Set_or_keep.Set x)
-                      ; delegate = Keep
-                      ; verification_key = Keep
-                      ; permissions = Keep
-                      ; snapp_uri = Keep
-                      ; token_symbol = Keep
-                      ; timing = Keep
-                      ; voting_for = Keep
-                      }
-                  ; token_id = ()
-                  ; balance_change = Fee.of_int full_amount
-                  ; increment_nonce = ()
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Field.zero
-                  ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
-                  ; use_full_commitment = ()
-                  }
-              ; predicate = acct1.account.nonce
-              }
-          ; authorization = Signature.dummy
-          }
-      ; other_parties =
-          [ { data =
+      Parties.of_wire
+        { fee_payer =
+            { data =
                 { body =
                     { public_key = acct1.account.public_key
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change =
-                        Amount.Signed.(of_unsigned receiver_amount |> negate)
-                    ; increment_nonce = true
+                    ; update =
+                        { app_state =
+                            Pickles_types.Vector.map new_state ~f:(fun x ->
+                                Zkapp_basic.Set_or_keep.Set x)
+                        ; delegate = Keep
+                        ; verification_key = Keep
+                        ; permissions = Keep
+                        ; zkapp_uri = Keep
+                        ; token_symbol = Keep
+                        ; timing = Keep
+                        ; voting_for = Keep
+                        }
+                    ; token_id = ()
+                    ; balance_change = Fee.of_int full_amount
+                    ; increment_nonce = ()
                     ; events = []
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = false
+                    ; use_full_commitment = ()
                     }
-                ; predicate = Accept
+                ; predicate = acct1.account.nonce
+                ; caller = ()
                 }
-            ; authorization = Signature Signature.dummy
+            ; authorization = Signature.dummy
             }
-          ; { data =
-                { body =
-                    { public_key = acct2.account.public_key
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change =
-                        Amount.Signed.(of_unsigned receiver_amount)
-                    ; increment_nonce = false
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = false
-                    }
-                ; predicate = Accept
-                }
-            ; authorization = None_given
-            }
-          ]
-      ; memo
-      }
+        ; other_parties =
+            [ { data =
+                  { body =
+                      { public_key = acct1.account.public_key
+                      ; update = Party.Update.noop
+                      ; token_id = Token_id.default
+                      ; balance_change =
+                          Amount.Signed.(of_unsigned receiver_amount |> negate)
+                      ; increment_nonce = true
+                      ; events = []
+                      ; sequence_events = []
+                      ; call_data = Field.zero
+                      ; call_depth = 0
+                      ; protocol_state = Snapp_predicate.Protocol_state.accept
+                      ; use_full_commitment = false
+                      }
+                  ; predicate = Accept
+                  ; caller = Call
+                  }
+              ; authorization = Signature Signature.dummy
+              }
+            ; { data =
+                  { body =
+                      { public_key = acct2.account.public_key
+                      ; update = Party.Update.noop
+                      ; token_id = Token_id.default
+                      ; balance_change =
+                          Amount.Signed.(of_unsigned receiver_amount)
+                      ; increment_nonce = false
+                      ; events = []
+                      ; sequence_events = []
+                      ; call_data = Field.zero
+                      ; call_depth = 0
+                      ; protocol_state = Snapp_predicate.Protocol_state.accept
+                      ; use_full_commitment = false
+                      }
+                  ; predicate = Accept
+                  ; caller = Call
+                  }
+              ; authorization = None_given
+              }
+            ]
+        ; memo
+        }
 
     let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -127,7 +131,7 @@ let%test_module "Snapp payments tests" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post))
 
-    let%test_unit "snapps-based payment" =
+    let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -136,7 +140,7 @@ let%test_module "Snapp payments tests" =
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
 
-    let%test_unit "Consecutive snapps-based payments" =
+    let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->

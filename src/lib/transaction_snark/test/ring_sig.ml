@@ -13,7 +13,7 @@ open Snark_params.Tick
 open Snark_params.Tick.Let_syntax
 
 (* check a signature on msg against a public key *)
-let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
+let check_sig pk msg sigma : Boolean.var Checked.t =
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
   Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
@@ -36,10 +36,10 @@ type _ Snarky_backendless.Request.t +=
 
 let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
     _ Pickles.Inductive_rule.t =
-  let ring_sig_main (tx_commitment : Snapp_statement.Checked.t) :
-      (unit, _) Checked.t =
+  let ring_sig_main (tx_commitment : Zkapp_statement.Checked.t) : unit Checked.t
+      =
     let msg_var =
-      Snapp_statement.Checked.to_field_elements tx_commitment
+      Zkapp_statement.Checked.to_field_elements tx_commitment
       |> Random_oracle_input.Chunked.field_elements
     in
     let%bind sigma_var =
@@ -77,7 +77,7 @@ let%test_unit "1-of-1" =
        in
        check_witness [ pk ] msg_var sigma_var)
       |> Checked.map ~f:As_prover.return
-      |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+      |> run_and_check |> Or_error.ok_exn)
 
 let%test_unit "1-of-2" =
   let gen =
@@ -98,7 +98,7 @@ let%test_unit "1-of-2" =
        in
        check_witness [ pk0; pk1 ] msg_var sigma1_var)
       |> Checked.map ~f:As_prover.return
-      |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+      |> run_and_check |> Or_error.ok_exn)
 
 (* test a snapp tx with a 3-party ring *)
 let%test_unit "ring-signature snapp tx with 3 parties" =
@@ -125,9 +125,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
             Pickles.compile ~cache:Cache_dir.cache
-              (module Snapp_statement.Checked)
-              (module Snapp_statement)
-              ~typ:Snapp_statement.typ
+              (module Zkapp_statement.Checked)
+              (module Zkapp_statement)
+              ~typ:Zkapp_statement.typ
               ~branches:(module Nat.N2)
               ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
               ~name:"ringsig"
@@ -251,9 +251,11 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               ~protocol_state_predicate_hash ~memo_hash
           in
           let at_party = Parties.Call_forest.hash ps in
-          let tx_statement : Snapp_statement.t = { transaction; at_party } in
+          let tx_statement : Zkapp_statement.t =
+            { transaction; at_party = (at_party :> field) }
+          in
           let msg =
-            tx_statement |> Snapp_statement.to_field_elements
+            tx_statement |> Zkapp_statement.to_field_elements
             |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in
@@ -273,7 +275,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             let txn_comm =
               Parties.Transaction_commitment.with_fee_payer transaction
                 ~fee_payer_hash:
-                  Party.Predicated.(digest (of_fee_payer fee_payer.data))
+                  (Parties.Digest.Party.create
+                     (Party.Predicated.of_fee_payer fee_payer.data))
             in
             { fee_payer with
               authorization =
@@ -322,5 +325,4 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Snapp_predicate.Protocol_state.to_yojson protocol_state
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
-          |> fun () -> apply_parties ledger [ parties ])
-      |> fun ((), ()) -> ())
+          |> fun () -> apply_parties ledger [ parties ]))

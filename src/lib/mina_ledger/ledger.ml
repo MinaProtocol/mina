@@ -474,8 +474,8 @@ let%test_unit "tokens test" =
   in
   let main (ledger : t) =
     let execute_parties_transaction
-        (parties : (Party.Predicated.Wire.t, unit) Parties.Call_forest.t) : unit
-        =
+        (parties : (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t)
+        : unit =
       let _res =
         apply_parties_unchecked ~constraint_constants ~state_view:view ledger
           (mk_parties_transaction ledger parties)
@@ -510,7 +510,8 @@ let%test_unit "tokens test" =
     let token_owner = Keypair.create () in
     let token_account1 = Keypair.create () in
     let token_account2 = Keypair.create () in
-    let forest ps : (Party.Predicated.Wire.t, unit) Parties.Call_forest.t =
+    let forest ps : (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t
+        =
       List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
     in
     let node party calls =
@@ -522,7 +523,8 @@ let%test_unit "tokens test" =
     let account_creation_fee =
       Currency.Fee.to_int constraint_constants.account_creation_fee
     in
-    let create_token : (Party.Predicated.Wire.t, unit) Parties.Call_forest.t =
+    let create_token :
+        (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t =
       forest
         [ node
             (party Call token_funder Token_id.default

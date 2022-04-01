@@ -1,7 +1,9 @@
 use crate::field_vector::fq::CamlFqVector;
 use mina_curves::pasta::fq::Fq;
-use oracle::poseidon::{poseidon_block_cipher, ArithmeticSpongeParams, PlonkSpongeConstantsKimchi};
-
+use oracle::{
+    constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher,
+    poseidon::ArithmeticSpongeParams,
+};
 pub struct CamlPastaFqPoseidonParams(ArithmeticSpongeParams<Fq>);
 pub type CamlPastaFqPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPoseidonParams>;
 

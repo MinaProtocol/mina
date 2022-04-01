@@ -10,9 +10,8 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::circuits::scalars::ProofEvaluations;
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
 use kimchi::prover::caml::CamlProverProof;
-use kimchi::prover::{ProverCommitments, ProverProof};
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
@@ -21,7 +20,7 @@ use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
 };
 use oracle::{
-    poseidon::PlonkSpongeConstantsKimchi,
+    constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use std::convert::TryInto;
@@ -78,7 +77,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fp>::setup();
-        let proof = ProverProof::create::<
+        let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, index, prev)

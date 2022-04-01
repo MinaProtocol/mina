@@ -67,16 +67,17 @@ module type Gossip_net_intf = sig
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
-  val broadcast : t -> Message.msg -> unit
+  val broadcast_state : t -> Message.state_msg -> unit Deferred.t
+
+  val broadcast_transaction_pool_diff :
+    t -> Message.transaction_pool_diff_msg -> unit Deferred.t
+
+  val broadcast_snark_pool_diff :
+    t -> Message.snark_pool_diff_msg -> unit Deferred.t
 
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-  val received_message_reader :
-       t
-    -> (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
-       Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 end

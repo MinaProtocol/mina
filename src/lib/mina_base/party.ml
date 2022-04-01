@@ -21,7 +21,7 @@ module type Type = sig
 end
 
 let token_id_deriver obj =
-  let open Fields_derivers_snapps in
+  let open Fields_derivers_zkapps in
   iso_string obj ~name:"TokenId" ~doc:"String representing a token ID"
     ~to_string:Token_id.to_string
     ~of_string:(except ~f:Token_id.of_string `Token_id)
@@ -191,7 +191,7 @@ module Update = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
     let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
@@ -199,7 +199,7 @@ module Update = struct
       |> finish "Timing" ~t_toplevel_annots
   end
 
-  open Snapp_basic
+  open Zkapp_basic
 
   [%%versioned
   module Stable = struct
@@ -207,7 +207,7 @@ module Update = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t =
         { app_state :
-            F.Stable.V1.t Set_or_keep.Stable.V1.t Snapp_state.V.Stable.V1.t
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             ( Pickles.Side_loaded.Verification_key.Stable.V2.t
@@ -215,7 +215,7 @@ module Update = struct
             With_hash.Stable.V1.t
             Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; snapp_uri : string Set_or_keep.Stable.V1.t
+        ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -236,7 +236,7 @@ module Update = struct
         Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
       in
       (* won't raise because length is correct *)
-      Quickcheck.Generator.return (Snapp_state.V.of_list_exn fields)
+      Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
@@ -256,7 +256,7 @@ module Update = struct
           let%map permissions = Permissions.gen ~auth_tag in
           Set_or_keep.Set permissions
     in
-    let%bind snapp_uri =
+    let%bind zkapp_uri =
       let uri_gen =
         Quickcheck.Generator.of_list
           [ "https://www.example.com"
@@ -284,7 +284,7 @@ module Update = struct
         ; delegate
         ; verification_key
         ; permissions
-        ; snapp_uri
+        ; zkapp_uri
         ; token_symbol
         ; timing
         ; voting_for
@@ -295,7 +295,7 @@ module Update = struct
     open Pickles.Impls.Step
 
     type t =
-      { app_state : Field.t Set_or_keep.Checked.t Snapp_state.V.t
+      { app_state : Field.t Set_or_keep.Checked.t Zkapp_state.V.t
       ; delegate : Public_key.Compressed.var Set_or_keep.Checked.t
       ; verification_key :
           ( Boolean.var
@@ -303,10 +303,10 @@ module Update = struct
             , Field.Constant.t )
             With_hash.t
             Data_as_hash.t )
-          Snapp_basic.Flagged_option.t
+          Zkapp_basic.Flagged_option.t
           Set_or_keep.Checked.t
       ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
-      ; snapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
+      ; zkapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
       ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
       ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
       ; voting_for : State_hash.var Set_or_keep.Checked.t
@@ -318,7 +318,7 @@ module Update = struct
          ; delegate
          ; verification_key
          ; permissions
-         ; snapp_uri
+         ; zkapp_uri
          ; token_symbol
          ; timing
          ; voting_for
@@ -326,7 +326,7 @@ module Update = struct
           t) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
-        [ Snapp_state.to_input app_state
+        [ Zkapp_state.to_input app_state
             ~f:(Set_or_keep.Checked.to_input ~f:field)
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
@@ -334,7 +334,7 @@ module Update = struct
               field (Data_as_hash.hash x.data))
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
-        ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
+        ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
@@ -344,11 +344,11 @@ module Update = struct
 
   let noop : t =
     { app_state =
-        Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
+        Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
-    ; snapp_uri = Keep
+    ; zkapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
@@ -361,7 +361,7 @@ module Update = struct
        ; delegate
        ; verification_key
        ; permissions
-       ; snapp_uri
+       ; zkapp_uri
        ; token_symbol
        ; timing
        ; voting_for
@@ -369,7 +369,7 @@ module Update = struct
         t) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
-      [ Snapp_state.to_input app_state
+      [ Zkapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
       ; Set_or_keep.to_input delegate
           ~dummy:(Snapp_predicate.Eq_data.Tc.public_key ()).default
@@ -380,8 +380,8 @@ module Update = struct
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
-          (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
-          ~dummy:(Account.hash_snapp_uri_opt None)
+          (Set_or_keep.map ~f:Account.hash_zkapp_uri zkapp_uri)
+          ~dummy:(Account.hash_zkapp_uri_opt None)
           ~f:field
       ; Set_or_keep.to_input token_symbol ~dummy:Account.Token_symbol.default
           ~f:Account.Token_symbol.to_input
@@ -394,7 +394,7 @@ module Update = struct
   let typ () : (Checked.t, t) Typ.t =
     let open Pickles.Impls.Step in
     Typ.of_hlistable
-      [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
+      [ Zkapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
       ; Set_or_keep.typ ~dummy:Public_key.Compressed.empty
           Public_key.Compressed.typ
       ; Set_or_keep.optional_typ
@@ -412,16 +412,16 @@ module Update = struct
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Snapp_basic.Flagged_option.data; _ } -> data))
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data))
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
-                   { Snapp_basic.Flagged_option.data
+                   { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    }))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Account.hash_snapp_uri
-             ~non_preimage:(Account.hash_snapp_uri_opt None)
+          (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
+             ~non_preimage:(Account.hash_zkapp_uri_opt None)
              ~dummy_value:"")
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -433,15 +433,15 @@ module Update = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let deriver obj =
-    let open Fields_derivers_snapps in
+    let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
-         ~app_state:!.(Snapp_state.deriver @@ Set_or_keep.deriver field)
+         ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~snapp_uri:!.(Set_or_keep.deriver string)
+         ~zkapp_uri:!.(Set_or_keep.deriver string)
          ~token_symbol:!.(Set_or_keep.deriver string)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
@@ -449,7 +449,7 @@ module Update = struct
 
   let%test_unit "json roundtrip" =
     let app_state =
-      Snapp_state.V.of_list_exn
+      Zkapp_state.V.of_list_exn
         Set_or_keep.
           [ Set (F.negate F.one); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
     in
@@ -467,13 +467,13 @@ module Update = struct
       ; delegate = Set_or_keep.Set Public_key.Compressed.empty
       ; verification_key
       ; permissions = Set_or_keep.Set Permissions.user_default
-      ; snapp_uri = Set_or_keep.Set "https://www.example.com"
+      ; zkapp_uri = Set_or_keep.Set "https://www.example.com"
       ; token_symbol = Set_or_keep.Set "TOKEN"
       ; timing = Set_or_keep.Set Timing_info.dummy
       ; voting_for = Set_or_keep.Set State_hash.dummy
       }
     in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
@@ -641,7 +641,7 @@ module Body = struct
       }
 
     let deriver obj =
-      let open Fields_derivers_snapps in
+      let open Fields_derivers_zkapps in
       let fee obj =
         iso_string obj ~name:"Fee" ~to_string:Fee.to_string
           ~of_string:Fee.of_string
@@ -658,7 +658,7 @@ module Body = struct
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let full = o () in
       let _a = deriver full in
       [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -784,7 +784,7 @@ module Body = struct
     }
 
   let deriver obj =
-    let open Fields_derivers_snapps in
+    let open Fields_derivers_zkapps in
     let token_id_deriver obj =
       iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
         ~of_string:Token_id.of_string
@@ -828,7 +828,7 @@ module Body = struct
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let full = o () in
     let _a = deriver full in
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -923,19 +923,19 @@ module Predicate = struct
         Accept
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     iso_record ~of_record:of_full ~to_record:to_full
       Snapp_predicate.Account.deriver obj
 
   let%test_unit "json roundtrip accept" =
     let predicate : t = Accept in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip nonce" =
     let predicate : t = Nonce (Account_nonce.of_int 928472) in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
@@ -948,13 +948,13 @@ module Predicate = struct
         ; public_key = Check Public_key.Compressed.empty
         }
     in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "to_json" =
     let predicate : t = Nonce (Account_nonce.of_int 34928) in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: string]
       (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
@@ -1033,7 +1033,7 @@ module Predicated = struct
   end]
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
       ~predicate:!.Predicate.deriver ~caller:!.token_id_deriver
@@ -1163,7 +1163,7 @@ module Predicated = struct
       }
 
     let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let ( !. ) ?skip_data =
         ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
       in
@@ -1271,7 +1271,7 @@ module Fee_payer = struct
     }
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let open Poly in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
@@ -1283,7 +1283,7 @@ module Fee_payer = struct
     let dummy : t =
       { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
     in
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let full = o () in
     let _a = deriver full in
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -1379,7 +1379,7 @@ let use_full_commitment (t : _ t_) : bool = t.data.body.use_full_commitment
 let increment_nonce (t : _ t_) : bool = t.data.body.increment_nonce
 
 let deriver obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let open Poly in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~data:!.Predicated.deriver
@@ -1396,6 +1396,6 @@ let%test_unit "json roundtrip dummy" =
     ; authorization = Control.dummy_of_tag Signature
     }
   in
-  let module Fd = Fields_derivers_snapps.Derivers in
+  let module Fd = Fields_derivers_zkapps.Derivers in
   let full = deriver @@ Fd.o () in
   [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)

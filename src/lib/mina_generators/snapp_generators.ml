@@ -48,7 +48,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
           (* choose constructor *)
           if b then
             (* Full *)
-            let open Snapp_basic in
+            let open Zkapp_basic in
             let%bind (predicate_account : Snapp_predicate.Account.t) =
               let%bind balance =
                 let%bind balance_change_int =
@@ -113,11 +113,11 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                 match snapp with
                 | None ->
                     let len =
-                      Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+                      Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
                     in
                     (* won't raise, correct length given *)
                     let state =
-                      Snapp_state.V.of_list_exn
+                      Zkapp_state.V.of_list_exn
                         (List.init len ~f:(fun _ -> Or_ignore.Ignore))
                     in
                     let sequence_state = Or_ignore.Ignore in
@@ -125,7 +125,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return (state, sequence_state, proved_state)
                 | Some { app_state; sequence_state; proved_state; _ } ->
                     let state =
-                      Snapp_state.V.map app_state ~f:(fun field ->
+                      Zkapp_state.V.map app_state ~f:(fun field ->
                           Quickcheck.random_value (Or_ignore.gen (return field)))
                     in
                     let%bind sequence_state =
@@ -214,14 +214,14 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return { predicate_account with delegate }
                 | State ->
                     let fields =
-                      Snapp_state.V.to_list predicate_account.state
+                      Zkapp_state.V.to_list predicate_account.state
                       |> Array.of_list
                     in
                     let%bind ndx = Int.gen_incl 0 (Array.length fields - 1) in
                     let%bind field = Snark_params.Tick.Field.gen in
                     fields.(ndx) <- Or_ignore.Check field ;
                     let state =
-                      Snapp_state.V.of_list_exn (Array.to_list fields)
+                      Zkapp_state.V.of_list_exn (Array.to_list fields)
                     in
                     return { predicate_account with state }
                 | Sequence_state ->
@@ -323,23 +323,23 @@ let gen_epoch_data_predicate
   let open Quickcheck.Let_syntax in
   let%bind ledger =
     let%bind hash =
-      Snapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
+      Zkapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
     in
     let%map total_currency =
       closed_interval_exact epoch_data.ledger.total_currency
-      |> return |> Snapp_basic.Or_ignore.gen
+      |> return |> Zkapp_basic.Or_ignore.gen
     in
     { Epoch_ledger.Poly.hash; total_currency }
   in
-  let%bind seed = Snapp_basic.Or_ignore.gen @@ return epoch_data.seed in
+  let%bind seed = Zkapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =
-    Snapp_basic.Or_ignore.gen @@ return epoch_data.start_checkpoint
+    Zkapp_basic.Or_ignore.gen @@ return epoch_data.start_checkpoint
   in
   let%bind lock_checkpoint =
-    Snapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
+    Zkapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
   in
   let%map epoch_length =
-    Snapp_basic.Or_ignore.gen @@ return
+    Zkapp_basic.Or_ignore.gen @@ return
     @@ closed_interval_exact epoch_data.epoch_length
   in
   { Epoch_data.Poly.ledger
@@ -353,31 +353,31 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
     Snapp_predicate.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind snarked_ledger_hash =
-    Snapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
+    Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
   let%bind timestamp =
     Snapp_predicate.Closed_interval.
       { lower = psv.timestamp; upper = Block_time.max_value }
-    |> return |> Snapp_basic.Or_ignore.gen
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind blockchain_length =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.blockchain_length)
   in
   let%bind min_window_density =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.min_window_density)
   in
   let%bind total_currency =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.total_currency)
   in
   let%bind global_slot_since_hard_fork =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.global_slot_since_hard_fork)
   in
   let%bind global_slot_since_genesis =
-    Snapp_basic.Or_ignore.gen
+    Zkapp_basic.Or_ignore.gen
       (return @@ closed_interval_exact psv.global_slot_since_genesis)
   in
   let%bind staking_epoch_data =
@@ -946,7 +946,7 @@ let gen_parties_from ?(succeed = true)
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
     Party.Predicated.of_fee_payer parties_dummy_signatures.fee_payer.data
-    |> Party.Predicated.digest
+    |> Parties.Digest.Party.create
   in
   let fee_payer_signature =
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
