@@ -116,16 +116,16 @@ type CodaConnectionManager struct {
 func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
 	prevOnConnect := cm.OnConnect
 	cm.OnConnect = func(net network.Network, c network.Conn) {
-		f(net, c)
 		prevOnConnect(net, c)
+		f(net, c)
 	}
 }
 
 func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
 	prevOnDisconnect := cm.OnDisconnect
 	cm.OnDisconnect = func(net network.Network, c network.Conn) {
-		f(net, c)
 		prevOnDisconnect(net, c)
+		f(net, c)
 	}
 }
 

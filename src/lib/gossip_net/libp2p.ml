@@ -81,20 +81,13 @@ type publish_functions =
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
 
-let empty_publish_functions logger =
-  { publish_v0 =
-      Fn.const
-      @@ Deferred.return ([%log warn] "Call of uninitialized publish_v0")
+let empty_publish_functions =
+  { publish_v0 = (fun _ -> failwith "Call of uninitialized publish_v0")
   ; publish_v1_block =
-      Fn.const
-      @@ Deferred.return ([%log warn] "Call of uninitialized publish_v1_block")
-  ; publish_v1_tx =
-      Fn.const
-      @@ Deferred.return ([%log warn] "Call of uninitialized publish_v1_tx")
+      (fun _ -> failwith "Call of uninitialized publish_v1_block")
+  ; publish_v1_tx = (fun _ -> failwith "Call of uninitialized publish_v1_tx")
   ; publish_v1_snark_work =
-      Fn.const
-      @@ Deferred.return
-           ([%log warn] "Call of uninitialized publish_v1_snark_work")
+      (fun _ -> failwith "Call of uninitialized publish_v1_snark_work")
   }
 
 let validate_gossip_base ~fn my_peer_id envelope validation_callback =
@@ -546,7 +539,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let net2_ref = ref (Deferred.never ()) in
-      let pfs_ref = ref @@ empty_publish_functions config.logger in
+      let pfs_ref = ref empty_publish_functions in
       let restarts_r, restarts_w =
         Strict_pipe.create ~name:"libp2p-restarts"
           (Strict_pipe.Buffered
@@ -907,23 +900,26 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     (* broadcast to new topics  *)
     let broadcast_state ?origin_topic t state =
       let pfs = !(t.publish_functions) in
-      guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
-      >>= fun () ->
+      let%bind () =
+        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+      in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
         (Message.New_state state)
 
     let broadcast_transaction_pool_diff ?origin_topic t diff =
       let pfs = !(t.publish_functions) in
-      guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
-      >>= fun () ->
+      let%bind () =
+        guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
+      in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
         (Message.Transaction_pool_diff diff)
 
     let broadcast_snark_pool_diff ?origin_topic t diff =
       let pfs = !(t.publish_functions) in
-      guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
-        diff
-      >>= fun () ->
+      let%bind () =
+        guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
+          diff
+      in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
         (Message.Snark_pool_diff diff)
 

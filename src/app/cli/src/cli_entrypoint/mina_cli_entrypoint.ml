@@ -264,25 +264,6 @@ let setup_daemon logger =
             in the gossip network (default: %d)"
            Cli_lib.Default.min_connections)
       (optional int)
-  (* TODO uncomment after introducing Bitswap-based block retrieval *)
-  (* and pubsub_v1 =
-     flag "--pubsub-v1" ~aliases:[ "pubsub-v1" ]
-       ~doc:
-         (Printf.sprintf
-            "Mode of handling pubsub v1 topic: 'ro', 'rw' or 'none' (default: \
-             %s)"
-            (Cli_lib.Arg_type.pubsub_topic_mode_to_string
-               Cli_lib.Default.pubsub_v1))
-       (optional pubsub_topic_mode) *)
-  and pubsub_v0 =
-    flag "--pubsub-v0" ~aliases:[ "pubsub-v0" ]
-      ~doc:
-        (Printf.sprintf
-           "Mode of handling pubsub v0 topic: 'ro', 'rw' or 'none' (default: \
-            %s)"
-           (Cli_lib.Arg_type.pubsub_topic_mode_to_string
-              Cli_lib.Default.pubsub_v0))
-      (optional pubsub_topic_mode)
   and max_connections =
     flag "--max-connections" ~aliases:[ "max-connections" ]
       ~doc:
@@ -1121,6 +1102,7 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "max-connections"
               ~default:Cli_lib.Default.max_connections max_connections
           in
+          let pubsub_v1 = Gossip_net.Libp2p.N in
           (* TODO uncomment after introducing Bitswap-based block retrieval *)
           (* let pubsub_v1 =
                or_from_config to_pubsub_topic_mode_option "pubsub-v1"
@@ -1128,7 +1110,7 @@ let setup_daemon logger =
              in *)
           let pubsub_v0 =
             or_from_config to_pubsub_topic_mode_option "pubsub-v0"
-              ~default:Cli_lib.Default.pubsub_v0 pubsub_v0
+              ~default:Cli_lib.Default.pubsub_v0 None
           in
           let validation_queue_size =
             or_from_config YJ.Util.to_int_option "validation-queue-size"
@@ -1187,7 +1169,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; known_private_ip_nets =
                   Option.value ~default:[] client_trustlist
               ; time_controller
-              ; pubsub_v1 = Gossip_net.Libp2p.N
+              ; pubsub_v1
               ; pubsub_v0
               }
           in
