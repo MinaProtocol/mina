@@ -1304,7 +1304,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let snapp =
           match a.snapp with
           | None ->
-              Some Snapp_account.default
+              Some Zkapp_account.default
           | Some _ as snapp ->
               snapp
         in
@@ -1316,7 +1316,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           | None ->
               None
           | Some snapp ->
-              if Snapp_account.(equal default snapp) then None else Some snapp
+              if Zkapp_account.(equal default snapp) then None else Some snapp
         in
         { a with snapp }
 
@@ -2246,7 +2246,7 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Snapp_account.t option
+      , Zkapp_account.t option
       , string )
       Account.Poly.t
     [@@deriving sexp, compare]

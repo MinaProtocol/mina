@@ -152,7 +152,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             spec
           in
           let fee = Amount.of_string "1000000" in
-          let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
+          let vk = With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk in
           let total = Option.value_exn (Amount.add fee amount) in
           (let _is_new, _loc =
              let pk = Public_key.compress sender.public_key in
@@ -173,7 +173,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
              { a with
                snapp =
                  Some
-                   { (Option.value ~default:Snapp_account.default a.snapp) with
+                   { (Option.value ~default:Zkapp_account.default a.snapp) with
                      verification_key = Some vk
                    }
              }) ;
