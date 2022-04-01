@@ -143,7 +143,7 @@ module Stable = struct
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option
-      , Mina_numbers.Snapp_version.Stable.V1.t
+      , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
       , Mina_numbers.Global_slot.Stable.V1.t
       , bool )
@@ -173,7 +173,7 @@ module Checked = struct
       , (Side_loaded_verification_key.t option, Field.t) With_hash.t
         Data_as_hash.t )
       Flagged_option.t
-    , Mina_numbers.Snapp_version.Checked.t
+    , Mina_numbers.Zkapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
     , Mina_numbers.Global_slot.Checked.t
     , Boolean.var )
@@ -188,7 +188,7 @@ module Checked = struct
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
       ~snapp_version:
-        (f (fun x -> Mina_numbers.Snapp_version.Checked.to_input x))
+        (f (fun x -> Mina_numbers.Zkapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
         (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
@@ -208,11 +208,11 @@ module Checked = struct
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
   let digest' t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input' t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
 end
 
 let typ : (Checked.t, t) Typ.t =
@@ -226,7 +226,7 @@ let typ : (Checked.t, t) Typ.t =
            ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
            ~back:
              (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
-    ; Mina_numbers.Snapp_version.typ
+    ; Mina_numbers.Zkapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot.typ
     ; Boolean.typ
@@ -247,7 +247,7 @@ let to_input (t : t) =
       (f
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
-    ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
+    ~snapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
     ~proved_state:
@@ -258,7 +258,7 @@ let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
   { app_state = Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
-  ; snapp_version = Mina_numbers.Snapp_version.zero
+  ; snapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
       (let empty = Lazy.force Sequence_events.empty_hash in
        [ empty; empty; empty; empty; empty ])
@@ -268,6 +268,6 @@ let default : _ Poly.t =
 
 let digest (t : t) =
   Random_oracle.(
-    hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input t)))
+    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
 let default_digest = lazy (digest default)

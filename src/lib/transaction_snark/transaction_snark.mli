@@ -251,8 +251,8 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> snapp_account1:Snapp_account.t option
-  -> snapp_account2:Snapp_account.t option
+  -> zkapp_account1:Zkapp_account.t option
+  -> zkapp_account2:Zkapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -276,8 +276,8 @@ val generate_transaction_witness :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> snapp_account1:Snapp_account.t option
-  -> snapp_account2:Snapp_account.t option
+  -> zkapp_account1:Zkapp_account.t option
+  -> zkapp_account2:Zkapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -507,9 +507,9 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypairs : Signature_lib.Keypair.t list
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
-      ; new_snapp_account : bool
+      ; new_zkapp_account : bool
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
@@ -544,7 +544,7 @@ module For_tests : sig
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
 
-  val create_trivial_snapp_account :
+  val create_trivial_zkapp_account :
        ?permissions:Permissions.t
     -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
     -> ledger:Mina_ledger.Ledger.t

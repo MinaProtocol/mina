@@ -133,7 +133,7 @@ module Accounts = struct
             in
             let verification_key =
               Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Snapp_account.digest_vk)
+                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
             let%map sequence_state =
               if
@@ -151,7 +151,7 @@ module Accounts = struct
               Mina_numbers.Global_slot.of_int last_sequence_slot
             in
             Some
-              { Snapp_account.verification_key
+              { Zkapp_account.verification_key
               ; app_state
               ; snapp_version
               ; sequence_state
@@ -278,7 +278,7 @@ module Accounts = struct
             let last_sequence_slot =
               Mina_numbers.Global_slot.to_int last_sequence_slot
             in
-            { Runtime_config.Accounts.Single.Snapp_account.state
+            { Runtime_config.Accounts.Single.Zkapp_account.state
             ; verification_key
             ; snapp_version
             ; sequence_state
