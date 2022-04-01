@@ -208,16 +208,19 @@ module Stable = struct
         let d = Common.wrap_domains.h in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
-        let wrap_vk : Impls.Wrap.Verification_key.t option =
-          try
-            Some
+        (* we only compute the wrap_vk if the srs can be loaded *)
+        let srs =
+          try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None
+        in
+        let wrap_vk =
+          Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
               { domain =
                   { log_size_of_group = log2_size
                   ; group_gen = Backend.Tock.Field.domain_generator log2_size
                   }
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
               ; max_quot_size
-              ; srs = Backend.Tock.Keypair.load_urs ()
+              ; srs
               ; evals =
                   (let g (x, y) =
                      { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
@@ -237,8 +240,7 @@ module Stable = struct
                    })
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              }
-          with _ -> None
+              })
         in
         { Poly.step_data; max_width; wrap_index = c; wrap_vk }
 
