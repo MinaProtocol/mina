@@ -166,7 +166,7 @@ module Update = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
     let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj ~initial_minimum_balance:!.balance
         ~cliff_time:!.global_slot ~cliff_amount:!.amount
@@ -408,7 +408,7 @@ module Update = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let deriver obj =
-    let open Fields_derivers_snapps in
+    let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
@@ -448,7 +448,7 @@ module Update = struct
       ; voting_for = Set_or_keep.Set State_hash.dummy
       }
     in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
@@ -616,7 +616,7 @@ module Body = struct
       }
 
     let deriver obj =
-      let open Fields_derivers_snapps in
+      let open Fields_derivers_zkapps in
       let fee obj =
         iso_string obj ~name:"Fee" ~to_string:Fee.to_string
           ~of_string:Fee.of_string
@@ -633,7 +633,7 @@ module Body = struct
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let full = o () in
       let _a = deriver full in
       [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -759,7 +759,7 @@ module Body = struct
     }
 
   let deriver obj =
-    let open Fields_derivers_snapps in
+    let open Fields_derivers_zkapps in
     let token_id_deriver obj =
       iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
         ~of_string:Token_id.of_string
@@ -803,7 +803,7 @@ module Body = struct
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let full = o () in
     let _a = deriver full in
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -898,19 +898,19 @@ module Predicate = struct
         Accept
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     iso_record ~of_record:of_full ~to_record:to_full
       Zkapp_precondition.Account.deriver obj
 
   let%test_unit "json roundtrip accept" =
     let predicate : t = Accept in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip nonce" =
     let predicate : t = Nonce (Account_nonce.of_int 928472) in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
@@ -923,13 +923,13 @@ module Predicate = struct
         ; public_key = Check Public_key.Compressed.empty
         }
     in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "to_json" =
     let predicate : t = Nonce (Account_nonce.of_int 34928) in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: string]
       (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
@@ -987,7 +987,7 @@ module Predicated = struct
   end]
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
       ~predicate:!.Predicate.deriver
@@ -1093,7 +1093,7 @@ module Predicated = struct
       { body = Body.of_fee_payer t.body; predicate = t.predicate }
 
     let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
         ~predicate:!.uint32
@@ -1187,7 +1187,7 @@ module Fee_payer = struct
     }
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
       ~data:!.Predicated.Fee_payer.deriver
@@ -1198,7 +1198,7 @@ module Fee_payer = struct
     let dummy : t =
       { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
     in
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let full = o () in
     let _a = deriver full in
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
@@ -1260,7 +1260,7 @@ let use_full_commitment (t : t) : bool = t.data.body.use_full_commitment
 let increment_nonce (t : t) : bool = t.data.body.increment_nonce
 
 let deriver obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~data:!.Predicated.deriver
     ~authorization:!.Control.deriver
@@ -1272,6 +1272,6 @@ let%test_unit "json roundtrip dummy" =
     ; authorization = Control.dummy_of_tag Signature
     }
   in
-  let module Fd = Fields_derivers_snapps.Derivers in
+  let module Fd = Fields_derivers_zkapps.Derivers in
   let full = deriver @@ Fd.o () in
   [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)

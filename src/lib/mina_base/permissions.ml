@@ -488,12 +488,12 @@ let auth_required_of_string = function
       failwith "auth_required_of_string: unknown variant"
 
 let auth_required =
-  Fields_derivers_snapps.Derivers.iso_string ~name:"AuthRequired"
+  Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
     ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
     ~of_string:auth_required_of_string
 
 let deriver obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
@@ -504,13 +504,13 @@ let deriver obj =
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 let%test_unit "json roundtrip" =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let full = o () in
   let _a = deriver full in
   [%test_eq: t] user_default (user_default |> to_json full |> of_json full)
 
 let%test_unit "json value" =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let full = o () in
   let _a = deriver full in
   [%test_eq: string]

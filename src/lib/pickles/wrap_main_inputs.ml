@@ -77,7 +77,7 @@ module Input_domain = struct
     let domain_size = Domain.size domain in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            (Kimchi.Protocol.SRS.Fp.lagrange_commitment
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                (Tick.Keypair.load_urs ()) domain_size i)
               .unshifted.(0)
             |> Common.finite_exn))
@@ -201,6 +201,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Kimchi.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
+      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
       |> Common.finite_exn )
 end

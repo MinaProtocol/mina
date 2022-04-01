@@ -108,7 +108,7 @@ val deriver :
       ; graphql_arg :
           (unit -> Yojson.Safe.t Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; graphql_fields :
-          Yojson.Safe.t Fields_derivers_snapps.Graphql.Fields.Input.T.t ref
+          Yojson.Safe.t Fields_derivers_zkapps.Graphql.Fields.Input.T.t ref
       ; graphql_query : string option ref
       ; graphql_query_accumulator : (string * string option) list ref
       ; map : (Yojson.Safe.t -> t) ref
@@ -117,14 +117,38 @@ val deriver :
            -> Yojson.Safe.t option Fields_derivers_graphql.Schema.Arg.arg_typ)
           ref
       ; nullable_graphql_fields :
-          Yojson.Safe.t option Fields_derivers_snapps.Graphql.Fields.Input.T.t
+          Yojson.Safe.t option Fields_derivers_zkapps.Graphql.Fields.Input.T.t
           ref
       ; of_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; .. >
       as
       'a)
-     Fields_derivers_snapps.Unified_input.t
-     Fields_derivers_snapps.Unified_input.t
-     Fields_derivers_snapps.Unified_input.t
-  -> 'a Fields_derivers_snapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+  -> 'a Fields_derivers_zkapps.Unified_input.t
+
+type raw =
+  | Digest of string  (** The digest of the string, encoded by base58-check *)
+  | Bytes of string  (** A string containing the raw bytes in the memo. *)
+
+(** Convert into a raw representation.
+
+    Raises if the tag or length are invalid.
+*)
+val to_raw_exn : t -> raw
+
+(** Convert back into the raw input bytes.
+
+    Raises if the tag or length are invalid, or if the memo was a digest.
+    Equivalent to [to_raw_exn] and then a match on [Bytes].
+*)
+val to_raw_bytes_exn : t -> string
+
+(** Convert from a raw representation.
+
+    Raises if the digest is not a valid base58-check string, or if the bytes
+    string is too long.
+*)
+val of_raw_exn : raw -> t
