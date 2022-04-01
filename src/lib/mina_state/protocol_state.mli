@@ -65,6 +65,11 @@ module Body : sig
   val view : Value.t -> Zkapp_precondition.Protocol_state.View.t
 
   val view_checked : var -> Zkapp_precondition.Protocol_state.View.Checked.t
+
+  module For_tests : sig
+    val with_consensus_state :
+      Value.t -> Consensus.Data.Consensus_state.Value.t -> Value.t
+  end
 end
 
 module Value : sig

@@ -34,7 +34,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Kimchi.Protocol.Index.Fp.read (Some offset)
+                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ()))
                 path
             in
@@ -50,7 +50,7 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Kimchi.Protocol.Index.Fp.write (Some true)
+                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
                    t.Backend.Tick.Keypair.index)
               header path))
 
@@ -62,7 +62,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset path ->
-                  Kimchi.Protocol.VerifierIndex.Fp.read (Some offset)
+                  Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ())
                     path)
                 path
@@ -79,7 +79,7 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Kimchi.Protocol.VerifierIndex.Fp.write (Some true) x)
+                (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path))
 
   let read_or_generate cache k_p k_v typ main =
@@ -160,7 +160,7 @@ module Wrap = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Kimchi.Protocol.Index.Fq.read (Some offset)
+                  Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
                     (Backend.Tock.Keypair.load_urs ()))
                 path
             in
@@ -175,7 +175,8 @@ module Wrap = struct
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
-              ~append_data:(Kimchi.Protocol.Index.Fq.write (Some true) t.index)
+              ~append_data:
+                (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path))
 
   let read_or_generate step_domains cache k_p k_v typ main =
@@ -250,7 +251,7 @@ module Wrap = struct
                    Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
                ; step_domains
                ; data =
-                   (let open Kimchi.Protocol.Index.Fq in
+                   (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })
                }
              in

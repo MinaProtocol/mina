@@ -40,7 +40,7 @@ module Closed_interval = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let deriver ~name inner obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~lower:!.inner ~upper:!.inner
     |> finish (name ^ "Interval") ~t_toplevel_annots
@@ -57,7 +57,7 @@ module Closed_interval = struct
       end
 
       let%test_unit "roundtrip json" =
-        let open Fields_derivers_snapps.Derivers in
+        let open Fields_derivers_zkapps.Derivers in
         let full = o () in
         let _a : _ Unified_input.t = deriver ~name:"Int" int full in
         [%test_eq: IntClosedInterval.t]
@@ -176,7 +176,7 @@ module Numeric = struct
     Or_ignore.deriver closed_interval obj
 
   module Derivers = struct
-    open Fields_derivers_snapps.Derivers
+    open Fields_derivers_zkapps.Derivers
 
     let token_id_inner obj =
       iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
@@ -221,14 +221,14 @@ module Numeric = struct
           { foo = Or_ignore.Check { Closed_interval.lower = 10; upper = 100 } }
 
         let deriver obj =
-          let open Fields_derivers_snapps.Derivers in
+          let open Fields_derivers_zkapps.Derivers in
           let ( !. ) = ( !. ) ~t_fields_annots in
           Fields.make_creator obj ~foo:!.(deriver "Int" int)
           |> finish "T" ~t_toplevel_annots
       end
 
       let%test_unit "roundtrip json" =
-        let open Fields_derivers_snapps.Derivers in
+        let open Fields_derivers_zkapps.Derivers in
         let full = o () in
         let _a : _ Unified_input.t = T.deriver full in
         [%test_eq: T.t] (of_json full (to_json full T.v)) T.v
@@ -581,7 +581,7 @@ module Account = struct
   let is_accept : t -> bool = equal accept
 
   let deriver obj =
-    let open Fields_derivers_snapps in
+    let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
@@ -603,7 +603,7 @@ module Account = struct
       ; proved_state = Or_ignore.Check true
       }
     in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
@@ -838,7 +838,7 @@ module Protocol_state = struct
     end]
 
     let deriver obj =
-      let open Fields_derivers_snapps.Derivers in
+      let open Fields_derivers_zkapps.Derivers in
       let ledger obj' =
         let ( !. ) =
           ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
@@ -874,7 +874,7 @@ module Protocol_state = struct
             Or_ignore.Check { Closed_interval.lower = u; upper = u }
         }
       in
-      let module Fd = Fields_derivers_snapps.Derivers in
+      let module Fd = Fields_derivers_zkapps.Derivers in
       let full = deriver (Fd.o ()) in
       [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 
@@ -1007,7 +1007,7 @@ module Protocol_state = struct
   end]
 
   let deriver obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     let ( !. ) ?skip_data =
       ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
     in
@@ -1299,7 +1299,7 @@ module Protocol_state = struct
 
   let%test_unit "json roundtrip" =
     let predicate : t = accept in
-    let module Fd = Fields_derivers_snapps.Derivers in
+    let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
 

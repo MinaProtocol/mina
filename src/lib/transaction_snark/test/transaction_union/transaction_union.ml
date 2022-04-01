@@ -1996,6 +1996,13 @@ let%test_module "transaction_undos" =
     let txn_state_view =
       Mina_state.Protocol_state.Body.view U.genesis_state_body
 
+    (* the amounts in [ledger_init_state] need to be
+       large enough to prevent nontermination in
+       Signed_command.sequence, and assure the fee calculation won't
+       have crossed bounds in Fee.gen_incl
+
+       100,000,000,000 = 100 Mina seems to be enough
+    *)
     let gen_user_commands ~length ledger_init_state =
       let open Quickcheck.Generator.Let_syntax in
       let%map cmds =
