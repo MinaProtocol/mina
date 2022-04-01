@@ -28,7 +28,7 @@ let account = create "CodaAccount"
 
 let side_loaded_vk = create "CodaSideLoadedVk"
 
-let snapp_account = create "CodaSnappAccount"
+let zkapp_account = create "CodaZkappAccount"
 
 let snapp_payload = create "CodaSnappPayload"
 
@@ -91,7 +91,7 @@ let party_node = create "MinaPartyNode"
 
 let party_with_protocol_state_predicate = create "MinaPartyStatePred"
 
-let snapp_uri = create "MinaSnappUri"
+let zkapp_uri = create "MinaZkappUri"
 
 let snapp_event = create "MinaSnappEvent"
 

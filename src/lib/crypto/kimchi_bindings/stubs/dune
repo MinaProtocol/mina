@@ -26,13 +26,38 @@
     (run cargo build --release))
    (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
 
-;; library
+;; libraries
 
 (library
- (public_name kimchi)
- (name kimchi)
+ (public_name kimchi_types)
+ (name kimchi_types)
+ (modules kimchi_types)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test)))
+
+(library
+ (public_name pasta_bindings)
+ (name pasta_bindings)
+ (modules pasta_bindings)
+ (libraries kimchi_types)
  (foreign_archives wires_15_stubs)
  (c_library_flags :standard "-lpthread")
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test)))
+
+(library
+ (public_name kimchi_bindings)
+ (name kimchi_bindings)
+ (modules kimchi_bindings)
+ (libraries
+   pasta_bindings
+   kimchi_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests)
@@ -42,7 +67,7 @@
 ;; generate the OCaml bindings
 
 (rule
- (target kimchi.ml)
+ (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (mode promote)
  (deps
   Cargo.toml
@@ -56,5 +81,5 @@
    (progn
     (run rm -rf ./target)
     (run rm -f ./Cargo.lock)
-    (run cargo run ../kimchi.ml)
-    (run ocamlformat --impl -i ../kimchi.ml)))))
+    (run cargo run %{targets})
+    (run ocamlformat -i %{targets})))))

@@ -3,7 +3,9 @@ open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
-let receipt_chain_user_command = salt receipt_chain_user_command
+let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
+
+let receipt_chain_user_command = salt_legacy receipt_chain_user_command
 
 let receipt_chain_snapp = salt receipt_chain_snapp
 
@@ -63,6 +65,17 @@ let signature =
   | Testnet ->
       signature_for_testnet
 
+let signature_for_mainnet_legacy = salt_legacy signature_mainnet
+
+let signature_for_testnet_legacy = salt_legacy signature_testnet
+
+let signature_legacy =
+  match Mina_signature_kind.t with
+  | Mainnet ->
+      signature_for_mainnet_legacy
+  | Testnet ->
+      signature_for_testnet_legacy
+
 let vrf_output = salt vrf_output
 
 let vrf_evaluation = salt vrf_evaluation
@@ -75,7 +88,7 @@ let account = salt account
 
 let side_loaded_vk = salt side_loaded_vk
 
-let snapp_account = salt snapp_account
+let zkapp_account = salt zkapp_account
 
 let snapp_payload = salt snapp_payload
 
@@ -98,7 +111,7 @@ let party_node = salt party_node
 let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate
 
-let snapp_uri = salt snapp_uri
+let zkapp_uri = salt zkapp_uri
 
 let snapp_event = salt snapp_event
 

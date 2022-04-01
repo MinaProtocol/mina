@@ -1370,7 +1370,7 @@ module Circuit = struct
         ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs)
-        spec (main ~w:priv) () pub
+        spec (main ~w:priv) pub
     in
     new%js proof_constr p
 
@@ -1417,17 +1417,13 @@ module Circuit = struct
         (fun (type a)
              (f : (unit -> (unit -> a) Js.callback Promise.t) Js.callback) :
              a Promise.t ->
-          Run_and_check_deferred.run_and_check
-            (fun () ->
+          Run_and_check_deferred.run_and_check (fun () ->
               let g : (unit -> a) Js.callback Promise.t = call f in
               Promise.map g ~f:(fun (p : (unit -> a) Js.callback) () -> call p))
-            ()
-          |> Promise.map ~f:(fun r ->
-                 let (), res = Or_error.ok_exn r in
-                 res)) ;
+          |> Promise.map ~f:Or_error.ok_exn) ;
     circuit##.runAndCheckSync :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
-          Impl.run_and_check (fun () -> f) @@ () |> Or_error.ok_exn |> snd) ;
+          Impl.run_and_check (fun () -> f) |> Or_error.ok_exn) ;
 
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
@@ -1539,7 +1535,7 @@ type snapp_statement_js =
   ; atParty : field_class Js.t Js.readonly_prop >
   Js.t
 
-module Snapp_statement = struct
+module Zkapp_statement = struct
   type t = Field.t snapp_statement
 
   let to_field_elements = snapp_statement_to_fields
@@ -1596,7 +1592,7 @@ let dummy_constraints =
       ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
         : Step_main_inputs.Inner_curve.t ) ;
     ignore
-      ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+      ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
           (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
@@ -1615,7 +1611,7 @@ let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   ; main =
       (fun _ statement ->
         dummy_constraints () ;
-        main (Snapp_statement.to_js statement) ;
+        main (Zkapp_statement.to_js statement) ;
         [])
   ; main_value = (fun _ _ -> [])
   }
@@ -1634,8 +1630,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices ~self:_ = List.map choices ~f:create_pickles_rule |> Obj.magic in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
-      (module Snapp_statement)
-      (module Snapp_statement.Constant)
+      (module Zkapp_statement)
+      (module Zkapp_statement.Constant)
       ~typ:snapp_statement_typ
       ~branches:(module Pickles_types.Nat.N1)
       ~max_branching:(module Pickles_types.Nat.N0)
@@ -1659,14 +1655,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     let prove (statement_js : snapp_statement_js) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
-      let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+      let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
+         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
       -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
     function
     | [] ->
@@ -1675,7 +1671,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         to_js_prover p :: to_js_provers ps
   in
   let verify (statement_js : snapp_statement_js) (proof : proof) =
-    let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+    let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
@@ -1801,13 +1797,13 @@ module Ledger = struct
     ; otherParties : party Js.js_array Js.t Js.prop >
     Js.t
 
-  type snapp_account =
+  type zkapp_account =
     < appState : js_field Js.js_array Js.t Js.readonly_prop > Js.t
 
   type account =
     < balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
-    ; snapp : snapp_account Js.readonly_prop >
+    ; snapp : zkapp_account Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -1820,7 +1816,7 @@ module Ledger = struct
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
-    ; set_snapp_uri = None
+    ; set_zkapp_uri = None
     ; edit_sequence_state = None
     ; set_token_symbol = None
     ; increment_nonce = None
@@ -1927,9 +1923,9 @@ module Ledger = struct
   module Snapp_predicate = Mina_base.Snapp_predicate
   module Party = Mina_base.Party
   module Parties = Mina_base.Parties
-  module Snapp_state = Mina_base.Snapp_state
+  module Zkapp_state = Mina_base.Zkapp_state
   module Token_id = Mina_base.Token_id
-  module Snapp_basic = Mina_base.Snapp_basic
+  module Zkapp_basic = Mina_base.Zkapp_basic
 
   let max_uint32 = Field.constant @@ Field.Constant.of_string "4294967295"
 
@@ -1996,7 +1992,7 @@ module Ledger = struct
 
   let or_ignore (type a) elt (x : a or_ignore) =
     if Js.to_bool x##.check##toBoolean then
-      Snapp_basic.Or_ignore.Check (elt x##.value)
+      Zkapp_basic.Or_ignore.Check (elt x##.value)
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
@@ -2062,7 +2058,7 @@ module Ledger = struct
 
   let set_or_keep (type a) elt (x : a set_or_keep) =
     if Js.to_bool x##.set##toBoolean then
-      Snapp_basic.Set_or_keep.Set (elt x##.value)
+      Zkapp_basic.Set_or_keep.Set (elt x##.value)
     else Keep
 
   let verification_key_with_hash (vk_artifact : Js.js_string Js.t) =
@@ -2070,17 +2066,17 @@ module Ledger = struct
       Pickles.Side_loaded.Verification_key.of_base58_check_exn
         (Js.to_string vk_artifact)
     in
-    { With_hash.data = vk; hash = Mina_base.Snapp_account.digest_vk vk }
+    { With_hash.data = vk; hash = Mina_base.Zkapp_account.digest_vk vk }
 
   let update (u : party_update) : Party.Update.t =
     { app_state =
-        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
             set_or_keep field (array_get_exn u##.appState i))
     ; delegate = set_or_keep public_key u##.delegate
     ; verification_key =
         set_or_keep verification_key_with_hash u##.verificationKey
     ; permissions = Keep
-    ; snapp_uri = Keep
+    ; zkapp_uri = Keep
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
@@ -2161,7 +2157,7 @@ module Ledger = struct
           ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
           ; sequence_state = or_ignore field p##.sequenceState
           ; proved_state =
@@ -2191,7 +2187,7 @@ module Ledger = struct
   let account_id pk =
     Mina_base.Account_id.create (public_key pk) Token_id.default
 
-  let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+  let max_state_size = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
 
   (*
      TODO: to de-scope initial version, the following types are converted
@@ -2239,32 +2235,32 @@ module Ledger = struct
         ~sgn:Sgn.Checked.pos
 
     let or_ignore (type a b) (transform : a -> b) (x : a or_ignore) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit
         x##.check##.value
         (transform x##.value)
 
     let ignore (dummy : 'a) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.false_ dummy
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.false_ dummy
 
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
-      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
 
     let numeric_equal (type a b) (transform : a -> b) (x : a) =
       let x' = transform x in
-      Snapp_basic.Or_ignore.Checked.make_unsafe_implicit
+      Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
         { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
-        b Snapp_basic.Set_or_keep.Checked.t =
-      Snapp_basic.Set_or_keep.Checked.make_unsafe
+        b Zkapp_basic.Set_or_keep.Checked.t =
+      Zkapp_basic.Set_or_keep.Checked.make_unsafe
         x##.set##.value
         (transform x##.value)
 
-    let keep dummy : 'a Snapp_basic.Set_or_keep.Checked.t =
-      Snapp_basic.Set_or_keep.Checked.make_unsafe Boolean.false_ dummy
+    let keep dummy : 'a Zkapp_basic.Set_or_keep.Checked.t =
+      Zkapp_basic.Set_or_keep.Checked.make_unsafe Boolean.false_ dummy
 
     let amount x = Currency.Amount.Checked.Unsafe.of_field @@ uint64 x
 
@@ -2341,11 +2337,11 @@ module Ledger = struct
 
     let events (js_events : js_field Js.js_array Js.t Js.js_array Js.t) =
       let events =
-        Impl.exists Mina_base.Snapp_account.Events.typ ~compute:(fun () -> [])
+        Impl.exists Mina_base.Zkapp_account.Events.typ ~compute:(fun () -> [])
       in
       let push_event js_event =
         let event = Array.map (Js.to_array js_event) ~f:field in
-        let _ = Mina_base.Snapp_account.Events.push_checked events event in
+        let _ = Mina_base.Zkapp_account.Events.push_checked events event in
         ()
       in
       Array.iter (Js.to_array js_events) ~f:push_event ;
@@ -2355,27 +2351,27 @@ module Ledger = struct
       let update : Party.Update.Checked.t =
         let u = b##.update in
         { app_state =
-            Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
         ; (* TODO *) verification_key =
             keep
-              { Snapp_basic.Flagged_option.is_some = Boolean.false_
+              { Zkapp_basic.Flagged_option.is_some = Boolean.false_
               ; data =
                   Mina_base.Data_as_hash.make_unsafe
-                    (Field.constant @@ Mina_base.Snapp_account.dummy_vk_hash ())
+                    (Field.constant @@ Mina_base.Zkapp_account.dummy_vk_hash ())
                     (As_prover.Ref.create (fun () ->
                          { With_hash.data = None; hash = Field.Constant.zero }))
               }
         ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
-        ; snapp_uri =
+        ; zkapp_uri =
             keep
               (Mina_base.Data_as_hash.make_unsafe Field.zero
                  (As_prover.Ref.create (fun () -> "")))
         ; token_symbol = keep Field.zero
         ; timing = keep (timing_info_dummy ())
         ; voting_for =
-            Snapp_basic.Set_or_keep.Checked.map
+            Zkapp_basic.Set_or_keep.Checked.map
               (set_or_keep field u##.votingFor)
               ~f:Mina_base.State_hash.var_of_hash_packed
         }
@@ -2411,7 +2407,7 @@ module Ledger = struct
       ; public_key = ignore pk_dummy
       ; delegate = ignore pk_dummy
       ; state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
               ignore Field.zero)
       ; sequence_state = ignore Field.zero
       ; proved_state = ignore Boolean.false_
@@ -2437,7 +2433,7 @@ module Ledger = struct
           ; public_key = or_ignore public_key predicate##.publicKey
           ; delegate = or_ignore public_key predicate##.delegate
           ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i ->
                   or_ignore field (array_get_exn predicate##.state i))
           ; sequence_state = or_ignore field predicate##.sequenceState
@@ -2618,7 +2614,7 @@ module Ledger = struct
           (Command (Parties (parties p)))
         |> Or_error.ok_exn |> ignore) ;
 
-    let full = Parties.deriver @@ Fields_derivers_snapps.Derivers.o () in
+    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
     let parties_to_json ps =
       parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
     in

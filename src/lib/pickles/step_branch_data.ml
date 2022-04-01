@@ -32,7 +32,7 @@ type ( 'a_var
           -> ( (Unfinalized.t, 'max_branching) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_branching) Vector.t )
-             Types.Pairing_based.Statement.t
+             Types.Step.Statement.t
           -> unit
       ; requests :
           (module Requests.Step.S
