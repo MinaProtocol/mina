@@ -25,6 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 USER root
 
 # OS package dependencies
+# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
+# afaict this is the last python dependency of any kind in CI
 RUN apt-get update --yes \
   && apt-get install --yes \
     apt-transport-https \
@@ -55,22 +57,15 @@ RUN apt-get update --yes \
     postgresql-contrib \
     perl \
     pkg-config \
+    python3-sexpdata \
     rubygems \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
-      && rm -rf /var/lib/apt/lists/* \
-      || exit 0
-
 # --- deb-s3 tool
-RUN curl -sLO https://github.com/deb-s3/deb-s3/releases/download/0.11.3/deb-s3-0.11.3.gem \
-    && gem install deb-s3-0.11.3.gem \
-    && rm -f deb-s3-0.11.3.gem
+RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/0.11.4/deb-s3-0.11.4.gem \
+    && gem install deb-s3-0.11.4.gem \
+    && rm -f deb-s3-0.11.4.gem
 
 # --- Docker Daemon
 RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
