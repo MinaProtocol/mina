@@ -10612,6 +10612,49 @@
         },
         {
           "kind": "OBJECT",
+          "name": "MerklePathElement",
+          "description": null,
+          "fields": [
+            {
+              "name": "isRightBranch",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "otherHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "NetworkPeerPayload",
           "description": null,
           "fields": [
@@ -13051,6 +13094,52 @@
                       "name": "Account",
                       "ofType": null
                     }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountMerklePath",
+              "description": "Get the merkle path for an account",
+              "args": [
+                {
+                  "name": "token",
+                  "description":
+                    "Token of account being retrieved (defaults to MINA)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "TokenId",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "MerklePathElement",
+                    "ofType": null
                   }
                 }
               },
