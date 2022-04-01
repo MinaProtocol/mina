@@ -47,14 +47,14 @@ module Value = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Snapp_basic.F.Stable.V1.t V.Stable.V1.t
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Snapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
+  type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let () =
     let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
@@ -67,7 +67,7 @@ let to_input (t : _ V.t) ~f =
   Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
 
 let deriver inner obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   iso ~map:V.of_list_exn ~contramap:V.to_list
     ((list @@ inner @@ o ()) (o ()))
     obj

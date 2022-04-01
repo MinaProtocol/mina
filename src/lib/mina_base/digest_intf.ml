@@ -3,7 +3,7 @@ open Core_kernel
 module type S = sig
   module Stable : sig
     module V1 : sig
-      type t = private Snapp_basic.F.t
+      type t = private Zkapp_basic.F.t
 
       val to_yojson : t -> Yojson.Safe.t
 

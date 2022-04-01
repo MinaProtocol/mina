@@ -549,7 +549,7 @@ module Types = struct
         ])
 
   let work_statement =
-    let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
+    let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
     obj "WorkDescription"
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
@@ -830,7 +830,7 @@ module Types = struct
           ; timing
           ; permissions
           ; snapp
-          ; snapp_uri
+          ; zkapp_uri
           } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
@@ -843,7 +843,7 @@ module Types = struct
         let%bind timing = timing in
         let%bind permissions = permissions in
         let%bind snapp = snapp in
-        let%map snapp_uri = snapp_uri in
+        let%map zkapp_uri = zkapp_uri in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
@@ -856,7 +856,7 @@ module Types = struct
         ; timing
         ; permissions
         ; snapp
-        ; snapp_uri
+        ; zkapp_uri
         }
 
       let of_full_account ?breadcrumb
@@ -872,7 +872,7 @@ module Types = struct
           ; timing
           ; permissions
           ; snapp
-          ; snapp_uri
+          ; zkapp_uri
           } =
         { Account.Poly.public_key
         ; token_id
@@ -891,7 +891,7 @@ module Types = struct
         ; timing
         ; permissions = Some permissions
         ; snapp
-        ; snapp_uri = Some snapp_uri
+        ; zkapp_uri = Some zkapp_uri
         }
 
       let of_account_id coda account_id =
@@ -928,7 +928,7 @@ module Types = struct
               ; timing = Timing.Untimed
               ; permissions = None
               ; snapp = None
-              ; snapp_uri = None
+              ; zkapp_uri = None
               }
 
       let of_pk coda pk =
@@ -1033,13 +1033,13 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_verification_key)
-          ; field "setSnappUri" ~typ:(non_null auth_required)
+          ; field "setZkappUri" ~typ:(non_null auth_required)
               ~doc:
                 "Authorization required to change the URI of the snapp \
                  associated with the account "
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
-                permission.Permissions.Poly.set_snapp_uri)
+                permission.Permissions.Poly.set_zkapp_uri)
           ; field "editSequenceState" ~typ:(non_null auth_required)
               ~doc:"Authorization required to edit the sequence state"
               ~args:Arg.[]
@@ -1308,13 +1308,13 @@ module Types = struct
                     ledger"
                  ~args:Arg.[]
                  ~resolve:(fun _ { index; _ } -> index)
-             ; field "snappUri" ~typ:string
+             ; field "zkappUri" ~typ:string
                  ~doc:
                    "The URI associated with this account, usually pointing to \
                     the snapp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp_uri)
+                   account.Account.Poly.zkapp_uri)
              ; field "snappState"
                  ~typ:(list @@ non_null string)
                  ~doc:
@@ -1324,8 +1324,8 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp
                    |> Option.map ~f:(fun snapp_account ->
-                          snapp_account.app_state |> Snapp_state.V.to_list
-                          |> List.map ~f:Snapp_basic.F.to_string))
+                          snapp_account.app_state |> Zkapp_state.V.to_list
+                          |> List.map ~f:Zkapp_basic.F.to_string))
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"
                  ~args:Arg.[]
@@ -1361,7 +1361,19 @@ module Types = struct
     type t =
       | Applied
       | Enqueued
-      | Included_but_failed of Transaction_status.Failure.t
+      | Included_but_failed of Transaction_status.Failure.Collection.t
+
+    let failure_reasons =
+      obj "PartiesFailureReason" ~fields:(fun _ ->
+          [ field "index" ~typ:string ~args:[]
+              ~doc:"List index of the party that failed"
+              ~resolve:(fun _ (index, _) -> Some (Int.to_string index))
+          ; field "failures"
+              ~typ:(non_null @@ list @@ non_null @@ string)
+              ~args:[] ~doc:"Failure reason for the party or any nested parties"
+              ~resolve:(fun _ (_, failures) ->
+                List.map failures ~f:Transaction_status.Failure.to_string)
+          ])
   end
 
   module User_command = struct
@@ -1566,8 +1578,9 @@ module Types = struct
             match uc.With_status.status with
             | Applied | Enqueued ->
                 None
-            | Included_but_failed failure ->
-                Some (Transaction_status.Failure.to_string failure))
+            | Included_but_failed failures ->
+                List.concat failures |> List.hd
+                |> Option.map ~f:Transaction_status.Failure.to_string)
       ]
 
     let payment =
@@ -1633,15 +1646,19 @@ module Types = struct
               ~args:Arg.[]
               ~doc:"Parties representing the transaction"
               ~resolve:(fun _ parties -> parties.With_hash.data)
-          ; field "failureReason" ~typ:string ~args:[]
+          ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
+              ~args:[]
               ~doc:
                 "The reason for the snapp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
                 | Applied | Enqueued ->
                     None
-                | Included_but_failed failure ->
-                    Some (Transaction_status.Failure.to_string failure))
+                | Included_but_failed failures ->
+                    Some
+                      (List.map
+                         (Transaction_status.Failure.Collection.to_display
+                            failures) ~f:(fun f -> Some f)))
           ])
   end
 

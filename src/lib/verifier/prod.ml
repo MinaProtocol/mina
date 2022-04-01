@@ -22,7 +22,7 @@ module Worker_state = struct
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Snapp_statement.t
+           * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
          | invalid ]
@@ -81,7 +81,7 @@ module Worker_state = struct
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify
-                   ~value_to_field_elements:Snapp_statement.to_field_elements
+                   ~value_to_field_elements:Zkapp_statement.to_field_elements
                    to_verify
                in
                List.map cs ~f:(function
@@ -154,7 +154,7 @@ module Worker = struct
           , [ `Valid of User_command.Valid.t
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
-              * Mina_base.Snapp_statement.t
+              * Mina_base.Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list
             | invalid ]
@@ -217,7 +217,7 @@ module Worker = struct
                   [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
-                    * Mina_base.Snapp_statement.Stable.Latest.t
+                    * Mina_base.Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list
                   | invalid ]

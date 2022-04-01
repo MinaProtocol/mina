@@ -95,7 +95,7 @@ let party_stack_frame_cons = create "MinaPartyStckFrmCons"
 
 let party_with_protocol_state_predicate = create "MinaPartyStatePred"
 
-let snapp_uri = create "MinaSnappUri"
+let zkapp_uri = create "MinaZkappUri"
 
 let snapp_event = create "MinaSnappEvent"
 

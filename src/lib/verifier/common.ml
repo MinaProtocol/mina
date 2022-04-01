@@ -99,7 +99,7 @@ let check :
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         let stmt =
-                          { Snapp_statement.Poly.transaction = commitment
+                          { Zkapp_statement.Poly.transaction = commitment
                           ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in

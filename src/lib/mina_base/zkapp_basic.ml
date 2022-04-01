@@ -115,7 +115,7 @@ module Set_or_keep = struct
   let is_keep = function Keep -> true | _ -> false
 
   let deriver inner obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
       ((option @@ inner @@ o ()) (o ()))
       obj
@@ -239,7 +239,7 @@ module Or_ignore = struct
   let of_option = function None -> Ignore | Some x -> Check x
 
   let deriver inner obj =
-    let open Fields_derivers_snapps.Derivers in
+    let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
       ((option @@ inner @@ o ()) (o ()))
       obj
