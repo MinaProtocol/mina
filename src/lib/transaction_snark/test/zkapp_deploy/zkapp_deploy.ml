@@ -22,9 +22,9 @@ let%test_module "Snapp deploy tests" =
                     ; fee
                     ; receivers = []
                     ; amount
-                    ; snapp_account_keypairs = [ new_kp ]
+                    ; zkapp_account_keypairs = [ new_kp ]
                     ; memo
-                    ; new_snapp_account = true
+                    ; new_zkapp_account = true
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
@@ -56,9 +56,9 @@ let%test_module "Snapp deploy tests" =
                     ; fee
                     ; receivers = []
                     ; amount
-                    ; snapp_account_keypairs = [ fst spec.sender ]
+                    ; zkapp_account_keypairs = [ fst spec.sender ]
                     ; memo
-                    ; new_snapp_account = true
+                    ; new_zkapp_account = true
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
@@ -91,9 +91,9 @@ let%test_module "Snapp deploy tests" =
                     ; fee
                     ; receivers = []
                     ; amount
-                    ; snapp_account_keypairs = [ fst spec1.sender ]
+                    ; zkapp_account_keypairs = [ fst spec1.sender ]
                     ; memo
-                    ; new_snapp_account = true
+                    ; new_zkapp_account = true
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero

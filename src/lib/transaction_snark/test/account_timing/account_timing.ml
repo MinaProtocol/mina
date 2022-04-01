@@ -393,7 +393,7 @@ let%test_module "account timing check" =
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~snapp_account1:None ~snapp_account2:None
+        ~zkapp_account1:None ~zkapp_account2:None
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         }

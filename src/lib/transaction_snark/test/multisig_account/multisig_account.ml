@@ -259,7 +259,7 @@ let%test_module "multisig_account" =
                 spec
               in
               let vk =
-                With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+                With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk
               in
               let total =
                 Option.value_exn Currency.Amount.(add (of_fee fee) amount)
@@ -288,7 +288,7 @@ let%test_module "multisig_account" =
                      { Permissions.user_default with set_permissions = Proof }
                  ; snapp =
                      Some
-                       { (Option.value ~default:Snapp_account.default a.snapp) with
+                       { (Option.value ~default:Zkapp_account.default a.snapp) with
                          verification_key = Some vk
                        }
                  }) ;
@@ -311,7 +311,8 @@ let%test_module "multisig_account" =
                         ; sequence_events = []
                         ; call_data = Field.zero
                         ; call_depth = 0
-                        ; protocol_state = Snapp_predicate.Protocol_state.accept
+                        ; protocol_state =
+                            Zkapp_precondition.Protocol_state.accept
                         ; use_full_commitment = ()
                         }
                     ; predicate = sender_nonce
@@ -332,7 +333,7 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -350,13 +351,13 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Full Snapp_predicate.Account.accept
+                ; predicate = Full Zkapp_precondition.Account.accept
                 }
               in
-              let protocol_state = Snapp_predicate.Protocol_state.accept in
+              let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
@@ -368,7 +369,7 @@ let%test_module "multisig_account" =
               let other_parties_hash = Parties.Call_forest.hash ps in
               let protocol_state_predicate_hash =
                 (*FIXME: is this ok? *)
-                Snapp_predicate.Protocol_state.digest protocol_state
+                Zkapp_precondition.Protocol_state.digest protocol_state
               in
               let transaction : Parties.Transaction_commitment.t =
                 (*FIXME: is this correct? *)

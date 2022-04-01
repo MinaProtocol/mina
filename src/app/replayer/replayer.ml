@@ -856,7 +856,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
 
 module Snapp_helpers = struct
   let get_parent_state_view ~pool block_id :
-      Snapp_predicate.Protocol_state.View.t Deferred.t =
+      Zkapp_precondition.Protocol_state.View.t Deferred.t =
     (* when a Snapp is applied, use the protocol state associated with the parent block
        of the block containing the transaction
     *)
@@ -952,7 +952,7 @@ module Snapp_helpers = struct
     in
     let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
     return
-      { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+      { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
       ; timestamp
       ; blockchain_length
       ; min_window_density
@@ -1148,19 +1148,19 @@ module Snapp_helpers = struct
       query_db pool
         ~f:(fun db ->
           Processor.Zkapp_predicate_protocol_states.load db
-            body_data.zkapp_predicate_protocol_state_id)
+            body_data.zkapp_precondition_protocol_state_id)
         ~item:"Snapp predicate protocol state"
     in
     let%bind snarked_ledger_hash =
       match protocol_state_data.snarked_ledger_hash_id with
       | None ->
-          return Snapp_predicate.Hash.Ignore
+          return Zkapp_precondition.Hash.Ignore
       | Some id ->
           let%map hash_str =
             query_db pool ~item:"snarked ledger hash" ~f:(fun db ->
                 Processor.Snarked_ledger_hash.load db id)
           in
-          Snapp_predicate.Hash.Check
+          Zkapp_precondition.Hash.Check
             (Frozen_ledger_hash.of_base58_check_exn hash_str)
     in
     let%bind timestamp =
@@ -1176,7 +1176,7 @@ module Snapp_helpers = struct
           let lower = to_timestamp bounds.timestamp_lower_bound in
           let upper = to_timestamp bounds.timestamp_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
     in
     let length_bounds_of_id = function
       | None ->
@@ -1192,7 +1192,7 @@ module Snapp_helpers = struct
           let lower = to_length bounds.length_lower_bound in
           let upper = to_length bounds.length_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
     in
     let%bind blockchain_length =
       length_bounds_of_id protocol_state_data.blockchain_length_id
@@ -1214,7 +1214,7 @@ module Snapp_helpers = struct
           let lower = to_amount bounds.amount_lower_bound in
           let upper = to_amount bounds.amount_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
     in
     (* TODO: this will change *)
     let last_vrf_output = () in
@@ -1236,7 +1236,7 @@ module Snapp_helpers = struct
           let lower = to_slot bounds.global_slot_lower_bound in
           let upper = to_slot bounds.global_slot_upper_bound in
           Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Snapp_predicate.Closed_interval.t)
+            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
     in
     let%bind global_slot_since_hard_fork =
       global_slot_of_id protocol_state_data.curr_global_slot_since_hard_fork
@@ -1285,7 +1285,7 @@ module Snapp_helpers = struct
       let%map epoch_length =
         length_bounds_of_id epoch_data_raw.epoch_length_id
       in
-      { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger
+      { Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger
       ; seed
       ; start_checkpoint
       ; lock_checkpoint
@@ -1298,7 +1298,7 @@ module Snapp_helpers = struct
     let%bind next_epoch_data =
       epoch_data_of_id protocol_state_data.next_epoch_data_id
     in
-    let protocol_state : Snapp_predicate.Protocol_state.t =
+    let protocol_state : Zkapp_precondition.Protocol_state.t =
       { snarked_ledger_hash
       ; timestamp
       ; blockchain_length
@@ -1395,7 +1395,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
             in
             match predicate_data.kind with
             | Full ->
-                let%bind snapp_account_data =
+                let%bind zkapp_account_data =
                   match predicate_data.account_id with
                   | None ->
                       failwith "Expected account id for predicate of kind Full"
@@ -1403,9 +1403,9 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       query_db pool ~item:"Snapp account" ~f:(fun db ->
                           Processor.Zkapp_account.load db account_id)
                 in
-                let%map snapp_account =
+                let%map zkapp_account =
                   let%bind balance =
-                    match snapp_account_data.balance_id with
+                    match zkapp_account_data.balance_id with
                     | None ->
                         return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
@@ -1421,10 +1421,10 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         let upper = to_balance bounds.balance_upper_bound in
                         Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
-                            : _ Snapp_predicate.Closed_interval.t )
+                            : _ Zkapp_precondition.Closed_interval.t )
                   in
                   let%bind nonce =
-                    match snapp_account_data.nonce_id with
+                    match zkapp_account_data.nonce_id with
                     | None ->
                         return Zkapp_basic.Or_ignore.Ignore
                     | Some balance_id ->
@@ -1440,10 +1440,10 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         let upper = to_nonce bounds.nonce_upper_bound in
                         Zkapp_basic.Or_ignore.Check
                           ( { lower; upper }
-                            : _ Snapp_predicate.Closed_interval.t )
+                            : _ Zkapp_precondition.Closed_interval.t )
                   in
                   let receipt_chain_hash =
-                    Option.value_map snapp_account_data.receipt_chain_hash
+                    Option.value_map zkapp_account_data.receipt_chain_hash
                       ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
                         Zkapp_basic.Or_ignore.Check
                           (Receipt.Chain_hash.of_base58_check_exn s))
@@ -1456,16 +1456,16 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Zkapp_basic.Or_ignore.Check pk)
                   in
                   let%bind public_key =
-                    pk_check_or_ignore_of_id snapp_account_data.public_key_id
+                    pk_check_or_ignore_of_id zkapp_account_data.public_key_id
                   in
                   let%bind delegate =
-                    pk_check_or_ignore_of_id snapp_account_data.delegate_id
+                    pk_check_or_ignore_of_id zkapp_account_data.delegate_id
                   in
                   let%bind state =
                     let%bind snapp_state_ids =
                       query_db pool ~item:"Snapp state id" ~f:(fun db ->
                           Processor.Zkapp_states.load db
-                            snapp_account_data.state_id)
+                            zkapp_account_data.state_id)
                     in
                     let%map state_data =
                       Snapp_helpers.state_data_of_ids ~pool snapp_state_ids
@@ -1475,7 +1475,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                     |> Pickles_types.Vector.Vector_8.of_list_exn
                   in
                   let%bind sequence_state =
-                    Option.value_map snapp_account_data.sequence_state_id
+                    Option.value_map zkapp_account_data.sequence_state_id
                       ~default:(return Zkapp_basic.Or_ignore.Ignore)
                       ~f:(fun state_id ->
                         let%map state_data_str =
@@ -1488,7 +1488,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         Zkapp_basic.Or_ignore.Check state_data)
                   in
                   let proved_state =
-                    Option.value_map snapp_account_data.proved_state
+                    Option.value_map zkapp_account_data.proved_state
                       ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
                         Zkapp_basic.Or_ignore.Check b)
                   in
@@ -1502,9 +1502,9 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                       ; sequence_state
                       ; proved_state
                       }
-                      : Snapp_predicate.Account.t )
+                      : Zkapp_precondition.Account.t )
                 in
-                Party.Predicate.Full snapp_account
+                Party.Predicate.Full zkapp_account
             | Nonce -> (
                 match predicate_data.nonce with
                 | None ->

@@ -53,7 +53,7 @@ let%test_module "Snapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = ()
                   }
               ; predicate = acct1.account.nonce
@@ -73,7 +73,7 @@ let%test_module "Snapp payments tests" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Accept
@@ -92,7 +92,7 @@ let%test_module "Snapp payments tests" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Accept
@@ -173,9 +173,9 @@ let%test_module "Snapp payments tests" =
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
                     ; amount
-                    ; snapp_account_keypairs = []
+                    ; zkapp_account_keypairs = []
                     ; memo
-                    ; new_snapp_account = false
+                    ; new_zkapp_account = false
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
