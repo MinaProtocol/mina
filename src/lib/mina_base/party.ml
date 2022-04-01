@@ -227,7 +227,7 @@ module Update = struct
     end
   end]
 
-  let gen ?(snapp_account = false) ?permissions_auth () :
+  let gen ?(zkapp_account = false) ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
@@ -240,11 +240,11 @@ module Update = struct
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
-      if snapp_account then
+      if zkapp_account then
         Set_or_keep.gen
           (Quickcheck.Generator.return
              (let data = Pickles.Side_loaded.Verification_key.dummy in
-              let hash = Snapp_account.digest_vk data in
+              let hash = Zkapp_account.digest_vk data in
               { With_hash.data; hash }))
       else return Set_or_keep.Keep
     in
@@ -459,7 +459,7 @@ module Update = struct
            Pickles.Side_loaded.Verification_key.(
              dummy |> to_base58_check |> of_base58_check_exn)
          in
-         let hash = Snapp_account.digest_vk data in
+         let hash = Zkapp_account.digest_vk data in
          { With_hash.data; hash })
     in
     let update : t =
@@ -478,8 +478,8 @@ module Update = struct
     [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
 
-module Events = Snapp_account.Events
-module Sequence_events = Snapp_account.Sequence_events
+module Events = Zkapp_account.Events
+module Sequence_events = Zkapp_account.Sequence_events
 
 module Body = struct
   module Poly

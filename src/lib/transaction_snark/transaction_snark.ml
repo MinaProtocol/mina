@@ -1172,7 +1172,7 @@ module Base = struct
       end
 
       module Events = struct
-        type t = Snapp_account.Events.var
+        type t = Zkapp_account.Events.var
 
         let is_empty x = run_checked (Party.Events.is_empty_var x)
 
@@ -1239,7 +1239,7 @@ module Base = struct
                 (let a =
                    { a with
                      snapp =
-                       ( Snapp_account.Checked.digest a.snapp
+                       ( Zkapp_account.Checked.digest a.snapp
                        , As_prover.Ref.create (fun () -> None) )
                    }
                  in
@@ -1758,7 +1758,7 @@ module Base = struct
                 let expected_hash =
                   Data_as_hash.hash a.snapp.verification_key.data
                 in
-                let actual_hash = Snapp_account.Checked.digest_vk vk in
+                let actual_hash = Zkapp_account.Checked.digest_vk vk in
                 Field.Assert.equal expected_hash actual_hash ;
                 Pickles.Side_loaded.in_circuit (side_loaded tag) vk)
         end
@@ -3373,8 +3373,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
       : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
-    ~snapp_account2:_
+    ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
+    ~zkapp_account2:_
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   let transaction =
@@ -3394,8 +3394,8 @@ let check_user_command ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~snapp_account1:None
-    ~snapp_account2:None
+    ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:None
+    ~zkapp_account2:None
     { t_in_block with transaction = Command (Signed_command user_command) }
     handler
 
@@ -3423,8 +3423,8 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   generate_auxiliary_input [ Statement.With_sok.typ ] main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
-    ~source ~target ~init_stack ~pending_coinbase_stack_state ~snapp_account1:_
-    ~snapp_account2:_
+    ~source ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
+    ~zkapp_account2:_
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   match
@@ -4199,9 +4199,9 @@ module For_tests = struct
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypairs : Signature_lib.Keypair.t list
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
-      ; new_snapp_account : bool
+      ; new_zkapp_account : bool
       ; snapp_update : Party.Update.t
             (* Authorization for the update being performed *)
       ; current_auth : Permissions.Auth_required.t
@@ -4271,7 +4271,7 @@ module For_tests = struct
           ])
     in
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-    ( `VK (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
+    ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
   let create_parties spec ~update ~predicate =
@@ -4279,8 +4279,8 @@ module For_tests = struct
         ; sender = sender, sender_nonce
         ; receivers
         ; amount
-        ; new_snapp_account
-        ; snapp_account_keypairs
+        ; new_zkapp_account
+        ; zkapp_account_keypairs
         ; memo
         ; sequence_events
         ; events
@@ -4332,21 +4332,21 @@ module For_tests = struct
         }
       in
       Option.some_if
-        ((not (List.is_empty receivers)) || new_snapp_account)
+        ((not (List.is_empty receivers)) || new_zkapp_account)
         { Party.Poly.data = sender_party_data
         ; authorization =
             Control.Signature Signature.dummy (*To be updated later*)
         }
     in
     let snapp_parties : Party.Wire.t list =
-      let num_keypairs = List.length snapp_account_keypairs in
+      let num_keypairs = List.length zkapp_account_keypairs in
       let account_creation_fee =
         Amount.of_fee
           Genesis_constants.Constraint_constants.compiled.account_creation_fee
       in
       (* if creating new snapp accounts, amount must be enough for account creation fees for each *)
       assert (
-        (not new_snapp_account) || num_keypairs = 0
+        (not new_zkapp_account) || num_keypairs = 0
         ||
         match Currency.Amount.scale account_creation_fee num_keypairs with
         | None ->
@@ -4355,7 +4355,7 @@ module For_tests = struct
             Currency.Amount.( >= ) amount product ) ;
       (* "fudge factor" so that balances sum to zero *)
       let zeroing_allotment =
-        if new_snapp_account then
+        if new_zkapp_account then
           (* value doesn't matter when num_keypairs = 0 *)
           if num_keypairs <= 1 then amount
           else
@@ -4366,12 +4366,12 @@ module For_tests = struct
             Option.value_exn (Currency.Amount.sub amount otherwise_allotted)
         else Currency.Amount.zero
       in
-      List.mapi snapp_account_keypairs ~f:(fun ndx snapp_account_keypair ->
+      List.mapi zkapp_account_keypairs ~f:(fun ndx zkapp_account_keypair ->
           let public_key =
-            Signature_lib.Public_key.compress snapp_account_keypair.public_key
+            Signature_lib.Public_key.compress zkapp_account_keypair.public_key
           in
           let delta =
-            if new_snapp_account then
+            if new_zkapp_account then
               if ndx = 0 then Amount.Signed.(of_unsigned zeroing_allotment)
               else Amount.Signed.(of_unsigned account_creation_fee)
             else Amount.Signed.zero
@@ -4477,7 +4477,7 @@ module For_tests = struct
     *)
     assert (
       Zkapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
-      || (spec.new_snapp_account && List.length spec.snapp_account_keypairs = 1)
+      || (spec.new_zkapp_account && List.length spec.zkapp_account_keypairs = 1)
     ) ;
     let update_vk =
       let update = spec.snapp_update in
@@ -4501,7 +4501,7 @@ module For_tests = struct
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
     let snapp_parties_keypairs =
-      List.zip_exn snapp_parties spec.snapp_account_keypairs
+      List.zip_exn snapp_parties spec.zkapp_account_keypairs
     in
     let snapp_parties =
       List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
@@ -4535,7 +4535,7 @@ module For_tests = struct
     assert (Option.is_none sender_party) ;
     assert (not @@ List.is_empty snapp_parties) ;
     let snapp_parties_keypairs =
-      List.zip_exn snapp_parties spec.snapp_account_keypairs
+      List.zip_exn snapp_parties spec.zkapp_account_keypairs
     in
     let%map.Async.Deferred snapp_parties =
       Async.Deferred.List.mapi snapp_parties_keypairs
@@ -4628,7 +4628,7 @@ module For_tests = struct
     in
     { parties with other_parties }
 
-  let create_trivial_snapp_account ?(permissions = Permissions.user_default) ~vk
+  let create_trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk
       ~ledger pk =
     let create ledger id account =
       match Ledger.location_of_account ledger id with
@@ -4644,7 +4644,7 @@ module For_tests = struct
     let account : Account.t =
       { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
         permissions
-      ; snapp = Some { Snapp_account.default with verification_key = Some vk }
+      ; snapp = Some { Zkapp_account.default with verification_key = Some vk }
       }
     in
     create ledger id account
@@ -4676,7 +4676,7 @@ module For_tests = struct
       |> Or_error.ok_exn
     in
     let () =
-      create_trivial_snapp_account trivial_account_pk ~ledger ~vk
+      create_trivial_zkapp_account trivial_account_pk ~ledger ~vk
         ~permissions:{ Permissions.user_default with set_permissions = Proof }
     in
     let update_empty_permissions =

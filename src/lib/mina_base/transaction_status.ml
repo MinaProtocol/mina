@@ -21,8 +21,8 @@ module Failure = struct
         | Receiver_already_exists
         | Token_owner_not_caller
         | Overflow
-        | Signed_command_on_snapp_account
-        | Snapp_account_not_present
+        | Signed_command_on_zkapp_account
+        | Zkapp_account_not_present
         | Update_not_permitted_balance
         | Update_not_permitted_timing_existing_account
         | Update_not_permitted_delegate
@@ -111,10 +111,10 @@ module Failure = struct
         "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
-    | Signed_command_on_snapp_account ->
-        "Signed_command_on_snapp_account"
-    | Snapp_account_not_present ->
-        "Snapp_account_not_present"
+    | Signed_command_on_zkapp_account ->
+        "Signed_command_on_zkapp_account"
+    | Zkapp_account_not_present ->
+        "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
     | Update_not_permitted_timing_existing_account ->
@@ -171,10 +171,10 @@ module Failure = struct
         Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
-    | "Signed_command_on_snapp_account" ->
-        Ok Signed_command_on_snapp_account
-    | "Snapp_account_not_present" ->
-        Ok Snapp_account_not_present
+    | "Signed_command_on_zkapp_account" ->
+        Ok Signed_command_on_zkapp_account
+    | "Zkapp_account_not_present" ->
+        Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
     | "Update_not_permitted_timing_existing_account" ->
@@ -244,9 +244,9 @@ module Failure = struct
          owner"
     | Overflow ->
         "The resulting balance is too large to store"
-    | Signed_command_on_snapp_account ->
+    | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
-    | Snapp_account_not_present ->
+    | Zkapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \

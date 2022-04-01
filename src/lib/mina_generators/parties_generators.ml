@@ -457,7 +457,7 @@ end
    fee payer, and `Token_id.t` for other parties.
 *)
 let gen_party_body_components (type a b c) ?account_id ?balances_tbl
-    ?(new_account = false) ?(snapp_account = false) ?(is_fee_payer = false)
+    ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
     ?available_public_keys ?permissions_auth
     ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
@@ -474,7 +474,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
      so we can't just pick a ledger account
   *)
   let new_account =
-    new_account || (snapp_account && Option.is_none account_id)
+    new_account || (zkapp_account && Option.is_none account_id)
   in
   (* a required balance is associated with a new account *)
   ( match (required_balance, new_account) with
@@ -482,7 +482,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
       failwith "Required balance, but not new account"
   | _ ->
       () ) ;
-  let%bind update = Party.Update.gen ?permissions_auth ~snapp_account () in
+  let%bind update = Party.Update.gen ?permissions_auth ~zkapp_account () in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -525,16 +525,16 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
             }
           in
           let account =
-            if snapp_account then
+            if zkapp_account then
               { account_with_pk with
                 snapp =
                   Some
-                    { Snapp_account.default with
+                    { Zkapp_account.default with
                       verification_key =
                         Some
                           With_hash.
                             { data = Pickles.Side_loaded.Verification_key.dummy
-                            ; hash = Snapp_account.dummy_vk_hash ()
+                            ; hash = Zkapp_account.dummy_vk_hash ()
                             }
                     }
               }
@@ -563,7 +563,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
             Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
           in
           let account = Ledger.get_at_index_exn ledger index in
-          if snapp_account && Option.is_none account.snapp then
+          if zkapp_account && Option.is_none account.snapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
           account
       | Some account_id -> (
@@ -589,7 +589,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some acct ->
-                  if snapp_account && Option.is_none acct.snapp then
+                  if zkapp_account && Option.is_none acct.snapp then
                     failwith
                       "gen_party_body: provided account has no snapp field" ;
                   return acct ) )
@@ -678,12 +678,12 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
   }
 
 let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
-    ?(snapp_account = false) ?(increment_nonce = false) ?available_public_keys
+    ?(zkapp_account = false) ?(increment_nonce = false) ?available_public_keys
     ?permissions_auth ?required_balance_change ?required_balance ~ledger
     ~balances_tbl ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
   let%bind body_components =
-    gen_party_body_components ~new_account ~snapp_account ~increment_nonce
+    gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
       ?permissions_auth ?account_id ?available_public_keys
       ?required_balance_change ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
@@ -700,7 +700,7 @@ let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
   { Party.Predicated.Poly.body; predicate; caller }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
-    ?(snapp_account = false) ?account_id ?permissions_auth
+    ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
     ~available_public_keys ~ledger ~balances_tbl () =
   let open Quickcheck.Let_syntax in
@@ -720,7 +720,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   in
   let%bind data =
     gen_predicated_from ?permissions_auth ?account_id ?required_balance_change
-      ?required_balance ~succeed ~new_account ~snapp_account ~increment_nonce
+      ?required_balance ~succeed ~new_account ~zkapp_account ~increment_nonce
       ~available_public_keys ~ledger ~balances_tbl ()
   in
   return { Party.Poly.data; authorization }
@@ -859,7 +859,7 @@ let gen_parties_from ?(succeed = true)
            second Party.t uses the random authorization
         *)
         let%bind permissions_auth = Control.Tag.gen in
-        let snapp_account =
+        let zkapp_account =
           match permissions_auth with
           | Proof ->
               true
@@ -871,7 +871,7 @@ let gen_parties_from ?(succeed = true)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
           gen_party_from ~authorization ~new_account:new_parties
-            ~permissions_auth ~snapp_account ~available_public_keys
+            ~permissions_auth ~zkapp_account ~available_public_keys
             ~required_balance_change ~ledger ~balances_tbl ()
         in
         let%bind party =
@@ -884,7 +884,7 @@ let gen_parties_from ?(succeed = true)
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
           gen_party_from ~account_id ~authorization ~permissions_auth
-            ~snapp_account ~available_public_keys ~succeed ~ledger ~balances_tbl
+            ~zkapp_account ~available_public_keys ~succeed ~ledger ~balances_tbl
             ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)

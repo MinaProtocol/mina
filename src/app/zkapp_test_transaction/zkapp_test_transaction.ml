@@ -25,7 +25,7 @@ module Flags = struct
            (Currency.Fee.to_formatted_string min_fee))
       (Param.optional txn_fee)
 
-  let snapp_account_key =
+  let zkapp_account_key =
     Param.flag "--snapp-account-key"
       ~doc:"PUBLIC KEY Base58 encoded public key of the new snapp account"
       Param.(required public_key_compressed)
@@ -57,12 +57,12 @@ module Flags = struct
       (keyfile, fee, nonce, memo, debug))
 end
 
-let create_snapp_account =
+let create_zkapp_account =
   let create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo ()
       =
     let open Deferred.Let_syntax in
     let%map parties =
-      create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
+      create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
         ~memo
     in
     Util.print_snapp_transaction parties ;
@@ -487,7 +487,7 @@ let test_snapp_with_genesis_ledger =
        test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file))
 
 let txn_commands =
-  [ ("create-snapp-account", create_snapp_account)
+  [ ("create-snapp-account", create_zkapp_account)
   ; ("upgrade-snapp", upgrade_snapp)
   ; ("transfer-funds", transfer_funds)
   ; ("update-state", update_state)
