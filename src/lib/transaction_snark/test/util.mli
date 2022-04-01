@@ -47,7 +47,7 @@ val dummy_rule :
 *)
 val check_parties_with_merges_exn :
      ?state_body:Transaction_protocol_state.Block_data.t
-  -> ?state_view:Snapp_predicate.Protocol_state.View.t
+  -> ?state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?apply:bool
   -> Ledger.t
   -> Parties.t list

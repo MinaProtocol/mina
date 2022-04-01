@@ -905,9 +905,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -972,9 +972,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -1056,9 +1056,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -1139,9 +1139,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -1211,9 +1211,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -1280,9 +1280,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -1351,9 +1351,9 @@ let%test_module "account timing check" =
             ; fee
             ; receivers = [ (receiver_key, amount) ]
             ; amount
-            ; snapp_account_keypairs = []
+            ; zkapp_account_keypairs = []
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update = Party.Update.dummy
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
