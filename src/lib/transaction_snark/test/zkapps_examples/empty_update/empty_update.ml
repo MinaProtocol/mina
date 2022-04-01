@@ -61,7 +61,7 @@ let deploy_party_body : Party.Predicated.t =
                     (* TODO: This function should live in
                        [Side_loaded_verification_key].
                     *)
-                    Snapp_account.digest_vk vk
+                    Zkapp_account.digest_vk vk
                 }
           }
       ; use_full_commitment = true
