@@ -39,15 +39,6 @@ let verify_one
     (pass_through : Digest.t) (unfinalized : Unfinalized.t)
     (should_verify : B.t) : _ Vector.t * B.t =
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
-  (*
-  let ( app_state
-      , state
-      , prev_evals
-      , sg_old
-      , old_bulletproof_challenges
-      , (opening, messages) ) =
-    p
-  in *)
   let finalized, chals =
     with_label __LOC__ (fun () ->
         let sponge_digest = proof_state.sponge_digest_before_evaluations in
