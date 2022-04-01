@@ -2605,7 +2605,7 @@ module Ledger = struct
     ; next_epoch_data = epoch_data
     }
 
-  let deriver () = Parties.deriver @@ Fields_derivers_snapps.Derivers.o ()
+  let deriver () = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o ()
 
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
@@ -2627,8 +2627,9 @@ module Ledger = struct
       match command.status with
       | Applied (_aux_data, _balance) ->
           ()
-      | Failed (failure, _balance) ->
-          raise_error (Mina_base.Transaction_status.Failure.to_string failure)
+      | Failed (_failure, _balance) ->
+          raise_error "error applying transaction"
+      (* (Mina_base.Transaction_status.Failure.to_string failure) *)
     in
     let account_list =
       List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
