@@ -7,7 +7,6 @@
     bigint256.js
     bigint_helpers.js
     vector.js
-    unimplemented.js
   ))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
