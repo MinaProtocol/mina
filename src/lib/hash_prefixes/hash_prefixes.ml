@@ -28,7 +28,7 @@ let account = create "CodaAccount"
 
 let side_loaded_vk = create "CodaSideLoadedVk"
 
-let snapp_account = create "CodaSnappAccount"
+let zkapp_account = create "CodaZkappAccount"
 
 let snapp_payload = create "CodaSnappPayload"
 

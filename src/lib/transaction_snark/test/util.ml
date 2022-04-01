@@ -213,7 +213,7 @@ let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           (*create a snapp account*)
-          Transaction_snark.For_tests.create_trivial_snapp_account
+          Transaction_snark.For_tests.create_trivial_zkapp_account
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =

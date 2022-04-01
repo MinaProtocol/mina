@@ -29,7 +29,7 @@ let parse_field_element_or_hash_string s ~f =
 let `VK vk, `Prover snapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
-let gen_proof ?(snapp_account = None) (parties : Parties.t) =
+let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
@@ -41,7 +41,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
     |> Or_error.ok_exn
   in
   let _v =
-    Option.value_map snapp_account ~default:() ~f:(fun pk ->
+    Option.value_map zkapp_account ~default:() ~f:(fun pk ->
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_int 1000000000000)) with
@@ -53,7 +53,7 @@ let gen_proof ?(snapp_account = None) (parties : Parties.t) =
               ; set_token_symbol = Proof
               }
           ; snapp =
-              Some { Snapp_account.default with verification_key = Some vk }
+              Some { Zkapp_account.default with verification_key = Some vk }
           }
         |> Or_error.ok_exn |> ignore)
   in
@@ -142,7 +142,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     let protocol_state_predicate_view =
       Mina_state.Protocol_state.Body.view compile_time_genesis.data.body
     in
-    Mina_generators.Snapp_generators.gen_protocol_state_predicate
+    Mina_generators.Parties_generators.gen_protocol_state_predicate
       protocol_state_predicate_view
     |> Base_quickcheck.Generator.generate ~size:1
          ~random:(Splittable_random.State.create Random.State.default)
@@ -300,7 +300,7 @@ let test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file () =
   in
   generate_snapp_txn keypair ledger ~snapp_kp
 
-let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
+let create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ~memo =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
@@ -310,9 +310,9 @@ let create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ; fee
     ; receivers = []
     ; amount
-    ; snapp_account_keypairs = [ snapp_keypair ]
+    ; zkapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = true
+    ; new_zkapp_account = true
     ; snapp_update = Party.Update.dummy
     ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
@@ -330,12 +330,12 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~verification_key ~zkapp_uri ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
+  let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let verification_key =
     let data =
       Side_loaded_verification_key.of_base58_check_exn verification_key
     in
-    let hash = Snapp_account.digest_vk data in
+    let hash = Zkapp_account.digest_vk data in
     Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
   in
   let spec =
@@ -343,9 +343,9 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_account_keypair ]
+    ; zkapp_account_keypairs = [ zkapp_account_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = { Party.Update.dummy with verification_key; zkapp_uri }
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
@@ -360,10 +360,10 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress
-                snapp_account_keypair.public_key))
+                zkapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -381,9 +381,9 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; fee
     ; receivers
     ; amount
-    ; snapp_account_keypairs = []
+    ; zkapp_account_keypairs = []
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = Party.Update.dummy
     ; current_auth = Permissions.Auth_required.Proof
     ; call_data = Snark_params.Tick.Field.zero
@@ -393,7 +393,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   in
   let parties = Transaction_snark.For_tests.multiple_transfers spec in
   let%map () =
-    if debug then gen_proof parties ~snapp_account:None else return ()
+    if debug then gen_proof parties ~zkapp_account:None else return ()
   in
   parties
 
@@ -407,9 +407,9 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_keypair ]
+    ; zkapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = { Party.Update.dummy with app_state }
     ; current_auth = Permissions.Auth_required.Proof
     ; call_data = Snark_params.Tick.Field.zero
@@ -424,7 +424,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
@@ -434,16 +434,16 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
+  let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let zkapp_uri = Zkapp_basic.Set_or_keep.Set zkapp_uri in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_account_keypair ]
+    ; zkapp_account_keypairs = [ zkapp_account_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = { Party.Update.dummy with zkapp_uri }
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
@@ -458,10 +458,10 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress
-                snapp_account_keypair.public_key))
+                zkapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -477,9 +477,9 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_keypair ]
+    ; zkapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = Party.Update.dummy
     ; current_auth = Permissions.Auth_required.Proof
     ; call_data = Snark_params.Tick.Field.zero
@@ -494,7 +494,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
@@ -504,16 +504,16 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~token_symbol ~auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind snapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
+  let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let token_symbol = Zkapp_basic.Set_or_keep.Set token_symbol in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_account_keypair ]
+    ; zkapp_account_keypairs = [ zkapp_account_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = { Party.Update.dummy with token_symbol }
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
@@ -528,10 +528,10 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress
-                snapp_account_keypair.public_key))
+                zkapp_account_keypair.public_key))
     else return ()
   in
   parties
@@ -546,9 +546,9 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; fee
     ; receivers = []
     ; amount = Currency.Amount.zero
-    ; snapp_account_keypairs = [ snapp_keypair ]
+    ; zkapp_account_keypairs = [ snapp_keypair ]
     ; memo = Util.memo memo
-    ; new_snapp_account = false
+    ; new_zkapp_account = false
     ; snapp_update = { Party.Update.dummy with permissions }
     ; current_auth
     ; call_data = Snark_params.Tick.Field.zero
@@ -564,7 +564,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let%map () =
     if debug then
       gen_proof parties
-        ~snapp_account:
+        ~zkapp_account:
           (Some (Signature_lib.Public_key.compress snapp_keypair.public_key))
     else return ()
   in
