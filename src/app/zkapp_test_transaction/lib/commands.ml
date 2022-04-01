@@ -139,9 +139,9 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Transaction_snark.For_tests.create_trivial_predicate_snapp
       ~constraint_constants ~protocol_state_predicate spec ledger ~snapp_kp
   in
-  printf "Zkapp transaction yojson: %s\n\n%!"
+  printf "ZkApp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-  printf "(Zkapp transaction graphQL input %s\n\n%!"
+  printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command parties) ;
   printf "Updated accounts\n" ;
   List.iter (Ledger.to_list ledger) ~f:(fun acc ->
@@ -546,7 +546,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   parties
 
-let%test_module "Snapps test transaction" =
+let%test_module "ZkApps test transaction" =
   ( module struct
     let execute mina schema query =
       match Graphql_parser.parse query with
@@ -582,7 +582,7 @@ let%test_module "Snapps test transaction" =
                     (Party.to_yojson expected |> Yojson.Safe.to_string)
                     (Party.to_yojson got |> Yojson.Safe.to_string)) ;
               if !failed then
-                return (Error "invalid snapp transaction generated")
+                return (Error "invalid zkApp transaction generated")
               else return (Ok "Passed")))
       in
       let schema =

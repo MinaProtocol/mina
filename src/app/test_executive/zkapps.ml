@@ -357,25 +357,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
-      [%log info] "Snapps transaction included in transition frontier"
+      [%log info] "ZkApp transactions included in transition frontier"
     in
     let%bind () =
-      section "Send a snapp to create snapp accounts"
+      section "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
       section
-        "Wait for snapp to create accounts to be included in transition \
+        "Wait for zkApp to create accounts to be included in transition \
          frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "Send a snapp to update permissions"
+      section "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
       section
-        "Wait for snapp to update permissions to be included in transition \
+        "Wait for zkApp transaction to update permissions to be included in transition \
          frontier"
         (wait_for_snapp parties_update_permissions)
     in
@@ -408,7 +408,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
-      section "Send a snapp to update all fields"
+      section "Send a zkApp transaction to update all fields"
         (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
@@ -418,7 +418,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for_snapp parties_update_all)
     in
     let%bind () =
-      section "Verify snapp updates in ledger"
+      section "Verify zkApp updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
@@ -455,11 +455,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section "Send a snapp with an invalid nonce"
+      section "Send a zkApp transaction with an invalid nonce"
         (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a snapp with an invalid signature"
+      section "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
