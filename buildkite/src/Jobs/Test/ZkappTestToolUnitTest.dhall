@@ -16,8 +16,8 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
-      label = "Snapps test transaction tool unit tests",
-      key = "snapp-tool-unit-test-${profile}",
+      label = "Zkapps test transaction tool unit tests",
+      key = "zkapp-tool-unit-test-${profile}",
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
@@ -30,8 +30,8 @@ Pipeline.build
     spec = 
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/app/snapp_test_transaction"),
-        S.exactly "buildkite/src/Jobs/Test/SnappTestToolUnitTest" "dhall",
+        S.strictlyStart (S.contains "src/app/zkapp_test_transaction"),
+        S.exactly "buildkite/src/Jobs/Test/ZkappTestToolUnitTest" "dhall",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
 
@@ -40,9 +40,9 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "SnappTestToolUnitTest"
+        name = "ZkappTestToolUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/app/snapp_test_transaction" Size.Small
+      buildTestCmd "dev" "src/app/zkapp_test_transaction" Size.Small
     ]
   }

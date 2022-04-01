@@ -90,7 +90,7 @@ ls -lh mina*.deb
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
-Package: mina-snapp-test-transaction
+Package: mina-zkapp-test-transaction
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
@@ -111,7 +111,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/snapp_test_transaction/snapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-snapp-test-transaction"
+cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -120,7 +120,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-snapp-test-transaction_${MINA_DEB_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-zkapp-test-transaction_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END SNAPP TEST TXN PACKAGE #######################################

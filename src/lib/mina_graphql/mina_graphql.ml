@@ -948,7 +948,7 @@ module Types = struct
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
-          , Snapp_account.t option
+          , Zkapp_account.t option
           , string option )
           Account.Poly.t
       ; locked : bool option
@@ -1323,8 +1323,8 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.snapp
-                   |> Option.map ~f:(fun snapp_account ->
-                          snapp_account.app_state |> Zkapp_state.V.to_list
+                   |> Option.map ~f:(fun zkapp_account ->
+                          zkapp_account.app_state |> Zkapp_state.V.to_list
                           |> List.map ~f:Zkapp_basic.F.to_string))
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"
@@ -1341,17 +1341,17 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.value_map account.Account.Poly.snapp ~default:None
-                     ~f:(fun snapp_account -> snapp_account.verification_key))
+                     ~f:(fun zkapp_account -> zkapp_account.verification_key))
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
                  ~typ:(list (non_null string))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map account.Account.Poly.snapp
-                     ~f:(fun snapp_account ->
+                     ~f:(fun zkapp_account ->
                        List.map ~f:Snark_params.Tick.Field.to_string
                          (Pickles_types.Vector.to_list
-                            snapp_account.sequence_state)))
+                            zkapp_account.sequence_state)))
              ]))
 
     let account = Lazy.force account
