@@ -11,7 +11,10 @@ module Parties_templates = struct
       pooledZkappCommands(publicKey: $public_key) {
         id
         hash
-        failureReason
+        failureReason {
+                         index
+                         failures
+                       }
         parties %s
       }
     }|graphql}
@@ -23,7 +26,10 @@ module Parties_templates = struct
             internalSendZkapp(parties: $parties) {
                zkapp { id
                        hash
-                       failureReason
+                       failureReason {
+                         index
+                         failures
+                       }
                        parties %s
                      }
              }

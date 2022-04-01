@@ -67,6 +67,12 @@ module Failure = struct
             else (index + 1, (index, bucket) :: acc))
       in
       display
+
+    let empty = []
+
+    let of_single_failure f : t = [ [ f ] ]
+
+    let is_empty : t -> bool = Fn.compose List.is_empty List.concat
   end
 
   type failure = t
@@ -439,7 +445,7 @@ module Stable = struct
   module V2 = struct
     type t =
       | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Stable.V2.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V1.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

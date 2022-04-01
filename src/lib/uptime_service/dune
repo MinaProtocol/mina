@@ -18,7 +18,9 @@
    cohttp
    uri
    ;; local libraries
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    network_peer
    block_time
    transaction_witness

@@ -55,8 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
         end in
         network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
-         ~hard_timeout:(Slots 10)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
+         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -354,7 +354,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_snapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
