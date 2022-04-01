@@ -196,19 +196,19 @@ module Json_layout = struct
                    Zkapp_account.verification_key, expected string"
         end
 
-        module Snapp_version = struct
-          type t = Mina_numbers.Snapp_version.Stable.Latest.t
+        module Zkapp_version = struct
+          type t = Mina_numbers.Zkapp_version.Stable.Latest.t
           [@@deriving bin_io_unversioned]
 
           include (
-            Mina_numbers.Snapp_version :
-              module type of Mina_numbers.Snapp_version with type t := t )
+            Mina_numbers.Zkapp_version :
+              module type of Mina_numbers.Zkapp_version with type t := t )
         end
 
         type t =
           { state : Field.t list
           ; verification_key : Verification_key.t option
-          ; snapp_version : Snapp_version.t
+          ; snapp_version : Zkapp_version.t
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
