@@ -1,20 +1,4 @@
-/* global _0n, _1n */
-
-// TODO domain_generator
-// this should take an int i <= 32 and return the primitive 2^ith root of unity, i.e. a number w with
-// w^(2^i) = 1, w^(2^(i-1)) = -1
-// computed by taking the 2^32th root and squaring 32-i times
-
-// Provides: caml_pasta_fp_domain_generator
-// Requires: _1n
-function caml_pasta_fp_domain_generator(_i) {
-  return [_1n];
-}
-// Provides: caml_pasta_fq_domain_generator
-// Requires: _1n
-function caml_pasta_fq_domain_generator(_i) {
-  return [_1n];
-}
+/* global _0n */
 
 // TODO verification shifts
 

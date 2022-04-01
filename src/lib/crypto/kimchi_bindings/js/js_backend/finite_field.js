@@ -2,6 +2,8 @@
    caml_bigint_of_bytes, caml_js_to_bool, caml_string_of_jsstring
 */
 
+// CONSTANTS
+
 // the modulus. called `p` in most of our code.
 // Provides: caml_pasta_p_bigint
 // Requires: BigInt_
@@ -25,6 +27,8 @@ var caml_twoadic_root_fp = BigInt_('0x2bce74deac30ebda362120830561f81aea322bf2b7
 // Provides: caml_twoadic_root_fq
 // Requires: BigInt_
 var caml_twoadic_root_fq = BigInt_('0x2de6a9b8746d3f589e5c4dfd492ae26e9bb97ea3c106f049a70e2c1102b6d05f')
+
+// GENERAL FINITE FIELD ALGORITHMS
 
 // Provides: caml_bigint_modulo
 function caml_bigint_modulo(x, p) {
@@ -150,6 +154,24 @@ function caml_finite_field_random(p) {
     if (x < p) return x;
   }
 }
+
+// Provides: caml_finite_field_domain_generator
+// Requires: caml_bigint_modulo, caml_bindings_debug, _1n
+function caml_finite_field_domain_generator(i, p, primitive_root_of_unity) {
+  // this takes an integer i and returns the 2^ith root of unity, i.e. a number `w` with
+  // w^(2^i) = 1, w^(2^(i-1)) = -1
+  // computed by taking the 2^32th root and squaring 32-i times
+  if (i > 32 || i < 0) throw Error('log2 size of evaluation domain must be in [0, 32], got ' + i);
+  if (i === 0) return _1n;
+  var generator = primitive_root_of_unity;
+  for (var j = 32; j > i; j--) {
+    generator = caml_bigint_modulo(generator * generator, p);
+  }
+  return generator;
+}
+
+// SPECIALIZATIONS TO FP, FQ
+// these get exported to ocaml, and should be mostly trivial
 
 // Provides: caml_pasta_fp_add
 // Requires: caml_bigint_modulo, caml_pasta_p_bigint
@@ -379,6 +401,18 @@ function caml_pasta_fq_mut_square(x) {
   caml_pasta_fq_copy(x, caml_pasta_fq_square(x));
 }
 
+// Provides: caml_pasta_fp_domain_generator
+// Requires: caml_finite_field_domain_generator, caml_pasta_p_bigint, caml_twoadic_root_fp
+function caml_pasta_fp_domain_generator(i) {
+  return [caml_finite_field_domain_generator(i, caml_pasta_p_bigint, caml_twoadic_root_fp)];
+}
+// Provides: caml_pasta_fq_domain_generator
+// Requires: caml_finite_field_domain_generator, caml_pasta_q_bigint, caml_twoadic_root_fq
+function caml_pasta_fq_domain_generator(i) {
+  return [caml_finite_field_domain_generator(i, caml_pasta_q_bigint, caml_twoadic_root_fq)];
+}
+
+// TESTS (activate by setting caml_bindings_debug = true)
 
 // Provides: caml_bindings_debug
 var caml_bindings_debug = false;
@@ -414,4 +448,13 @@ var _test_finite_field = caml_bindings_debug && (function test() {
   // -> verifies that the two-adicity is 32, and that they can be used as non-squares in the sqrt algorithm
   console.assert(caml_pasta_fp_is_square([caml_twoadic_root_fp]) === 0);
   console.assert(caml_pasta_fq_is_square([caml_twoadic_root_fq]) === 0);
+
+  // the domain generator for log2_size=i satisfies the equations we expect:
+  // generator^(2^i) = 1, generator^(2^(i-1)) = -1
+  var i = 10;
+  var domain_gen = caml_finite_field_domain_generator(i, caml_pasta_p_bigint, caml_twoadic_root_fp);
+  should_be_1 = caml_finite_field_power(domain_gen, _1n << BigInt_(i), caml_pasta_p_bigint);
+  should_be_minus_1 = caml_finite_field_power(domain_gen, _1n << BigInt_(i-1), caml_pasta_p_bigint);
+  console.assert(should_be_1 === _1n);
+  console.assert(should_be_minus_1 + _1n === caml_pasta_p_bigint);
 })()
