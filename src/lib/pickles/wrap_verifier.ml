@@ -11,7 +11,7 @@ open Tuple_lib
 open Import
 
 (* given [chals], compute
-   \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
+   \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
 let b_poly ~one ~add ~mul chals =
   let ( + ) = add and ( * ) = mul in
   stage (fun pt ->
