@@ -36,6 +36,7 @@ class SimpleZkapp extends SmartContract {
     this.x.set(x);
   }
 }
+// note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
 declareMethodArguments(SimpleZkapp, { update: [Field] });
 
@@ -44,27 +45,36 @@ let zkappPrivateKey = PrivateKey.random();
 let zkappAddress = zkappPrivateKey.toPublicKey();
 
 let [isDeploy, feePayerKey, feePayerNonce] = parseCommandLineArgs();
+let isUpdate = !isDeploy;
 
-console.log(isDeploy ? "deploy" : "update", feePayerKey, feePayerNonce);
+// console.log(isDeploy ? "deploy" : "update", feePayerKey, feePayerNonce);
 
 if (isDeploy) {
   let { verificationKey } = compile(SimpleZkapp, zkappAddress);
   let partiesJson = deploy(SimpleZkapp, zkappAddress, verificationKey);
   let parties = JSON.parse(partiesJson);
 
-  let feePayerKeySnarky = new PrivateKey(Scalar.fromJSON(feePayerKey));
-  let feePayerAddress = feePayerKeySnarky.toPublicKey();
+  let client = new Client({ network: "testnet" });
+
+  let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
-    feePayer: "TODO string derived from feePayerAddress",
+    feePayer: feePayerAddress,
     fee: 1_000_000,
     nonce: feePayerNonce,
   };
 
-  let client = new Client({ network: "testnet" });
   let {
     data: { parties: signedParties },
   } = client.signParty({ parties, feePayer }, feePayerKey);
   console.log(signedParties);
+}
+
+if (isUpdate) {
+  // compile once more, to get the provers :'/
+  let { provers } = SimpleZkapp.compile(zkappAddress);
+  let zkapp = new SimpleZkapp(zkappAddress);
+  let { proof, statement } = await zkapp.prove(provers, "update", [Field(3)]);
+  // TODO create tx during proof, add proof to it
 }
 
 shutdown();
