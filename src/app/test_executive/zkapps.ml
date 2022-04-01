@@ -101,16 +101,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
     let num_snapp_accounts = 3 in
     let snapp_keypairs =
-      List.init num_snapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
+      List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
-    let snapp_account_ids =
+    let zkapp_account_ids =
       List.map snapp_keypairs ~f:(fun snapp_keypair ->
           Mina_base.Account_id.create
             (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
             Mina_base.Token_id.default)
     in
     let%bind parties_create_account =
-      (* construct a Parties.t, similar to snapp_test_transaction create-snapp-account *)
+      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
       let open Mina_base in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
@@ -123,9 +123,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = true
+        ; new_zkapp_account = true
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -138,7 +138,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            parties_spec
     in
     let%bind.Deferred parties_update_permissions, permissions_updated =
-      (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
+      (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
       let open Mina_base in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -163,9 +163,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount = Currency.Amount.zero
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update =
             { Party.Update.dummy with permissions = Set new_permissions }
         ; current_auth =
@@ -205,7 +205,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let new_verification_key =
         let data = Pickles.Side_loaded.Verification_key.dummy in
-        let hash = Snapp_account.digest_vk data in
+        let hash = Zkapp_account.digest_vk data in
         ({ data; hash } : _ With_hash.t)
       in
       let new_permissions =
@@ -231,9 +231,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
@@ -393,7 +393,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Verify that updated permissions are in ledger accounts"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
@@ -440,7 +440,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Verify snapp updates in ledger"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;

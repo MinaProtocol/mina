@@ -237,7 +237,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                 { source = Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~snapp_account1:None ~snapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
@@ -279,7 +279,7 @@ let generate_base_snarks_witness sparse_ledger0
                     Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~snapp_account1:None ~snapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
               }

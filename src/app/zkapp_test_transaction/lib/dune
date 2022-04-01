@@ -1,6 +1,6 @@
 (library
- (name snapp_test_transaction_lib)
- (public_name snapp_test_transaction_lib)
+ (name zkapp_test_transaction_lib)
+ (public_name zkapp_test_transaction_lib)
  (libraries
    ;;opam libraries
    async_unix

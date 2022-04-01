@@ -1,7 +1,7 @@
 (executable
- (package snapp_test_transaction)
- (name snapp_test_transaction)
- (public_name snapp_test_transaction)
+ (package zkapp_test_transaction)
+ (name zkapp_test_transaction)
+ (public_name zkapp_test_transaction)
  (libraries
    ;;opam libraries
    async.async_command
@@ -9,7 +9,7 @@
    core_kernel
    core
    async_kernel
-   snapp_test_transaction_lib
+   zkapp_test_transaction_lib
    async
    async_unix
    ;;local libraries
