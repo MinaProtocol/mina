@@ -114,9 +114,9 @@ func (m TestDecodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Messag
 	}
 
 	var rootHash [32]byte
-	copy(rootHash[:], rawRootHash[:32])
+	copy(rootHash[:], rawRootHash[:])
 
-  blockMap := make(map[BitswapBlockLink][]byte)
+	blockMap := make(map[BitswapBlockLink][]byte)
 	err = blockWithIdListForeach(blocks, func(blockWithId ipc.BlockWithId) error {
 		rawHash, err := blockWithId.Blake2bHash()
 		if err != nil {
@@ -157,29 +157,29 @@ func fromTestEncodeBitswapBlocksReq(req ipcRpcRequest) (rpcRequest, error) {
 }
 
 func (m TestEncodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Message {
-  mr := TestEncodeBitswapBlocksReqT(m)
+	mr := TestEncodeBitswapBlocksReqT(m)
 
 	data, err := mr.Data()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-  blocks, rootBlockHash := SplitDataToBitswapBlocks(int(mr.MaxBlockSize()), data)
+	blocks, rootBlockHash := SplitDataToBitswapBlocks(int(mr.MaxBlockSize()), data)
 
-  return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
-    r, err := m.NewTestEncodeBitswapBlocks()
-    panicOnErr(err)
-    bs, err := r.NewBlocks(int32(len(blocks)))
-    panicOnErr(err)
-    i := 0
-    for hash, block := range blocks {
-      b := bs.At(i)
-      b.SetBlake2bHash(hash[:])
-      b.SetBlock(block)
-      i++
-    }
-    rid, err := r.NewRootBlockId()
-    panicOnErr(err)
-    rid.SetBlake2bHash(rootBlockHash[:])
-  })
+	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
+		r, err := m.NewTestEncodeBitswapBlocks()
+		panicOnErr(err)
+		bs, err := r.NewBlocks(int32(len(blocks)))
+		panicOnErr(err)
+		i := 0
+		for hash, block := range blocks {
+			b := bs.At(i)
+			b.SetBlake2bHash(hash[:])
+			b.SetBlock(block)
+			i++
+		}
+		rid, err := r.NewRootBlockId()
+		panicOnErr(err)
+		rid.SetBlake2bHash(rootBlockHash[:])
+	})
 }

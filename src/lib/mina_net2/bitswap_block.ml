@@ -109,7 +109,6 @@ let blocks_of_data ~max_block_size data =
       failwith "invalid block produced" ;
     let block = Bigstring.create size in
     Bigstring.set_uint16_le_exn block ~pos:0 num_links ;
-    (* Printf.printf "writing links: [%s]\n" (String.concat ~sep:"; " @@ List.map links ~f:(Fn.compose Base64.encode_string Blake2.to_raw_string)) ; *)
     List.iteri links ~f:(fun i link ->
         let link_buf = Bigstring.of_string (Blake2.to_raw_string link) in
         Bigstring.blit ~src:link_buf ~src_pos:0 ~dst:block
@@ -120,7 +119,6 @@ let blocks_of_data ~max_block_size data =
       ~len:chunk_size ;
     let hash = Blake2.digest_bigstring block in
     Hashtbl.set blocks ~key:hash ~data:block ;
-    (* Printf.printf "created block %s containing data: %s\n" (Base64.encode_string (Blake2.to_raw_string hash)) (Bigstring.to_string chunk) ; *)
     Queue.enqueue link_queue hash
   in
   (* create the last block *)
@@ -262,10 +260,6 @@ let%test_module "bitswap blocks" =
 
     let%test_unit "forall x: data_of_blocks (blocks_of_data x) = x" =
       Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
-          (*
-          let schema = create_schema ~max_block_size (Bigstring.length data) in
-          Printf.printf !"schema: %{Sexp}\n" (sexp_of_schema schema) ;
-          *)
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           let result =
             Or_error.ok_exn (data_of_blocks blocks root_block_hash)
@@ -293,20 +287,6 @@ let%test_module "bitswap blocks" =
       assert (Bigstring.length data = data_length) ;
       let blocks, root_block_hash = blocks_of_data ~max_block_size data in
       let result = Or_error.ok_exn (data_of_blocks blocks root_block_hash) in
-      (*
-      Printf.printf "data size: %d, result size: %d\n" (Bigstring.length data) (Bigstring.length result) ;
-      let get hash = Or_error.ok_exn @@ parse_block @@ Map.find_exn blocks hash in
-      let get_link hash i = List.nth_exn (fst @@ get hash) i in
-      let search is = get @@ List.fold_left is ~init:root_block_hash ~f:(fun hash i -> get_link hash i) in
-      let fmt_links = Fn.compose (String.concat ~sep:"; ") (List.map ~f:(Fn.compose Base64.encode_string Blake2.to_raw_string)) in
-      let fmt_data = Bigstring.to_string in
-      Printf.printf "[] links: [%s]\n" (fmt_links @@ fst @@ get root_block_hash) ;
-      Printf.printf "[] data: %s\n" (fmt_data @@ snd @@ get root_block_hash) ;
-      Printf.printf "[0] links: [%s]\n" (fmt_links @@ fst @@ search [0]) ;
-      Printf.printf "[0] data: %s\n" (fmt_data @@ snd @@ search [0]) ;
-      Printf.printf "[0;0] links: [%s]\n" (fmt_links @@ fst @@ search [0;0]) ;
-      Printf.printf "[0;0] data: %s\n" (fmt_data @@ snd @@ search [0;0]) ;
-      *)
       Out_channel.flush Out_channel.stdout ;
       [%test_eq: Bigstring.t] data result
 
