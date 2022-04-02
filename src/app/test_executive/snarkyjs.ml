@@ -71,69 +71,108 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let my_account_id =
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in
-    (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
-    [%log info] "Running JS while waiting for node to initialize" ;
-    let%bind.Deferred parties_deploy_contract_str, unit_with_error =
-      Deferred.both
-        (let%bind.Deferred process =
-           Async_unix.Process.create_exn
-             ~prog:"./src/lib/snarky_js_bindings/test_module/node"
-             ~args:
-               [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
-               ; "deploy"
-               ; Signature_lib.Private_key.to_base58_check my_sk
-               ; "0"
-               ]
-             ()
-         in
-         wait_and_stdout ~logger process)
-        (wait_for t (Wait_condition.node_to_initialize node))
-    in
-    let parties_deploy_contract =
-      Mina_base.Parties.of_json
-        (Yojson.Safe.from_string parties_deploy_contract_str)
-    in
-    let%bind () = Deferred.return unit_with_error in
-    (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
-    let uri = Network.Node.graphql_uri node in
-    let parties_query = Lazy.force Mina_base.Parties.inner_query in
-    let%bind.Deferred () =
-      let open Deferred.Let_syntax in
-      let%bind process =
-        Async_unix.Process.create_exn
-          ~prog:"./scripts/send-parties-transaction.sh"
-          ~args:[ parties_query; parties_deploy_contract_str; uri ]
-          ()
+    let make_sign_and_send which =
+      let which_str, nonce =
+        match which with
+        | `Deploy ->
+            ("deploy", "0")
+        | `Update ->
+            ("update", "1")
       in
-      let%map _stdout = wait_and_stdout ~logger process in
-      ()
+      (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
+      [%log info] "Running JS while waiting for node to initialize" ;
+      let%bind.Deferred parties_contract_str, unit_with_error =
+        Deferred.both
+          (let%bind.Deferred process =
+             Async_unix.Process.create_exn
+               ~prog:"./src/lib/snarky_js_bindings/test_module/node"
+               ~args:
+                 [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
+                 ; which_str
+                 ; Signature_lib.Private_key.to_base58_check my_sk
+                 ; nonce
+                 ]
+               ()
+           in
+           wait_and_stdout ~logger process)
+          (wait_for t (Wait_condition.node_to_initialize node))
+      in
+      let parties_contract =
+        Mina_base.Parties.of_json (Yojson.Safe.from_string parties_contract_str)
+      in
+      let%bind () = Deferred.return unit_with_error in
+      (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
+      let uri = Network.Node.graphql_uri node in
+      let parties_query = Lazy.force Mina_base.Parties.inner_query in
+      let%bind.Deferred () =
+        let open Deferred.Let_syntax in
+        let%bind process =
+          Async_unix.Process.create_exn
+            ~prog:"./scripts/send-parties-transaction.sh"
+            ~args:[ parties_query; parties_contract_str; uri ]
+            ()
+        in
+        let%map _stdout = wait_and_stdout ~logger process in
+        ()
+      in
+      return parties_contract
     in
+    let%bind parties_deploy_contract = make_sign_and_send `Deploy in
     let%bind () =
       section
-        "Wait for smart contract transaction to be included in transition \
+        "Wait for deploy contract transaction to be included in transition \
          frontier"
         (wait_for_zkapp parties_deploy_contract)
     in
-    (*
-    let%bind manipulation_of_contract_transaction =
-      failwith
-        "TODO: shell exec to make/sign+send the user manipulation transction \
-         (+ keypair as the user)"
-    in
+    let%bind parties_update_contract = make_sign_and_send `Deploy in
     let%bind () =
       section
-        "Wait for manipulation transaction to be included in transition \
+        "Wait for update contract transaction to be included in transition \
          frontier"
-        (wait_for_zkapp manipulation_of_contract_transaction)
-    in*)
+        (wait_for_zkapp parties_update_contract)
+    in
     let%bind () =
-      section "Verify that the manipulation transaction did update the ledger"
-        ( [%log info] "Verifying permissions for account"
+      section "Verify that the update transaction did update the ledger"
+        ( [%log info] "Verifying account state change"
             ~metadata:
               [ ("account_id", Mina_base.Account_id.to_yojson my_account_id) ] ;
           let%bind { total_balance = balance; _ } =
             Network.Node.must_get_account_data ~logger node
               ~account_id:my_account_id
+          in
+          let%bind account_update =
+            Network.Node.get_account_update ~logger node
+              ~account_id:my_account_id
+            |> Deferred.bind ~f:Malleable_error.or_hard_error
+          in
+          let%bind () =
+            let first_state =
+              Mina_base.Snapp_state.V.to_list account_update.app_state
+              |> List.hd_exn
+            in
+            let module Set_or_keep = Mina_base.Zkapp_basic.Set_or_keep in
+            let module Field = Snark_params.Tick0.Field in
+            let expected = Set_or_keep.Set (Field.of_int 3) in
+            if
+              Set_or_keep.equal Field.equal first_state
+                (Set_or_keep.Set (Field.of_int 3))
+            then (
+              [%log info] "Ledger sees state update in zkapp execution" ;
+              return () )
+            else
+              let to_yojson =
+                Set_or_keep.to_yojson (fun x -> `String (Field.to_string x))
+              in
+              [%log error]
+                "Ledger does not see state update $expected from zkapp \
+                 execution ( actual $actual )"
+                ~metadata:
+                  [ ("expected", to_yojson expected)
+                  ; ("actual", to_yojson first_state)
+                  ] ;
+              Malleable_error.hard_error
+                (Error.of_string
+                   "State update not witnessed from smart contract execution")
           in
           if
             Currency.Balance.(
@@ -154,8 +193,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             return () )
           else (
             [%log error]
-              "Ledger does not see balance change from zkapp execution (-10 \
-               MINA from initial_balance)"
+              "Ledger does not see balance $balance change from zkapp \
+               execution (-10 MINA from initial_balance $initial_balance)"
               ~metadata:
                 [ ("balance", Currency.Balance.to_yojson balance)
                 ; ("initial_balance", Currency.Balance.to_yojson initial_balance)
