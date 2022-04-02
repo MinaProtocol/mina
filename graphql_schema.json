@@ -828,7 +828,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -967,7 +967,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -2168,7 +2168,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochLedgerPredicateInput",
+          "name": "EpochLedgerPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2288,7 +2288,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochDataPredicateInput",
+          "name": "EpochDataPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2300,7 +2300,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2353,7 +2353,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2394,7 +2394,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ProtocolStatePredicateInput",
+          "name": "ProtocolStatePreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2486,7 +2486,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2502,7 +2502,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2585,7 +2585,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2599,7 +2599,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2796,7 +2796,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -2983,7 +2983,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -3154,7 +3154,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "AccountPredicateInput",
+          "name": "AccountPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -3346,7 +3346,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -3377,7 +3377,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -6853,7 +6853,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AccountPredicate",
+          "name": "AccountPrecondition",
           "description": null,
           "fields": [
             {
@@ -7185,7 +7185,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
+                  "name": "ProtocolStatePrecondition",
                   "ofType": null
                 }
               },
@@ -7244,7 +7244,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "AccountPredicate",
+                  "name": "AccountPrecondition",
                   "ofType": null
                 }
               },
@@ -7312,7 +7312,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochLedgerPredicate",
+          "name": "EpochLedgerPrecondition",
           "description": null,
           "fields": [
             {
@@ -7343,7 +7343,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochDataPredicate",
+          "name": "EpochDataPrecondition",
           "description": null,
           "fields": [
             {
@@ -7355,7 +7355,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochLedgerPredicate",
+                  "name": "EpochLedgerPrecondition",
                   "ofType": null
                 }
               },
@@ -7588,7 +7588,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ProtocolStatePredicate",
+          "name": "ProtocolStatePrecondition",
           "description": null,
           "fields": [
             {
@@ -7680,7 +7680,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -7696,7 +7696,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -8359,7 +8359,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
+                  "name": "ProtocolStatePrecondition",
                   "ofType": null
                 }
               },
