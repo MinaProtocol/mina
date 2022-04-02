@@ -407,7 +407,7 @@ let commitment (t : t) : Transaction_commitment.t =
     ~other_parties_hash:
       (Call_forest.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
-      (Snapp_predicate.Protocol_state.digest
+      (Zkapp_precondition.Protocol_state.digest
          t.fee_payer.data.body.protocol_state)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
@@ -433,31 +433,31 @@ let weight (parties : t) : int =
     ]
 
 let deriver obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj ~fee_payer:!.Party.Fee_payer.deriver
     ~other_parties:!.(list @@ Party.deriver @@ o ())
     ~memo:!.Signed_command_memo.deriver
   |> finish "Parties" ~t_toplevel_annots
 
-let arg_typ () = Fields_derivers_snapps.(arg_typ (deriver @@ Derivers.o ()))
+let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
 
-let typ () = Fields_derivers_snapps.(typ (deriver @@ Derivers.o ()))
+let typ () = Fields_derivers_zkapps.(typ (deriver @@ Derivers.o ()))
 
-let to_json x = Fields_derivers_snapps.(to_json (deriver @@ Derivers.o ())) x
+let to_json x = Fields_derivers_zkapps.(to_json (deriver @@ Derivers.o ())) x
 
-let of_json x = Fields_derivers_snapps.(of_json (deriver @@ Derivers.o ())) x
+let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 
 let other_parties_of_json x =
-  Fields_derivers_snapps.(
+  Fields_derivers_zkapps.(
     of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()))
     x
 
 let parties_to_json x =
-  Fields_derivers_snapps.(to_json (deriver @@ derivers ())) x
+  Fields_derivers_zkapps.(to_json (deriver @@ derivers ())) x
 
 let arg_query_string x =
-  Fields_derivers_snapps.Test.Loop.json_to_string_gql @@ to_json x
+  Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
   let party : Party.t =
@@ -473,11 +473,11 @@ let dummy =
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
-       Fields_derivers_snapps.(inner_query (deriver @@ Derivers.o ())))
+       Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())))
 
 let%test_module "Test" =
   ( module struct
-    module Fd = Fields_derivers_snapps.Derivers
+    module Fd = Fields_derivers_zkapps.Derivers
 
     let full = deriver @@ Fd.o ()
 
@@ -486,5 +486,5 @@ let%test_module "Test" =
 
     let%test_unit "full circuit" =
       Run_in_thread.block_on_async_exn
-      @@ fun () -> Fields_derivers_snapps.Test.Loop.run full dummy
+      @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
   end )

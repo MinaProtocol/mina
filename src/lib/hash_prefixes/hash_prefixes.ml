@@ -28,7 +28,7 @@ let account = create "CodaAccount"
 
 let side_loaded_vk = create "CodaSideLoadedVk"
 
-let snapp_account = create "CodaSnappAccount"
+let zkapp_account = create "CodaZkappAccount"
 
 let snapp_payload = create "CodaSnappPayload"
 
@@ -75,11 +75,11 @@ let checkpoint_list = create "CodaCheckpoints"
 
 let bowe_gabizon_hash = create "CodaTockBGHash"
 
-let snapp_predicate = create "CodaSnappPred"
+let zkapp_precondition = create "CodaSnappPred"
 
-let snapp_predicate_account = create "CodaSnappPredAcct"
+let zkapp_precondition_account = create "CodaSnappPredAcct"
 
-let snapp_predicate_protocol_state = create "CodaSnappPredPS"
+let zkapp_precondition_protocol_state = create "CodaSnappPredPS"
 
 let party_predicate = create "MinaPartyPredicate"
 
@@ -91,7 +91,7 @@ let party_node = create "MinaPartyNode"
 
 let party_with_protocol_state_predicate = create "MinaPartyStatePred"
 
-let snapp_uri = create "MinaSnappUri"
+let zkapp_uri = create "MinaZkappUri"
 
 let snapp_event = create "MinaSnappEvent"
 

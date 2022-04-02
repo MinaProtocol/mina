@@ -139,7 +139,7 @@ let%test_module "multisig_account" =
       | Sigma : int -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
     (* test with a 2-of-3 multisig *)
-    let%test_unit "snapps-based proved transaction" =
+    let%test_unit "zkapps-based proved transaction" =
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -163,7 +163,7 @@ let%test_module "multisig_account" =
               let spec = List.hd_exn specs in
               let tag, _, (module P), Pickles.Provers.[ multisig_prover; _ ] =
                 let multisig_rule : _ Pickles.Inductive_rule.t =
-                  let multisig_main (tx_commitment : Snapp_statement.Checked.t)
+                  let multisig_main (tx_commitment : Zkapp_statement.Checked.t)
                       : unit Checked.t =
                     let%bind pk0_var =
                       exists Inner_curve.typ
@@ -176,7 +176,7 @@ let%test_module "multisig_account" =
                         ~request:(As_prover.return @@ Pubkey 2)
                     in
                     let msg_var =
-                      tx_commitment |> Snapp_statement.Checked.to_field_elements
+                      tx_commitment |> Zkapp_statement.Checked.to_field_elements
                       |> Random_oracle_input.Chunked.field_elements
                     in
                     let%bind sigma0_var =
@@ -215,9 +215,9 @@ let%test_module "multisig_account" =
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
-                  (module Snapp_statement.Checked)
-                  (module Snapp_statement)
-                  ~typ:Snapp_statement.typ
+                  (module Zkapp_statement.Checked)
+                  (module Zkapp_statement)
+                  ~typ:Zkapp_statement.typ
                   ~branches:(module Nat.N2)
                   ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
                   ~name:"multisig"
@@ -240,8 +240,8 @@ let%test_module "multisig_account" =
                             |> fun s ->
                             Run.Field.(Assert.equal s (s + one))
                             |> fun () :
-                                   ( Snapp_statement.Checked.t
-                                   * (Snapp_statement.Checked.t * unit) )
+                                   ( Zkapp_statement.Checked.t
+                                   * (Zkapp_statement.Checked.t * unit) )
                                    Pickles_types.Hlist0.H1
                                      (Pickles_types.Hlist.E01
                                         (Pickles.Inductive_rule.B))
@@ -259,7 +259,7 @@ let%test_module "multisig_account" =
                 spec
               in
               let vk =
-                With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+                With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk
               in
               let total =
                 Option.value_exn Currency.Amount.(add (of_fee fee) amount)
@@ -288,13 +288,13 @@ let%test_module "multisig_account" =
                      { Permissions.user_default with set_permissions = Proof }
                  ; snapp =
                      Some
-                       { (Option.value ~default:Snapp_account.default a.snapp) with
+                       { (Option.value ~default:Zkapp_account.default a.snapp) with
                          verification_key = Some vk
                        }
                  }) ;
               let update_empty_permissions =
                 let permissions =
-                  Snapp_basic.Set_or_keep.Set Permissions.empty
+                  Zkapp_basic.Set_or_keep.Set Permissions.empty
                 in
                 { Party.Update.noop with permissions }
               in
@@ -311,7 +311,8 @@ let%test_module "multisig_account" =
                         ; sequence_events = []
                         ; call_data = Field.zero
                         ; call_depth = 0
-                        ; protocol_state = Snapp_predicate.Protocol_state.accept
+                        ; protocol_state =
+                            Zkapp_precondition.Protocol_state.accept
                         ; use_full_commitment = ()
                         }
                     ; predicate = sender_nonce
@@ -332,7 +333,7 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -350,13 +351,13 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Full Snapp_predicate.Account.accept
+                ; predicate = Full Zkapp_precondition.Account.accept
                 }
               in
-              let protocol_state = Snapp_predicate.Protocol_state.accept in
+              let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
@@ -368,7 +369,7 @@ let%test_module "multisig_account" =
               let other_parties_hash = Parties.Call_forest.hash ps in
               let protocol_state_predicate_hash =
                 (*FIXME: is this ok? *)
-                Snapp_predicate.Protocol_state.digest protocol_state
+                Zkapp_precondition.Protocol_state.digest protocol_state
               in
               let transaction : Parties.Transaction_commitment.t =
                 (*FIXME: is this correct? *)
@@ -377,11 +378,11 @@ let%test_module "multisig_account" =
                   ~memo_hash:(Signed_command_memo.hash memo)
               in
               let at_party = Parties.Call_forest.hash ps in
-              let tx_statement : Snapp_statement.t =
+              let tx_statement : Zkapp_statement.t =
                 { transaction; at_party }
               in
               let msg =
-                tx_statement |> Snapp_statement.to_field_elements
+                tx_statement |> Zkapp_statement.to_field_elements
                 |> Random_oracle_input.Chunked.field_elements
               in
               let sigma0 = Schnorr.Chunked.sign sk0 msg in

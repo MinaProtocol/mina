@@ -55,8 +55,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
         end in
         network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 10)
-         ~hard_timeout:(Slots 10)
+    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
+         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -100,11 +100,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let keypair2 = (List.hd_exn config.extra_genesis_accounts).keypair in
-    let num_snapp_accounts = 3 in
+    let num_zkapp_accounts = 3 in
     let snapp_keypairs =
-      List.init num_snapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
+      List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
-    let snapp_account_ids =
+    let zkapp_account_ids =
       List.map snapp_keypairs ~f:(fun snapp_keypair ->
           Mina_base.Account_id.create
             (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
@@ -112,7 +112,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fee = Currency.Fee.of_int 1_000_000 in
     let%bind parties_create_account =
-      (* construct a Parties.t, similar to snapp_test_transaction create-snapp-account *)
+      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
       let open Mina_base in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
@@ -124,9 +124,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = true
+        ; new_zkapp_account = true
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -139,7 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            parties_spec
     in
     let%bind.Deferred parties_update_permissions, permissions_updated =
-      (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
+      (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
       let open Mina_base in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -152,7 +152,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
-        ; set_snapp_uri = Proof
+        ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
         }
@@ -162,9 +162,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount = Currency.Amount.zero
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update =
             { Party.Update.dummy with permissions = Set new_permissions }
         ; current_auth =
@@ -189,27 +189,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
       let app_state =
-        let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
+        let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
                Snark_params.Tick.Field.gen)
         in
-        List.map fields ~f:(fun field -> Snapp_basic.Set_or_keep.Set field)
-        |> Snapp_state.V.of_list_exn
+        List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
+        |> Zkapp_state.V.of_list_exn
       in
       let new_delegate =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
       in
       let new_verification_key =
         let data = Pickles.Side_loaded.Verification_key.dummy in
-        let hash = Snapp_account.digest_vk data in
+        let hash = Zkapp_account.digest_vk data in
         ({ data; hash } : _ With_hash.t)
       in
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
       in
-      let new_snapp_uri = "https://www.minaprotocol.com" in
+      let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
       let snapp_update : Party.Update.t =
@@ -217,7 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
         ; permissions = Set new_permissions
-        ; snapp_uri = Set new_snapp_uri
+        ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
         ; timing = (* timing can't be updated for an existing account *)
                    Keep
@@ -229,9 +229,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
@@ -277,9 +277,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
-      | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+      | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
           true
-      | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+      | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
           equal v1 v2
       | Set _, Keep ->
           false
@@ -323,8 +323,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         compatible requested_update.permissions ledger_update.permissions
           ~equal:Mina_base.Permissions.equal
       in
-      let snapp_uris_compat =
-        compatible requested_update.snapp_uri ledger_update.snapp_uri
+      let zkapp_uris_compat =
+        compatible requested_update.zkapp_uri ledger_update.zkapp_uri
           ~equal:String.equal
       in
       let token_symbols_compat =
@@ -344,7 +344,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; delegates_compat
         ; verification_keys_compat
         ; permissions_compat
-        ; snapp_uris_compat
+        ; zkapp_uris_compat
         ; token_symbols_compat
         ; timings_compat
         ; voting_fors_compat
@@ -354,7 +354,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_snapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~parties
+        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
       in
       [%log info] "Snapps transaction included in transition frontier"
     in
@@ -380,7 +381,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Verify that updated permissions are in ledger accounts"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
@@ -418,7 +419,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Verify snapp updates in ledger"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;

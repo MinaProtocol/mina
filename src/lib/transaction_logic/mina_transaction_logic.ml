@@ -278,7 +278,7 @@ module type S = sig
     type t =
       { ledger : ledger
       ; fee_excess : Amount.Signed.t
-      ; protocol_state : Snapp_predicate.Protocol_state.View.t
+      ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
   end
 
@@ -298,7 +298,7 @@ module type S = sig
 
   val apply_parties_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> state_view:Snapp_predicate.Protocol_state.View.t
+    -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
@@ -330,7 +330,7 @@ module type S = sig
   *)
   val apply_parties_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> state_view:Snapp_predicate.Protocol_state.View.t
+    -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
          (   'acc
@@ -366,14 +366,14 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
     -> Transaction_applied.t Or_error.t
 
   val merkle_root_after_parties_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Parties.Valid.t
     -> Ledger_hash.t
@@ -975,7 +975,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           { applied_common with
             user_command =
               { data = user_command
-              ; status = Failed (failure, compute_balances ())
+              ; status =
+                  Failed
+                    ( Transaction_status.Failure.Collection.of_single_failure
+                        failure
+                    , compute_balances () )
               }
           }
         in
@@ -1002,7 +1006,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                ; delegate = _
                ; verification_key = _
                ; permissions = _
-               ; snapp_uri = _
+               ; zkapp_uri = _
                ; token_symbol = _
                ; timing = _
                ; voting_for = _
@@ -1025,7 +1029,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
          or the full commitment is used to avoid replays. *)
     let%map () =
       let predicate_is_accept =
-        Snapp_predicate.Account.is_accept @@ Party.Predicate.to_full predicate
+        Zkapp_precondition.Account.is_accept
+        @@ Party.Predicate.to_full predicate
       in
       List.exists ~f:Fn.id
         [ predicate_is_accept
@@ -1041,7 +1046,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     type t =
       { ledger : L.t
       ; fee_excess : Amount.Signed.t
-      ; protocol_state : Snapp_predicate.Protocol_state.View.t
+      ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
     let ledger { ledger; _ } = L.create_masked ledger
@@ -1222,7 +1227,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push_events = Party.Sequence_events.push_events
     end
 
-    module Snapp_uri = struct
+    module Zkapp_uri = struct
       type t = string
 
       let if_ = Parties.value_if
@@ -1253,8 +1258,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_verification_key : t -> Controller.t =
          fun a -> a.permissions.set_verification_key
 
-        let set_snapp_uri : t -> Controller.t =
-         fun a -> a.permissions.set_snapp_uri
+        let set_zkapp_uri : t -> Controller.t =
+         fun a -> a.permissions.set_zkapp_uri
 
         let edit_sequence_state : t -> Controller.t =
          fun a -> a.permissions.edit_sequence_state
@@ -1300,7 +1305,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let snapp =
           match a.snapp with
           | None ->
-              Some Snapp_account.default
+              Some Zkapp_account.default
           | Some _ as snapp ->
               snapp
         in
@@ -1312,7 +1317,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           | None ->
               None
           | Some snapp ->
-              if Snapp_account.(equal default snapp) then None else Some snapp
+              if Zkapp_account.(equal default snapp) then None else Some snapp
         in
         { a with snapp }
 
@@ -1347,9 +1352,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let set_sequence_state sequence_state (a : t) =
         set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
 
-      let snapp_uri (a : t) = a.snapp_uri
+      let zkapp_uri (a : t) = a.zkapp_uri
 
-      let set_snapp_uri snapp_uri (a : t) = { a with snapp_uri }
+      let set_zkapp_uri zkapp_uri (a : t) = { a with zkapp_uri }
 
       let token_symbol (a : t) = a.token_symbol
 
@@ -1432,7 +1437,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Protocol_state_predicate = struct
-      include Snapp_predicate.Protocol_state
+      include Zkapp_precondition.Protocol_state
     end
 
     module Party = struct
@@ -1455,9 +1460,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies false, `Signature_verifies false)
 
       module Update = struct
-        open Snapp_basic
+        open Zkapp_basic
 
-        type 'a set_or_keep = 'a Snapp_basic.Set_or_keep.t
+        type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
         let timing (party : t) : Account.timing set_or_keep =
           Set_or_keep.map ~f:Option.some party.data.body.update.timing
@@ -1465,12 +1470,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let app_state (party : t) = party.data.body.update.app_state
 
         let verification_key (party : t) =
-          Snapp_basic.Set_or_keep.map ~f:Option.some
+          Zkapp_basic.Set_or_keep.map ~f:Option.some
             party.data.body.update.verification_key
 
         let sequence_events (party : t) = party.data.body.sequence_events
 
-        let snapp_uri (party : t) = party.data.body.update.snapp_uri
+        let zkapp_uri (party : t) = party.data.body.update.zkapp_uri
 
         let token_symbol (party : t) = party.data.body.update.token_symbol
 
@@ -1483,7 +1488,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Set_or_keep = struct
-      include Snapp_basic.Set_or_keep
+      include Zkapp_basic.Set_or_keep
 
       let set_or_keep ~if_:_ t x = set_or_keep t x
     end
@@ -1609,7 +1614,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_commitment.t
           , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
-      ; protocol_state_predicate : Snapp_predicate.Protocol_state.t
+      ; protocol_state_predicate : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
       ; full_transaction_commitment : unit
       ; field : Snark_params.Tick.Field.t
@@ -1619,7 +1624,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
       | Check_protocol_state_predicate (pred, global_state) -> (
-          Snapp_predicate.Protocol_state.check pred global_state.protocol_state
+          Zkapp_precondition.Protocol_state.check pred
+            global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_predicate (_is_start, party, account, _global_state) -> (
           match party.data.predicate with
@@ -1628,7 +1634,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           | Nonce n ->
               Account.Nonce.equal account.nonce n
           | Full p ->
-              Or_error.is_ok (Snapp_predicate.Account.check p account) )
+              Or_error.is_ok (Zkapp_precondition.Account.check p account) )
       | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
@@ -1643,9 +1649,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   let apply_parties_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~(init : user_acc)
-      ~(f : user_acc -> _ -> user_acc) ?(fee_excess = Amount.Signed.zero)
-      (ledger : L.t) (c : Parties.t) :
+      ~(state_view : Zkapp_precondition.Protocol_state.View.t)
+      ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
+      ?(fee_excess = Amount.Signed.zero) (ledger : L.t) (c : Parties.t) :
       (Transaction_applied.Parties_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
     let original_account_states =
@@ -1659,8 +1665,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
-        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.parties then Ok user_acc
+        , (l_state : _ Parties_logic.Local_state.t) ) :
+        (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
+      if List.is_empty l_state.parties then
+        Ok (user_acc, l_state.failure_status_tbl)
       else
         let%bind states =
           Or_error.try_with (fun () ->
@@ -1705,21 +1713,32 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok s ->
+    | Ok (s, failure_status_tbl) ->
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
                     (* TODO *)
-                    Applied
-                      ( { fee_payer_account_creation_fee_paid = None
-                        ; receiver_account_creation_fee_paid = None
-                        }
-                      , { fee_payer_balance = None
-                        ; source_balance = None
-                        ; receiver_balance = None
-                        } )
+                    ( if
+                      Transaction_status.Failure.Collection.is_empty
+                        failure_status_tbl
+                    then
+                      Applied
+                        ( { fee_payer_account_creation_fee_paid = None
+                          ; receiver_account_creation_fee_paid = None
+                          }
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } )
+                    else
+                      Failed
+                        ( failure_status_tbl
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } ) )
                 }
             }
           , s )
@@ -2157,7 +2176,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     res
 
   let apply_transaction ~constraint_constants
-      ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
+      ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
     let txn_global_slot = txn_state_view.global_slot_since_genesis in
@@ -2229,7 +2248,7 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Snapp_account.t option
+      , Zkapp_account.t option
       , string )
       Account.Poly.t
     [@@deriving sexp, compare]
@@ -2402,7 +2421,7 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = ()
                   }
               ; predicate = actual_nonce
@@ -2423,7 +2442,7 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment
                     }
                 ; predicate = Nonce (Account.Nonce.succ actual_nonce)
@@ -2441,7 +2460,7 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; predicate = Accept
@@ -2523,7 +2542,7 @@ module For_tests = struct
       ~f:(fun () t ->
         match f t with Error e -> Stop (Error e) | Ok _ -> Continue ())
 
-  let view : Snapp_predicate.Protocol_state.View.t =
+  let view : Zkapp_precondition.Protocol_state.View.t =
     let h = Frozen_ledger_hash.empty_hash in
     let len = Length.zero in
     let a = Currency.Amount.zero in

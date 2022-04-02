@@ -46,7 +46,7 @@ let check :
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest
+                (Zkapp_precondition.Protocol_state.digest
                    fee_payer.data.body.protocol_state)
               ~memo_hash:(Signed_command_memo.hash memo)
           in
@@ -99,7 +99,7 @@ let check :
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         let stmt =
-                          { Snapp_statement.Poly.transaction = commitment
+                          { Zkapp_statement.Poly.transaction = commitment
                           ; at_party
                           }
                         in
