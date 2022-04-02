@@ -38,7 +38,7 @@ DROP TABLE zkapp_party_body;
 
 DROP TABLE zkapp_updates;
 
-DROP TABLE zkapp_precondition_protocol_states;
+DROP TABLE zkapp_protocol_state_precondition;
 
 DROP TABLE zkapp_account_precondition;
 

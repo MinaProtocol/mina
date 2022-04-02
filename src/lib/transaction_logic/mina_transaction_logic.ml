@@ -1013,7 +1013,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events = _
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-           ; protocol_state = _
+           ; protocol_state_precondition = _
            ; use_full_commitment
            }
        ; account_precondition
@@ -1432,7 +1432,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
-    module Protocol_state_predicate = struct
+    module Protocol_state_precondition = struct
       include Zkapp_precondition.Protocol_state
     end
 
@@ -1610,7 +1610,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_commitment.t
           , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
-      ; protocol_state_predicate : Zkapp_precondition.Protocol_state.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
       ; full_transaction_commitment : unit
       ; field : Snark_params.Tick.Field.t
@@ -1619,7 +1619,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
-      | Check_protocol_state_predicate (pred, global_state) -> (
+      | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
@@ -2408,7 +2408,8 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = ()
                   }
               ; account_precondition = actual_nonce
@@ -2429,7 +2430,8 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment
                     }
                 ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
@@ -2447,7 +2449,8 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
                 ; account_precondition = Accept

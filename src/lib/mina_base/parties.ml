@@ -413,7 +413,7 @@ let commitment (t : t) : Transaction_commitment.t =
       (Call_forest.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.data.body.protocol_state)
+         t.fee_payer.data.body.protocol_state_precondition)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)

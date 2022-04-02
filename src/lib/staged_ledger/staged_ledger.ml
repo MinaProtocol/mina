@@ -2470,7 +2470,7 @@ let%test_module "staged ledger tests" =
                           in
                           let signature =
                             sign_for_other_party ~use_full_commitment sk
-                              data.body.protocol_state
+                              data.body.protocol_state_precondition
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->

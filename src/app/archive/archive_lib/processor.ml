@@ -978,7 +978,7 @@ module Zkapp_epoch_data = struct
       id
 end
 
-module Zkapp_account_precondition_protocol_states = struct
+module Zkapp_protocol_state_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
     ; timestamp_id : int option
@@ -1006,7 +1006,7 @@ module Zkapp_account_precondition_protocol_states = struct
         ; int
         ]
 
-  let table_name = "zkapp_precondition_protocol_states"
+  let table_name = "zkapp_protocol_state_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1087,7 +1087,7 @@ module Zkapp_party_body = struct
     ; sequence_events_ids : int array
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_precondition_protocol_state_id : int
+    ; zkapp_protocol_state_precondition_id : int
     ; use_full_commitment : bool
     }
   [@@deriving fields, hlist]
@@ -1132,10 +1132,10 @@ module Zkapp_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_precondition_protocol_state_id =
-      Zkapp_account_precondition_protocol_states.add_if_doesn't_exist
+    let%bind zkapp_protocol_state_precondition_id =
+      Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
-        body.protocol_state
+        body.protocol_state_precondition
     in
     let token_id = Token_id.to_string body.token_id in
     let balance_change =
@@ -1161,7 +1161,7 @@ module Zkapp_party_body = struct
       ; sequence_events_ids
       ; call_data_id
       ; call_depth
-      ; zkapp_precondition_protocol_state_id
+      ; zkapp_protocol_state_precondition_id
       ; use_full_commitment
       }
     in

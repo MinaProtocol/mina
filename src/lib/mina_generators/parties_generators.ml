@@ -353,7 +353,7 @@ let gen_epoch_data_predicate
   ; epoch_length
   }
 
-let gen_protocol_state_predicate
+let gen_protocol_state_precondition
     (psv : Zkapp_precondition.Protocol_state.View.t) :
     Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
@@ -410,7 +410,7 @@ module Party_body_components = struct
        , 'call_data
        , 'int
        , 'bool
-       , 'protocol_state )
+       , 'protocol_state_precondition )
        t =
     { public_key : 'pk
     ; update : 'update
@@ -421,7 +421,7 @@ module Party_body_components = struct
     ; sequence_events : 'events
     ; call_data : 'call_data
     ; call_depth : 'int
-    ; protocol_state : 'protocol_state
+    ; protocol_state_precondition : 'protocol_state_precondition
     ; use_full_commitment : 'bool
     }
 
@@ -435,7 +435,7 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
     ; use_full_commitment = t.use_full_commitment
     }
 
@@ -449,7 +449,7 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
     ; use_full_commitment = t.use_full_commitment
     }
 end
@@ -663,8 +663,8 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
   let%bind call_data = Snark_params.Tick.Field.gen in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
-  let%bind protocol_state =
-    Option.value_map protocol_state_view ~f:gen_protocol_state_predicate
+  let%bind protocol_state_precondition =
+    Option.value_map protocol_state_view ~f:gen_protocol_state_precondition
       ~default:(return Zkapp_precondition.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
@@ -678,7 +678,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
   ; sequence_events
   ; call_data
   ; call_depth
-  ; protocol_state
+  ; protocol_state_precondition
   ; use_full_commitment
   }
 
@@ -971,7 +971,7 @@ let gen_parties_from ?(succeed = true)
   in
   let protocol_state_predicate_hash =
     Zkapp_precondition.Protocol_state.digest
-      parties_dummy_signatures.fee_payer.data.body.protocol_state
+      parties_dummy_signatures.fee_payer.data.body.protocol_state_precondition
   in
   let tx_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash

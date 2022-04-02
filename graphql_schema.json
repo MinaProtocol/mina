@@ -820,7 +820,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -960,7 +960,7 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -980,7 +980,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyPredicatedFeePayerInput",
+          "name": "ZkappPartyPreconditionedFeePayerInput",
           "description": null,
           "fields": [
             {
@@ -1064,7 +1064,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPreconditionedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1097,7 +1097,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPreconditionedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -2788,7 +2788,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -2976,7 +2976,7 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -7177,7 +7177,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8351,7 +8351,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8374,7 +8374,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappPartyPredicatedFeePayer",
+          "name": "ZkappPartyPreconditionedFeePayer",
           "description": null,
           "fields": [
             {
@@ -8429,7 +8429,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayer",
+                  "name": "ZkappPartyPreconditionedFeePayer",
                   "ofType": null
                 }
               },

@@ -479,7 +479,7 @@ module Body = struct
       ; sequence_events : Events.t
       ; call_data : Call_data.t
       ; call_depth : Int.t
-      ; protocol_state : Protocol_state.t
+      ; protocol_state_precondition : Protocol_state.t
       ; use_full_commitment : Bool.t
       }
   end
@@ -552,7 +552,8 @@ module Body = struct
         ; sequence_events : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; call_depth : int
-        ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
+        ; protocol_state_precondition :
+            Zkapp_precondition.Protocol_state.Stable.V1.t
         ; use_full_commitment : bool
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -592,7 +593,8 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
+          ; protocol_state_precondition :
+              Zkapp_precondition.Protocol_state.Stable.V1.t
           ; use_full_commitment : unit [@skip]
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -611,7 +613,7 @@ module Body = struct
       ; sequence_events = []
       ; call_data = Field.zero
       ; call_depth = 0
-      ; protocol_state = Zkapp_precondition.Protocol_state.accept
+      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
       ; use_full_commitment = ()
       }
 
@@ -628,7 +630,7 @@ module Body = struct
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
         ~call_data:!.field ~call_depth:!.int
-        ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
+        ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~use_full_commitment:unit
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
@@ -652,7 +654,7 @@ module Body = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
     ; use_full_commitment = true
     }
 
@@ -687,7 +689,8 @@ module Body = struct
       ; sequence_events : Events.var
       ; call_data : Field.Var.t
       ; call_depth : int As_prover.Ref.t
-      ; protocol_state : Zkapp_precondition.Protocol_state.Checked.t
+      ; protocol_state_precondition :
+          Zkapp_precondition.Protocol_state.Checked.t
       ; use_full_commitment : Boolean.var
       }
     [@@deriving annot, hlist, fields]
@@ -702,7 +705,7 @@ module Body = struct
          ; sequence_events
          ; call_data
          ; call_depth = _depth (* ignored *)
-         ; protocol_state
+         ; protocol_state_precondition
          ; use_full_commitment
          } :
           t) =
@@ -717,7 +720,8 @@ module Body = struct
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.Chunked.field call_data
-        ; Zkapp_precondition.Protocol_state.Checked.to_input protocol_state
+        ; Zkapp_precondition.Protocol_state.Checked.to_input
+            protocol_state_precondition
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
         ]
@@ -754,7 +758,7 @@ module Body = struct
     ; sequence_events = []
     ; call_data = Field.zero
     ; call_depth = 0
-    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+    ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
     ; use_full_commitment = false
     }
 
@@ -798,7 +802,7 @@ module Body = struct
       ~events:!.(list @@ array field @@ o ())
       ~sequence_events:!.(list @@ array field @@ o ())
       ~call_data:!.field ~call_depth:!.int
-      ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
+      ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~use_full_commitment:!.bool
     |> finish "PartyBody" ~t_toplevel_annots
 
@@ -818,7 +822,7 @@ module Body = struct
        ; sequence_events
        ; call_data
        ; call_depth = _ (* ignored *)
-       ; protocol_state
+       ; protocol_state_precondition
        ; use_full_commitment
        } :
         t) =
@@ -831,7 +835,7 @@ module Body = struct
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.Chunked.field call_data
-      ; Zkapp_precondition.Protocol_state.to_input protocol_state
+      ; Zkapp_precondition.Protocol_state.to_input protocol_state_precondition
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ]
 
@@ -1109,7 +1113,7 @@ module Preconditioned = struct
       let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
         ~account_precondition:!.uint32
-      |> finish "ZkappPartyPredicatedFeePayer"
+      |> finish "ZkappPartyPreconditionedFeePayer"
            ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
@@ -1264,8 +1268,8 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
 *)
 let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 
-let protocol_state (t : t) : Zkapp_precondition.Protocol_state.t =
-  t.data.body.protocol_state
+let protocol_state_precondition (t : t) : Zkapp_precondition.Protocol_state.t =
+  t.data.body.protocol_state_precondition
 
 let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
 

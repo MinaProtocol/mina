@@ -997,7 +997,7 @@ module Base = struct
                  _ (* This is for the snapp to use, we don't need it. *)
              ; sequence_events = _
              ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-             ; protocol_state = _
+             ; protocol_state_precondition = _
              ; use_full_commitment
              }
          ; account_precondition
@@ -1065,7 +1065,7 @@ module Base = struct
               ~other_parties_hash:other_parties
               ~protocol_state_predicate_hash:
                 (Zkapp_precondition.Protocol_state.Checked.digest
-                   party.data.body.protocol_state)
+                   party.data.body.protocol_state_precondition)
               ~memo_hash
 
           let full_commitment ~party:{ party; _ } ~commitment =
@@ -1641,7 +1641,8 @@ module Base = struct
 
           let balance_change (t : t) = t.party.data.body.balance_change
 
-          let protocol_state (t : t) = t.party.data.body.protocol_state
+          let protocol_state_precondition (t : t) =
+            t.party.data.body.protocol_state_precondition
 
           let token_id (t : t) = t.party.data.body.token_id
 
@@ -1790,7 +1791,7 @@ module Base = struct
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
         end
 
-        module Protocol_state_predicate = struct
+        module Protocol_state_precondition = struct
           type t = Zkapp_precondition.Protocol_state.Checked.t
         end
 
@@ -1868,7 +1869,7 @@ module Base = struct
               , Transaction_commitment.t
               , unit )
               Mina_transaction_logic.Parties_logic.Local_state.t
-          ; protocol_state_predicate :
+          ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
           ; full_transaction_commitment : Transaction_commitment.t
@@ -1881,8 +1882,8 @@ module Base = struct
       let perform (type r)
           (eff : (r, Env.t) Mina_transaction_logic.Parties_logic.Eff.t) : r =
         match eff with
-        | Check_protocol_state_predicate (protocol_state_predicate, global_state)
-          ->
+        | Check_protocol_state_precondition
+            (protocol_state_predicate, global_state) ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
         | Check_account_precondition (_is_start, { party; _ }, account, _global)
@@ -4152,7 +4153,8 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition =
+                  Zkapp_precondition.Protocol_state.accept
               ; use_full_commitment = ()
               }
           ; account_precondition = sender_nonce
@@ -4173,7 +4175,8 @@ module For_tests = struct
             ; sequence_events = []
             ; call_data = Field.zero
             ; call_depth = 0
-            ; protocol_state = Zkapp_precondition.Protocol_state.accept
+            ; protocol_state_precondition =
+                Zkapp_precondition.Protocol_state.accept
             ; use_full_commitment = false
             }
         ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
@@ -4235,7 +4238,8 @@ module For_tests = struct
                   ; sequence_events
                   ; call_data
                   ; call_depth = 0
-                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = true
                   }
               ; account_precondition
@@ -4257,7 +4261,8 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = false
                   }
               ; account_precondition = Accept
@@ -4537,7 +4542,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = protocol_state_predicate
+              ; protocol_state_precondition = protocol_state_predicate
               ; use_full_commitment = ()
               }
           ; account_precondition = sender_nonce
@@ -4557,7 +4562,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = protocol_state_predicate
+          ; protocol_state_precondition = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
@@ -4574,7 +4579,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state = protocol_state_predicate
+          ; protocol_state_precondition = protocol_state_predicate
           ; use_full_commitment = false
           }
       ; account_precondition = Full Zkapp_precondition.Account.accept
