@@ -54,7 +54,7 @@ let%test_module "Snapp payments tests" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = ()
                     }
                 ; predicate = acct1.account.nonce
@@ -75,7 +75,8 @@ let%test_module "Snapp payments tests" =
                       ; sequence_events = []
                       ; call_data = Field.zero
                       ; call_depth = 0
-                      ; protocol_state = Snapp_predicate.Protocol_state.accept
+                      ; protocol_state =
+                          Zkapp_precondition.Protocol_state.accept
                       ; use_full_commitment = false
                       }
                   ; predicate = Accept
@@ -95,7 +96,8 @@ let%test_module "Snapp payments tests" =
                       ; sequence_events = []
                       ; call_data = Field.zero
                       ; call_depth = 0
-                      ; protocol_state = Snapp_predicate.Protocol_state.accept
+                      ; protocol_state =
+                          Zkapp_precondition.Protocol_state.accept
                       ; use_full_commitment = false
                       }
                   ; predicate = Accept

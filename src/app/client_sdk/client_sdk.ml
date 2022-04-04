@@ -51,8 +51,8 @@ let _ =
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =
-           Snapp_predicate.Protocol_state.digest
-             Snapp_predicate.Protocol_state.accept
+           Zkapp_precondition.Protocol_state.digest
+             Zkapp_precondition.Protocol_state.accept
          in
          let memo =
            fee_payer_party_js##.memo |> Js.to_string
