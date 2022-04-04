@@ -4,7 +4,6 @@ import {
   declareState,
   declareMethodArguments,
   State,
-  UInt64,
   PrivateKey,
   SmartContract,
   compile,
@@ -34,7 +33,7 @@ function toc() {
 
 // declare the zkapp in snarkyjs
 const transactionFee = 10_000_000;
-const initialBalance = 10_000_000_000 - transactionFee;
+// const initialBalance = 10_000_000_000; // TODO add initial balance (=> snarkyjs needs access to fee payer)
 const initialState = Field(1);
 class SimpleZkapp extends SmartContract {
   constructor(address) {
@@ -44,8 +43,6 @@ class SimpleZkapp extends SmartContract {
 
   deploy() {
     super.deploy();
-    let amount = new UInt64(Field(`${initialBalance}`));
-    this.balance.addInPlace(amount);
     this.x.set(initialState);
   }
 
@@ -94,7 +91,7 @@ tic("sign deploy transaction");
 let feePayerNonce = 0;
 let feePayerDeploy = {
   feePayer: feePayerAddress,
-  fee: `${transactionFee + initialBalance}`,
+  fee: `${transactionFee}`,
   nonce: feePayerNonce,
 };
 let signedDeploy = client.signTransaction(
@@ -107,7 +104,7 @@ toc();
 tic("sign update transaction");
 let feePayerUpdate = {
   feePayer: feePayerAddress,
-  fee: transactionFee,
+  fee: `${transactionFee}`,
   nonce: feePayerNonce++,
 };
 let signedUpdate = client.signTransaction(

@@ -35,8 +35,8 @@ function toc() {
 // PART 1: snarkyjs
 
 // declare the zkapp in snarkyjs
-const transactionFee = 10_000_000;
-const initialBalance = 10_000_000_000 - transactionFee;
+const transactionFee = 1_000_000_000;
+const initialBalance = 10_000_000_000;
 const initialState = Field(1);
 class SimpleZkapp extends SmartContract {
   constructor(address) {
@@ -46,8 +46,6 @@ class SimpleZkapp extends SmartContract {
 
   deploy() {
     super.deploy();
-    let amount = new UInt64(Field(`${initialBalance}`));
-    this.balance.addInPlace(amount);
     this.x.set(initialState);
   }
 
@@ -58,6 +56,11 @@ class SimpleZkapp extends SmartContract {
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
 declareMethodArguments(SimpleZkapp, { update: [Field] });
+
+// setup mock mina
+let Local = Mina.LocalBlockchain();
+Mina.setActiveInstance(Local);
+let senderAccount = Local.testAccounts[0];
 
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
@@ -73,13 +76,13 @@ toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = deploy(SimpleZkapp, zkappKey, verificationKey);
+let partiesJsonDeploy = deploy(SimpleZkapp, {
+  zkappKey,
+  verificationKey,
+  initialBalance,
+  initialBalanceFundingAccountKey: senderAccount.privateKey,
+});
 toc();
-
-// setup mock mina
-let Local = Mina.LocalBlockchain();
-Mina.setActiveInstance(Local);
-let senderAccount = Local.testAccounts[0];
 
 // add nonce, public key; sign feepayer
 // TODO better API for setting feepayer
@@ -88,7 +91,7 @@ parties.feePayer.data.predicate = "0";
 parties.feePayer.data.body.publicKey = Ledger.publicKeyToString(
   senderAccount.publicKey
 );
-parties.feePayer.data.body.balanceChange = `${transactionFee + initialBalance}`;
+parties.feePayer.data.body.balanceChange = `${transactionFee}`;
 partiesJsonDeploy = JSON.stringify(parties);
 
 let partiesJsonDeploySigned = Ledger.signFeePayer(
