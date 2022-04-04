@@ -375,8 +375,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Wait for zkApp transaction to update permissions to be included in transition \
-         frontier"
+        "Wait for zkApp transaction to update permissions to be included in \
+         transition frontier"
         (wait_for_snapp parties_update_permissions)
     in
     let%bind () =
