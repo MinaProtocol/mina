@@ -52,7 +52,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
               ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
-          ; snapp =
+          ; zkapp =
               Some { Zkapp_account.default with verification_key = Some vk }
           }
         |> Or_error.ok_exn |> ignore)
