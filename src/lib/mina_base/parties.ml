@@ -787,7 +787,7 @@ let other_parties_hash (t : t) = Call_forest.hash t.other_parties
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~other_parties_hash:(other_parties_hash t)
     ~protocol_state_predicate_hash:
-      (Snapp_predicate.Protocol_state.digest
+      (Zkapp_precondition.Protocol_state.digest
          t.fee_payer.data.body.protocol_state)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 

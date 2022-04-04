@@ -62,9 +62,9 @@ module Body : sig
 
   val consensus_state : (_, _, 'a, _) Poly.t -> 'a
 
-  val view : Value.t -> Snapp_predicate.Protocol_state.View.t
+  val view : Value.t -> Zkapp_precondition.Protocol_state.View.t
 
-  val view_checked : var -> Snapp_predicate.Protocol_state.View.Checked.t
+  val view_checked : var -> Zkapp_precondition.Protocol_state.View.Checked.t
 
   module For_tests : sig
     val with_consensus_state :
