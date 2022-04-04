@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ("update", "1")
       in
       (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
-      [%log info] "Running JS script with command " ^ which_str ;
+      [%log info] ("Running JS script with command " ^ which_str) ;
       let%bind.Deferred parties_contract_str, unit_with_error =
         Deferred.both
           (let%bind.Deferred process =
