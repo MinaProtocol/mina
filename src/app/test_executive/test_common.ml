@@ -41,7 +41,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             substring
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.soft_error_format ~value:()
-            "ZkApp transaction failed: %s, but expected \"%s\"" err_str substring )
+            "ZkApp transaction failed: %s, but expected \"%s\"" err_str
+            substring )
 
   let get_account_permissions ~logger node account_id =
     [%log info] "Getting permissions for account"
