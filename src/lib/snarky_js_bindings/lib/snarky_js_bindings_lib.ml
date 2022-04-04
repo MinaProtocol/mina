@@ -2602,32 +2602,33 @@ module Ledger = struct
 
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
-  let add_account_exn (l : L.t) pk balance =
+  let public_key_to_string (pk : public_key) : Js.js_string Js.t =
+    pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
+    |> Js.string
+
+  let private_key_to_string (sk : private_key) : Js.js_string Js.t =
+    sk |> private_key |> Signature_lib.Private_key.to_base58_check |> Js.string
+
+  let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk in
-
-    let bal_u64 =
-      (* TODO: Why is this conversion necessary to make it work ? *)
-      Unsigned.UInt64.of_string (Int.to_string balance)
-    in
-
+    let bal_u64 = Unsigned.UInt64.of_string balance in
     let balance = Currency.Balance.of_uint64 bal_u64 in
-
     let a : Mina_base.Account.t =
       { (Mina_base.Account.create account_id balance) with
         permissions = loose_permissions
       }
     in
-
     create_new_account_exn l account_id a
 
   let create
       (genesis_accounts :
-        < publicKey : public_key Js.prop ; balance : int Js.prop > Js.t
+        < publicKey : public_key Js.prop ; balance : Js.js_string Js.t Js.prop >
+        Js.t
         Js.js_array
         Js.t) : ledger_class Js.t =
     let l = L.empty ~depth:20 () in
     array_iter genesis_accounts ~f:(fun a ->
-        add_account_exn l a##.publicKey a##.balance) ;
+        add_account_exn l a##.publicKey (Js.to_string a##.balance)) ;
     new%js ledger_constr l
 
   module To_js = struct
@@ -2690,8 +2691,8 @@ module Ledger = struct
     | Some a ->
         Js.Opt.return (To_js.account a)
 
-  let add_account l (pk : public_key) (balance : int) =
-    add_account_exn l##.value pk balance
+  let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
+    add_account_exn l##.value pk (Js.to_string balance)
 
   let dummy_state_view : Zkapp_precondition.Protocol_state.View.t =
     let epoch_data =
@@ -2722,12 +2723,8 @@ module Ledger = struct
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
 
-  (* TODO: this is not yet working!
-   * lacking API to create a proper tx on the JS side (authorization)
-   *)
-  let apply_parties_transaction l (p : parties) =
+  let apply_parties_transaction l (txn : Parties.t) =
     let ledger = l##.value in
-    let txn = parties p in
     let applied_exn =
       T.apply_parties_unchecked ~state_view:dummy_state_view
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
@@ -2739,14 +2736,27 @@ module Ledger = struct
       match command.status with
       | Applied (_aux_data, _balance) ->
           ()
-      | Failed (_failure, _balance) ->
-          raise_error "error applying transaction"
-      (* (Mina_base.Transaction_status.Failure.to_string failure) *)
+      | Failed (failure, _balance) ->
+          raise_error
+            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failure
+            |> Yojson.Safe.to_string )
     in
     let account_list =
       List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
     in
     Js.array @@ Array.of_list account_list
+
+  (* TODO: this is not yet working!
+   * lacking API to create a proper tx on the JS side (authorization)
+   *)
+  let apply_js_transaction l (p : parties) =
+    apply_parties_transaction l (parties p)
+
+  let apply_json_transaction l (tx_json : Js.js_string Js.t) =
+    let txn =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    apply_parties_transaction l txn
 
   let () =
     let static_method name f =
@@ -2767,10 +2777,13 @@ module Ledger = struct
 
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
+    static_method "publicKeyToString" public_key_to_string ;
+    static_method "privateKeyToString" private_key_to_string ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
-    method_ "applyPartiesTransaction" apply_parties_transaction ;
+    method_ "applyPartiesTransaction" apply_js_transaction ;
+    method_ "applyJsonTransaction" apply_json_transaction ;
 
     static_method "partiesToJson" parties_to_json ;
     let rec yojson_to_gql (y : Yojson.Safe.t) : string =

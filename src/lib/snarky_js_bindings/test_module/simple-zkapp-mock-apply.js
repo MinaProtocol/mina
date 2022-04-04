@@ -1,4 +1,3 @@
-import Client from "mina-signer";
 import {
   Field,
   declareState,
@@ -12,7 +11,10 @@ import {
   call,
   isReady,
   shutdown,
+  Mina,
+  Ledger,
 } from "snarkyjs";
+import cached from "./cached.js";
 
 await isReady;
 
@@ -63,7 +65,10 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey, provers } = compile(SimpleZkapp, zkappAddress);
+// let { verificationKey, provers } = compile(SimpleZkapp, zkappAddress);
+let verificationKey = await cached(
+  () => compile(SimpleZkapp, zkappAddress).verificationKey
+);
 toc();
 
 // deploy transaction
@@ -71,53 +76,42 @@ tic("create deploy transaction");
 let partiesJsonDeploy = deploy(SimpleZkapp, zkappKey, verificationKey);
 toc();
 
-// update transaciton
-tic("create update transaction (with proof)");
-let partiesJsonUpdate = await call(
-  SimpleZkapp,
-  zkappAddress,
-  "update",
-  [Field(3)],
-  provers
+// setup mock mina
+let Local = Mina.LocalBlockchain();
+Mina.setActiveInstance(Local);
+let senderAccount = Local.testAccounts[0];
+
+// add nonce, public key; sign feepayer
+// TODO better API for setting feepayer
+let parties = JSON.parse(partiesJsonDeploy);
+parties.feePayer.data.predicate = "0";
+parties.feePayer.data.body.publicKey = Ledger.publicKeyToString(
+  senderAccount.publicKey
 );
-toc();
+parties.feePayer.data.body.balanceChange = `${transactionFee + initialBalance}`;
+partiesJsonDeploy = JSON.stringify(parties);
 
-// PART 2: mina-signer
-let client = new Client({ network: "testnet" });
-
-// TODO create new random sender keypair (with mina-signer, in string format)
-let feePayerKey = "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
-let feePayerAddress = client.derivePublicKey(feePayerKey);
-
-// sign deploy txn
-tic("sign deploy transaction");
-let feePayerNonce = 0;
-let feePayerDeploy = {
-  feePayer: feePayerAddress,
-  fee: `${transactionFee + initialBalance}`,
-  nonce: feePayerNonce,
-};
-let signedDeploy = client.signTransaction(
-  { parties: JSON.parse(partiesJsonDeploy), feePayer: feePayerDeploy },
-  feePayerKey
+let partiesJsonDeploySigned = Ledger.signFeePayer(
+  partiesJsonDeploy,
+  senderAccount.privateKey
 );
-toc();
+console.log(JSON.stringify(JSON.parse(partiesJsonDeploySigned), null, 2));
 
-// sign update txn
-tic("sign update transaction");
-let feePayerUpdate = {
-  feePayer: feePayerAddress,
-  fee: transactionFee,
-  nonce: feePayerNonce++,
-};
-let signedUpdate = client.signTransaction(
-  { parties: JSON.parse(partiesJsonUpdate), feePayer: feePayerUpdate },
-  feePayerKey
-);
-toc();
+Local.applyJsonTransaction(partiesJsonDeploySigned);
 
-console.log("success! created and signed two transactions.");
-console.log(signedDeploy.data.parties);
-console.log(signedUpdate.data.parties);
+// check that deploy txn was applied
+let snappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+console.log("initial state: " + snappState);
+
+// // update transaction
+// tic("create update transaction (with proof)");
+// let partiesJsonUpdate = await call(
+//   SimpleZkapp,
+//   zkappAddress,
+//   "update",
+//   [Field(3)],
+//   provers
+// );
+// toc();
 
 shutdown();
