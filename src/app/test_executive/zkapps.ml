@@ -360,27 +360,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       [%log info] "ZkApp transactions included in transition frontier"
     in
     let%bind () =
-      section "Send a zkApp transaction to create zkApp accounts"
+      section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkApp to create accounts to be included in transition \
          frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "Send a zkApp transaction to update permissions"
+      section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
         (wait_for_snapp parties_update_permissions)
     in
     let%bind () =
-      section "Verify that updated permissions are in ledger accounts"
+      section_hard "Verify that updated permissions are in ledger accounts"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
                ~metadata:
@@ -408,17 +408,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
-      section "Send a zkApp transaction to update all fields"
+      section_hard "Send a zkApp transaction to update all fields"
         (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for snapp to update all fields to be included in transition \
          frontier"
         (wait_for_snapp parties_update_all)
     in
     let%bind () =
-      section "Verify zkApp updates in ledger"
+      section_hard "Verify zkApp updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
@@ -455,16 +455,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid nonce"
+      section_hard "Send a zkApp transaction with an invalid nonce"
         (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid signature"
+      section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
     let%bind () =
-      section "Wait for proof to be emitted"
+      section_hard "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()
