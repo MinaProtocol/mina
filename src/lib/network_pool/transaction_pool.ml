@@ -248,6 +248,7 @@ struct
   type verification_failure =
     | Command_failure of Indexed_pool.Command_error.t
     | Invalid_failure of Verifier.invalid
+  [@@deriving to_yojson]
 
   module Breadcrumb = Transition_frontier.Breadcrumb
 
@@ -1193,6 +1194,13 @@ struct
                               let uc = User_command.of_verifiable c in
                               if Result.is_error !failures then (
                                 Mutex.release signer_lock ;
+                                let failures =
+                                  Result.error !failures |> Option.value_exn
+                                in
+                                Core.printf "%sXXXXXXXXXXX %!"
+                                  (List.to_string failures ~f:(fun s ->
+                                       verification_failure_to_yojson s
+                                       |> Yojson.Safe.to_string)) ;
                                 return (Error `Other_command_failed) )
                               else if
                                 has_sufficient_fee t.pool ~pool_max_size uc
@@ -1245,6 +1253,10 @@ struct
                                     with
                                     | `Reject ->
                                         add_failure (Command_failure e) ;
+                                        Core.printf "XXXXX%s\n %!"
+                                          ( Indexed_pool.Command_error.to_yojson
+                                              e
+                                          |> Yojson.Safe.to_string ) ;
                                         Mutex.release signer_lock ;
                                         return (Error `Invalid_command)
                                     | `Ignore ->
@@ -1302,15 +1314,25 @@ struct
                     errs_string
               | Error _ | Ok () ->
                   let data =
-                    List.filter_map diffs' ~f:(function
-                      | Error (`Invalid_command | `Other_command_failed) ->
-                          (* If this happens, we should be in the Error branch for !failure above *)
-                          assert false
-                      | Error `Account_not_found ->
-                          (* We can just skip this set of commands *)
-                          None
-                      | Ok t ->
-                          Some t)
+                    List.filter_map diffs' ~f:(fun e ->
+                        match e with
+                        | Error (`Invalid_command | `Other_command_failed) ->
+                            (* If this happens, we should be in the Error branch for !failure above *)
+                            ( match e with
+                            | Error `Invalid_command ->
+                                Core.printf "%s %!"
+                                  "!!!!!!!!!!!!Invalid_command"
+                            | Error `Other_command_failed ->
+                                Core.printf "%s %!"
+                                  "!!!!!!!!!!!!!!!!!!!Other_command_failed"
+                            | _ ->
+                                () ) ;
+                            assert false
+                        | Error `Account_not_found ->
+                            (* We can just skip this set of commands *)
+                            None
+                        | Ok t ->
+                            Some t)
                   in
                   let data : verified =
                     { accepted =
@@ -2344,8 +2366,8 @@ let%test_module _ =
        mk_expired_txs_get_removed_test (fun ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ledger pool)
     *)
 
-    let%test_unit "Expired zkapps that are already in the pool are removed \
-                   from the pool when best tip changes (user cmds)" =
+    let%test_unit "Expired transactions that are already in the pool are \
+                   removed from the pool when best tip changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2399,13 +2421,13 @@ let%test_module _ =
           let%bind expires_later1 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
-              ~sender_idx:9 ~receiver_idx:2 ~fee:1_000_000_000
+              ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
               ~amount:10_000_000_000 ~nonce:1 ledger
           in
           let%bind expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~sender_idx:8 ~receiver_idx:2 ~fee:1_000_000_000
+              ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
               ~amount:10_000_000_000 ~nonce:2 ledger
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
