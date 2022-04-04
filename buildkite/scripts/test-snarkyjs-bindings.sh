@@ -1,19 +1,27 @@
 #!/bin/bash
 
 set -eo pipefail
-
-# run snarkyjs tests in node
-
-echo "Building SnarkyJS.."
 source ~/.profile
+
+echo "Node version:"
+node --version
+
+echo "Build SnarkyJS..."
 make snarkyjs
 
-echo "Running SnarkyJS unit tests"
-node --version
+echo "Run SnarkyJS bindings unit tests..."
 node src/lib/snarky_js_bindings/tests/run-tests.mjs
 
-echo "Building MinaSigner"
+echo "Build MinaSigner..."
 make mina_signer
 
-echo "Running MinaSigner unit tests"
+echo "Run MinaSigner unit tests..."
 npm --prefix=frontend/mina-signer test
+
+echo "Prepare SnarkyJS + MinaSigner tests..."
+cd src/lib/snarky_js_bindings/test_module
+npm i
+cd ../../../..
+
+echo "Run SnarkyJS + MinaSigner tests..."
+node src/lib/snarky_js_bindings/test_module/simple-zkapp-unit-test.js
