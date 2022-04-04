@@ -2079,7 +2079,8 @@ module Ledger = struct
     let ( ^ ) = Fn.compose in
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
     ; timestamp =
-        Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp)
+        Ignore
+        (* Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp) *)
     ; blockchain_length =
         Check
           (closed_interval
