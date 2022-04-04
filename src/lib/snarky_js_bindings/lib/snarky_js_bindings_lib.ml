@@ -2693,7 +2693,7 @@ module Ledger = struct
   let add_account l (pk : public_key) (balance : int) =
     add_account_exn l##.value pk balance
 
-  let dummy_state_view : Snapp_predicate.Protocol_state.View.t =
+  let dummy_state_view : Zkapp_precondition.Protocol_state.View.t =
     let epoch_data =
       { Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
           { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
