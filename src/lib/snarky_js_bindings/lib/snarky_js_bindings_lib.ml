@@ -2101,7 +2101,7 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = bool b##.incrementNonce
     ; use_full_commitment = bool b##.useFullCommitment
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
     }
 
   let fee_payer_body (b : party_body) : Party.Body.Fee_payer.t =
@@ -2123,7 +2123,7 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = ()
     ; use_full_commitment = ()
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
     }
 
   let fee_payer_party (party : fee_payer_party) :
@@ -2389,7 +2389,7 @@ module Ledger = struct
       ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
       ; increment_nonce = bool b##.incrementNonce
       ; use_full_commitment = bool b##.useFullCommitment
-      ; protocol_state = protocol_state b##.protocolState
+      ; protocol_state_precondition = protocol_state b##.protocolState
       }
 
     let fee_payer_party (party : fee_payer_party) :

@@ -10,7 +10,7 @@ module Party_under_construction = struct
   let create ~public_key ?(token_id = Token_id.default) () =
     { public_key; token_id }
 
-  let to_party (t : t) : Party.Predicated.t =
+  let to_party (t : t) : Party.Preconditioned.t =
     { body =
         { public_key = t.public_key
         ; token_id = t.token_id

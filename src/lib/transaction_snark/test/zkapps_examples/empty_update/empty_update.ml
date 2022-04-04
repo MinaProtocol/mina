@@ -47,7 +47,7 @@ let party_proof =
 
 let party : Party.t = { data = party_body; authorization = Proof party_proof }
 
-let deploy_party_body : Party.Predicated.t =
+let deploy_party_body : Party.Preconditioned.t =
   (* TODO: This is a pain. *)
   { body =
       { Party.Body.dummy with
@@ -78,7 +78,7 @@ let protocol_state = Zkapp_precondition.Protocol_state.accept
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Preconditioned.t) -> p.body.call_depth)
     [ deploy_party_body; party_body ]
   |> Parties.Call_forest.accumulate_hashes_predicated
 

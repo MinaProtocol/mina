@@ -1147,7 +1147,7 @@ module Snapp_helpers = struct
     let%bind protocol_state_data =
       query_db pool
         ~f:(fun db ->
-          Processor.Zkapp_account_precondition_protocol_states.load db
+          Processor.Zkapp_protocol_state_precondition.load db
             body_data.zkapp_protocol_state_precondition_id)
         ~item:"Snapp account_precondition protocol state"
     in
@@ -1298,7 +1298,7 @@ module Snapp_helpers = struct
     let%bind next_epoch_data =
       epoch_data_of_id protocol_state_data.next_epoch_data_id
     in
-    let protocol_state : Zkapp_precondition.Protocol_state.t =
+    let protocol_state_precondition : Zkapp_precondition.Protocol_state.t =
       { snarked_ledger_hash
       ; timestamp
       ; blockchain_length
@@ -1322,7 +1322,7 @@ module Snapp_helpers = struct
         ; sequence_events
         ; call_data
         ; call_depth
-        ; protocol_state
+        ; protocol_state_precondition
         ; use_full_commitment
         }
         : Party.Body.t )
@@ -1350,7 +1350,7 @@ module Snapp_helpers = struct
       ; sequence_events = body.sequence_events
       ; call_data = body.call_data
       ; call_depth = body.call_depth
-      ; protocol_state = body.protocol_state
+      ; protocol_state_precondition = body.protocol_state_precondition
       ; use_full_commitment = ()
       }
       : Party.Body.Fee_payer.t )

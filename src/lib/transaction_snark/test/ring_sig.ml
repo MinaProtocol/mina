@@ -190,7 +190,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; increment_nonce = ()
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = ()
                     }
                 ; account_precondition = sender_nonce
@@ -210,7 +211,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; sequence_events = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
                 ; use_full_commitment = false
                 }
             ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
@@ -227,7 +229,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
-                ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
                 ; use_full_commitment = false
                 }
             ; account_precondition = Full Zkapp_precondition.Account.accept
