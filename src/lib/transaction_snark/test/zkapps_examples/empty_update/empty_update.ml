@@ -61,7 +61,7 @@ let deploy_party_body : Party.Predicated.t =
                     (* TODO: This function should live in
                        [Side_loaded_verification_key].
                     *)
-                    Snapp_account.digest_vk vk
+                    Zkapp_account.digest_vk vk
                 }
           }
       ; use_full_commitment = true
@@ -73,7 +73,7 @@ let deploy_party : Party.t =
   (* TODO: This is a pain. *)
   { data = deploy_party_body; authorization = Signature Signature.dummy }
 
-let protocol_state = Snapp_predicate.Protocol_state.accept
+let protocol_state = Zkapp_precondition.Protocol_state.accept
 
 let ps =
   (* TODO: This is a pain. *)
@@ -88,7 +88,7 @@ let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
   let other_parties_hash = Parties.Call_forest.hash ps in
   let protocol_state_predicate_hash =
-    Snapp_predicate.Protocol_state.digest protocol_state
+    Zkapp_precondition.Protocol_state.digest protocol_state
   in
   let memo_hash = Signed_command_memo.hash memo in
   Parties.Transaction_commitment.create ~other_parties_hash

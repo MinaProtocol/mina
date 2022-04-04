@@ -182,7 +182,7 @@ CREATE TABLE zkapp_epoch_data
 );
 
 /* NULL convention */
-CREATE TABLE zkapp_predicate_protocol_states
+CREATE TABLE zkapp_precondition_protocol_states
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
 , timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
@@ -209,7 +209,7 @@ CREATE TABLE zkapp_party_body
 , sequence_events_ids                   int[]      NOT NULL
 , call_data_id                          int        NOT NULL REFERENCES zkapp_state_data(id)
 , call_depth                            int        NOT NULL
-, zkapp_predicate_protocol_state_id     int        NOT NULL REFERENCES zkapp_predicate_protocol_states(id)
+, zkapp_precondition_protocol_state_id     int        NOT NULL REFERENCES zkapp_precondition_protocol_states(id)
 , use_full_commitment                   boolean    NOT NULL
 );
 

@@ -1,7 +1,7 @@
 open Mina_base
 open Pickles
 
-module Test_input : Transaction_snark_tests.Test_snapp_update.Input_intf =
+module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "verification_key"
 
@@ -19,5 +19,5 @@ end
 
 let%test_module "Update account verification key" =
   ( module struct
-    include Transaction_snark_tests.Test_snapp_update.Make (Test_input)
+    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
   end )
