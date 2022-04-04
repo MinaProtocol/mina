@@ -865,6 +865,57 @@ let%test_module "account timing check" =
               failwithf "Transaction failed: %s" (Error.to_string_hum err) ())
       |> Fn.flip Async.upon (fun () -> ())
 
+    let check_zkapp_failure expected_failure = function
+      | Ok
+          ( (parties_undo :
+              Mina_transaction_logic.Transaction_applied.Parties_applied.t)
+          , ( (local_state :
+                _ Mina_transaction_logic.Parties_logic.Local_state.t)
+            , _amount ) ) ->
+          (* we expect a Failed status, and the failure to appear in
+              the failure status table
+          *)
+          ( match With_status.status parties_undo.command with
+          | Applied _ ->
+              failwith "Expected transaction failure"
+          | Failed (failuress, _balances) ->
+              let failures = List.concat failuress in
+              if
+                not
+                  (List.equal Transaction_status.Failure.equal failures
+                     [ expected_failure ])
+              then
+                failwithf "Got unxpected transaction failure(s): %s"
+                  ( List.map failures ~f:Transaction_status.Failure.to_string
+                  |> String.concat ~sep:"," )
+                  () ) ;
+          let failure_statuses =
+            local_state.failure_status_tbl |> List.concat
+          in
+          if List.is_empty failure_statuses then
+            failwithf "Expected failure: %s, got no failure"
+              (Transaction_status.Failure.to_string expected_failure)
+              () ;
+          if not (List.length failure_statuses = 1) then
+            failwithf "Expected one failure: %s, got these failures: %s"
+              (Transaction_status.Failure.to_string expected_failure)
+              ( List.map failure_statuses ~f:(fun failure ->
+                    Transaction_status.Failure.to_string failure)
+              |> String.concat ~sep:"," )
+              () ;
+          let actual_failure = List.hd_exn failure_statuses in
+          if
+            not
+              (Transaction_status.Failure.equal actual_failure expected_failure)
+          then
+            failwithf "Expected failure: %s, got failure %s"
+              (Transaction_status.Failure.to_string expected_failure)
+              (Transaction_status.Failure.to_string actual_failure)
+              ()
+      | Error err ->
+          let err_str = Error.to_string_hum err in
+          failwithf "Unexpected transaction error: %s" err_str ()
+
     let%test_unit "zkApp command, before cliff time, sufficient balance" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -893,7 +944,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -960,7 +1011,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1044,7 +1095,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1127,7 +1178,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1153,7 +1204,7 @@ let%test_module "account timing check" =
         in
         return (ledger_init_state, parties)
       in
-      Quickcheck.test ~seed:(`Deterministic "zkapp command, just before cliff")
+      Quickcheck.test ~seed:(`Deterministic "zkapp command, at cliff time")
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
         gen ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
@@ -1199,7 +1250,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1236,6 +1287,87 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot.(of_int 10_100)
                 [ parties ]))
 
+    let%test_unit "zkApp command, while vesting, insufficient balance" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let balance_int = 100_000_000_000_000 in
+        let init_min_balance_int = 100_000_000_000_000 in
+        let ledger_init_state =
+          List.map keypairs ~f:(fun keypair ->
+              let balance = Currency.Balance.of_int balance_int in
+              let nonce = Mina_numbers.Account_nonce.zero in
+              let (timing : Account_timing.t) =
+                Timed
+                  { initial_minimum_balance =
+                      Currency.Balance.of_int init_min_balance_int
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_amount = Currency.Amount.zero
+                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_increment = Currency.Amount.of_int 100_000
+                  }
+              in
+              let balance_as_amount = Currency.Balance.to_amount balance in
+              (keypair, balance_as_amount, nonce, timing))
+          |> Array.of_list
+        in
+        let liquid_balance =
+          balance_int - (init_min_balance_int - (100 * 100_000))
+        in
+        let fee_int = 1_000_000 in
+        (* the + 1 breaks the min balance requirement *)
+        let amount_int = liquid_balance - fee_int + 1 in
+        let parties =
+          let open Mina_base in
+          let fee = Currency.Fee.of_int 1_000_000 in
+          let amount = Currency.Amount.of_int amount_int in
+          let nonce = Account.Nonce.zero in
+          let memo =
+            Signed_command_memo.create_from_string_exn
+              "zkApps transfer, timed account"
+          in
+          let sender_keypair = List.hd_exn keypairs in
+          let zkapp_keypair = List.nth_exn keypairs 1 in
+          let receiver_key =
+            zkapp_keypair.public_key |> Signature_lib.Public_key.compress
+          in
+          let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+            { sender = (sender_keypair, nonce)
+            ; fee
+            ; receivers = [ (receiver_key, amount) ]
+            ; amount
+            ; zkapp_account_keypairs = []
+            ; memo
+            ; new_zkapp_account = false
+            ; snapp_update = Party.Update.dummy
+            ; current_auth = Permissions.Auth_required.Signature
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; sequence_events = []
+            }
+          in
+          Transaction_snark.For_tests.multiple_transfers parties_spec
+        in
+        return (ledger_init_state, parties)
+      in
+      Quickcheck.test ~seed:(`Deterministic "zkapp command, while vesting")
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        gen ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let _state_body, state_view =
+                state_body_and_view_at_slot
+                  Mina_numbers.Global_slot.(of_int 10_100)
+              in
+              let result =
+                Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
+                  ~state_view ledger parties
+              in
+              check_zkapp_failure
+                Transaction_status.Failure.Source_minimum_balance_violation
+                result))
+
     let%test_unit "zkApp command, after vesting, sufficient balance" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -1268,7 +1400,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1339,7 +1471,7 @@ let%test_module "account timing check" =
           let nonce = Account.Nonce.zero in
           let memo =
             Signed_command_memo.create_from_string_exn
-              "Snapp transfer, timed account"
+              "zkApp transfer, timed account"
           in
           let sender_keypair = List.hd_exn keypairs in
           let zkapp_keypair = List.nth_exn keypairs 1 in
@@ -1377,37 +1509,9 @@ let%test_module "account timing check" =
                 state_body_and_view_at_slot
                   Mina_numbers.Global_slot.(of_int (100_000 + 10_000))
               in
-              match
+              let result =
                 Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view ledger parties
-              with
-              | Ok (_parties_undo, (local_state, _amount)) ->
-                  let failure_statuses =
-                    local_state.failure_status_tbl |> List.concat
-                  in
-                  let expected_failure = Transaction_status.Failure.Overflow in
-                  if List.is_empty failure_statuses then
-                    failwithf "Expected failure: %s, got no failure"
-                      (Transaction_status.Failure.to_string expected_failure)
-                      () ;
-                  if not (List.length failure_statuses = 1) then
-                    failwithf "Expected one failure: %s, got these failures: %s"
-                      (Transaction_status.Failure.to_string expected_failure)
-                      ( List.map failure_statuses ~f:(fun failure ->
-                            Transaction_status.Failure.to_string failure)
-                      |> String.concat ~sep:"," )
-                      () ;
-                  let actual_failure = List.hd_exn failure_statuses in
-                  if
-                    not
-                      (Transaction_status.Failure.equal actual_failure
-                         expected_failure)
-                  then
-                    failwithf "Expected failure: %s, got failure %s"
-                      (Transaction_status.Failure.to_string expected_failure)
-                      (Transaction_status.Failure.to_string actual_failure)
-                      ()
-              | Error err ->
-                  let err_str = Error.to_string_hum err in
-                  failwithf "Unexpected transaction error: %s" err_str ()))
+              in
+              check_zkapp_failure Transaction_status.Failure.Overflow result))
   end )
