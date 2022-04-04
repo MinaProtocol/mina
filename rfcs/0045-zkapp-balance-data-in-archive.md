@@ -150,6 +150,16 @@ Information to be added:
   The staged ledger is contained in the breadcrumb argument, and the block contains transactions,
   so the accounts affected by the block can be queried from the staged ledger.
 
+Types to modify:
+
+- The type `Mina_transaction_logic.Transaction_applied.Signed_command_applied`
+  contains the field `user_command` with a status, which will contain
+  the account creation fees.  Modify the nearby types
+  `Fee_transfer_applied` and `Coinbase_applied` to contain those
+  fees. We could use `With_status.t` for that purpose, or, since those
+  commands always succeed, add new fields to those types to hold the
+  account creation fee list.
+
 Removing the information from transaction statuses changes the
 structure of blocks, which use a versioned type. While the version
 number need not be changed, because the new type will be deployed at a
@@ -237,12 +247,6 @@ and query transaction data in an archive database.
 [unresolved-questions]: #unresolved-questions
 
 There are some minor questions posed in the text above. Besides those:
-
- - For fee transfers and coinbases, the `Applied` status contains
-   `Auxiliary_data.empty`, so no account creation fee information is
-   provided to the archive processor, which uses a calculational hack
-   to determine such fees. Are there obstacles to obtaining those
-   fees on the daemon side?
 
  - The new database schema has information not present in the current
    schema, such as the `accounts` table.  It won't be possible to
