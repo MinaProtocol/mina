@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ("update", "1")
       in
       (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
-      [%log info] "Running JS while waiting for node to initialize" ;
+      [%log info] "Running JS script with command " ^ which_str ;
       let%bind.Deferred parties_contract_str, unit_with_error =
         Deferred.both
           (let%bind.Deferred process =
@@ -124,7 +124,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          frontier"
         (wait_for_zkapp parties_deploy_contract)
     in
-    let%bind parties_update_contract = make_sign_and_send `Deploy in
+    let%bind parties_update_contract = make_sign_and_send `Update in
     let%bind () =
       section
         "Wait for update contract transaction to be included in transition \
