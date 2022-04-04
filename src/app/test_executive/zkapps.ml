@@ -277,9 +277,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             data =
               { body =
                   { p.fee_payer.data.body with
-                    balance_change = Currency.Fee.of_int 8000000000
+                    balance_change = Currency.Fee.of_int 1000
                   }
-              ; predicate = Mina_base.Account.Nonce.of_int 4
+              ; predicate = Mina_base.Account.Nonce.of_int 2
               }
           }
       }
@@ -291,7 +291,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             { p.fee_payer with
               data =
                 { p.fee_payer.data with
-                  predicate = Mina_base.Account.Nonce.of_int 4
+                  predicate = Mina_base.Account.Nonce.of_int 2
                 }
             }
         ; other_parties =
@@ -316,9 +316,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             data =
               { body =
                   { p.fee_payer.data.body with
-                    balance_change = Currency.Fee.of_int 1000
+                    balance_change = Currency.Fee.of_int 100000
                   }
-              ; predicate = Mina_base.Account.Nonce.of_int 4
+              ; predicate = Mina_base.Account.Nonce.of_int 1
               }
           }
       }
