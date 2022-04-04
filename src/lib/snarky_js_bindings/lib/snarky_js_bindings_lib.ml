@@ -2620,7 +2620,7 @@ module Ledger = struct
           (Command (Parties (parties p)))
         |> Or_error.ok_exn |> ignore) ;
 
-    let full = Parties.deriver @@ Fields_derivers_snapps.Derivers.o () in
+    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
     let parties_to_json ps =
       parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
     in

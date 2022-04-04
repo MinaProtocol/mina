@@ -139,7 +139,7 @@ let%test_module "multisig_account" =
       | Sigma : int -> Schnorr.Chunked.Signature.t Snarky_backendless.Request.t
 
     (* test with a 2-of-3 multisig *)
-    let%test_unit "snapps-based proved transaction" =
+    let%test_unit "zkapps-based proved transaction" =
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -286,9 +286,9 @@ let%test_module "multisig_account" =
                  { a with
                    permissions =
                      { Permissions.user_default with set_permissions = Proof }
-                 ; snapp =
+                 ; zkapp =
                      Some
-                       { (Option.value ~default:Zkapp_account.default a.snapp) with
+                       { (Option.value ~default:Zkapp_account.default a.zkapp) with
                          verification_key = Some vk
                        }
                  }) ;

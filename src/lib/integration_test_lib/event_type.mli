@@ -52,6 +52,7 @@ module Block_produced : sig
     ; epoch : int
     ; global_slot : int
     ; snarked_ledger_generated : bool
+    ; state_hash : State_hash.t
     }
 
   include Event_type_intf with type t := t

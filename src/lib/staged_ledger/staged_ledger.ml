@@ -2392,15 +2392,15 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps ~iters ~num_snapps :
+    let gen_zkapps ~iters ~num_zkapps :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_snapps ()
+          ~length:num_zkapps ()
       in
-      let snapps =
+      let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
@@ -2490,18 +2490,18 @@ let%test_module "staged ledger tests" =
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command")
       in
-      assert (List.length snapps = num_snapps) ;
-      return (ledger, snapps, List.init iters ~f:(Fn.const None))
+      assert (List.length zkapps = num_zkapps) ;
+      return (ledger, zkapps, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps_at_capacity :
+    let gen_zkapps_at_capacity :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
-      let num_snapps = transaction_capacity * iters in
-      gen_snapps ~num_snapps ~iters
+      let num_zkapps = transaction_capacity * iters in
+      gen_zkapps ~num_zkapps ~iters
 
-    let gen_snapps_below_capacity ?(extra_blocks = false) () :
+    let gen_zkapps_below_capacity ?(extra_blocks = false) () :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -2510,12 +2510,12 @@ let%test_module "staged ledger tests" =
       in
       let%bind iters = Int.gen_incl 1 iters_max in
       (* see comment in gen_below_capacity for rationale *)
-      let%bind snapps_per_iter =
+      let%bind zkapps_per_iter =
         Quickcheck.Generator.list_with_length iters
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
-      let num_snapps = List.fold snapps_per_iter ~init:0 ~f:( + ) in
-      gen_snapps ~num_snapps ~iters
+      let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
+      gen_zkapps ~num_zkapps ~iters
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2586,15 +2586,15 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
-    let%test_unit "Max_throughput (snapps)" =
+    let%test_unit "Max_throughput (zkapps)" =
       (* limit trials to prevent too-many-open-files failure *)
-      Quickcheck.test ~trials:3 gen_snapps_at_capacity
-        ~f:(fun (ledger, snapps, iters) ->
+      Quickcheck.test ~trials:3 gen_zkapps_at_capacity
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `Many_provers
+              test_simple account_ids zkapps iters sl test_mask `Many_provers
                 stmt_to_work_random_prover))
 
     let%test_unit "Be able to include random number of commands" =
@@ -2605,14 +2605,14 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
-    let%test_unit "Be able to include random number of commands (snapps)" =
-      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
-        ~f:(fun (ledger, snapps, iters) ->
+    let%test_unit "Be able to include random number of commands (zkapps)" =
+      Quickcheck.test (gen_zkapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `Many_provers
+              test_simple account_ids zkapps iters sl test_mask `Many_provers
                 stmt_to_work_random_prover))
 
     let%test_unit "Be able to include random number of commands (One prover)" =
@@ -2624,14 +2624,14 @@ let%test_module "staged ledger tests" =
                 cmds iters sl test_mask `One_prover stmt_to_work_one_prover))
 
     let%test_unit "Be able to include random number of commands (One prover, \
-                   snapps)" =
-      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
-        ~f:(fun (ledger, snapps, iters) ->
+                   zkapps)" =
+      Quickcheck.test (gen_zkapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `One_prover
+              test_simple account_ids zkapps iters sl test_mask `One_prover
                 stmt_to_work_one_prover))
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
@@ -3668,8 +3668,9 @@ let%test_module "staged ledger tests" =
                       { data = invalid_command
                       ; status =
                           Transaction_status.Failed
-                            ( Transaction_status.Failure
-                              .Amount_insufficient_to_create_account
+                            ( Transaction_status.Failure.(
+                                Collection.of_single_failure
+                                  Amount_insufficient_to_create_account)
                             , Transaction_status.Balance_data.
                                 { fee_payer_balance = None
                                 ; source_balance = None

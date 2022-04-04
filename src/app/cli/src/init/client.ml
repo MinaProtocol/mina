@@ -1045,7 +1045,7 @@ let pooled_zkapp_commands =
              let kvs = Yojson.Safe.Util.to_assoc raw_response in
              List.hd_exn kvs |> snd |> return
            with _ ->
-             eprintf "Failed to read result of pooled zkapp commands" ;
+             eprintf "Failed to read result of pooled zkApp commands" ;
              exit 1
          in
          print_string (Yojson.Safe.to_string json_response)))

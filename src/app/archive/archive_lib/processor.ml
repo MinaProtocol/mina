@@ -2158,8 +2158,14 @@ module Block_and_signed_command = struct
           , receiver_account_creation_fee_paid
           , None
           , balances )
-      | Failed (failure, balances) ->
-          ("failed", Some failure, None, None, None, balances)
+      | Failed (failures, balances) ->
+          (*TODO: change schema to include list of failures when/after refactoring for balance changes*)
+          ( "failed"
+          , Some (List.concat failures |> List.hd_exn)
+          , None
+          , None
+          , None
+          , balances )
     in
     let pk_of_id id =
       let%map pk_str = Public_key.find_by_id (module Conn) id in

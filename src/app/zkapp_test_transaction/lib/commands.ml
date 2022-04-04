@@ -23,20 +23,8 @@ let parse_field_element_or_hash_string s ~f =
   match Or_error.try_with (fun () -> Snark_params.Tick.Field.of_string s) with
   | Ok field ->
       f field
-  | Error e1 -> (
-      match Signed_command_memo.create_from_string s with
-      | Ok memo ->
-          Random_oracle.Legacy.(
-            hash ~init:Hash_prefix.zkapp_test
-              ( Signed_command_memo.to_bits memo
-              |> Random_oracle_input.Legacy.bitstring |> pack_input ))
-          |> f
-      | Error e2 ->
-          failwith
-            (sprintf
-               "Neither a field element nor a suitable memo string: Errors \
-                (%s, %s)"
-               (Error.to_string_hum e1) (Error.to_string_hum e2)) )
+  | Error e1 ->
+      Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
 let `VK vk, `Prover snapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -151,9 +139,9 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Transaction_snark.For_tests.create_trivial_predicate_snapp
       ~constraint_constants ~protocol_state_predicate spec ledger ~snapp_kp
   in
-  printf "Zkapp transaction yojson: %s\n\n%!"
+  printf "ZkApp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-  printf "(Zkapp transaction graphQL input %s\n\n%!"
+  printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command parties) ;
   printf "Updated accounts\n" ;
   List.iter (Ledger.to_list ledger) ~f:(fun acc ->
@@ -558,7 +546,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   parties
 
-let%test_module "Snapps test transaction" =
+let%test_module "ZkApps test transaction" =
   ( module struct
     let execute mina schema query =
       match Graphql_parser.parse query with
@@ -594,7 +582,7 @@ let%test_module "Snapps test transaction" =
                     (Party.to_yojson expected |> Yojson.Safe.to_string)
                     (Party.to_yojson got |> Yojson.Safe.to_string)) ;
               if !failed then
-                return (Error "invalid snapp transaction generated")
+                return (Error "invalid zkApp transaction generated")
               else return (Ok "Passed")))
       in
       let schema =
@@ -614,7 +602,7 @@ let%test_module "Snapps test transaction" =
       | Error e ->
           Error e
 
-    let%test_unit "snapps transaction graphql round trip" =
+    let%test_unit "zkapps transaction graphql round trip" =
       Quickcheck.test ~trials:20
         (Mina_generators.User_command_generators.parties_with_ledger ())
         ~f:(fun (user_cmd, _, _, _) ->

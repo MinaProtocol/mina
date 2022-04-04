@@ -1361,7 +1361,19 @@ module Types = struct
     type t =
       | Applied
       | Enqueued
-      | Included_but_failed of Transaction_status.Failure.t
+      | Included_but_failed of Transaction_status.Failure.Collection.t
+
+    let failure_reasons =
+      obj "PartiesFailureReason" ~fields:(fun _ ->
+          [ field "index" ~typ:string ~args:[]
+              ~doc:"List index of the party that failed"
+              ~resolve:(fun _ (index, _) -> Some (Int.to_string index))
+          ; field "failures"
+              ~typ:(non_null @@ list @@ non_null @@ string)
+              ~args:[] ~doc:"Failure reason for the party or any nested parties"
+              ~resolve:(fun _ (_, failures) ->
+                List.map failures ~f:Transaction_status.Failure.to_string)
+          ])
   end
 
   module User_command = struct
@@ -1566,8 +1578,9 @@ module Types = struct
             match uc.With_status.status with
             | Applied | Enqueued ->
                 None
-            | Included_but_failed failure ->
-                Some (Transaction_status.Failure.to_string failure))
+            | Included_but_failed failures ->
+                List.concat failures |> List.hd
+                |> Option.map ~f:Transaction_status.Failure.to_string)
       ]
 
     let payment =
@@ -1633,15 +1646,19 @@ module Types = struct
               ~args:Arg.[]
               ~doc:"Parties representing the transaction"
               ~resolve:(fun _ parties -> parties.With_hash.data)
-          ; field "failureReason" ~typ:string ~args:[]
+          ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
+              ~args:[]
               ~doc:
                 "The reason for the zkApp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
                 | Applied | Enqueued ->
                     None
-                | Included_but_failed failure ->
-                    Some (Transaction_status.Failure.to_string failure))
+                | Included_but_failed failures ->
+                    Some
+                      (List.map
+                         (Transaction_status.Failure.Collection.to_display
+                            failures) ~f:(fun f -> Some f)))
           ])
   end
 
