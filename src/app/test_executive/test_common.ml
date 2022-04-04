@@ -18,8 +18,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let err_str = Error.to_string_mach err in
         [%log error] "Error sending zkApp"
           ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.soft_error_format ~value:() "Error sending zkApp: %s"
-          err_str
+        Malleable_error.hard_error_format "Error sending zkApp: %s" err_str
 
   let send_invalid_zkapp ~logger node parties substring =
     [%log info] "Sending zkApp, expected to fail" ;
@@ -27,7 +26,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | Ok _zkapp_id ->
         [%log error] "ZkApp transaction succeeded, expected error \"%s\""
           substring ;
-        Malleable_error.soft_error_format ~value:()
+        Malleable_error.hard_error_format
           "ZkApp transaction succeeded, expected error \"%s\"" substring
     | Error err ->
         let err_str = Error.to_string_mach err in
@@ -40,7 +39,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             "Error sending zkApp, for a reason other than the expected \"%s\""
             substring
             ~metadata:[ ("error", `String err_str) ] ;
-          Malleable_error.soft_error_format ~value:()
+          Malleable_error.hard_error_format
             "ZkApp transaction failed: %s, but expected \"%s\"" err_str
             substring )
 
