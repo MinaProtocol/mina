@@ -871,13 +871,18 @@ let%test_module "account timing check" =
               Mina_transaction_logic.Transaction_applied.Parties_applied.t)
           , ( (local_state :
                 _ Mina_transaction_logic.Parties_logic.Local_state.t)
-            , _amount ) ) ->
+            , _amount ) ) -> (
           (* we expect a Failed status, and the failure to appear in
-              the failure status table
+             the failure status table
           *)
-          ( match With_status.status parties_undo.command with
+          let failure_statuses =
+            local_state.failure_status_tbl |> List.concat
+          in
+          match With_status.status parties_undo.command with
           | Applied _ ->
-              failwith "Expected transaction failure"
+              failwithf "Expected transaction failure: %s"
+                (Transaction_status.Failure.to_string expected_failure)
+                ()
           | Failed (failuress, _balances) ->
               let failures = List.concat failuress in
               if
@@ -888,30 +893,10 @@ let%test_module "account timing check" =
                 failwithf "Got unxpected transaction failure(s): %s"
                   ( List.map failures ~f:Transaction_status.Failure.to_string
                   |> String.concat ~sep:"," )
-                  () ) ;
-          let failure_statuses =
-            local_state.failure_status_tbl |> List.concat
-          in
-          if List.is_empty failure_statuses then
-            failwithf "Expected failure: %s, got no failure"
-              (Transaction_status.Failure.to_string expected_failure)
-              () ;
-          if not (List.length failure_statuses = 1) then
-            failwithf "Expected one failure: %s, got these failures: %s"
-              (Transaction_status.Failure.to_string expected_failure)
-              ( List.map failure_statuses ~f:(fun failure ->
-                    Transaction_status.Failure.to_string failure)
-              |> String.concat ~sep:"," )
-              () ;
-          let actual_failure = List.hd_exn failure_statuses in
-          if
-            not
-              (Transaction_status.Failure.equal actual_failure expected_failure)
-          then
-            failwithf "Expected failure: %s, got failure %s"
-              (Transaction_status.Failure.to_string expected_failure)
-              (Transaction_status.Failure.to_string actual_failure)
-              ()
+                  () ;
+              assert (
+                List.equal Transaction_status.Failure.equal failures
+                  failure_statuses ) )
       | Error err ->
           let err_str = Error.to_string_hum err in
           failwithf "Unexpected transaction error: %s" err_str ()
