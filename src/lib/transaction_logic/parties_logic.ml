@@ -476,12 +476,12 @@ module type Account_intf = sig
     -> [ `Invalid_timing of bool | `Insufficient_balance of bool ] * timing
 
   (** Fill the snapp field of the account if it's currently [None] *)
-  val make_snapp : t -> t
+  val make_zkapp : t -> t
 
   (** If the current account has no snapp fields set, reset its snapp field to
       [None].
   *)
-  val unmake_snapp : t -> t
+  val unmake_zkapp : t -> t
 
   val proved_state : t -> bool
 
@@ -1120,7 +1120,7 @@ module Make (Inputs : Inputs_intf) = struct
     (* Transform into a snapp account.
        This must be done before updating snapp fields!
     *)
-    let a = Account.make_snapp a in
+    let a = Account.make_zkapp a in
     (* Update app state. *)
     let a, local_state =
       let app_state = Party.Update.app_state party in
@@ -1232,7 +1232,7 @@ module Make (Inputs : Inputs_intf) = struct
       (a, local_state)
     in
     (* Reset snapp state to [None] if it is unmodified. *)
-    let a = Account.unmake_snapp a in
+    let a = Account.unmake_zkapp a in
     (* Update snapp URI. *)
     let a, local_state =
       let zkapp_uri = Party.Update.zkapp_uri party in

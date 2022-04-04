@@ -105,10 +105,10 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t =
+      type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) t =
         { app_state : 'app_state
         ; verification_key : 'vk
-        ; snapp_version : 'snapp_version
+        ; zkapp_version : 'zkapp_version
         ; sequence_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
         ; last_sequence_slot : 'slot
         ; proved_state : 'bool
@@ -124,11 +124,11 @@ module Poly = struct
   end]
 end
 
-type ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) t_ =
-      ('app_state, 'vk, 'snapp_version, 'field, 'slot, 'bool) Poly.t =
+type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) t_ =
+      ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) Poly.t =
   { app_state : 'app_state
   ; verification_key : 'vk
-  ; snapp_version : 'snapp_version
+  ; zkapp_version : 'zkapp_version
   ; sequence_state : 'field Pickles_types.Vector.Vector_5.t
   ; last_sequence_slot : 'slot
   ; proved_state : 'bool
@@ -187,7 +187,7 @@ module Checked = struct
     in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
-      ~snapp_version:
+      ~zkapp_version:
         (f (fun x -> Mina_numbers.Zkapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
@@ -247,7 +247,7 @@ let to_input (t : t) =
       (f
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
-    ~snapp_version:(f Mina_numbers.Zkapp_version.to_input)
+    ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
     ~proved_state:
@@ -255,10 +255,10 @@ let to_input (t : t) =
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =
-  (* These are the permissions of a "user"/"non snapp" account. *)
+  (* These are the permissions of a "user"/"non zkapp" account. *)
   { app_state = Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
-  ; snapp_version = Mina_numbers.Zkapp_version.zero
+  ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
       (let empty = Lazy.force Sequence_events.empty_hash in
        [ empty; empty; empty; empty; empty ])

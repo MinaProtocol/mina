@@ -40,7 +40,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
               ; nonce
               ; receipt_chain_hash
               ; delegate
-              ; snapp
+              ; zkapp
               ; _
               } =
             account
@@ -110,7 +110,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     Or_ignore.gen (return pk)
               in
               let%bind state, sequence_state, proved_state =
-                match snapp with
+                match zkapp with
                 | None ->
                     let len =
                       Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
@@ -528,7 +528,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
           let account =
             if zkapp_account then
               { account_with_pk with
-                snapp =
+                zkapp =
                   Some
                     { Zkapp_account.default with
                       verification_key =
@@ -564,7 +564,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
             Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
           in
           let account = Ledger.get_at_index_exn ledger index in
-          if zkapp_account && Option.is_none account.snapp then
+          if zkapp_account && Option.is_none account.zkapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
           account
       | Some account_id -> (
@@ -590,7 +590,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some acct ->
-                  if zkapp_account && Option.is_none acct.snapp then
+                  if zkapp_account && Option.is_none acct.zkapp then
                     failwith
                       "gen_party_body: provided account has no snapp field" ;
                   return acct ) )
