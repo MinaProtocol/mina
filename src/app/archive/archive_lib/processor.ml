@@ -391,7 +391,7 @@ module Zkapp_balance_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (balance_bounds :
-        Currency.Balance.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Currency.Balance.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let balance_lower_bound =
       balance_bounds.lower |> Currency.Balance.to_uint64
       |> Unsigned.UInt64.to_int64
@@ -425,8 +425,8 @@ module Zkapp_nonce_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (nonce_bounds :
-        Mina_numbers.Account_nonce.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
+        Mina_numbers.Account_nonce.t
+        Mina_base.Zkapp_precondition.Closed_interval.t) =
     let nonce_lower_bound = Unsigned.UInt32.to_int64 nonce_bounds.lower in
     let nonce_upper_bound = Unsigned.UInt32.to_int64 nonce_bounds.upper in
     let value = { nonce_lower_bound; nonce_upper_bound } in
@@ -471,7 +471,7 @@ module Zkapp_account = struct
   let table_name = "zkapp_account"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (acct : Snapp_predicate.Account.t) =
+      (acct : Zkapp_precondition.Account.t) =
     let open Deferred.Result.Let_syntax in
     let%bind balance_id =
       Mina_caqti.add_if_zkapp_check
@@ -607,8 +607,8 @@ module Zkapp_token_id_bounds = struct
   let table_name = "zkapp_token_id_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (token_id_bounds : Token_id.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
+      (token_id_bounds :
+        Token_id.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
     let token_id_upper_bound = token_id_bounds.upper |> Token_id.to_string in
     let value = { token_id_lower_bound; token_id_upper_bound } in
@@ -636,7 +636,7 @@ module Zkapp_timestamp_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timestamp_bounds :
-        Block_time.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let timestamp_lower_bound = Block_time.to_int64 timestamp_bounds.lower in
     let timestamp_upper_bound = Block_time.to_int64 timestamp_bounds.upper in
     let value = { timestamp_lower_bound; timestamp_upper_bound } in
@@ -664,7 +664,7 @@ module Zkapp_length_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (length_bounds :
-        Unsigned.uint32 Mina_base.Snapp_predicate.Closed_interval.t) =
+        Unsigned.uint32 Mina_base.Zkapp_precondition.Closed_interval.t) =
     let length_lower_bound = Unsigned.UInt32.to_int64 length_bounds.lower in
     let length_upper_bound = Unsigned.UInt32.to_int64 length_bounds.upper in
     let value = { length_lower_bound; length_upper_bound } in
@@ -692,7 +692,7 @@ module Zkapp_amount_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (amount_bounds :
-        Currency.Amount.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Currency.Amount.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let amount_lower_bound =
       Currency.Amount.to_uint64 amount_bounds.lower |> Unsigned.UInt64.to_int64
     in
@@ -724,8 +724,8 @@ module Zkapp_global_slot_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (global_slot_bounds :
-        Mina_numbers.Global_slot.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
+        Mina_numbers.Global_slot.t
+        Mina_base.Zkapp_precondition.Closed_interval.t) =
     let global_slot_lower_bound =
       Mina_numbers.Global_slot.to_uint32 global_slot_bounds.lower
       |> Unsigned.UInt32.to_int64
@@ -935,7 +935,7 @@ module Zkapp_epoch_data = struct
   let table_name = "zkapp_epoch_data"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (epoch_data : Mina_base.Snapp_predicate.Protocol_state.Epoch_data.t) =
+      (epoch_data : Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.t) =
     let open Deferred.Result.Let_syntax in
     let%bind epoch_ledger_id =
       Zkapp_epoch_ledger.add_if_doesn't_exist (module Conn) epoch_data.ledger
@@ -1005,10 +1005,10 @@ module Zkapp_predicate_protocol_states = struct
         ; int
         ]
 
-  let table_name = "zkapp_predicate_protocol_states"
+  let table_name = "zkapp_precondition_protocol_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (ps : Mina_base.Snapp_predicate.Protocol_state.t) =
+      (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
     let open Deferred.Result.Let_syntax in
     let%bind snarked_ledger_hash_id =
       Mina_caqti.add_if_zkapp_check
@@ -1086,7 +1086,7 @@ module Zkapp_party_body = struct
     ; sequence_events_ids : int array
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_predicate_protocol_state_id : int
+    ; zkapp_precondition_protocol_state_id : int
     ; use_full_commitment : bool
     }
   [@@deriving fields, hlist]
@@ -1131,7 +1131,7 @@ module Zkapp_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_predicate_protocol_state_id =
+    let%bind zkapp_precondition_protocol_state_id =
       Zkapp_predicate_protocol_states.add_if_doesn't_exist
         (module Conn)
         body.protocol_state
@@ -1160,7 +1160,7 @@ module Zkapp_party_body = struct
       ; sequence_events_ids
       ; call_data_id
       ; call_depth
-      ; zkapp_predicate_protocol_state_id
+      ; zkapp_precondition_protocol_state_id
       ; use_full_commitment
       }
     in

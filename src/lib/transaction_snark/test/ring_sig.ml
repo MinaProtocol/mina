@@ -190,7 +190,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; increment_nonce = ()
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
+                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = ()
                     }
                 ; predicate = sender_nonce
@@ -210,7 +210,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; sequence_events = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; protocol_state = Zkapp_precondition.Protocol_state.accept
                 ; use_full_commitment = false
                 }
             ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -227,13 +227,13 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; protocol_state = Zkapp_precondition.Protocol_state.accept
                 ; use_full_commitment = false
                 }
-            ; predicate = Full Snapp_predicate.Account.accept
+            ; predicate = Full Zkapp_precondition.Account.accept
             }
           in
-          let protocol_state = Snapp_predicate.Protocol_state.accept in
+          let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Parties.Call_forest.of_parties_list
               ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
@@ -242,7 +242,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
-            Snapp_predicate.Protocol_state.digest protocol_state
+            Zkapp_precondition.Protocol_state.digest protocol_state
           in
           let memo = Signed_command_memo.empty in
           let memo_hash = Signed_command_memo.hash memo in
@@ -317,7 +317,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> printf "other_party_proof:\n%s\n\n"
             |> fun () ->
             (* print protocol_state *)
-            Snapp_predicate.Protocol_state.to_yojson protocol_state
+            Zkapp_precondition.Protocol_state.to_yojson protocol_state
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () -> apply_parties ledger [ parties ]))

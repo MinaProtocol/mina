@@ -49,7 +49,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
           if b then
             (* Full *)
             let open Zkapp_basic in
-            let%bind (predicate_account : Snapp_predicate.Account.t) =
+            let%bind (predicate_account : Zkapp_precondition.Account.t) =
               let%bind balance =
                 let%bind balance_change_int =
                   Int.gen_uniform_incl 1 10_000_000
@@ -72,7 +72,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                       bal
                 in
                 Or_ignore.gen
-                  (return { Snapp_predicate.Closed_interval.lower; upper })
+                  (return { Zkapp_precondition.Closed_interval.lower; upper })
               in
               let%bind nonce =
                 let%bind balance_change_int = Int.gen_uniform_incl 1 100 in
@@ -98,7 +98,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                       else Account.Nonce.add nonce balance_change
                 in
                 Or_ignore.gen
-                  (return { Snapp_predicate.Closed_interval.lower; upper })
+                  (return { Zkapp_precondition.Closed_interval.lower; upper })
               in
               let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
               let public_key = Or_ignore.Check public_key in
@@ -142,7 +142,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return (state, sequence_state, proved_state)
               in
               return
-                { Snapp_predicate.Account.Poly.balance
+                { Zkapp_precondition.Account.Poly.balance
                 ; nonce
                 ; receipt_chain_hash
                 ; public_key
@@ -185,7 +185,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     in
                     let balance =
                       Or_ignore.Check
-                        { Snapp_predicate.Closed_interval.lower = new_balance
+                        { Zkapp_precondition.Closed_interval.lower = new_balance
                         ; upper = new_balance
                         }
                     in
@@ -197,7 +197,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                       else Account.Nonce.zero
                     in
                     let%bind nonce =
-                      Snapp_predicate.Numeric.gen (return new_nonce)
+                      Zkapp_precondition.Numeric.gen (return new_nonce)
                         Account.Nonce.compare
                     in
                     return { predicate_account with nonce }
@@ -307,7 +307,7 @@ let gen_use_full_commitment ~increment_nonce () :
   else Quickcheck.Generator.return true
 
 let closed_interval_exact value =
-  Snapp_predicate.Closed_interval.{ lower = value; upper = value }
+  Zkapp_precondition.Closed_interval.{ lower = value; upper = value }
 
 let gen_epoch_data_predicate
     (epoch_data :
@@ -318,8 +318,8 @@ let gen_epoch_data_predicate
       , State_hash.Stable.V1.t
       , State_hash.Stable.V1.t
       , Mina_numbers.Length.Stable.V1.t )
-      Snapp_predicate.Protocol_state.Epoch_data.Poly.t) :
-    Snapp_predicate.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
+      Zkapp_precondition.Protocol_state.Epoch_data.Poly.t) :
+    Zkapp_precondition.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind ledger =
     let%bind hash =
@@ -349,14 +349,15 @@ let gen_epoch_data_predicate
   ; epoch_length
   }
 
-let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
-    Snapp_predicate.Protocol_state.t Base_quickcheck.Generator.t =
+let gen_protocol_state_predicate
+    (psv : Zkapp_precondition.Protocol_state.View.t) :
+    Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind snarked_ledger_hash =
     Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
   let%bind timestamp =
-    Snapp_predicate.Closed_interval.
+    Zkapp_precondition.Closed_interval.
       { lower = psv.timestamp; upper = Block_time.max_value }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
@@ -384,7 +385,7 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
     gen_epoch_data_predicate psv.staking_epoch_data
   in
   let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
-  { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+  { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
   ; timestamp
   ; blockchain_length
   ; min_window_density
@@ -660,7 +661,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
   let call_depth = 0 in
   let%bind protocol_state =
     Option.value_map protocol_state_view ~f:gen_protocol_state_predicate
-      ~default:(return Snapp_predicate.Protocol_state.accept)
+      ~default:(return Zkapp_precondition.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
   let token_id = f_token_id token_id in
@@ -963,7 +964,7 @@ let gen_parties_from ?(succeed = true)
       parties_dummy_signatures.other_parties
   in
   let protocol_state_predicate_hash =
-    Snapp_predicate.Protocol_state.digest
+    Zkapp_precondition.Protocol_state.digest
       parties_dummy_signatures.fee_payer.data.body.protocol_state
   in
   let tx_commitment =

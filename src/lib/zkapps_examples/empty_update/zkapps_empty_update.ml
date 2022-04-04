@@ -103,12 +103,12 @@ module Party_under_construction = struct
           ; balance_change =
               var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
           ; increment_nonce = Boolean.false_
-          ; events = var_of_t Snapp_account.Events.typ []
-          ; sequence_events = var_of_t Snapp_account.Events.typ []
+          ; events = var_of_t Zkapp_account.Events.typ []
+          ; sequence_events = var_of_t Zkapp_account.Events.typ []
           ; call_data = Field.Var.constant Field.zero
           ; call_depth = Run.As_prover.Ref.create (fun () -> 0)
           ; protocol_state =
-              var_of_t Snapp_predicate.Protocol_state.typ
+              var_of_t Zkapp_precondition.Protocol_state.typ
                 { snarked_ledger_hash = Ignore
                 ; timestamp = Ignore
                 ; blockchain_length = Ignore

@@ -963,7 +963,7 @@ module Base = struct
       type t =
         { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
         ; fee_excess : Amount.Signed.var
-        ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
+        ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
         }
     end
 
@@ -1013,11 +1013,11 @@ module Base = struct
          or the full commitment is used to avoid replays. *)
       let predicate_is_accept =
         let accept_digest =
-          Snapp_predicate.Account.digest Snapp_predicate.Account.accept
+          Zkapp_precondition.Account.digest Zkapp_precondition.Account.accept
           |> Field.constant
         in
         let predicate_digest =
-          Snapp_predicate.Account.Checked.digest predicate
+          Zkapp_precondition.Account.Checked.digest predicate
         in
         Field.equal accept_digest predicate_digest
       in
@@ -1064,7 +1064,7 @@ module Base = struct
             Parties.Transaction_commitment.Checked.create
               ~other_parties_hash:other_parties
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.Checked.digest
+                (Zkapp_precondition.Protocol_state.Checked.digest
                    party.data.body.protocol_state)
               ~memo_hash
 
@@ -1788,7 +1788,7 @@ module Base = struct
         end
 
         module Protocol_state_predicate = struct
-          type t = Snapp_predicate.Protocol_state.Checked.t
+          type t = Zkapp_precondition.Protocol_state.Checked.t
         end
 
         module Field = struct
@@ -1822,7 +1822,7 @@ module Base = struct
           type t = Global_state.t =
             { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
             ; fee_excess : Amount.Signed.t
-            ; protocol_state : Snapp_predicate.Protocol_state.View.Checked.t
+            ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
             }
 
           let fee_excess { fee_excess; _ } = fee_excess
@@ -1865,7 +1865,8 @@ module Base = struct
               , Transaction_commitment.t
               , unit )
               Mina_transaction_logic.Parties_logic.Local_state.t
-          ; protocol_state_predicate : Snapp_predicate.Protocol_state.Checked.t
+          ; protocol_state_predicate :
+              Zkapp_precondition.Protocol_state.Checked.t
           ; transaction_commitment : Transaction_commitment.t
           ; full_transaction_commitment : Transaction_commitment.t
           ; field : Field.t
@@ -1879,10 +1880,10 @@ module Base = struct
         match eff with
         | Check_protocol_state_predicate (protocol_state_predicate, global_state)
           ->
-            Snapp_predicate.Protocol_state.Checked.check
+            Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
         | Check_predicate (_is_start, { party; _ }, account, _global) ->
-            Snapp_predicate.Account.Checked.check party.data.predicate
+            Zkapp_precondition.Account.Checked.check party.data.predicate
               account.data
         | Check_auth { is_start; party = { party; _ }; account } ->
             (* If there's a valid signature, it must increment the nonce or use full commitment *)
@@ -4146,7 +4147,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; protocol_state = Zkapp_precondition.Protocol_state.accept
               ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
@@ -4167,7 +4168,7 @@ module For_tests = struct
             ; sequence_events = []
             ; call_data = Field.zero
             ; call_depth = 0
-            ; protocol_state = Snapp_predicate.Protocol_state.accept
+            ; protocol_state = Zkapp_precondition.Protocol_state.accept
             ; use_full_commitment = false
             }
         ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -4229,7 +4230,7 @@ module For_tests = struct
                   ; sequence_events
                   ; call_data
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = true
                   }
               ; predicate
@@ -4251,7 +4252,7 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = false
                   }
               ; predicate = Accept
@@ -4259,14 +4260,14 @@ module For_tests = struct
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Snapp_predicate.Protocol_state.accept in
+    let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
       @ List.map snapp_parties ~f:(fun p -> p.data)
       @ List.map other_receivers ~f:(fun p -> p.data)
     in
     let protocol_state_predicate_hash =
-      Snapp_predicate.Protocol_state.digest protocol_state
+      Zkapp_precondition.Protocol_state.digest protocol_state
     in
     let ps =
       Parties.Call_forest.of_parties_list
@@ -4481,7 +4482,7 @@ module For_tests = struct
     create ledger id account
 
   let create_trivial_predicate_snapp ~constraint_constants
-      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept)
+      ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
       ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
     let { Mina_transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
@@ -4569,7 +4570,7 @@ module For_tests = struct
           ; protocol_state = protocol_state_predicate
           ; use_full_commitment = false
           }
-      ; predicate = Full Snapp_predicate.Account.accept
+      ; predicate = Full Zkapp_precondition.Account.accept
       }
     in
     let memo = Signed_command_memo.empty in
@@ -4582,7 +4583,7 @@ module For_tests = struct
     let other_parties_hash = Parties.Call_forest.hash ps in
     let protocol_state_predicate_hash =
       (*FIXME: is this ok? *)
-      Snapp_predicate.Protocol_state.digest protocol_state_predicate
+      Zkapp_precondition.Protocol_state.digest protocol_state_predicate
     in
     let transaction : Parties.Transaction_commitment.t =
       (*FIXME: is this correct? *)
