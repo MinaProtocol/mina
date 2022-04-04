@@ -975,7 +975,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           { applied_common with
             user_command =
               { data = user_command
-              ; status = Failed (failure, compute_balances ())
+              ; status =
+                  Failed
+                    ( Transaction_status.Failure.Collection.of_single_failure
+                        failure
+                    , compute_balances () )
               }
           }
         in
@@ -1661,8 +1665,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
         ( (g_state : Inputs.Global_state.t)
-        , (l_state : _ Parties_logic.Local_state.t) ) : user_acc Or_error.t =
-      if List.is_empty l_state.parties then Ok user_acc
+        , (l_state : _ Parties_logic.Local_state.t) ) :
+        (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
+      if List.is_empty l_state.parties then
+        Ok (user_acc, l_state.failure_status_tbl)
       else
         let%bind states =
           Or_error.try_with (fun () ->
@@ -1707,21 +1713,32 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match step_all (f user_acc start) start with
     | Error e ->
         Error e
-    | Ok s ->
+    | Ok (s, failure_status_tbl) ->
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
                 { With_status.data = c
                 ; status =
                     (* TODO *)
-                    Applied
-                      ( { fee_payer_account_creation_fee_paid = None
-                        ; receiver_account_creation_fee_paid = None
-                        }
-                      , { fee_payer_balance = None
-                        ; source_balance = None
-                        ; receiver_balance = None
-                        } )
+                    ( if
+                      Transaction_status.Failure.Collection.is_empty
+                        failure_status_tbl
+                    then
+                      Applied
+                        ( { fee_payer_account_creation_fee_paid = None
+                          ; receiver_account_creation_fee_paid = None
+                          }
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } )
+                    else
+                      Failed
+                        ( failure_status_tbl
+                        , { fee_payer_balance = None
+                          ; source_balance = None
+                          ; receiver_balance = None
+                          } ) )
                 }
             }
           , s )

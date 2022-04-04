@@ -11,7 +11,7 @@ module type Input_intf = sig
   end
 
   module Affine : sig
-    type t = BaseField.t Kimchi.Foundations.or_infinity
+    type t = BaseField.t Kimchi_types.or_infinity
   end
 
   type t
@@ -88,9 +88,9 @@ struct
     module Backend = struct
       include C.Affine
 
-      let zero () = Kimchi.Foundations.Infinity
+      let zero () = Kimchi_types.Infinity
 
-      let create x y = Kimchi.Foundations.Finite (x, y)
+      let create x y = Kimchi_types.Finite (x, y)
     end
 
     module Stable = struct
