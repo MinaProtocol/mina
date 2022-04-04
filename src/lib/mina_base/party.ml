@@ -347,7 +347,7 @@ module Update = struct
       [ Zkapp_state.to_input app_state
           ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
       ; Set_or_keep.to_input delegate
-          ~dummy:(Snapp_predicate.Eq_data.Tc.public_key ()).default
+          ~dummy:(Zkapp_precondition.Eq_data.Tc.public_key ()).default
           ~f:Public_key.Compressed.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
@@ -540,7 +540,7 @@ module Body = struct
               (Pickles.Backend.Tick.Field.Stable.V1)
               (Int)
               (Bool)
-              (Snapp_predicate.Protocol_state.Stable.V1)
+              (Zkapp_precondition.Protocol_state.Stable.V1)
             .t
             (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -552,7 +552,7 @@ module Body = struct
         ; sequence_events : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; call_depth : int
-        ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+        ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; use_full_commitment : bool
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -580,7 +580,7 @@ module Body = struct
                 (Pickles.Backend.Tick.Field.Stable.V1)
                 (Int)
                 (Unit)
-                (Snapp_predicate.Protocol_state.Stable.V1)
+                (Zkapp_precondition.Protocol_state.Stable.V1)
               .t
               (* Opaque to txn logic *) =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -592,7 +592,7 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+          ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
           ; use_full_commitment : unit [@skip]
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -611,7 +611,7 @@ module Body = struct
       ; sequence_events = []
       ; call_data = Field.zero
       ; call_depth = 0
-      ; protocol_state = Snapp_predicate.Protocol_state.accept
+      ; protocol_state = Zkapp_precondition.Protocol_state.accept
       ; use_full_commitment = ()
       }
 
@@ -628,7 +628,7 @@ module Body = struct
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
         ~call_data:!.field ~call_depth:!.int
-        ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
+        ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
         ~use_full_commitment:unit
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
@@ -676,7 +676,7 @@ module Body = struct
             (Field.Var)
             (Int_as_prover_ref)
             (Type_of_var(Boolean))
-            (Snapp_predicate.Protocol_state.Checked)
+            (Zkapp_precondition.Protocol_state.Checked)
           .t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
@@ -687,7 +687,7 @@ module Body = struct
       ; sequence_events : Events.var
       ; call_data : Field.Var.t
       ; call_depth : int As_prover.Ref.t
-      ; protocol_state : Snapp_predicate.Protocol_state.Checked.t
+      ; protocol_state : Zkapp_precondition.Protocol_state.Checked.t
       ; use_full_commitment : Boolean.var
       }
     [@@deriving annot, hlist, fields]
@@ -717,7 +717,7 @@ module Body = struct
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.Chunked.field call_data
-        ; Snapp_predicate.Protocol_state.Checked.to_input protocol_state
+        ; Zkapp_precondition.Protocol_state.Checked.to_input protocol_state
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
         ]
@@ -738,7 +738,7 @@ module Body = struct
       ; Events.typ
       ; Field.typ
       ; Typ.Internal.ref ()
-      ; Snapp_predicate.Protocol_state.typ
+      ; Zkapp_precondition.Protocol_state.typ
       ; Impl.Boolean.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -754,7 +754,7 @@ module Body = struct
     ; sequence_events = []
     ; call_data = Field.zero
     ; call_depth = 0
-    ; protocol_state = Snapp_predicate.Protocol_state.accept
+    ; protocol_state = Zkapp_precondition.Protocol_state.accept
     ; use_full_commitment = false
     }
 
@@ -798,7 +798,7 @@ module Body = struct
       ~events:!.(list @@ array field @@ o ())
       ~sequence_events:!.(list @@ array field @@ o ())
       ~call_data:!.field ~call_depth:!.int
-      ~protocol_state:!.Snapp_predicate.Protocol_state.deriver
+      ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
       ~use_full_commitment:!.bool
     |> finish "PartyBody" ~t_toplevel_annots
 
@@ -831,7 +831,7 @@ module Body = struct
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.Chunked.field call_data
-      ; Snapp_predicate.Protocol_state.to_input protocol_state
+      ; Zkapp_precondition.Protocol_state.to_input protocol_state
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ]
 
@@ -852,7 +852,7 @@ module Predicate = struct
   module Stable = struct
     module V1 = struct
       type t =
-        | Full of Snapp_predicate.Account.Stable.V2.t
+        | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -865,14 +865,14 @@ module Predicate = struct
     | Full s ->
         s
     | Nonce n ->
-        { Snapp_predicate.Account.accept with
+        { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
         }
     | Accept ->
-        Snapp_predicate.Account.accept
+        Zkapp_precondition.Account.accept
 
-  let of_full (p : Snapp_predicate.Account.t) =
-    let module A = Snapp_predicate.Account in
+  let of_full (p : Zkapp_precondition.Account.t) =
+    let module A = Zkapp_precondition.Account in
     if A.equal p A.accept then Accept
     else
       match p.nonce with
@@ -900,7 +900,7 @@ module Predicate = struct
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
     iso_record ~of_record:of_full ~to_record:to_full
-      Snapp_predicate.Account.deriver obj
+      Zkapp_precondition.Account.deriver obj
 
   let%test_unit "json roundtrip accept" =
     let predicate : t = Accept in
@@ -918,7 +918,7 @@ module Predicate = struct
     let n = Account_nonce.of_int 4513 in
     let predicate : t =
       Full
-        { Snapp_predicate.Account.accept with
+        { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
         ; public_key = Check Public_key.Compressed.empty
         }
@@ -947,21 +947,21 @@ module Predicate = struct
       Random_oracle.(
         hash ~init:Hash_prefix_states.party_predicate (pack_input x))
     in
-    to_full t |> Snapp_predicate.Account.to_input |> digest
+    to_full t |> Zkapp_precondition.Account.to_input |> digest
 
   module Checked = struct
-    type t = Snapp_predicate.Account.Checked.t
+    type t = Zkapp_precondition.Account.Checked.t
 
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.party_predicate (pack_input x))
       in
-      Snapp_predicate.Account.Checked.to_input t |> digest
+      Zkapp_precondition.Account.Checked.to_input t |> digest
   end
 
-  let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
-    Typ.transport (Snapp_predicate.Account.typ ()) ~there:to_full
+  let typ () : (Zkapp_precondition.Account.Checked.t, t) Typ.t =
+    Typ.transport (Zkapp_precondition.Account.typ ()) ~there:to_full
       ~back:(fun s -> Full s)
 end
 
@@ -1029,7 +1029,7 @@ module Predicated = struct
       module V1 = struct
         type t =
           ( Body.Stable.V1.t
-          , Snapp_predicate.Account.Stable.V1.t )
+          , Zkapp_precondition.Account.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -1038,7 +1038,7 @@ module Predicated = struct
     end]
 
     module Digested = struct
-      type t = (Body.Digested.t, Snapp_predicate.Digested.t) Poly.t
+      type t = (Body.Digested.t, Zkapp_precondition.Digested.t) Poly.t
 
       module Checked = struct
         type t = (Body.Digested.Checked.t, Field.Var.t) Poly.t
@@ -1046,7 +1046,7 @@ module Predicated = struct
     end
 
     module Checked = struct
-      type t = (Body.Checked.t, Snapp_predicate.Account.Checked.t) Poly.t
+      type t = (Body.Checked.t, Zkapp_precondition.Account.Checked.t) Poly.t
     end
   end
 
@@ -1248,7 +1248,7 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
 *)
 let balance_change (t : t) : Amount.Signed.t = t.data.body.balance_change
 
-let protocol_state (t : t) : Snapp_predicate.Protocol_state.t =
+let protocol_state (t : t) : Zkapp_precondition.Protocol_state.t =
   t.data.body.protocol_state
 
 let public_key (t : t) : Public_key.Compressed.t = t.data.body.public_key
