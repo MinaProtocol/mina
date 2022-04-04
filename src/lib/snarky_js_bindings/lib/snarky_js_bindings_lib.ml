@@ -2569,7 +2569,7 @@ module Ledger = struct
             in
             let app_state =
               let xs = new%js Js.array_empty in
-              ( match a.snapp with
+              ( match a.zkapp with
               | Some s ->
                   Pickles_types.Vector.iter s.app_state ~f:(fun x ->
                       ignore (xs##push (mk (Field.constant x))))

@@ -4,11 +4,11 @@ open Parsetree
 open Core_kernel
 
 module Parties_templates = struct
-  let pooled_snapp_commands =
+  let pooled_zkapp_commands =
     Printf.sprintf
       {graphql|
-    query snapp_commands($public_key: PublicKey) {
-      pooledSnappCommands(publicKey: $public_key) {
+    query zkapp_commands($public_key: PublicKey) {
+      pooledZkappCommands(publicKey: $public_key) {
         id
         hash
         failureReason {
@@ -19,12 +19,12 @@ module Parties_templates = struct
       }
     }|graphql}
 
-  let internal_send_snapp =
+  let internal_send_zkapp =
     Printf.sprintf
       {|
-         mutation ($parties: SendTestSnappInput!) {
-            internalSendSnapp(parties: $parties) {
-               snapp { id
+         mutation ($parties: SendTestZkappInput!) {
+            internalSendZkapp(parties: $parties) {
+               zkapp { id
                        hash
                        failureReason {
                          index
@@ -50,13 +50,13 @@ let structure ~loc =
   end) in
   let open E in
   [%str
-    module Pooled_snapp_commands =
+    module Pooled_zkapp_commands =
     [%graphql
-    [%e party_query_expr Parties_templates.pooled_snapp_commands ~loc]]
+    [%e party_query_expr Parties_templates.pooled_zkapp_commands ~loc]]
 
-    module Send_test_snapp =
+    module Send_test_zkapp =
     [%graphql
-    [%e party_query_expr Parties_templates.internal_send_snapp ~loc]]]
+    [%e party_query_expr Parties_templates.internal_send_zkapp ~loc]]]
 
 let main () =
   Out_channel.with_file "generated_graphql_queries.ml" ~f:(fun ml_file ->

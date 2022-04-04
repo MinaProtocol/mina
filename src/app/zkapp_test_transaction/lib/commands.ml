@@ -9,12 +9,12 @@ let proof_level = Genesis_constants.Proof_level.Full
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
-let graphql_snapp_command (parties : Parties.t) =
+let graphql_zkapp_command (parties : Parties.t) =
   sprintf
     {|
 mutation MyMutation {
   __typename
-  sendSnapp(input: { parties: %s })
+  sendZkapp(input: { parties: %s })
 }
     |}
     (Parties.arg_query_string parties)
@@ -52,7 +52,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
               ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
-          ; snapp =
+          ; zkapp =
               Some { Zkapp_account.default with verification_key = Some vk }
           }
         |> Or_error.ok_exn |> ignore)
@@ -139,10 +139,10 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Transaction_snark.For_tests.create_trivial_predicate_snapp
       ~constraint_constants ~protocol_state_predicate spec ledger ~snapp_kp
   in
-  printf "Snapp transaction yojson: %s\n\n%!"
+  printf "ZkApp transaction yojson: %s\n\n%!"
     (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-  printf "(Snapp transaction graphQL input %s\n\n%!"
-    (graphql_snapp_command parties) ;
+  printf "(ZkApp transaction graphQL input %s\n\n%!"
+    (graphql_zkapp_command parties) ;
   printf "Updated accounts\n" ;
   List.iter (Ledger.to_list ledger) ~f:(fun acc ->
       printf "Account: %s\n%!"
@@ -210,14 +210,14 @@ module Util = struct
     printf "%s keyfile\n" which ;
     Secrets.Keypair.Terminal_stdin.read_exn ~which f
 
-  let snapp_keypair_of_file = keypair_of_file ~which:"Snapp Account"
+  let snapp_keypair_of_file = keypair_of_file ~which:"Zkapp Account"
 
   let print_snapp_transaction parties =
     printf !"Parties sexp:\n %{sexp: Parties.t}\n\n%!" parties ;
-    printf "Snapp transaction yojson:\n %s\n\n%!"
+    printf "Zkapp transaction yojson:\n %s\n\n%!"
       (Parties.to_yojson parties |> Yojson.Safe.to_string) ;
-    printf "Snapp transaction graphQL input %s\n\n%!"
-      (graphql_snapp_command parties)
+    printf "Zkapp transaction graphQL input %s\n\n%!"
+      (graphql_zkapp_command parties)
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
@@ -546,7 +546,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   parties
 
-let%test_module "Snapps test transaction" =
+let%test_module "ZkApps test transaction" =
   ( module struct
     let execute mina schema query =
       match Graphql_parser.parse query with
@@ -557,10 +557,10 @@ let%test_module "Snapps test transaction" =
           Deferred.return (Error e)
 
     let hit_server (parties : Parties.t) query =
-      let typ = Mina_graphql.Types.Input.send_snapp in
+      let typ = Mina_graphql.Types.Input.send_zkapp in
       let query_top_level =
         Graphql_async.Schema.(
-          io_field "sendSnapp" ~typ:(non_null string)
+          io_field "sendZkapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
             ~resolve:(fun _ () (parties' : Parties.t) ->
@@ -582,7 +582,7 @@ let%test_module "Snapps test transaction" =
                     (Party.to_yojson expected |> Yojson.Safe.to_string)
                     (Party.to_yojson got |> Yojson.Safe.to_string)) ;
               if !failed then
-                return (Error "invalid snapp transaction generated")
+                return (Error "invalid zkApp transaction generated")
               else return (Ok "Passed")))
       in
       let schema =
@@ -608,7 +608,7 @@ let%test_module "Snapps test transaction" =
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Parties p ->
-              let q = graphql_snapp_command p in
+              let q = graphql_zkapp_command p in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   match%map hit_server p q with
                   | Ok _res ->
