@@ -269,6 +269,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
       }
     in
+    let parties_invalid_fee_payer =
+      let dummy_keypair = Signature_lib.Keypair.create () in
+      let p = parties_update_all in
+      { p with
+        fee_payer =
+          { data =
+              { body =
+                  { p.fee_payer.data.body with
+                    public_key =
+                      dummy_keypair.public_key
+                      |> Signature_lib.Public_key.compress
+                  }
+              ; predicate = Mina_base.Account.Nonce.of_int 3
+              }
+          ; authorization = Mina_base.Signature.dummy
+          }
+      }
+    in
     let with_timeout =
       let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -461,6 +479,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
+           "Invalid_signature")
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction with an invalid fee payer"
+        (send_invalid_zkapp ~logger node parties_invalid_fee_payer
            "Invalid_signature")
     in
     let%bind () =
