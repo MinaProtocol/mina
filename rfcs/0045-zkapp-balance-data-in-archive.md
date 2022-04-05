@@ -56,7 +56,6 @@ While the array is not nullable, array elements may be `NULL`.
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
-  block_height        bigint             NOT NULL
   public_key          int                NOT NULL  REFERENCES public_keys(id)
   token               int                NOT NULL  REFERENCES tokens(id)
   token_permissions   token_permissions  NOT NULL
