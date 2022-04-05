@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Mina_base
 open Cli_lib.Arg_type
-open Snapp_test_transaction_lib.Commands
+open Zkapp_test_transaction_lib.Commands
 
 module Flags = struct
   open Command
@@ -25,9 +25,9 @@ module Flags = struct
            (Currency.Fee.to_formatted_string min_fee))
       (Param.optional txn_fee)
 
-  let snapp_account_key =
-    Param.flag "--snapp-account-key"
-      ~doc:"PUBLIC KEY Base58 encoded public key of the new snapp account"
+  let zkapp_account_key =
+    Param.flag "--zkapp-account-key"
+      ~doc:"PUBLIC KEY Base58 encoded public key of the new zkApp account"
       Param.(required public_key_compressed)
 
   let amount =
@@ -57,12 +57,12 @@ module Flags = struct
       (keyfile, fee, nonce, memo, debug))
 end
 
-let create_snapp_account =
+let create_zkapp_account =
   let create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo ()
       =
     let open Deferred.Let_syntax in
     let%map parties =
-      create_snapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
+      create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
         ~memo
     in
     Util.print_snapp_transaction parties ;
@@ -71,11 +71,11 @@ let create_snapp_account =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that creates a snapp account"
+      ~summary:"Generate a zkApp transaction that creates a zkApp account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and amount = Flags.amount in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -99,18 +99,18 @@ let upgrade_snapp =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that updates the verification key"
+      ~summary:"Generate a zkApp transaction that updates the verification key"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and verification_key =
          Param.flag "--verification-key"
-           ~doc:"VERIFICATION_KEY the verification key for the snapp account"
+           ~doc:"VERIFICATION_KEY the verification key for the zkApp account"
            Param.(required string)
        and zkapp_uri_str =
-         Param.flag "--snapp-uri" ~doc:"URI the URI for the snapp account"
+         Param.flag "--zkapp-uri" ~doc:"URI the URI for the zkApp account"
            Param.(optional string)
        and auth =
          Param.flag "--auth"
@@ -182,7 +182,7 @@ let transfer_funds =
     let open Let_syntax in
     Command.async
       ~summary:
-        "Generate a snapp transaction that makes multiple transfers from one \
+        "Generate a zkApp transaction that makes multiple transfers from one \
          account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -207,17 +207,17 @@ let update_state =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that updates snapp state"
+      ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and app_state =
-         Param.flag "--snapp-state"
+         Param.flag "--zkapp-state"
            ~doc:
              "String(hash)|Integer(field element) a list of 8 elements that \
-              represent the snapp state (Use empty string for no-op)"
+              represent the zkApp state (Use empty string for no-op)"
            Param.(listed string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -242,21 +242,21 @@ let update_zkapp_uri =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that updates the snapp uri"
+      ~summary:"Generate a zkApp transaction that updates the zkApp uri"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and zkapp_uri =
-         Param.flag "--snapp-uri"
-           ~doc:"SNAPP_URI The string to be used as the updated snapp uri"
+         Param.flag "--zkapp-uri"
+           ~doc:"SNAPP_URI The string to be used as the updated zkApp uri"
            Param.(required string)
        and auth =
          Param.flag "--auth"
            ~doc:
              "Proof|Signature|Either|None Current authorization in the account \
-              to change the snapp uri"
+              to change the zkApp uri"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -282,11 +282,11 @@ let update_sequence_state =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that updates snapp state"
+      ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and sequence_state0 =
          Param.flag "--sequence-state0"
@@ -349,11 +349,11 @@ let update_token_symbol =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a snapp transaction that updates token symbol"
+      ~summary:"Generate a zkApp transaction that updates token symbol"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and token_symbol =
          Param.flag "--token-symbol"
@@ -390,12 +390,12 @@ let update_permissions =
     let open Let_syntax in
     Command.async
       ~summary:
-        "Generate a snapp transaction that updates the permissions of a snapp \
+        "Generate a zkApp transaction that updates the permissions of a zkApp \
          account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and edit_state =
          Param.flag "--edit-state" ~doc:"Proof|Signature|Either|None"
@@ -416,7 +416,7 @@ let update_permissions =
          Param.flag "--set-verification-key" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_zkapp_uri =
-         Param.flag "--set-snapp-uri" ~doc:"Proof|Signature|Either|None"
+         Param.flag "--set-zkapp-uri" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and edit_sequence_state =
          Param.flag "--set-sequence-state" ~doc:"Proof|Signature|Either|None"
@@ -466,7 +466,7 @@ let test_snapp_with_genesis_ledger =
     let open Let_syntax in
     Command.async
       ~summary:
-        "Generate a trivial snapp transaction and genesis ledger with \
+        "Generate a trivial zkApp transaction and genesis ledger with \
          verification key for testing"
       (let%map keyfile =
          Param.flag "--fee-payer-key"
@@ -475,8 +475,8 @@ let test_snapp_with_genesis_ledger =
               (should be in the genesis ledger)"
            Param.(required string)
        and snapp_keyfile =
-         Param.flag "--snapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new snapp account"
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and config_file =
          Param.flag "--config-file" ~aliases:[ "config-file" ]
@@ -487,18 +487,18 @@ let test_snapp_with_genesis_ledger =
        test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file))
 
 let txn_commands =
-  [ ("create-snapp-account", create_snapp_account)
-  ; ("upgrade-snapp", upgrade_snapp)
+  [ ("create-zkapp-account", create_zkapp_account)
+  ; ("upgrade-zkapp", upgrade_snapp)
   ; ("transfer-funds", transfer_funds)
   ; ("update-state", update_state)
-  ; ("update-snapp-uri", update_zkapp_uri)
+  ; ("update-zkapp-uri", update_zkapp_uri)
   ; ("update-sequence-state", update_sequence_state)
   ; ("update-token-symbol", update_token_symbol)
   ; ("update-permissions", update_permissions)
-  ; ("test-snapp-with-genesis-ledger", test_snapp_with_genesis_ledger)
+  ; ("test-zkapp-with-genesis-ledger", test_snapp_with_genesis_ledger)
   ]
 
 let () =
   Command.run
-    (Command.group ~summary:"Snapp test transaction"
+    (Command.group ~summary:"ZkApp test transaction"
        ~preserve_subcommand_order:() txn_commands)

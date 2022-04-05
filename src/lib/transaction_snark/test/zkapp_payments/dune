@@ -1,5 +1,5 @@
 (library
-  (name snapp_deploy_tests)
+  (name zkapp_payments_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -19,7 +19,6 @@
    snark_params
    mina_ledger
    mina_base
-   mina_transaction_logic
    currency
    mina_state
    signature_lib
@@ -29,6 +28,8 @@
    mina_numbers
    sgn
    transaction_snark_tests
+   test_util
+   mina_transaction_logic
    )
   (library_flags -linkall)
   (inline_tests)

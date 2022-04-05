@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 2 in
+    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
@@ -58,9 +58,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let nonce = List.hd_exn noncelist in
           let%map () =
             wait_for dsl
-              (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-                 ~command_type:Send_payment ~node_included_in:`Any_node)
+              ( Wait_condition.signed_command_to_be_included_in_frontier
+                  ~sender_pub_key ~receiver_pub_key ~amount ~nonce
+                  ~command_type:Send_payment ~node_included_in:`Any_node
+              |> Wait_condition.with_timeouts
+                   ~soft_timeout:
+                     (Network_time_span.Literal
+                        (Time.Span.of_sec (8. *. 3. *. 60.)))
+                     (* 8 slots, 3 minutes per slot.  timeouts are hardcoded because the intg test configurations of genesis constants aren't registering.  hardcoding should be removed when that's fixed *)
+                   ~hard_timeout:
+                     (Network_time_span.Literal
+                        (Time.Span.of_sec (16. *. 3. *. 60.))) )
           in
           [%log info]
             "gossip_consistency test: payment #%d with nonce %d successfully \
