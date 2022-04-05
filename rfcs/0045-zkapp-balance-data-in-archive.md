@@ -93,12 +93,15 @@ a separate app to populate it. Alternatively, once we have the genesis ledger, w
 could use an app to dump the SQL needed to populate the table, and keep that SQL in the
 Mina repository.
 
-Add a new table `account_creation_fees`:
+Add a new table `accounts_created`:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
   public_key_id       int                NOT NULL  REFERENCES public_keys(id)
-  fee                 bigint             NOT NULL
+  creation_fee        bigint             NOT NULL
 ```
+
+There should be an entry in this table for every account, other than
+those in the genesis ledger.
 
 Delete the unused table `zkapp_party_balances`.
 
