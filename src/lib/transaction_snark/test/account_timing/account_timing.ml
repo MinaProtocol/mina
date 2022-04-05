@@ -890,9 +890,12 @@ let%test_module "account timing check" =
                   (List.equal Transaction_status.Failure.equal failures
                      [ expected_failure ])
               then
-                failwithf "Got unxpected transaction failure(s): %s"
+                failwithf
+                  "Got unxpected transaction failure(s): %s, expected failure: \
+                   %s"
                   ( List.map failures ~f:Transaction_status.Failure.to_string
                   |> String.concat ~sep:"," )
+                  (Transaction_status.Failure.to_string expected_failure)
                   () ;
               assert (
                 List.equal Transaction_status.Failure.equal failures
@@ -978,7 +981,7 @@ let%test_module "account timing check" =
               let (timing : Account_timing.t) =
                 Timed
                   { initial_minimum_balance =
-                      Currency.Balance.of_int 100_000_000_000_000
+                      Currency.Balance.of_int 99_000_000_000_000
                   ; cliff_time = Mina_numbers.Global_slot.of_int 10000
                   ; cliff_amount = Currency.Amount.of_int 100
                   ; vesting_period = Mina_numbers.Global_slot.of_int 1
@@ -1033,22 +1036,13 @@ let%test_module "account timing check" =
               let _state_body, state_view =
                 state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
               in
-              match
+              let result =
                 Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view ledger parties
-              with
-              | Ok _txn_applied ->
-                  failwith "Should have failed with min balance violation"
-              | Error err ->
-                  let err_str = Error.to_string_hum err in
-                  (* error is tagged *)
-                  if
-                    not
-                      (String.is_substring err_str
-                         ~substring:
-                           (Transaction_status.Failure.to_string
-                              Source_minimum_balance_violation))
-                  then failwithf "Unexpected transaction error: %s" err_str ()))
+              in
+              check_zkapp_failure
+                Transaction_status.Failure.Source_minimum_balance_violation
+                result))
 
     let%test_unit "zkApp command, just before cliff time, insufficient balance"
         =
