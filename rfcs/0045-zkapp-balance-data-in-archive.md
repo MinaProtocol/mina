@@ -65,7 +65,7 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   voting_for          text    NOT NULL
   timing              int                          REFERENCES timing_info(id)
   permissions         int     NOT NULL             REFERENCES zkapp_permissions(id)
-  zkapp               int                          REFERENCES snapp_account(id)
+  zkapp               int                          REFERENCES zkapp_account(id)
   zkapp_uri           text    NOT NULL
 ```
 
