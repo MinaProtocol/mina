@@ -53,7 +53,7 @@ Table `blocks_zkapps_commands`, add column:
 where the array contains account creation fees for each of the `other_parties`.
 While the array is not nullable, array elements may be `NULL`.
 
-The table `balances` is replaced by a new table `accounts`, with columns:
+The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
   block_height        bigint             NOT NULL
@@ -66,8 +66,8 @@ The table `balances` is replaced by a new table `accounts`, with columns:
   delegate            int                          REFERENCES public_keys(id)
   voting_for          text    NOT NULL
   timing              int                          REFERENCES timing_info(id)
-  permissions         int     NOT NULL             REFERENCES zkapp_account(id)
-  zkapp               int                          REFERENCES snapp_account
+  permissions         int     NOT NULL             REFERENCES zkapp_permissions(id)
+  zkapp               int                          REFERENCES snapp_account(id)
   zkapp_uri           text    NOT NULL
 ```
 
@@ -122,8 +122,9 @@ Information to be removed:
   to a particular transaction. Make the constructor unary, applied to a new type
   `Account_creation_fees.t` (see below).
 
-- In `Transaction.Status.t`, the `Failed` constructor applied to an instance of `Balance_data.t`.
-  Make the constructor nullary.
+- In `Transaction.Status.t`, the `Failed` constructor is applied to a pair, consisting of
+  instances of `Failure.Collection.t` and `Balance_data.t`. Make the constructor unary by
+  omitting the second element of the pair.
 
 - Delete the types `Auxiliary_data.t` and `Balance_data.t`.
 
@@ -143,12 +144,14 @@ Information to be added:
 - The `Breadcrumb_added` message can contain a list of accounts
   affected by the block.  Specifically, the list contains a list of
   `int`, `Account.t` pairs (or perhaps a record with two fields),
-  where the integer is the ledger index, and the account is its
-  ledger state when the block is created. From this list,
-  we can populate the new `accounts` table, and for new accounts, the `public_keys` table.
-  The account information is available in the function `Archive_lib.Diff.Builder.breadcrumb_added`.
-  The staged ledger is contained in the breadcrumb argument, and the block contains transactions,
-  so the accounts affected by the block can be queried from the staged ledger.
+  where the integer is the ledger index, and the account is its ledger
+  state when the block is created. From this list, we can populate the
+  new `accounts_accessed` table, and for new accounts, the
+  `public_keys` table. The account information is available in the
+  function `Archive_lib.Diff.Builder.breadcrumb_added`. The staged
+  ledger is contained in the breadcrumb argument, and the block
+  contains transactions, so the accounts affected by the block can be
+  queried from the staged ledger.
 
 Types to modify:
 
@@ -172,8 +175,8 @@ layout, independently of the changes here.)
 ## Changes to the archive processor
 
 The archive processor will need to be updated to add the account information that's
-changed for each block. There's currently no code to add zkApps commands to the
-database, it needs to be added.
+changed for each block. There is no code to add entries to the `blocks_zkapps_commands`
+join table, it needs to be added.
 
 Because transaction statuses will contain account creation fee information, the processor will
 no longer require the temporizing hack to calculate that information (but see the question
@@ -184,7 +187,7 @@ below in [Unresolved questions]).
 For extensional blocks (the type `Extensional.t`), a field `zkapps_cmds` needs to be added,
 and the function `add_from_extensional` needs to use that field to populate the tables
 `zkapp_commands` and `blocks_zkapp_commands`. Also, there needs to be a field `accounts`
-with the account information used to populate the new `accounts` table.
+with the account information used to populate the new `accounts_accessed` table.
 
 Likewise, precomputed blocks (type `External_transition.Precomputed_block.t`) will need
 an `accounts` field with account information.
@@ -207,7 +210,7 @@ query fails, a fallback query is made using two subqueries: at a given block
 height, the balance comes from the most recent transaction (user or
 internal command), while the nonce comes from the most recent user
 command. With the changes here, a single query will always return both the
-balance and nonce, because both items always appear in the `accounts` table.
+balance and nonce, because both items always appear in the `accounts_accessed` table.
 
 We'll still need to distinguish canonical from pending block heights,
 and in the latter case, use the Postgresql recursion mechanism to find
@@ -249,7 +252,7 @@ and query transaction data in an archive database.
 There are some minor questions posed in the text above. Besides those:
 
  - The new database schema has information not present in the current
-   schema, such as the `accounts` table.  It won't be possible to
+   schema, such as the `accounts_accessed` table.  It won't be possible to
    write a simple migration program, that simply shuffles around
    existing information, if migration is needed. It may be possible to
    do a migration by modifying the replayer, which maintains a ledger,
