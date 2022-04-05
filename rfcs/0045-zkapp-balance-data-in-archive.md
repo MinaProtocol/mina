@@ -263,5 +263,4 @@ There are some minor questions posed in the text above. Besides those:
    write a simple migration program, that simply shuffles around
    existing information, if migration is needed. It may be possible to
    do a migration by modifying the replayer, which maintains a ledger,
-   to write out account information. Will the archive database at the
-   hard fork start empty, or will it contain pre-fork data?
+   to write out account information. Is there a better way?
