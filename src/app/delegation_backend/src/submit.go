@@ -33,12 +33,12 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 
 func (ctx *GoogleContext) GoogleStorageSave(objs ObjectsToSave) {
 	for path, bs := range objs {
-		writer := ctx.Bucket.Object(path).NewWriter(ctx.Context)
+		obj := ctx.Bucket.Object(path).If(storage.Conditions{DoesNotExist: true})
+		writer := obj.NewWriter(ctx.Context)
 		defer writer.Close()
 		_, err := io.Copy(writer, bytes.NewReader(bs))
 		if err != nil {
-			ctx.Log.Debugf("Error while saving metadata: %v", err)
-			return
+			ctx.Log.Warnf("Error while saving metadata: %v", err)
 		}
 	}
 }
