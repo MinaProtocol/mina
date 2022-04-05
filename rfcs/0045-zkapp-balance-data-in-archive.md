@@ -38,17 +38,16 @@ Balances are no longer per-transaction, but per-block.
 
 Table `blocks_internal_commands`, remove the column:
 
+  `receiver_account_creation_fee_paid`
   `receiver_balance`
 
 Table `blocks_user_commands`, remove the columns:
 
+  `fee_payer_account_creation_fee_paid`
+  `receiver_account_creation_fee_paid`
   `fee_payer_balance`
   `source_balance`
   `receiver_balance`
-
-Table `blocks_zkapps_commands`, add column:
-
-  `other_parties_account_creation_fees bigint[] NOT NULL`
 
 where the array contains account creation fees for each of the `other_parties`.
 While the array is not nullable, array elements may be `NULL`.
@@ -93,6 +92,13 @@ In order to include the hard fork genesis ledger accounts in this table, we may 
 a separate app to populate it. Alternatively, once we have the genesis ledger, we
 could use an app to dump the SQL needed to populate the table, and keep that SQL in the
 Mina repository.
+
+Add a new table `account_creation_fees`:
+```
+  block_id            int                NOT NULL  REFERENCES blocks(id)
+  public_key_id       int                NOT NULL  REFERENCES public_keys(id)
+  fee                 bigint             NOT NULL
+```
 
 Delete the unused table `zkapp_party_balances`.
 
@@ -174,12 +180,14 @@ layout, independently of the changes here.)
 ## Changes to the archive processor
 
 The archive processor will need to be updated to add the account information that's
-changed for each block. There is no code to add entries to the `blocks_zkapps_commands`
-join table, it needs to be added.
+changed for each block. There is no exiting code to add entries to the
+`blocks_zkapps_commands` join table, it needs to be added.
 
-Because transaction statuses will contain account creation fee information, the processor will
-no longer require the temporizing hack to calculate that information (but see the question
-below in [Unresolved questions]).
+Because transaction statuses will contain account creation fee
+information, the processor will no longer require the temporizing hack
+to calculate that information. The creation fee information will no
+longer be written to join tables, instead it will be written to the
+new `account_creation_fees` table.
 
 ### Changes to archive blocks
 
