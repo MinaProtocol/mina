@@ -418,7 +418,7 @@ func TestTwoTopicLevels(t *testing.T) {
 	//  * each regular node is connected to at least one old node
 	//  * nodes are connected in a ring topology (except for link between last new and first old node, which is omitted)
 	//  (i.e. each old node has each new node banned and vice versa)
-	nodes, _ := initNodes(t, 30, upcallDropAllMask^(1<<GossipReceivedChan)^(1<<PeerConnectedChan)^(1<<PeerDisconnectedChan))
+	nodes, _ := initNodes(t, 30, upcallDropAllMask^(1<<GossipReceivedChan))
 	// seds := []string{}
 	// for ni, n := range nodes {
 	// 	pid := n.node.P2p.Me.String()
