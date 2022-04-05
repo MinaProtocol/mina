@@ -210,12 +210,12 @@ CREATE TABLE zkapp_party_body
 , call_data_id                          int        NOT NULL REFERENCES zkapp_state_data(id)
 , call_depth                            int        NOT NULL
 , zkapp_protocol_state_precondition_id     int        NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
+, account_precondition_id             int                             NOT NULL REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean    NOT NULL
 );
 
 CREATE TABLE zkapp_party
 ( id                       serial                          NOT NULL PRIMARY KEY
 , body_id                  int                             NOT NULL REFERENCES zkapp_party_body(id)
-, account_precondition_id             int                             NOT NULL REFERENCES zkapp_account_precondition(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
