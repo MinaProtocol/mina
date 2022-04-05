@@ -1064,7 +1064,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   end
 
   module Inputs = struct
-    module First_party = Party.Signed
     module Global_state = Global_state
 
     module Field = struct
@@ -1692,17 +1691,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let user_acc = f init initial_state in
     let%bind (start : Inputs.Global_state.t * _) =
-      let parties =
-        let p = Party.Fee_payer.to_signed c.fee_payer in
-        { Party.authorization = Control.Signature p.authorization
-        ; data =
-            { p.data with
-              account_precondition =
-                Party.Account_precondition.Nonce p.data.account_precondition
-            }
-        }
-        :: c.other_parties
-      in
+      let parties = Party.Fee_payer.to_party c.fee_payer :: c.other_parties in
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
             { parties = Inputs.Parties.of_parties_list parties

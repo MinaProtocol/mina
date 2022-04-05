@@ -1146,7 +1146,7 @@ module Poly (Data : Type) (Auth : Type) = struct
   type t = { data : Data.t; authorization : Auth.t }
 end
 
-module Proved = struct
+(*module Proved = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1180,6 +1180,22 @@ module Signed = struct
 
   let account_id (t : t) : Account_id.t =
     Account_id.create t.data.body.public_key t.data.body.token_id
+end*)
+
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      (** A party to a zkApp transaction *)
+      type t = Poly(Preconditioned.Stable.V1)(Control.Stable.V2).t =
+        { data : Preconditioned.Stable.V1.t
+        ; authorization : Control.Stable.V2.t
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
 end
 
 module Fee_payer = struct
@@ -1199,9 +1215,17 @@ module Fee_payer = struct
   let account_id (t : t) : Account_id.t =
     Account_id.create t.data.body.public_key Token_id.default
 
-  let to_signed (t : t) : Signed.t =
+  (*let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
     ; data = Preconditioned.Fee_payer.to_signed t.data
+    }*)
+
+  let to_party (t : t) : T.t =
+    { authorization = Control.Signature t.authorization
+    ; data =
+        { body = Body.of_fee_payer t.data.body
+        ; account_precondition = Nonce t.data.account_precondition
+        }
     }
 
   let deriver obj =
@@ -1222,7 +1246,7 @@ module Fee_payer = struct
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
 end
 
-module Empty = struct
+(*module Empty = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1233,27 +1257,17 @@ module Empty = struct
       let to_latest = Fn.id
     end
   end]
-end
+end*)
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    (** A party to a zkApp transaction *)
-    type t = Poly(Preconditioned.Stable.V1)(Control.Stable.V2).t =
-      { data : Preconditioned.Stable.V1.t; authorization : Control.Stable.V2.t }
-    [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
-
-    let to_latest = Fn.id
-  end
-end]
+include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.data.body.public_key t.data.body.token_id
 
-let of_signed ({ data; authorization } : Signed.t) : t =
+(*let of_signed ({ data; authorization } : Signed.t) : t =
   { authorization = Signature authorization
   ; data = Preconditioned.of_signed data
-  }
+  }*)
 
 let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization

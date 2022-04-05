@@ -279,8 +279,6 @@ let fee_payer_pk (t : t) = t.fee_payer.data.body.public_key
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
 module Virtual = struct
-  module First_party = Party
-
   module Bool = struct
     type t = bool
 
