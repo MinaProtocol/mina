@@ -183,14 +183,14 @@ layout, independently of the changes here.)
 ## Changes to the archive processor
 
 The archive processor will need to be updated to add the account information that's
-changed for each block. There is no exiting code to add entries to the
+changed for each block. There is no existing code to add entries to the
 `blocks_zkapps_commands` join table, it needs to be added.
 
 Because transaction statuses will contain account creation fee
 information, the processor will no longer require the temporizing hack
 to calculate that information. The creation fee information will no
 longer be written to join tables, instead it will be written to the
-new `account_creation_fees` table.
+new `accounts_created` table.
 
 ### Changes to archive blocks
 
@@ -225,6 +225,14 @@ balance and nonce, because both items always appear in the `accounts_accessed` t
 We'll still need to distinguish canonical from pending block heights,
 and in the latter case, use the Postgresql recursion mechanism to find
 a path back to a canonical block.
+
+Placing the account creation fees in a separate table will require changes
+to the SQL queries for the `block` endpoint, which currently rely on
+those fees' presence in the `blocks_internal_commands` and `blocks_user_commands`
+tables.
+
+There is no current support for zkApps in the Rosetta code, that will need
+to be added.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
