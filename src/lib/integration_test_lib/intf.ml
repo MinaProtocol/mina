@@ -294,6 +294,8 @@ module Dsl = struct
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
       ; blocks_produced_by_node : State_hash.t list String.Map.t
+      ; blocks_seen_by_node : State_hash.Set.t String.Map.t
+      ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
       }
 
     val listen :

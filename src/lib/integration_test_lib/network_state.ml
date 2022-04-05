@@ -30,6 +30,20 @@ module Make
           [@to_yojson
             map_to_yojson ~f:(fun ls ->
                 `List (List.map State_hash.to_yojson ls))]
+    ; blocks_seen_by_node : State_hash.Set.t String.Map.t
+          [@to_yojson
+            map_to_yojson ~f:(fun set ->
+                `List
+                  (State_hash.Set.to_list set |> List.map State_hash.to_yojson))]
+    ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
+          [@to_yojson
+            Transaction_hash.Map.to_alist ~key_order:`Decreasing
+            |> List.map ~f:(fun (k, v) -> (State_hash.to_yojson k, v))
+            |> of_alist_exn
+            |> map_to_yojson ~f:(fun set ->
+                   `List
+                     ( State_hash.Set.to_list set
+                     |> List.map State_hash.to_yojson ))]
     }
   [@@deriving to_yojson]
 
@@ -43,6 +57,8 @@ module Make
     ; gossip_received = String.Map.empty
     ; best_tips_by_node = String.Map.empty
     ; blocks_produced_by_node = String.Map.empty
+    ; blocks_seen_by_node = String.Map.empty
+    ; blocks_including_txn = Transaction_hash.Map.empty
     }
 
   let listen ~logger event_router =
@@ -172,6 +188,48 @@ module Make
                 { state with
                   node_initialization = node_initialization'
                 ; best_tips_by_node = best_tips_by_node'
+                }))
+        : _ Event_router.event_subscription ) ;
+    (* handle_breadcrumb_added *)
+    ignore
+      ( Event_router.on event_router Event_type.Breadcrumb_added
+          ~f:(fun node breadcrumb ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with Breadcrumb added to $node"
+                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                let blocks_seen_by_node' =
+                  let block_set' =
+                    State_hash.Set.add
+                      ( String.Map.find state.blocks_seen_by_node (Node.id node)
+                      |> Option.value ~default:State_hash.Set.empty )
+                      breadcrumb.state_hash
+                  in
+                  String.Map.set state.blocks_seen_by_node ~key:(Node.id node)
+                    ~data:block_set'
+                in
+                let user_command_list =
+                  List.map breadcrumb.user_commands ~f:(fun with_status ->
+                      with_status.data)
+                in
+                let txn_hash_list =
+                  List.map user_command_list ~f:(fun cmd ->
+                      User_command.hash cmd)
+                in
+                let blocks_including_txn' =
+                  let txn_set' =
+                    State_hash.Set.add
+                      ( Transaction_hash.Map.find state.blocks_including_txn
+                          breadcrumb.user_commands
+                      |> Option.value ~default:State_hash.Set.empty )
+                      breadcrumb.state_hash
+                  in
+                  Transaction_hash.Map.set state.blocks_including_txn
+                    ~key:breadcrumb.user_commands ~data:txn_set'
+                in
+                { state with
+                  blocks_seen_by_node = blocks_seen_by_node'
+                ; blocks_including_txn = blocks_including_txn'
                 }))
         : _ Event_router.event_subscription ) ;
     (r, w)

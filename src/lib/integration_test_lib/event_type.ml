@@ -219,7 +219,10 @@ end
 module Breadcrumb_added = struct
   let name = "Breadcrumb_added"
 
-  type t = { user_commands : User_command.Valid.t With_status.t list }
+  type t =
+    { state_hash : State_hash.t
+    ; user_commands : User_command.Valid.t With_status.t list
+    }
   [@@deriving to_yojson]
 
   let structured_event_id =
@@ -228,11 +231,24 @@ module Breadcrumb_added = struct
   let parse_func message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
+    let%bind breadcrumb = get_metadata message "breadcrumb" in
+    let%bind state_hash_str =
+      find string breadcrumb [ "validated_transition"; "hash"; "state_hash" ]
+    in
+    let%bind state_hash =
+      State_hash.of_yojson (`String state_hash_str)
+      |> fun res ->
+      match res with
+      | Ok hash ->
+          Or_error.return hash
+      | Error str ->
+          Or_error.error_string str
+    in
     let%map user_commands =
       get_metadata message "user_commands"
       >>= parse valid_commands_with_statuses
     in
-    { user_commands }
+    { state_hash; user_commands }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end

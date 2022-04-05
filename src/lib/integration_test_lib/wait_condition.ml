@@ -203,7 +203,8 @@ struct
           (Public_key.Compressed.to_string sender_pub_key)
           (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)
-    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; predicate =
+        Network_state_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
