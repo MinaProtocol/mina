@@ -41,7 +41,7 @@ let party_body = Zkapps_empty_update.generate_party pk_compressed
 let party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
       prover []
-        { transaction = Party.Preconditioned.digest party_body
+        { transaction = Party.digest party_body
         ; at_party = Parties.Call_forest.empty
         })
 
@@ -109,8 +109,7 @@ let full_commitment =
   (* TODO: This is a pain. *)
   Parties.Transaction_commitment.with_fee_payer transaction_commitment
     ~fee_payer_hash:
-      (Party.Preconditioned.digest
-         (Party.Preconditioned.of_fee_payer fee_payer_body))
+      (Party.digest (Party.Preconditioned.of_fee_payer fee_payer_body))
 
 (* TODO: Make this better. *)
 let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =

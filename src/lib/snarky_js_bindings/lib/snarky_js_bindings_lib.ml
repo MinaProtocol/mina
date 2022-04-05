@@ -2455,7 +2455,7 @@ module Ledger = struct
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
-    p |> party |> Party.Preconditioned.digest |> Field.constant |> to_js_field
+    p |> party |> Party.digest |> Field.constant |> to_js_field
 
   let hash_party_checked p =
     p |> Checked.party |> Party.Preconditioned.Checked.digest |> to_js_field
