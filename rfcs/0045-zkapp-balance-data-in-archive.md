@@ -75,13 +75,9 @@ The new table `zkapp_uris` is:
 
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
-  id                      serial  PRIMARY KEY
   ledger_index            int     NOT NULL
   block_id                int     NOT NULL  REFERENCES blocks(id)
-  public_key              int     NOT NULL  REFERENCES public_keys(id)
-  token_owner_account_id  int               REFERENCES accounts_accessed(id)
-  token_id                text    NOT NULL
-  token_symbol            text    NOT NULL
+  account_id              int     NOT NULL  REFERENCES account_ids(id)
   balance                 bigint  NOT NULL
   nonce                   bigint  NOT NULL
   receipt_chain_hash      text    NOT NULL
@@ -92,13 +88,33 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   zkapp                   int               REFERENCES zkapp_accounts(id)
 ```
 
-In order to include the genesis ledger accounts in this table, we may need
-a separate app to populate it. Alternatively, we could use an app to dump the SQL needed
-to populate the table, and keep that SQL in the Mina repository.
+In order to include the genesis ledger accounts in this table, we may
+need a separate app to populate it. Alternatively, we could use an app
+to dump the SQL needed to populate the table, and keep that SQL in the
+Mina repository.
 
-The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`;
-it represents a vector of field elements.  We probably don't want to commingle sequence states
-with app states in a single table, because they contain differing numbers of elements.
+The new table `account_ids`:
+```
+  id                 serial  PRIMARY_KEY
+  public_key_id      int     NOT NULL     REFERENCES public_keys(id)
+  token_id           int     NOT NULL     REFERENCES tokens(id)
+  token_owner        int                  REFERENCES account_ids(id)
+```
+A `NULL` entry for the `token_owner` indicates that this account
+owns the token.
+
+The new table `tokens` is:
+```
+  id                 serial  PRIMARY_KEY
+  token              text    NOT NULL
+  token_symbol       text    NOT NULL
+  UNIQUE (token,token_symbol)
+```
+
+The new table `zkapp_sequence_states` has the same definition as the
+existing `zkapp_states`; it represents a vector of field elements.  We
+probably don't want to commingle sequence states with app states in a
+single table, because they contain differing numbers of elements.
 
 Add a new table `accounts_created`:
 ```
