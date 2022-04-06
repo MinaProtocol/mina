@@ -184,6 +184,8 @@ module Engine = struct
 
     val seeds : t -> Node.t list
 
+    val all_non_seed_pods : t -> Node.t list
+
     val block_producers : t -> Node.t list
 
     val snark_coordinators : t -> Node.t list

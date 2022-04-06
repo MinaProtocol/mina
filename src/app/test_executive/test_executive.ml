@@ -336,6 +336,46 @@ let main inputs =
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize ~logger network in
+
+        [%log info] "Starting the daemons within the pods" ;
+        let start_print (node : Engine.Network.Node.t) =
+          let open Malleable_error.Let_syntax in
+          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          let%bind res = Engine.Network.Node.start ~fresh_state:false node in
+          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          Malleable_error.return res
+        in
+        let seed_nodes = network |> Engine.Network.seeds in
+        (* let seed_node_set =
+             ref
+               (String.Set.of_list (seed_nodes |> List.map ~f:(fun n -> Node.id n)))
+           in *)
+        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        (* TODO: parallelize (requires accumlative hard errors) *)
+        let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
+        (* let%bind () =
+           Event_router.on event_router Event_type.Node_initialization
+                  ~f:(fun node () ->
+                    if
+                      String.Set.exists !seed_node_set ~f:(fun n ->
+                          String.equal n (Node.id node))
+                    then (
+                      seed_node_set := String.Set.remove !seed_node_set (Node.id node) ;
+                      if String.Set.is_empty !seed_node_set then `Stop `Success
+                      else `Continue )
+                    else `Continue)
+                |> Event_router.await_with_timeout event_router
+                     ~timeout_duration:(Time.Span.of_min 20.)
+                     ~timeout_cancellation:`Hard_timeout
+                |> Deferred.bind ~f:Malleable_error.or_hard_error
+              in *)
+        (* put a short delay before starting other nodes, to help avoid artifact generation races *)
+        let%bind () =
+          after (Time.Span.of_sec 30.0)
+          |> Deferred.bind ~f:Malleable_error.return
+        in
+        let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
+        [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
         T.run network dsl)
   in
