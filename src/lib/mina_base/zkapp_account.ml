@@ -9,14 +9,14 @@ module Events = struct
     (* Arbitrary hash input, encoding determined by the snapp's developer. *)
     type t = Field.t array
 
-    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
+    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
     [%%ifdef consensus_mechanism]
 
     type var = Field.Var.t array
 
     let hash_var (x : Field.Var.t array) =
-      Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
+      Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
 
     [%%endif]
   end
@@ -26,7 +26,7 @@ module Events = struct
   let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
 
   let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.snapp_events [| acc; hash |]
+    Random_oracle.hash ~init:Hash_prefix_states.zkapp_events [| acc; hash |]
 
   let push_event acc event = push_hash acc (Event.hash event)
 
@@ -59,7 +59,7 @@ module Events = struct
               (event, events))
     in
     Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
          [| Data_as_hash.hash tl; Data_as_hash.hash hd |])
       (Data_as_hash.hash events) ;
     (hd, tl)
@@ -75,7 +75,7 @@ module Events = struct
           hd :: tl)
     in
     Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
          [| Data_as_hash.hash events; Event.hash_var e |])
       (Data_as_hash.hash res) ;
     res
@@ -87,7 +87,7 @@ module Sequence_events = struct
   let empty_hash = lazy Random_oracle.(salt "MinaSnappSequenceEmpty" |> digest)
 
   let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.snapp_sequence_events
+    Random_oracle.hash ~init:Hash_prefix_states.zkapp_sequence_events
       [| acc; hash |]
 
   let push_events acc events = push_hash acc (Events.hash events)
@@ -95,7 +95,7 @@ module Sequence_events = struct
   [%%ifdef consensus_mechanism]
 
   let push_events_checked x (e : Events.var) =
-    Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_sequence_events
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_sequence_events
       [| x; Data_as_hash.hash e |]
 
   [%%endif]

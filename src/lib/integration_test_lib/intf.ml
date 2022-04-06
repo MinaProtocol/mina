@@ -118,7 +118,7 @@ module Engine = struct
         -> signed_command_result Malleable_error.t
 
       (** returned string is the transaction id *)
-      val send_snapp :
+      val send_zkapp :
            logger:Logger.t
         -> t
         -> parties:Mina_base.Parties.t
