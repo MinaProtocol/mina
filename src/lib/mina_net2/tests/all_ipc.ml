@@ -554,7 +554,7 @@ let%test_module "all-ipc test" =
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
-          ~known_private_ip_nets:[]
+          ~known_private_ip_nets:[] ~topic_config:[ [ topic_a; topic_c ] ]
         >>| Or_error.ok_exn
       in
       let%bind raw_seed_peers = listening_addrs node >>| Or_error.ok_exn in
