@@ -78,6 +78,7 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   ledger_index            int     NOT NULL
   block_id                int     NOT NULL  REFERENCES blocks(id)
   account_id              int     NOT NULL  REFERENCES account_ids(id)
+  token_symbol            text    NOT NULL
   balance                 bigint  NOT NULL
   nonce                   bigint  NOT NULL
   receipt_chain_hash      text    NOT NULL
@@ -97,19 +98,11 @@ The new table `account_ids`:
 ```
   id                 serial  PRIMARY_KEY
   public_key_id      int     NOT NULL     REFERENCES public_keys(id)
-  token_id           int     NOT NULL     REFERENCES tokens(id)
+  token              text    NOT NULL
   token_owner        int                  REFERENCES account_ids(id)
 ```
 A `NULL` entry for the `token_owner` indicates that this account
 owns the token.
-
-The new table `tokens` is:
-```
-  id                 serial  PRIMARY_KEY
-  token              text    NOT NULL
-  token_symbol       text    NOT NULL
-  UNIQUE (token,token_symbol)
-```
 
 The new table `zkapp_sequence_states` has the same definition as the
 existing `zkapp_states`; it represents a vector of field elements.  We
