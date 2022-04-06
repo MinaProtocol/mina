@@ -691,29 +691,6 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
   ; use_full_commitment
   }
 
-(*let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
-    ?(zkapp_account = false) ?(increment_nonce = false) ?available_public_keys
-    ?permissions_auth ?required_balance_change ?required_balance ~ledger
-    ~balances_tbl ?protocol_state_view () =
-  let open Quickcheck.Let_syntax in
-  let%bind body_components =
-    gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
-      ?permissions_auth ?account_id ?available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~balances_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
-      ~f_balance_change:Fn.id () ~f_token_id:Fn.id ~f_account_predcondition:(fun account_id ledger -> gen_account_precondition_from ~succeed ~account_id ~ledger)
-      ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
-      ?protocol_state_view
-  in
-  let body = Party_body_components.to_typical_party body_components in
-  let account_id =
-    Account_id.create body.Party.Body.public_key body.Party.Body.token_id
-  in
-  let%map account_precondition =
-    gen_account_precondition_from ~succeed ~account_id ~ledger ()
-  in
-  { Party.Preconditioned.Poly.body; account_precondition }*)
-
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
@@ -744,11 +721,6 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
   let body = Party_body_components.to_typical_party body_components in
-  (*let%bind body =
-      gen_predicated_from ?permissions_auth ?account_id ?required_balance_change
-        ?required_balance ~succeed ~new_account ~zkapp_account ~increment_nonce
-        ~available_public_keys ~ledger ~balances_tbl ()
-    in*)
   return { Party.body; authorization }
 
 (* takes an account id, if we want to sign this data *)

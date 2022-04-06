@@ -1504,12 +1504,6 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
     let%bind (body : Party.Body.Fee_payer.t) =
       Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
     in
-    (*let account_precondition =
-          fee_payer_data.nonce |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Account_nonce.of_uint32
-        in
-        return { Party.Preconditioned.Poly.body; account_precondition }
-      in*)
     return { Party.Fee_payer.body; authorization = Signature.dummy }
   in
   let%bind (other_parties : Party.t list) =

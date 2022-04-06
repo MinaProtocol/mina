@@ -1252,7 +1252,6 @@ module Zkapp_fee_payers = struct
         (module Conn)
         (Party.Body.of_fee_payer fp.body)
     in
-    (*let nonce = fp.body.account_precondition |> Unsigned.UInt32.to_int64 in*)
     let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
