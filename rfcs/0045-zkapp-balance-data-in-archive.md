@@ -52,9 +52,19 @@ Table `blocks_user_commands`, remove the columns:
 where the array contains account creation fees for each of the `other_parties`.
 While the array is not nullable, array elements may be `NULL`.
 
-Rename the existing `zkapp_account` to `zkapp_precondition_account`, and in the
+Rename the existing `zkapp_account` to `zkapp_precondition_accounts`, and in the
 table `zkapp_predicate`, rename `account_id` to `precondition_account_id`, and
 modify the foreign key reference accordingly.
+
+Add new table `zkapp_accounts`:
+```
+  app_state           int     NOT NULL  REFERENCES zkapp_states
+  verification_key    int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+  zkapp_version       bigint  NOT NULL
+  sequence_state      int     NOT NULL  REFERENCES zkapp_sequence_states(id)
+  last_sequence_slot  bigint  NOT NULL
+  proved_state        bool    NOT NULL
+```
 
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
@@ -69,23 +79,13 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   voting_for          text    NOT NULL
   timing              int                          REFERENCES timing_info(id)
   permissions         int     NOT NULL             REFERENCES zkapp_permissions(id)
-  zkapp               int                          REFERENCES zkapp_account(id)
+  zkapp               int                          REFERENCES zkapp_accounts(id)
   zkapp_uri           text    NOT NULL
 ```
 
-The new table `zkapp_account` is:
-```
-  app_state           int     NOT NULL  REFERENCES zkapp_states
-  verification_key    int     NOT NULL  REFERENCES zkapp_verification_keys(id)
-  zkapp_version       bigint  NOT NULL
-  sequence_state      int     NOT NULL  REFERENCES zkapp_sequence_states(id)
-  last_sequence_slot  bigint  NOT NULL
-  proved_state        bool    NOT NULL
-```
-
-The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`. We
-probably don't want to commingle sequence states with app states in a single table, because
-they contain differing numbers of elements.
+The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`;
+it represents a vector of field elements.  We probably don't want to commingle sequence states
+with app states in a single table, because they contain differing numbers of elements.
 
 The new type `token_permissions` is:
 
