@@ -3,6 +3,27 @@ open Core_kernel
 open Mina_base
 open Mina_state
 
+(* this module exists only as a stub to keep the bin_io for external transition from changing *)
+module Validate_content = struct
+  type t = unit
+
+  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref
+
+  let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
+
+  let bin_shape_t = bin_shape_unit
+
+  let bin_size_t _ = bin_size_unit ()
+
+  let t_of_sexp _ = ()
+
+  let sexp_of_t _ = sexp_of_unit ()
+
+  let compare _ _ = 0
+
+  let __versioned__ = ()
+end
+
 (* do not expose refer to types in here directly; use allocation functor version instead *)
 module Raw_versioned__ = struct
   [%%versioned
@@ -16,6 +37,7 @@ module Raw_versioned__ = struct
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
         ; current_protocol_version : Protocol_version.Stable.V1.t
         ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
+        ; mutable validation_callback : Validate_content.t
         }
       [@@deriving compare, sexp, fields]
 
@@ -52,6 +74,7 @@ module Raw_versioned__ = struct
         ; delta_transition_chain_proof
         ; current_protocol_version
         ; proposed_protocol_version_opt
+        ; validation_callback = ()
         }
     end
   end]
