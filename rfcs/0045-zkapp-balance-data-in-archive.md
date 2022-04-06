@@ -76,6 +76,7 @@ The new table `zkapp_uris` is:
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
   id                      serial  PRIMARY KEY
+  ledger_index            int     NOT NULL
   block_id                int     NOT NULL  REFERENCES blocks(id)
   public_key              int     NOT NULL  REFERENCES public_keys(id)
   token_owner_account_id  int               REFERENCES accounts_accessed(id)
@@ -91,22 +92,13 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   zkapp                   int               REFERENCES zkapp_accounts(id)
 ```
 
-Invariant: `token_owner_account` is `NULL` iff `token_id` and `token_symbol` are not `NULL`.
-That is, the token owner account has values for the token id and symbol, while non-owner accounts
-refer to the token owner account.
+In order to include the genesis ledger accounts in this table, we may need
+a separate app to populate it. Alternatively, we could use an app to dump the SQL needed
+to populate the table, and keep that SQL in the Mina repository.
 
 The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`;
 it represents a vector of field elements.  We probably don't want to commingle sequence states
 with app states in a single table, because they contain differing numbers of elements.
-
-Table `public_keys`, add column:
-
-  `ledger_index int  NOT NULL`
-
-In order to include the hard fork genesis ledger accounts in this table, we may need
-a separate app to populate it. Alternatively, once we have the genesis ledger, we
-could use an app to dump the SQL needed to populate the table, and keep that SQL in the
-Mina repository.
 
 Add a new table `accounts_created`:
 ```
