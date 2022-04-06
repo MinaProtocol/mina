@@ -1,6 +1,7 @@
 open Core
 open Async
 open Integration_test_lib
+open Mina_base
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -37,7 +38,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
   let run_in_container ?container_id ~cmd { pod_id; config; info; _ } =
@@ -45,7 +46,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
@@ -403,7 +404,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =
-    { id : string; hash : string; nonce : Unsigned.uint32 }
+    { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -440,14 +441,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -491,14 +492,14 @@ module Node = struct
     let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -530,14 +531,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -740,7 +741,7 @@ module Workload = struct
   let get_nodes t ~config =
     let%bind cwd = Unix.getcwd () in
     let%bind app_id =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"
           ; "deployment"
@@ -750,7 +751,7 @@ module Workload = struct
           ] )
     in
     let%map pod_ids_str =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
@@ -835,7 +836,8 @@ let initialize ~logger network =
     |> String.Set.of_list
   in
   let kube_get_pods () =
-    Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/" "kubectl"
+    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
+      "kubectl"
       [ "-n"
       ; network.namespace
       ; "get"

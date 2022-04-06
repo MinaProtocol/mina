@@ -37,13 +37,17 @@ module Make
                   (State_hash.Set.to_list set |> List.map State_hash.to_yojson))]
     ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
           [@to_yojson
-            Transaction_hash.Map.to_alist ~key_order:`Decreasing
-            |> List.map ~f:(fun (k, v) -> (State_hash.to_yojson k, v))
-            |> of_alist_exn
-            |> map_to_yojson ~f:(fun set ->
-                   `List
-                     ( State_hash.Set.to_list set
-                     |> List.map State_hash.to_yojson ))]
+            let open Base in
+            let set_to_yojson ~(element : 'a -> Yojson.Safe.t) s : Yojson.Safe.t
+                =
+              `List (List.map ~f:element (State_hash.Set.to_list s))
+            in
+            let map_to_yojson ~key ~value m : Yojson.Safe.t =
+              `Assoc
+                (Map.to_alist m |> List.map ~f:(fun (k, v) -> (key k, value v)))
+            in
+            map_to_yojson ~key:Transaction_hash.to_base58_check
+              ~value:(set_to_yojson ~element:State_hash.to_yojson)]
     }
   [@@deriving to_yojson]
 
@@ -208,24 +212,23 @@ module Make
                   String.Map.set state.blocks_seen_by_node ~key:(Node.id node)
                     ~data:block_set'
                 in
-                let user_command_list =
-                  List.map breadcrumb.user_commands ~f:(fun with_status ->
-                      with_status.data)
-                in
                 let txn_hash_list =
-                  List.map user_command_list ~f:(fun cmd ->
-                      User_command.hash cmd)
+                  List.map breadcrumb.user_commands ~f:(fun cmd_with_status ->
+                      cmd_with_status.With_status.data
+                      |> User_command.forget_check
+                      |> Transaction_hash.hash_command)
                 in
                 let blocks_including_txn' =
-                  let txn_set' =
-                    State_hash.Set.add
-                      ( Transaction_hash.Map.find state.blocks_including_txn
-                          breadcrumb.user_commands
-                      |> Option.value ~default:State_hash.Set.empty )
-                      breadcrumb.state_hash
-                  in
-                  Transaction_hash.Map.set state.blocks_including_txn
-                    ~key:breadcrumb.user_commands ~data:txn_set'
+                  List.fold txn_hash_list ~init:state.blocks_including_txn
+                    ~f:(fun accum hash ->
+                      let txn_set' =
+                        State_hash.Set.add
+                          ( Transaction_hash.Map.find state.blocks_including_txn
+                              hash
+                          |> Option.value ~default:State_hash.Set.empty )
+                          breadcrumb.state_hash
+                      in
+                      Transaction_hash.Map.set accum ~key:hash ~data:txn_set')
                 in
                 { state with
                   blocks_seen_by_node = blocks_seen_by_node'

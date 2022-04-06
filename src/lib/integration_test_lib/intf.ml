@@ -1,9 +1,7 @@
 open Async_kernel
 open Core_kernel
-open Currency
 open Mina_base
 open Pipe_lib
-open Signature_lib
 
 type metrics_t =
   { block_production_delay : int list
@@ -51,7 +49,7 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       type signed_command_result =
-        { id : string; hash : string; nonce : Unsigned.uint32 }
+        { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
 
       val send_payment :
            logger:Logger.t
@@ -330,14 +328,10 @@ module Dsl = struct
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    type command_type = Send_payment | Send_delegation
+    (* type command_type = Send_payment | Send_delegation *)
 
     val signed_command_to_be_included_in_frontier :
-         sender_pub_key:Public_key.Compressed.t
-      -> receiver_pub_key:Public_key.Compressed.t
-      -> amount:Amount.t
-      -> nonce:Unsigned.uint32
-      -> command_type:command_type
+         txn_hash:Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
   end
