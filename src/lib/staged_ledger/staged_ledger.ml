@@ -1788,6 +1788,15 @@ module T = struct
              supercharged coinbase" ;
         let partitions = Scan_state.partition_if_overflowing t.scan_state in
         let work_to_do = Scan_state.work_statements_for_new_diff t.scan_state in
+        [%log debug] "Staged_ledger_diff creation: $work_to_do"
+          ~metadata:
+            [ ( "work_to_do"
+              , `List
+                  (List.map work_to_do
+                     ~f:
+                       (One_or_two.to_yojson
+                          Transaction_snark.Statement.to_yojson)) )
+            ] ;
         let completed_works_seq, proof_count =
           List.fold_until work_to_do ~init:(Sequence.empty, 0)
             ~f:(fun (seq, count) w ->
@@ -1838,6 +1847,13 @@ module T = struct
                   Stop (seq, count))
             ~finish:Fn.id
         in
+        [%log debug] "Staged_ledger_diff creation: $completed_works"
+          ~metadata:
+            [ ( "completed_works"
+              , `List
+                  ( completed_works_seq |> Sequence.to_list
+                  |> List.map ~f:Transaction_snark_work.Checked.to_yojson ) )
+            ] ;
         (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
         let valid_on_this_ledger =
           Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
@@ -1869,6 +1885,15 @@ module T = struct
                   else Continue (seq', count'))
             ~finish:fst
         in
+        [%log debug] "Staged_ledger_diff creation: $valid_on_this_ledger"
+          ~metadata:
+            [ ( "valid_on_this_ledger"
+              , `List
+                  ( valid_on_this_ledger |> Sequence.to_list
+                  |> List.map
+                       ~f:(With_status.to_yojson User_command.Valid.to_yojson)
+                  ) )
+            ] ;
         let diff, log =
           O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
               generate ~constraint_constants logger completed_works_seq

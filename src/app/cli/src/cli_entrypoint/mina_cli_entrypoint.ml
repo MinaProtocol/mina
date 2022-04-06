@@ -171,8 +171,8 @@ let setup_daemon logger =
     flag "--archive-rocksdb" ~aliases:[ "archive-rocksdb" ] no_arg
       ~doc:"Stores all the blocks heard in RocksDB"
   and log_json = Flag.Log.json
-  and log_level = Flag.Log.level
-  and file_log_level = Flag.Log.file_log_level
+  and _log_level = Flag.Log.level
+  and _file_log_level = Flag.Log.file_log_level
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
@@ -458,12 +458,12 @@ let setup_daemon logger =
               ~redirect_stderr:`Dev_null () )
           else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
         in
-        Stdout_log.setup log_json log_level ;
+        Stdout_log.setup log_json Logger.Level.Debug ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
         let logrotate_num_rotate = 50 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-          ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+          ~processor:(Logger.Processor.raw ~log_level:Logger.Level.Debug ())
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
