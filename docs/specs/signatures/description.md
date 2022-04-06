@@ -14,7 +14,7 @@ Introduction
 ------------
 
 This document proposes a standard for Mina Schnorr signatures over
-the elliptic curve [Pallas Pasta](https://o1-labs.github.io/mina-book/specs/pasta_curves.html). It is adapted from a [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki).
+the elliptic curve [Pallas Pasta](https://o1-labs.github.io/proof-systems/specs/pasta.html). It is adapted from a [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki).
 
 ## Copyright
 
@@ -86,7 +86,7 @@ Y coordinate is even, and which satisfies *`sG = R + H(r || P || m)P`*.
 We first describe the verification algorithm, and then the signature
 algorithm.
 
-The following convention is used, with constants as defined for Mina's version of [Pasta Pallas](https://o1-labs.github.io/mina-book/specs/pasta_curves.html):
+The following convention is used, with constants as defined for Mina's version of [Pasta Pallas](https://o1-labs.github.io/proof-systems/specs/pasta.html):
 
 -   Lowercase variables represent integers or byte arrays.
     -   The constant *`p`* refers to the field size,
