@@ -1861,12 +1861,7 @@ let%test_module _ =
     let accepted_commands = Result.map ~f:fst
 
     let mk_with_status (cmd : User_command.Valid.t) =
-      { With_status.data = cmd
-      ; status =
-          Applied
-            ( Transaction_status.Auxiliary_data.empty
-            , Transaction_status.Balance_data.empty )
-      }
+      { With_status.data = cmd; status = Applied }
 
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
       let tm0 = Time.now () in

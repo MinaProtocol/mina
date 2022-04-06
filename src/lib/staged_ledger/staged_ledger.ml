@@ -1677,8 +1677,6 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
-          ; internal_command_balances =
-              (* These will get filled in by the caller. *) []
           })
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1688,8 +1686,6 @@ module T = struct
       { commands = Sequence.to_list_rev res.commands_rev
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
-      ; internal_command_balances =
-          (* These will get filled in by the caller. *) []
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2685,7 +2681,6 @@ let%test_module "staged ledger tests" =
                 @@ ( { completed_works = List.take completed_works job_count1
                      ; commands = List.take txns slots
                      ; coinbase = Zero
-                     ; internal_command_balances = []
                      }
                    , None )
             }
@@ -2695,7 +2690,6 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
-                ; internal_command_balances = []
                 }
               , Some
                   { completed_works =
@@ -2703,7 +2697,6 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
-                  ; internal_command_balances = []
                   } )
             in
             { diff = compute_statuses ~ledger ~coinbase_amount diff }
@@ -2713,7 +2706,6 @@ let%test_module "staged ledger tests" =
             ( { completed_works = []
               ; commands = []
               ; coinbase = Staged_ledger_diff.At_most_two.Zero
-              ; internal_command_balances = []
               }
             , None )
         }
@@ -2747,10 +2739,7 @@ let%test_module "staged ledger tests" =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
                              { With_status.data = (cmd :> User_command.t)
-                             ; status =
-                                 Applied
-                                   ( Transaction_status.Auxiliary_data.empty
-                                   , Transaction_status.Balance_data.empty )
+                             ; status = Applied
                              })
                     in
                     let diff =
@@ -3668,14 +3657,9 @@ let%test_module "staged ledger tests" =
                       { data = invalid_command
                       ; status =
                           Transaction_status.Failed
-                            ( Transaction_status.Failure.(
-                                Collection.of_single_failure
-                                  Amount_insufficient_to_create_account)
-                            , Transaction_status.Balance_data.
-                                { fee_payer_balance = None
-                                ; source_balance = None
-                                ; receiver_balance = None
-                                } )
+                            Transaction_status.Failure.(
+                              Collection.of_single_failure
+                                Amount_insufficient_to_create_account)
                       }
                   in
                   (*Replace the valid command with an invalid command)*)

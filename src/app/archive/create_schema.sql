@@ -178,7 +178,6 @@ CREATE TABLE blocks_user_commands
 , sequence_no     int NOT NULL
 , status          user_command_status NOT NULL
 , failure_reason  text
-, created_token   text
 , PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 

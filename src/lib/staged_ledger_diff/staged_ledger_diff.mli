@@ -33,8 +33,6 @@ module Pre_diff_two : sig
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Coinbase.Fee_transfer.t At_most_two.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
 
@@ -53,8 +51,6 @@ module Pre_diff_one : sig
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Coinbase.Fee_transfer.t At_most_one.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
 

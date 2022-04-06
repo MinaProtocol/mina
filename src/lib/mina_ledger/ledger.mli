@@ -150,7 +150,6 @@ module Transaction_applied : sig
       { fee_transfer : Fee_transfer.t
       ; previous_empty_accounts : Account_id.t list
       ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Fee_transfer_balance_data.t
       }
     [@@deriving sexp]
   end
@@ -160,7 +159,6 @@ module Transaction_applied : sig
       { coinbase : Coinbase.t
       ; previous_empty_accounts : Account_id.t list
       ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Coinbase_balance_data.t
       }
     [@@deriving sexp]
   end
