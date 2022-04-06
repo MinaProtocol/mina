@@ -591,7 +591,7 @@ module Account = struct
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish "AccountPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "AccountPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
@@ -846,7 +846,7 @@ module Protocol_state = struct
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.Numeric.Derivers.amount
-        |> finish "EpochLedgerPredicate"
+        |> finish "EpochLedgerPrecondition"
              ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
       let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
@@ -855,7 +855,8 @@ module Protocol_state = struct
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
         ~epoch_length:!.Numeric.Derivers.length
-      |> finish "EpochDataPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+      |> finish "EpochDataPrecondition"
+           ~t_toplevel_annots:Poly.t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let f = Or_ignore.Check Field.one in
@@ -1022,7 +1023,8 @@ module Protocol_state = struct
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
-    |> finish "ProtocolStatePredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "ProtocolStatePrecondition"
+         ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in

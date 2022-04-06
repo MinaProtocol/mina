@@ -2404,8 +2404,8 @@ let%test_module "staged ledger tests" =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
-                Party.Predicated.of_fee_payer parties.fee_payer.data
-                |> Party.Predicated.digest
+                Party.Preconditioned.of_fee_payer parties.fee_payer.data
+                |> Party.Preconditioned.digest
               in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -2470,7 +2470,7 @@ let%test_module "staged ledger tests" =
                           in
                           let signature =
                             sign_for_other_party ~use_full_commitment sk
-                              data.body.protocol_state
+                              data.body.protocol_state_precondition
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->

@@ -41,13 +41,13 @@ let party_body = Zkapps_empty_update.generate_party pk_compressed
 let party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
       prover []
-        { transaction = Party.Predicated.digest party_body
+        { transaction = Party.Preconditioned.digest party_body
         ; at_party = Parties.Call_forest.empty
         })
 
 let party : Party.t = { data = party_body; authorization = Proof party_proof }
 
-let deploy_party_body : Party.Predicated.t =
+let deploy_party_body : Party.Preconditioned.t =
   (* TODO: This is a pain. *)
   { body =
       { Party.Body.dummy with
@@ -66,19 +66,19 @@ let deploy_party_body : Party.Predicated.t =
           }
       ; use_full_commitment = true
       }
-  ; predicate = Accept
+  ; account_precondition = Accept
   }
 
 let deploy_party : Party.t =
   (* TODO: This is a pain. *)
   { data = deploy_party_body; authorization = Signature Signature.dummy }
 
-let protocol_state = Zkapp_precondition.Protocol_state.accept
+let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Preconditioned.t) -> p.body.call_depth)
     [ deploy_party_body; party_body ]
   |> Parties.Call_forest.accumulate_hashes_predicated
 
@@ -88,7 +88,7 @@ let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
   let other_parties_hash = Parties.Call_forest.hash ps in
   let protocol_state_predicate_hash =
-    Zkapp_precondition.Protocol_state.digest protocol_state
+    Zkapp_precondition.Protocol_state.digest protocol_state_precondition
   in
   let memo_hash = Signed_command_memo.hash memo in
   Parties.Transaction_commitment.create ~other_parties_hash
@@ -96,12 +96,12 @@ let transaction_commitment : Parties.Transaction_commitment.t =
 
 let fee_payer_body =
   (* TODO: This is a pain. *)
-  { Party.Predicated.Fee_payer.dummy with
+  { Party.Preconditioned.Fee_payer.dummy with
     body =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; balance_change = Currency.Fee.(of_int 100)
-      ; protocol_state
+      ; protocol_state_precondition
       }
   }
 
@@ -109,7 +109,8 @@ let full_commitment =
   (* TODO: This is a pain. *)
   Parties.Transaction_commitment.with_fee_payer transaction_commitment
     ~fee_payer_hash:
-      (Party.Predicated.digest (Party.Predicated.of_fee_payer fee_payer_body))
+      (Party.Preconditioned.digest
+         (Party.Preconditioned.of_fee_payer fee_payer_body))
 
 (* TODO: Make this better. *)
 let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =

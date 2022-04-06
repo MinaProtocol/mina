@@ -159,11 +159,11 @@ module Call_forest = struct
         { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
 
   let accumulate_hashes' xs =
-    let hash_party (p : Party.t) = Party.Predicated.digest p.data in
+    let hash_party (p : Party.t) = Party.Preconditioned.digest p.data in
     accumulate_hashes ~hash_party xs
 
   let accumulate_hashes_predicated xs =
-    accumulate_hashes ~hash_party:Party.Predicated.digest xs
+    accumulate_hashes ~hash_party:Party.Preconditioned.digest xs
 
   module With_hashes = struct
     [%%versioned
@@ -179,7 +179,7 @@ module Call_forest = struct
 
     let empty = empty
 
-    let hash_party ((p : Party.t), _) = Party.Predicated.digest p.data
+    let hash_party ((p : Party.t), _) = Party.Preconditioned.digest p.data
 
     let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
 
@@ -247,7 +247,11 @@ let parties (t : t) : Party.t list =
   let p = t.fee_payer in
   let body = Party.Body.of_fee_payer p.data.body in
   { authorization = Control.Signature p.authorization
-  ; data = { body; predicate = Party.Predicate.Nonce p.data.predicate }
+  ; data =
+      { body
+      ; account_precondition =
+          Party.Account_precondition.Nonce p.data.account_precondition
+      }
   }
   :: t.other_parties
 
@@ -257,7 +261,8 @@ let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
 let fee_payer (t : t) = Party.Fee_payer.account_id (fee_payer_party t)
 
-let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
+let nonce (t : t) : Account.Nonce.t =
+  (fee_payer_party t).data.account_precondition
 
 let fee_token (_t : t) = Token_id.default
 
@@ -408,7 +413,7 @@ let commitment (t : t) : Transaction_commitment.t =
       (Call_forest.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.data.body.protocol_state)
+         t.fee_payer.data.body.protocol_state_precondition)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
@@ -461,12 +466,17 @@ let arg_query_string x =
 
 let dummy =
   let party : Party.t =
-    { data = { body = Party.Body.dummy; predicate = Party.Predicate.Accept }
+    { data =
+        { body = Party.Body.dummy
+        ; account_precondition = Party.Account_precondition.Accept
+        }
     ; authorization = Control.dummy_of_tag Signature
     }
   in
   let fee_payer : Party.Fee_payer.t =
-    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+    { data = Party.Preconditioned.Fee_payer.dummy
+    ; authorization = Signature.dummy
+    }
   in
   { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
 

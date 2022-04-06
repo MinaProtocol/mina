@@ -820,7 +820,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -828,7 +828,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -960,14 +960,14 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -980,7 +980,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyPredicatedFeePayerInput",
+          "name": "ZkappPartyPreconditionedFeePayerInput",
           "description": null,
           "fields": [
             {
@@ -1000,7 +1000,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -1032,7 +1032,7 @@
               "defaultValue": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1064,7 +1064,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPreconditionedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -1097,7 +1097,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "ZkappPartyPreconditionedFeePayerInput",
                   "ofType": null
                 }
               },
@@ -2168,7 +2168,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochLedgerPredicateInput",
+          "name": "EpochLedgerPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2288,7 +2288,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochDataPredicateInput",
+          "name": "EpochDataPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2300,7 +2300,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2353,7 +2353,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2394,7 +2394,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ProtocolStatePredicateInput",
+          "name": "ProtocolStatePreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2486,7 +2486,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2502,7 +2502,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2585,7 +2585,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2599,7 +2599,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2788,7 +2788,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -2796,7 +2796,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -2976,14 +2976,14 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -3154,7 +3154,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "AccountPredicateInput",
+          "name": "AccountPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -3318,7 +3318,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedInput",
+          "name": "ZkappPartyPreconditionedInput",
           "description": null,
           "fields": [
             {
@@ -3338,7 +3338,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -3346,7 +3346,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -3370,14 +3370,14 @@
               "defaultValue": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -3458,7 +3458,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "ZkappPartyPreconditionedInput",
                   "ofType": null
                 }
               },
@@ -3491,7 +3491,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "ZkappPartyPreconditionedInput",
                   "ofType": null
                 }
               },
@@ -6897,7 +6897,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AccountPredicate",
+          "name": "AccountPrecondition",
           "description": null,
           "fields": [
             {
@@ -7221,7 +7221,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -7229,7 +7229,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
+                  "name": "ProtocolStatePrecondition",
                   "ofType": null
                 }
               },
@@ -7260,7 +7260,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappPartyPredicated",
+          "name": "ZkappPartyPreconditioned",
           "description": null,
           "fields": [
             {
@@ -7280,7 +7280,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -7288,7 +7288,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "AccountPredicate",
+                  "name": "AccountPrecondition",
                   "ofType": null
                 }
               },
@@ -7315,7 +7315,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyPredicated",
+                  "name": "ZkappPartyPreconditioned",
                   "ofType": null
                 }
               },
@@ -7356,7 +7356,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochLedgerPredicate",
+          "name": "EpochLedgerPrecondition",
           "description": null,
           "fields": [
             {
@@ -7387,7 +7387,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochDataPredicate",
+          "name": "EpochDataPrecondition",
           "description": null,
           "fields": [
             {
@@ -7399,7 +7399,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochLedgerPredicate",
+                  "name": "EpochLedgerPrecondition",
                   "ofType": null
                 }
               },
@@ -7632,7 +7632,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ProtocolStatePredicate",
+          "name": "ProtocolStatePrecondition",
           "description": null,
           "fields": [
             {
@@ -7724,7 +7724,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -7740,7 +7740,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -8395,7 +8395,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8403,7 +8403,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
+                  "name": "ProtocolStatePrecondition",
                   "ofType": null
                 }
               },
@@ -8418,7 +8418,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappPartyPredicatedFeePayer",
+          "name": "ZkappPartyPreconditionedFeePayer",
           "description": null,
           "fields": [
             {
@@ -8438,7 +8438,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8473,7 +8473,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayer",
+                  "name": "ZkappPartyPreconditionedFeePayer",
                   "ofType": null
                 }
               },

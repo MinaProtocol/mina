@@ -46,7 +46,8 @@ let _ =
          in
          let ps =
            Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
+             ~party_depth:(fun (p : Party.Preconditioned.t) ->
+               p.body.call_depth)
              other_parties_data
            |> Parties.Call_forest.accumulate_hashes_predicated
          in
@@ -68,7 +69,7 @@ let _ =
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
-               Party.Predicated.(digest (of_fee_payer fee_payer.data))
+               Party.Preconditioned.(digest (of_fee_payer fee_payer.data))
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn

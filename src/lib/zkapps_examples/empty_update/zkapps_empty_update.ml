@@ -10,7 +10,7 @@ module Party_under_construction = struct
   let create ~public_key ?(token_id = Token_id.default) () =
     { public_key; token_id }
 
-  let to_party (t : t) : Party.Predicated.t =
+  let to_party (t : t) : Party.Preconditioned.t =
     { body =
         { public_key = t.public_key
         ; token_id = t.token_id
@@ -30,7 +30,7 @@ module Party_under_construction = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state =
+        ; protocol_state_precondition =
             { snarked_ledger_hash = Ignore
             ; timestamp = Ignore
             ; blockchain_length = Ignore
@@ -58,7 +58,7 @@ module Party_under_construction = struct
             }
         ; use_full_commitment = false
         }
-    ; predicate =
+    ; account_precondition =
         Full
           { balance = Ignore
           ; nonce = Ignore
@@ -80,7 +80,7 @@ module Party_under_construction = struct
         =
       { public_key; token_id }
 
-    let to_party (t : t) : Party.Predicated.Checked.t =
+    let to_party (t : t) : Party.Preconditioned.Checked.t =
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -107,7 +107,7 @@ module Party_under_construction = struct
           ; sequence_events = var_of_t Zkapp_account.Events.typ []
           ; call_data = Field.Var.constant Field.zero
           ; call_depth = Run.As_prover.Ref.create (fun () -> 0)
-          ; protocol_state =
+          ; protocol_state_precondition =
               var_of_t Zkapp_precondition.Protocol_state.typ
                 { snarked_ledger_hash = Ignore
                 ; timestamp = Ignore
@@ -140,8 +140,9 @@ module Party_under_construction = struct
                 }
           ; use_full_commitment = Boolean.false_
           }
-      ; predicate =
-          var_of_t (Party.Predicate.typ ())
+      ; account_precondition =
+          var_of_t
+            (Party.Account_precondition.typ ())
             (Full
                { balance = Ignore
                ; nonce = Ignore
@@ -201,7 +202,7 @@ let main public_key ([] : _ H1.T(Id).t)
       ()
   in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Predicated.Checked.digest party in
+  let returned_transaction = Party.Preconditioned.Checked.digest party in
   let returned_at_party =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].

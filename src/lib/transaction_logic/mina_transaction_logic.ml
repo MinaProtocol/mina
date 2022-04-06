@@ -1017,23 +1017,23 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            ; sequence_events = _
            ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-           ; protocol_state = _
+           ; protocol_state_precondition = _
            ; use_full_commitment
            }
-       ; predicate
+       ; account_precondition
        } :
-        Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
+        Party.Preconditioned.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Result.Let_syntax in
-    (* enforce that either the predicate is `Accept`,
+    (* enforce that either the account_precondition is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
     let%map () =
-      let predicate_is_accept =
+      let account_precondition_is_accept =
         Zkapp_precondition.Account.is_accept
-        @@ Party.Predicate.to_full predicate
+        @@ Party.Account_precondition.to_full account_precondition
       in
       List.exists ~f:Fn.id
-        [ predicate_is_accept
+        [ account_precondition_is_accept
         ; increment_nonce
         ; use_full_commitment && not is_start
         ]
@@ -1436,7 +1436,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
-    module Protocol_state_predicate = struct
+    module Protocol_state_precondition = struct
       include Zkapp_precondition.Protocol_state
     end
 
@@ -1614,7 +1614,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_commitment.t
           , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
-      ; protocol_state_predicate : Zkapp_precondition.Protocol_state.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
       ; full_transaction_commitment : unit
       ; field : Snark_params.Tick.Field.t
@@ -1623,12 +1623,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
-      | Check_protocol_state_predicate (pred, global_state) -> (
+      | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_predicate (_is_start, party, account, _global_state) -> (
-          match party.data.predicate with
+      | Check_account_precondition (_is_start, party, account, _global_state)
+        -> (
+          match party.data.account_precondition with
           | Accept ->
               true
           | Nonce n ->
@@ -1695,7 +1696,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let p = Party.Fee_payer.to_signed c.fee_payer in
         { Party.authorization = Control.Signature p.authorization
         ; data =
-            { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
+            { p.data with
+              account_precondition =
+                Party.Account_precondition.Nonce p.data.account_precondition
+            }
         }
         :: c.other_parties
       in
@@ -2421,10 +2425,11 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Snark_params.Tick.Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
                   ; use_full_commitment = ()
                   }
-              ; predicate = actual_nonce
+              ; account_precondition = actual_nonce
               }
               (* Real signature added in below *)
           ; authorization = Signature.dummy
@@ -2442,10 +2447,11 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment
                     }
-                ; predicate = Nonce (Account.Nonce.succ actual_nonce)
+                ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
                 }
             ; authorization = None_given
             }
@@ -2460,10 +2466,11 @@ module For_tests = struct
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = false
                     }
-                ; predicate = Accept
+                ; account_precondition = Accept
                 }
             ; authorization = None_given
             }
@@ -2475,8 +2482,8 @@ module For_tests = struct
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
         ~fee_payer_hash:
-          (Party.Predicated.digest
-             (Party.Predicated.of_fee_payer parties.fee_payer.data))
+          (Party.Preconditioned.digest
+             (Party.Preconditioned.of_fee_payer parties.fee_payer.data))
     in
     let other_parties_signature =
       let c = if use_full_commitment then full_commitment else commitment in
@@ -2485,7 +2492,7 @@ module For_tests = struct
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
-          match party.data.predicate with
+          match party.data.account_precondition with
           | Nonce _ ->
               { party with authorization = Signature other_parties_signature }
           | _ ->
