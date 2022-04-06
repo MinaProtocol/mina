@@ -450,11 +450,9 @@ let%test_unit "tokens test" =
               ; increment_nonce = ()
               ; events = []
               ; sequence_events = []
-              ; call_data =
-                  (* TODO: Not sure why this is a type error. *)
-                  Obj.magic Pickles.Impls.Step.Field.Constant.zero
+              ; call_data = Pickles.Impls.Step.Field.Constant.zero
               ; call_depth = 0
-              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; protocol_state = Zkapp_precondition.Protocol_state.accept
               ; use_full_commitment = ()
               }
           ; predicate = nonce
@@ -495,11 +493,9 @@ let%test_unit "tokens test" =
           ; increment_nonce = true
           ; events = []
           ; sequence_events = []
-          ; call_data =
-              (* TODO: Not sure why this is a type error. *)
-              Obj.magic Pickles.Impls.Step.Field.Constant.zero
+          ; call_data = Pickles.Impls.Step.Field.Constant.zero
           ; call_depth = 0
-          ; protocol_state = Snapp_predicate.Protocol_state.accept
+          ; protocol_state = Zkapp_precondition.Protocol_state.accept
           ; use_full_commitment = false
           }
       ; predicate = Accept

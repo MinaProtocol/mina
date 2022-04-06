@@ -24,6 +24,7 @@
    syncable_ledger
    snark_params
    pickles
+   pickles.backend
    mina_base.import
    o1trace
    rocksdb
