@@ -992,227 +992,11 @@ module Body = struct
   end
 end
 
-(*module Preconditioned = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('body, 'account_precondition) t =
-          { body : 'body; account_precondition : 'account_precondition }
-        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
-      end
-    end]
-  end
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        (Body.Stable.V1.t, Account_precondition.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-    Poly.Fields.make_creator obj ~body:!.Body.deriver
-      ~account_precondition:!.Account_precondition.deriver
-    |> finish "ZkappPartyPreconditioned"
-         ~t_toplevel_annots:Poly.t_toplevel_annots
-
-  let to_input ({ body; account_precondition } : t) =
-    List.reduce_exn ~f:Random_oracle_input.Chunked.append
-      [ Body.to_input body
-      ; Random_oracle_input.Chunked.field
-          (Account_precondition.digest account_precondition)
-      ]
-
-  let digest (t : t) =
-    Random_oracle.(hash ~init:Hash_prefix.party (pack_input (to_input t)))
-
-  let typ () : (_, t) Typ.t =
-    let open Poly in
-    Typ.of_hlistable
-      [ Body.typ (); Account_precondition.typ () ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
-
-  module Checked = struct
-    type t = (Body.Checked.t, Account_precondition.Checked.t) Poly.t
-
-    let to_input ({ body; account_precondition } : t) =
-      List.reduce_exn ~f:Random_oracle_input.Chunked.append
-        [ Body.Checked.to_input body
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account_precondition)
-        ]
-
-    let digest (t : t) =
-      Random_oracle.Checked.(
-        hash ~init:Hash_prefix.party (pack_input (to_input t)))
-  end
-
-  module Proved = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Body.Stable.V1.t
-          , Zkapp_precondition.Account.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    module Digested = struct
-      type t = (Body.Digested.t, Zkapp_precondition.Digested.t) Poly.t
-
-      module Checked = struct
-        type t = (Body.Digested.Checked.t, Field.Var.t) Poly.t
-      end
-    end
-
-    module Checked = struct
-      type t = (Body.Checked.t, Zkapp_precondition.Account.Checked.t) Poly.t
-    end
-  end
-
-  module Signed = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = (Body.Stable.V1.t, Account_nonce.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    module Checked = struct
-      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
-    end
-
-    let dummy : t =
-      { body = Body.dummy; account_precondition = Account_nonce.zero }
-  end
-
-  module Fee_payer = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Body.Fee_payer.Stable.V1.t
-          , Account_nonce.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    module Checked = struct
-      type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
-    end
-
-    let dummy : t =
-      { body = Body.Fee_payer.dummy; account_precondition = Account_nonce.zero }
-
-    let to_signed (t : t) : Signed.t =
-      { body = Body.of_fee_payer t.body
-      ; account_precondition = t.account_precondition
-      }
-
-    let deriver obj =
-      let open Fields_derivers_zkapps.Derivers in
-      let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-      Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
-        ~account_precondition:!.uint32
-      |> finish "ZkappPartyPreconditionedFeePayer"
-           ~t_toplevel_annots:Poly.t_toplevel_annots
-  end
-
-  module Empty = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = (Body.Stable.V1.t, unit) Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    let dummy : t = { body = Body.dummy; account_precondition = () }
-
-    let create body : t = { body; account_precondition = () }
-  end
-
-  let of_signed ({ body; account_precondition } : Signed.t) : t =
-    { body; account_precondition = Nonce account_precondition }
-
-  let of_fee_payer ({ body; account_precondition } : Fee_payer.t) : t =
-    { body = Body.of_fee_payer body
-    ; account_precondition = Nonce account_precondition
-    }
-end*)
-
 module Poly (Body : Type) (Auth : Type) = struct
   type t = { body : Body.t; authorization : Auth.t }
 end
 
-(*module Proved = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-            Poly(Preconditioned.Proved.Stable.V1)
-              (Pickles.Side_loaded.Proof.Stable.V2)
-            .t =
-        { data : Preconditioned.Proved.Stable.V1.t
-        ; authorization : Pickles.Side_loaded.Proof.Stable.V2.t
-        }
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
-module Signed = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Poly(Preconditioned.Signed.Stable.V1)(Signature.Stable.V1).t =
-        { data : Preconditioned.Signed.Stable.V1.t
-        ; authorization : Signature.Stable.V1.t
-        }
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let account_id (t : t) : Account_id.t =
-    Account_id.create t.data.body.public_key t.data.body.token_id
-end*)
-
 module T = struct
-  (*module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('body, 'authorization) t =
-            { body : 'body; authorization : 'authorization }
-          [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
-        end
-      end]
-    end*)
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1225,28 +1009,13 @@ module T = struct
     end
   end]
 
-  let to_input ({ body; authorization = _ } : t) = Body.to_input body
+  let digest (t : t) = Body.digest t.body
 
-  let digest (t : t) =
-    Random_oracle.(hash ~init:Hash_prefix.party (pack_input (to_input t)))
+  module Checked = struct
+    type t = Body.Checked.t
 
-  (*let typ () : (_, t) Typ.t =
-      let open Poly in
-      Typ.of_hlistable
-        [ Body.typ (); Account_precondition.typ () ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-
-    module Checked = struct
-      include Body.Checked
-
-      let to_input (body : t) =
-        Body.Checked.to_input body
-
-      let digest (t : t) =
-        Random_oracle.Checked.(
-          hash ~init:Hash_prefix.party (pack_input (to_input t)))
-    end*)
+    let digest (t : t) = Body.Checked.digest t
+  end
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -1281,11 +1050,6 @@ module Fee_payer = struct
   let account_id (t : t) : Account_id.t =
     Account_id.create t.body.public_key Token_id.default
 
-  (*let to_signed (t : t) : Signed.t =
-    { authorization = t.authorization
-    ; data = Preconditioned.Fee_payer.to_signed t.data
-    }*)
-
   let to_party (t : t) : T.t =
     { authorization = Control.Signature t.authorization
     ; body = Body.of_fee_payer t.body
@@ -1308,28 +1072,10 @@ module Fee_payer = struct
     [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
 end
 
-(*module Empty = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Poly(Preconditioned.Empty.Stable.V1)(Unit.Stable.V1).t =
-        { data : Preconditioned.Empty.Stable.V1.t; authorization : unit }
-      [@@deriving annot, sexp, equal, yojson, hash, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-end*)
-
 include T
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
-
-(*let of_signed ({ data; authorization } : Signed.t) : t =
-  { authorization = Signature authorization
-  ; data = Preconditioned.of_signed data
-  }*)
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
