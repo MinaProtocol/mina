@@ -70,7 +70,7 @@ Add new table `zkapp_accounts`:
 The new table `zkapp_uris` is:
 ```
   id                 serial  PRIMARY_KEY
-  uri                text    NOT NULL
+  uri                text    NOT NULL UNIQUE
 ```
 
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
@@ -214,6 +214,8 @@ with the account information used to populate the new `accounts_accessed` table.
 
 Likewise, precomputed blocks (type `External_transition.Precomputed_block.t`) will need
 an `accounts` field with account information.
+
+For both kinds of blocks, we'll also need a list of account creation fees.
 
 These archive block types do not contain version information in their JSON serialization.
 Therefore, blocks exported with changed types will require code using the same types, and

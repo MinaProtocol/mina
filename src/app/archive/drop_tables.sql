@@ -10,11 +10,13 @@ DROP TABLE blocks_user_commands;
 
 DROP TABLE blocks_zkapp_commands;
 
-DROP TABLE zkapp_party_balances;
+DROP TABLE zkapp_party_failures;
 
-DROP TABLE balances;
+DROP TABLE accounts_accessed;
 
 DROP TABLE blocks;
+
+DROP TYPE chain_status_type;
 
 DROP TABLE epoch_data;
 
@@ -42,7 +44,9 @@ DROP TABLE zkapp_protocol_state_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
-DROP TABLE zkapp_account;
+DROP TABLE zkapp_precondition_accounts;
+
+DROP TABLE zkapp_accounts;
 
 DROP TABLE zkapp_epoch_data;
 
@@ -83,5 +87,11 @@ DROP TYPE zkapp_account_precondition_type;
 DROP TABLE snarked_ledger_hashes;
 
 DROP TABLE timing_info;
+
+DROP TABLE account_ids;
+
+DROP TABLE zkapp_sequence_states;
+
+DROP TABLE zkapp_uris;
 
 DROP TABLE public_keys;

@@ -142,31 +142,35 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
-/* the block_* columns refer to the block containing a user command or internal command that
-    results in a balance
-   for a balance resulting from a user command, the secondary sequence no is always 0
-   these columns duplicate information available in the
-    blocks_user_commands and blocks_internal_commands tables
-   they are included here to allow Rosetta account queries to consume
-    fewer Postgresql resources
-   TODO: nonce column is NULLable until we can establish valid nonces for all rows
-*/
-
-CREATE TABLE balances
-( id                           serial PRIMARY KEY
-, public_key_id                int    NOT NULL REFERENCES public_keys(id)
-, balance                      bigint NOT NULL
-, block_id                     int    NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, block_height                 int    NOT NULL
-, block_sequence_no            int    NOT NULL
-, block_secondary_sequence_no  int    NOT NULL
-, nonce                        bigint
-, UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
+CREATE TABLE account_ids
+( id                 serial  PRIMARY KEY
+, public_key_id      int     NOT NULL     REFERENCES public_keys(id) ON DELETE CASCADE
+, token              text    NOT NULL
+, token_owner        int                  REFERENCES account_ids(id)
 );
 
-CREATE INDEX idx_balances_id ON balances(id);
-CREATE INDEX idx_balances_public_key_id ON balances(public_key_id);
-CREATE INDEX idx_balances_height_seq_nos ON balances(block_height,block_sequence_no,block_secondary_sequence_no);
+/* accounts accessed in a block, representing the account
+   state after all transactions in the block have been executed
+*/
+
+CREATE TABLE accounts_accessed
+( ledger_index            int     NOT NULL
+, block_id                int     NOT NULL  REFERENCES blocks(id)
+, account_id              int     NOT NULL  REFERENCES account_ids(id)
+, token_symbol            text    NOT NULL
+, balance                 bigint  NOT NULL
+, nonce                   bigint  NOT NULL
+, receipt_chain_hash      text    NOT NULL
+, delegate                int               REFERENCES public_keys(id)
+, voting_for              text    NOT NULL
+, timing                  int               REFERENCES timing_info(id)
+, permissions             int     NOT NULL  REFERENCES zkapp_permissions(id)
+, zkapp                   int               REFERENCES zkapp_accounts(id)
+, PRIMARY KEY (block_id,account_id)
+);
+
+CREATE INDEX idx_accounts_accessed_block_id ON accounts_accessed(block_id);
+CREATE INDEX idx_accounts_accessed_block_account_id ON accounts_accessed(account_id);
 
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
@@ -174,20 +178,13 @@ CREATE TABLE blocks_user_commands
 , sequence_no     int NOT NULL
 , status          user_command_status NOT NULL
 , failure_reason  text
-, fee_payer_account_creation_fee_paid bigint
-, receiver_account_creation_fee_paid bigint
-, created_token     text
-, fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
-, source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
-, receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE
+, created_token   text
 , PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 
 CREATE INDEX idx_blocks_user_commands_block_id ON blocks_user_commands(block_id);
 CREATE INDEX idx_blocks_user_commands_user_command_id ON blocks_user_commands(user_command_id);
-CREATE INDEX idx_blocks_user_commands_fee_payer_balance ON blocks_user_commands(fee_payer_balance);
-CREATE INDEX idx_blocks_user_commands_source_balance ON blocks_user_commands(source_balance);
-CREATE INDEX idx_blocks_user_commands_receiver_balance ON blocks_user_commands(receiver_balance);
+CREATE INDEX idx_blocks_user_commands_sequence_no ON blocks_user_commands(sequence_no);
 
 /* a join table between blocks and internal_commands, with some additional information
    the pair sequence_no, secondary_sequence_no gives the order within all transactions in the block
@@ -199,37 +196,30 @@ CREATE TABLE blocks_internal_commands
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
 , secondary_sequence_no int NOT NULL
-, receiver_account_creation_fee_paid bigint
-, receiver_balance      int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );
 
 CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(block_id);
 CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
-CREATE INDEX idx_blocks_internal_commands_receiver_balance ON blocks_internal_commands(receiver_balance);
+CREATE INDEX idx_blocks_internal_commands_sequence_no ON blocks_internal_commands(sequence_no);
+CREATE INDEX idx_blocks_internal_commands_secondary_sequence_no ON blocks_internal_commands(secondary_sequence_no);
 
-/* in this file because reference to balances doesn't work if in zkapp_tables.sql */
-CREATE TABLE zkapp_party_balances
-( list_id                  int  NOT NULL
-, list_index               int  NOT NULL
-, balance_id               int  NOT NULL REFERENCES balances(id)
-);
-
-/* a join table between blocks and zkapp_commands, with some additional information
+/* a join table between blocks and zkapp_commands
    sequence_no gives the order within all transactions in the block
 
-   other_parties_list_id refers to a list of balances in the same order as the other parties in the
-   zkapps_command; that is, the list_index for the balances is the same as the list_index for other_parties
+   The `failure_reasons` column is not NULL iff `status` is `failed`. The
+   entries in the array are unenforced foreign key references to `zkapp_party_failures(id)`,
+   and are not NULL.
 
    Blocks command convention
 */
 
 CREATE TABLE blocks_zkapp_commands
-( block_id                        int  NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, zkapp_command_id                int  NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
-, sequence_no                     int  NOT NULL
-, fee_payer_balance_id            int  NOT NULL REFERENCES balances(id)
-, other_parties_balances_list_id  int  NOT NULL
+( block_id                        int                 NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
+, zkapp_command_id                int                 NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
+, sequence_no                     int                 NOT NULL
+, status                          user_command_status NOT NULL
+, failure_reasons                 int[]
 , PRIMARY KEY (block_id, zkapp_command_id, sequence_no)
 );
 

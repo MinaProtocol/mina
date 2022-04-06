@@ -50,6 +50,11 @@ CREATE TABLE zkapp_states
 , element_ids              int[]
 );
 
+CREATE TABLE zkapp_sequence_states
+( id                       serial           PRIMARY KEY
+, element_ids              int[]
+);
+
 CREATE TABLE zkapp_verification_keys
 ( id                       serial           PRIMARY KEY
 , verification_key         text             NOT NULL UNIQUE
@@ -110,7 +115,7 @@ CREATE TABLE zkapp_nonce_bounds
 CREATE TYPE zkapp_account_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
-CREATE TABLE zkapp_account
+CREATE TABLE zkapp_precondition_accounts
 ( id                       serial                 PRIMARY KEY
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
@@ -122,14 +127,30 @@ CREATE TABLE zkapp_account
 , proved_state             boolean
 );
 
-/* invariants: account id is not NULL iff kind is 'full'
+/* invariants: precondition_account id is not NULL iff kind is 'full'
                nonce is not NULL iff kind is 'nonce'
 */
 CREATE TABLE zkapp_account_precondition
-( id               serial                 PRIMARY KEY
-, kind             zkapp_account_precondition_type   NOT NULL
-, account_id       int                    REFERENCES zkapp_account(id)
-, nonce            bigint
+( id                       serial                            PRIMARY KEY
+, kind                     zkapp_account_precondition_type   NOT NULL
+, precondition_account_id  int                               REFERENCES zkapp_precondition_accounts(id)
+, nonce                    bigint
+);
+
+CREATE TABLE zkapp_uris
+( id                 serial  PRIMARY KEY
+, uri                text    NOT NULL UNIQUE
+);
+
+CREATE TABLE zkapp_accounts
+( id                   serial  PRIMARY KEY
+, app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
+, verification_key_id  int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+, zkapp_version        bigint  NOT NULL
+, sequence_state_id    int     NOT NULL  REFERENCES zkapp_sequence_states(id)
+, last_sequence_slot   bigint  NOT NULL
+, proved_state         bool    NOT NULL
+, zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
 );
 
 CREATE TYPE zkapp_authorization_kind_type AS ENUM ('proof','signature','none_given');
@@ -218,4 +239,13 @@ CREATE TABLE zkapp_party
 , body_id                  int                             NOT NULL REFERENCES zkapp_party_body(id)
 , account_precondition_id             int                             NOT NULL REFERENCES zkapp_account_precondition(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
+);
+
+/* a list of of failures for a party in a zkApp
+   the index is the index into the `other_parties`
+*/
+CREATE TABLE zkapp_party_failures
+( id       serial    PRIMARY KEY
+, index    int       NOT NULL
+, failures text[]    NOT NULL
 );
