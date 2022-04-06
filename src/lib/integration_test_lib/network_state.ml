@@ -221,14 +221,17 @@ module Make
                 let blocks_including_txn' =
                   List.fold txn_hash_list ~init:state.blocks_including_txn
                     ~f:(fun accum hash ->
-                      let txn_set' =
+                      let block_set' =
                         State_hash.Set.add
-                          ( Transaction_hash.Map.find state.blocks_including_txn
-                              hash
+                          ( Transaction_hash.Map.find accum hash
                           |> Option.value ~default:State_hash.Set.empty )
                           breadcrumb.state_hash
                       in
-                      Transaction_hash.Map.set accum ~key:hash ~data:txn_set')
+                      [%log info]
+                        "adding or updating txn_hash %s to \
+                         state.blocks_including_txn"
+                        (Transaction_hash.to_base58_check hash) ;
+                      Transaction_hash.Map.set accum ~key:hash ~data:block_set')
                 in
                 { state with
                   blocks_seen_by_node = blocks_seen_by_node'
