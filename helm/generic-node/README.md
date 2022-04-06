@@ -39,3 +39,5 @@ Parameter | Description | Default
 ```console
 helm install generic-node
 ```
+
+### Generic-node launch example
