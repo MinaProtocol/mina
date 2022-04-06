@@ -670,8 +670,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SendTestSnappInput",
-          "description": "Parties for a test snapp",
+          "name": "SendTestZkappInput",
+          "description": "Parties for a test zkApp",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -3666,7 +3666,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SendSnappInput",
+          "name": "SendZkappInput",
           "description": null,
           "fields": [
             {
@@ -3708,19 +3708,19 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SendSnappPayload",
+          "name": "SendZkappPayload",
           "description": null,
           "fields": [
             {
-              "name": "snapp",
-              "description": "snapp transaction that was sent",
+              "name": "zkapp",
+              "description": "zkApp transaction that was sent",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappCommand",
+                  "name": "ZkappCommand",
                   "ofType": null
                 }
               },
@@ -4991,8 +4991,8 @@
               "deprecationReason": null
             },
             {
-              "name": "sendSnapp",
-              "description": "Send a snapp transaction",
+              "name": "sendZkapp",
+              "description": "Send a zkApp transaction",
               "args": [
                 {
                   "name": "input",
@@ -5002,7 +5002,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SendSnappInput",
+                      "name": "SendZkappInput",
                       "ofType": null
                     }
                   },
@@ -5014,7 +5014,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -5022,9 +5022,9 @@
               "deprecationReason": null
             },
             {
-              "name": "mockSnapp",
+              "name": "mockZkapp",
               "description":
-                "Mock a snapp transaction, no effect on blockchain",
+                "Mock a zkApp transaction, no effect on blockchain",
               "args": [
                 {
                   "name": "input",
@@ -5034,7 +5034,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SendSnappInput",
+                      "name": "SendZkappInput",
                       "ofType": null
                     }
                   },
@@ -5046,7 +5046,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -5054,8 +5054,8 @@
               "deprecationReason": null
             },
             {
-              "name": "internalSendSnapp",
-              "description": "Send a snapp (for internal testing purposes)",
+              "name": "internalSendZkapp",
+              "description": "Send a zkApp (for internal testing purposes)",
               "args": [
                 {
                   "name": "parties",
@@ -5065,7 +5065,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "SendTestSnappInput",
+                      "name": "SendTestZkappInput",
                       "ofType": null
                     }
                   },
@@ -5077,7 +5077,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -8617,7 +8617,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappCommand",
+          "name": "ZkappCommand",
           "description": null,
           "fields": [
             {
@@ -8634,7 +8634,7 @@
             },
             {
               "name": "hash",
-              "description": "A cryptographic hash of the snapp command",
+              "description": "A cryptographic hash of the zkApp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8667,7 +8667,7 @@
             {
               "name": "failureReason",
               "description":
-                "The reason for the snapp transaction failure; null means success or the status is unknown",
+                "The reason for the zkApp transaction failure; null means success or the status is unknown",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -9702,8 +9702,8 @@
               "deprecationReason": null
             },
             {
-              "name": "snappCommands",
-              "description": "List of snapp commands included in this block",
+              "name": "zkappCommands",
+              "description": "List of zkApp commands included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9716,7 +9716,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappCommand",
+                      "name": "ZkappCommand",
                       "ofType": null
                     }
                   }
@@ -10879,7 +10879,7 @@
           "fields": [
             {
               "name": "editState",
-              "description": "Authorization required to edit snapp state",
+              "description": "Authorization required to edit zkApp state",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10960,7 +10960,7 @@
             {
               "name": "setVerificationKey",
               "description":
-                "Authorization required to set the verification key of the snapp associated with the account",
+                "Authorization required to set the verification key of the zkApp associated with the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10977,7 +10977,7 @@
             {
               "name": "setZkappUri",
               "description":
-                "Authorization required to change the URI of the snapp associated with the account ",
+                "Authorization required to change the URI of the zkApp associated with the account ",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11493,16 +11493,16 @@
             {
               "name": "zkappUri",
               "description":
-                "The URI associated with this account, usually pointing to the snapp source code",
+                "The URI associated with this account, usually pointing to the zkApp source code",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "snappState",
+              "name": "zkappState",
               "description":
-                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
+                "The 8 field elements comprising the zkApp state associated with this account encoded as bignum strings",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -13346,13 +13346,13 @@
               "deprecationReason": null
             },
             {
-              "name": "pooledSnappCommands",
+              "name": "pooledZkappCommands",
               "description":
-                "Retrieve all the scheduled snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+                "Retrieve all the scheduled zkApp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of snapp commands",
+                  "description": "Ids of zkApp commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13371,7 +13371,7 @@
                 {
                   "name": "hashes",
                   "description":
-                    "Hashes of the snapp commands to find in the pool",
+                    "Hashes of the zkApp commands to find in the pool",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13390,7 +13390,7 @@
                 {
                   "name": "publicKey",
                   "description":
-                    "Public key of sender of pooled snapp commands",
+                    "Public key of sender of pooled zkApp commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",
@@ -13410,7 +13410,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappCommand",
+                      "name": "ZkappCommand",
                       "ofType": null
                     }
                   }
@@ -13424,8 +13424,8 @@
               "description": "Get the status of a transaction",
               "args": [
                 {
-                  "name": "snappTransaction",
-                  "description": "Id of a snapp transaction",
+                  "name": "zkappTransaction",
+                  "description": "Id of a zkApp transaction",
                   "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
                   "defaultValue": null
                 },

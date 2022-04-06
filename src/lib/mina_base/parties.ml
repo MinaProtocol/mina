@@ -557,7 +557,7 @@ module Call_forest = struct
   let is_empty : _ t -> bool = List.is_empty
 
   let to_list (type p) (t : (p, _, _) t) : p list =
-    fold t ~init:[] ~f:(fun acc p -> p :: acc)
+    List.rev @@ fold t ~init:[] ~f:(fun acc p -> p :: acc)
 
   let exists (type p) (t : (p, _, _) t) ~(f : p -> bool) : bool =
     with_return (fun { return } ->

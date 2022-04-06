@@ -660,7 +660,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%bind ((_, acct) as r) = get_with_location ledger account_id in
     let%map () =
       check
-        (Option.is_none acct.snapp)
+        (Option.is_none acct.zkapp)
         !"Expected account %{sexp: Account_id.t} to be a user account, got a \
           snapp account."
         account_id
@@ -1316,56 +1316,56 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
 
-      let make_snapp (a : t) =
-        let snapp =
-          match a.snapp with
+      let make_zkapp (a : t) =
+        let zkapp =
+          match a.zkapp with
           | None ->
               Some Zkapp_account.default
-          | Some _ as snapp ->
-              snapp
+          | Some _ as zkapp ->
+              zkapp
         in
-        { a with snapp }
+        { a with zkapp }
 
-      let unmake_snapp (a : t) : t =
-        let snapp =
-          match a.snapp with
+      let unmake_zkapp (a : t) : t =
+        let zkapp =
+          match a.zkapp with
           | None ->
               None
-          | Some snapp ->
-              if Zkapp_account.(equal default snapp) then None else Some snapp
+          | Some zkapp ->
+              if Zkapp_account.(equal default zkapp) then None else Some zkapp
         in
-        { a with snapp }
+        { a with zkapp }
 
-      let get_snapp (a : t) = Option.value_exn a.snapp
+      let get_zkapp (a : t) = Option.value_exn a.zkapp
 
-      let set_snapp (a : t) ~f : t = { a with snapp = Option.map a.snapp ~f }
+      let set_zkapp (a : t) ~f : t = { a with zkapp = Option.map a.zkapp ~f }
 
-      let proved_state (a : t) = (get_snapp a).proved_state
+      let proved_state (a : t) = (get_zkapp a).proved_state
 
       let set_proved_state proved_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with proved_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with proved_state })
 
-      let app_state (a : t) = (get_snapp a).app_state
+      let app_state (a : t) = (get_zkapp a).app_state
 
       let set_app_state app_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with app_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with app_state })
 
       let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_snapp a).verification_key
+      let verification_key (a : t) = (get_zkapp a).verification_key
 
       let set_verification_key verification_key (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with verification_key })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
 
-      let last_sequence_slot (a : t) = (get_snapp a).last_sequence_slot
+      let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
 
       let set_last_sequence_slot last_sequence_slot (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with last_sequence_slot })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with last_sequence_slot })
 
-      let sequence_state (a : t) = (get_snapp a).sequence_state
+      let sequence_state (a : t) = (get_zkapp a).sequence_state
 
       let set_sequence_state sequence_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
       let zkapp_uri (a : t) = a.zkapp_uri
 

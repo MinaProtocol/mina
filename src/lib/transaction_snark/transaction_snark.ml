@@ -916,7 +916,7 @@ module Base = struct
       (module Int)
       (fun i ->
         let open Zkapp_statement in
-        Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
+        Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
           ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
           ~value_to_field_elements:to_field_elements
           ~var_to_field_elements:Checked.to_field_elements)
@@ -1238,8 +1238,8 @@ module Base = struct
               lazy
                 (let a =
                    { a with
-                     snapp =
-                       ( Zkapp_account.Checked.digest a.snapp
+                     zkapp =
+                       ( Zkapp_account.Checked.digest a.zkapp
                        , As_prover.Ref.create (fun () -> None) )
                    }
                  in
@@ -1269,45 +1269,45 @@ module Base = struct
           in
           let `Min_balance _, timing =
             run_checked
-            @@ [%with_label "Check snapp timing"]
+            @@ [%with_label "Check zkapp timing"]
                  (check_timing ~balance_check ~timed_balance_check ~account
                     ~txn_amount:None ~txn_global_slot)
           in
           (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
-        let make_snapp (a : t) = a
+        let make_zkapp (a : t) = a
 
-        let unmake_snapp (a : t) = a
+        let unmake_zkapp (a : t) = a
 
-        let proved_state (a : t) = a.data.snapp.proved_state
+        let proved_state (a : t) = a.data.zkapp.proved_state
 
         let set_proved_state proved_state ({ data = a; hash } : t) : t =
-          { data = { a with snapp = { a.snapp with proved_state } }; hash }
+          { data = { a with zkapp = { a.zkapp with proved_state } }; hash }
 
-        let app_state (a : t) = a.data.snapp.app_state
+        let app_state (a : t) = a.data.zkapp.app_state
 
         let set_app_state app_state ({ data = a; hash } : t) : t =
-          { data = { a with snapp = { a.snapp with app_state } }; hash }
+          { data = { a with zkapp = { a.zkapp with app_state } }; hash }
 
         let verification_key (a : t) : Verification_key.t =
-          a.data.snapp.verification_key
+          a.data.zkapp.verification_key
 
         let set_verification_key (verification_key : Verification_key.t)
             ({ data = a; hash } : t) : t =
-          { data = { a with snapp = { a.snapp with verification_key } }; hash }
+          { data = { a with zkapp = { a.zkapp with verification_key } }; hash }
 
-        let last_sequence_slot (a : t) = a.data.snapp.last_sequence_slot
+        let last_sequence_slot (a : t) = a.data.zkapp.last_sequence_slot
 
         let set_last_sequence_slot last_sequence_slot ({ data = a; hash } : t) :
             t =
-          { data = { a with snapp = { a.snapp with last_sequence_slot } }
+          { data = { a with zkapp = { a.zkapp with last_sequence_slot } }
           ; hash
           }
 
-        let sequence_state (a : t) = a.data.snapp.sequence_state
+        let sequence_state (a : t) = a.data.zkapp.sequence_state
 
         let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
-          { data = { a with snapp = { a.snapp with sequence_state } }; hash }
+          { data = { a with zkapp = { a.zkapp with sequence_state } }; hash }
 
         let zkapp_uri (a : t) = a.data.zkapp_uri
 
@@ -1752,11 +1752,11 @@ module Base = struct
                   exists Side_loaded_verification_key.typ ~compute:(fun () ->
                       Option.value_exn
                         (As_prover.Ref.get
-                           (Data_as_hash.ref a.snapp.verification_key.data))
+                           (Data_as_hash.ref a.zkapp.verification_key.data))
                           .data)
                 in
                 let expected_hash =
-                  Data_as_hash.hash a.snapp.verification_key.data
+                  Data_as_hash.hash a.zkapp.verification_key.data
                 in
                 let actual_hash = Zkapp_account.Checked.digest_vk vk in
                 Field.Assert.equal expected_hash actual_hash ;
@@ -2708,7 +2708,7 @@ module Base = struct
              ; voting_for = account.voting_for
              ; timing
              ; permissions = account.permissions
-             ; snapp = account.snapp
+             ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
              }))
     in
@@ -2895,7 +2895,7 @@ module Base = struct
              ; voting_for = account.voting_for
              ; timing = account.timing
              ; permissions = account.permissions
-             ; snapp = account.snapp
+             ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
              }))
     in
@@ -3009,7 +3009,7 @@ module Base = struct
              ; voting_for = account.voting_for
              ; timing
              ; permissions = account.permissions
-             ; snapp = account.snapp
+             ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
              }))
     in
@@ -4092,7 +4092,7 @@ struct
             (find_index_exn witness.local_state_init.ledger account_id))
       in
       match
-        Option.value_map ~default:None account.snapp ~f:(fun s ->
+        Option.value_map ~default:None account.zkapp ~f:(fun s ->
             s.verification_key)
       with
       | None ->
@@ -4645,7 +4645,7 @@ module For_tests = struct
     let account : Account.t =
       { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
         permissions
-      ; snapp = Some { Zkapp_account.default with verification_key = Some vk }
+      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
       }
     in
     create ledger id account

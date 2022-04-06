@@ -41,7 +41,8 @@
    pickles.backend
    consensus.vrf
    error_json
-   kimchi_backend.pasta)
+   kimchi_backend.pasta
+   gossip_net)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))
