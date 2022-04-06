@@ -3,8 +3,8 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+(* Only show stdout for failed inline tests.
+open Inline_test_quiet_logs*)
 open Core
 open Async
 open Mina_base
@@ -1326,6 +1326,7 @@ struct
                                 Core.printf "%s %!"
                                   "!!!!!!!!!!!!!!!!!!!Other_command_failed"
                             | _ ->
+                                Core.printf "Other Error!! %!" ;
                                 () ) ;
                             assert false
                         | Error `Account_not_found ->
@@ -2073,22 +2074,17 @@ let%test_module _ =
                 }))
 
     let mk_parties ?valid_period ~sender_idx ~receiver_idx ~fee ~nonce ~amount
-        ledger =
+        _ledger =
       let sender_kp = test_keys.(sender_idx) in
       let nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, nonce) in
+      let amount = Currency.Amount.of_int amount in
       let receiver_kp = test_keys.(receiver_idx) in
       let receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
       in
-      let spec =
-        { Mina_transaction_logic.For_tests.Transaction_spec.sender
-        ; receiver
-        ; fee = Currency.Fee.of_int fee
-        ; amount = Currency.Amount.of_int amount
-        }
-      in
-      let snapp_kp = Signature_lib.Keypair.create () in
+      let fee = Currency.Fee.of_int fee in
+      (*let snapp_kp = Signature_lib.Keypair.create () in*)
       let protocol_state_predicate =
         match valid_period with
         | None ->
@@ -2096,9 +2092,24 @@ let%test_module _ =
         | Some time ->
             Snapp_predicate.Protocol_state.valid_until time
       in
-      let%map parties =
-        Transaction_snark.For_tests.create_trivial_predicate_snapp
-          ~constraint_constants ~protocol_state_predicate ~snapp_kp spec ledger
+      let test_spec : Transaction_snark.For_tests.Spec.t =
+        { sender
+        ; fee
+        ; receivers = [ (receiver, amount) ]
+        ; amount
+        ; snapp_account_keypairs = []
+        ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
+        ; new_snapp_account = false
+        ; snapp_update = Party.Update.dummy
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      let parties =
+        Transaction_snark.For_tests.multiple_transfers ~protocol_state_predicate
+          test_spec
       in
       User_command.Parties parties
 
@@ -2418,13 +2429,13 @@ let%test_module _ =
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
-          let%bind expires_later1 =
+          let expires_later1 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
               ~amount:10_000_000_000 ~nonce:1 ledger
           in
-          let%bind expires_later2 =
+          let expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
@@ -2460,13 +2471,13 @@ let%test_module _ =
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           (* Add new commands, remove old commands some of which are now expired *)
-          let%bind expired_zkapp =
+          let expired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
               ~sender_idx:9 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5
               ~amount:1_000_000_000 ledger
           in
-          let%bind unexpired_zkapp =
+          let unexpired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~sender_idx:8 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9

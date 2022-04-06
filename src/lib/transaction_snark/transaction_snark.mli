@@ -563,5 +563,8 @@ module For_tests : sig
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Parties.t
+  val multiple_transfers :
+       ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
+    -> Spec.t
+    -> Parties.t
 end

@@ -57,6 +57,7 @@
    data_hash_lib
    mina_ledger
    mina_base.import
+   snark_params
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

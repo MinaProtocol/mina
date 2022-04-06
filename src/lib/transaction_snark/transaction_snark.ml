@@ -4118,7 +4118,9 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties spec ~update ~predicate =
+  let create_parties
+      ?(protocol_state_predicate = Snapp_predicate.Protocol_state.accept) spec
+      ~update ~predicate =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; receivers
@@ -4146,7 +4148,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state = Snapp_predicate.Protocol_state.accept
+              ; protocol_state = protocol_state_predicate
               ; use_full_commitment = ()
               }
           ; predicate = sender_nonce
@@ -4167,7 +4169,7 @@ module For_tests = struct
             ; sequence_events = []
             ; call_data = Field.zero
             ; call_depth = 0
-            ; protocol_state = Snapp_predicate.Protocol_state.accept
+            ; protocol_state = protocol_state_predicate
             ; use_full_commitment = false
             }
         ; predicate = Nonce (Account.Nonce.succ sender_nonce)
@@ -4229,7 +4231,7 @@ module For_tests = struct
                   ; sequence_events
                   ; call_data
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = protocol_state_predicate
                   ; use_full_commitment = true
                   }
               ; predicate
@@ -4251,7 +4253,7 @@ module For_tests = struct
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state = Snapp_predicate.Protocol_state.accept
+                  ; protocol_state = protocol_state_predicate
                   ; use_full_commitment = false
                   }
               ; predicate = Accept
@@ -4259,14 +4261,13 @@ module For_tests = struct
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Snapp_predicate.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
       @ List.map snapp_parties ~f:(fun p -> p.data)
       @ List.map other_receivers ~f:(fun p -> p.data)
     in
     let protocol_state_predicate_hash =
-      Snapp_predicate.Protocol_state.digest protocol_state
+      Snapp_predicate.Protocol_state.digest protocol_state_predicate
     in
     let ps =
       Parties.Call_forest.of_parties_list
@@ -4443,14 +4444,14 @@ module For_tests = struct
     let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 
-  let multiple_transfers (spec : Spec.t) =
+  let multiple_transfers ?protocol_state_predicate (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
       create_parties spec ~update:spec.snapp_update
-        ~predicate:Party.Predicate.Accept
+        ~predicate:Party.Predicate.Accept ?protocol_state_predicate
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
