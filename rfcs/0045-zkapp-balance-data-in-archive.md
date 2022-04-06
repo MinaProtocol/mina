@@ -52,6 +52,10 @@ Table `blocks_user_commands`, remove the columns:
 where the array contains account creation fees for each of the `other_parties`.
 While the array is not nullable, array elements may be `NULL`.
 
+Rename the existing `zkapp_account` to `zkapp_precondition_account`, and in the
+table `zkapp_predicate`, rename `account_id` to `precondition_account_id`, and
+modify the foreign key reference accordingly.
+
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
@@ -68,6 +72,20 @@ The table `balances` is replaced by a new table `accounts_accessed`, with column
   zkapp               int                          REFERENCES zkapp_account(id)
   zkapp_uri           text    NOT NULL
 ```
+
+The new table `zkapp_account` is:
+```
+  app_state           int     NOT NULL  REFERENCES zkapp_states
+  verification_key    int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+  zkapp_version       bigint  NOT NULL
+  sequence_state      int     NOT NULL  REFERENCES zkapp_sequence_states(id)
+  last_sequence_slot  bigint  NOT NULL
+  proved_state        bool    NOT NULL
+```
+
+The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`. We
+probably don't want to commingle sequence states with app states in a single table, because
+they contain differing numbers of elements.
 
 The new type `token_permissions` is:
 
@@ -126,9 +144,7 @@ Information to be removed:
 
 - In `Transaction.Status.t`, the `Applied` constructor is applied to a pair consisting of
   `Auxiliary_data.t` containing account creation fees, and `Balance_data.t`, containing
-  balances. The fields in those types are all options, because they may not be relevant
-  to a particular transaction. Make the constructor unary, applied to a new type
-  `Account_creation_fees.t` (see below).
+  balances. Make the constructor nullary.
 
 - In `Transaction.Status.t`, the `Failed` constructor is applied to a pair, consisting of
   instances of `Failure.Collection.t` and `Balance_data.t`. Make the constructor unary by
@@ -143,12 +159,6 @@ Information to be removed:
 
 Information to be added:
 
-- The new type `Account_creation_fees.t` is a list of records with
-  fields for public key, amount, and an account role.  The account role can be
-  `Receiver_account`, `Other_party_account`, and so on. This approach
-  gives flexibility for the number of such fees, and avoids the use of
-  options.
-
 - The `Breadcrumb_added` message can contain a list of accounts
   affected by the block.  Specifically, the list contains a list of
   `int`, `Account.t` pairs (or perhaps a record with two fields),
@@ -160,6 +170,11 @@ Information to be added:
   ledger is contained in the breadcrumb argument, and the block
   contains transactions, so the accounts affected by the block can be
   queried from the staged ledger.
+
+- The same message can contain a list of records representing account
+  creation fees burned for the block, with fields for the public key
+  of the created account and the fee amount. That information can be
+  extracted from the scan state of the staged ledger in the breadcrumb.
 
 Types to modify:
 
@@ -186,7 +201,7 @@ The archive processor will need to be updated to add the account information tha
 changed for each block. There is no existing code to add entries to the
 `blocks_zkapps_commands` join table, it needs to be added.
 
-Because transaction statuses will contain account creation fee
+Because the `Breadcrumb_added` message will contain account creation fee
 information, the processor will no longer require the temporizing hack
 to calculate that information. The creation fee information will no
 longer be written to join tables, instead it will be written to the
