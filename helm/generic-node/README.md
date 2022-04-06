@@ -39,5 +39,9 @@ Parameter | Description | Default
 ```console
 helm install generic-node
 ```
-
-### Generic-node launch example
+### Generic-node Side Note
+- For ```uploadBlocksToGCloud``` feature, ensure to get the credentials in the cluster. All secrets are already stored in the ```coda-central1-cluster
+- For persistence feature, there might be a need for details per deployment.
+- For privatekeySecret feature, the secret is already stored in the generic-node-test namespace.
+- Some ports have to be unique per deployment but i think the most important is nodePort. But you may have to consider client, graphql and p2p.
+- All other related info are available in the namespace.
