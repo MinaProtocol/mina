@@ -39,7 +39,7 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.apply_parties_with_merges ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ])))
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract" =
@@ -73,7 +73,7 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.apply_parties_with_merges ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ])))
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract- different fee payer" =
@@ -108,5 +108,5 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.apply_parties_with_merges ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ])))
   end )
