@@ -58,49 +58,46 @@ modify the foreign key reference accordingly.
 
 Add new table `zkapp_accounts`:
 ```
-  app_state           int     NOT NULL  REFERENCES zkapp_states
-  verification_key    int     NOT NULL  REFERENCES zkapp_verification_keys(id)
-  zkapp_version       bigint  NOT NULL
-  sequence_state      int     NOT NULL  REFERENCES zkapp_sequence_states(id)
-  last_sequence_slot  bigint  NOT NULL
-  proved_state        bool    NOT NULL
+  app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
+  verification_key_id  int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+  zkapp_version        bigint  NOT NULL
+  sequence_state_id    int     NOT NULL  REFERENCES zkapp_sequence_states(id)
+  last_sequence_slot   bigint  NOT NULL
+  proved_state         bool    NOT NULL
+  zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
+```
+
+The new table `zkapp_uris` is:
+```
+  id                 serial  PRIMARY_KEY
+  uri                text    NOT NULL
 ```
 
 The table `balances` is replaced by a new table `accounts_accessed`, with columns:
 ```
-  block_id            int                NOT NULL  REFERENCES blocks(id)
-  public_key          int                NOT NULL  REFERENCES public_keys(id)
-  token               int                NOT NULL  REFERENCES tokens(id)
-  token_permissions   token_permissions  NOT NULL
-  balance             bigint             NOT NULL
-  nonce               bigint             NOT NULL
-  receipt_chain_hash  text               NOT NULL
-  delegate            int                          REFERENCES public_keys(id)
-  voting_for          text    NOT NULL
-  timing              int                          REFERENCES timing_info(id)
-  permissions         int     NOT NULL             REFERENCES zkapp_permissions(id)
-  zkapp               int                          REFERENCES zkapp_accounts(id)
-  zkapp_uri           text    NOT NULL
+  id                      serial  PRIMARY KEY
+  block_id                int     NOT NULL  REFERENCES blocks(id)
+  public_key              int     NOT NULL  REFERENCES public_keys(id)
+  token_owner_account_id  int               REFERENCES accounts_accessed(id)
+  token_id                text    NOT NULL
+  token_symbol            text    NOT NULL
+  balance                 bigint  NOT NULL
+  nonce                   bigint  NOT NULL
+  receipt_chain_hash      text    NOT NULL
+  delegate                int               REFERENCES public_keys(id)
+  voting_for              text    NOT NULL
+  timing                  int               REFERENCES timing_info(id)
+  permissions             int     NOT NULL  REFERENCES zkapp_permissions(id)
+  zkapp                   int               REFERENCES zkapp_accounts(id)
 ```
+
+Invariant: `token_owner_account` is `NULL` iff `token_id` and `token_symbol` are not `NULL`.
+That is, the token owner account has values for the token id and symbol, while non-owner accounts
+refer to the token owner account.
 
 The new table `zkapp_sequence_states` has the same definition as the existing `zkapp_states`;
 it represents a vector of field elements.  We probably don't want to commingle sequence states
 with app states in a single table, because they contain differing numbers of elements.
-
-The new type `token_permissions` is:
-
-  `CREATE TYPE token_permission AS ENUM ('token_owned_new_accounts_disabled', 'token_owned_new_accounts_enabled',
-                                         'token_not_owned_account_disabled', 'token_not_owned_account_enabled')`
-
-(Alternatively, we could create a new table with four entries corresponding to these possibilities,
-and refer to it with a foreign key.)
-
-The new table `tokens` is:
-```
-  id                  serial  PRIMARY KEY
-  token_id            text    NOT NULL
-  token_symbol        text    NOT NULL
-```
 
 Table `public_keys`, add column:
 
