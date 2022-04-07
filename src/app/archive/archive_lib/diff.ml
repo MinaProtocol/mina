@@ -12,7 +12,7 @@ module Transition_frontier = struct
       type t =
         | Breadcrumb_added of
             { block:
-                ( External_transition.Stable.V1.t
+                ( External_transition.Raw.Stable.V1.t
                 , State_hash.Stable.V1.t )
                 With_hash.Stable.V1.t
             ; sender_receipt_chains_from_parent_ledger:
@@ -81,7 +81,7 @@ module Builder = struct
                (sender, receipt_chain_hash)) )
     in
     Transition_frontier.Breadcrumb_added
-      {block; sender_receipt_chains_from_parent_ledger}
+      {block = With_hash.map ~f:External_transition.compose block; sender_receipt_chains_from_parent_ledger}
 
   let user_commands user_commands =
     Transaction_pool {Transaction_pool.added= user_commands; removed= []}

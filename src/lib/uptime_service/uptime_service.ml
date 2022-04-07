@@ -184,7 +184,7 @@ let block_base64_of_breadcrumb breadcrumb =
   let external_transition = external_transition_of_breadcrumb breadcrumb in
   let block_string =
     Binable.to_string
-      (module External_transition.Stable.Latest)
+      (module External_transition.Raw.Stable.Latest)
       external_transition
   in
   (* raises only on errors from invalid optional arguments *)

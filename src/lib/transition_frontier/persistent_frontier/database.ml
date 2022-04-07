@@ -45,7 +45,7 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> External_transition.Stable.V1.t t
+    | Transition : State_hash.Stable.V1.t -> External_transition.Raw.Stable.V1.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     | Root : Root_data.Minimal.Stable.V1.t t
     | Best_tip : State_hash.Stable.V1.t t
@@ -70,7 +70,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.Latest.t]
+        [%bin_type_class: External_transition.Raw.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -274,9 +274,10 @@ let check t ~genesis_state_hash =
       in
       let%bind () = check_version () in
       let%bind root_hash, root_transition = check_base () in
+      let root_block = External_transition.decompose root_transition in
       let%bind () =
         let persisted_genesis_state_hash =
-          External_transition.protocol_state root_transition
+          External_transition.protocol_state root_block
           |> Mina_state.Protocol_state.genesis_state_hash
         in
         if State_hash.equal persisted_genesis_state_hash genesis_state_hash
@@ -284,7 +285,7 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      External_transition.blockchain_state root_transition
+      External_transition.blockchain_state root_block
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
@@ -309,8 +310,8 @@ let initialize t ~root_data =
 
 let add t ~transition:(transition, _validation) =
   let hash = State_hash.With_state_hashes.state_hash transition in
-  let raw_transition = With_hash.data transition in
-  let parent_hash = External_transition.parent_hash raw_transition in
+  let raw_transition = External_transition.compose (With_hash.data transition) in
+  let parent_hash = External_transition.parent_hash (With_hash.data transition) in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
@@ -356,7 +357,7 @@ let get_transition t hash =
   in
   (* this transition was read from the database, so it must have been validated already *)
   let (`I_swear_this_is_safe_see_my_comment validated_transition) =
-    External_transition.Validated.create_unsafe transition
+    External_transition.(Validated.create_unsafe @@ decompose transition)
   in
   validated_transition
 
