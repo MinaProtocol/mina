@@ -208,7 +208,7 @@ module Json_layout = struct
         type t =
           { state : Field.t list
           ; verification_key : Verification_key.t option
-          ; snapp_version : Zkapp_version.t
+          ; zkapp_version : Zkapp_version.t
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
@@ -218,7 +218,7 @@ module Json_layout = struct
         let fields =
           [| "state"
            ; "verification_key"
-           ; "snapp_version"
+           ; "zkapp_version"
            ; "sequence_state"
            ; "last_sequence_slot"
            ; "proved_state"
@@ -239,7 +239,7 @@ module Json_layout = struct
               [@default Mina_numbers.Account_nonce.zero]
         ; receipt_chain_hash : string option [@default None]
         ; voting_for : string option [@default None]
-        ; snapp : Zkapp_account.t option [@default None]
+        ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
         ; zkapp_uri : string option [@default None]
@@ -257,7 +257,7 @@ module Json_layout = struct
          ; "nonce"
          ; "receipt_chain_hash"
          ; "voting_for"
-         ; "snapp"
+         ; "zkapp"
          ; "permissions"
          ; "token_symbol"
          ; "zkapp_uri"
@@ -276,7 +276,7 @@ module Json_layout = struct
         ; nonce = Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash = None
         ; voting_for = None
-        ; snapp = None
+        ; zkapp = None
         ; permissions = None
         ; token_symbol = None
         ; zkapp_uri = None
@@ -498,7 +498,7 @@ module Accounts = struct
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
       ; voting_for : string option
-      ; snapp : Zkapp_account.t option
+      ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
       ; zkapp_uri : string option
@@ -529,7 +529,7 @@ module Accounts = struct
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
     ; voting_for : string option
-    ; snapp : Single.Zkapp_account.t option
+    ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
     ; zkapp_uri : string option
