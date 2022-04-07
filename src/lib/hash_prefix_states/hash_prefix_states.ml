@@ -102,7 +102,7 @@ let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
 
 let party = salt party
 
-let party_predicate = salt party_predicate
+let party_account_precondition = salt party_account_precondition
 
 let party_cons = salt party_cons
 

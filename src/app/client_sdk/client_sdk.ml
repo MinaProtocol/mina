@@ -68,7 +68,7 @@ let _ =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
                (Parties.Digest.Party.create
-                  (Party.Predicated.of_fee_payer fee_payer.data))
+                  (Party.Preconditioned.of_fee_payer fee_payer.data))
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn

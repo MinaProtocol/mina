@@ -76,12 +76,12 @@ module Call_forest = struct
       module Checked : sig
         include Digest_intf.S_checked
 
-        val create : Party.Predicated.Checked.t -> t
+        val create : Party.Preconditioned.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Party.Predicated.t -> t
+      val create : Party.Preconditioned.t -> t
     end
 
     module rec Forest : sig
@@ -140,10 +140,10 @@ module Call_forest = struct
       module Checked = struct
         include Checked
 
-        let create = Party.Predicated.Checked.digest
+        let create = Party.Preconditioned.Checked.digest
       end
 
-      let create : Party.Predicated.t -> t = Party.Predicated.digest
+      let create : Party.Preconditioned.t -> t = Party.Preconditioned.digest
     end
 
     module Forest = struct
@@ -391,8 +391,8 @@ module Call_forest = struct
     in
     go { caller = null_id; self = null_id } ps
 
-  let add_callers' (type h1 h2) (ps : (Party.Predicated.Wire.t, h1, h2) t) :
-      (Party.Predicated.t, h1, h2) t =
+  let add_callers' (type h1 h2) (ps : (Party.Preconditioned.Wire.t, h1, h2) t) :
+      (Party.Preconditioned.t, h1, h2) t =
     add_callers ps
       ~call_type:(fun p -> p.caller)
       ~add_caller:(fun p (caller : Token_id.t) -> { p with caller })
@@ -499,7 +499,7 @@ module Wire = struct
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             ( Party.Body.Stable.V1.t
-            , Party.Predicate.Stable.V1.t
+            , Party.Account_precondition.Stable.V1.t
             , Party.Call_type.Stable.V1.t
             , Control.Stable.V2.t )
             Party.Poly.Stable.V1.t
@@ -606,7 +606,8 @@ let parties (t : t) : _ Call_forest.t =
     { authorization = Control.Signature p.authorization
     ; data =
         { body
-        ; predicate = Party.Predicate.Nonce p.data.predicate
+        ; account_precondition =
+            Party.Account_precondition.Nonce p.data.account_precondition
         ; caller = Token_id.default
         }
     }
@@ -617,7 +618,8 @@ let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.balance_change
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
+let nonce (t : t) : Account.Nonce.t =
+  (fee_payer_party t).data.account_precondition
 
 let fee_token (_t : t) = Token_id.default
 
@@ -788,12 +790,12 @@ let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~other_parties_hash:(other_parties_hash t)
     ~protocol_state_predicate_hash:
       (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.data.body.protocol_state)
+         t.fee_payer.data.body.protocol_state_precondition)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
-let of_predicated_list (ps : Party.Predicated.Wire.t list) =
+let of_predicated_list (ps : Party.Preconditioned.Wire.t list) =
   Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.Predicated.Wire.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Preconditioned.Wire.t) -> p.body.call_depth)
     ps
   |> Call_forest.add_callers' |> Call_forest.accumulate_hashes_predicated
 
@@ -875,14 +877,16 @@ let dummy =
   let party : Party.t =
     { data =
         { body = Party.Body.dummy
-        ; predicate = Party.Predicate.Accept
+        ; account_precondition = Party.Account_precondition.Accept
         ; caller = Token_id.default
         }
     ; authorization = Control.dummy_of_tag Signature
     }
   in
   let fee_payer : Party.Fee_payer.t =
-    { data = Party.Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+    { data = Party.Preconditioned.Fee_payer.dummy
+    ; authorization = Signature.dummy
+    }
   in
   { fee_payer
   ; other_parties = Call_forest.cons party []

@@ -141,7 +141,7 @@ module type Events_intf = sig
   val push_events : field -> t -> field
 end
 
-module type Protocol_state_predicate_intf = sig
+module type Protocol_state_precondition_intf = sig
   type t
 end
 
@@ -250,7 +250,7 @@ module type Party_intf = sig
 
   type transaction_commitment
 
-  type protocol_state_predicate
+  type protocol_state_precondition
 
   type public_key
 
@@ -262,7 +262,7 @@ module type Party_intf = sig
 
   val balance_change : t -> signed_amount
 
-  val protocol_state : t -> protocol_state_predicate
+  val protocol_state_precondition : t -> protocol_state_precondition
 
   val public_key : t -> public_key
 
@@ -548,7 +548,7 @@ end
 
 module Eff = struct
   type (_, _) t =
-    | Check_predicate :
+    | Check_account_precondition :
         'bool * 'party * 'account * 'global_state
         -> ( 'bool
            , < bool : 'bool
@@ -557,12 +557,12 @@ module Eff = struct
              ; global_state : 'global_state
              ; .. > )
            t
-    | Check_protocol_state_predicate :
+    | Check_protocol_state_precondition :
         'protocol_state_pred * 'global_state
         -> ( 'bool
            , < bool : 'bool
              ; global_state : 'global_state
-             ; protocol_state_predicate : 'protocol_state_pred
+             ; protocol_state_precondition : 'protocol_state_pred
              ; .. > )
            t
     | Check_auth :
@@ -606,7 +606,7 @@ module type Inputs_intf = sig
 
   module Set_or_keep : Set_or_keep_intf with type bool := Bool.t
 
-  module Protocol_state_predicate : Protocol_state_predicate_intf
+  module Protocol_state_precondition : Protocol_state_precondition_intf
 
   module Controller : Controller_intf with type bool := Bool.t
 
@@ -649,7 +649,7 @@ module type Inputs_intf = sig
   module Party :
     Party_intf
       with type signed_amount := Amount.Signed.t
-       and type protocol_state_predicate := Protocol_state_predicate.t
+       and type protocol_state_precondition := Protocol_state_precondition.t
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
@@ -994,17 +994,17 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let predicate_satisfied =
-      h.perform (Check_predicate (is_start', party, a, global_state))
+    let account_precondition_satisfied =
+      h.perform (Check_account_precondition (is_start', party, a, global_state))
     in
     let local_state =
       Local_state.add_check local_state Account_precondition_unsatisfied
-        predicate_satisfied
+        account_precondition_satisfied
     in
     let protocol_state_predicate_satisfied =
       h.perform
-        (Check_protocol_state_predicate
-           (Party.protocol_state party, global_state))
+        (Check_protocol_state_precondition
+           (Party.protocol_state_precondition party, global_state))
     in
     let local_state =
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied

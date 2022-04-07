@@ -2101,7 +2101,7 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = bool b##.incrementNonce
     ; use_full_commitment = bool b##.useFullCommitment
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
     }
 
   let fee_payer_body (b : party_body) : Party.Body.Fee_payer.t =
@@ -2123,17 +2123,18 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = ()
     ; use_full_commitment = ()
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
     }
 
-  let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
+  let fee_payer_party (party : fee_payer_party) :
+      Party.Preconditioned.Fee_payer.t =
     { body = fee_payer_body party##.body
-    ; predicate =
+    ; account_precondition =
         uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
     ; caller = ()
     }
 
-  let predicate (t : Party_predicate.t) : Party.Predicate.t =
+  let predicate (t : Party_predicate.t) : Party.Account_precondition.t =
     match Js.to_string t##.type_ with
     | "accept" ->
         Accept
@@ -2170,9 +2171,9 @@ module Ledger = struct
   let token_id (str : Js.js_string Js.t) : Token_id.t =
     Token_id.of_string (Js.to_string str)
 
-  let party (party : party) : Party.Predicated.t =
+  let party (party : party) : Party.Preconditioned.t =
     { body = body party##.body
-    ; predicate = predicate party##.predicate
+    ; account_precondition = account_precondition party##.account_precondition
     ; caller = (* TODO *) Token_id.default
     }
 
@@ -2398,20 +2399,24 @@ module Ledger = struct
       ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
       ; increment_nonce = bool b##.incrementNonce
       ; use_full_commitment = bool b##.useFullCommitment
-      ; protocol_state = protocol_state b##.protocolState
+      ; protocol_state_precondition = protocol_state b##.protocolState
       }
 
     let fee_payer_party (party : fee_payer_party) :
-        Party.Predicated.Fee_payer.Checked.t =
+        Party.Preconditioned.Fee_payer.Checked.t =
       { (* TODO: is it OK that body is the same for fee_payer as for party?
            what about fee vs. delta and other differences in the unchecked version?
         *)
         body = body party##.body
+<<<<<<< HEAD
       ; predicate = nonce party##.predicate
       ; caller = Token_id.Checked.constant Token_id.default
+=======
+      ; account_precondition = nonce party##.predicate
+>>>>>>> upstream/develop
       }
 
-    let predicate_accept () : Party.Predicate.Checked.t =
+    let predicate_accept () : Party.Account_precondition.Checked.t =
       let pk_dummy = public_key_dummy () in
       { balance = numeric balance max_interval_uint64
       ; nonce = numeric nonce max_interval_uint32
@@ -2426,7 +2431,8 @@ module Ledger = struct
       ; proved_state = ignore Boolean.false_
       }
 
-    let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
+    let predicate (t : Party_predicate.t) : Party.Account_precondition.Checked.t
+        =
       match Js.to_string t##.type_ with
       | "accept" ->
           predicate_accept ()
@@ -2455,21 +2461,27 @@ module Ledger = struct
       | s ->
           failwithf "bad predicate type: %s" s ()
 
+<<<<<<< HEAD
     let party (party : party) : Party.Predicated.Checked.t =
       { body = body party##.body
       ; predicate = predicate party##.predicate
       ; caller = (* TODO *)
                  Token_id.Checked.constant Token_id.default
+=======
+    let party (party : party) : Party.Preconditioned.Checked.t =
+      { body = body party##.body
+      ; account_precondition = predicate party##.predicate
+>>>>>>> upstream/develop
       }
   end
 
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
-    p |> party |> Party.Predicated.digest |> Field.constant |> to_js_field
+    p |> party |> Party.Preconditioned.digest |> Field.constant |> to_js_field
 
   let hash_party_checked p =
-    p |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
+    p |> Checked.party |> Party.Preconditioned.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
     p |> protocol_state |> Zkapp_precondition.Protocol_state.digest

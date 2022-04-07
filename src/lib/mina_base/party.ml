@@ -504,7 +504,7 @@ module Body = struct
       ; sequence_events : Events.t
       ; call_data : Call_data.t
       ; call_depth : Int.t
-      ; protocol_state : Protocol_state.t
+      ; protocol_state_precondition : Protocol_state.t
       ; use_full_commitment : Bool.t
       }
   end
@@ -577,7 +577,8 @@ module Body = struct
         ; sequence_events : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; call_depth : int
-        ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
+        ; protocol_state_precondition :
+            Zkapp_precondition.Protocol_state.Stable.V1.t
         ; use_full_commitment : bool
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -617,7 +618,8 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; protocol_state : Zkapp_precondition.Protocol_state.Stable.V1.t
+          ; protocol_state_precondition :
+              Zkapp_precondition.Protocol_state.Stable.V1.t
           ; use_full_commitment : unit [@skip]
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -636,7 +638,7 @@ module Body = struct
       ; sequence_events = []
       ; call_data = Field.zero
       ; call_depth = 0
-      ; protocol_state = Zkapp_precondition.Protocol_state.accept
+      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
       ; use_full_commitment = ()
       }
 
@@ -653,7 +655,7 @@ module Body = struct
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
         ~call_data:!.field ~call_depth:!.int
-        ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
+        ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~use_full_commitment:unit
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
@@ -677,7 +679,7 @@ module Body = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
     ; use_full_commitment = true
     }
 
@@ -712,7 +714,8 @@ module Body = struct
       ; sequence_events : Events.var
       ; call_data : Field.Var.t
       ; call_depth : int As_prover.Ref.t
-      ; protocol_state : Zkapp_precondition.Protocol_state.Checked.t
+      ; protocol_state_precondition :
+          Zkapp_precondition.Protocol_state.Checked.t
       ; use_full_commitment : Boolean.var
       }
     [@@deriving annot, hlist, fields]
@@ -727,7 +730,7 @@ module Body = struct
          ; sequence_events
          ; call_data
          ; call_depth = _depth (* ignored *)
-         ; protocol_state
+         ; protocol_state_precondition
          ; use_full_commitment
          } :
           t) =
@@ -742,7 +745,8 @@ module Body = struct
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.Chunked.field call_data
-        ; Zkapp_precondition.Protocol_state.Checked.to_input protocol_state
+        ; Zkapp_precondition.Protocol_state.Checked.to_input
+            protocol_state_precondition
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
         ]
@@ -779,7 +783,7 @@ module Body = struct
     ; sequence_events = []
     ; call_data = Field.zero
     ; call_depth = 0
-    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+    ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
     ; use_full_commitment = false
     }
 
@@ -823,7 +827,7 @@ module Body = struct
       ~events:!.(list @@ array field @@ o ())
       ~sequence_events:!.(list @@ array field @@ o ())
       ~call_data:!.field ~call_depth:!.int
-      ~protocol_state:!.Zkapp_precondition.Protocol_state.deriver
+      ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~use_full_commitment:!.bool
     |> finish "PartyBody" ~t_toplevel_annots
 
@@ -843,7 +847,7 @@ module Body = struct
        ; sequence_events
        ; call_data
        ; call_depth = _ (* ignored *)
-       ; protocol_state
+       ; protocol_state_precondition
        ; use_full_commitment
        } :
         t) =
@@ -856,7 +860,7 @@ module Body = struct
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.Chunked.field call_data
-      ; Zkapp_precondition.Protocol_state.to_input protocol_state
+      ; Zkapp_precondition.Protocol_state.to_input protocol_state_precondition
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ]
 
@@ -872,7 +876,7 @@ module Body = struct
   end
 end
 
-module Predicate = struct
+module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -928,20 +932,22 @@ module Predicate = struct
       Zkapp_precondition.Account.deriver obj
 
   let%test_unit "json roundtrip accept" =
-    let predicate : t = Accept in
+    let account_precondition : t = Accept in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip nonce" =
-    let predicate : t = Nonce (Account_nonce.of_int 928472) in
+    let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip full" =
     let n = Account_nonce.of_int 4513 in
-    let predicate : t =
+    let account_precondition : t =
       Full
         { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
@@ -950,14 +956,15 @@ module Predicate = struct
     in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
-    [%test_eq: t] predicate (predicate |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "to_json" =
-    let predicate : t = Nonce (Account_nonce.of_int 34928) in
+    let account_precondition : t = Nonce (Account_nonce.of_int 34928) in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: string]
-      (predicate |> Fd.to_json full |> Yojson.Safe.to_string)
+      (account_precondition |> Fd.to_json full |> Yojson.Safe.to_string)
       ( {json|{
           balance: null,
           nonce: {lower: "34928", upper: "34928"},
@@ -970,7 +977,7 @@ module Predicate = struct
   let digest (t : t) =
     let digest x =
       Random_oracle.(
-        hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+        hash ~init:Hash_prefix_states.party_account_precondition (pack_input x))
     in
     to_full t |> Zkapp_precondition.Account.to_input |> digest
 
@@ -980,7 +987,8 @@ module Predicate = struct
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
-          hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+          hash ~init:Hash_prefix_states.party_account_precondition
+            (pack_input x))
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
   end
@@ -990,13 +998,16 @@ module Predicate = struct
       ~back:(fun s -> Full s)
 end
 
-module Predicated = struct
+module Preconditioned = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('body, 'predicate, 'caller) t =
-          { body : 'body; predicate : 'predicate; caller : 'caller }
+        type ('body, 'account_precondition, 'caller) t =
+          { body : 'body
+          ; account_precondition : 'account_precondition
+          ; caller : 'caller
+          }
         [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
@@ -1008,7 +1019,7 @@ module Predicated = struct
       module V1 = struct
         type t =
           ( Body.Stable.V1.t
-          , Predicate.Stable.V1.t
+          , Account_precondition.Stable.V1.t
           , Call_type.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -1023,7 +1034,7 @@ module Predicated = struct
     module V1 = struct
       type t =
         ( Body.Stable.V1.t
-        , Predicate.Stable.V1.t
+        , Account_precondition.Stable.V1.t
         , Token_id.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1036,13 +1047,16 @@ module Predicated = struct
     let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
     Poly.Fields.make_creator obj ~body:!.Body.deriver
-      ~predicate:!.Predicate.deriver ~caller:!.token_id_deriver
-    |> finish "SnappPartyPredicated" ~t_toplevel_annots:Poly.t_toplevel_annots
+      ~account_precondition:!.Account_precondition.deriver
+      ~caller:!.token_id_deriver
+    |> finish "ZkappPartyPreconditioned"
+         ~t_toplevel_annots:Poly.t_toplevel_annots
 
-  let to_input ({ body; predicate; caller } : t) =
+  let to_input ({ body; account_precondition; caller } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Body.to_input body
-      ; Random_oracle_input.Chunked.field (Predicate.digest predicate)
+      ; Random_oracle_input.Chunked.field
+          (Account_precondition.digest account_precondition)
       ; Token_id.to_input caller
       ]
 
@@ -1052,17 +1066,22 @@ module Predicated = struct
   let typ () : (_, t) Typ.t =
     let open Poly in
     Typ.of_hlistable
-      [ Body.typ (); Predicate.typ (); Token_id.typ ]
+      [ Body.typ (); Account_precondition.typ (); Token_id.typ ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   module Checked = struct
-    type t = (Body.Checked.t, Predicate.Checked.t, Token_id.Checked.t) Poly.t
+    type t =
+      ( Body.Checked.t
+      , Account_precondition.Checked.t
+      , Token_id.Checked.t )
+      Poly.t
 
-    let to_input ({ body; predicate; caller } : t) =
+    let to_input ({ body; account_precondition; caller } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Body.Checked.to_input body
-        ; Random_oracle_input.Chunked.field (Predicate.Checked.digest predicate)
+        ; Random_oracle_input.Chunked.field
+            (Account_precondition.Checked.digest account_precondition)
         ; Token_id.Checked.to_input caller
         ]
 
@@ -1125,7 +1144,7 @@ module Predicated = struct
 
     let dummy : t =
       { body = Body.dummy
-      ; predicate = Account_nonce.zero
+      ; account_precondition = Account_nonce.zero
       ; caller = Token_id.default
       }
   end
@@ -1152,13 +1171,13 @@ module Predicated = struct
 
     let dummy : t =
       { body = Body.Fee_payer.dummy
-      ; predicate = Account_nonce.zero
+      ; account_precondition = Account_nonce.zero
       ; caller = ()
       }
 
     let to_signed (t : t) : Signed.t =
       { body = Body.of_fee_payer t.body
-      ; predicate = t.predicate
+      ; account_precondition = t.account_precondition
       ; caller = Token_id.default
       }
 
@@ -1169,8 +1188,8 @@ module Predicated = struct
       in
       let unit = ( !. ) ~skip_data:() skip in
       Poly.Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
-        ~predicate:!.uint32 ~caller:unit
-      |> finish "ZkappPartyPredicatedFeePayer"
+        ~account_precondition:!.uint32 ~caller:unit
+      |> finish "ZkappPartyPreconditionedFeePayer"
            ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
@@ -1186,15 +1205,19 @@ module Predicated = struct
     end]
 
     let dummy : t =
-      { body = Body.dummy; predicate = (); caller = Token_id.default }
+      { body = Body.dummy
+      ; account_precondition = ()
+      ; caller = Token_id.default
+      }
   end
 
-  let of_signed ({ body; predicate; caller } : Signed.t) : t =
-    { body; predicate = Nonce predicate; caller }
+  let of_signed ({ body; account_precondition; caller } : Signed.t) : t =
+    { body; account_precondition = Nonce account_precondition; caller }
 
-  let of_fee_payer ({ body; predicate; caller = () } : Fee_payer.t) : t =
+  let of_fee_payer ({ body; account_precondition; caller = () } : Fee_payer.t) :
+      t =
     { body = Body.of_fee_payer body
-    ; predicate = Nonce predicate
+    ; account_precondition = Nonce account_precondition
     ; caller = Token_id.default
     }
 end
@@ -1203,8 +1226,12 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('body, 'predicate, 'caller, 'auth) t =
-        { data : ('body, 'predicate, 'caller) Predicated.Poly.Stable.V1.t
+      type ('body, 'account_precondition, 'caller, 'auth) t =
+        { data :
+            ( 'body
+            , 'account_precondition
+            , 'caller )
+            Preconditioned.Poly.Stable.V1.t
         ; authorization : 'auth
         }
       [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
@@ -1267,7 +1294,7 @@ module Fee_payer = struct
 
   let to_signed (t : t) : Signed.t =
     { authorization = t.authorization
-    ; data = Predicated.Fee_payer.to_signed t.data
+    ; data = Preconditioned.Fee_payer.to_signed t.data
     }
 
   let deriver obj =
@@ -1275,13 +1302,13 @@ module Fee_payer = struct
     let open Poly in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~data:!.Predicated.Fee_payer.deriver
+      ~data:!.Preconditioned.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
     |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
-      { data = Predicated.Fee_payer.dummy; authorization = Signature.dummy }
+      { data = Preconditioned.Fee_payer.dummy; authorization = Signature.dummy }
     in
     let open Fields_derivers_zkapps.Derivers in
     let full = o () in
@@ -1302,7 +1329,7 @@ module Empty = struct
   end]
 end
 
-type 'caller t_ = (Body.t, Predicate.t, 'caller, Control.t) Poly.t
+type 'caller t_ = (Body.t, Account_precondition.t, 'caller, Control.t) Poly.t
 
 module Wire = struct
   [%%versioned
@@ -1310,7 +1337,7 @@ module Wire = struct
     module V1 = struct
       type t =
         ( Body.Stable.V1.t
-        , Predicate.Stable.V1.t
+        , Account_precondition.Stable.V1.t
         , Call_type.Stable.V1.t
         , Control.Stable.V2.t )
         Poly.Stable.V1.t
@@ -1324,7 +1351,7 @@ module Wire = struct
     { authorization = Signature authorization
     ; data =
         { body = Body.of_fee_payer data.body
-        ; predicate = Nonce data.predicate
+        ; account_precondition = Nonce data.account_precondition
         ; caller = Call
         }
     }
@@ -1336,7 +1363,7 @@ module Stable = struct
     (** A party to a zkApp transaction *)
     type t =
       ( Body.Stable.V1.t
-      , Predicate.Stable.V1.t
+      , Account_precondition.Stable.V1.t
       , Token_id.Stable.V1.t
       , Control.Stable.V2.t )
       Poly.Stable.V1.t
@@ -1352,11 +1379,13 @@ let account_id (t : _ t_) : Account_id.t =
 let caller (t : _ t_) : Account_id.t = t.data.caller
 
 let of_signed ({ data; authorization } : Signed.t) : t =
-  { authorization = Signature authorization; data = Predicated.of_signed data }
+  { authorization = Signature authorization
+  ; data = Preconditioned.of_signed data
+  }
 
 let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization
-  ; data = Predicated.of_fee_payer data
+  ; data = Preconditioned.of_fee_payer data
   }
 
 (** The change in balance to apply to the target account of this party.
@@ -1367,8 +1396,9 @@ let of_fee_payer ({ data; authorization } : Fee_payer.t) : t =
 *)
 let balance_change (t : _ t_) : Amount.Signed.t = t.data.body.balance_change
 
-let protocol_state (t : _ t_) : Zkapp_precondition.Protocol_state.t =
-  t.data.body.protocol_state
+let protocol_state_precondition (t : _ t_) : Zkapp_precondition.Protocol_state.t
+    =
+  t.data.body.protocol_state_precondition
 
 let public_key (t : _ t_) : Public_key.Compressed.t = t.data.body.public_key
 
@@ -1382,7 +1412,7 @@ let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let open Poly in
   let ( !. ) = ( !. ) ~t_fields_annots in
-  Fields.make_creator obj ~data:!.Predicated.deriver
+  Fields.make_creator obj ~data:!.Preconditioned.deriver
     ~authorization:!.Control.deriver
   |> finish "ZkappParty" ~t_toplevel_annots
 
@@ -1390,7 +1420,7 @@ let%test_unit "json roundtrip dummy" =
   let dummy : t =
     { data =
         { body = Body.dummy
-        ; predicate = Predicate.Accept
+        ; account_precondition = Account_precondition.Accept
         ; caller = Token_id.default
         }
     ; authorization = Control.dummy_of_tag Signature
