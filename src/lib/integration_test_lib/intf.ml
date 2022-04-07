@@ -196,7 +196,7 @@ module Engine = struct
 
     val keypairs : t -> Signature_lib.Keypair.t list
 
-    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
+    val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig

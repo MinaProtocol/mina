@@ -335,7 +335,7 @@ let main inputs =
           Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
         [%log trace] "initializing network abstraction" ;
-        let%bind () = Engine.Network.initialize ~logger network in
+        let%bind () = Engine.Network.initialize_infra ~logger network in
 
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =

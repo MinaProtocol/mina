@@ -826,7 +826,7 @@ let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
 let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
-let initialize ~logger network =
+let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 60 (* 15 mins *) in
@@ -915,5 +915,5 @@ let initialize ~logger network =
         "Since not all pods were assigned nodes, daemons will not be started" ;
       res
   | Ok _ ->
-      [%log info] "Pods assigned node" ;
+      [%log info] "Pods assigned to nodes" ;
       res
