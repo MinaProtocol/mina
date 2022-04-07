@@ -37,14 +37,6 @@ module User_command = struct
           [@of_yojson Transaction_hash.of_yojson]
     ; status : string
     ; failure_reason : Transaction_status.Failure.Stable.Latest.t option
-    ; source_balance : Currency.Balance.Stable.Latest.t option
-    ; fee_payer_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; fee_payer_balance : Currency.Balance.Stable.Latest.t
-    ; receiver_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; receiver_balance : Currency.Balance.Stable.Latest.t option
-    ; created_token : Token_id.Stable.Latest.t option
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end

@@ -137,17 +137,6 @@ let fill_in_user_commands pool block_state_hash =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
     Public_key.Compressed.of_base58_check_exn pk_str
   in
-  let balance_of_id id ~item =
-    let%map { balance; _ } =
-      query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
-    in
-    balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  in
-  let balance_of_id_opt id_opt ~item =
-    Option.value_map id_opt ~default:(Deferred.return None) ~f:(fun id ->
-        let%map balance = balance_of_id id ~item in
-        Some balance)
-  in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~item:"blocks" ~f:(fun db ->
@@ -199,28 +188,6 @@ let fill_in_user_commands pool block_state_hash =
                 failwithf "Not a transaction status failure: %s, error: %s" s
                   err ())
       in
-      let%bind source_balance =
-        balance_of_id_opt block_user_cmd.source_balance_id
-          ~item:"source balance"
-      in
-      let fee_payer_account_creation_fee_paid =
-        Option.map block_user_cmd.fee_payer_account_creation_fee_paid
-          ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
-      in
-      let%bind fee_payer_balance =
-        balance_of_id block_user_cmd.fee_payer_balance_id
-          ~item:"fee payer balance"
-      in
-      let receiver_account_creation_fee_paid =
-        Option.map block_user_cmd.receiver_account_creation_fee_paid
-          ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
-      in
-      let%bind receiver_balance =
-        balance_of_id_opt block_user_cmd.receiver_balance_id
-          ~item:"receiver balance"
-      in
       return
         { Extensional.User_command.sequence_no
         ; typ
@@ -237,12 +204,6 @@ let fill_in_user_commands pool block_state_hash =
         ; hash
         ; status
         ; failure_reason
-        ; source_balance
-        ; fee_payer_account_creation_fee_paid
-        ; fee_payer_balance
-        ; receiver_account_creation_fee_paid
-        ; receiver_balance
-        ; created_token = None (* TODO: remove dummy *)
         })
 
 let fill_in_internal_commands pool block_state_hash =
