@@ -977,33 +977,30 @@ module Base = struct
           acc')
 
     let apply_body ~is_start
-        ({ body =
-             { public_key
-             ; token_id = _
-             ; update =
-                 { app_state = _
-                 ; delegate = _
-                 ; verification_key = _
-                 ; permissions = _
-                 ; zkapp_uri = _
-                 ; token_symbol = _
-                 ; timing = _
-                 ; voting_for = _
-                 }
-             ; balance_change = _
-             ; increment_nonce
-             ; events = _ (* This is for the snapp to use, we don't need it. *)
-             ; call_data =
-                 _ (* This is for the snapp to use, we don't need it. *)
-             ; sequence_events = _
-             ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-             ; protocol_state_precondition = _
-             ; use_full_commitment
+        ({ public_key
+         ; token_id = _
+         ; update =
+             { app_state = _
+             ; delegate = _
+             ; verification_key = _
+             ; permissions = _
+             ; zkapp_uri = _
+             ; token_symbol = _
+             ; timing = _
+             ; voting_for = _
              }
+         ; balance_change = _
+         ; increment_nonce
+         ; events = _ (* This is for the snapp to use, we don't need it. *)
+         ; call_data = _ (* This is for the snapp to use, we don't need it. *)
+         ; sequence_events = _
+         ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+         ; protocol_state_precondition = _
          ; account_precondition
+         ; use_full_commitment
          ; caller = _
          } :
-          Party.Preconditioned.Checked.t) (a : Account.Checked.Unhashed.t) :
+          Party.Body.Checked.t) (a : Account.Checked.Unhashed.t) :
         Account.Checked.Unhashed.t * _ =
       let open Impl in
       let r = ref [] in
@@ -1041,9 +1038,7 @@ module Base = struct
 
     type party =
       { party :
-          ( Party.Preconditioned.Checked.t
-          , Parties.Digest.Party.Checked.t )
-          With_hash.t
+          (Party.Body.Checked.t, Parties.Digest.Party.Checked.t) With_hash.t
       ; control : Control.t Prover_value.t
       }
 
@@ -1068,7 +1063,7 @@ module Base = struct
             ~other_parties_hash:other_parties
             ~protocol_state_predicate_hash:
               (Zkapp_precondition.Protocol_state.Checked.digest
-                 party.data.body.protocol_state_precondition)
+                 party.data.protocol_state_precondition)
             ~memo_hash
 
         let full_commitment ~party:{ party; _ } ~commitment =
@@ -1389,21 +1384,10 @@ module Base = struct
                     V.get r |> List.hd_exn |> With_stack_hash.elt)
               in
               let party = V.create (fun () -> (V.get hd_r).party |> fst) in
-              let caller =
-                exists Mina_base.Token_id.typ ~compute:(fun () ->
-                    (V.get party).data.caller)
-              in
-              let body =
-                exists (Party.Body.typ ()) ~compute:(fun () ->
-                    (V.get party).data.body)
-              in
-              let account_precondition : Party.Account_precondition.Checked.t =
-                exists (Party.Account_precondition.typ ()) ~compute:(fun () ->
-                    (V.get party).data.account_precondition)
-              in
               let auth = V.(create (fun () -> (V.get party).authorization)) in
-              let party : Party.Preconditioned.Checked.t =
-                { body; account_precondition; caller }
+              let party =
+                exists (Party.Body.typ ()) ~compute:(fun () ->
+                    (V.get party).body)
               in
               let party =
                 With_hash.of_data party
@@ -1797,9 +1781,7 @@ module Base = struct
               (read Mina_base.Token_id.typ body.token_id)
 
           let get_account { party; _ } (_root, ledger) =
-            let idx =
-              V.map ledger ~f:(fun l -> idx l (body_id party.data.body))
-            in
+            let idx = V.map ledger ~f:(fun l -> idx l (body_id party.data)) in
             let account =
               exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
                   Sparse_ledger.get_exn (V.get ledger) (V.get idx))
@@ -1867,23 +1849,22 @@ module Base = struct
 
           type transaction_commitment = Transaction_commitment.t
 
-          let balance_change (t : t) = t.party.data.body.balance_change
+          let balance_change (t : t) = t.party.data.balance_change
 
           let protocol_state_precondition (t : t) =
-            t.party.data.body.protocol_state_precondition
+            t.party.data.protocol_state_precondition
 
-          let token_id (t : t) = t.party.data.body.token_id
+          let token_id (t : t) = t.party.data.token_id
 
-          let public_key (t : t) = t.party.data.body.public_key
+          let public_key (t : t) = t.party.data.public_key
 
           let caller (t : t) = t.party.data.caller
 
           let account_id (t : t) = Account_id.create (public_key t) (token_id t)
 
-          let use_full_commitment (t : t) =
-            t.party.data.body.use_full_commitment
+          let use_full_commitment (t : t) = t.party.data.use_full_commitment
 
-          let increment_nonce (t : t) = t.party.data.body.increment_nonce
+          let increment_nonce (t : t) = t.party.data.increment_nonce
 
           let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)
@@ -1926,7 +1907,7 @@ module Base = struct
                      signature_verifies
                        ~shifted:(module S)
                        ~payload_digest:commitment signature
-                       party.data.body.public_key)
+                       party.data.public_key)
             in
             ( `Proof_verifies proof_verifies
             , `Signature_verifies signature_verifies )
@@ -1939,28 +1920,24 @@ module Base = struct
             let timing ({ party; _ } : t) : Account.timing set_or_keep =
               Set_or_keep.Checked.map
                 ~f:Party.Update.Timing_info.Checked.to_account_timing
-                party.data.body.update.timing
+                party.data.update.timing
 
-            let app_state ({ party; _ } : t) = party.data.body.update.app_state
+            let app_state ({ party; _ } : t) = party.data.update.app_state
 
             let verification_key ({ party; _ } : t) =
-              party.data.body.update.verification_key
+              party.data.update.verification_key
 
-            let sequence_events ({ party; _ } : t) =
-              party.data.body.sequence_events
+            let sequence_events ({ party; _ } : t) = party.data.sequence_events
 
-            let zkapp_uri ({ party; _ } : t) = party.data.body.update.zkapp_uri
+            let zkapp_uri ({ party; _ } : t) = party.data.update.zkapp_uri
 
-            let token_symbol ({ party; _ } : t) =
-              party.data.body.update.token_symbol
+            let token_symbol ({ party; _ } : t) = party.data.update.token_symbol
 
-            let delegate ({ party; _ } : t) = party.data.body.update.delegate
+            let delegate ({ party; _ } : t) = party.data.update.delegate
 
-            let voting_for ({ party; _ } : t) =
-              party.data.body.update.voting_for
+            let voting_for ({ party; _ } : t) = party.data.update.voting_for
 
-            let permissions ({ party; _ } : t) =
-              party.data.body.update.permissions
+            let permissions ({ party; _ } : t) = party.data.update.permissions
           end
         end
 
@@ -3518,11 +3495,10 @@ end
 let group_by_parties_rev (partiess : Party.t list list)
     (stmtss : (global_state * local_state) list list) :
     Parties_intermediate_state.t list =
-  let open Party.Poly in
   let use_full_commitment (p : Party.t) =
     match p.authorization with
     | Proof _ ->
-        `Proved_use_full_commitment p.data.body.use_full_commitment
+        `Proved_use_full_commitment p.body.use_full_commitment
     | _ ->
         `Others
   in
@@ -3857,7 +3833,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
               let next_commitment = Parties.commitment parties in
               let fee_payer_hash =
                 Parties.Digest.Party.create
-                  (Party.Preconditioned.of_fee_payer parties.fee_payer.data)
+                  (Party.of_fee_payer parties.fee_payer)
               in
               let next_full_commitment =
                 Parties.Transaction_commitment.with_fee_payer next_commitment
@@ -4078,9 +4054,7 @@ struct
     let%bind tag, snapp_statement = snapp_statement in
     let%map pi = party_proof p in
     let vk =
-      let account_id =
-        Account_id.create p.data.body.public_key p.data.body.token_id
-      in
+      let account_id = Account_id.create p.body.public_key p.body.token_id in
       let account : Account.t =
         Sparse_ledger.(
           get_exn witness.local_state_init.ledger
@@ -4287,21 +4261,19 @@ module For_tests = struct
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
-      { data =
-          { body =
-              { public_key = sender_pk
-              ; update = Party.Update.noop
-              ; token_id = ()
-              ; balance_change = fee
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
-              ; use_full_commitment = ()
-              }
+      { body =
+          { public_key = sender_pk
+          ; update = Party.Update.noop
+          ; token_id = ()
+          ; balance_change = fee
+          ; increment_nonce = ()
+          ; events = []
+          ; sequence_events = []
+          ; call_data = Field.zero
+          ; call_depth = 0
+          ; protocol_state_precondition =
+              Zkapp_precondition.Protocol_state.accept
+          ; use_full_commitment = ()
           ; account_precondition = sender_nonce
           ; caller = ()
           }
@@ -4310,31 +4282,29 @@ module For_tests = struct
       }
     in
     let sender_party : Party.Wire.t option =
-      let sender_party_data : Party.Preconditioned.Wire.t =
-        { body =
-            { public_key = sender_pk
-            ; update = Party.Update.noop
-            ; token_id = Token_id.default
-            ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
-            ; increment_nonce = true
-            ; events = []
-            ; sequence_events = []
-            ; call_data = Field.zero
-            ; call_depth = 0
-            ; protocol_state_precondition =
-                Zkapp_precondition.Protocol_state.accept
-            ; use_full_commitment = false
-            }
+      let sender_party_body : Party.Body.Wire.t =
+        { public_key = sender_pk
+        ; update = Party.Update.noop
+        ; token_id = Token_id.default
+        ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
+        ; increment_nonce = true
+        ; events = []
+        ; sequence_events = []
+        ; call_data = Field.zero
+        ; call_depth = 0
+        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; use_full_commitment = false
         ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
         ; caller = Call
         }
       in
       Option.some_if
         ((not (List.is_empty receivers)) || new_zkapp_account)
-        { Party.Poly.data = sender_party_data
-        ; authorization =
-            Control.Signature Signature.dummy (*To be updated later*)
-        }
+        ( { body = sender_party_body
+          ; authorization =
+              Control.Signature Signature.dummy (*To be updated later*)
+          }
+          : Party.Wire.t )
     in
     let snapp_parties : Party.Wire.t list =
       let num_keypairs = List.length zkapp_account_keypairs in
@@ -4374,21 +4344,19 @@ module For_tests = struct
               else Amount.Signed.(of_unsigned account_creation_fee)
             else Amount.Signed.zero
           in
-          ( { data =
-                { body =
-                    { public_key
-                    ; update
-                    ; token_id = Token_id.default
-                    ; balance_change = delta
-                    ; increment_nonce = false
-                    ; events
-                    ; sequence_events
-                    ; call_data
-                    ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = true
-                    }
+          ( { body =
+                { public_key
+                ; update
+                ; token_id = Token_id.default
+                ; balance_change = delta
+                ; increment_nonce = false
+                ; events
+                ; sequence_events
+                ; call_data
+                ; call_depth = 0
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; use_full_commitment = true
                 ; account_precondition
                 ; caller = Call
                 }
@@ -4399,21 +4367,19 @@ module For_tests = struct
     in
     let other_receivers =
       List.map receivers ~f:(fun (receiver, amt) : Party.Wire.t ->
-          { data =
-              { body =
-                  { public_key = receiver
-                  ; update
-                  ; token_id = Token_id.default
-                  ; balance_change = Amount.Signed.of_unsigned amt
-                  ; increment_nonce = false
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Field.zero
-                  ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
-                  ; use_full_commitment = false
-                  }
+          { body =
+              { public_key = receiver
+              ; update
+              ; token_id = Token_id.default
+              ; balance_change = Amount.Signed.of_unsigned amt
+              ; increment_nonce = false
+              ; events = []
+              ; sequence_events = []
+              ; call_data = Field.zero
+              ; call_depth = 0
+              ; protocol_state_precondition =
+                  Zkapp_precondition.Protocol_state.accept
+              ; use_full_commitment = false
               ; account_precondition = Accept
               ; caller = Call
               }
@@ -4422,14 +4388,16 @@ module For_tests = struct
     in
     let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
-      Option.value_map ~default:[] sender_party ~f:(fun p -> [ p.data ])
-      @ List.map snapp_parties ~f:(fun p -> p.data)
-      @ List.map other_receivers ~f:(fun p -> p.data)
+      Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
+      @ snapp_parties @ other_receivers
     in
     let protocol_state_predicate_hash =
       Zkapp_precondition.Protocol_state.digest protocol_state
     in
-    let ps = Parties.of_predicated_list other_parties_data in
+    let ps =
+      Parties.Call_forest.With_hashes.of_parties_list
+        (List.map ~f:(fun p -> (p, ())) other_parties_data)
+    in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
       Parties.Transaction_commitment.create ~other_parties_hash
@@ -4439,8 +4407,7 @@ module For_tests = struct
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
         ~fee_payer_hash:
-          (Parties.Digest.Party.create
-             (Party.Preconditioned.of_fee_payer fee_payer.data))
+          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
     let fee_payer =
       let fee_payer_signature_auth =
@@ -4452,14 +4419,13 @@ module For_tests = struct
     let sender_party =
       Option.map sender_party ~f:(fun s : Party.Wire.t ->
           let commitment =
-            if s.data.body.use_full_commitment then full_commitment
-            else commitment
+            if s.body.use_full_commitment then full_commitment else commitment
           in
           let sender_signature_auth =
             Signature_lib.Schnorr.Chunked.sign sender.private_key
               (Random_oracle.Input.Chunked.field commitment)
           in
-          { data = s.data; authorization = Signature sender_signature_auth })
+          { body = s.body; authorization = Signature sender_signature_auth })
     in
     ( `Parties
         (Parties.of_wire { fee_payer; other_parties = other_receivers; memo })
@@ -4507,14 +4473,14 @@ module For_tests = struct
     let snapp_parties =
       List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
           let commitment =
-            if snapp_party.data.body.use_full_commitment then full_commitment
+            if snapp_party.body.use_full_commitment then full_commitment
             else commitment
           in
           let signature =
             Signature_lib.Schnorr.Chunked.sign keypair.private_key
               (Random_oracle.Input.Chunked.field commitment)
           in
-          ( { data = snapp_party.data; authorization = Signature signature }
+          ( { body = snapp_party.body; authorization = Signature signature }
             : Party.Wire.t ))
     in
     let other_parties = [ Option.value_exn sender_party ] @ snapp_parties in
@@ -4545,15 +4511,16 @@ module For_tests = struct
           | Permissions.Auth_required.Proof ->
               let proof_party =
                 let ps =
-                  Parties.of_predicated_list
-                    (List.map (List.drop snapp_parties ndx) ~f:(fun p -> p.data))
+                  Parties.Call_forest.With_hashes.of_parties_list
+                    (List.map
+                       ~f:(fun p -> (p, ()))
+                       (List.drop snapp_parties ndx))
                 in
                 Parties.Call_forest.hash ps
               in
               let tx_statement : Zkapp_statement.t =
                 let commitment =
-                  if snapp_party.data.body.use_full_commitment then
-                    full_commitment
+                  if snapp_party.body.use_full_commitment then full_commitment
                   else commitment
                 in
                 { transaction = commitment
@@ -4577,12 +4544,11 @@ module For_tests = struct
               let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
                 prover ~handler [] tx_statement
               in
-              ( { data = snapp_party.data; authorization = Proof pi }
+              ( { body = snapp_party.body; authorization = Proof pi }
                 : Party.Wire.t )
           | Signature ->
               let commitment =
-                if snapp_party.data.body.use_full_commitment then
-                  full_commitment
+                if snapp_party.body.use_full_commitment then full_commitment
                 else commitment
               in
               let signature =
@@ -4590,13 +4556,13 @@ module For_tests = struct
                   (Random_oracle.Input.Chunked.field commitment)
               in
               Async.Deferred.return
-                ( { data = snapp_party.data
+                ( { body = snapp_party.body
                   ; authorization = Signature signature
                   }
                   : Party.Wire.t )
           | None ->
               Async.Deferred.return
-                ( { data = snapp_party.data; authorization = None_given }
+                ( { body = snapp_party.body; authorization = None_given }
                   : Party.Wire.t )
           | _ ->
               failwith
@@ -4622,9 +4588,7 @@ module For_tests = struct
     let other_parties =
       let sender_party = Option.value_exn sender_party in
       Parties.Call_forest.cons
-        { sender_party with
-          data = { sender_party.data with caller = Token_id.default }
-        }
+        (Parties.add_caller sender_party Token_id.default)
         parties.other_parties
     in
     { parties with other_parties }
@@ -4688,20 +4652,18 @@ module For_tests = struct
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
-      { data =
-          { body =
-              { public_key = sender_pk
-              ; update = Party.Update.noop
-              ; token_id = ()
-              ; balance_change = fee
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state_precondition = protocol_state_predicate
-              ; use_full_commitment = ()
-              }
+      { body =
+          { public_key = sender_pk
+          ; update = Party.Update.noop
+          ; token_id = ()
+          ; balance_change = fee
+          ; increment_nonce = ()
+          ; events = []
+          ; sequence_events = []
+          ; call_data = Field.zero
+          ; call_depth = 0
+          ; protocol_state_precondition = protocol_state_predicate
+          ; use_full_commitment = ()
           ; account_precondition = sender_nonce
           ; caller = ()
           }
@@ -4709,7 +4671,7 @@ module For_tests = struct
       ; authorization = Signature.dummy
       }
     in
-    let sender_party_data : Party.Preconditioned.Wire.t =
+    let sender_party_data : Party.Wire.t =
       { body =
           { public_key = sender_pk
           ; update = Party.Update.noop
@@ -4721,13 +4683,14 @@ module For_tests = struct
           ; call_data = Field.zero
           ; call_depth = 0
           ; protocol_state_precondition = protocol_state_predicate
+          ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
           ; use_full_commitment = false
+          ; caller = Call
           }
-      ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
-      ; caller = Call
+      ; authorization = Signature Signature.dummy
       }
     in
-    let snapp_party_data : Party.Preconditioned.Wire.t =
+    let snapp_party_data : Party.Wire.t =
       { body =
           { public_key = trivial_account_pk
           ; update = update_empty_permissions
@@ -4740,14 +4703,16 @@ module For_tests = struct
           ; call_depth = 0
           ; protocol_state_precondition = protocol_state_predicate
           ; use_full_commitment = false
+          ; caller = Call
+          ; account_precondition = Full Zkapp_precondition.Account.accept
           }
-      ; caller = Call
-      ; account_precondition = Full Zkapp_precondition.Account.accept
+      ; authorization = Proof Mina_base.Proof.blockchain_dummy
       }
     in
     let memo = Signed_command_memo.empty in
     let ps =
-      Parties.of_predicated_list [ sender_party_data; snapp_party_data ]
+      Parties.Call_forest.With_hashes.of_parties_list
+        [ (sender_party_data, ()); (snapp_party_data, ()) ]
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let protocol_state_predicate_hash =
@@ -4761,7 +4726,10 @@ module For_tests = struct
         ~memo_hash:(Signed_command_memo.hash memo)
     in
     let proof_party =
-      let ps = Parties.of_predicated_list [ snapp_party_data ] in
+      let ps =
+        Parties.Call_forest.With_hashes.of_parties_list
+          [ (snapp_party_data, ()) ]
+      in
       Parties.Call_forest.hash ps
     in
     let tx_statement : Zkapp_statement.t =
@@ -4777,8 +4745,7 @@ module For_tests = struct
       let txn_comm =
         Parties.Transaction_commitment.with_fee_payer transaction
           ~fee_payer_hash:
-            (Parties.Digest.Party.create
-               (Party.Preconditioned.of_fee_payer fee_payer.data))
+            (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
       in
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field txn_comm)
@@ -4791,12 +4758,10 @@ module For_tests = struct
         (Random_oracle.Input.Chunked.field transaction)
     in
     let sender : Party.Wire.t =
-      { data = sender_party_data
-      ; authorization = Signature sender_signature_auth
-      }
+      { sender_party_data with authorization = Signature sender_signature_auth }
     in
     let other_parties =
-      [ sender; { data = snapp_party_data; authorization = Proof pi } ]
+      [ sender; { body = snapp_party_data.body; authorization = Proof pi } ]
     in
     let parties : Parties.t =
       Parties.of_wire { fee_payer; other_parties; memo }

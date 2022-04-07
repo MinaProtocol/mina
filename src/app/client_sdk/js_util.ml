@@ -43,22 +43,19 @@ let payload_of_fee_payer_party_js
     fee_payer_party_js##.nonce |> Js.to_string
     |> Mina_numbers.Account_nonce.of_string
   in
-  { data =
-      { body =
-          { public_key = fee_payer_pk
-          ; update = Party.Update.noop
-          ; token_id = ()
-          ; balance_change = fee
-          ; increment_nonce = ()
-          ; events = []
-          ; sequence_events = []
-          ; call_data = Field.zero
-          ; call_depth = 0
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
-          ; use_full_commitment = ()
-          }
-      ; predicate = nonce
+  { Party.Fee_payer.body =
+      { public_key = fee_payer_pk
+      ; update = Party.Update.noop
+      ; token_id = ()
+      ; balance_change = fee
+      ; increment_nonce = ()
+      ; events = []
+      ; sequence_events = []
+      ; call_data = Field.zero
+      ; call_depth = 0
+      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; account_precondition = nonce
+      ; use_full_commitment = ()
       ; caller = ()
       }
   ; authorization = Signature.dummy

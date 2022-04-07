@@ -179,29 +179,27 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
              }) ;
           let sender_pk = sender.public_key |> Public_key.compress in
           let fee_payer : Party.Fee_payer.t =
-            { data =
-                { body =
-                    { public_key = sender_pk
-                    ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = Amount.to_fee fee
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; increment_nonce = ()
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = ()
-                    }
+            { Party.Fee_payer.body =
+                { public_key = sender_pk
+                ; update = Party.Update.noop
+                ; token_id = ()
+                ; balance_change = Amount.to_fee fee
+                ; events = []
+                ; sequence_events = []
+                ; call_data = Field.zero
+                ; call_depth = 0
+                ; increment_nonce = ()
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
                 ; account_precondition = sender_nonce
+                ; use_full_commitment = ()
                 ; caller = ()
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
             }
           in
-          let sender_party_data : Party.Preconditioned.Wire.t =
+          let sender_party_data : Party.Wire.t =
             { body =
                 { public_key = sender_pk
                 ; update = Party.Update.noop
@@ -215,13 +213,14 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
                 ; use_full_commitment = false
+                ; caller = Call
+                ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
                 }
-            ; caller = Call
-            ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
+            ; authorization = Signature Signature.dummy
             }
           in
-          let snapp_party_data : Party.Preconditioned.Wire.t =
-            { Party.Preconditioned.Poly.body =
+          let snapp_party_data : Party.Wire.t =
+            { body =
                 { public_key = ringsig_account_pk
                 ; update = Party.Update.noop
                 ; token_id = Token_id.default
@@ -233,15 +232,17 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; increment_nonce = false
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = Full Zkapp_precondition.Account.accept
                 ; use_full_commitment = false
+                ; caller = Call
                 }
-            ; account_precondition = Full Zkapp_precondition.Account.accept
-            ; caller = Call
+            ; authorization = Proof Mina_base.Proof.transaction_dummy
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
-            Parties.of_predicated_list [ sender_party_data; snapp_party_data ]
+            Parties.Call_forest.With_hashes.of_parties_list
+              [ sender_party_data, (); snapp_party_data, () ]
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
@@ -279,7 +280,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               Parties.Transaction_commitment.with_fee_payer transaction
                 ~fee_payer_hash:
                   (Parties.Digest.Party.create
-                     (Party.Preconditioned.of_fee_payer fee_payer.data))
+                     (Party.of_fee_payer fee_payer))
             in
             { fee_payer with
               authorization =

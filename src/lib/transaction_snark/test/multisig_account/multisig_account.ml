@@ -322,7 +322,7 @@ let%test_module "multisig_account" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Preconditioned.Wire.t =
+              let sender_party_data : Party.Wire.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -336,14 +336,16 @@ let%test_module "multisig_account" =
                     ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
+                    ; account_precondition =
+                        Nonce (Account.Nonce.succ sender_nonce)
                     ; use_full_commitment = false
-                    }
                 ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
                 ; caller = Call
                 }
+                ; authorization = Signature Signature.dummy }
               in
-              let snapp_party_data : Party.Preconditioned.Wire.t =
-                { Party.Predicated.Poly.body =
+              let snapp_party_data : Party.Wire.t =
+                { body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
                     ; token_id = Token_id.default
@@ -356,11 +358,13 @@ let%test_module "multisig_account" =
                     ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
+                    ; account_precondition =
+                        Full Zkapp_precondition.Account.accept
                     ; use_full_commitment = false
-                    }
                 ; account_precondition = Full Zkapp_precondition.Account.accept
                 ; caller = Call
                 }
+                ; authorization = Proof Mina_base.Proof.transaction_dummy }
               in
               let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
