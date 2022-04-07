@@ -43,6 +43,7 @@
    error_json
    logproc_lib
    pasta
+   gossip_net
 )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))

@@ -30,7 +30,7 @@ func processRows(rows [][](interface{})) Whitelist {
 func RetrieveWhitelist(service *sheets.Service, log *logging.ZapEventLogger) Whitelist {
 	col := DELEGATION_WHITELIST_COLUMN
 	readRange := DELEGATION_WHITELIST_LIST + "!" + col + ":" + col
-	spId := DELEGATION_WHITELIST_SPREADSHEET_ID
+	spId := WhitelistSpreadsheetId()
 	resp, err := service.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
