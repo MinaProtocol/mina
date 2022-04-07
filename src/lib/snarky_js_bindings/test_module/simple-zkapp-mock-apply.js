@@ -44,7 +44,6 @@ class SimpleZkapp extends SmartContract {
   }
 
   deploy() {
-    super.deploy();
     this.self.update.permissions.setValue({
       editState: Perm.proofOrSignature(),
     });

@@ -1771,9 +1771,26 @@ module Ledger = struct
 
   type public_key = < g : group_class Js.t Js.prop > Js.t
 
+  type auth_required = Js.js_string Js.t
+
+  type permissions =
+    < editState : auth_required Js.prop
+    ; send : auth_required Js.prop
+    ; receive : auth_required Js.prop
+    ; setSelegate : auth_required Js.prop
+    ; setPermissions : auth_required Js.prop
+    ; setVerificationKey : auth_required Js.prop
+    ; setZkappUri : auth_required Js.prop
+    ; editSequenceState : auth_required Js.prop
+    ; setTokenSymbol : auth_required Js.prop
+    ; incrementNonce : auth_required Js.prop
+    ; setVotingFor : auth_required Js.prop >
+    Js.t
+
   type party_update =
     < appState : js_field set_or_keep Js.js_array Js.t Js.prop
     ; delegate : public_key set_or_keep Js.prop
+    ; permissions : permissions set_or_keep Js.prop
     ; verificationKey : Js.js_string Js.t set_or_keep Js.prop
     ; votingFor : js_field set_or_keep Js.prop >
     Js.t
