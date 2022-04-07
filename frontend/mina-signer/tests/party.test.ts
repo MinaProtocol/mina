@@ -22,7 +22,7 @@ let otherParties = {
               hash: "6126967149054324897758004030656063508224598401695819012488759098837572287200",
             },
             permissions: null,
-            snappUri: null,
+            zkappUri: null,
             tokenSymbol: null,
             timing: null,
             votingFor: null,
@@ -76,7 +76,7 @@ let otherParties = {
           },
           useFullCommitment: true,
         },
-        predicate: {
+        account_precondition: {
           balance: { lower: "0", upper: "18446744073709551615" },
           nonce: { lower: "0", upper: "4294967295" },
           receiptChainHash: null,
@@ -101,7 +101,7 @@ let otherParties = {
               hash: "6126967149054324897758004030656063508224598401695819012488759098837572287200",
             },
             permissions: null,
-            snappUri: null,
+            zkappUri: null,
             tokenSymbol: null,
             timing: null,
             votingFor: null,
@@ -155,7 +155,7 @@ let otherParties = {
           },
           useFullCommitment: true,
         },
-        predicate: {
+        account_precondition: {
           balance: { lower: "0", upper: "18446744073709551615" },
           nonce: { lower: "0", upper: "4294967295" },
           receiptChainHash: null,

@@ -132,7 +132,7 @@ let currency_consumed_unchecked :
         | Stake_delegation _ ->
             zero )
     | Parties _ ->
-        (*TODO: document- txns succeeds with source amount insufficient in the case of snapps*)
+        (*TODO: document- txns succeeds with source amount insufficient in the case of zkapps*)
         zero
   in
   fee_amt + amt
@@ -745,7 +745,7 @@ let expired_by_predicate (t : t) :
              None)
   |> Sequence.filter ~f:(fun (_, ps) ->
          ps.other_parties
-         |> List.map ~f:Party.protocol_state
+         |> List.map ~f:Party.protocol_state_precondition
          |> List.exists ~f:(fun predicate ->
                 match predicate.timestamp with
                 | Check { upper; _ } ->
@@ -938,7 +938,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         true
     | User_command.Parties ps ->
         ps.other_parties
-        |> List.map ~f:Party.protocol_state
+        |> List.map ~f:Party.protocol_state_precondition
         |> List.exists ~f:(fun predicate ->
                match predicate.timestamp with
                | Check { lower; upper } ->

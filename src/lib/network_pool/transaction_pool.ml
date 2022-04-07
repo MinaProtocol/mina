@@ -1821,7 +1821,7 @@ let%test_module _ =
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
-              Mina_generators.Snapp_generators.gen_parties_from ~succeed:true
+              Mina_generators.Parties_generators.gen_parties_from ~succeed:true
                 ~keymap ~fee_payer_keypair ~ledger ()
             in
             User_command.Parties parties
@@ -1835,7 +1835,7 @@ let%test_module _ =
       (* add new accounts to best tip ledger *)
       let ledger_accounts =
         Mina_ledger.Ledger.to_list ledger
-        |> List.filter ~f:(fun acct -> Option.is_some acct.snapp)
+        |> List.filter ~f:(fun acct -> Option.is_some acct.zkapp)
       in
       List.iter ledger_accounts ~f:(fun account ->
           let account_id =
@@ -1917,7 +1917,7 @@ let%test_module _ =
           mk_linear_case_test assert_pool_txs pool best_tip_diff_w
             independent_cmds')
 
-    let%test_unit "transactions are removed in linear case (snapps)" =
+    let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
@@ -1955,8 +1955,8 @@ let%test_module _ =
               State_hash.gen
         ; timing = Account.Timing.Untimed
         ; permissions = Permissions.user_default
-        ; snapp = None
-        ; snapp_uri = ""
+        ; zkapp = None
+        ; zkapp_uri = ""
         } )
 
     let mk_remove_and_add_test assert_pool_txs pool best_tip_diff_w best_tip_ref
@@ -1991,7 +1991,7 @@ let%test_module _ =
             best_tip_ref independent_cmds)
 
     let%test_unit "Transactions are removed and added back in fork changes \
-                   (snapps)" =
+                   (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2027,7 +2027,7 @@ let%test_module _ =
           mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
             independent_cmds')
 
-    let%test_unit "invalid transactions are not accepted (snapps)" =
+    let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2124,7 +2124,7 @@ let%test_module _ =
             independent_cmds)
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \
-                   changes (snapps)" =
+                   changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2180,7 +2180,7 @@ let%test_module _ =
           mk_expired_not_accepted_test assert_pool_txs pool ~padding:10
             independent_cmds)
 
-    let%test_unit "expired transactions are not accepted (snapps)" =
+    let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
@@ -2673,7 +2673,7 @@ let%test_module _ =
           mk_rebroadcastable_test assert_pool_txs pool best_tip_diff_w
             independent_cmds)
 
-    let%test_unit "rebroadcastable transaction behavior (snapps)" =
+    let%test_unit "rebroadcastable transaction behavior (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
@@ -2681,7 +2681,7 @@ let%test_module _ =
           mk_rebroadcastable_test assert_pool_txs pool best_tip_diff_w
             (mk_parties_cmds pool))
 
-    let%test_unit "apply user cmds and snapps" =
+    let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
             setup_test ()

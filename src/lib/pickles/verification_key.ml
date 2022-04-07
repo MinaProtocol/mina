@@ -123,8 +123,7 @@ module Stable = struct
         ; srs
         ; evals =
             (let g (x, y) =
-               { Kimchi.Protocol.unshifted =
-                   [| Kimchi.Foundations.Finite (x, y) |]
+               { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
                ; shifted = None
                }
              in
@@ -181,4 +180,4 @@ let dummy =
      ; step_domains = [||]
      ; data = { constraints = rows }
      }
-     |> Stable.Latest.of_repr (Kimchi.Protocol.SRS.Fq.create 1))
+     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1))

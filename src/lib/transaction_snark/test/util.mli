@@ -9,7 +9,7 @@ val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
 
-(* For tests, monkey patch ledger and sparse ledger to freeze their 
+(* For tests, monkey patch ledger and sparse ledger to freeze their
    ledger_hashes.
    The nominal type prevents using this in non-test code. *)
 module Ledger : module type of Mina_ledger.Ledger
@@ -29,8 +29,8 @@ val init_stack : Pending_coinbase.Stack_versioned.t
 val apply_parties : Ledger.t -> Parties.t list -> unit
 
 val dummy_rule :
-     (Snapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
-  -> ( Snapp_statement.Checked.t * (Snapp_statement.Checked.t * unit)
+     (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
+  -> ( Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit)
      , 'a * ('a * unit)
      , 'b * ('b * unit)
      , 'c * ('c * unit)
@@ -38,9 +38,20 @@ val dummy_rule :
      , 'e )
      Pickles.Inductive_rule.t
 
-(** Generates base and merge snarks of all the party segments*)
-val apply_parties_with_merges :
-  Ledger.t -> Parties.t list -> unit Async.Deferred.t
+(** Generates base and merge snarks of all the party segments
+
+    if apply is true, then also run unchecked apply
+
+    raises if either the snark generation or application fails
+    but does not examine the failure table created by the application
+*)
+val check_parties_with_merges_exn :
+     ?state_body:Transaction_protocol_state.Block_data.t
+  -> ?state_view:Zkapp_precondition.Protocol_state.View.t
+  -> ?apply:bool
+  -> Ledger.t
+  -> Parties.t list
+  -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
 val trivial_snapp :
@@ -49,7 +60,7 @@ val trivial_snapp :
        ( unit
        , unit
        , unit
-       , Snapp_statement.t
+       , Zkapp_statement.t
        , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
          Async.Deferred.t )
        Pickles.Prover.t ] )
@@ -66,7 +77,7 @@ val test_snapp_update :
        ( unit
        , unit
        , unit
-       , Snapp_statement.t
+       , Zkapp_statement.t
        , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
          Async.Deferred.t )
        Pickles.Prover.t

@@ -132,8 +132,8 @@ struct
         "Send Delegation"
 
   let signed_command_to_be_included_in_frontier ~sender_pub_key
-      ~receiver_pub_key ~amount ~(nonce : Mina_numbers.Account_nonce.t)
-      ~command_type =
+      ~receiver_pub_key ~amount ~nonce ~command_type
+      ~(node_included_in : [ `Any_node | `Node of Node.t ]) =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
@@ -166,30 +166,39 @@ struct
       | Parties _ ->
           false
     in
-    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let payment_opt =
-        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-            cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_payment)
+    let check () node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let check_helper (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+        let payment_opt =
+          List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
+              cmd_with_status.With_status.data |> User_command.forget_check
+              |> command_matches_payment)
+        in
+        match payment_opt with
+        | Some cmd_with_status ->
+            let actual_status = cmd_with_status.With_status.status in
+            let was_applied =
+              match actual_status with
+              | Transaction_status.Applied _ ->
+                  true
+              | _ ->
+                  false
+            in
+            if was_applied then Predicate_passed
+            else
+              Predicate_failure
+                (Error.createf "Unexpected status in matching payment: %s"
+                   ( Transaction_status.to_yojson actual_status
+                   |> Yojson.Safe.to_string ))
+        | None ->
+            Predicate_continuation ()
       in
-      match payment_opt with
-      | Some cmd_with_status ->
-          let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
-            match actual_status with
-            | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
-          in
-          if was_applied then Predicate_passed
-          else
-            Predicate_failure
-              (Error.createf "Unexpected status in matching payment: %s"
-                 ( Transaction_status.to_yojson actual_status
-                 |> Yojson.Safe.to_string ))
-      | None ->
-          Predicate_continuation ()
+      match node_included_in with
+      | `Any_node ->
+          check_helper breadcrumb_added
+      | `Node n ->
+          if String.equal (Node.id node) (Node.id n) then
+            check_helper breadcrumb_added
+          else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
     { description =
@@ -203,7 +212,7 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let snapp_to_be_included_in_frontier ~parties =
+  let snapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -221,14 +230,14 @@ struct
       match snapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
+          let successful =
             match actual_status with
             | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
+                not has_failures
+            | Failed _ ->
+                has_failures
           in
-          if was_applied then Predicate_passed
+          if successful then Predicate_passed
           else
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"
@@ -241,9 +250,9 @@ struct
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
           (Public_key.Compressed.to_base58_check
-             parties.fee_payer.data.body.public_key)
+             parties.fee_payer.body.public_key)
           ( List.map parties.other_parties ~f:(fun party ->
-                Public_key.Compressed.to_base58_check party.data.body.public_key)
+                Public_key.Compressed.to_base58_check party.body.public_key)
           |> String.concat ~sep:", " )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots

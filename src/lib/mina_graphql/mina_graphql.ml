@@ -549,7 +549,7 @@ module Types = struct
         ])
 
   let work_statement =
-    let `Needs_some_work_for_snapps_on_mainnet = Mina_base.Util.todo_snapps in
+    let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
     obj "WorkDescription"
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
@@ -829,8 +829,8 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp
-          ; snapp_uri
+          ; zkapp
+          ; zkapp_uri
           } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
@@ -842,8 +842,8 @@ module Types = struct
         let%bind voting_for = voting_for in
         let%bind timing = timing in
         let%bind permissions = permissions in
-        let%bind snapp = snapp in
-        let%map snapp_uri = snapp_uri in
+        let%bind zkapp = zkapp in
+        let%map zkapp_uri = zkapp_uri in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
@@ -855,8 +855,8 @@ module Types = struct
         ; voting_for
         ; timing
         ; permissions
-        ; snapp
-        ; snapp_uri
+        ; zkapp
+        ; zkapp_uri
         }
 
       let of_full_account ?breadcrumb
@@ -871,8 +871,8 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp
-          ; snapp_uri
+          ; zkapp
+          ; zkapp_uri
           } =
         { Account.Poly.public_key
         ; token_id
@@ -890,8 +890,8 @@ module Types = struct
         ; voting_for = Some voting_for
         ; timing
         ; permissions = Some permissions
-        ; snapp
-        ; snapp_uri = Some snapp_uri
+        ; zkapp
+        ; zkapp_uri = Some zkapp_uri
         }
 
       let of_account_id coda account_id =
@@ -927,8 +927,8 @@ module Types = struct
               ; voting_for = None
               ; timing = Timing.Untimed
               ; permissions = None
-              ; snapp = None
-              ; snapp_uri = None
+              ; zkapp = None
+              ; zkapp_uri = None
               }
 
       let of_pk coda pk =
@@ -948,7 +948,7 @@ module Types = struct
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
-          , Snapp_account.t option
+          , Zkapp_account.t option
           , string option )
           Account.Poly.t
       ; locked : bool option
@@ -1004,7 +1004,7 @@ module Types = struct
     let account_permissions =
       obj "AccountPermissions" ~fields:(fun _ ->
           [ field "editState" ~typ:(non_null auth_required)
-              ~doc:"Authorization required to edit snapp state"
+              ~doc:"Authorization required to edit zkApp state"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.edit_state)
@@ -1029,17 +1029,17 @@ module Types = struct
           ; field "setVerificationKey" ~typ:(non_null auth_required)
               ~doc:
                 "Authorization required to set the verification key of the \
-                 snapp associated with the account"
+                 zkApp associated with the account"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_verification_key)
-          ; field "setSnappUri" ~typ:(non_null auth_required)
+          ; field "setZkappUri" ~typ:(non_null auth_required)
               ~doc:
-                "Authorization required to change the URI of the snapp \
+                "Authorization required to change the URI of the zkApp \
                  associated with the account "
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
-                permission.Permissions.Poly.set_snapp_uri)
+                permission.Permissions.Poly.set_zkapp_uri)
           ; field "editSequenceState" ~typ:(non_null auth_required)
               ~doc:"Authorization required to edit the sequence state"
               ~args:Arg.[]
@@ -1308,24 +1308,24 @@ module Types = struct
                     ledger"
                  ~args:Arg.[]
                  ~resolve:(fun _ { index; _ } -> index)
-             ; field "snappUri" ~typ:string
+             ; field "zkappUri" ~typ:string
                  ~doc:
                    "The URI associated with this account, usually pointing to \
-                    the snapp source code"
+                    the zkApp source code"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp_uri)
-             ; field "snappState"
+                   account.Account.Poly.zkapp_uri)
+             ; field "zkappState"
                  ~typ:(list @@ non_null string)
                  ~doc:
-                   "The 8 field elements comprising the snapp state associated \
+                   "The 8 field elements comprising the zkApp state associated \
                     with this account encoded as bignum strings"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   account.Account.Poly.snapp
-                   |> Option.map ~f:(fun snapp_account ->
-                          snapp_account.app_state |> Snapp_state.V.to_list
-                          |> List.map ~f:Snapp_basic.F.to_string))
+                   account.Account.Poly.zkapp
+                   |> Option.map ~f:(fun zkapp_account ->
+                          zkapp_account.app_state |> Zkapp_state.V.to_list
+                          |> List.map ~f:Zkapp_basic.F.to_string))
              ; field "permissions" ~typ:account_permissions
                  ~doc:"Permissions for updating certain fields of this account"
                  ~args:Arg.[]
@@ -1340,18 +1340,18 @@ module Types = struct
                  ~doc:"Verification key associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.value_map account.Account.Poly.snapp ~default:None
-                     ~f:(fun snapp_account -> snapp_account.verification_key))
+                   Option.value_map account.Account.Poly.zkapp ~default:None
+                     ~f:(fun zkapp_account -> zkapp_account.verification_key))
              ; field "sequenceEvents"
                  ~doc:"Sequence events associated with this account"
                  ~typ:(list (non_null string))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
-                   Option.map account.Account.Poly.snapp
-                     ~f:(fun snapp_account ->
+                   Option.map account.Account.Poly.zkapp
+                     ~f:(fun zkapp_account ->
                        List.map ~f:Snark_params.Tick.Field.to_string
                          (Pickles_types.Vector.to_list
-                            snapp_account.sequence_state)))
+                            zkapp_account.sequence_state)))
              ]))
 
     let account = Lazy.force account
@@ -1361,7 +1361,19 @@ module Types = struct
     type t =
       | Applied
       | Enqueued
-      | Included_but_failed of Transaction_status.Failure.t
+      | Included_but_failed of Transaction_status.Failure.Collection.t
+
+    let failure_reasons =
+      obj "PartiesFailureReason" ~fields:(fun _ ->
+          [ field "index" ~typ:string ~args:[]
+              ~doc:"List index of the party that failed"
+              ~resolve:(fun _ (index, _) -> Some (Int.to_string index))
+          ; field "failures"
+              ~typ:(non_null @@ list @@ non_null @@ string)
+              ~args:[] ~doc:"Failure reason for the party or any nested parties"
+              ~resolve:(fun _ (_, failures) ->
+                List.map failures ~f:Transaction_status.Failure.to_string)
+          ])
   end
 
   module User_command = struct
@@ -1566,8 +1578,9 @@ module Types = struct
             match uc.With_status.status with
             | Applied | Enqueued ->
                 None
-            | Included_but_failed failure ->
-                Some (Transaction_status.Failure.to_string failure))
+            | Included_but_failed failures ->
+                List.concat failures |> List.hd
+                |> Option.map ~f:Transaction_status.Failure.to_string)
       ]
 
     let payment =
@@ -1603,7 +1616,7 @@ module Types = struct
     let user_command = user_command_interface
   end
 
-  module Snapp_command = struct
+  module Zkapp_command = struct
     module With_status = struct
       type 'a t = { data : 'a; status : Command_status.t }
 
@@ -1614,18 +1627,18 @@ module Types = struct
       field ?doc ?deprecated lab ~typ ~args ~resolve:(fun c cmd ->
           resolve c cmd.With_status.data)
 
-    let snapp_command =
+    let zkapp_command =
       let conv (x : (Mina_lib.t, Parties.t) Fields_derivers_graphql.Schema.typ)
           : (Mina_lib.t, Parties.t) typ =
         Obj.magic x
       in
-      obj "SnappCommand" ~fields:(fun _ ->
+      obj "ZkappCommand" ~fields:(fun _ ->
           [ field_no_status "id"
               ~doc:"A Base58Check string representing the command"
               ~typ:(non_null guid) ~args:[] ~resolve:(fun _ parties ->
                 Parties.to_base58_check parties.With_hash.data)
           ; field_no_status "hash"
-              ~doc:"A cryptographic hash of the snapp command"
+              ~doc:"A cryptographic hash of the zkApp command"
               ~typ:(non_null string) ~args:[] ~resolve:(fun _ parties ->
                 Transaction_hash.to_base58_check parties.With_hash.hash)
           ; field_no_status "parties"
@@ -1633,15 +1646,19 @@ module Types = struct
               ~args:Arg.[]
               ~doc:"Parties representing the transaction"
               ~resolve:(fun _ parties -> parties.With_hash.data)
-          ; field "failureReason" ~typ:string ~args:[]
+          ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
+              ~args:[]
               ~doc:
-                "The reason for the snapp transaction failure; null means \
+                "The reason for the zkApp transaction failure; null means \
                  success or the status is unknown" ~resolve:(fun _ cmd ->
                 match cmd.With_status.status with
                 | Applied | Enqueued ->
                     None
-                | Included_but_failed failure ->
-                    Some (Transaction_status.Failure.to_string failure))
+                | Included_but_failed failures ->
+                    Some
+                      (List.map
+                         (Transaction_status.Failure.Collection.to_display
+                            failures) ~f:(fun f -> Some f)))
           ])
   end
 
@@ -1671,9 +1688,9 @@ module Types = struct
                            { status; data = { t.data with data = c } })
                   | Parties _ ->
                       None))
-        ; field "snappCommands"
-            ~doc:"List of snapp commands included in this block"
-            ~typ:(non_null @@ list @@ non_null Snapp_command.snapp_command)
+        ; field "zkappCommands"
+            ~doc:"List of zkApp commands included in this block"
+            ~typ:(non_null @@ list @@ non_null Zkapp_command.zkapp_command)
             ~args:Arg.[]
             ~resolve:(fun _ { commands; _ } ->
               List.filter_map commands ~f:(fun t ->
@@ -1689,7 +1706,7 @@ module Types = struct
                             Command_status.Included_but_failed e
                       in
                       Some
-                        { Snapp_command.With_status.status
+                        { Zkapp_command.With_status.status
                         ; data = { t.data with data = parties }
                         }))
         ; field "feeTransfer"
@@ -1938,11 +1955,11 @@ module Types = struct
               ~resolve:(fun _ -> Fn.id)
           ])
 
-    let send_snapp =
-      obj "SendSnappPayload" ~fields:(fun _ ->
-          [ field "snapp"
-              ~typ:(non_null Snapp_command.snapp_command)
-              ~doc:"snapp transaction that was sent"
+    let send_zkapp =
+      obj "SendZkappPayload" ~fields:(fun _ ->
+          [ field "zkapp"
+              ~typ:(non_null Zkapp_command.zkapp_command)
+              ~doc:"zkApp transaction that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id)
           ])
@@ -2168,8 +2185,8 @@ module Types = struct
           | _ ->
               Error "Expected string for fee")
 
-    let internal_send_snapp =
-      scalar "SendTestSnappInput" ~doc:"Parties for a test snapp"
+    let internal_send_zkapp =
+      scalar "SendTestZkappInput" ~doc:"Parties for a test zkApp"
         ~coerce:(fun json ->
           let json = to_yojson json in
           Result.try_with (fun () -> Mina_base.Parties.of_json json)
@@ -2416,12 +2433,12 @@ module Types = struct
           ; nonce
           ]
 
-    let send_snapp =
+    let send_zkapp =
       let conv (x : Parties.t Fields_derivers_graphql.Schema.Arg.arg_typ) :
           Parties.t arg_typ =
         Obj.magic x
       in
-      obj "SendSnappInput" ~coerce:Fn.id
+      obj "SendZkappInput" ~coerce:Fn.id
         ~fields:
           [ arg "parties" ~doc:"Parties structure representing the transaction"
               ~typ:(Parties.arg_typ () |> conv)
@@ -2961,18 +2978,18 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let send_snapp_command mina parties =
+  let send_zkapp_command mina parties =
     match Mina_commands.setup_and_submit_snapp_command mina parties with
     | `Active f -> (
         match%map f with
         | Ok parties ->
             let cmd =
-              { Types.Snapp_command.With_status.data = parties
+              { Types.Zkapp_command.With_status.data = parties
               ; status = Enqueued
               }
             in
             let cmd_with_hash =
-              Types.Snapp_command.With_status.map cmd ~f:(fun cmd ->
+              Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                   { With_hash.data = cmd
                   ; hash = Transaction_hash.hash_command (Parties cmd)
                   })
@@ -2980,19 +2997,19 @@ module Mutations = struct
             Ok cmd_with_hash
         | Error e ->
             Error
-              (sprintf "Couldn't send snapp command: %s"
+              (sprintf "Couldn't send zkApp command: %s"
                  (Error.to_string_hum e)) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_snapp_command mina parties :
+  let mock_zkapp_command mina parties :
       ( (Parties.t, Transaction_hash.t) With_hash.t
-        Types.Snapp_command.With_status.t
+        Types.Zkapp_command.With_status.t
       , string )
       result
       Io.t =
-    (* instead of adding the parties to the transaction pool, as we would for an actual snapp,
-       apply the snapp using an ephemeral ledger
+    (* instead of adding the parties to the transaction pool, as we would for an actual zkapp,
+       apply the zkapp using an ephemeral ledger
     *)
     match Mina_lib.best_tip mina with
     | `Active breadcrumb -> (
@@ -3019,14 +3036,14 @@ module Mutations = struct
             | Ok (`Existed, _loc) ->
                 (* should be unreachable *)
                 failwithf
-                  "When creating ledger for mock snapp, account with public \
+                  "When creating ledger for mock zkApp, account with public \
                    key %s and token %s already existed"
                   (Signature_lib.Public_key.Compressed.to_string pk)
                   (Token_id.to_string token) ()
             | Error err ->
                 (* should be unreachable *)
                 Error.tag_arg err
-                  "When creating ledger for mock snapp, error when adding \
+                  "When creating ledger for mock zkApp, error when adding \
                    account"
                   (("public_key", pk), ("token", token))
                   [%sexp_of:
@@ -3057,7 +3074,7 @@ module Mutations = struct
                   Ledger.apply_parties_unchecked ~constraint_constants
                     ~state_view ledger parties
                 in
-                (* rearrange data to match result type of `send_snapp_command` *)
+                (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (parties_applied, _local_state_and_amount) ->
@@ -3079,7 +3096,7 @@ module Mutations = struct
                             Included_but_failed failure
                       in
                       ( { data = with_hash; status }
-                        : _ Types.Snapp_command.With_status.t ))
+                        : _ Types.Zkapp_command.With_status.t ))
                 in
                 return @@ Result.map_error applied_ok ~f:Error.to_string_hum ) )
     | `Bootstrapping ->
@@ -3230,30 +3247,30 @@ module Mutations = struct
               ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command)
 
-  let make_snapp_endpoint ~name ~doc ~f =
+  let make_zkapp_endpoint ~name ~doc ~f =
     io_field name ~doc
-      ~typ:(non_null Types.Payload.send_snapp)
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_snapp) ]
+      ~typ:(non_null Types.Payload.send_zkapp)
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_zkapp) ]
       ~resolve:(fun { ctx = coda; _ } () parties ->
         f coda parties (* TODO: error handling? *))
 
-  let send_snapp =
-    make_snapp_endpoint ~name:"sendSnapp" ~doc:"Send a snapp transaction"
-      ~f:send_snapp_command
+  let send_zkapp =
+    make_zkapp_endpoint ~name:"sendZkapp" ~doc:"Send a zkApp transaction"
+      ~f:send_zkapp_command
 
-  let mock_snapp =
-    make_snapp_endpoint ~name:"mockSnapp"
-      ~doc:"Mock a snapp transaction, no effect on blockchain"
-      ~f:mock_snapp_command
+  let mock_zkapp =
+    make_zkapp_endpoint ~name:"mockZkapp"
+      ~doc:"Mock a zkApp transaction, no effect on blockchain"
+      ~f:mock_zkapp_command
 
-  let internal_send_snapp =
-    io_field "internalSendSnapp"
-      ~doc:"Send a snapp (for internal testing purposes)"
+  let internal_send_zkapp =
+    io_field "internalSendZkapp"
+      ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
-        Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_snapp) ]
-      ~typ:(non_null Types.Payload.send_snapp)
+        Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_zkapp) ]
+      ~typ:(non_null Types.Payload.send_zkapp)
       ~resolve:(fun { ctx = mina; _ } () parties ->
-        send_snapp_command mina parties)
+        send_zkapp_command mina parties)
 
   let send_test_payments =
     io_field "sendTestPayments" ~doc:"Send a series of test payments"
@@ -3545,9 +3562,9 @@ module Mutations = struct
     ; send_payment
     ; send_test_payments
     ; send_delegation
-    ; send_snapp
-    ; mock_snapp
-    ; internal_send_snapp
+    ; send_zkapp
+    ; mock_zkapp
+    ; internal_send_zkapp
     ; export_logs
     ; set_coinbase_receiver
     ; set_snark_worker
@@ -3563,7 +3580,7 @@ end
 module Queries = struct
   open Schema
 
-  (* helper for pooledUserCommands, pooledSnappCommands *)
+  (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
@@ -3662,20 +3679,20 @@ module Queries = struct
             | Parties _ ->
                 None))
 
-  let pooled_snapp_commands =
-    field "pooledSnappCommands"
+  let pooled_zkapp_commands =
+    field "pooledZkappCommands"
       ~doc:
-        "Retrieve all the scheduled snapp commands for a specified sender that \
+        "Retrieve all the scheduled zkApp commands for a specified sender that \
          the current daemon sees in its transaction pool. All scheduled \
          commands are queried if no sender is specified"
-      ~typ:(non_null @@ list @@ non_null Types.Snapp_command.snapp_command)
+      ~typ:(non_null @@ list @@ non_null Types.Zkapp_command.zkapp_command)
       ~args:
         Arg.
-          [ arg "publicKey" ~doc:"Public key of sender of pooled snapp commands"
+          [ arg "publicKey" ~doc:"Public key of sender of pooled zkApp commands"
               ~typ:Types.Input.public_key_arg
-          ; arg "hashes" ~doc:"Hashes of the snapp commands to find in the pool"
+          ; arg "hashes" ~doc:"Hashes of the zkApp commands to find in the pool"
               ~typ:(list (non_null string))
-          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of snapp commands"
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of zkApp commands"
           ]
       ~resolve:(fun { ctx = coda; _ } () pk_opt hashes_opt txns_opt ->
         let transaction_pool = Mina_lib.transaction_pool coda in
@@ -3693,10 +3710,10 @@ module Queries = struct
             match cmd_with_hash.data with
             | Signed_command _ ->
                 None
-            | Parties snapp_cmd ->
+            | Parties zkapp_cmd ->
                 Some
-                  { Types.Snapp_command.With_status.status = Enqueued
-                  ; data = { cmd_with_hash with data = snapp_cmd }
+                  { Types.Zkapp_command.With_status.status = Enqueued
+                  ; data = { cmd_with_hash with data = zkapp_cmd }
                   }))
 
   let sync_status =
@@ -3871,11 +3888,11 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
-          ; arg "snappTransaction" ~typ:guid ~doc:"Id of a snapp transaction"
+          ; arg "zkappTransaction" ~typ:guid ~doc:"Id of a zkApp transaction"
           ]
       ~resolve:
         (fun { ctx = coda; _ } () (serialized_payment : string option)
-             (serialized_snapp : string option) ->
+             (serialized_zkapp : string option) ->
         let open Result.Let_syntax in
         let deserialize_txn serialized_txn =
           let res =
@@ -3895,15 +3912,15 @@ module Queries = struct
                  })
         in
         let%bind txn =
-          match (serialized_payment, serialized_snapp) with
+          match (serialized_payment, serialized_zkapp) with
           | None, None | Some _, Some _ ->
               Error
-                "Invalid query: Specify either a payment ID or a snapp \
+                "Invalid query: Specify either a payment ID or a zkApp \
                  transaction ID"
           | Some payment, None ->
               deserialize_txn (`Signed_command payment)
-          | None, Some snapp_txn ->
-              deserialize_txn (`Parties snapp_txn)
+          | None, Some zkapp_txn ->
+              deserialize_txn (`Parties zkapp_txn)
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
@@ -4320,7 +4337,7 @@ module Queries = struct
     ; initial_peers
     ; get_peers
     ; pooled_user_commands
-    ; pooled_snapp_commands
+    ; pooled_zkapp_commands
     ; transaction_status
     ; trust_status
     ; trust_status_all
