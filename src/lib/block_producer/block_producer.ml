@@ -747,9 +747,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         ; data =
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
-                              ~validation_callback:
-                                (Mina_net2.Validation_callback
-                                 .create_without_expiration ())
                               ~delta_transition_chain_proof ()
                         }
                       |> External_transition.skip_time_received_validation
@@ -1226,9 +1223,6 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               ; data =
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
-                    ~validation_callback:
-                      (Mina_net2.Validation_callback.create_without_expiration
-                         ())
                     ~delta_transition_chain_proof ()
               }
             |> External_transition.skip_time_received_validation

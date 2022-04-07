@@ -33,7 +33,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
-      parties.fee_payer.data.body.public_key
+      parties.fee_payer.body.public_key
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
