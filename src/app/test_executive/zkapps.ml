@@ -367,7 +367,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a zkApp transaction to update permissions"
-        (send_snapp ~logger node parties_update_permissions)
+        (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
       let padding_payments =
