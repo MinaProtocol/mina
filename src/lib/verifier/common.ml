@@ -47,14 +47,12 @@ let check :
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
                 (Zkapp_precondition.Protocol_state.digest
-                   fee_payer.data.body.protocol_state_precondition)
+                   fee_payer.body.protocol_state_precondition)
               ~memo_hash:(Signed_command_memo.hash memo)
           in
           let full_tx_commitment =
             Parties.Transaction_commitment.with_fee_payer tx_commitment
-              ~fee_payer_hash:
-                (Party.Preconditioned.digest
-                   (Party.Preconditioned.of_fee_payer fee_payer.data))
+              ~fee_payer_hash:(Party.digest (Party.of_fee_payer fee_payer))
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -72,7 +70,7 @@ let check :
                       [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization fee_payer.data.body.public_key
+          check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
           let parties_with_hashes_list =
             Parties.Call_forest.With_hashes.to_parties_with_hashes_list
@@ -82,12 +80,12 @@ let check :
             List.filter_map parties_with_hashes_list
               ~f:(fun ((p, vk_opt), at_party) ->
                 let commitment =
-                  if p.data.body.use_full_commitment then full_tx_commitment
+                  if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
                 in
                 match p.authorization with
                 | Signature s ->
-                    check_signature s p.data.body.public_key commitment ;
+                    check_signature s p.body.public_key commitment ;
                     None
                 | None_given ->
                     None
