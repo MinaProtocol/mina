@@ -11,7 +11,14 @@ module Make
      and module Event_router := Event_router = struct
   module Node = Engine.Network.Node
 
-  let map_to_yojson m ~f = `Assoc String.Map.(m |> map ~f |> to_alist)
+  let set_to_yojson ~(element : 'a -> Yojson.Safe.t) s : Yojson.Safe.t =
+    `List (List.map ~f:element (State_hash.Set.to_list s))
+
+  let map_to_yojson ~(f_key_to_string : 'a -> string) ~f_value_to_yojson m :
+      Yojson.Safe.t =
+    `Assoc
+      ( Map.to_alist m
+      |> List.map ~f:(fun (k, v) -> (f_key_to_string k, f_value_to_yojson v)) )
 
   (* TODO: Just replace the first 3 fields here with Protocol_state *)
   type t =
@@ -21,33 +28,30 @@ module Make
     ; snarked_ledgers_generated : int
     ; blocks_generated : int
     ; node_initialization : bool String.Map.t
-          [@to_yojson map_to_yojson ~f:(fun b -> `Bool b)]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
+                `Bool b)]
     ; gossip_received : Gossip_state.t String.Map.t
-          [@to_yojson map_to_yojson ~f:Gossip_state.to_yojson]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident
+              ~f_value_to_yojson:Gossip_state.to_yojson]
     ; best_tips_by_node : State_hash.t String.Map.t
-          [@to_yojson map_to_yojson ~f:State_hash.to_yojson]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident
+              ~f_value_to_yojson:State_hash.to_yojson]
     ; blocks_produced_by_node : State_hash.t list String.Map.t
           [@to_yojson
-            map_to_yojson ~f:(fun ls ->
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun ls ->
                 `List (List.map State_hash.to_yojson ls))]
     ; blocks_seen_by_node : State_hash.Set.t String.Map.t
           [@to_yojson
-            map_to_yojson ~f:(fun set ->
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun set ->
                 `List
                   (State_hash.Set.to_list set |> List.map State_hash.to_yojson))]
     ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
           [@to_yojson
-            let open Base in
-            let set_to_yojson ~(element : 'a -> Yojson.Safe.t) s : Yojson.Safe.t
-                =
-              `List (List.map ~f:element (State_hash.Set.to_list s))
-            in
-            let map_to_yojson ~key ~value m : Yojson.Safe.t =
-              `Assoc
-                (Map.to_alist m |> List.map ~f:(fun (k, v) -> (key k, value v)))
-            in
-            map_to_yojson ~key:Transaction_hash.to_base58_check
-              ~value:(set_to_yojson ~element:State_hash.to_yojson)]
+            map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
+              ~f_value_to_yojson:(set_to_yojson ~element:State_hash.to_yojson)]
     }
   [@@deriving to_yojson]
 
@@ -203,14 +207,11 @@ module Make
                   "Updating network state with Breadcrumb added to $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;
                 let blocks_seen_by_node' =
-                  let block_set' =
-                    State_hash.Set.add
-                      ( String.Map.find state.blocks_seen_by_node (Node.id node)
-                      |> Option.value ~default:State_hash.Set.empty )
-                      breadcrumb.state_hash
-                  in
-                  String.Map.set state.blocks_seen_by_node ~key:(Node.id node)
-                    ~data:block_set'
+                  String.Map.update state.blocks_seen_by_node (Node.id node)
+                    ~f:(fun block_set ->
+                      State_hash.Set.add
+                        (Option.value block_set ~default:State_hash.Set.empty)
+                        breadcrumb.state_hash)
                 in
                 let txn_hash_list =
                   List.map breadcrumb.user_commands ~f:(fun cmd_with_status ->
