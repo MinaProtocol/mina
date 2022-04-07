@@ -911,8 +911,7 @@ let initialize_infra ~logger network =
   let res = poll 0 in
   match%bind.Deferred res with
   | Error _ ->
-      [%log error]
-        "Since not all pods were assigned nodes, daemons will not be started" ;
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
       res
   | Ok _ ->
       [%log info] "Pods assigned to nodes" ;

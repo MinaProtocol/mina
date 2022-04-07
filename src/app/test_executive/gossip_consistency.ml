@@ -139,8 +139,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =
       if union = 0 then 1. else Float.of_int inter /. Float.of_int union
-      (* Gossip_state.consistency_ratio Transactions_gossip
-         (Map.data (network_state t).gossip_received) *)
     in
     [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in

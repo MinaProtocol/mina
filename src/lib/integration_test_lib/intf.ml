@@ -330,8 +330,6 @@ module Dsl = struct
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    (* type command_type = Send_payment | Send_delegation *)
-
     val signed_command_to_be_included_in_frontier :
          txn_hash:Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
