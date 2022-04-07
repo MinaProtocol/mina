@@ -5,12 +5,12 @@ open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
-    type lookups_used = Kimchi.Protocol.VerifierIndex.Lookup.lookups_used =
+    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
       | Single
       | Joint
     [@@deriving yojson]
 
-    type 'polyComm t = 'polyComm Kimchi.Protocol.VerifierIndex.Lookup.t =
+    type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm array
@@ -18,12 +18,12 @@ module Verifier_index_json = struct
     [@@deriving yojson]
   end
 
-  type 'fr domain = 'fr Kimchi.Protocol.VerifierIndex.domain =
+  type 'fr domain = 'fr Kimchi_types.VerifierIndex.domain =
     { log_size_of_group : int; group_gen : 'fr }
   [@@deriving yojson]
 
   type 'polyComm verification_evals =
-        'polyComm Kimchi.Protocol.VerifierIndex.verification_evals =
+        'polyComm Kimchi_types.VerifierIndex.verification_evals =
     { sigma_comm : 'polyComm array
     ; coefficients_comm : 'polyComm array
     ; generic_comm : 'polyComm
@@ -37,7 +37,7 @@ module Verifier_index_json = struct
   [@@deriving yojson]
 
   type ('fr, 'sRS, 'polyComm) verifier_index =
-        ('fr, 'sRS, 'polyComm) Kimchi.Protocol.VerifierIndex.verifier_index =
+        ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
     ; max_quot_size : int
@@ -48,12 +48,12 @@ module Verifier_index_json = struct
     }
   [@@deriving yojson]
 
-  type 'f or_infinity = 'f Kimchi.Foundations.or_infinity =
+  type 'f or_infinity = 'f Kimchi_types.or_infinity =
     | Infinity
     | Finite of ('f * 'f)
   [@@deriving yojson]
 
-  type 'g polycomm = 'g Kimchi.Protocol.poly_comm =
+  type 'g polycomm = 'g Kimchi_types.poly_comm =
     { unshifted : 'g array; shifted : 'g option }
   [@@deriving yojson]
 
