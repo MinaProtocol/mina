@@ -3,16 +3,17 @@ import {
   declareState,
   declareMethodArguments,
   State,
-  UInt64,
   PrivateKey,
   SmartContract,
   compile,
   deploy,
-  call,
+  callUnproved,
   isReady,
   shutdown,
   Mina,
-  Ledger,
+  signJsonTransaction,
+  Perm,
+  call,
 } from "snarkyjs";
 import cached from "./cached.js";
 
@@ -32,9 +33,7 @@ function toc() {
   process.stdout.write(`\r${label}... ${time.toFixed(3)} sec\n`);
 }
 
-// PART 1: snarkyjs
-
-// declare the zkapp in snarkyjs
+// declare the zkapp
 const transactionFee = 1_000_000_000;
 const initialBalance = 10_000_000_000;
 const initialState = Field(1);
@@ -46,6 +45,9 @@ class SimpleZkapp extends SmartContract {
 
   deploy() {
     super.deploy();
+    this.self.update.permissions.setValue({
+      editState: Perm.proofOrSignature(),
+    });
     this.x.set(initialState);
   }
 
@@ -60,7 +62,7 @@ declareMethodArguments(SimpleZkapp, { update: [Field] });
 // setup mock mina
 let Local = Mina.LocalBlockchain();
 Mina.setActiveInstance(Local);
-let senderAccount = Local.testAccounts[0];
+let sender = Local.testAccounts[0];
 
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
@@ -68,53 +70,76 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-// let { verificationKey, provers } = compile(SimpleZkapp, zkappAddress);
-let verificationKey = await cached(
-  () => compile(SimpleZkapp, zkappAddress).verificationKey
-);
+let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
+// let verificationKey = await cached(
+//   () => compile(SimpleZkapp, zkappAddress).verificationKey
+// );
 toc();
 
-// deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = deploy(SimpleZkapp, {
+let partiesJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
   initialBalance,
-  initialBalanceFundingAccountKey: senderAccount.privateKey,
+  initialBalanceFundingAccountKey: sender.privateKey,
+  shouldSignFeePayer: true,
+  feePayerKey: sender.privateKey,
+  transactionFee,
 });
 toc();
 
-// add nonce, public key; sign feepayer
-// TODO better API for setting feepayer
-let parties = JSON.parse(partiesJsonDeploy);
-parties.feePayer.data.predicate = "0";
-parties.feePayer.data.body.publicKey = Ledger.publicKeyToString(
-  senderAccount.publicKey
-);
-parties.feePayer.data.body.balanceChange = `${transactionFee}`;
-partiesJsonDeploy = JSON.stringify(parties);
+console.log(JSON.stringify(JSON.parse(partiesJsonDeploy), null, 2));
 
-let partiesJsonDeploySigned = Ledger.signFeePayer(
-  partiesJsonDeploy,
-  senderAccount.privateKey
-);
-console.log(JSON.stringify(JSON.parse(partiesJsonDeploySigned), null, 2));
-
-Local.applyJsonTransaction(partiesJsonDeploySigned);
+tic("apply deploy transaction");
+Local.applyJsonTransaction(partiesJsonDeploy);
+toc();
 
 // check that deploy txn was applied
-let snappState = Mina.getAccount(zkappAddress).snapp.appState[0];
-console.log("initial state: " + snappState);
+let zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+zkappState.assertEquals(1);
+console.log("got initial state: " + zkappState);
 
-// // update transaction
-// tic("create update transaction (with proof)");
-// let partiesJsonUpdate = await call(
-//   SimpleZkapp,
-//   zkappAddress,
-//   "update",
-//   [Field(3)],
-//   provers
-// );
-// toc();
+tic("create update transaction (no proof)");
+let partiesJsonUpdate = await callUnproved(
+  SimpleZkapp,
+  zkappAddress,
+  "update",
+  [Field(3)],
+  zkappKey
+);
+partiesJsonUpdate = await signJsonTransaction(
+  partiesJsonUpdate,
+  sender.privateKey,
+  { transactionFee }
+);
+toc();
+
+tic("apply update transaction (no proof)");
+Local.applyJsonTransaction(partiesJsonUpdate);
+toc();
+
+tic("create update transaction (with proof)");
+let partiesJsonUpdateWithProof = await call(
+  SimpleZkapp,
+  zkappAddress,
+  "update",
+  [Field(5)],
+  provers
+);
+partiesJsonUpdateWithProof = await signJsonTransaction(
+  partiesJsonUpdateWithProof,
+  sender.privateKey,
+  { transactionFee }
+);
+toc();
+
+tic("apply update transaction (with proof)");
+Local.applyJsonTransaction(partiesJsonUpdateWithProof);
+toc();
+
+// check that deploy txn was applied
+zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+zkappState.assertEquals(5);
+console.log("got updated state: " + zkappState);
 
 shutdown();

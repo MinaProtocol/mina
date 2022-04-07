@@ -24,7 +24,7 @@ export default async function cached(createStuff) {
   if (content !== undefined) return content;
 
   // otherwise run the function and write to cache
-  content = createStuff();
+  content = await createStuff();
   await fs.writeFile(file, JSON.stringify(content));
   return content;
 }

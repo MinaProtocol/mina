@@ -2680,16 +2680,10 @@ module Ledger = struct
       Js.Optdef.option (Option.map x ~f:transform)
   end
 
-  let get_account l (pk : public_key) : account Js.opt =
-    match
-      Option.bind
-        (L.location_of_account l##.value (account_id pk))
-        ~f:(L.get l##.value)
-    with
-    | None ->
-        Js.Opt.empty
-    | Some a ->
-        Js.Opt.return (To_js.account a)
+  let get_account l (pk : public_key) : account Js.optdef =
+    let loc = L.location_of_account l##.value (account_id pk) in
+    let account = Option.bind loc ~f:(L.get l##.value) in
+    To_js.option To_js.account account
 
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
@@ -2746,9 +2740,6 @@ module Ledger = struct
     in
     Js.array @@ Array.of_list account_list
 
-  (* TODO: this is not yet working!
-   * lacking API to create a proper tx on the JS side (authorization)
-   *)
   let apply_js_transaction l (p : parties) =
     apply_parties_transaction l (parties p)
 
