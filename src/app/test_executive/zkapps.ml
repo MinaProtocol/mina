@@ -99,7 +99,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (List.nth_exn config.extra_genesis_accounts 0).keypair
     in
     let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
-    let num_snapp_accounts = 3 in
+    let num_zkapp_accounts = 3 in
     let snapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
