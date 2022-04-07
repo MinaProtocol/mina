@@ -2,16 +2,17 @@ package delegation_backend
 
 import (
 	"bytes"
-	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
-	"github.com/btcsuite/btcutil/base58"
-	logging "github.com/ipfs/go-log/v2"
-	"golang.org/x/crypto/blake2b"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/storage"
+	"github.com/btcsuite/btcutil/base58"
+	logging "github.com/ipfs/go-log/v2"
+	"golang.org/x/crypto/blake2b"
 )
 
 type errorResponse struct {
@@ -32,12 +33,12 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 
 func (ctx *GoogleContext) GoogleStorageSave(objs ObjectsToSave) {
 	for path, bs := range objs {
-		writer := ctx.Bucket.Object(path).NewWriter(ctx.Context)
+		obj := ctx.Bucket.Object(path).If(storage.Conditions{DoesNotExist: true})
+		writer := obj.NewWriter(ctx.Context)
 		defer writer.Close()
 		_, err := io.Copy(writer, bytes.NewReader(bs))
 		if err != nil {
-			ctx.Log.Debugf("Error while saving metadata: %v", err)
-			return
+			ctx.Log.Warnf("Error while saving metadata: %v", err)
 		}
 	}
 }
@@ -63,18 +64,20 @@ type SubmitH struct {
 }
 
 type Paths struct {
-	metaPath  string
-	blockPath string
+	Meta  string
+	Block string
 }
 
-func makePaths(req *submitRequest) (res Paths) {
+func MakePathsImpl(submittedAt string, blockHash string, submitter Pk) (res Paths) {
+	res.Meta = strings.Join([]string{"submissions", submittedAt[:10], submittedAt + "-" + submitter.String() + ".json"}, "/")
+	res.Block = "blocks/" + blockHash + ".dat"
+	return
+}
+func makePaths(submittedAt time.Time, req *submitRequest) (Paths, string) {
 	blockHashBytes := blake2b.Sum256(req.Data.Block.data)
 	blockHash := base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
-	createdAtStr := req.Data.CreatedAt.UTC().Format(time.RFC3339)
-	pkStr := base58.CheckEncode(req.Submitter[:], BASE58CHECK_VERSION_PK)
-	res.metaPath = strings.Join([]string{"submissions", pkStr, blockHash, createdAtStr + ".json"}, "/")
-	res.blockPath = "blocks/" + blockHash + ".dat"
-	return
+	submittedAtStr := submittedAt.UTC().Format(time.RFC3339)
+	return MakePathsImpl(submittedAtStr, blockHash, req.Submitter), blockHash
 }
 
 func makeSignPayload(req *submitRequestData) ([]byte, error) {
@@ -88,8 +91,9 @@ func makeSignPayload(req *submitRequestData) ([]byte, error) {
 	signPayload.Write(req.Block.json)
 	signPayload.WriteString(",\"created_at\":")
 	signPayload.Write(createdAtJson)
-	signPayload.WriteString(",\"peer_id\":")
-	signPayload.Write(req.PeerId.json)
+	signPayload.WriteString(",\"peer_id\":\"")
+	signPayload.WriteString(req.PeerId)
+	signPayload.WriteString("\"")
 	if req.SnarkWork != nil {
 		signPayload.WriteString(",\"snark_work\":")
 		signPayload.Write(req.SnarkWork.json)
@@ -125,7 +129,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeErrorResponse(h.app, &w, "Wrong payload")
 		return
 	}
-	if req.Data.Block == nil || req.Data.PeerId == nil || req.Data.CreatedAt == nilTime || req.Submitter == nilPk || req.Sig == nilSig {
+	if req.Data.Block == nil || req.Data.PeerId == "" || req.Data.CreatedAt == nilTime || req.Submitter == nilPk || req.Sig == nilSig {
 		h.app.Log.Debug("One of required fields wasn't provided")
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "One of required fields wasn't provided")
@@ -168,11 +172,16 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var meta metaToBeSaved
-	meta.SubmittedAt = submittedAt
-	meta.PeerId = req.Data.PeerId
-	meta.SnarkWork = req.Data.SnarkWork
-	meta.RemoteAddr = r.RemoteAddr
+	ps, blockHash := makePaths(submittedAt, &req)
+
+	meta := MetaToBeSaved{
+		CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
+		PeerId:     req.Data.PeerId,
+		SnarkWork:  req.Data.SnarkWork,
+		RemoteAddr: r.RemoteAddr,
+		BlockHash:  blockHash,
+		Submitter:  req.Submitter,
+	}
 
 	metaBytes, err1 := json.Marshal(meta)
 	if err1 != nil {
@@ -182,11 +191,9 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ps := makePaths(&req)
-
 	toSave := make(ObjectsToSave)
-	toSave[ps.metaPath] = metaBytes
-	toSave[ps.blockPath] = req.Data.Block.data
+	toSave[ps.Meta] = metaBytes
+	toSave[ps.Block] = req.Data.Block.data
 	h.app.Save(toSave)
 
 	_, err2 := io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))
