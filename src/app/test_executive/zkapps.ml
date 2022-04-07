@@ -431,11 +431,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a zkApp transaction with an invalid nonce"
-        (send_invalid_snapp ~logger node parties_invalid_nonce "Invalid_nonce")
+        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
       section "Send a zkApp transaction with an invalid signature"
-        (send_invalid_snapp ~logger node parties_invalid_signature
+        (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
     let%bind () =

@@ -119,8 +119,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
-                ~state_body ~fee_excess:Amount.Signed.zero
-                ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
+                ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
                 [ ( `Pending_coinbase_init_stack init_stack
                   , `Pending_coinbase_of_statement pending_coinbase_state_stack
                   , parties )
