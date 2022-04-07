@@ -12,7 +12,9 @@ val run :
   -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:
-       External_transition.Initial_validated.t Envelope.Incoming.t
+       ( [ `Block of External_transition.Initial_validated.t Envelope.Incoming.t
+         ]
+       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t
   -> best_seen_transition:
        External_transition.Initial_validated.t Envelope.Incoming.t option

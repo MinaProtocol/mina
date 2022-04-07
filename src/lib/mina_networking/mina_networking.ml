@@ -988,6 +988,7 @@ module Rpcs = struct
         None
 end
 
+module Sinks = Sinks
 module Gossip_net = Gossip_net.Make (Rpcs)
 
 module Config = struct

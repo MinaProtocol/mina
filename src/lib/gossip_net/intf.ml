@@ -67,13 +67,17 @@ module type Gossip_net_intf = sig
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
-  val broadcast_state : t -> Message.state_msg -> unit Deferred.t
+  val broadcast_state :
+    ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t
 
   val broadcast_transaction_pool_diff :
-    t -> Message.transaction_pool_diff_msg -> unit Deferred.t
+       ?origin_topic:string
+    -> t
+    -> Message.transaction_pool_diff_msg
+    -> unit Deferred.t
 
   val broadcast_snark_pool_diff :
-    t -> Message.snark_pool_diff_msg -> unit Deferred.t
+    ?origin_topic:string -> t -> Message.snark_pool_diff_msg -> unit Deferred.t
 
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
