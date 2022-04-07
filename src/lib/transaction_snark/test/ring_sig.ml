@@ -171,35 +171,34 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
            let a = Ledger.get ledger loc |> Option.value_exn in
            Ledger.set ledger loc
              { a with
-               snapp =
+               zkapp =
                  Some
-                   { (Option.value ~default:Zkapp_account.default a.snapp) with
+                   { (Option.value ~default:Zkapp_account.default a.zkapp) with
                      verification_key = Some vk
                    }
              }) ;
           let sender_pk = sender.public_key |> Public_key.compress in
           let fee_payer =
-            { Party.Fee_payer.data =
-                { body =
-                    { public_key = sender_pk
-                    ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = Amount.to_fee fee
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; increment_nonce = ()
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = ()
-                    }
-                ; predicate = sender_nonce
+            { Party.Fee_payer.body =
+                { public_key = sender_pk
+                ; update = Party.Update.noop
+                ; token_id = ()
+                ; balance_change = Amount.to_fee fee
+                ; events = []
+                ; sequence_events = []
+                ; call_data = Field.zero
+                ; call_depth = 0
+                ; increment_nonce = ()
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = sender_nonce
+                ; use_full_commitment = ()
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
             }
           in
-          let sender_party_data : Party.Predicated.t =
+          let sender_party : Party.t =
             { body =
                 { public_key = sender_pk
                 ; update = Party.Update.noop
@@ -210,14 +209,17 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; sequence_events = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
                 ; use_full_commitment = false
                 }
-            ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+                (* Updated below *)
+            ; authorization = Signature Signature.dummy
             }
           in
-          let snapp_party_data : Party.Predicated.t =
-            { Party.Predicated.Poly.body =
+          let snapp_party : Party.t =
+            { body =
                 { public_key = ringsig_account_pk
                 ; update = Party.Update.noop
                 ; token_id = Token_id.default
@@ -227,22 +229,25 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = Full Zkapp_precondition.Account.accept
                 ; use_full_commitment = false
                 }
-            ; predicate = Full Snapp_predicate.Account.accept
+                (* Updated below *)
+            ; authorization = Signature Signature.dummy
             }
           in
-          let protocol_state = Snapp_predicate.Protocol_state.accept in
+          let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Parties.Call_forest.of_parties_list
-              ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-              [ sender_party_data; snapp_party_data ]
+              ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+              [ sender_party; snapp_party ]
             |> Parties.Call_forest.accumulate_hashes_predicated
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let protocol_state_predicate_hash =
-            Snapp_predicate.Protocol_state.digest protocol_state
+            Zkapp_precondition.Protocol_state.digest protocol_state
           in
           let memo = Signed_command_memo.empty in
           let memo_hash = Signed_command_memo.hash memo in
@@ -272,8 +277,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let fee_payer =
             let txn_comm =
               Parties.Transaction_commitment.with_fee_payer transaction
-                ~fee_payer_hash:
-                  Party.Predicated.(digest (of_fee_payer fee_payer.data))
+                ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
             in
             { fee_payer with
               authorization =
@@ -286,7 +290,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               Signature_lib.Schnorr.Chunked.sign sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
-            { Party.data = sender_party_data
+            { Party.body = sender_party.body
             ; authorization = Signature sender_signature
             }
           in
@@ -294,7 +298,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             { fee_payer
             ; other_parties =
                 [ sender
-                ; { data = snapp_party_data; authorization = Proof pi }
+                ; { body = snapp_party.body; authorization = Proof pi }
                 ]
             ; memo
             }
@@ -307,8 +311,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> fun () ->
             (* print other_party data *)
             List.iteri parties.other_parties ~f:(fun idx (p : Party.t) ->
-                Party.Predicated.to_yojson p.data
-                |> Yojson.Safe.pretty_to_string
+                Party.to_yojson p |> Yojson.Safe.pretty_to_string
                 |> printf "other_party #%d data:\n%s\n\n" idx)
             |> fun () ->
             (* print other_party proof *)
@@ -317,7 +320,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> printf "other_party_proof:\n%s\n\n"
             |> fun () ->
             (* print protocol_state *)
-            Snapp_predicate.Protocol_state.to_yojson protocol_state
+            Zkapp_precondition.Protocol_state.to_yojson protocol_state
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () -> apply_parties ledger [ parties ]))

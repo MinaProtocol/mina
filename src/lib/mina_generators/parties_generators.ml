@@ -8,8 +8,8 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
-  (* construct predicate using pk and ledger
+let gen_account_precondition_from ?(succeed = true) ~account_id ~ledger () =
+  (* construct account_precondition using pk and ledger
      don't return Accept, which would ignore those inputs
   *)
   let open Quickcheck.Let_syntax in
@@ -18,8 +18,8 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
       (* account not in the ledger, can't create meaningful Full or Nonce *)
       if succeed then
         failwithf
-          "gen_predicate_from: account id with public key %s and token id %s \
-           not in ledger"
+          "gen_account_precondition_from: account id with public key %s and \
+           token id %s not in ledger"
           (Signature_lib.Public_key.Compressed.to_base58_check
              (Account_id.public_key account_id))
           (Account_id.token_id account_id |> Token_id.to_string)
@@ -27,12 +27,13 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
       else
         (* nonce not connected with any particular account *)
         let%map nonce = Account.Nonce.gen in
-        Party.Predicate.Nonce nonce
+        Party.Account_precondition.Nonce nonce
   | Some loc -> (
       match Ledger.get ledger loc with
       | None ->
           failwith
-            "gen_predicate_from: could not find account with known location"
+            "gen_account_precondition_from: could not find account with known \
+             location"
       | Some account ->
           let%bind b = Quickcheck.Generator.bool in
           let { Account.Poly.public_key
@@ -40,7 +41,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
               ; nonce
               ; receipt_chain_hash
               ; delegate
-              ; snapp
+              ; zkapp
               ; _
               } =
             account
@@ -49,7 +50,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
           if b then
             (* Full *)
             let open Zkapp_basic in
-            let%bind (predicate_account : Snapp_predicate.Account.t) =
+            let%bind (predicate_account : Zkapp_precondition.Account.t) =
               let%bind balance =
                 let%bind balance_change_int =
                   Int.gen_uniform_incl 1 10_000_000
@@ -72,7 +73,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                       bal
                 in
                 Or_ignore.gen
-                  (return { Snapp_predicate.Closed_interval.lower; upper })
+                  (return { Zkapp_precondition.Closed_interval.lower; upper })
               in
               let%bind nonce =
                 let%bind balance_change_int = Int.gen_uniform_incl 1 100 in
@@ -90,15 +91,15 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                   | None ->
                       (* unreachable *)
                       failwith
-                        "gen_predicate_from: nonce subtraction failed \
-                         unexpectedly"
+                        "gen_account_precondition_from: nonce subtraction \
+                         failed unexpectedly"
                   | Some n ->
                       if Account.Nonce.( < ) n nonce then
                         Account.Nonce.max_value
                       else Account.Nonce.add nonce balance_change
                 in
                 Or_ignore.gen
-                  (return { Snapp_predicate.Closed_interval.lower; upper })
+                  (return { Zkapp_precondition.Closed_interval.lower; upper })
               in
               let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
               let public_key = Or_ignore.Check public_key in
@@ -110,7 +111,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     Or_ignore.gen (return pk)
               in
               let%bind state, sequence_state, proved_state =
-                match snapp with
+                match zkapp with
                 | None ->
                     let len =
                       Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
@@ -142,7 +143,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     return (state, sequence_state, proved_state)
               in
               return
-                { Snapp_predicate.Account.Poly.balance
+                { Zkapp_precondition.Account.Poly.balance
                 ; nonce
                 ; receipt_chain_hash
                 ; public_key
@@ -152,7 +153,8 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                 ; proved_state
                 }
             in
-            if succeed then return (Party.Predicate.Full predicate_account)
+            if succeed then
+              return (Party.Account_precondition.Full predicate_account)
             else
               let module Tamperable = struct
                 type t =
@@ -185,7 +187,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     in
                     let balance =
                       Or_ignore.Check
-                        { Snapp_predicate.Closed_interval.lower = new_balance
+                        { Zkapp_precondition.Closed_interval.lower = new_balance
                         ; upper = new_balance
                         }
                     in
@@ -197,7 +199,7 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                       else Account.Nonce.zero
                     in
                     let%bind nonce =
-                      Snapp_predicate.Numeric.gen (return new_nonce)
+                      Zkapp_precondition.Numeric.gen (return new_nonce)
                         Account.Nonce.compare
                     in
                     return { predicate_account with nonce }
@@ -238,12 +240,14 @@ let gen_predicate_from ?(succeed = true) ~account_id ~ledger () =
                     in
                     return { predicate_account with proved_state }
               in
-              return (Party.Predicate.Full faulty_predicate_account)
+              return (Party.Account_precondition.Full faulty_predicate_account)
           else
             (* Nonce *)
             let { Account.Poly.nonce; _ } = account in
-            if succeed then return (Party.Predicate.Nonce nonce)
-            else return (Party.Predicate.Nonce (Account.Nonce.succ nonce)) )
+            if succeed then return (Party.Account_precondition.Nonce nonce)
+            else
+              return
+                (Party.Account_precondition.Nonce (Account.Nonce.succ nonce)) )
 
 let gen_fee (account : Account.t) =
   let lo_fee = Mina_compile_config.minimum_user_command_fee in
@@ -307,7 +311,7 @@ let gen_use_full_commitment ~increment_nonce () :
   else Quickcheck.Generator.return true
 
 let closed_interval_exact value =
-  Snapp_predicate.Closed_interval.{ lower = value; upper = value }
+  Zkapp_precondition.Closed_interval.{ lower = value; upper = value }
 
 let gen_epoch_data_predicate
     (epoch_data :
@@ -318,8 +322,8 @@ let gen_epoch_data_predicate
       , State_hash.Stable.V1.t
       , State_hash.Stable.V1.t
       , Mina_numbers.Length.Stable.V1.t )
-      Snapp_predicate.Protocol_state.Epoch_data.Poly.t) :
-    Snapp_predicate.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
+      Zkapp_precondition.Protocol_state.Epoch_data.Poly.t) :
+    Zkapp_precondition.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind ledger =
     let%bind hash =
@@ -349,14 +353,15 @@ let gen_epoch_data_predicate
   ; epoch_length
   }
 
-let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
-    Snapp_predicate.Protocol_state.t Base_quickcheck.Generator.t =
+let gen_protocol_state_precondition
+    (psv : Zkapp_precondition.Protocol_state.View.t) :
+    Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind snarked_ledger_hash =
     Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
   let%bind timestamp =
-    Snapp_predicate.Closed_interval.
+    Zkapp_precondition.Closed_interval.
       { lower = psv.timestamp; upper = Block_time.max_value }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
@@ -384,7 +389,7 @@ let gen_protocol_state_predicate (psv : Snapp_predicate.Protocol_state.View.t) :
     gen_epoch_data_predicate psv.staking_epoch_data
   in
   let%map next_epoch_data = gen_epoch_data_predicate psv.next_epoch_data in
-  { Snapp_predicate.Protocol_state.Poly.snarked_ledger_hash
+  { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
   ; timestamp
   ; blockchain_length
   ; min_window_density
@@ -405,7 +410,8 @@ module Party_body_components = struct
        , 'call_data
        , 'int
        , 'bool
-       , 'protocol_state )
+       , 'protocol_state_precondition
+       , 'account_precondition )
        t =
     { public_key : 'pk
     ; update : 'update
@@ -416,7 +422,8 @@ module Party_body_components = struct
     ; sequence_events : 'events
     ; call_data : 'call_data
     ; call_depth : 'int
-    ; protocol_state : 'protocol_state
+    ; protocol_state_precondition : 'protocol_state_precondition
+    ; account_precondition : 'account_precondition
     ; use_full_commitment : 'bool
     }
 
@@ -430,7 +437,8 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
+    ; account_precondition = Account.Nonce.zero
     ; use_full_commitment = t.use_full_commitment
     }
 
@@ -444,7 +452,8 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state = t.protocol_state
+    ; protocol_state_precondition = t.protocol_state_precondition
+    ; account_precondition = t.account_precondition
     ; use_full_commitment = t.use_full_commitment
     }
 end
@@ -456,7 +465,7 @@ end
    The type `c` is associated with the `token_id` field, which is `unit` for the
    fee payer, and `Token_id.t` for other parties.
 *)
-let gen_party_body_components (type a b c) ?account_id ?balances_tbl
+let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
     ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
     ?available_public_keys ?permissions_auth
     ?(required_balance_change : a option)
@@ -464,8 +473,9 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
-    ~(f_token_id : Token_id.t -> c) ~ledger () :
-    (_, _, _, a, _, _, _, b, _) Party_body_components.t Quickcheck.Generator.t =
+    ~(f_token_id : Token_id.t -> c) ~f_account_predcondition ~ledger () :
+    (_, _, _, a, _, _, _, b, _, d) Party_body_components.t
+    Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
@@ -527,7 +537,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
           let account =
             if zkapp_account then
               { account_with_pk with
-                snapp =
+                zkapp =
                   Some
                     { Zkapp_account.default with
                       verification_key =
@@ -563,7 +573,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
             Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
           in
           let account = Ledger.get_at_index_exn ledger index in
-          if zkapp_account && Option.is_none account.snapp then
+          if zkapp_account && Option.is_none account.zkapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
           account
       | Some account_id -> (
@@ -589,7 +599,7 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some acct ->
-                  if zkapp_account && Option.is_none acct.snapp then
+                  if zkapp_account && Option.is_none acct.zkapp then
                     failwith
                       "gen_party_body: provided account has no snapp field" ;
                   return acct ) )
@@ -656,11 +666,14 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
+  let%bind account_precondition =
+    f_account_predcondition (Account.identifier account) ledger ()
+  in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
-  let%bind protocol_state =
-    Option.value_map protocol_state_view ~f:gen_protocol_state_predicate
-      ~default:(return Snapp_predicate.Protocol_state.accept)
+  let%bind protocol_state_precondition =
+    Option.value_map protocol_state_view ~f:gen_protocol_state_precondition
+      ~default:(return Zkapp_precondition.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment in
   let token_id = f_token_id token_id in
@@ -673,30 +686,10 @@ let gen_party_body_components (type a b c) ?account_id ?balances_tbl
   ; sequence_events
   ; call_data
   ; call_depth
-  ; protocol_state
+  ; protocol_state_precondition
+  ; account_precondition
   ; use_full_commitment
   }
-
-let gen_predicated_from ?(succeed = true) ?(new_account = false) ?account_id
-    ?(zkapp_account = false) ?(increment_nonce = false) ?available_public_keys
-    ?permissions_auth ?required_balance_change ?required_balance ~ledger
-    ~balances_tbl ?protocol_state_view () =
-  let open Quickcheck.Let_syntax in
-  let%bind body_components =
-    gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
-      ?permissions_auth ?account_id ?available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~balances_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
-      ~f_balance_change:Fn.id () ~f_token_id:Fn.id
-      ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
-      ?protocol_state_view
-  in
-  let body = Party_body_components.to_typical_party body_components in
-  let account_id =
-    Account_id.create body.Party.Body.public_key body.Party.Body.token_id
-  in
-  let%map predicate = gen_predicate_from ~succeed ~account_id ~ledger () in
-  { Party.Predicated.Poly.body; predicate }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
@@ -717,18 +710,38 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
     | None ->
         false
   in
-  let%bind data =
-    gen_predicated_from ?permissions_auth ?account_id ?required_balance_change
-      ?required_balance ~succeed ~new_account ~zkapp_account ~increment_nonce
-      ~available_public_keys ~ledger ~balances_tbl ()
+  let%bind body_components =
+    gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
+      ?permissions_auth ?account_id ~available_public_keys
+      ?required_balance_change ?required_balance ~ledger ~balances_tbl
+      ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
+      ~f_balance_change:Fn.id () ~f_token_id:Fn.id
+      ~f_account_predcondition:(fun account_id ledger ->
+        gen_account_precondition_from ~succeed ~account_id ~ledger)
+      ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
-  return { Party.data; authorization }
+  let body = Party_body_components.to_typical_party body_components in
+  return { Party.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
-    ?protocol_state_view () :
-    Party.Predicated.Fee_payer.t Quickcheck.Generator.t =
+let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
+    ?protocol_state_view () : Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
+  let account_precondition_gen account_id ledger () =
+    let account =
+      match Ledger.location_of_account ledger account_id with
+      | None ->
+          failwith
+            "gen_party_predicated_fee_payer: expected account to be in ledger"
+      | Some loc -> (
+          match Ledger.get ledger loc with
+          | None ->
+              failwith "gen_party_predicated_fee_payer: no account at location"
+          | Some account ->
+              account )
+    in
+    Quickcheck.Generator.return account.nonce
+  in
   let%map body_components =
     gen_party_body_components ?permissions_auth ~account_id ~is_fee_payer:true
       ~increment_nonce:() ~gen_balance_change:gen_fee
@@ -739,37 +752,21 @@ let gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
         *)
         assert (Token_id.equal token_id Token_id.default) ;
         ())
+      ~f_account_predcondition:account_precondition_gen
       ~gen_use_full_commitment:(return ()) ~ledger ?protocol_state_view ()
   in
-  let body = Party_body_components.to_fee_payer body_components in
-  (* use nonce from account in ledger *)
-  let pk = body.public_key in
-  let account_id = Account_id.create pk Token_id.default in
-  let account =
-    match Ledger.location_of_account ledger account_id with
-    | None ->
-        failwith
-          "gen_party_predicated_fee_payer: expected account to be in ledger"
-    | Some loc -> (
-        match Ledger.get ledger loc with
-        | None ->
-            failwith "gen_party_predicated_fee_payer: no account at location"
-        | Some account ->
-            account )
-  in
-  let predicate = account.nonce in
-  { Party.Predicated.Poly.body; predicate }
+  Party_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
     : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let%map data =
-    gen_party_predicated_fee_payer ?permissions_auth ~account_id ~ledger
+  let%map body =
+    gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
       ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  { Party.Fee_payer.data; authorization }
+  { Party.Fee_payer.body; authorization }
 
 (* keep max_other_parties small, so snapp integration tests don't need lots
    of block producers
@@ -826,11 +823,11 @@ let gen_parties_from ?(succeed = true)
   let balances_tbl = Signature_lib.Public_key.Compressed.Table.create () in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     (* add fee payer account, in case same account used again *)
-    let fee_payer_pk = fee_payer.data.body.public_key in
+    let fee_payer_pk = fee_payer.body.public_key in
     let fee_payer_balance =
       (* if we've done things right, all the options here are Some *)
       let fee =
-        fee_payer.data.body.balance_change |> Currency.Fee.to_uint64
+        fee_payer.body.balance_change |> Currency.Fee.to_uint64
         |> Currency.Amount.of_uint64
       in
       let ledger_balance =
@@ -877,8 +874,7 @@ let gen_parties_from ?(succeed = true)
           (* authorization according to chosen permissions auth *)
           let authorization = Control.dummy_of_tag permissions_auth in
           let account_id =
-            Account_id.create party0.data.body.public_key
-              party0.data.body.token_id
+            Account_id.create party0.body.public_key party0.body.token_id
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
@@ -905,7 +901,7 @@ let gen_parties_from ?(succeed = true)
   let balance_change_sum =
     List.fold other_parties0 ~init:Currency.Amount.Signed.zero
       ~f:(fun acc party ->
-        match Currency.Amount.Signed.add acc party.data.body.balance_change with
+        match Currency.Amount.Signed.add acc party.body.balance_change with
         | Some sum ->
             sum
         | None ->
@@ -944,8 +940,7 @@ let gen_parties_from ?(succeed = true)
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
-    Party.Predicated.of_fee_payer parties_dummy_signatures.fee_payer.data
-    |> Party.Predicated.digest
+    Party.of_fee_payer parties_dummy_signatures.fee_payer |> Party.digest
   in
   let fee_payer_signature =
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -963,8 +958,8 @@ let gen_parties_from ?(succeed = true)
       parties_dummy_signatures.other_parties
   in
   let protocol_state_predicate_hash =
-    Snapp_predicate.Protocol_state.digest
-      parties_dummy_signatures.fee_payer.data.body.protocol_state
+    Zkapp_precondition.Protocol_state.digest
+      parties_dummy_signatures.fee_payer.body.protocol_state_precondition
   in
   let tx_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash
@@ -983,11 +978,11 @@ let gen_parties_from ?(succeed = true)
   (* replace dummy signatures in other parties *)
   let other_parties_with_valid_signatures =
     List.map parties_dummy_signatures.other_parties
-      ~f:(fun { data; authorization } ->
+      ~f:(fun { body; authorization } ->
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
-              let pk = data.body.public_key in
+              let pk = body.public_key in
               let sk =
                 match
                   Signature_lib.Public_key.Compressed.Map.find keymap pk
@@ -1001,13 +996,13 @@ let gen_parties_from ?(succeed = true)
                       (Signature_lib.Public_key.Compressed.to_base58_check pk)
                       ()
               in
-              let use_full_commitment = data.body.use_full_commitment in
+              let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_other_party ~use_full_commitment sk in
               Control.Signature signature
           | Proof _ | None_given ->
               authorization
         in
-        { Party.data; authorization = authorization_with_valid_signature })
+        { Party.body; authorization = authorization_with_valid_signature })
   in
   return
     { parties_dummy_signatures with

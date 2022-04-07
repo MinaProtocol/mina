@@ -46,15 +46,14 @@ func newApp() *app {
 
 func (app *app) SetConnectionHandlers() {
 	app.setConnectionHandlersOnce.Do(func() {
-		app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.P2p.ConnectionManager.AddOnConnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
 			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
-		}
-
-		app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		})
+		app.P2p.ConnectionManager.AddOnDisconnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
 			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
-		}
+		})
 	})
 }
 
