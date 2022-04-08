@@ -208,37 +208,41 @@ module Stable = struct
         let d = Common.wrap_domains.h in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
-        let wrap_vk : Impls.Wrap.Verification_key.t =
-          { domain =
-              { log_size_of_group = log2_size
-              ; group_gen = Backend.Tock.Field.domain_generator log2_size
-              }
-          ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-          ; max_quot_size
-          ; srs = Backend.Tock.Keypair.load_urs ()
-          ; evals =
-              (let g (x, y) =
-                 { Kimchi.Protocol.unshifted =
-                     [| Kimchi.Foundations.Finite (x, y) |]
-                 ; shifted = None
-                 }
-               in
-               { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
-               ; coefficients_comm =
-                   Array.map ~f:g (Vector.to_array c.coefficients_comm)
-               ; generic_comm = g c.generic_comm
-               ; mul_comm = g c.mul_comm
-               ; psm_comm = g c.psm_comm
-               ; emul_comm = g c.emul_comm
-               ; complete_add_comm = g c.complete_add_comm
-               ; endomul_scalar_comm = g c.endomul_scalar_comm
-               ; chacha_comm = None
-               })
-          ; shifts = Common.tock_shifts ~log2_size
-          ; lookup_index = None
-          }
+        (* we only compute the wrap_vk if the srs can be loaded *)
+        let srs =
+          try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None
         in
-        { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }
+        let wrap_vk =
+          Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
+              { domain =
+                  { log_size_of_group = log2_size
+                  ; group_gen = Backend.Tock.Field.domain_generator log2_size
+                  }
+              ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; max_quot_size
+              ; srs
+              ; evals =
+                  (let g (x, y) =
+                     { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
+                     ; shifted = None
+                     }
+                   in
+                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+                   ; coefficients_comm =
+                       Array.map ~f:g (Vector.to_array c.coefficients_comm)
+                   ; generic_comm = g c.generic_comm
+                   ; mul_comm = g c.mul_comm
+                   ; psm_comm = g c.psm_comm
+                   ; emul_comm = g c.emul_comm
+                   ; complete_add_comm = g c.complete_add_comm
+                   ; endomul_scalar_comm = g c.endomul_scalar_comm
+                   ; chacha_comm = None
+                   })
+              ; shifts = Common.tock_shifts ~log2_size
+              ; lookup_index = None
+              })
+        in
+        { Poly.step_data; max_width; wrap_index = c; wrap_vk }
 
       (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
 

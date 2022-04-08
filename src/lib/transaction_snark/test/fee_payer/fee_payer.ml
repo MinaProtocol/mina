@@ -16,7 +16,7 @@ let%test_module "Fee payer tests" =
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
       }
 
@@ -31,9 +31,9 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -56,9 +56,9 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -80,9 +80,9 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
@@ -108,9 +108,9 @@ let%test_module "Fee payer tests" =
             ; fee
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
@@ -138,9 +138,9 @@ let%test_module "Fee payer tests" =
                 ; fee
                 ; receivers = []
                 ; amount
-                ; snapp_account_keypairs = [ fst spec.sender ]
+                ; zkapp_account_keypairs = [ fst spec.sender ]
                 ; memo
-                ; new_snapp_account = true
+                ; new_zkapp_account = true
                 ; snapp_update
                 ; current_auth = Permissions.Auth_required.Signature
                 ; call_data = Snark_params.Tick.Field.zero
