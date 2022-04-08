@@ -9,4 +9,4 @@ set -x
 curl \
   -X POST \
   -H "Content-Type: application/json" \
-  -d "$(printf '{ "query": "mutation($input: SendSnappInput!) { sendSnapp(input: $input) %s }" , "variables": { "input": { "parties": %s } } }' "$1" "$2")" $3
+  -d "$(printf '{ "query": "mutation($input: SendZkappInput!) { sendZkapp(input: $input) %s }" , "variables": { "input": { "parties": %s } } }' "$1" "$2")" $3
