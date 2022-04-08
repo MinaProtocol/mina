@@ -19,14 +19,6 @@ import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
 
 const defaultValidUntil = "4294967295";
 
-// Shut down wasm workers, which are not needed here
-if (globalThis.wasm_rayon_poolbuilder) {
-  globalThis.wasm_rayon_poolbuilder.free();
-  for (let worker of globalThis.wasm_workers) {
-    worker.terminate();
-  }
-}
-
 class Client {
   private network: Network;
 
