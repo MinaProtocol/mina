@@ -47,4 +47,5 @@
    coda_genesis_ledger
    block_time
    o1trace
+   mina_net2
    ))

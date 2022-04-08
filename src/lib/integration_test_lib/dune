@@ -42,4 +42,5 @@
    integers
    unsigned_extended
    transition_handler
+   data_hash_lib
 ))
