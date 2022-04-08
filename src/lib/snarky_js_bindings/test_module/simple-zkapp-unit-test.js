@@ -11,29 +11,16 @@ import {
   call,
   isReady,
   shutdown,
+  Permissions,
 } from "snarkyjs";
+import { tic, toc } from "./tictoc.js";
 
 await isReady;
-
-// helper for printing timings
-
-let timingStack = [];
-let i = 0;
-function tic(label = `Run command ${i++}`) {
-  process.stdout.write(`${label}... `);
-  timingStack.push([label, Date.now()]);
-}
-function toc() {
-  let [label, start] = timingStack.pop();
-  let time = (Date.now() - start) / 1000; // in seconds
-  process.stdout.write(`\r${label}... ${time.toFixed(3)} sec\n`);
-}
 
 // PART 1: snarkyjs
 
 // declare the zkapp in snarkyjs
-const transactionFee = 10_000_000;
-// const initialBalance = 10_000_000_000; // TODO add initial balance (=> snarkyjs needs access to fee payer)
+const transactionFee = 1_000_000_000;
 const initialState = Field(1);
 class SimpleZkapp extends SmartContract {
   constructor(address) {
@@ -42,7 +29,7 @@ class SimpleZkapp extends SmartContract {
   }
 
   deploy() {
-    super.deploy();
+    this.self.update.permissions.setValue(Permissions.default());
     this.x.set(initialState);
   }
 
@@ -65,10 +52,13 @@ toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, zkappKey, verificationKey);
+let partiesJsonDeploy = await deploy(SimpleZkapp, {
+  zkappKey,
+  verificationKey,
+});
 toc();
 
-// update transaciton
+// update transaction
 tic("create update transaction (with proof)");
 let partiesJsonUpdate = await call(
   SimpleZkapp,
