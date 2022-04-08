@@ -1,9 +1,6 @@
 module T = Keypair_read_write.Make (struct
   let env = "MINA_PRIVKEY_PASS"
 
-  (* TODO: remove eventually *)
-  let env_deprecated = Some "CODA_PRIVKEY_PASS"
-
   let which = "Mina keypair"
 end)
 

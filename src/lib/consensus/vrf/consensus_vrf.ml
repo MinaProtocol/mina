@@ -94,13 +94,13 @@ module Message = struct
   let to_input
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ({ global_slot; seed; delegator } : value) =
-    { Random_oracle.Input.field_elements = [| (seed :> Tick.field) |]
-    ; bitstrings =
-        [| Global_slot.Bits.to_bits global_slot
-         ; Mina_base.Account.Index.to_bits
-             ~ledger_depth:constraint_constants.ledger_depth delegator
-        |]
-    }
+    let open Random_oracle.Input.Chunked in
+    Array.reduce_exn ~f:append
+      [| field (seed :> Tick.field)
+       ; Global_slot.to_input global_slot
+       ; Mina_base.Account.Index.to_input
+           ~ledger_depth:constraint_constants.ledger_depth delegator
+      |]
 
   let data_spec
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -123,19 +123,16 @@ module Message = struct
     |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
   module Checked = struct
-    open Tick
-
     let to_input ({ global_slot; seed; delegator } : var) =
-      let open Tick.Checked.Let_syntax in
-      let%map global_slot = Global_slot.Checked.to_bits global_slot in
-      let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-      { Random_oracle.Input.field_elements =
-          [| Mina_base.Epoch_seed.var_to_hash_packed seed |]
-      ; bitstrings = [| s global_slot; delegator |]
-      }
+      let open Random_oracle.Input.Chunked in
+      Array.reduce_exn ~f:append
+        [| field (Mina_base.Epoch_seed.var_to_hash_packed seed)
+         ; Global_slot.Checked.to_input global_slot
+         ; Mina_base.Account.Index.Unpacked.to_input delegator
+        |]
 
     let hash_to_group msg =
-      let%bind input = to_input msg in
+      let input = to_input msg in
       Tick.make_checked (fun () ->
           Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
             (Random_oracle.Checked.pack_input input)
@@ -226,6 +223,14 @@ module Output = struct
       in
       Bignum.(
         of_bigint n / of_bigint Bignum_bigint.(shift_left one length_in_bits))
+
+    let to_input (t : t) =
+      List.map (to_bits t) ~f:(fun b -> (Mina_base.Util.field_of_bool b, 1))
+      |> List.to_array |> Random_oracle.Input.Chunked.packeds
+
+    let var_to_input (t : var) =
+      Array.map t ~f:(fun b -> ((b :> Tick.Field.Var.t), 1))
+      |> Random_oracle.Input.Chunked.packeds
   end
 
   open Tick
@@ -241,7 +246,7 @@ module Output = struct
   let hash ~constraint_constants msg g =
     let x, y = Non_zero_curve_point.of_inner_curve_exn g in
     let input =
-      Random_oracle.Input.(
+      Random_oracle.Input.Chunked.(
         append
           (Message.to_input ~constraint_constants msg)
           (field_elements [| x; y |]))
@@ -257,9 +262,9 @@ module Output = struct
           |> Array.of_list)
 
     let hash msg (x, y) =
-      let%bind msg = Message.Checked.to_input msg in
+      let msg = Message.Checked.to_input msg in
       let input =
-        Random_oracle.Input.(append msg (field_elements [| x; y |]))
+        Random_oracle.Input.Chunked.(append msg (field_elements [| x; y |]))
       in
       make_checked (fun () ->
           let open Random_oracle.Checked in
@@ -330,7 +335,14 @@ module Threshold = struct
     Bignum.(lhs <= rhs)
 
   module Checked = struct
-    let is_satisfied ~my_stake ~total_stake (vrf_output : Output.Truncated.var)
+    let balance_upper_bound =
+      Bignum_bigint.(one lsl Currency.Balance.length_in_bits)
+
+    let amount_upper_bound =
+      Bignum_bigint.(one lsl Currency.Amount.length_in_bits)
+
+    let is_satisfied ~(my_stake : Currency.Balance.var)
+        ~(total_stake : Currency.Amount.var) (vrf_output : Output.Truncated.var)
         =
       let open Currency in
       let open Snark_params.Tick in
@@ -342,8 +354,14 @@ module Threshold = struct
             Exp.one_minus_exp ~m params
               (Floating_point.of_quotient ~m
                  ~precision:params.per_term_precision
-                 ~top:(Integer.of_bits ~m (Balance.var_to_bits my_stake))
-                 ~bottom:(Integer.of_bits ~m (Amount.var_to_bits total_stake))
+                 ~top:
+                   (Integer.create
+                      ~value:(Balance.pack_var my_stake)
+                      ~upper_bound:balance_upper_bound)
+                 ~bottom:
+                   (Integer.create
+                      ~value:(Amount.pack_var total_stake)
+                      ~upper_bound:amount_upper_bound)
                  ~top_is_less_than_bottom:())
           in
           let vrf_output = Array.to_list (vrf_output :> Boolean.var array) in
@@ -358,15 +376,11 @@ end
 module Evaluation_hash = struct
   let hash_for_proof ~constraint_constants message public_key g1 g2 =
     let input =
-      let open Random_oracle_input in
       let g_to_input g =
-        { field_elements =
-            (let f1, f2 = Group.to_affine_exn g in
-             [| f1; f2 |])
-        ; bitstrings = [||]
-        }
+        let f1, f2 = Group.to_affine_exn g in
+        Random_oracle_input.Chunked.field_elements [| f1; f2 |]
       in
-      Array.reduce_exn ~f:Random_oracle_input.append
+      Array.reduce_exn ~f:Random_oracle_input.Chunked.append
         [| Message.to_input ~constraint_constants message
          ; g_to_input public_key
          ; g_to_input g1
@@ -383,14 +397,12 @@ module Evaluation_hash = struct
   module Checked = struct
     let hash_for_proof message public_key g1 g2 =
       let open Tick.Checked.Let_syntax in
-      let%bind input =
-        let open Random_oracle_input in
+      let input =
         let g_to_input (f1, f2) =
-          { field_elements = [| f1; f2 |]; bitstrings = [||] }
+          Random_oracle_input.Chunked.field_elements [| f1; f2 |]
         in
-        let%map message_input = Message.Checked.to_input message in
-        Array.reduce_exn ~f:Random_oracle_input.append
-          [| message_input
+        Array.reduce_exn ~f:Random_oracle_input.Chunked.append
+          [| Message.Checked.to_input message
            ; g_to_input public_key
            ; g_to_input g1
            ; g_to_input g2
@@ -465,14 +477,14 @@ struct
 end
 
 type evaluation =
-  ( Marlin_plonk_bindings_pasta_pallas.t
-  , Marlin_plonk_bindings_pasta_fq.t
+  ( Pasta_bindings.Pallas.t
+  , Pasta_bindings.Fq.t
     Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
   Vrf_lib.Standalone.Evaluation.Poly.t
 
 type context =
-  ( (Unsigned.uint32, Marlin_plonk_bindings_pasta_fp.t, int) Message.t
-  , Marlin_plonk_bindings_pasta_pallas.t )
+  ( (Unsigned.uint32, Pasta_bindings.Fp.t, int) Message.t
+  , Pasta_bindings.Pallas.t )
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct

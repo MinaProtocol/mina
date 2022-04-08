@@ -3,7 +3,16 @@
  (public_name sparse_ledger_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel logger)
+ (libraries
+   ;; opam libraries
+   base.caml
+   core_kernel
+   sexplib0
+   base
+   ppx_inline_test.config
+   bin_prot.shape
+   result
+ )
  (preprocess
   (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))
  (instrumentation (backend bisect_ppx))

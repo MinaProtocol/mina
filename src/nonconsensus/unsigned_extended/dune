@@ -3,7 +3,23 @@
  (public_name unsigned_extended_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel integers snark_params_nonconsensus ppx_dhall_type ppx_version)
+ (libraries
+   ;;opam libraries
+   base.caml
+   result
+   base
+   integers
+   core_kernel
+   sexplib0
+   bignum.bigint
+   base.base_internalhash_types
+   bin_prot.shape
+   ppx_inline_test.config
+   ;;local libraries
+   bignum_bigint
+   ppx_dhall_type
+   snark_params_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare

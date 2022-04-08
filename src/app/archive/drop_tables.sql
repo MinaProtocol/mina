@@ -1,37 +1,87 @@
-drop table blocks_internal_commands;
+/* delete all relations and types from the archive database
 
-drop table blocks_user_commands;
+   it is not necessary to explicitly drop indexes, they're removed when dropping the relation
+    containing the indexed column
+*/
 
-drop table balances;
+DROP TABLE blocks_internal_commands;
 
-drop index idx_blocks_height;
+DROP TABLE blocks_user_commands;
 
-drop index idx_blocks_creator_id;
+DROP TABLE blocks_zkapp_commands;
 
-drop index idx_blocks_state_hash;
+DROP TABLE zkapp_party_balances;
 
-drop table blocks;
+DROP TABLE balances;
 
-drop table epoch_data;
+DROP TABLE blocks;
 
-drop table internal_commands;
+DROP TABLE epoch_data;
 
-drop type internal_command_type;
+DROP TABLE internal_commands;
 
-drop table user_commands;
+DROP TYPE internal_command_type;
 
-drop type user_command_type;
+DROP TABLE user_commands;
 
-drop type user_command_status;
+DROP TYPE user_command_type;
 
-drop index idx_snarked_ledger_hashes_value;
+DROP TYPE user_command_status;
 
-drop table snarked_ledger_hashes;
+DROP TABLE zkapp_commands;
 
-drop index idx_public_keys_value;
+DROP TABLE zkapp_party;
 
-drop index idx_public_key_id;
+DROP TABLE zkapp_fee_payers;
 
-drop table timing_info;
+DROP TABLE zkapp_party_body;
 
-drop table public_keys;
+DROP TABLE zkapp_updates;
+
+DROP TABLE zkapp_protocol_state_precondition;
+
+DROP TABLE zkapp_account_precondition;
+
+DROP TABLE zkapp_account;
+
+DROP TABLE zkapp_epoch_data;
+
+DROP TABLE zkapp_epoch_ledger;
+
+DROP TABLE zkapp_permissions;
+
+DROP TABLE zkapp_state_data_array;
+
+DROP TABLE zkapp_states;
+
+DROP TABLE zkapp_state_data;
+
+DROP TABLE zkapp_timing_info;
+
+DROP TABLE zkapp_verification_keys;
+
+DROP TABLE zkapp_amount_bounds;
+
+DROP TABLE zkapp_balance_bounds;
+
+DROP TABLE zkapp_length_bounds;
+
+DROP TABLE zkapp_global_slot_bounds;
+
+DROP TABLE zkapp_nonce_bounds;
+
+DROP TABLE zkapp_timestamp_bounds;
+
+DROP TABLE zkapp_token_id_bounds;
+
+DROP TYPE zkapp_auth_required_type;
+
+DROP TYPE zkapp_authorization_kind_type;
+
+DROP TYPE zkapp_account_precondition_type;
+
+DROP TABLE snarked_ledger_hashes;
+
+DROP TABLE timing_info;
+
+DROP TABLE public_keys;

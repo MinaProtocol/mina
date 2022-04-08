@@ -53,6 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
+                ~soft_timeout:(Network_time_span.Slots 3)
                 ~hard_timeout:
                   (Network_time_span.Literal
                      (Time.Span.of_ms (15. *. 60. *. 1000.))) ))

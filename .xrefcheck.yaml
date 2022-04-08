@@ -11,6 +11,7 @@ traversal:
     # Git submodules
     - src/external
     - src/lib/marlin
+    - src/lib/crypto/proof-systems
     - src/lib/snarky
     - frontend/wallet/tablecloth
 

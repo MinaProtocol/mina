@@ -4,6 +4,10 @@ open Mina_base
 
 type t = unit
 
+type invalid = Common.invalid [@@deriving bin_io_unversioned]
+
+let invalid_to_string = Common.invalid_to_string
+
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ~proof_level ~constraint_constants:_ ~pids:_ ~conf_dir:_ =
@@ -15,24 +19,33 @@ let create ~logger:_ ~proof_level ~constraint_constants:_ ~pids:_ ~conf_dir:_ =
 
 let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
 
+(* N.B.: Valid_assuming is never returned, in fact; we assert a return type
+   containing Valid_assuming to match the expected type
+*)
 let verify_commands _ (cs : User_command.Verifiable.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
-    | `Invalid
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t
-      * Mina_base.Snapp_statement.t
+      * Mina_base.Zkapp_statement.t
       * Pickles.Side_loaded.Proof.t )
-      list ]
+      list
+    | Common.invalid ]
     list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
       match Common.check c with
       | `Valid c ->
           `Valid c
-      | `Invalid ->
-          `Invalid
       | `Valid_assuming (c, _) ->
-          `Valid c)
+          `Valid c
+      | `Invalid_keys keys ->
+          `Invalid_keys keys
+      | `Invalid_signature keys ->
+          `Invalid_signature keys
+      | `Invalid_proof ->
+          `Invalid_proof
+      | `Missing_verification_key keys ->
+          `Missing_verification_key keys)
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

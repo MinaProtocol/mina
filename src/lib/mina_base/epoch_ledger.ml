@@ -1,7 +1,6 @@
 open Core_kernel
 open Currency
 open Snark_params.Tick
-open Bitstring_lib
 
 module Poly = struct
   [%%versioned
@@ -9,7 +8,7 @@ module Poly = struct
     module V1 = struct
       type ('ledger_hash, 'amount) t =
         { hash : 'ledger_hash; total_currency : 'amount }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 end
@@ -28,10 +27,8 @@ module Value = struct
 end
 
 let to_input ({ hash; total_currency } : Value.t) =
-  let open Snark_params.Tick in
-  { Random_oracle.Input.field_elements = [| (hash :> Field.t) |]
-  ; bitstrings = [| Amount.to_bits total_currency |]
-  }
+  Random_oracle_input.Chunked.(
+    append (field (hash :> Field.t)) (Amount.to_input total_currency))
 
 type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
 
@@ -43,11 +40,9 @@ let typ : (var, Value.t) Typ.t =
     ~value_of_hlist:Poly.of_hlist
 
 let var_to_input ({ Poly.hash; total_currency } : var) =
-  { Random_oracle.Input.field_elements =
-      [| Frozen_ledger_hash0.var_to_hash_packed hash |]
-  ; bitstrings =
-      [| Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency) |]
-  }
+  let total_currency = Amount.var_to_input total_currency in
+  Random_oracle_input.Chunked.(
+    append (field (Frozen_ledger_hash0.var_to_hash_packed hash)) total_currency)
 
 let if_ cond ~(then_ : (Frozen_ledger_hash0.var, Amount.var) Poly.t)
     ~(else_ : (Frozen_ledger_hash0.var, Amount.var) Poly.t) =

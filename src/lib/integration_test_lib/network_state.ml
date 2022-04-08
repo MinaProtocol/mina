@@ -149,7 +149,7 @@ module Make
                           in
                           [%log debug] "GOSSIP RECEIVED by $node"
                             ~metadata:[ ("node", `String (Node.id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                          [%log debug] "GOSSIP RECEIVED received event: $event"
                             ~metadata:
                               [ ( "event"
                                 , Event_type.event_to_yojson
@@ -228,7 +228,7 @@ module Make
                           |> Option.value ~default:State_hash.Set.empty )
                           breadcrumb.state_hash
                       in
-                      [%log info]
+                      [%log debug]
                         "adding or updating txn_hash %s to \
                          state.blocks_including_txn"
                         (Transaction_hash.to_base58_check hash) ;
