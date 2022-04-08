@@ -3,8 +3,8 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+(* Only show stdout for failed inline tests.
+open Inline_test_quiet_logs*)
 open Core
 open Async
 open Mina_base
@@ -2467,6 +2467,7 @@ let%test_module _ =
             [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2
             ; mk_account ~idx:1 ~balance:1_000_000_000_000_000 ~nonce:2
             ] ;
+          Core.eprintf "Before first write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2477,6 +2478,7 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
+          Core.eprintf "After first write\n%!" ;
           let cmds_wo_check =
             List.map ~f:User_command.forget_check
               (expires_later2 :: List.drop few_now 1)
@@ -2493,7 +2495,7 @@ let%test_module _ =
           let unexpired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(3, 1) ~sender_idx:5 ~fee:1_000_000_000 ~nonce:1
+              ~fee_payer_idx:(3, 1) ~sender_idx:4 ~fee:1_000_000_000 ~nonce:2
               ~receiver_idx:9 ~amount:1_000_000_000 ledger
           in
           let valid_forever = List.nth_exn few_now 0 in
@@ -2510,6 +2512,7 @@ let%test_module _ =
           let%bind () =
             after (Block_time.Span.to_time_span (n_block_times 3L))
           in
+          Core.eprintf "Before second write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands = [ mk_with_status valid_forever ]
@@ -2518,6 +2521,7 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
+          Core.eprintf "After second write\n%!" ;
           (* expired_command should not be in the pool because they are expired
              and (List.nth few_now 0) because it was committed in a block
           *)
@@ -2532,6 +2536,7 @@ let%test_module _ =
           let%bind () =
             after (Block_time.Span.to_time_span (n_block_times 5L))
           in
+          Core.eprintf "Before third write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands = []
@@ -2540,6 +2545,7 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
+          Core.eprintf "After third write\n%!" ;
           let cmds_wo_check =
             List.map ~f:User_command.forget_check (List.drop few_now 1)
           in
