@@ -1,6 +1,7 @@
-open Core
+open Core_kernel
 open Async
 open Integration_test_lib
+open Mina_transaction
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -680,7 +681,10 @@ module Node = struct
         fail (Error.of_string "Could not get account from ledger")
 
   type signed_command_result =
-    { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
+    { id : string
+    ; hash : Transaction_hash.t
+    ; nonce : Mina_numbers.Account_nonce.t
+    }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -717,14 +721,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -812,14 +816,14 @@ module Node = struct
     let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -852,14 +856,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -1147,7 +1151,7 @@ let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
 let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
-let initialize ~logger network =
+let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 60 (* 15 mins *) in
@@ -1232,24 +1236,8 @@ let initialize ~logger network =
   let res = poll 0 in
   match%bind.Deferred res with
   | Error _ ->
-      [%log error]
-        "Since not all pods were assigned nodes, daemons will not be started" ;
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
       res
   | Ok _ ->
-      [%log info] "Starting the daemons within the pods" ;
-      let start_print (node : Node.t) =
-        let open Malleable_error.Let_syntax in
-        [%log info] "starting %s ..." node.pod_id ;
-        let%bind res = Node.start ~fresh_state:false node in
-        [%log info] "%s started" node.pod_id ;
-        Malleable_error.return res
-      in
-      let seed_nodes = network |> seeds in
-      let non_seed_pods = network |> all_non_seed_pods in
-      (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-      let%bind () =
-        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
-      in
-      Malleable_error.List.iter non_seed_pods ~f:start_print
+      [%log info] "Pods assigned to nodes" ;
+      res
