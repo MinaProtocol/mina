@@ -117,7 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* setup complete *)
     let%bind () =
       section "send a single payment between 2 untimed accounts"
-        (let%bind { nonce; _ } =
+        (let%bind { hash; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
@@ -139,9 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-               ~command_type:Send_payment
-               ~node_included_in:(`Node untimed_node_b)
+               ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)
            |> Wait_condition.with_timeouts
                 ~soft_timeout:
                   (Network_time_span.Literal
@@ -344,14 +342,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let%bind { nonce; _ } =
+         let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
            ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-               ~command_type:Send_payment ~node_included_in:(`Node timed_node_c)
+               ~txn_hash:hash ~node_included_in:(`Node timed_node_c)
            |> Wait_condition.with_timeouts
                 ~soft_timeout:
                   (Network_time_span.Literal
