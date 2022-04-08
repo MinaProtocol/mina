@@ -2435,14 +2435,14 @@ let%test_module _ =
           in
           let three_slot = n_block_times 3L in
           let seven_slot = n_block_times 7L in
-          let _curr_time_plus_three = Block_time.add curr_time three_slot in
+          let curr_time_plus_three = Block_time.add curr_time three_slot in
           let curr_time_plus_seven = Block_time.add curr_time seven_slot in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
             mk_parties
-            (*~valid_period:{ lower = curr_time; upper = curr_time_plus_three }*)
+              ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~fee_payer_idx:(1, 1) ~sender_idx:0 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ledger
           in
