@@ -148,7 +148,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           in
           let%bind () =
             let first_state =
-              Mina_base.Snapp_state.V.to_list account_update.app_state
+              Mina_base.Zkapp_state.V.to_list account_update.app_state
               |> List.hd_exn
             in
             let module Set_or_keep = Mina_base.Zkapp_basic.Set_or_keep in
