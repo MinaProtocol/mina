@@ -1771,13 +1771,17 @@ module Ledger = struct
 
   type public_key = < g : group_class Js.t Js.prop > Js.t
 
-  type auth_required = Js.js_string Js.t
+  type auth_required =
+    < constant : js_bool Js.prop
+    ; signatureNecessary : js_bool Js.prop
+    ; signatureSufficient : js_bool Js.prop >
+    Js.t
 
   type permissions =
     < editState : auth_required Js.prop
     ; send : auth_required Js.prop
     ; receive : auth_required Js.prop
-    ; setSelegate : auth_required Js.prop
+    ; setDelegate : auth_required Js.prop
     ; setPermissions : auth_required Js.prop
     ; setVerificationKey : auth_required Js.prop
     ; setZkappUri : auth_required Js.prop
@@ -2140,6 +2144,42 @@ module Ledger = struct
     in
     { With_hash.data = vk; hash = Mina_base.Zkapp_account.digest_vk vk }
 
+  let auth_required (auth : auth_required) :
+      Mina_base.Permissions.Auth_required.t =
+    match
+      ( bool auth##.constant
+      , bool auth##.signatureNecessary
+      , bool auth##.signatureSufficient )
+    with
+    | true, _, false ->
+        Impossible
+    | true, _, true ->
+        None
+    | false, false, false ->
+        Proof
+    | false, true, true ->
+        Signature
+    | false, false, true ->
+        Either
+    | false, true, false ->
+        failwith
+          "Permissions: Found encoding of Both, but Both is not an exposed \
+           option"
+
+  let permissions (p : permissions) : Mina_base.Permissions.t =
+    { edit_state = auth_required p##.editState
+    ; send = auth_required p##.send
+    ; receive = auth_required p##.receive
+    ; set_delegate = auth_required p##.setDelegate
+    ; set_permissions = auth_required p##.setPermissions
+    ; set_verification_key = auth_required p##.setVerificationKey
+    ; set_zkapp_uri = auth_required p##.setZkappUri
+    ; edit_sequence_state = auth_required p##.editSequenceState
+    ; set_token_symbol = auth_required p##.setTokenSymbol
+    ; increment_nonce = auth_required p##.incrementNonce
+    ; set_voting_for = auth_required p##.setVotingFor
+    }
+
   let update (u : party_update) : Party.Update.t =
     { app_state =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
@@ -2147,11 +2187,11 @@ module Ledger = struct
     ; delegate = set_or_keep public_key u##.delegate
     ; verification_key =
         set_or_keep verification_key_with_hash u##.verificationKey
-    ; permissions = Keep
-    ; zkapp_uri = Keep
-    ; token_symbol = Keep
-    ; timing = Keep
-    ; voting_for = Keep
+    ; permissions = set_or_keep permissions u##.permissions
+    ; zkapp_uri = Keep (* TODO *)
+    ; token_symbol = Keep (* TODO *)
+    ; timing = Keep (* TODO *)
+    ; voting_for = Keep (* TODO *)
     }
 
   let body (b : party_body) : Party.Body.t =

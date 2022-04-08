@@ -14,24 +14,11 @@ import {
   signJsonTransaction,
   Perm,
   call,
+  Permissions,
 } from "snarkyjs";
-import cached from "./cached.js";
+import { tic, toc } from "./tictoc.js";
 
 await isReady;
-
-// helper for printing timings
-
-let timingStack = [];
-let i = 0;
-function tic(label = `Run command ${i++}`) {
-  process.stdout.write(`${label}... `);
-  timingStack.push([label, Date.now()]);
-}
-function toc() {
-  let [label, start] = timingStack.pop();
-  let time = (Date.now() - start) / 1000; // in seconds
-  process.stdout.write(`\r${label}... ${time.toFixed(3)} sec\n`);
-}
 
 // declare the zkapp
 const transactionFee = 1_000_000_000;
@@ -44,7 +31,9 @@ class SimpleZkapp extends SmartContract {
   }
 
   deploy() {
+    // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
+      ...Permissions.default(),
       editState: Perm.proofOrSignature(),
     });
     this.x.set(initialState);
@@ -70,9 +59,6 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
-// let verificationKey = await cached(
-//   () => compile(SimpleZkapp, zkappAddress).verificationKey
-// );
 toc();
 
 tic("create deploy transaction");
@@ -86,8 +72,6 @@ let partiesJsonDeploy = await deploy(SimpleZkapp, {
   transactionFee,
 });
 toc();
-
-console.log(JSON.stringify(JSON.parse(partiesJsonDeploy), null, 2));
 
 tic("apply deploy transaction");
 Local.applyJsonTransaction(partiesJsonDeploy);
@@ -117,6 +101,11 @@ tic("apply update transaction (no proof)");
 Local.applyJsonTransaction(partiesJsonUpdate);
 toc();
 
+// check that first update txn was applied
+zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+zkappState.assertEquals(3);
+console.log("got updated state: " + zkappState);
+
 tic("create update transaction (with proof)");
 let partiesJsonUpdateWithProof = await call(
   SimpleZkapp,
@@ -136,7 +125,7 @@ tic("apply update transaction (with proof)");
 Local.applyJsonTransaction(partiesJsonUpdateWithProof);
 toc();
 
-// check that deploy txn was applied
+// check that second update txn was applied
 zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
 zkappState.assertEquals(5);
 console.log("got updated state: " + zkappState);
