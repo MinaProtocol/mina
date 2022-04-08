@@ -4040,6 +4040,7 @@ module For_tests = struct
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
@@ -4123,6 +4124,7 @@ module For_tests = struct
       ~update ~predicate =
     let { Spec.fee
         ; sender = sender, sender_nonce
+        ; fee_payer = fee_payer_opt
         ; receivers
         ; amount
         ; new_snapp_account
@@ -4136,26 +4138,47 @@ module For_tests = struct
       spec
     in
     let sender_pk = sender.public_key |> Public_key.compress in
-    let fee_payer =
-      { Party.Fee_payer.data =
-          { body =
-              { public_key = sender_pk
-              ; update = Party.Update.noop
-              ; token_id = ()
-              ; balance_change = fee
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state = protocol_state_predicate
-              ; use_full_commitment = ()
+    let fee_payer : Party.Fee_payer.t =
+      match fee_payer_opt with
+      | None ->
+          { data =
+              { body =
+                  { public_key = sender_pk
+                  ; update = Party.Update.noop
+                  ; token_id = ()
+                  ; balance_change = fee
+                  ; increment_nonce = ()
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state = protocol_state_predicate
+                  ; use_full_commitment = ()
+                  }
+              ; predicate = sender_nonce
               }
-          ; predicate = sender_nonce
+              (*To be updated later*)
+          ; authorization = Signature.dummy
           }
-          (*To be updated later*)
-      ; authorization = Signature.dummy
-      }
+      | Some (fee_payer_kp, fee_payer_nonce) ->
+          { data =
+              { body =
+                  { public_key = fee_payer_kp.public_key |> Public_key.compress
+                  ; update = Party.Update.noop
+                  ; token_id = ()
+                  ; balance_change = fee
+                  ; increment_nonce = ()
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state = protocol_state_predicate
+                  ; use_full_commitment = ()
+                  }
+              ; predicate = fee_payer_nonce
+              }
+          ; authorization = Signature.dummy
+          }
     in
     let sender_party : Party.t option =
       let sender_party_data : Party.Predicated.t =
@@ -4172,7 +4195,10 @@ module For_tests = struct
             ; protocol_state = protocol_state_predicate
             ; use_full_commitment = false
             }
-        ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+        ; predicate =
+            ( if Option.is_none fee_payer_opt then
+              Nonce (Account.Nonce.succ sender_nonce)
+            else Nonce sender_nonce )
         }
       in
       Option.some_if
@@ -4287,8 +4313,13 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.Chunked.sign sender.private_key
-          (Random_oracle.Input.Chunked.field full_commitment)
+        match fee_payer_opt with
+        | None ->
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
+        | Some (fee_payer_kp, _) ->
+            Signature_lib.Schnorr.Chunked.sign fee_payer_kp.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in

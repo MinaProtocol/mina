@@ -3,8 +3,8 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests.
-open Inline_test_quiet_logs*)
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -80,7 +80,7 @@ module Diff_versioned = struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
       end
@@ -169,16 +169,16 @@ module Diff_versioned = struct
 
       module V2 = struct
         type t = (User_command.Stable.V2.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, yojson]
+    type t = Stable.Latest.t [@@deriving sexp, yojson, compare]
   end
 
-  type rejected = Rejected.t [@@deriving sexp, yojson]
+  type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
   type verified =
     { accepted :
@@ -926,18 +926,19 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
       end
 
       module Rejected = struct
-        type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
+        type t = (User_command.t * Diff_error.t) list
+        [@@deriving sexp, yojson, compare]
 
         type _unused = unit constraint t = Diff_versioned.Rejected.t
       end
 
-      type rejected = Rejected.t [@@deriving sexp, yojson]
+      type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
       type verified = Diff_versioned.verified =
         { accepted :
@@ -2073,15 +2074,24 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_int amount
                 }))
 
-    let mk_parties ?valid_period ~sender_idx ~receiver_idx ~fee ~nonce ~amount
-        _ledger =
+    let mk_parties ?valid_period ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
+        ~nonce ~amount _ledger =
       let sender_kp = test_keys.(sender_idx) in
-      let nonce = Account.Nonce.of_int nonce in
-      let sender = (sender_kp, nonce) in
+      let sender_nonce = Account.Nonce.of_int nonce in
+      let sender = (sender_kp, sender_nonce) in
       let amount = Currency.Amount.of_int amount in
       let receiver_kp = test_keys.(receiver_idx) in
       let receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
+      in
+      let fee_payer =
+        match fee_payer_idx with
+        | None ->
+            None
+        | Some (idx, nonce) ->
+            let fee_payer_kp = test_keys.(idx) in
+            let fee_payer_nonce = Account.Nonce.of_int nonce in
+            Some (fee_payer_kp, fee_payer_nonce)
       in
       let fee = Currency.Fee.of_int fee in
       (*let snapp_kp = Signature_lib.Keypair.create () in*)
@@ -2094,6 +2104,7 @@ let%test_module _ =
       in
       let test_spec : Transaction_snark.For_tests.Spec.t =
         { sender
+        ; fee_payer
         ; fee
         ; receivers = [ (receiver, amount) ]
         ; amount
@@ -2424,22 +2435,22 @@ let%test_module _ =
           in
           let three_slot = n_block_times 3L in
           let seven_slot = n_block_times 7L in
-          let curr_time_plus_three = Block_time.add curr_time three_slot in
+          let _curr_time_plus_three = Block_time.add curr_time three_slot in
           let curr_time_plus_seven = Block_time.add curr_time seven_slot in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
             mk_parties
-              ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
-              ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
-              ~amount:10_000_000_000 ~nonce:1 ledger
+            (*~valid_period:{ lower = curr_time; upper = curr_time_plus_three }*)
+              ~fee_payer_idx:(7, 0) ~sender_idx:0 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ledger
           in
           let expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~sender_idx:0 ~receiver_idx:9 ~fee:1_000_000_000
-              ~amount:10_000_000_000 ~nonce:2 ledger
+              ~fee_payer_idx:(7, 1) ~sender_idx:0 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ledger
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let cmds_wo_check =
@@ -2474,14 +2485,14 @@ let%test_module _ =
           let expired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
-              ~sender_idx:9 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5
-              ~amount:1_000_000_000 ledger
+              ~fee_payer_idx:(7, 2) ~sender_idx:9 ~fee:1_000_000_000 ~nonce:1
+              ~receiver_idx:5 ~amount:1_000_000_000 ledger
           in
           let unexpired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~sender_idx:8 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9
-              ~amount:1_000_000_000 ledger
+              ~fee_payer_idx:(7, 3) ~sender_idx:8 ~fee:1_000_000_000 ~nonce:1
+              ~receiver_idx:9 ~amount:1_000_000_000 ledger
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
