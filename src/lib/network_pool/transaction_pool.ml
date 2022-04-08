@@ -2443,13 +2443,13 @@ let%test_module _ =
           let expires_later1 =
             mk_parties
             (*~valid_period:{ lower = curr_time; upper = curr_time_plus_three }*)
-              ~fee_payer_idx:(7, 0) ~sender_idx:0 ~receiver_idx:9
+              ~fee_payer_idx:(1, 1) ~sender_idx:0 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ledger
           in
           let expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(7, 1) ~sender_idx:0 ~receiver_idx:9
+              ~fee_payer_idx:(1, 2) ~sender_idx:0 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ledger
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
@@ -2464,7 +2464,9 @@ let%test_module _ =
           (* new commands from best tip diff should be removed from the pool *)
           (* update the nonce to be consistent with the commands in the block *)
           map_set_multi !best_tip_ref
-            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2 ] ;
+            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2
+            ; mk_account ~idx:1 ~balance:1_000_000_000_000_000 ~nonce:2
+            ] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2485,13 +2487,13 @@ let%test_module _ =
           let expired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
-              ~fee_payer_idx:(7, 2) ~sender_idx:9 ~fee:1_000_000_000 ~nonce:1
+              ~fee_payer_idx:(2, 1) ~sender_idx:4 ~fee:1_000_000_000 ~nonce:1
               ~receiver_idx:5 ~amount:1_000_000_000 ledger
           in
           let unexpired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(7, 3) ~sender_idx:8 ~fee:1_000_000_000 ~nonce:1
+              ~fee_payer_idx:(3, 1) ~sender_idx:5 ~fee:1_000_000_000 ~nonce:1
               ~receiver_idx:9 ~amount:1_000_000_000 ledger
           in
           let valid_forever = List.nth_exn few_now 0 in
