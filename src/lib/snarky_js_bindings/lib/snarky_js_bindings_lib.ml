@@ -758,6 +758,16 @@ let scalar_constr_const :
     =
   Obj.magic scalar_class
 
+let scalar_to_bits x =
+  let (Shifted_value x) =
+    Pickles_types.Shifted_value.Type1.of_field ~shift:scalar_shift
+      (module Other_backend.Field)
+      x
+  in
+  Array.of_list_map (Other_backend.Field.to_bits x) ~f:Boolean.var_of_value
+
+let to_js_scalar x = new%js scalar_constr_const (scalar_to_bits x) x
+
 let () =
   let num_bits = Field.size_in_bits in
   let method_ name (f : scalar_class Js.t -> _) = method_ scalar_class name f in
@@ -769,14 +779,7 @@ let () =
         raise_error
           (sprintf "Scalar.%s can only be called on non-witness values." name))
   in
-  let bits x =
-    let (Shifted_value x) =
-      Pickles_types.Shifted_value.Type1.of_field ~shift:scalar_shift
-        (module Other_backend.Field)
-        x
-    in
-    Array.of_list_map (Other_backend.Field.to_bits x) ~f:Boolean.var_of_value
-  in
+  let bits = scalar_to_bits in
   let constant_op1 name (f : Other_backend.Field.t -> Other_backend.Field.t) =
     method_ name (fun x : scalar_class Js.t ->
         let z = f (!name x##.constantValue) in
@@ -2666,6 +2669,57 @@ module Ledger = struct
     let party (party : party) : Party.Checked.t = body party##.body
   end
 
+  module To_js = struct
+    let field x = to_js_field @@ Field.constant x
+
+    let uint32 n =
+      object%js
+        val value =
+          Unsigned.UInt32.to_string n |> Field.Constant.of_string |> field
+      end
+
+    let uint64 n =
+      object%js
+        val value =
+          Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
+      end
+
+    let app_state (a : Mina_base.Account.t) =
+      let xs = new%js Js.array_empty in
+      ( match a.zkapp with
+      | Some s ->
+          Pickles_types.Vector.iter s.app_state ~f:(fun x ->
+              ignore (xs##push (field x)))
+      | None ->
+          for _ = 0 to max_state_size - 1 do
+            xs##push (field Field.Constant.zero) |> ignore
+          done ) ;
+      xs
+
+    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
+      let x, y = Signature_lib.Public_key.decompress_exn pk in
+      to_js_group (Field.constant x) (Field.constant y)
+
+    let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
+
+    let account (a : Mina_base.Account.t) : account =
+      object%js
+        val publicKey = public_key a.public_key
+
+        val balance = uint64 (Currency.Balance.to_uint64 a.balance)
+
+        val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
+
+        val zkapp =
+          object%js
+            val appState = app_state a
+          end
+      end
+
+    let option (transform : 'a -> 'b) (x : 'a option) =
+      Js.Optdef.option (Option.map x ~f:transform)
+  end
+
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
@@ -2758,8 +2812,18 @@ module Ledger = struct
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
 
+  let public_key_of_string (pk_base58 : Js.js_string Js.t) : group_class Js.t =
+    pk_base58 |> Js.to_string
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+    |> To_js.public_key
+
   let private_key_to_string (sk : private_key) : Js.js_string Js.t =
     sk |> private_key |> Signature_lib.Private_key.to_base58_check |> Js.string
+
+  let private_key_of_string (sk_base58 : Js.js_string Js.t) : scalar_class Js.t
+      =
+    sk_base58 |> Js.to_string |> Signature_lib.Private_key.of_base58_check_exn
+    |> To_js.private_key
 
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk in
@@ -2782,55 +2846,6 @@ module Ledger = struct
     array_iter genesis_accounts ~f:(fun a ->
         add_account_exn l a##.publicKey (Js.to_string a##.balance)) ;
     new%js ledger_constr l
-
-  module To_js = struct
-    let field x = to_js_field @@ Field.constant x
-
-    let uint32 n =
-      object%js
-        val value =
-          Unsigned.UInt32.to_string n |> Field.Constant.of_string |> field
-      end
-
-    let uint64 n =
-      object%js
-        val value =
-          Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
-      end
-
-    let app_state (a : Mina_base.Account.t) =
-      let xs = new%js Js.array_empty in
-      ( match a.zkapp with
-      | Some s ->
-          Pickles_types.Vector.iter s.app_state ~f:(fun x ->
-              ignore (xs##push (field x)))
-      | None ->
-          for _ = 0 to max_state_size - 1 do
-            xs##push (field Field.Constant.zero) |> ignore
-          done ) ;
-      xs
-
-    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
-      let x, y = Signature_lib.Public_key.decompress_exn pk in
-      to_js_group (Field.constant x) (Field.constant y)
-
-    let account (a : Mina_base.Account.t) : account =
-      object%js
-        val publicKey = public_key a.public_key
-
-        val balance = uint64 (Currency.Balance.to_uint64 a.balance)
-
-        val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
-
-        val zkapp =
-          object%js
-            val appState = app_state a
-          end
-      end
-
-    let option (transform : 'a -> 'b) (x : 'a option) =
-      Js.Optdef.option (Option.map x ~f:transform)
-  end
 
   let get_account l (pk : public_key) : account Js.optdef =
     let loc = L.location_of_account l##.value (account_id pk) in
@@ -2921,7 +2936,9 @@ module Ledger = struct
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
     static_method "publicKeyToString" public_key_to_string ;
+    static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
+    static_method "privateKeyOfString" private_key_of_string ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
