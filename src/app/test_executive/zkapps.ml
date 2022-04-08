@@ -274,12 +274,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            data =
-              { body =
-                  { p.fee_payer.data.body with
-                    balance_change = Currency.Fee.of_int 1000
-                  }
-              ; predicate = Mina_base.Account.Nonce.of_int 2
+            body =
+              { p.fee_payer.body with
+                balance_change = Currency.Fee.of_int 1000
+              ; account_precondition = Mina_base.Account.Nonce.of_int 2
               }
           }
       }
@@ -289,9 +287,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Mina_base.Parties.
         { fee_payer =
             { p.fee_payer with
-              data =
-                { p.fee_payer.data with
-                  predicate = Mina_base.Account.Nonce.of_int 2
+              body =
+                { p.fee_payer.body with
+                  account_precondition = Mina_base.Account.Nonce.of_int 2
                 }
             }
         ; other_parties =
@@ -313,12 +311,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            data =
-              { body =
-                  { p.fee_payer.data.body with
-                    balance_change = Currency.Fee.of_int 999_999
-                  }
-              ; predicate = Mina_base.Account.Nonce.of_int 1
+            body =
+              { p.fee_payer.body with
+                balance_change = Currency.Fee.of_int 999_999
+              ; account_precondition = Mina_base.Account.Nonce.of_int 1
               }
           }
       }
@@ -519,12 +515,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp with an invalid proof"
-        (send_invalid_snapp ~logger node parties_invalid_proof
+        (send_invalid_zkapp ~logger node parties_invalid_proof
            "Invalid_signature")
     in
     let%bind () =
       section "Send a snapp with an insufficient fee"
-        (send_invalid_snapp ~logger node parties_insufficient_fee
+        (send_invalid_zkapp ~logger node parties_insufficient_fee
            "Insufficient_fee")
     in
     (*
@@ -536,7 +532,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let%bind () =
       section "Send a snapp with an insufficient replace fee"
-        (send_invalid_snapp ~logger node parties_insufficient_replace_fee
+        (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
            "Insufficient_replace_fee")
     in
     let%bind () =
