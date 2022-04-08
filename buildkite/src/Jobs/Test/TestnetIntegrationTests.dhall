@@ -16,6 +16,7 @@ in Pipeline.build Pipeline.Config::{
     JobSpec::{
     dirtyWhen = [
         S.strictlyStart (S.contains "src"),
+        S.strictlyStart (S.contains "helm"),
         S.strictlyStart (S.contains "dockerfiles"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive")
