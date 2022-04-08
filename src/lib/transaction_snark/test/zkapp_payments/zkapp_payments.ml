@@ -32,8 +32,7 @@ let%test_module "Snapp payments tests" =
       in
       Parties.of_wire
         { fee_payer =
-            { data =
-                { body =
+            { body =
                     { public_key = acct1.account.public_key
                     ; update =
                         { app_state =
@@ -54,17 +53,15 @@ let%test_module "Snapp payments tests" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
                     ; use_full_commitment = ()
-                    }
                 ; account_precondition = acct1.account.nonce
                 ; caller = ()
                 }
             ; authorization = Signature.dummy
             }
         ; other_parties =
-            [ { data =
-                  { body =
+            [ { body =
                       { public_key = acct1.account.public_key
                       ; update = Party.Update.noop
                       ; token_id = Token_id.default
@@ -75,17 +72,15 @@ let%test_module "Snapp payments tests" =
                       ; sequence_events = []
                       ; call_data = Field.zero
                       ; call_depth = 0
-                      ; protocol_state =
+                      ; protocol_state_precondition =
                           Zkapp_precondition.Protocol_state.accept
                       ; use_full_commitment = false
-                      }
                   ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = Signature Signature.dummy
               }
-            ; { data =
-                  { body =
+            ; { body =
                       { public_key = acct2.account.public_key
                       ; update = Party.Update.noop
                       ; token_id = Token_id.default
@@ -96,10 +91,9 @@ let%test_module "Snapp payments tests" =
                       ; sequence_events = []
                       ; call_data = Field.zero
                       ; call_depth = 0
-                      ; protocol_state =
+                      ; protocol_state_precondition =
                           Zkapp_precondition.Protocol_state.accept
                       ; use_full_commitment = false
-                      }
                   ; account_precondition = Accept
                   ; caller = Call
                   }

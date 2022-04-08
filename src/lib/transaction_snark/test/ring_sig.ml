@@ -293,7 +293,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               Signature_lib.Schnorr.Chunked.sign sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
-            { data = sender_party_data
+            { body = sender_party_data.body
             ; authorization = Signature sender_signature
             }
           in
@@ -302,7 +302,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               { fee_payer
               ; other_parties =
                   [ sender
-                  ; { data = snapp_party_data; authorization = Proof pi }
+                  ; { body = snapp_party_data.body; authorization = Proof pi }
                   ]
               ; memo
               }
@@ -316,9 +316,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             (* print other_party data *)
             Parties.Call_forest.iteri parties.other_parties
               ~f:(fun idx (p : Party.t) ->
-                Party.Preconditioned.to_yojson p.data
+                Party.Body.to_yojson p.body
                 |> Yojson.Safe.pretty_to_string
-                |> printf "other_party #%d data:\n%s\n\n" idx)
+                |> printf "other_party #%d body:\n%s\n\n" idx)
             |> fun () ->
             (* print other_party proof *)
             Pickles.Side_loaded.Proof.Stable.V2.sexp_of_t pi

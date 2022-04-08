@@ -1801,8 +1801,6 @@ module Ledger = struct
     ; provedState : bool_class Js.t or_ignore Js.prop >
     Js.t
 
-  (*Reviewer: Leave this structure as is for authorization to be added later or
-    should it be an alias of party_body?*)
   type party = < body : party_body Js.prop > Js.t
 
   type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
@@ -2152,6 +2150,8 @@ module Ledger = struct
     ; use_full_commitment = bool b##.useFullCommitment
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition = predicate b##.accountPrecondition
+    ; caller =(* TODO *)
+                 Token_id.default
     }
 
   let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
@@ -2175,29 +2175,17 @@ module Ledger = struct
     ; use_full_commitment = ()
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition =
-<<<<<<< HEAD
-        uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
-    ; caller = ()
-=======
         uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
->>>>>>> upstream/develop
+    ; caller = ()
     }
 
   let fee_payer_party_body (party : fee_payer_party) : Party.Body.Fee_payer.t =
     fee_payer_body party##.body
 
-<<<<<<< HEAD
   let token_id (str : Js.js_string Js.t) : Token_id.t =
     Token_id.of_string (Js.to_string str)
 
-  let party (party : party) : Party.Preconditioned.t =
-    { body = body party##.body
-    ; account_precondition = account_precondition party##.account_precondition
-    ; caller = (* TODO *) Token_id.default
-    }
-=======
   let party_body (party : party) : Party.Body.t = body party##.body
->>>>>>> upstream/develop
 
   (* TODO: enable proper authorization *)
   (* the fact that we don't leads to mock tx with state update being rejected *)
@@ -2212,10 +2200,10 @@ module Ledger = struct
                { body = party_body p; authorization = None_given })
         |> Array.to_list
         |> Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
         |> Parties.Call_forest.accumulate_hashes
              ~hash_party:(fun (p : Party.t) ->
-               Parties.Digest.Party.create p.data)
+               Parties.Digest.Party.create p)
     ; memo = Mina_base.Signed_command_memo.empty
     }
 
@@ -2468,6 +2456,7 @@ module Ledger = struct
       ; use_full_commitment = bool b##.useFullCommitment
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition = predicate b##.accountPrecondition
+      ; caller = (*TODO*) Token_id.Checked.constant Token_id.default
       }
 
     let fee_payer_body (b : fee_payer_party_body) : Party.Body.Checked.t =
@@ -2516,85 +2505,15 @@ module Ledger = struct
       ; use_full_commitment = bool b##.useFullCommitment
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition
+      ; caller = (*TODO*) Token_id.Checked.constant Token_id.default
       }
 
     let fee_payer_party (party : fee_payer_party) : Party.Checked.t =
       (* TODO: is it OK that body is the same for fee_payer as for party?
-           what about fee vs. delta and other differences in the unchecked version?
-<<<<<<< HEAD
-        *)
-        body = body party##.body
-<<<<<<< HEAD
-      ; predicate = nonce party##.predicate
-      ; caller = Token_id.Checked.constant Token_id.default
-=======
-      ; account_precondition = nonce party##.predicate
->>>>>>> upstream/develop
-      }
-
-    let predicate_accept () : Party.Account_precondition.Checked.t =
-      let pk_dummy = public_key_dummy () in
-      { balance = numeric balance max_interval_uint64
-      ; nonce = numeric nonce max_interval_uint32
-      ; receipt_chain_hash =
-          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
-      ; public_key = ignore pk_dummy
-      ; delegate = ignore pk_dummy
-      ; state =
-          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
-              ignore Field.zero)
-      ; sequence_state = ignore Field.zero
-      ; proved_state = ignore Boolean.false_
-      }
-
-    let predicate (t : Party_predicate.t) : Party.Account_precondition.Checked.t
-        =
-      match Js.to_string t##.type_ with
-      | "accept" ->
-          predicate_accept ()
-      | "nonce" ->
-          let nonce_js : js_uint32 = Obj.magic t##.value in
-          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
-      | "full" ->
-          let ( ^ ) = Fn.compose in
-          let predicate : full_account_predicate = Obj.magic t##.value in
-          { balance = numeric balance predicate##.balance
-          ; nonce = numeric nonce predicate##.nonce
-          ; receipt_chain_hash =
-              or_ignore
-                (* TODO: assumes constant *)
-                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
-                predicate##.receiptChainHash
-          ; public_key = or_ignore public_key predicate##.publicKey
-          ; delegate = or_ignore public_key predicate##.delegate
-          ; state =
-              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
-                ~f:(fun i ->
-                  or_ignore field (array_get_exn predicate##.state i))
-          ; sequence_state = or_ignore field predicate##.sequenceState
-          ; proved_state = or_ignore bool predicate##.provedState
-          }
-      | s ->
-          failwithf "bad predicate type: %s" s ()
-
-<<<<<<< HEAD
-    let party (party : party) : Party.Predicated.Checked.t =
-      { body = body party##.body
-      ; predicate = predicate party##.predicate
-      ; caller = (* TODO *)
-                 Token_id.Checked.constant Token_id.default
-=======
-    let party (party : party) : Party.Preconditioned.Checked.t =
-      { body = body party##.body
-      ; account_precondition = predicate party##.predicate
->>>>>>> upstream/develop
-      }
-=======
-      *)
+           what about fee vs. delta and other differences in the unchecked version?*)
       fee_payer_body party##.body
 
     let party (party : party) : Party.Checked.t = body party##.body
->>>>>>> upstream/develop
   end
 
   (* TODO hash two parties together in the correct way *)

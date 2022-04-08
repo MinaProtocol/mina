@@ -300,8 +300,7 @@ let%test_module "multisig_account" =
               in
               let sender_pk = sender.public_key |> Public_key.compress in
               let fee_payer : Party.Fee_payer.t =
-                { data =
-                    { body =
+                { body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
                         ; token_id = ()
@@ -314,7 +313,6 @@ let%test_module "multisig_account" =
                         ; protocol_state_precondition =
                             Zkapp_precondition.Protocol_state.accept
                         ; use_full_commitment = ()
-                        }
                     ; account_precondition = sender_nonce
                     ; caller = ()
                     }
@@ -339,7 +337,6 @@ let%test_module "multisig_account" =
                     ; account_precondition =
                         Nonce (Account.Nonce.succ sender_nonce)
                     ; use_full_commitment = false
-                ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
                 ; caller = Call
                 }
                 ; authorization = Signature Signature.dummy }
@@ -361,7 +358,6 @@ let%test_module "multisig_account" =
                     ; account_precondition =
                         Full Zkapp_precondition.Account.accept
                     ; use_full_commitment = false
-                ; account_precondition = Full Zkapp_precondition.Account.accept
                 ; caller = Call
                 }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy }
@@ -370,7 +366,7 @@ let%test_module "multisig_account" =
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Preconditioned.Wire.t) ->
+                  ~party_depth:(fun (p : Party.Wire.t) ->
                     p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
                 |> Parties.Call_forest.add_callers'
@@ -425,7 +421,7 @@ let%test_module "multisig_account" =
                   Parties.Transaction_commitment.with_fee_payer transaction
                     ~fee_payer_hash:
                       (Parties.Digest.Party.create
-                         (Party.Preconditioned.of_fee_payer fee_payer.data))
+                         (Party.of_fee_payer fee_payer))
                 in
                 { fee_payer with
                   authorization =
@@ -434,7 +430,7 @@ let%test_module "multisig_account" =
                 }
               in
               let sender : Party.Wire.t =
-                { data = sender_party_data
+                { body = sender_party_data.body
                 ; authorization =
                     Signature
                       (Signature_lib.Schnorr.Chunked.sign sender.private_key
@@ -446,7 +442,7 @@ let%test_module "multisig_account" =
                   { fee_payer
                   ; other_parties =
                       [ sender
-                      ; { data = snapp_party_data; authorization = Proof pi }
+                      ; { body = snapp_party_data.body; authorization = Proof pi }
                       ]
                   ; memo
                   }

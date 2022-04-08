@@ -68,6 +68,7 @@ module Party_under_construction = struct
           ; proved_state = Ignore
           }
     ; use_full_commitment = false
+    ; caller = Token_id.default
     }
 
   module In_circuit = struct

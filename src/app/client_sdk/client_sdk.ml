@@ -43,11 +43,11 @@ let _ =
          let other_parties = Parties.other_parties_of_json other_parties_json in
          let other_parties =
            Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
              other_parties
            |> Parties.Call_forest.accumulate_hashes
                 ~hash_party:(fun (p : Party.t) ->
-                  Parties.Digest.Party.create p.data)
+                  Parties.Digest.Party.create p)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =

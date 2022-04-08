@@ -251,12 +251,12 @@ struct
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
           (Public_key.Compressed.to_base58_check
-             parties.fee_payer.data.body.public_key)
+             parties.fee_payer.body.public_key)
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
              ~f:(fun acc party ->
                let str =
                  Public_key.Compressed.to_base58_check
-                   party.data.body.public_key
+                   party.body.public_key
                in
                if !is_first then (
                  is_first := false ;
