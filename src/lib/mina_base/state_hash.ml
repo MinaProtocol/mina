@@ -34,6 +34,8 @@ end
 module With_state_hashes = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = ('a, State_hashes.Stable.V1.t) With_hash.Stable.V1.t
       [@@deriving equal, sexp, to_yojson]
@@ -41,6 +43,9 @@ module With_state_hashes = struct
       let to_latest = Fn.id
     end
   end]
+
+  type 'a t = ('a, State_hashes.t) With_hash.t
+  [@@deriving equal, sexp, to_yojson]
 
   open With_hash
   open State_hashes.Stable.Latest
