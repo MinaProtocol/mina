@@ -4,7 +4,6 @@ import {
   declareState,
   declareMethodArguments,
   State,
-  UInt64,
   PrivateKey,
   SmartContract,
   compile,
@@ -13,12 +12,15 @@ import {
   isReady,
   shutdown,
   PublicKey,
+  Perm,
+  Mina,
+  Permissions,
 } from "snarkyjs";
 import cached from "./cached.js";
 
 await isReady;
 const transactionFee = 10_000_000;
-const initialBalance = 10_000_000_000 - transactionFee;
+const initialBalance = 10_000_000_000;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
@@ -28,9 +30,11 @@ class SimpleZkapp extends SmartContract {
   }
 
   deploy() {
-    super.deploy();
-    let amount = new UInt64(Field(`${initialBalance}`));
-    this.balance.addInPlace(amount);
+    // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
+    this.self.update.permissions.setValue({
+      ...Permissions.default(),
+      editState: Perm.proof(),
+    });
     this.x.set(initialState);
   }
 
@@ -53,18 +57,30 @@ let zkappKey = PrivateKey.fromJSON(keyPair.privateKey);
 
 let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
 feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
+console.assert(PrivateKey.fromBase58(feePayerKey).toBase58() === feePayerKey);
 
 if (command === "deploy") {
   // snarkyjs part
-  let { verificationKey } = compile(SimpleZkapp, zkappAddress);
-  let partiesJson = deploy(SimpleZkapp, zkappKey, verificationKey);
+  let feePayerKeyJs = PrivateKey.fromBase58(feePayerKey);
+  // FIXME: this is a hack, we need something like "add cached account" for testing
+  let Local = Mina.LocalBlockchain();
+  Mina.setActiveInstance(Local);
+  Local.addAccount(feePayerKeyJs.toPublicKey(), "30000000000");
+
+  let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
+  let partiesJson = await deploy(SimpleZkapp, {
+    zkappKey,
+    verificationKey,
+    initialBalance,
+    initialBalanceFundingAccountKey: feePayerKeyJs,
+  });
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
   let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
     feePayer: feePayerAddress,
-    fee: `${transactionFee + initialBalance}`,
+    fee: `${transactionFee}`,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
