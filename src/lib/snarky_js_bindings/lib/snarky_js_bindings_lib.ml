@@ -2150,8 +2150,8 @@ module Ledger = struct
     ; use_full_commitment = bool b##.useFullCommitment
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition = predicate b##.accountPrecondition
-    ; caller =(* TODO *)
-                 Token_id.default
+    ; caller = (* TODO *)
+               Token_id.default
     }
 
   let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
@@ -2202,8 +2202,7 @@ module Ledger = struct
         |> Parties.Call_forest.of_parties_list
              ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
         |> Parties.Call_forest.accumulate_hashes
-             ~hash_party:(fun (p : Party.t) ->
-               Parties.Digest.Party.create p)
+             ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
     ; memo = Mina_base.Signed_command_memo.empty
     }
 

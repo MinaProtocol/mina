@@ -46,8 +46,7 @@ let _ =
              ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
              other_parties
            |> Parties.Call_forest.accumulate_hashes
-                ~hash_party:(fun (p : Party.t) ->
-                  Parties.Digest.Party.create p)
+                ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =

@@ -199,7 +199,7 @@ struct
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
              ~f:(fun acc party ->
                let str =
-                 Public_key.Compressed.to_base58_check
+                 Signature_lib.Public_key.Compressed.to_base58_check
                    party.body.public_key
                in
                if !is_first then (

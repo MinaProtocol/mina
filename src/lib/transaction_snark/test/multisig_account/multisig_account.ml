@@ -301,18 +301,18 @@ let%test_module "multisig_account" =
               let sender_pk = sender.public_key |> Public_key.compress in
               let fee_payer : Party.Fee_payer.t =
                 { body =
-                        { public_key = sender_pk
-                        ; update = Party.Update.noop
-                        ; token_id = ()
-                        ; balance_change = fee
-                        ; increment_nonce = ()
-                        ; events = []
-                        ; sequence_events = []
-                        ; call_data = Field.zero
-                        ; call_depth = 0
-                        ; protocol_state_precondition =
-                            Zkapp_precondition.Protocol_state.accept
-                        ; use_full_commitment = ()
+                    { public_key = sender_pk
+                    ; update = Party.Update.noop
+                    ; token_id = ()
+                    ; balance_change = fee
+                    ; increment_nonce = ()
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Field.zero
+                    ; call_depth = 0
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; use_full_commitment = ()
                     ; account_precondition = sender_nonce
                     ; caller = ()
                     }
@@ -337,9 +337,10 @@ let%test_module "multisig_account" =
                     ; account_precondition =
                         Nonce (Account.Nonce.succ sender_nonce)
                     ; use_full_commitment = false
-                ; caller = Call
+                    ; caller = Call
+                    }
+                ; authorization = Signature Signature.dummy
                 }
-                ; authorization = Signature Signature.dummy }
               in
               let snapp_party_data : Party.Wire.t =
                 { body =
@@ -358,16 +359,16 @@ let%test_module "multisig_account" =
                     ; account_precondition =
                         Full Zkapp_precondition.Account.accept
                     ; use_full_commitment = false
-                ; caller = Call
+                    ; caller = Call
+                    }
+                ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }
-                ; authorization = Proof Mina_base.Proof.transaction_dummy }
               in
               let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Wire.t) ->
-                    p.body.call_depth)
+                  ~party_depth:(fun (p : Party.Wire.t) -> p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
                 |> Parties.Call_forest.add_callers'
                 |> Parties.Call_forest.accumulate_hashes_predicated
@@ -442,7 +443,9 @@ let%test_module "multisig_account" =
                   { fee_payer
                   ; other_parties =
                       [ sender
-                      ; { body = snapp_party_data.body; authorization = Proof pi }
+                      ; { body = snapp_party_data.body
+                        ; authorization = Proof pi
+                        }
                       ]
                   ; memo
                   }

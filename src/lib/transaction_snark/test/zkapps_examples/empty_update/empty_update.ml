@@ -107,8 +107,7 @@ let fee_payer =
 let full_commitment =
   (* TODO: This is a pain. *)
   Parties.Transaction_commitment.with_fee_payer transaction_commitment
-    ~fee_payer_hash:
-      (Parties.Digest.Party.create (Party.of_fee_payer fee_payer_body))
+    ~fee_payer_hash:(Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
 
 (* TODO: Make this better. *)
 let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
@@ -147,7 +146,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
 
 let parties : Parties.t =
   sign_all
-    { fee_payer = { body = fee_payer_body; authorization = Signature.dummy }
+    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
     ; other_parties =
         Parties.Call_forest.of_parties_list [ deploy_party; party ]
           ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
