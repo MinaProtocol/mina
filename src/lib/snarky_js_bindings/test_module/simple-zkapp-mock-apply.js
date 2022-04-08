@@ -78,7 +78,7 @@ Local.applyJsonTransaction(partiesJsonDeploy);
 toc();
 
 // check that deploy txn was applied
-let zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+let zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
 zkappState.assertEquals(1);
 console.log("got initial state: " + zkappState);
 
@@ -102,7 +102,7 @@ Local.applyJsonTransaction(partiesJsonUpdate);
 toc();
 
 // check that first update txn was applied
-zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
 zkappState.assertEquals(3);
 console.log("got updated state: " + zkappState);
 
@@ -126,7 +126,7 @@ Local.applyJsonTransaction(partiesJsonUpdateWithProof);
 toc();
 
 // check that second update txn was applied
-zkappState = Mina.getAccount(zkappAddress).snapp.appState[0];
+zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
 zkappState.assertEquals(5);
 console.log("got updated state: " + zkappState);
 

@@ -1530,20 +1530,20 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a snapp_statement = { transaction : 'a; at_party : 'a }
+type 'a zkapp_statement = { transaction : 'a; at_party : 'a }
 
-let snapp_statement_to_fields { transaction; at_party } =
+let zkapp_statement_to_fields { transaction; at_party } =
   [| transaction; at_party |]
 
-type snapp_statement_js =
+type zkapp_statement_js =
   < transaction : field_class Js.t Js.readonly_prop
   ; atParty : field_class Js.t Js.readonly_prop >
   Js.t
 
 module Zkapp_statement = struct
-  type t = Field.t snapp_statement
+  type t = Field.t zkapp_statement
 
-  let to_field_elements = snapp_statement_to_fields
+  let to_field_elements = zkapp_statement_to_fields
 
   let to_constant ({ transaction; at_party } : t) =
     { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
@@ -1555,19 +1555,19 @@ module Zkapp_statement = struct
       val atParty = to_js_field at_party
     end
 
-  let of_js (statement : snapp_statement_js) =
+  let of_js (statement : zkapp_statement_js) =
     { transaction = of_js_field statement##.transaction
     ; at_party = of_js_field statement##.atParty
     }
 
   module Constant = struct
-    type t = Field.Constant.t snapp_statement
+    type t = Field.Constant.t zkapp_statement
 
-    let to_field_elements = snapp_statement_to_fields
+    let to_field_elements = zkapp_statement_to_fields
   end
 end
 
-let snapp_statement_typ =
+let zkapp_statement_typ =
   let to_hlist { transaction; at_party } = H_list.[ transaction; at_party ] in
   let of_hlist ([ transaction; at_party ] : (unit, _) H_list.t) =
     { transaction; at_party }
@@ -1608,7 +1608,7 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
   ; main_value : 'a_value list -> 'a_value -> bool list
   }
 
-type pickles_rule_js = Js.js_string Js.t * (snapp_statement_js -> unit)
+type pickles_rule_js = Js.js_string Js.t * (zkapp_statement_js -> unit)
 
 let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   { identifier = Js.to_string identifier
@@ -1654,7 +1654,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Pickles.compile_promise ~choices
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
-      ~typ:snapp_statement_typ
+      ~typ:zkapp_statement_typ
       ~branches:(module Pickles_types.Nat.N2)
       ~max_branching:(module Pickles_types.Nat.N2)
       ~name:"smart-contract"
@@ -1674,7 +1674,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let module Proof = (val p) in
   let to_js_prover prover =
-    let prove (statement_js : snapp_statement_js) =
+    let prove (statement_js : zkapp_statement_js) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
@@ -1685,14 +1685,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let rec to_js_provers :
       type a b c.
          (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
-      -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
+      -> (zkapp_statement_js -> proof Promise_js_helpers.js_promise) list =
     function
     | [] ->
         []
     | p :: ps ->
         to_js_prover p :: to_js_provers ps
   in
-  let verify (statement_js : snapp_statement_js) (proof : proof) =
+  let verify (statement_js : zkapp_statement_js) (proof : proof) =
     let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
@@ -1809,6 +1809,17 @@ module Ledger = struct
     ; vestingIncrement : js_uint64 Js.prop >
     Js.t
 
+  type full_account_precondition =
+    < balance : js_uint64 closed_interval Js.prop
+    ; nonce : js_uint32 closed_interval Js.prop
+    ; receiptChainHash : js_field or_ignore Js.prop
+    ; publicKey : public_key or_ignore Js.prop
+    ; delegate : public_key or_ignore Js.prop
+    ; state : js_field or_ignore Js.js_array Js.t Js.prop
+    ; sequenceState : js_field or_ignore Js.prop
+    ; provedState : bool_class Js.t or_ignore Js.prop >
+    Js.t
+
   module Account_precondition = struct
     type precondition
 
@@ -1846,17 +1857,6 @@ module Ledger = struct
     ; incrementNonce : js_bool Js.prop >
     Js.t
 
-  type full_account_predicate =
-    < balance : js_uint64 closed_interval Js.prop
-    ; nonce : js_uint32 closed_interval Js.prop
-    ; receiptChainHash : js_field or_ignore Js.prop
-    ; publicKey : public_key or_ignore Js.prop
-    ; delegate : public_key or_ignore Js.prop
-    ; state : js_field or_ignore Js.js_array Js.t Js.prop
-    ; sequenceState : js_field or_ignore Js.prop
-    ; provedState : bool_class Js.t or_ignore Js.prop >
-    Js.t
-
   module Party_authorization = struct
     type authorization
 
@@ -1883,7 +1883,7 @@ module Ledger = struct
     < publicKey : group_class Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
-    ; snapp : zkapp_account Js.readonly_prop >
+    ; zkapp : zkapp_account Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2115,7 +2115,7 @@ module Ledger = struct
           (Mina_numbers.Account_nonce.of_uint32
              (uint32 (Obj.magic t##.value : js_uint32)))
     | "full" ->
-        let p : full_account_predicate = Obj.magic t##.value in
+        let p : full_account_precondition = Obj.magic t##.value in
         Full
           { balance =
               Check
@@ -2295,7 +2295,7 @@ module Ledger = struct
           (Mina_numbers.Account_nonce.of_uint32
              (uint32 (Obj.magic t##.value : js_uint32)))
     | "full" ->
-        let p : full_account_predicate = Obj.magic t##.value in
+        let p : full_account_precondition = Obj.magic t##.value in
         Full
           { balance =
               Check
@@ -2525,22 +2525,21 @@ module Ledger = struct
           { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
       | "full" ->
           let ( ^ ) = Fn.compose in
-          let predicate : full_account_predicate = Obj.magic t##.value in
-          { balance = numeric balance predicate##.balance
-          ; nonce = numeric nonce predicate##.nonce
+          let p : full_account_precondition = Obj.magic t##.value in
+          { balance = numeric balance p##.balance
+          ; nonce = numeric nonce p##.nonce
           ; receipt_chain_hash =
               or_ignore
                 (* TODO: assumes constant *)
                 (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
-                predicate##.receiptChainHash
-          ; public_key = or_ignore public_key predicate##.publicKey
-          ; delegate = or_ignore public_key predicate##.delegate
+                p##.receiptChainHash
+          ; public_key = or_ignore public_key p##.publicKey
+          ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
-                ~f:(fun i ->
-                  or_ignore field (array_get_exn predicate##.state i))
-          ; sequence_state = or_ignore field predicate##.sequenceState
-          ; proved_state = or_ignore bool predicate##.provedState
+                ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
+          ; sequence_state = or_ignore field p##.sequenceState
+          ; proved_state = or_ignore bool p##.provedState
           }
       | s ->
           failwithf "bad predicate type: %s" s ()
@@ -2815,7 +2814,7 @@ module Ledger = struct
       let x, y = Signature_lib.Public_key.decompress_exn pk in
       to_js_group (Field.constant x) (Field.constant y)
 
-    let account (a : Mina_base.Account.t) =
+    let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
 
@@ -2823,7 +2822,7 @@ module Ledger = struct
 
         val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
 
-        val snapp =
+        val zkapp =
           object%js
             val appState = app_state a
           end
