@@ -25,3 +25,4 @@ cd ../../../..
 
 echo "Run SnarkyJS + MinaSigner tests..."
 node src/lib/snarky_js_bindings/test_module/simple-zkapp-unit-test.js
+node src/lib/snarky_js_bindings/test_module/simple-zkapp-mock-apply.js
