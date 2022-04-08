@@ -228,7 +228,7 @@ module Make
                           |> Option.value ~default:State_hash.Set.empty )
                           breadcrumb.state_hash
                       in
-                      [%log info]
+                      [%log debug]
                         "adding or updating txn_hash %s to \
                          state.blocks_including_txn"
                         (Transaction_hash.to_base58_check hash) ;
