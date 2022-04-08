@@ -21,7 +21,7 @@
   (source_tree ../../../proof-systems) )
  (action
   (progn
-   (run chmod -R +w ../../wasm)
+   (run chmod -R +w ../../wasm .)
    (setenv
      RUSTFLAGS
      "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"

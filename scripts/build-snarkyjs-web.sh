@@ -1,5 +1,5 @@
 SNARKY_JS_PATH=$1
-[ -z "$SNARKY_JS_PATH" ] && echo "Usage: ./build-snarkyjs-web.sh [/path/to/snarkyjs]" && exit 1
+[ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
 dune b src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
 cp _build/default/src/lib/crypto/kimchi_bindings/js/chrome/plonk_wasm* "$SNARKY_JS_PATH"/src/chrome_bindings/
