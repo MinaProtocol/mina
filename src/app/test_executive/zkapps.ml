@@ -41,9 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let transactions_sent = ref 0
 
-  let send_snapp ~logger node parties =
+  let send_zkapp ~logger node parties =
     incr transactions_sent ;
-    send_snapp ~logger node parties
+    send_zkapp ~logger node parties
 
   (* An event which fires when [n] ledger proofs have been emitted *)
   let ledger_proofs_emitted ~logger ~num_proofs =
@@ -100,11 +100,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let keypair2 = (List.hd_exn config.extra_genesis_accounts).keypair in
-    let num_snapp_accounts = 3 in
+    let num_zkapp_accounts = 3 in
     let snapp_keypairs =
-      List.init num_snapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
+      List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
-    let snapp_account_ids =
+    let zkapp_account_ids =
       List.map snapp_keypairs ~f:(fun snapp_keypair ->
           Mina_base.Account_id.create
             (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
@@ -112,7 +112,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fee = Currency.Fee.of_int 1_000_000 in
     let%bind parties_create_account =
-      (* construct a Parties.t, similar to snapp_test_transaction create-snapp-account *)
+      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
       let open Mina_base in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
@@ -124,9 +124,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = true
+        ; new_zkapp_account = true
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -139,7 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            parties_spec
     in
     let%bind.Deferred parties_update_permissions, permissions_updated =
-      (* construct a Parties.t, similar to snapp_test_transaction update-permissions *)
+      (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
       let open Mina_base in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -162,9 +162,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount = Currency.Amount.zero
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update =
             { Party.Update.dummy with permissions = Set new_permissions }
         ; current_auth =
@@ -189,21 +189,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
       let app_state =
-        let len = Snapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
+        let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
                Snark_params.Tick.Field.gen)
         in
         List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
-        |> Snapp_state.V.of_list_exn
+        |> Zkapp_state.V.of_list_exn
       in
       let new_delegate =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
       in
       let new_verification_key =
         let data = Pickles.Side_loaded.Verification_key.dummy in
-        let hash = Snapp_account.digest_vk data in
+        let hash = Zkapp_account.digest_vk data in
         ({ data; hash } : _ With_hash.t)
       in
       let new_permissions =
@@ -229,9 +229,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = snapp_keypairs
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
@@ -250,9 +250,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            data =
-              { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 42
+            body =
+              { p.fee_payer.body with
+                account_precondition = Mina_base.Account.Nonce.of_int 42
               }
           }
       }
@@ -261,16 +261,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let p = parties_update_all in
       { p with
         fee_payer =
-          { data =
-              { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 2
+          { body =
+              { p.fee_payer.body with
+                account_precondition = Mina_base.Account.Nonce.of_int 2
               }
           ; authorization = Mina_base.Signature.dummy
           }
       }
     in
     let with_timeout =
-      let soft_slots = 3 in
+      let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
@@ -357,31 +357,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
-      [%log info] "Snapps transaction included in transition frontier"
+      [%log info] "ZkApp transactions included in transition frontier"
     in
     let%bind () =
-      section "Send a snapp to create snapp accounts"
-        (send_snapp ~logger node parties_create_account)
+      section_hard "Send a zkApp transaction to create zkApp accounts"
+        (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section
-        "Wait for snapp to create accounts to be included in transition \
+      section_hard
+        "Wait for zkApp to create accounts to be included in transition \
          frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "Send a snapp to update permissions"
-        (send_snapp ~logger node parties_update_permissions)
+      section_hard "Send a zkApp transaction to update permissions"
+        (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
-      section
-        "Wait for snapp to update permissions to be included in transition \
-         frontier"
+      section_hard
+        "Wait for zkApp transaction to update permissions to be included in \
+         transition frontier"
         (wait_for_snapp parties_update_permissions)
     in
     let%bind () =
-      section "Verify that updated permissions are in ledger accounts"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+      section_hard "Verify that updated permissions are in ledger accounts"
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
@@ -408,18 +408,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
-      section "Send a snapp to update all fields"
-        (send_snapp ~logger node parties_update_all)
+      section_hard "Send a zkApp transaction to update all fields"
+        (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for snapp to update all fields to be included in transition \
          frontier"
         (wait_for_snapp parties_update_all)
     in
     let%bind () =
-      section "Verify snapp updates in ledger"
-        (Malleable_error.List.iter snapp_account_ids ~f:(fun account_id ->
+      section_hard "Verify zkApp updates in ledger"
+        (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
                  [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
@@ -455,16 +455,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section "Send a snapp with an invalid nonce"
-        (send_invalid_snapp ~logger node parties_invalid_nonce "Invalid_nonce")
+      section_hard "Send a zkApp transaction with an invalid nonce"
+        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a snapp with an invalid signature"
-        (send_invalid_snapp ~logger node parties_invalid_signature
+      section_hard "Send a zkApp transaction with an invalid signature"
+        (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
     let%bind () =
-      section "Wait for proof to be emitted"
+      section_hard "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()

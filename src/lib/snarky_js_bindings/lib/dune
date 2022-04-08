@@ -21,7 +21,9 @@
    kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.common
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    block_time
    currency
    data_hash_lib

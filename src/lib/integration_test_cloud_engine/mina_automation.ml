@@ -268,7 +268,7 @@ module Network_config = struct
     in
     let mina_archive_schema_aux_files =
       [ mina_archive_base_url ^ "create_schema.sql"
-      ; mina_archive_base_url ^ "snapp_tables.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
       ]
     in
     let mk_net_keypair index (pk, sk) =

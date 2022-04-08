@@ -65,9 +65,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = [ snapp_keypair ]
+        ; zkapp_account_keypairs = [ snapp_keypair ]
         ; memo
-        ; new_snapp_account = true
+        ; new_zkapp_account = true
         ; snapp_update =
             (let timing =
                Zkapp_basic.Set_or_keep.Set
@@ -117,9 +117,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = [ (receiver_key, amount) ]
         ; amount
-        ; snapp_account_keypairs = []
+        ; zkapp_account_keypairs = []
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -147,9 +147,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = [ (receiver_key, amount) ]
         ; amount
-        ; snapp_account_keypairs = []
+        ; zkapp_account_keypairs = []
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -185,9 +185,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; receivers = []
         ; amount
-        ; snapp_account_keypairs = [ timed_account_keypair ]
+        ; zkapp_account_keypairs = [ timed_account_keypair ]
         ; memo
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
@@ -214,7 +214,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp to create a snapp account with timing"
-        (send_snapp ~logger node parties_create_account_with_timing)
+        (send_zkapp ~logger node parties_create_account_with_timing)
     in
     let%bind () =
       section
@@ -257,7 +257,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        in *)
     let%bind () =
       section "Send a snapp with transfer from timed account that succeeds"
-        (send_snapp ~logger node parties_transfer_from_timed_account)
+        (send_zkapp ~logger node parties_transfer_from_timed_account)
     in
     let%bind () =
       section "Waiting for snapp with transfer from timed account that succeeds"
@@ -350,7 +350,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          assert (
            Currency.Amount.( < ) proposed_balance
              (Option.value_exn locked_balance |> Currency.Balance.to_amount) ) ;
-         send_snapp ~logger node parties_invalid_transfer_from_timed_account)
+         send_zkapp ~logger node parties_invalid_transfer_from_timed_account)
     in
     let%bind () =
       section
@@ -399,7 +399,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Send a snapp with invalid timing update"
-        (send_snapp ~logger node parties_update_timing)
+        (send_zkapp ~logger node parties_update_timing)
     in
     let%bind () =
       section "Wait for snapp with invalid timing update"

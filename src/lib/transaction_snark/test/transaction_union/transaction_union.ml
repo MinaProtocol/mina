@@ -148,7 +148,7 @@ let%test_module "Transaction union tests" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~snapp_account1:None ~snapp_account2:None)
+            ~zkapp_account1:None ~zkapp_account2:None)
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -253,7 +253,7 @@ let%test_module "Transaction union tests" =
             in
             (state_body, state_body_hash)
       in
-      let txn_state_view : Snapp_predicate.Protocol_state.View.t =
+      let txn_state_view : Zkapp_precondition.Protocol_state.View.t =
         Mina_state.Protocol_state.Body.view state_body
       in
       let mentioned_keys, pending_coinbase_stack_target =
@@ -297,7 +297,7 @@ let%test_module "Transaction union tests" =
               pending_coinbase_stack
           ; target = pending_coinbase_stack_target
           }
-        ~snapp_account1:None ~snapp_account2:None
+        ~zkapp_account1:None ~zkapp_account2:None
         { transaction = txn; block_data = state_body }
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -1996,6 +1996,13 @@ let%test_module "transaction_undos" =
     let txn_state_view =
       Mina_state.Protocol_state.Body.view U.genesis_state_body
 
+    (* the amounts in [ledger_init_state] need to be
+       large enough to prevent nontermination in
+       Signed_command.sequence, and assure the fee calculation won't
+       have crossed bounds in Fee.gen_incl
+
+       100,000,000,000 = 100 Mina seems to be enough
+    *)
     let gen_user_commands ~length ledger_init_state =
       let open Quickcheck.Generator.Let_syntax in
       let%map cmds =

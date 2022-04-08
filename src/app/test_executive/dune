@@ -23,6 +23,7 @@
    integration_test_lib
    signature_lib
    mina_base
+   mina_transaction
    file_system
    currency
    coda_runtime_config

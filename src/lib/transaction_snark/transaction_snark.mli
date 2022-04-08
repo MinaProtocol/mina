@@ -251,8 +251,8 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> snapp_account1:Snapp_account.t option
-  -> snapp_account2:Snapp_account.t option
+  -> zkapp_account1:Zkapp_account.t option
+  -> zkapp_account2:Zkapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -276,8 +276,8 @@ val generate_transaction_witness :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> snapp_account1:Snapp_account.t option
-  -> snapp_account2:Snapp_account.t option
+  -> zkapp_account1:Zkapp_account.t option
+  -> zkapp_account2:Zkapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -342,7 +342,7 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Snapp_statement.t) option
+    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -436,7 +436,7 @@ val parties_witnesses_exn :
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
-     * (int * Snapp_statement.t) option )
+     * (int * Zkapp_statement.t) option )
      list
 
 module Make (Inputs : sig
@@ -493,7 +493,7 @@ module Base : sig
          ?witness:Parties_segment.Witness.t
       -> Parties_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> (int * Snapp_statement.Checked.t) list
+      -> (int * Zkapp_statement.Checked.t) list
       -> Statement.With_sok.var
       -> unit
   end
@@ -507,9 +507,9 @@ module For_tests : sig
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
-      ; snapp_account_keypairs : Signature_lib.Keypair.t list
+      ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
-      ; new_snapp_account : bool
+      ; new_zkapp_account : bool
       ; snapp_update : Party.Update.t
       ; current_auth : Permissions.Auth_required.t
       ; sequence_events : Tick.Field.t array list
@@ -529,7 +529,7 @@ module For_tests : sig
          ( unit
          , unit
          , unit
-         , Snapp_statement.t
+         , Zkapp_statement.t
          , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -538,13 +538,13 @@ module For_tests : sig
 
   val create_trivial_predicate_snapp :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
+    -> ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
     -> snapp_kp:Signature_lib.Keypair.t
     -> Mina_transaction_logic.For_tests.Transaction_spec.t
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
 
-  val create_trivial_snapp_account :
+  val create_trivial_zkapp_account :
        ?permissions:Permissions.t
     -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
     -> ledger:Mina_ledger.Ledger.t
@@ -559,7 +559,7 @@ module For_tests : sig
             ( unit
             , unit
             , unit
-            , Snapp_statement.t
+            , Zkapp_statement.t
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 

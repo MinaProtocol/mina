@@ -1530,20 +1530,20 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a snapp_statement = { transaction : 'a; at_party : 'a }
+type 'a zkapp_statement = { transaction : 'a; at_party : 'a }
 
-let snapp_statement_to_fields { transaction; at_party } =
+let zkapp_statement_to_fields { transaction; at_party } =
   [| transaction; at_party |]
 
-type snapp_statement_js =
+type zkapp_statement_js =
   < transaction : field_class Js.t Js.readonly_prop
   ; atParty : field_class Js.t Js.readonly_prop >
   Js.t
 
-module Snapp_statement = struct
-  type t = Field.t snapp_statement
+module Zkapp_statement = struct
+  type t = Field.t zkapp_statement
 
-  let to_field_elements = snapp_statement_to_fields
+  let to_field_elements = zkapp_statement_to_fields
 
   let to_constant ({ transaction; at_party } : t) =
     { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
@@ -1555,19 +1555,19 @@ module Snapp_statement = struct
       val atParty = to_js_field at_party
     end
 
-  let of_js (statement : snapp_statement_js) =
+  let of_js (statement : zkapp_statement_js) =
     { transaction = of_js_field statement##.transaction
     ; at_party = of_js_field statement##.atParty
     }
 
   module Constant = struct
-    type t = Field.Constant.t snapp_statement
+    type t = Field.Constant.t zkapp_statement
 
-    let to_field_elements = snapp_statement_to_fields
+    let to_field_elements = zkapp_statement_to_fields
   end
 end
 
-let snapp_statement_typ =
+let zkapp_statement_typ =
   let to_hlist { transaction; at_party } = H_list.[ transaction; at_party ] in
   let of_hlist ([ transaction; at_party ] : (unit, _) H_list.t) =
     { transaction; at_party }
@@ -1608,7 +1608,7 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
   ; main_value : 'a_value list -> 'a_value -> bool list
   }
 
-type pickles_rule_js = Js.js_string Js.t * (snapp_statement_js -> unit)
+type pickles_rule_js = Js.js_string Js.t * (zkapp_statement_js -> unit)
 
 let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   { identifier = Js.to_string identifier
@@ -1616,7 +1616,7 @@ let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   ; main =
       (fun _ statement ->
         dummy_constraints () ;
-        main (Snapp_statement.to_js statement) ;
+        main (Zkapp_statement.to_js statement) ;
         [])
   ; main_value = (fun _ _ -> [])
   }
@@ -1652,9 +1652,9 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
-      (module Snapp_statement)
-      (module Snapp_statement.Constant)
-      ~typ:snapp_statement_typ
+      (module Zkapp_statement)
+      (module Zkapp_statement.Constant)
+      ~typ:zkapp_statement_typ
       ~branches:(module Pickles_types.Nat.N2)
       ~max_branching:(module Pickles_types.Nat.N2)
       ~name:"smart-contract"
@@ -1674,26 +1674,26 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let module Proof = (val p) in
   let to_js_prover prover =
-    let prove (statement_js : snapp_statement_js) =
+    let prove (statement_js : zkapp_statement_js) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
-      let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+      let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Snapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
-      -> (snapp_statement_js -> proof Promise_js_helpers.js_promise) list =
+         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
+      -> (zkapp_statement_js -> proof Promise_js_helpers.js_promise) list =
     function
     | [] ->
         []
     | p :: ps ->
         to_js_prover p :: to_js_provers ps
   in
-  let verify (statement_js : snapp_statement_js) (proof : proof) =
-    let statement = Snapp_statement.(statement_js |> of_js |> to_constant) in
+  let verify (statement_js : zkapp_statement_js) (proof : proof) =
+    let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
@@ -1771,9 +1771,30 @@ module Ledger = struct
 
   type public_key = < g : group_class Js.t Js.prop > Js.t
 
+  type auth_required =
+    < constant : js_bool Js.prop
+    ; signatureNecessary : js_bool Js.prop
+    ; signatureSufficient : js_bool Js.prop >
+    Js.t
+
+  type permissions =
+    < editState : auth_required Js.prop
+    ; send : auth_required Js.prop
+    ; receive : auth_required Js.prop
+    ; setDelegate : auth_required Js.prop
+    ; setPermissions : auth_required Js.prop
+    ; setVerificationKey : auth_required Js.prop
+    ; setZkappUri : auth_required Js.prop
+    ; editSequenceState : auth_required Js.prop
+    ; setTokenSymbol : auth_required Js.prop
+    ; incrementNonce : auth_required Js.prop
+    ; setVotingFor : auth_required Js.prop >
+    Js.t
+
   type party_update =
     < appState : js_field set_or_keep Js.js_array Js.t Js.prop
     ; delegate : public_key set_or_keep Js.prop
+    ; permissions : permissions set_or_keep Js.prop
     ; verificationKey : Js.js_string Js.t set_or_keep Js.prop
     ; votingFor : js_field set_or_keep Js.prop >
     Js.t
@@ -1788,21 +1809,7 @@ module Ledger = struct
     ; vestingIncrement : js_uint64 Js.prop >
     Js.t
 
-  type party_body =
-    < publicKey : public_key Js.prop
-    ; update : party_update Js.prop
-    ; tokenId : js_field Js.prop
-    ; delta : js_int64 Js.prop
-    ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
-    ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
-    ; callData : js_field Js.prop
-    ; depth : int Js.prop
-    ; protocolState : protocol_state_predicate Js.prop
-    ; useFullCommitment : js_bool Js.prop
-    ; incrementNonce : js_bool Js.prop >
-    Js.t
-
-  type full_account_predicate =
+  type full_account_precondition =
     < balance : js_uint64 closed_interval Js.prop
     ; nonce : js_uint32 closed_interval Js.prop
     ; receiptChainHash : js_field or_ignore Js.prop
@@ -1813,13 +1820,42 @@ module Ledger = struct
     ; provedState : bool_class Js.t or_ignore Js.prop >
     Js.t
 
-  module Party_predicate = struct
-    type party_predicate
+  module Account_precondition = struct
+    type precondition
 
     type t =
-      < kind : Js.js_string Js.t Js.prop ; value : party_predicate Js.prop >
-      Js.t
+      < kind : Js.js_string Js.t Js.prop ; value : precondition Js.prop > Js.t
   end
+
+  type party_body =
+    < publicKey : public_key Js.prop
+    ; update : party_update Js.prop
+    ; tokenId : js_field Js.prop
+    ; delta : js_int64 Js.prop
+    ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; callData : js_field Js.prop
+    ; depth : int Js.prop
+    ; protocolState : protocol_state_predicate Js.prop
+    ; accountPrecondition : Account_precondition.t Js.prop
+    ; useFullCommitment : js_bool Js.prop
+    ; incrementNonce : js_bool Js.prop >
+    Js.t
+
+  type fee_payer_party_body =
+    < publicKey : public_key Js.prop
+    ; update : party_update Js.prop
+    ; tokenId : js_field Js.prop
+    ; delta : js_int64 Js.prop
+    ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; callData : js_field Js.prop
+    ; depth : int Js.prop
+    ; protocolState : protocol_state_predicate Js.prop
+    ; accountPrecondition : js_uint32 Js.prop
+    ; useFullCommitment : js_bool Js.prop
+    ; incrementNonce : js_bool Js.prop >
+    Js.t
 
   module Party_authorization = struct
     type authorization
@@ -1828,30 +1864,26 @@ module Ledger = struct
       < kind : Js.js_string Js.t Js.prop ; value : authorization Js.prop > Js.t
   end
 
-  type party_predicated =
-    < body : party_body Js.prop ; predicate : Party_predicate.t Js.prop > Js.t
-
   type party =
-    < data : party_predicated Js.prop
+    < body : party_body Js.prop
     ; authorization : Party_authorization.t Js.prop >
     Js.t
 
-  type fee_payer_party =
-    < body : party_body Js.prop ; predicate : js_uint32 Js.prop > Js.t
+  type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
 
   type parties =
     < feePayer : fee_payer_party Js.prop
     ; otherParties : party Js.js_array Js.t Js.prop >
     Js.t
 
-  type snapp_account =
+  type zkapp_account =
     < appState : js_field Js.js_array Js.t Js.readonly_prop > Js.t
 
   type account =
     < publicKey : group_class Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
-    ; snapp : snapp_account Js.readonly_prop >
+    ; zkapp : zkapp_account Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -1968,10 +2000,10 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
-  module Snapp_predicate = Mina_base.Snapp_predicate
+  module Zkapp_precondition = Mina_base.Zkapp_precondition
   module Party = Mina_base.Party
   module Parties = Mina_base.Parties
-  module Snapp_state = Mina_base.Snapp_state
+  module Zkapp_state = Mina_base.Zkapp_state
   module Token_id = Mina_base.Token_id
   module Zkapp_basic = Mina_base.Zkapp_basic
 
@@ -2050,11 +2082,11 @@ module Ledger = struct
     else Ignore
 
   let closed_interval f (c : 'a closed_interval) :
-      _ Snapp_predicate.Closed_interval.t =
+      _ Zkapp_precondition.Closed_interval.t =
     { lower = f c##.lower; upper = f c##.upper }
 
   let epoch_data (e : epoch_data_predicate) :
-      Snapp_predicate.Protocol_state.Epoch_data.t =
+      Zkapp_precondition.Protocol_state.Epoch_data.t =
     let ( ^ ) = Fn.compose in
     { ledger =
         { hash = or_ignore field e##.ledger##.hash
@@ -2074,8 +2106,42 @@ module Ledger = struct
              e##.epochLength)
     }
 
+  let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
+    match Js.to_string t##.kind with
+    | "accept" ->
+        Accept
+    | "nonce" ->
+        Nonce
+          (Mina_numbers.Account_nonce.of_uint32
+             (uint32 (Obj.magic t##.value : js_uint32)))
+    | "full" ->
+        let p : full_account_precondition = Obj.magic t##.value in
+        Full
+          { balance =
+              Check
+                (closed_interval
+                   (Fn.compose Currency.Balance.of_uint64 uint64)
+                   p##.balance)
+          ; nonce =
+              Check
+                (closed_interval
+                   (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
+                   p##.nonce)
+          ; receipt_chain_hash = or_ignore field p##.receiptChainHash
+          ; public_key = or_ignore public_key p##.publicKey
+          ; delegate = or_ignore public_key p##.delegate
+          ; state =
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
+          ; sequence_state = or_ignore field p##.sequenceState
+          ; proved_state =
+              or_ignore (fun x -> Js.to_bool x##toBoolean) p##.provedState
+          }
+    | s ->
+        failwithf "bad predicate type: %s" s ()
+
   let protocol_state (p : protocol_state_predicate) :
-      Snapp_predicate.Protocol_state.t =
+      Zkapp_precondition.Protocol_state.t =
     let ( ^ ) = Fn.compose in
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
     ; timestamp =
@@ -2121,20 +2187,56 @@ module Ledger = struct
       Pickles.Side_loaded.Verification_key.of_base58_check_exn
         (Js.to_string vk_artifact)
     in
-    { With_hash.data = vk; hash = Mina_base.Snapp_account.digest_vk vk }
+    { With_hash.data = vk; hash = Mina_base.Zkapp_account.digest_vk vk }
+
+  let auth_required (auth : auth_required) :
+      Mina_base.Permissions.Auth_required.t =
+    match
+      ( bool auth##.constant
+      , bool auth##.signatureNecessary
+      , bool auth##.signatureSufficient )
+    with
+    | true, _, false ->
+        Impossible
+    | true, _, true ->
+        None
+    | false, false, false ->
+        Proof
+    | false, true, true ->
+        Signature
+    | false, false, true ->
+        Either
+    | false, true, false ->
+        failwith
+          "Permissions: Found encoding of Both, but Both is not an exposed \
+           option"
+
+  let permissions (p : permissions) : Mina_base.Permissions.t =
+    { edit_state = auth_required p##.editState
+    ; send = auth_required p##.send
+    ; receive = auth_required p##.receive
+    ; set_delegate = auth_required p##.setDelegate
+    ; set_permissions = auth_required p##.setPermissions
+    ; set_verification_key = auth_required p##.setVerificationKey
+    ; set_zkapp_uri = auth_required p##.setZkappUri
+    ; edit_sequence_state = auth_required p##.editSequenceState
+    ; set_token_symbol = auth_required p##.setTokenSymbol
+    ; increment_nonce = auth_required p##.incrementNonce
+    ; set_voting_for = auth_required p##.setVotingFor
+    }
 
   let update (u : party_update) : Party.Update.t =
     { app_state =
-        Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
             set_or_keep field (array_get_exn u##.appState i))
     ; delegate = set_or_keep public_key u##.delegate
     ; verification_key =
         set_or_keep verification_key_with_hash u##.verificationKey
-    ; permissions = Keep
-    ; zkapp_uri = Keep
-    ; token_symbol = Keep
-    ; timing = Keep
-    ; voting_for = Keep
+    ; permissions = set_or_keep permissions u##.permissions
+    ; zkapp_uri = Keep (* TODO *)
+    ; token_symbol = Keep (* TODO *)
+    ; timing = Keep (* TODO *)
+    ; voting_for = Keep (* TODO *)
     }
 
   let body (b : party_body) : Party.Body.t =
@@ -2156,10 +2258,11 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = bool b##.incrementNonce
     ; use_full_commitment = bool b##.useFullCommitment
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
+    ; account_precondition = predicate b##.accountPrecondition
     }
 
-  let fee_payer_body (b : party_body) : Party.Body.Fee_payer.t =
+  let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
     { public_key = public_key b##.publicKey
     ; update = update b##.update
     ; token_id = ()
@@ -2178,16 +2281,12 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = ()
     ; use_full_commitment = ()
-    ; protocol_state = protocol_state b##.protocolState
+    ; protocol_state_precondition = protocol_state b##.protocolState
+    ; account_precondition =
+        uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
     }
 
-  let fee_payer_party (party : fee_payer_party) : Party.Predicated.Fee_payer.t =
-    { body = fee_payer_body party##.body
-    ; predicate =
-        uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
-    }
-
-  let predicate (t : Party_predicate.t) : Party.Predicate.t =
+  let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
     match Js.to_string t##.kind with
     | "accept" ->
         Accept
@@ -2196,7 +2295,7 @@ module Ledger = struct
           (Mina_numbers.Account_nonce.of_uint32
              (uint32 (Obj.magic t##.value : js_uint32)))
     | "full" ->
-        let p : full_account_predicate = Obj.magic t##.value in
+        let p : full_account_precondition = Obj.magic t##.value in
         Full
           { balance =
               Check
@@ -2212,7 +2311,7 @@ module Ledger = struct
           ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
           ; sequence_state = or_ignore field p##.sequenceState
           ; proved_state =
@@ -2221,8 +2320,10 @@ module Ledger = struct
     | s ->
         failwithf "bad predicate type: %s" s ()
 
-  let party (party : party_predicated) : Party.Predicated.t =
-    { body = body party##.body; predicate = predicate party##.predicate }
+  let party_body (party : party) : Party.Body.t = body party##.body
+
+  let fee_payer_party_body (party : fee_payer_party) : Party.Body.Fee_payer.t =
+    fee_payer_body party##.body
 
   let authorization (a : Party_authorization.t) : Mina_base.Control.t =
     match Js.to_string a##.kind with
@@ -2245,13 +2346,13 @@ module Ledger = struct
 
   let parties (parties : parties) : Parties.t =
     { fee_payer =
-        { data = fee_payer_party parties##.feePayer
+        { body = fee_payer_party_body parties##.feePayer
         ; authorization = Mina_base.Signature.dummy
         }
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
-               { data = party p##.data
+               { body = body p##.body
                ; authorization = authorization p##.authorization
                })
         |> Array.to_list
@@ -2261,7 +2362,7 @@ module Ledger = struct
   let account_id pk =
     Mina_base.Account_id.create (public_key pk) Token_id.default
 
-  let max_state_size = Pickles_types.Nat.to_int Snapp_state.Max_state_size.n
+  let max_state_size = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n
 
   (*
      TODO: to de-scope initial version, the following types are converted
@@ -2318,14 +2419,14 @@ module Ledger = struct
 
     let numeric (type a b) (transform : a -> b) (x : a closed_interval) =
       Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
-        { Snapp_predicate.Closed_interval.lower = transform x##.lower
+        { Zkapp_precondition.Closed_interval.lower = transform x##.lower
         ; upper = transform x##.upper
         }
 
     let numeric_equal (type a b) (transform : a -> b) (x : a) =
       let x' = transform x in
       Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
-        { Snapp_predicate.Closed_interval.lower = x'; upper = x' }
+        { Zkapp_precondition.Closed_interval.lower = x'; upper = x' }
 
     let set_or_keep (type a b) (transform : a -> b) (x : a set_or_keep) :
         b Zkapp_basic.Set_or_keep.Checked.t =
@@ -2352,7 +2453,7 @@ module Ledger = struct
       Mina_base.Frozen_ledger_hash.var_of_t @@ field_value x
 
     let epoch_data (e : epoch_data_predicate) :
-        Snapp_predicate.Protocol_state.Epoch_data.Checked.t =
+        Zkapp_precondition.Protocol_state.Epoch_data.Checked.t =
       let ( ^ ) = Fn.compose in
       { ledger =
           { hash = or_ignore ledger_hash e##.ledger##.hash
@@ -2375,7 +2476,7 @@ module Ledger = struct
       }
 
     let protocol_state (p : protocol_state_predicate) :
-        Snapp_predicate.Protocol_state.Checked.t =
+        Zkapp_precondition.Protocol_state.Checked.t =
       let ( ^ ) = Fn.compose in
 
       { snarked_ledger_hash = or_ignore ledger_hash p##.snarkedLedgerHash
@@ -2399,6 +2500,50 @@ module Ledger = struct
       ; next_epoch_data = epoch_data p##.nextEpochData
       }
 
+    let predicate_accept () : Party.Account_precondition.Checked.t =
+      let pk_dummy = public_key_dummy () in
+      { balance = numeric balance max_interval_uint64
+      ; nonce = numeric nonce max_interval_uint32
+      ; receipt_chain_hash =
+          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
+      ; public_key = ignore pk_dummy
+      ; delegate = ignore pk_dummy
+      ; state =
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+              ignore Field.zero)
+      ; sequence_state = ignore Field.zero
+      ; proved_state = ignore Boolean.false_
+      }
+
+    let predicate (t : Account_precondition.t) :
+        Party.Account_precondition.Checked.t =
+      match Js.to_string t##.kind with
+      | "accept" ->
+          predicate_accept ()
+      | "nonce" ->
+          let nonce_js : js_uint32 = Obj.magic t##.value in
+          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
+      | "full" ->
+          let ( ^ ) = Fn.compose in
+          let p : full_account_precondition = Obj.magic t##.value in
+          { balance = numeric balance p##.balance
+          ; nonce = numeric nonce p##.nonce
+          ; receipt_chain_hash =
+              or_ignore
+                (* TODO: assumes constant *)
+                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
+                p##.receiptChainHash
+          ; public_key = or_ignore public_key p##.publicKey
+          ; delegate = or_ignore public_key p##.delegate
+          ; state =
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
+          ; sequence_state = or_ignore field p##.sequenceState
+          ; proved_state = or_ignore bool p##.provedState
+          }
+      | s ->
+          failwithf "bad predicate type: %s" s ()
+
     let timing_info_dummy () : Party.Update.Timing_info.Checked.t =
       { initial_minimum_balance =
           Currency.Balance.Checked.Unsafe.of_field Field.zero
@@ -2411,11 +2556,11 @@ module Ledger = struct
 
     let events (js_events : js_field Js.js_array Js.t Js.js_array Js.t) =
       let events =
-        Impl.exists Mina_base.Snapp_account.Events.typ ~compute:(fun () -> [])
+        Impl.exists Mina_base.Zkapp_account.Events.typ ~compute:(fun () -> [])
       in
       let push_event js_event =
         let event = Array.map (Js.to_array js_event) ~f:field in
-        let _ = Mina_base.Snapp_account.Events.push_checked events event in
+        let _ = Mina_base.Zkapp_account.Events.push_checked events event in
         ()
       in
       Array.iter (Js.to_array js_events) ~f:push_event ;
@@ -2425,7 +2570,7 @@ module Ledger = struct
       let update : Party.Update.Checked.t =
         let u = b##.update in
         { app_state =
-            Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
                 set_or_keep field (array_get_exn u##.appState i))
         ; delegate = set_or_keep public_key u##.delegate
         ; (* TODO *) verification_key =
@@ -2433,7 +2578,7 @@ module Ledger = struct
               { Zkapp_basic.Flagged_option.is_some = Boolean.false_
               ; data =
                   Mina_base.Data_as_hash.make_unsafe
-                    (Field.constant @@ Mina_base.Snapp_account.dummy_vk_hash ())
+                    (Field.constant @@ Mina_base.Zkapp_account.dummy_vk_hash ())
                     (As_prover.Ref.create (fun () ->
                          { With_hash.data = None; hash = Field.Constant.zero }))
               }
@@ -2460,82 +2605,89 @@ module Ledger = struct
       ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
       ; increment_nonce = bool b##.incrementNonce
       ; use_full_commitment = bool b##.useFullCommitment
-      ; protocol_state = protocol_state b##.protocolState
+      ; protocol_state_precondition = protocol_state b##.protocolState
+      ; account_precondition = predicate b##.accountPrecondition
       }
 
-    let fee_payer_party (party : fee_payer_party) :
-        Party.Predicated.Fee_payer.Checked.t =
-      { (* TODO: is it OK that body is the same for fee_payer as for party?
+    let fee_payer_body (b : fee_payer_party_body) : Party.Body.Checked.t =
+      let account_precondition =
+        let nonce_js : js_uint32 = Obj.magic b##.accountPrecondition##.value in
+        { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
+      in
+      (*TODO: duplicated most of the function body above*)
+      let update : Party.Update.Checked.t =
+        let u = b##.update in
+        { app_state =
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+                set_or_keep field (array_get_exn u##.appState i))
+        ; delegate = set_or_keep public_key u##.delegate
+        ; (* TODO *) verification_key =
+            keep
+              { Zkapp_basic.Flagged_option.is_some = Boolean.false_
+              ; data =
+                  Mina_base.Data_as_hash.make_unsafe
+                    (Field.constant @@ Mina_base.Zkapp_account.dummy_vk_hash ())
+                    (As_prover.Ref.create (fun () ->
+                         { With_hash.data = None; hash = Field.Constant.zero }))
+              }
+        ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
+        ; zkapp_uri =
+            keep
+              (Mina_base.Data_as_hash.make_unsafe Field.zero
+                 (As_prover.Ref.create (fun () -> "")))
+        ; token_symbol = keep Field.zero
+        ; timing = keep (timing_info_dummy ())
+        ; voting_for =
+            Zkapp_basic.Set_or_keep.Checked.map
+              (set_or_keep field u##.votingFor)
+              ~f:Mina_base.State_hash.var_of_hash_packed
+        }
+      in
+      { public_key = public_key b##.publicKey
+      ; update
+      ; token_id = token_id b##.tokenId
+      ; balance_change = int64 b##.delta
+      ; events = events b##.events
+      ; sequence_events = events b##.sequenceEvents
+      ; call_data = field b##.callData
+      ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; increment_nonce = bool b##.incrementNonce
+      ; use_full_commitment = bool b##.useFullCommitment
+      ; protocol_state_precondition = protocol_state b##.protocolState
+      ; account_precondition
+      }
+
+    let fee_payer_party (party : fee_payer_party) : Party.Checked.t =
+      (* TODO: is it OK that body is the same for fee_payer as for party?
            what about fee vs. delta and other differences in the unchecked version?
-        *)
-        body = body party##.body
-      ; predicate = nonce party##.predicate
-      }
+      *)
+      fee_payer_body party##.body
 
-    let predicate_accept () : Party.Predicate.Checked.t =
-      let pk_dummy = public_key_dummy () in
-      { balance = numeric balance max_interval_uint64
-      ; nonce = numeric nonce max_interval_uint32
-      ; receipt_chain_hash =
-          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
-      ; public_key = ignore pk_dummy
-      ; delegate = ignore pk_dummy
-      ; state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
-              ignore Field.zero)
-      ; sequence_state = ignore Field.zero
-      ; proved_state = ignore Boolean.false_
-      }
-
-    let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-      match Js.to_string t##.kind with
-      | "accept" ->
-          predicate_accept ()
-      | "nonce" ->
-          let nonce_js : js_uint32 = Obj.magic t##.value in
-          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
-      | "full" ->
-          let ( ^ ) = Fn.compose in
-          let predicate : full_account_predicate = Obj.magic t##.value in
-          { balance = numeric balance predicate##.balance
-          ; nonce = numeric nonce predicate##.nonce
-          ; receipt_chain_hash =
-              or_ignore
-                (* TODO: assumes constant *)
-                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
-                predicate##.receiptChainHash
-          ; public_key = or_ignore public_key predicate##.publicKey
-          ; delegate = or_ignore public_key predicate##.delegate
-          ; state =
-              Pickles_types.Vector.init Snapp_state.Max_state_size.n
-                ~f:(fun i ->
-                  or_ignore field (array_get_exn predicate##.state i))
-          ; sequence_state = or_ignore field predicate##.sequenceState
-          ; proved_state = or_ignore bool predicate##.provedState
-          }
-      | s ->
-          failwithf "bad predicate type: %s" s ()
-
-    let party (party : party_predicated) : Party.Predicated.Checked.t =
-      { body = body party##.body; predicate = predicate party##.predicate }
+    let party (party : party) : Party.Checked.t = body party##.body
   end
 
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
-    p##.data |> party |> Party.Predicated.digest |> Field.constant
-    |> to_js_field
+    let party =
+      (*using dummy authorization to construct Party.t. Alternatively, one
+        could use Party.Body.digest which is what Party.digest calls*)
+      { Party.body = p |> party_body
+      ; authorization = Signature Mina_base.Signature.dummy
+      }
+    in
+    Party.digest party |> Field.constant |> to_js_field
 
-  let hash_party_checked (p : party) =
-    p##.data |> Checked.party |> Party.Predicated.Checked.digest |> to_js_field
+  let hash_party_checked p =
+    p |> Checked.party |> Party.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
-    p |> protocol_state |> Snapp_predicate.Protocol_state.digest
+    p |> protocol_state |> Zkapp_precondition.Protocol_state.digest
     |> Field.constant |> to_js_field
 
   let hash_protocol_state_checked (p : protocol_state_predicate) =
-    p |> Checked.protocol_state |> Snapp_predicate.Protocol_state.Checked.digest
-    |> to_js_field
+    p |> Checked.protocol_state
+    |> Zkapp_precondition.Protocol_state.Checked.digest |> to_js_field
 
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
@@ -2566,14 +2718,14 @@ module Ledger = struct
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
     in
     let use_full_commitment =
       match party_index with
       | Fee_payer ->
           true
       | Other_party i ->
-          (List.nth_exn other_parties i).data.body.use_full_commitment
+          (List.nth_exn other_parties i).body.use_full_commitment
     in
     if use_full_commitment then full_commitment else commitment
 
@@ -2602,32 +2754,33 @@ module Ledger = struct
 
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
-  let add_account_exn (l : L.t) pk balance =
+  let public_key_to_string (pk : public_key) : Js.js_string Js.t =
+    pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
+    |> Js.string
+
+  let private_key_to_string (sk : private_key) : Js.js_string Js.t =
+    sk |> private_key |> Signature_lib.Private_key.to_base58_check |> Js.string
+
+  let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk in
-
-    let bal_u64 =
-      (* TODO: Why is this conversion necessary to make it work ? *)
-      Unsigned.UInt64.of_string (Int.to_string balance)
-    in
-
+    let bal_u64 = Unsigned.UInt64.of_string balance in
     let balance = Currency.Balance.of_uint64 bal_u64 in
-
     let a : Mina_base.Account.t =
       { (Mina_base.Account.create account_id balance) with
         permissions = loose_permissions
       }
     in
-
     create_new_account_exn l account_id a
 
   let create
       (genesis_accounts :
-        < publicKey : public_key Js.prop ; balance : int Js.prop > Js.t
+        < publicKey : public_key Js.prop ; balance : Js.js_string Js.t Js.prop >
+        Js.t
         Js.js_array
         Js.t) : ledger_class Js.t =
     let l = L.empty ~depth:20 () in
     array_iter genesis_accounts ~f:(fun a ->
-        add_account_exn l a##.publicKey a##.balance) ;
+        add_account_exn l a##.publicKey (Js.to_string a##.balance)) ;
     new%js ledger_constr l
 
   module To_js = struct
@@ -2647,7 +2800,7 @@ module Ledger = struct
 
     let app_state (a : Mina_base.Account.t) =
       let xs = new%js Js.array_empty in
-      ( match a.snapp with
+      ( match a.zkapp with
       | Some s ->
           Pickles_types.Vector.iter s.app_state ~f:(fun x ->
               ignore (xs##push (field x)))
@@ -2661,7 +2814,7 @@ module Ledger = struct
       let x, y = Signature_lib.Public_key.decompress_exn pk in
       to_js_group (Field.constant x) (Field.constant y)
 
-    let account (a : Mina_base.Account.t) =
+    let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
 
@@ -2669,7 +2822,7 @@ module Ledger = struct
 
         val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
 
-        val snapp =
+        val zkapp =
           object%js
             val appState = app_state a
           end
@@ -2679,23 +2832,17 @@ module Ledger = struct
       Js.Optdef.option (Option.map x ~f:transform)
   end
 
-  let get_account l (pk : public_key) : account Js.opt =
-    match
-      Option.bind
-        (L.location_of_account l##.value (account_id pk))
-        ~f:(L.get l##.value)
-    with
-    | None ->
-        Js.Opt.empty
-    | Some a ->
-        Js.Opt.return (To_js.account a)
+  let get_account l (pk : public_key) : account Js.optdef =
+    let loc = L.location_of_account l##.value (account_id pk) in
+    let account = Option.bind loc ~f:(L.get l##.value) in
+    To_js.option To_js.account account
 
-  let add_account l (pk : public_key) (balance : int) =
-    add_account_exn l##.value pk balance
+  let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
+    add_account_exn l##.value pk (Js.to_string balance)
 
-  let dummy_state_view : Snapp_predicate.Protocol_state.View.t =
+  let dummy_state_view : Zkapp_precondition.Protocol_state.View.t =
     let epoch_data =
-      { Snapp_predicate.Protocol_state.Epoch_data.Poly.ledger =
+      { Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
           { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
           ; total_currency = Currency.Amount.zero
           }
@@ -2722,12 +2869,8 @@ module Ledger = struct
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
 
-  (* TODO: this is not yet working!
-   * lacking API to create a proper tx on the JS side (authorization)
-   *)
-  let apply_parties_transaction l (p : parties) =
+  let apply_parties_transaction l (txn : Parties.t) =
     let ledger = l##.value in
-    let txn = parties p in
     let applied_exn =
       T.apply_parties_unchecked ~state_view:dummy_state_view
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
@@ -2739,21 +2882,24 @@ module Ledger = struct
       match command.status with
       | Applied (_aux_data, _balance) ->
           ()
-      | Failed (failures, _balance) ->
-          let concat_commas = String.concat ~sep:"," in
+      | Failed (failure, _balance) ->
           raise_error
-            (sprintf "[ %s ]"
-               ( List.map failures ~f:(fun l ->
-                     sprintf "[ %s ]"
-                       ( List.map l
-                           ~f:Mina_base.Transaction_status.Failure.to_string
-                       |> concat_commas ))
-               |> concat_commas ))
+            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failure
+            |> Yojson.Safe.to_string )
     in
     let account_list =
       List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
     in
     Js.array @@ Array.of_list account_list
+
+  let apply_js_transaction l (p : parties) =
+    apply_parties_transaction l (parties p)
+
+  let apply_json_transaction l (tx_json : Js.js_string Js.t) =
+    let txn =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    apply_parties_transaction l txn
 
   let () =
     let static_method name f =
@@ -2761,10 +2907,6 @@ module Ledger = struct
     in
     let method_ name (f : ledger_class Js.t -> _) =
       method_ ledger_class name f
-    in
-    let full = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o () in
-    let parties_to_json ps =
-      parties ps |> !(full#to_json) |> Yojson.Safe.to_string |> Js.string
     in
     static_method "create" create ;
 
@@ -2778,10 +2920,13 @@ module Ledger = struct
 
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
+    static_method "publicKeyToString" public_key_to_string ;
+    static_method "privateKeyToString" private_key_to_string ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
-    method_ "applyPartiesTransaction" apply_parties_transaction ;
+    method_ "applyPartiesTransaction" apply_js_transaction ;
+    method_ "applyJsonTransaction" apply_json_transaction ;
 
     static_method "partiesToJson" parties_to_json ;
     let rec yojson_to_gql (y : Yojson.Safe.t) : string =
