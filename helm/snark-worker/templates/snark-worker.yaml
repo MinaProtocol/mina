@@ -25,10 +25,11 @@ spec:
       - name: worker
         resources:
           limits:
-            memory: 16.0Gi
+            memory: 16Gi
+            cpu: 8
           requests:
-            memory: 6.0Gi
-            cpu: 4
+            memory: 16Gi
+            cpu: 8
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]

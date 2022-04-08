@@ -78,9 +78,12 @@ spec:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
         resources:
+          limits:
+            memory: 4Gi
+            cpu: 2
           requests:
-            memory: 512m
-            cpu: 0.1
+            memory: 4Gi
+            cpu: 2
         image: {{ $.Values.userAgent.image }}
         command: ["bash"]
         args: ["-c", "python3 agent.py"]

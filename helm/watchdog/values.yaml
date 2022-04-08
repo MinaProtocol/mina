@@ -2,7 +2,7 @@ testnetName: "mina-testnet"
 name: "watchdog"
 
 mina:
-  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  image: minaprotocol/mina-daemon:focal-latest
   ports:
     client: "8301"
     graphql: "3085"

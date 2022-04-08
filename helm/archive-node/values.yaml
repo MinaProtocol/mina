@@ -5,7 +5,7 @@ mina:
   logLevel: "Info"
   logSnarkWorkGossip: false
   logTxnPoolGossip: false
-  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  image: minaprotocol/mina-daemon:focal-latest
   useCustomEntrypoint: false
   customEntrypoint: ""
   privkeyPass: "naughty blue worm"
@@ -20,7 +20,7 @@ mina:
 
 archive:
   hostPort: "10909"
-  image: gcr.io/o1labs-192920/mina-archive:1.1.8-b10c0e3
+  image: minaprotocol/mina-archive:focal-latest
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"

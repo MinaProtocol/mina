@@ -10,7 +10,7 @@ mina:
     delta: 3
     txpool_max_size: 3000
     genesis_state_timestamp: "2020-04-20 11:00:00-07:00"
-  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  image: minaprotocol/mina-daemon:focal-latest
   useCustomEntrypoint: false
   customEntrypoint: ""
   seedPeers:

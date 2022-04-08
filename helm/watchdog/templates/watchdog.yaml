@@ -25,8 +25,11 @@ spec:
       - name: watchdog
         resources:
           requests:
-            memory: 512m
-            cpu: 1.0
+            memory: 2Gi
+            cpu: 2
+          limits:
+            memory: 2Gi
+            cpu: 2
         image: {{ .Values.image }}
         command: ["python3"]
         args: ["-u", "/code/watchdog.py"]

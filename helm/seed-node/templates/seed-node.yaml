@@ -42,6 +42,8 @@ spec:
       - name: mina
         resources:
           limits:
+            memory: 32.0Gi
+            cpu: 12.0
           requests:
             memory: 32.0Gi
             cpu: 12.0
