@@ -24,7 +24,7 @@ features:
   uploadBlocksToGCloud:
     enabled: false
   seedPeersLists:
-    enabled: true
+    enabled: false
   customEntrypoint:
     enabled: false
     command: ""
