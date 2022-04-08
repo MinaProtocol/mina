@@ -1,7 +1,6 @@
 open Core_kernel
 open Async
 open Integration_test_lib
-open Mina_base
 open Mina_transaction
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)

@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
@@ -192,10 +193,11 @@ struct
     let soft_timeout_in_slots = 8 in
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
-          (Public_key.Compressed.to_base58_check
+          (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key)
           ( List.map parties.other_parties ~f:(fun party ->
-                Public_key.Compressed.to_base58_check party.body.public_key)
+                Signature_lib.Public_key.Compressed.to_base58_check
+                  party.body.public_key)
           |> String.concat ~sep:", " )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots

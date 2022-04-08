@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 
 module Make
     (Engine : Intf.Engine.S)
