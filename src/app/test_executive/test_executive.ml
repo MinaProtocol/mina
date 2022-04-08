@@ -337,7 +337,25 @@ let main inputs =
           Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
         [%log trace] "initializing network abstraction" ;
-        let%bind () = Engine.Network.initialize ~logger network in
+        let%bind () = Engine.Network.initialize_infra ~logger network in
+
+        [%log info] "Starting the daemons within the pods" ;
+        let start_print (node : Engine.Network.Node.t) =
+          let open Malleable_error.Let_syntax in
+          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          let%bind res = Engine.Network.Node.start ~fresh_state:false node in
+          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          Malleable_error.return res
+        in
+        let seed_nodes = network |> Engine.Network.seeds in
+        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        (* TODO: parallelize (requires accumlative hard errors) *)
+        let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
+        let%bind () =
+          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
+        in
+        let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
+        [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
         T.run network dsl)
   in
