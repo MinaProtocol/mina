@@ -660,7 +660,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%bind ((_, acct) as r) = get_with_location ledger account_id in
     let%map () =
       check
-        (Option.is_none acct.snapp)
+        (Option.is_none acct.zkapp)
         !"Expected account %{sexp: Account_id.t} to be a user account, got a \
           snapp account."
         account_id
@@ -998,42 +998,40 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       (Signed_command.forget_check user_command)
 
   let apply_body ~is_start
-      ({ body =
-           { public_key = _
-           ; token_id = _
-           ; update =
-               { app_state = _
-               ; delegate = _
-               ; verification_key = _
-               ; permissions = _
-               ; zkapp_uri = _
-               ; token_symbol = _
-               ; timing = _
-               ; voting_for = _
-               }
-           ; balance_change = _
-           ; increment_nonce
-           ; events = _ (* This is for the snapp to use, we don't need it. *)
-           ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-           ; sequence_events = _
-           ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-           ; protocol_state = _
-           ; use_full_commitment
+      ({ public_key = _
+       ; token_id = _
+       ; update =
+           { app_state = _
+           ; delegate = _
+           ; verification_key = _
+           ; permissions = _
+           ; zkapp_uri = _
+           ; token_symbol = _
+           ; timing = _
+           ; voting_for = _
            }
-       ; predicate
+       ; balance_change = _
+       ; increment_nonce
+       ; events = _ (* This is for the snapp to use, we don't need it. *)
+       ; call_data = _ (* This is for the snapp to use, we don't need it. *)
+       ; sequence_events = _
+       ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
+       ; protocol_state_precondition = _
+       ; account_precondition
+       ; use_full_commitment
        } :
-        Party.Predicated.t) (a : Account.t) : (Account.t, _) Result.t =
+        Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
     let open Result.Let_syntax in
-    (* enforce that either the predicate is `Accept`,
+    (* enforce that either the account_precondition is `Accept`,
          the nonce is incremented,
          or the full commitment is used to avoid replays. *)
     let%map () =
-      let predicate_is_accept =
+      let account_precondition_is_accept =
         Zkapp_precondition.Account.is_accept
-        @@ Party.Predicate.to_full predicate
+        @@ Party.Account_precondition.to_full account_precondition
       in
       List.exists ~f:Fn.id
-        [ predicate_is_accept
+        [ account_precondition_is_accept
         ; increment_nonce
         ; use_full_commitment && not is_start
         ]
@@ -1064,7 +1062,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   end
 
   module Inputs = struct
-    module First_party = Party.Signed
     module Global_state = Global_state
 
     module Field = struct
@@ -1301,56 +1298,56 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
 
-      let make_snapp (a : t) =
-        let snapp =
-          match a.snapp with
+      let make_zkapp (a : t) =
+        let zkapp =
+          match a.zkapp with
           | None ->
               Some Zkapp_account.default
-          | Some _ as snapp ->
-              snapp
+          | Some _ as zkapp ->
+              zkapp
         in
-        { a with snapp }
+        { a with zkapp }
 
-      let unmake_snapp (a : t) : t =
-        let snapp =
-          match a.snapp with
+      let unmake_zkapp (a : t) : t =
+        let zkapp =
+          match a.zkapp with
           | None ->
               None
-          | Some snapp ->
-              if Zkapp_account.(equal default snapp) then None else Some snapp
+          | Some zkapp ->
+              if Zkapp_account.(equal default zkapp) then None else Some zkapp
         in
-        { a with snapp }
+        { a with zkapp }
 
-      let get_snapp (a : t) = Option.value_exn a.snapp
+      let get_zkapp (a : t) = Option.value_exn a.zkapp
 
-      let set_snapp (a : t) ~f : t = { a with snapp = Option.map a.snapp ~f }
+      let set_zkapp (a : t) ~f : t = { a with zkapp = Option.map a.zkapp ~f }
 
-      let proved_state (a : t) = (get_snapp a).proved_state
+      let proved_state (a : t) = (get_zkapp a).proved_state
 
       let set_proved_state proved_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with proved_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with proved_state })
 
-      let app_state (a : t) = (get_snapp a).app_state
+      let app_state (a : t) = (get_zkapp a).app_state
 
       let set_app_state app_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with app_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with app_state })
 
       let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_snapp a).verification_key
+      let verification_key (a : t) = (get_zkapp a).verification_key
 
       let set_verification_key verification_key (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with verification_key })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
 
-      let last_sequence_slot (a : t) = (get_snapp a).last_sequence_slot
+      let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
 
       let set_last_sequence_slot last_sequence_slot (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with last_sequence_slot })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with last_sequence_slot })
 
-      let sequence_state (a : t) = (get_snapp a).sequence_state
+      let sequence_state (a : t) = (get_zkapp a).sequence_state
 
       let set_sequence_state sequence_state (a : t) =
-        set_snapp a ~f:(fun snapp -> { snapp with sequence_state })
+        set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
       let zkapp_uri (a : t) = a.zkapp_uri
 
@@ -1436,7 +1433,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
-    module Protocol_state_predicate = struct
+    module Protocol_state_precondition = struct
       include Zkapp_precondition.Protocol_state
     end
 
@@ -1465,25 +1462,25 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
 
         let timing (party : t) : Account.timing set_or_keep =
-          Set_or_keep.map ~f:Option.some party.data.body.update.timing
+          Set_or_keep.map ~f:Option.some party.body.update.timing
 
-        let app_state (party : t) = party.data.body.update.app_state
+        let app_state (party : t) = party.body.update.app_state
 
         let verification_key (party : t) =
           Zkapp_basic.Set_or_keep.map ~f:Option.some
-            party.data.body.update.verification_key
+            party.body.update.verification_key
 
-        let sequence_events (party : t) = party.data.body.sequence_events
+        let sequence_events (party : t) = party.body.sequence_events
 
-        let zkapp_uri (party : t) = party.data.body.update.zkapp_uri
+        let zkapp_uri (party : t) = party.body.update.zkapp_uri
 
-        let token_symbol (party : t) = party.data.body.update.token_symbol
+        let token_symbol (party : t) = party.body.update.token_symbol
 
-        let delegate (party : t) = party.data.body.update.delegate
+        let delegate (party : t) = party.body.update.delegate
 
-        let voting_for (party : t) = party.data.body.update.voting_for
+        let voting_for (party : t) = party.body.update.voting_for
 
-        let permissions (party : t) = party.data.body.update.permissions
+        let permissions (party : t) = party.body.update.permissions
       end
     end
 
@@ -1544,7 +1541,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let of_parties_list : Party.t list -> t =
         Parties.Call_forest.of_parties_list ~party_depth:(fun (p : Party.t) ->
-            p.data.body.call_depth)
+            p.body.call_depth)
 
       let pop_exn : t -> (Party.t * t) * t = function
         | { stack_hash = (); elt = { party; calls; party_digest = () } } :: xs
@@ -1614,7 +1611,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_commitment.t
           , Transaction_status.Failure.t option )
           Parties_logic.Local_state.t
-      ; protocol_state_predicate : Zkapp_precondition.Protocol_state.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
       ; full_transaction_commitment : unit
       ; field : Snark_params.Tick.Field.t
@@ -1623,12 +1620,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Parties_logic.Eff.t) : r =
       match eff with
-      | Check_protocol_state_predicate (pred, global_state) -> (
+      | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_predicate (_is_start, party, account, _global_state) -> (
-          match party.data.predicate with
+      | Check_account_precondition (_is_start, party, account, _global_state)
+        -> (
+          match party.body.account_precondition with
           | Accept ->
               true
           | Nonce n ->
@@ -1638,7 +1636,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Check_auth { is_start; party = p; account = a } -> (
           if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
-          match apply_body ~is_start p.data a with
+          match apply_body ~is_start p.body a with
           | Error failure ->
               (a, false, Some failure)
           | Ok a ->
@@ -1691,14 +1689,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let user_acc = f init initial_state in
     let%bind (start : Inputs.Global_state.t * _) =
-      let parties =
-        let p = Party.Fee_payer.to_signed c.fee_payer in
-        { Party.authorization = Control.Signature p.authorization
-        ; data =
-            { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
-        }
-        :: c.other_parties
-      in
+      let parties = Party.Fee_payer.to_party c.fee_payer :: c.other_parties in
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
             { parties = Inputs.Parties.of_parties_list parties
@@ -2410,60 +2401,56 @@ module For_tests = struct
     in
     let parties : Parties.t =
       { fee_payer =
-          { Party.Fee_payer.data =
-              { body =
-                  { public_key = sender_pk
-                  ; update = Party.Update.noop
-                  ; token_id = ()
-                  ; balance_change = fee
-                  ; increment_nonce = ()
-                  ; events = []
-                  ; sequence_events = []
-                  ; call_data = Snark_params.Tick.Field.zero
-                  ; call_depth = 0
-                  ; protocol_state = Zkapp_precondition.Protocol_state.accept
-                  ; use_full_commitment = ()
-                  }
-              ; predicate = actual_nonce
+          { Party.Fee_payer.body =
+              { public_key = sender_pk
+              ; update = Party.Update.noop
+              ; token_id = ()
+              ; balance_change = fee
+              ; increment_nonce = ()
+              ; events = []
+              ; sequence_events = []
+              ; call_data = Snark_params.Tick.Field.zero
+              ; call_depth = 0
+              ; protocol_state_precondition =
+                  Zkapp_precondition.Protocol_state.accept
+              ; account_precondition = actual_nonce
+              ; use_full_commitment = ()
               }
               (* Real signature added in below *)
           ; authorization = Signature.dummy
           }
       ; other_parties =
-          [ { data =
-                { body =
-                    { public_key = sender_pk
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change =
-                        Amount.Signed.(negate (of_unsigned amount))
-                    ; increment_nonce = not use_full_commitment
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment
-                    }
-                ; predicate = Nonce (Account.Nonce.succ actual_nonce)
+          [ { body =
+                { public_key = sender_pk
+                ; update = Party.Update.noop
+                ; token_id = Token_id.default
+                ; balance_change = Amount.Signed.(negate (of_unsigned amount))
+                ; increment_nonce = not use_full_commitment
+                ; events = []
+                ; sequence_events = []
+                ; call_data = Snark_params.Tick.Field.zero
+                ; call_depth = 0
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
+                ; use_full_commitment
                 }
             ; authorization = None_given
             }
-          ; { data =
-                { body =
-                    { public_key = receiver
-                    ; update = Party.Update.noop
-                    ; token_id = Token_id.default
-                    ; balance_change = Amount.Signed.(of_unsigned amount)
-                    ; increment_nonce = false
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = false
-                    }
-                ; predicate = Accept
+          ; { body =
+                { public_key = receiver
+                ; update = Party.Update.noop
+                ; token_id = Token_id.default
+                ; balance_change = Amount.Signed.(of_unsigned amount)
+                ; increment_nonce = false
+                ; events = []
+                ; sequence_events = []
+                ; call_data = Snark_params.Tick.Field.zero
+                ; call_depth = 0
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; account_precondition = Accept
+                ; use_full_commitment = false
                 }
             ; authorization = None_given
             }
@@ -2474,9 +2461,7 @@ module For_tests = struct
     let commitment = Parties.commitment parties in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:
-          (Party.Predicated.digest
-             (Party.Predicated.of_fee_payer parties.fee_payer.data))
+        ~fee_payer_hash:(Party.digest (Party.of_fee_payer parties.fee_payer))
     in
     let other_parties_signature =
       let c = if use_full_commitment then full_commitment else commitment in
@@ -2485,7 +2470,7 @@ module For_tests = struct
     in
     let other_parties =
       List.map parties.other_parties ~f:(fun party ->
-          match party.data.predicate with
+          match party.body.account_precondition with
           | Nonce _ ->
               { party with authorization = Signature other_parties_signature }
           | _ ->

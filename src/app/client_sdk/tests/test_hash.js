@@ -1,5 +1,5 @@
 const assert = require('assert');
-const mina = require("./client_sdk.js").minaSDK;
+const mina = require('./client_sdk.js').minaSDK;
 const fs = require('fs');
 
 // helpers

@@ -41,9 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let transactions_sent = ref 0
 
-  let send_snapp ~logger node parties =
+  let send_zkapp ~logger node parties =
     incr transactions_sent ;
-    send_snapp ~logger node parties
+    send_zkapp ~logger node parties
 
   (* An event which fires when [n] ledger proofs have been emitted *)
   let ledger_proofs_emitted ~logger ~num_proofs =
@@ -250,9 +250,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            data =
-              { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 42
+            body =
+              { p.fee_payer.body with
+                account_precondition = Mina_base.Account.Nonce.of_int 42
               }
           }
       }
@@ -261,9 +261,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let p = parties_update_all in
       { p with
         fee_payer =
-          { data =
-              { p.fee_payer.data with
-                predicate = Mina_base.Account.Nonce.of_int 2
+          { body =
+              { p.fee_payer.body with
+                account_precondition = Mina_base.Account.Nonce.of_int 2
               }
           ; authorization = Mina_base.Signature.dummy
           }
@@ -316,7 +316,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             data =
               { body =
                   { p.fee_payer.data.body with
-                    balance_change = Currency.Fee.of_int 100000
+                    balance_change = Currency.Fee.of_int 999_999
                   }
               ; predicate = Mina_base.Account.Nonce.of_int 1
               }
@@ -324,7 +324,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let with_timeout =
-      let soft_slots = 3 in
+      let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
@@ -411,30 +411,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
-      [%log info] "Snapps transaction included in transition frontier"
+      [%log info] "ZkApp transactions included in transition frontier"
     in
     let%bind () =
-      section "Send a snapp to create snapp accounts"
-        (send_snapp ~logger node parties_create_account)
+      section_hard "Send a zkApp transaction to create zkApp accounts"
+        (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section
-        "Wait for snapp to create accounts to be included in transition \
+      section_hard
+        "Wait for zkApp to create accounts to be included in transition \
          frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section "Send a snapp to update permissions"
-        (send_snapp ~logger node parties_update_permissions)
+      section_hard "Send a zkApp transaction to update permissions"
+        (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
-      section
-        "Wait for snapp to update permissions to be included in transition \
-         frontier"
+      section_hard
+        "Wait for zkApp transaction to update permissions to be included in \
+         transition frontier"
         (wait_for_snapp parties_update_permissions)
     in
     let%bind () =
-      section "Verify that updated permissions are in ledger accounts"
+      section_hard "Verify that updated permissions are in ledger accounts"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
                ~metadata:
@@ -462,17 +462,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
-      section "Send a snapp to update all fields"
-        (send_snapp ~logger node parties_update_all)
+      section_hard "Send a zkApp transaction to update all fields"
+        (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for snapp to update all fields to be included in transition \
          frontier"
         (wait_for_snapp parties_update_all)
     in
     let%bind () =
-      section "Verify snapp updates in ledger"
+      section_hard "Verify zkApp updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
@@ -509,12 +509,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section "Send a snapp with an invalid nonce"
-        (send_invalid_snapp ~logger node parties_invalid_nonce "Invalid_nonce")
+      section_hard "Send a zkApp transaction with an invalid nonce"
+        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a snapp with an invalid signature"
-        (send_invalid_snapp ~logger node parties_invalid_signature
+      section_hard "Send a zkApp transaction with an invalid signature"
+        (send_invalid_zkapp ~logger node parties_invalid_signature
+           "Invalid_signature")
+    in
+    let%bind () =
+      section "Send a snapp with an invalid proof"
+        (send_invalid_snapp ~logger node parties_invalid_proof
            "Invalid_signature")
     in
     let%bind () =
@@ -522,22 +527,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_invalid_snapp ~logger node parties_insufficient_fee
            "Insufficient_fee")
     in
-    let%bind () =
-      section "Send a snapp with an invalid proof"
-        (send_invalid_snapp ~logger node parties_invalid_proof "Invalid_proof")
-    in
+    (*
     let%bind () =
       section "Send a snapp with a duplicate txn"
         (send_invalid_snapp ~logger node parties_update_all
-           "Duplicate_transaction")
+           "Duplicate")
     in
+    *)
     let%bind () =
       section "Send a snapp with an insufficient replace fee"
         (send_invalid_snapp ~logger node parties_insufficient_replace_fee
            "Insufficient_replace_fee")
     in
     let%bind () =
-      section "Wait for proof to be emitted"
+      section_hard "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()

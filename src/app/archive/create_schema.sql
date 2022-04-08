@@ -90,7 +90,6 @@ CREATE TABLE internal_commands
 CREATE TABLE zkapp_fee_payers
 ( id                       serial           PRIMARY KEY
 , body_id                  int              NOT NULL REFERENCES zkapp_party_body(id)
-, nonce                    bigint           NOT NULL
 );
 
 /* zkapp_other_parties_ids refers to a list of ids in zkapp_party.

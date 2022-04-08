@@ -1099,20 +1099,6 @@ struct
         let pool_max_size = t.config.pool_max_size in
         let sender = Envelope.Incoming.sender diffs in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
-        let diffs_are_valid () =
-          List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
-              let is_valid = not (User_command.has_insufficient_fee cmd) in
-              if not is_valid then
-                [%log' debug t.logger]
-                  "Filtering user command with insufficient fee from \
-                   transaction-pool diff $cmd from $sender"
-                  ~metadata:
-                    [ ("cmd", User_command.to_yojson cmd)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
-                    ] ;
-              is_valid)
-        in
         let h = Lru_cache.T.hash diffs.data in
         let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
         if (not allow_failures_for_tests) && already_mem && not is_sender_local
@@ -1122,9 +1108,6 @@ struct
              rebroadcast but also never made it into a block for some reason.
           *)
           Deferred.Or_error.error_string "already saw this"
-        else if (not allow_failures_for_tests) && not (diffs_are_valid ()) then
-          Deferred.Or_error.error_string
-            "at least one user command had an insufficient fee"
         else
           match t.best_tip_ledger with
           | None ->
@@ -1835,7 +1818,7 @@ let%test_module _ =
       (* add new accounts to best tip ledger *)
       let ledger_accounts =
         Mina_ledger.Ledger.to_list ledger
-        |> List.filter ~f:(fun acct -> Option.is_some acct.snapp)
+        |> List.filter ~f:(fun acct -> Option.is_some acct.zkapp)
       in
       List.iter ledger_accounts ~f:(fun account ->
           let account_id =
@@ -1955,7 +1938,7 @@ let%test_module _ =
               State_hash.gen
         ; timing = Account.Timing.Untimed
         ; permissions = Permissions.user_default
-        ; snapp = None
+        ; zkapp = None
         ; zkapp_uri = ""
         } )
 
