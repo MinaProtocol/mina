@@ -1869,7 +1869,7 @@ module Ledger = struct
     ; authorization : Party_authorization.t Js.prop >
     Js.t
 
-  type fee_payer_party = < body : party_body Js.prop > Js.t
+  type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
 
   type parties =
     < feePayer : fee_payer_party Js.prop
@@ -2286,7 +2286,7 @@ module Ledger = struct
         uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
     }
 
-  let predicate (t : Party_predicate.t) : Party.Predicate.t =
+  let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
     match Js.to_string t##.kind with
     | "accept" ->
         Accept
@@ -2352,7 +2352,7 @@ module Ledger = struct
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
-               { body = party_body p##.data
+               { body = body p##.body
                ; authorization = authorization p##.authorization
                })
         |> Array.to_list
@@ -2517,7 +2517,7 @@ module Ledger = struct
 
     let predicate (t : Account_precondition.t) :
         Party.Account_precondition.Checked.t =
-      match Js.to_string t##.type_ with
+      match Js.to_string t##.kind with
       | "accept" ->
           predicate_accept ()
       | "nonce" ->
@@ -2658,35 +2658,6 @@ module Ledger = struct
       ; account_precondition
       }
 
-    let predicate (t : Party_predicate.t) : Party.Predicate.Checked.t =
-      match Js.to_string t##.kind with
-      | "accept" ->
-          predicate_accept ()
-      | "nonce" ->
-          let nonce_js : js_uint32 = Obj.magic t##.value in
-          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
-      | "full" ->
-          let ( ^ ) = Fn.compose in
-          let predicate : full_account_predicate = Obj.magic t##.value in
-          { balance = numeric balance predicate##.balance
-          ; nonce = numeric nonce predicate##.nonce
-          ; receipt_chain_hash =
-              or_ignore
-                (* TODO: assumes constant *)
-                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
-                predicate##.receiptChainHash
-          ; public_key = or_ignore public_key predicate##.publicKey
-          ; delegate = or_ignore public_key predicate##.delegate
-          ; state =
-              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
-                ~f:(fun i ->
-                  or_ignore field (array_get_exn predicate##.state i))
-          ; sequence_state = or_ignore field predicate##.sequenceState
-          ; proved_state = or_ignore bool predicate##.provedState
-          }
-      | s ->
-          failwithf "bad predicate type: %s" s ()
-
     let fee_payer_party (party : fee_payer_party) : Party.Checked.t =
       (* TODO: is it OK that body is the same for fee_payer as for party?
            what about fee vs. delta and other differences in the unchecked version?
@@ -2748,14 +2719,14 @@ module Ledger = struct
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.Predicated.(digest (of_fee_payer fee_payer.data))
+        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
     in
     let use_full_commitment =
       match party_index with
       | Fee_payer ->
           true
       | Other_party i ->
-          (List.nth_exn other_parties i).data.body.use_full_commitment
+          (List.nth_exn other_parties i).body.use_full_commitment
     in
     if use_full_commitment then full_commitment else commitment
 
@@ -2830,7 +2801,7 @@ module Ledger = struct
 
     let app_state (a : Mina_base.Account.t) =
       let xs = new%js Js.array_empty in
-      ( match a.snapp with
+      ( match a.zkapp with
       | Some s ->
           Pickles_types.Vector.iter s.app_state ~f:(fun x ->
               ignore (xs##push (field x)))
