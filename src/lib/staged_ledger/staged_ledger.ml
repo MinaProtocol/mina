@@ -1558,48 +1558,69 @@ module T = struct
       match count with `One -> by_one t | `Two -> by_one (by_one t)
   end
 
-  let rec check_constraints_and_update ~constraint_constants
+  let rec check_constraints_and_update ~logger ~constraint_constants
       (resources : Resources.t) log =
-    if Resources.slots_occupied resources = 0 then (resources, log)
-    else if Resources.work_constraint_satisfied resources then
+    if Resources.slots_occupied resources = 0 then (
+      [%log debug]
+        "Staged_ledger_diff creation: no resources remaining; terminating" ;
+      (resources, log) )
+    else if Resources.work_constraint_satisfied resources then (
+      [%log debug] "Staged_ledger_diff creation: work constraint is satisifed" ;
       if
         (*There's enough work. Check if they satisfy other constraints*)
         Resources.budget_sufficient resources
-      then
-        if Resources.space_constraint_satisfied resources then (resources, log)
-        else if Resources.worked_more ~constraint_constants resources then
+      then (
+        [%log debug] "Staged_ledger_diff creation: budget was sufficient" ;
+        if Resources.space_constraint_satisfied resources then (
+          [%log debug]
+            "Staged_ledger_diff creation: space constraint satisified; \
+             terminating" ;
+          (resources, log) )
+        else if Resources.worked_more ~constraint_constants resources then (
+          [%log debug]
+            "Staged_ledger_diff creation: too many fee_transfers; discarding \
+             last work" ;
           (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
           let resources', work_opt =
             Resources.discard_last_work ~constraint_constants resources
           in
-          check_constraints_and_update ~constraint_constants resources'
+          check_constraints_and_update ~logger ~constraint_constants resources'
             (Option.value_map work_opt ~default:log ~f:(fun work ->
                  Diff_creation_log.discard_completed_work `Extra_work work log))
-        else
+          )
+        else (
+          [%log debug]
+            "Staged_ledger_diff creation: no space available; discarding a \
+             user command" ;
           (*Well, there's no space; discard a user command *)
           let resources', uc_opt = Resources.discard_user_command resources in
-          check_constraints_and_update ~constraint_constants resources'
+          check_constraints_and_update ~logger ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
                  Diff_creation_log.discard_command `No_space
                    (uc.data :> User_command.t)
-                   log))
-      else
+                   log)) ) )
+      else (
+        [%log debug]
+          "Staged_ledger_diff creation: budget was insufficient; reducing cost" ;
         (* insufficient budget; reduce the cost*)
         let resources', work_opt =
           Resources.discard_last_work ~constraint_constants resources
         in
-        check_constraints_and_update ~constraint_constants resources'
+        check_constraints_and_update ~logger ~constraint_constants resources'
           (Option.value_map work_opt ~default:log ~f:(fun work ->
                Diff_creation_log.discard_completed_work `Insufficient_fees work
-                 log))
-    else
+                 log)) ) )
+    else (
+      [%log debug]
+        "Staged_ledger_diff creation: not enough wprk available for \
+         transactions; discarding a transaction" ;
       (* There isn't enough work for the transactions. Discard a transaction and check again *)
       let resources', uc_opt = Resources.discard_user_command resources in
-      check_constraints_and_update ~constraint_constants resources'
+      check_constraints_and_update ~logger ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
              Diff_creation_log.discard_command `No_work
                (uc.data :> User_command.t)
-               log))
+               log)) )
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
       slot_job_count logger ~is_coinbase_receiver_new partition
@@ -1618,7 +1639,8 @@ module T = struct
             ~available_slots:(fst slot_job_count)
             ~required_work_count:(snd slot_job_count)
         in
-        check_constraints_and_update ~constraint_constants init_resources log)
+        check_constraints_and_update ~logger ~constraint_constants
+          init_resources log)
 
   let generate ~constraint_constants logger cw_seq ts_seq ~receiver
       ~is_coinbase_receiver_new ~supercharge_coinbase
