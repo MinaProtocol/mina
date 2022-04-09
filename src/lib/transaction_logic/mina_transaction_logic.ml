@@ -2500,7 +2500,7 @@ module For_tests = struct
         (Random_oracle.Input.Chunked.field c)
     in
     let other_parties =
-      Parties.Call_forest.map parties.other_parties ~f:(fun party ->
+      Parties.Call_forest.map parties.other_parties ~f:(fun (party : Party.t) ->
           match party.body.account_precondition with
           | Nonce _ ->
               { party with

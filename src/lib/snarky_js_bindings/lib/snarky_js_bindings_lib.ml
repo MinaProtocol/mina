@@ -2793,14 +2793,17 @@ module Ledger = struct
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
     let use_full_commitment =
       match party_index with
       | Fee_payer ->
           true
       | Other_party i ->
-          (List.nth_exn other_parties i).body.use_full_commitment
+          (List.nth_exn (Parties.Call_forest.to_parties_list other_parties) i)
+            .body
+            .use_full_commitment
     in
     if use_full_commitment then full_commitment else commitment
 
@@ -2819,7 +2822,8 @@ module Ledger = struct
     | Other_party i ->
         { tx with
           other_parties =
-            List.mapi tx.other_parties ~f:(fun i' p ->
+            Parties.Call_forest.mapi tx.other_parties
+              ~f:(fun i' (p : Party.t) ->
                 if i' = i then { p with authorization = Signature signature }
                 else p)
         } )

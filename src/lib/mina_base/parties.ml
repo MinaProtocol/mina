@@ -67,13 +67,23 @@ module Call_forest = struct
     let iter2_exn ts1 ts2 ~f =
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
-    let rec map (t : _ t) ~f =
-      { calls = map_forest t.calls ~f
-      ; party = f t.party
-      ; party_digest = t.party_digest
-      }
+    let rec mapi' ~i (t : _ t) ~f =
+      let l, calls = mapi_forest' ~i:(i + 1) t.calls ~f in
+      (l, { calls; party = f i t.party; party_digest = t.party_digest })
 
-    and map_forest x ~f = List.map x ~f:(With_stack_hash.map ~f:(map ~f))
+    and mapi_forest' ~i x ~f =
+      let rec go i acc = function
+        | [] ->
+            (i, List.rev acc)
+        | t :: ts ->
+            let l, elt' = mapi' ~i ~f (With_stack_hash.elt t) in
+            go l (With_stack_hash.map t ~f:(fun _ -> elt') :: acc) ts
+      in
+      go i [] x
+
+    let map_forest ~f t = mapi_forest' ~i:0 ~f:(fun _ x -> f x) t |> snd
+
+    let mapi_forest ~f t = mapi_forest' ~i:0 ~f t |> snd
 
     let hash { party = _; calls; party_digest } =
       let stack_hash =
@@ -275,6 +285,10 @@ module Call_forest = struct
     | { elt = { party; calls = _; party_digest = _ }; stack_hash = _ } :: _ ->
         Some party
 
+  let map = Tree.map_forest
+
+  let mapi = Tree.mapi_forest
+
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
     let node i calls =
@@ -286,25 +300,41 @@ module Call_forest = struct
       let n0 = node 0 [] in
       [ n0; n0; n0; n0 ]
     in
+    let f_index = mapi ~f:(fun i _p -> i) in
     [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_1)
       parties_list_1_res ;
+    let parties_list1_index : (int, unit, unit) t =
+      let n i = node i [] in
+      [ n 0; n 1; n 2; n 3 ]
+    in
+    [%test_eq: (int, unit, unit) t]
+      (of_parties_list ~party_depth:Fn.id parties_list_1 |> f_index)
+      parties_list1_index ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_1))
       parties_list_1 ;
     let parties_list_2 = [ 0; 0; 1; 1 ] in
     let parties_list_2_res = [ node 0 []; node 0 [ node 1 []; node 1 [] ] ] in
+    let parties_list_2_index = [ node 0 []; node 1 [ node 2 []; node 3 [] ] ] in
     [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_2)
       parties_list_2_res ;
+    [%test_eq: (int, unit, unit) t]
+      (of_parties_list ~party_depth:Fn.id parties_list_2 |> f_index)
+      parties_list_2_index ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_2))
       parties_list_2 ;
     let parties_list_3 = [ 0; 0; 1; 0 ] in
     let parties_list_3_res = [ node 0 []; node 0 [ node 1 [] ]; node 0 [] ] in
+    let parties_list_3_index = [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ] in
     [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_3)
       parties_list_3_res ;
+    [%test_eq: (int, unit, unit) t]
+      (of_parties_list ~party_depth:Fn.id parties_list_3 |> f_index)
+      parties_list_3_index ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_3))
       parties_list_3 ;
@@ -314,9 +344,17 @@ module Call_forest = struct
       ; node 0 []
       ]
     in
+    let parties_list_4_index =
+      [ node 0 [ node 1 [ node 2 [ node 3 [] ]; node 4 [] ]; node 5 [] ]
+      ; node 6 []
+      ]
+    in
     [%test_eq: (int, unit, unit) t]
       (of_parties_list ~party_depth:Fn.id parties_list_4)
       parties_list_4_res ;
+    [%test_eq: (int, unit, unit) t]
+      (of_parties_list ~party_depth:Fn.id parties_list_4 |> f_index)
+      parties_list_4_index ;
     [%test_eq: int list]
       (to_parties_list (of_parties_list ~party_depth:Fn.id parties_list_4))
       parties_list_4
@@ -339,8 +377,6 @@ module Call_forest = struct
         Digest.Forest.empty
     | x :: _ ->
         With_stack_hash.stack_hash x
-
-  let map = Tree.map_forest
 
   let cons ?(calls = []) (party : Party.t) (xs : _ t) : _ t =
     let party_digest = Digest.Party.create party in
