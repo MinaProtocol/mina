@@ -565,7 +565,7 @@ module For_tests : sig
             Pickles.Prover.t ]
 
   val multiple_transfers :
-       ?protocol_state_predicate:Snapp_predicate.Protocol_state.t
+       ?protocol_state_precondition:Zkapp_precondition.Protocol_state.t
     -> Spec.t
     -> Parties.t
 end

@@ -4106,8 +4106,8 @@ module For_tests = struct
     , `Prover trivial_prover )
 
   let create_parties
-      ?(protocol_state_precondition = Snapp_predicate.Protocol_state.accept)
-      spec ~update ~account_precondition =
+      ?(protocol_state_precondition = Zkapp_precondition.Protocol_state.accept)
+      ?(account_precondition = Party.Account_precondition.Accept) spec ~update =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; fee_payer = fee_payer_opt
@@ -4141,6 +4141,7 @@ module For_tests = struct
               ; account_precondition = sender_nonce
               ; use_full_commitment = ()
               }
+          ; authorization = Signature.dummy
           }
       | Some (fee_payer_kp, fee_payer_nonce) ->
           { body =
@@ -4157,6 +4158,7 @@ module For_tests = struct
               ; account_precondition = fee_payer_nonce
               ; use_full_commitment = ()
               }
+          ; authorization = Signature.dummy
           }
     in
     let sender_party : Party.t option =
@@ -4170,7 +4172,7 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precodition
+        ; protocol_state_precondition
         ; account_precondition =
             ( if Option.is_none fee_payer_opt then
               Nonce (Account.Nonce.succ sender_nonce)
@@ -4233,7 +4235,7 @@ module For_tests = struct
               ; sequence_events
               ; call_data
               ; call_depth = 0
-              ; protocol_state_precodition
+              ; protocol_state_precondition
               ; account_precondition
               ; use_full_commitment = true
               }
@@ -4343,7 +4345,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:update_vk
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4373,7 +4374,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4444,15 +4444,13 @@ module For_tests = struct
     let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 
-  let multiple_transfers ?protocol_state_predicate (spec : Spec.t) =
+  let multiple_transfers ?protocol_state_precondition (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
-      create_parties spec ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
-        ?protocol_state_predicate
+      create_parties spec ~update:spec.snapp_update ?protocol_state_precondition
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;

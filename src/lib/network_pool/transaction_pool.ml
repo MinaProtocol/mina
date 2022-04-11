@@ -2073,12 +2073,12 @@ let%test_module _ =
       in
       let fee = Currency.Fee.of_int fee in
       (*let snapp_kp = Signature_lib.Keypair.create () in*)
-      let protocol_state_predicate =
+      let protocol_state_precondition =
         match valid_period with
         | None ->
-            Snapp_predicate.Protocol_state.accept
+            Zkapp_precondition.Protocol_state.accept
         | Some time ->
-            Snapp_predicate.Protocol_state.valid_until time
+            Zkapp_precondition.Protocol_state.valid_until time
       in
       let test_spec : Transaction_snark.For_tests.Spec.t =
         { sender
@@ -2086,9 +2086,9 @@ let%test_module _ =
         ; fee
         ; receivers = [ (receiver, amount) ]
         ; amount
-        ; snapp_account_keypairs = []
+        ; zkapp_account_keypairs = []
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
-        ; new_snapp_account = false
+        ; new_zkapp_account = false
         ; snapp_update = Party.Update.dummy
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
@@ -2097,8 +2097,8 @@ let%test_module _ =
         }
       in
       let parties =
-        Transaction_snark.For_tests.multiple_transfers ~protocol_state_predicate
-          test_spec
+        Transaction_snark.For_tests.multiple_transfers
+          ~protocol_state_precondition test_spec
       in
       User_command.Parties parties
 
