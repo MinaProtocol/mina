@@ -441,21 +441,20 @@ let%test_unit "tokens test" =
           (Account_id.create pk Token_id.default)
         |> Or_error.ok_exn
       in
-      { data =
-          { body =
-              { update = Party.Update.noop
-              ; public_key = pk
-              ; token_id = ()
-              ; balance_change = Currency.Fee.of_int 7
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Pickles.Impls.Step.Field.Constant.zero
-              ; call_depth = 0
-              ; protocol_state = Zkapp_precondition.Protocol_state.accept
-              ; use_full_commitment = ()
-              }
-          ; predicate = nonce
+      { body =
+          { update = Party.Update.noop
+          ; public_key = pk
+          ; token_id = ()
+          ; balance_change = Currency.Fee.of_int 7
+          ; increment_nonce = ()
+          ; events = []
+          ; sequence_events = []
+          ; call_data = Pickles.Impls.Step.Field.Constant.zero
+          ; call_depth = 0
+          ; protocol_state_precondition =
+              Zkapp_precondition.Protocol_state.accept
+          ; use_full_commitment = ()
+          ; account_precondition = nonce
           ; caller = ()
           }
       ; authorization = Signature.dummy
@@ -464,16 +463,18 @@ let%test_unit "tokens test" =
     { fee_payer
     ; memo = Signed_command_memo.dummy
     ; other_parties =
-        other_parties |> Parties.Call_forest.add_callers'
+        other_parties
+        |> Parties.Call_forest.map
+             ~f:(fun (p : Party.Body.Wire.t) : Party.Wire.t ->
+               { body = p; authorization = Signature Signature.dummy })
+        |> Parties.Call_forest.add_callers'
         |> Parties.Call_forest.accumulate_hashes_predicated
-        |> Parties.Call_forest.map ~f:(fun p : Party.t ->
-               { data = p; authorization = Signature Signature.dummy })
     }
   in
   let main (ledger : t) =
     let execute_parties_transaction
-        (parties : (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t)
-        : unit =
+        (parties : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t) : unit
+        =
       let _res =
         apply_parties_unchecked ~constraint_constants ~state_view:view ledger
           (mk_parties_transaction ledger parties)
@@ -481,24 +482,22 @@ let%test_unit "tokens test" =
       in
       ()
     in
-    let party caller kp token_id balance_change : Party.Predicated.Wire.t =
-      { body =
-          { update = Party.Update.noop
-          ; public_key = Public_key.compress kp.Keypair.public_key
-          ; token_id
-          ; balance_change =
-              Currency.Amount.Signed.create
-                ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
-                ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-          ; increment_nonce = true
-          ; events = []
-          ; sequence_events = []
-          ; call_data = Pickles.Impls.Step.Field.Constant.zero
-          ; call_depth = 0
-          ; protocol_state = Zkapp_precondition.Protocol_state.accept
-          ; use_full_commitment = false
-          }
-      ; predicate = Accept
+    let party caller kp token_id balance_change : Party.Body.Wire.t =
+      { update = Party.Update.noop
+      ; public_key = Public_key.compress kp.Keypair.public_key
+      ; token_id
+      ; balance_change =
+          Currency.Amount.Signed.create
+            ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
+            ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
+      ; increment_nonce = true
+      ; events = []
+      ; sequence_events = []
+      ; call_data = Pickles.Impls.Step.Field.Constant.zero
+      ; call_depth = 0
+      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; use_full_commitment = false
+      ; account_precondition = Accept
       ; caller
       }
     in
@@ -506,8 +505,7 @@ let%test_unit "tokens test" =
     let token_owner = Keypair.create () in
     let token_account1 = Keypair.create () in
     let token_account2 = Keypair.create () in
-    let forest ps : (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t
-        =
+    let forest ps : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
       List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
     in
     let node party calls =
@@ -519,8 +517,7 @@ let%test_unit "tokens test" =
     let account_creation_fee =
       Currency.Fee.to_int constraint_constants.account_creation_fee
     in
-    let create_token :
-        (Party.Predicated.Wire.t, unit, unit) Parties.Call_forest.t =
+    let create_token : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
       forest
         [ node
             (party Call token_funder Token_id.default

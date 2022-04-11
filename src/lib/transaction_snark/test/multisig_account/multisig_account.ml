@@ -300,29 +300,27 @@ let%test_module "multisig_account" =
               in
               let sender_pk = sender.public_key |> Public_key.compress in
               let fee_payer : Party.Fee_payer.t =
-                { data =
-                    { body =
-                        { public_key = sender_pk
-                        ; update = Party.Update.noop
-                        ; token_id = ()
-                        ; balance_change = fee
-                        ; increment_nonce = ()
-                        ; events = []
-                        ; sequence_events = []
-                        ; call_data = Field.zero
-                        ; call_depth = 0
-                        ; protocol_state =
-                            Zkapp_precondition.Protocol_state.accept
-                        ; use_full_commitment = ()
-                        }
-                    ; predicate = sender_nonce
+                { body =
+                    { public_key = sender_pk
+                    ; update = Party.Update.noop
+                    ; token_id = ()
+                    ; balance_change = fee
+                    ; increment_nonce = ()
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Field.zero
+                    ; call_depth = 0
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; use_full_commitment = ()
+                    ; account_precondition = sender_nonce
                     ; caller = ()
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Predicated.Wire.t =
+              let sender_party_data : Party.Wire.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -334,15 +332,18 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account_precondition =
+                        Nonce (Account.Nonce.succ sender_nonce)
                     ; use_full_commitment = false
+                    ; caller = Call
                     }
-                ; predicate = Nonce (Account.Nonce.succ sender_nonce)
-                ; caller = Call
+                ; authorization = Signature Signature.dummy
                 }
               in
-              let snapp_party_data : Party.Predicated.Wire.t =
-                { Party.Predicated.Poly.body =
+              let snapp_party_data : Party.Wire.t =
+                { body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
                     ; token_id = Token_id.default
@@ -353,19 +354,21 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
+                    ; protocol_state_precondition =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account_precondition =
+                        Full Zkapp_precondition.Account.accept
                     ; use_full_commitment = false
+                    ; caller = Call
                     }
-                ; predicate = Full Zkapp_precondition.Account.accept
-                ; caller = Call
+                ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }
               in
               let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Predicated.Wire.t) ->
-                    p.body.call_depth)
+                  ~party_depth:(fun (p : Party.Wire.t) -> p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
                 |> Parties.Call_forest.add_callers'
                 |> Parties.Call_forest.accumulate_hashes_predicated
@@ -419,7 +422,7 @@ let%test_module "multisig_account" =
                   Parties.Transaction_commitment.with_fee_payer transaction
                     ~fee_payer_hash:
                       (Parties.Digest.Party.create
-                         (Party.Predicated.of_fee_payer fee_payer.data))
+                         (Party.of_fee_payer fee_payer))
                 in
                 { fee_payer with
                   authorization =
@@ -428,7 +431,7 @@ let%test_module "multisig_account" =
                 }
               in
               let sender : Party.Wire.t =
-                { data = sender_party_data
+                { body = sender_party_data.body
                 ; authorization =
                     Signature
                       (Signature_lib.Schnorr.Chunked.sign sender.private_key
@@ -440,7 +443,9 @@ let%test_module "multisig_account" =
                   { fee_payer
                   ; other_parties =
                       [ sender
-                      ; { data = snapp_party_data; authorization = Proof pi }
+                      ; { body = snapp_party_data.body
+                        ; authorization = Proof pi
+                        }
                       ]
                   ; memo
                   }

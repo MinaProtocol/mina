@@ -32,75 +32,69 @@ let%test_module "Snapp payments tests" =
       in
       Parties.of_wire
         { fee_payer =
-            { data =
-                { body =
-                    { public_key = acct1.account.public_key
-                    ; update =
-                        { app_state =
-                            Pickles_types.Vector.map new_state ~f:(fun x ->
-                                Zkapp_basic.Set_or_keep.Set x)
-                        ; delegate = Keep
-                        ; verification_key = Keep
-                        ; permissions = Keep
-                        ; zkapp_uri = Keep
-                        ; token_symbol = Keep
-                        ; timing = Keep
-                        ; voting_for = Keep
-                        }
-                    ; token_id = ()
-                    ; balance_change = Fee.of_int full_amount
-                    ; increment_nonce = ()
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; protocol_state = Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = ()
+            { body =
+                { public_key = acct1.account.public_key
+                ; update =
+                    { app_state =
+                        Pickles_types.Vector.map new_state ~f:(fun x ->
+                            Zkapp_basic.Set_or_keep.Set x)
+                    ; delegate = Keep
+                    ; verification_key = Keep
+                    ; permissions = Keep
+                    ; zkapp_uri = Keep
+                    ; token_symbol = Keep
+                    ; timing = Keep
+                    ; voting_for = Keep
                     }
-                ; predicate = acct1.account.nonce
+                ; token_id = ()
+                ; balance_change = Fee.of_int full_amount
+                ; increment_nonce = ()
+                ; events = []
+                ; sequence_events = []
+                ; call_data = Field.zero
+                ; call_depth = 0
+                ; protocol_state_precondition =
+                    Zkapp_precondition.Protocol_state.accept
+                ; use_full_commitment = ()
+                ; account_precondition = acct1.account.nonce
                 ; caller = ()
                 }
             ; authorization = Signature.dummy
             }
         ; other_parties =
-            [ { data =
-                  { body =
-                      { public_key = acct1.account.public_key
-                      ; update = Party.Update.noop
-                      ; token_id = Token_id.default
-                      ; balance_change =
-                          Amount.Signed.(of_unsigned receiver_amount |> negate)
-                      ; increment_nonce = true
-                      ; events = []
-                      ; sequence_events = []
-                      ; call_data = Field.zero
-                      ; call_depth = 0
-                      ; protocol_state =
-                          Zkapp_precondition.Protocol_state.accept
-                      ; use_full_commitment = false
-                      }
-                  ; predicate = Accept
+            [ { body =
+                  { public_key = acct1.account.public_key
+                  ; update = Party.Update.noop
+                  ; token_id = Token_id.default
+                  ; balance_change =
+                      Amount.Signed.(of_unsigned receiver_amount |> negate)
+                  ; increment_nonce = true
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
+                  ; use_full_commitment = false
+                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = Signature Signature.dummy
               }
-            ; { data =
-                  { body =
-                      { public_key = acct2.account.public_key
-                      ; update = Party.Update.noop
-                      ; token_id = Token_id.default
-                      ; balance_change =
-                          Amount.Signed.(of_unsigned receiver_amount)
-                      ; increment_nonce = false
-                      ; events = []
-                      ; sequence_events = []
-                      ; call_data = Field.zero
-                      ; call_depth = 0
-                      ; protocol_state =
-                          Zkapp_precondition.Protocol_state.accept
-                      ; use_full_commitment = false
-                      }
-                  ; predicate = Accept
+            ; { body =
+                  { public_key = acct2.account.public_key
+                  ; update = Party.Update.noop
+                  ; token_id = Token_id.default
+                  ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
+                  ; increment_nonce = false
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
+                  ; use_full_commitment = false
+                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = None_given

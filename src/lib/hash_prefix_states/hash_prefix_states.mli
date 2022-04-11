@@ -53,7 +53,7 @@ val zkapp_precondition_account : Field.t State.t
 
 val zkapp_precondition_protocol_state : Field.t State.t
 
-val party_predicate : Field.t State.t
+val party_account_precondition : Field.t State.t
 
 val party : Field.t State.t
 

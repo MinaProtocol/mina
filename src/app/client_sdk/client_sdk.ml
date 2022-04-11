@@ -43,11 +43,10 @@ let _ =
          let other_parties = Parties.other_parties_of_json other_parties_json in
          let other_parties =
            Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.t) -> p.data.body.call_depth)
+             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
              other_parties
            |> Parties.Call_forest.accumulate_hashes
-                ~hash_party:(fun (p : Party.t) ->
-                  Parties.Digest.Party.create p.data)
+                ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
          let protocol_state_predicate_hash =
@@ -67,8 +66,7 @@ let _ =
          let full_commitment =
            Parties.Transaction_commitment.with_fee_payer commitment
              ~fee_payer_hash:
-               (Parties.Digest.Party.create
-                  (Party.Predicated.of_fee_payer fee_payer.data))
+               (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
@@ -81,7 +79,7 @@ let _ =
            { fee_payer with authorization = fee_payer_signature_auth }
          in
          { Parties.fee_payer; other_parties; memo }
-         |> Parties.parties_to_json |> Yojson.Safe.to_string
+         |> Parties.parties_to_json |> Yojson.Safe.to_string |> Js.string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =

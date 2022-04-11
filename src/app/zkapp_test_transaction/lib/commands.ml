@@ -33,7 +33,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
-      parties.fee_payer.data.body.public_key
+      parties.fee_payer.body.public_key
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
@@ -130,7 +130,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     let protocol_state_predicate_view =
       Mina_state.Protocol_state.Body.view compile_time_genesis.data.body
     in
-    Mina_generators.Parties_generators.gen_protocol_state_predicate
+    Mina_generators.Parties_generators.gen_protocol_state_precondition
       protocol_state_predicate_view
     |> Base_quickcheck.Generator.generate ~size:1
          ~random:(Splittable_random.State.create Random.State.default)
