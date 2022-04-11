@@ -52,10 +52,9 @@ let genesis_state_body_hash =
 
 let init_stack = Pending_coinbase.Stack.empty
 
-let pending_coinbase_state_stack =
+let pending_coinbase_state_stack ~state_body_hash =
   { Transaction_snark.Pending_coinbase_stack_state.source = init_stack
-  ; target =
-      Pending_coinbase.Stack.push_state genesis_state_body_hash init_stack
+  ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
   }
 
 let apply_parties ledger parties =
@@ -65,14 +64,21 @@ let apply_parties ledger parties =
         []
     | [ ps ] ->
         [ ( `Pending_coinbase_init_stack init_stack
-          , `Pending_coinbase_of_statement pending_coinbase_state_stack
+          , `Pending_coinbase_of_statement
+              (pending_coinbase_state_stack
+                 ~state_body_hash:genesis_state_body_hash)
           , ps )
         ]
     | ps1 :: ps2 :: rest ->
         let ps1 =
           ( `Pending_coinbase_init_stack init_stack
-          , `Pending_coinbase_of_statement pending_coinbase_state_stack
+          , `Pending_coinbase_of_statement
+              (pending_coinbase_state_stack
+                 ~state_body_hash:genesis_state_body_hash)
           , ps1 )
+        in
+        let pending_coinbase_state_stack =
+          pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
         in
         let unchanged_stack_state ps =
           ( `Pending_coinbase_init_stack init_stack
@@ -114,6 +120,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
     ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
     ?(apply = true) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
       let witnesses =
         match
@@ -121,7 +128,8 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
               Transaction_snark.parties_witnesses_exn ~constraint_constants
                 ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
                 [ ( `Pending_coinbase_init_stack init_stack
-                  , `Pending_coinbase_of_statement pending_coinbase_state_stack
+                  , `Pending_coinbase_of_statement
+                      (pending_coinbase_state_stack ~state_body_hash)
                   , parties )
                 ])
         with

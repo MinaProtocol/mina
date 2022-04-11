@@ -173,7 +173,8 @@ let%test_module "Fee payer tests" =
                       ~fee_excess:Amount.Signed.zero (`Ledger ledger)
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
-                            U.pending_coinbase_state_stack
+                            (U.pending_coinbase_state_stack
+                               ~state_body_hash:U.genesis_state_body_hash)
                         , parties )
                       ])
               with
