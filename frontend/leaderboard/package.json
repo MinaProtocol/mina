@@ -10,9 +10,9 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@googleapis/sheets": "^0.3.0",
     "bs-fetch": "^0.5.0",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
-    "googleapis": "^50.0.0",
     "isomorphic-unfetch": "^3.0.0",
     "pg": "^8.3.0"
   },
