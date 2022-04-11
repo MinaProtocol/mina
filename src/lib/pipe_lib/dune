@@ -2,6 +2,16 @@
  (name pipe_lib)
  (inline_tests)
  (public_name pipe_lib)
- (libraries core_kernel async_kernel o1trace logger run_in_thread)
+ (libraries
+   ;; opam libraries
+   sexplib
+   core_kernel
+   async_kernel
+   core
+   ppx_inline_test.config
+   ;; local libraries
+   run_in_thread
+   logger
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.make)))

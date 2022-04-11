@@ -2,7 +2,17 @@
  (name cache_lib)
  (public_name cache_lib)
  (inline_tests)
- (libraries async_kernel core_kernel logger)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   base
+   base.base_internalhash_types
+   core
+   ppx_inline_test.config
+   ;; local libraries
+   logger
+   )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf ppx_inline_test ppx_optcomp)))

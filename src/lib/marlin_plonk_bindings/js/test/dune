@@ -2,7 +2,17 @@
  (name bindings_js_test)
  (modes js)
  (js_of_ocaml (flags +toplevel.js +dynlink.js))
- (libraries marlin_plonk_bindings js_of_ocaml bindings_js node_backend)
+ (libraries
+   js_of_ocaml
+   bindings_js
+   node_backend
+   marlin_plonk_bindings
+   marlin_plonk_bindings_bigint_256
+   marlin_plonk_bindings_pasta_fp
+   marlin_plonk_bindings_pasta_fq
+   marlin_plonk_bindings_pasta_fp_vector
+   marlin_plonk_bindings_pasta_fq_vector
+ )
  (link_deps ../node_js/plonk_wasm.js ../node_js/plonk_wasm.wasm)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
