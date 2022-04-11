@@ -3,8 +3,8 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests.
-open Inline_test_quiet_logs*)
+(* Only show stdout for failed inline tests.*)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -1198,10 +1198,6 @@ struct
                                 let failures =
                                   Result.error !failures |> Option.value_exn
                                 in
-                                Core.printf "%sXXXXXXXXXXX %!"
-                                  (List.to_string failures ~f:(fun s ->
-                                       verification_failure_to_yojson s
-                                       |> Yojson.Safe.to_string)) ;
                                 return (Error `Other_command_failed) )
                               else if
                                 has_sufficient_fee t.pool ~pool_max_size uc
@@ -1254,10 +1250,6 @@ struct
                                     with
                                     | `Reject ->
                                         add_failure (Command_failure e) ;
-                                        Core.printf "XXXXX%s\n %!"
-                                          ( Indexed_pool.Command_error.to_yojson
-                                              e
-                                          |> Yojson.Safe.to_string ) ;
                                         Mutex.release signer_lock ;
                                         return (Error `Invalid_command)
                                     | `Ignore ->
@@ -1315,26 +1307,14 @@ struct
                     errs_string
               | Error _ | Ok () ->
                   let data =
-                    List.filter_map diffs' ~f:(fun e ->
-                        match e with
-                        | Error (`Invalid_command | `Other_command_failed) ->
-                            (* If this happens, we should be in the Error branch for !failure above *)
-                            ( match e with
-                            | Error `Invalid_command ->
-                                Core.printf "%s %!"
-                                  "!!!!!!!!!!!!Invalid_command"
-                            | Error `Other_command_failed ->
-                                Core.printf "%s %!"
-                                  "!!!!!!!!!!!!!!!!!!!Other_command_failed"
-                            | _ ->
-                                Core.printf "Other Error!! %!" ;
-                                () ) ;
-                            assert false
-                        | Error `Account_not_found ->
-                            (* We can just skip this set of commands *)
-                            None
-                        | Ok t ->
-                            Some t)
+                    List.filter_map diffs' ~f:(function
+                      | Error (`Invalid_command | `Other_command_failed) ->
+                          assert false
+                      | Error `Account_not_found ->
+                          (* We can just skip this set of commands *)
+                          None
+                      | Ok t ->
+                          Some t)
                   in
                   let data : verified =
                     { accepted =
@@ -1750,13 +1730,14 @@ let%test_module _ =
       in
       assert (List.is_sorted txns ~compare)
 
-    let setup_test () =
+    let setup_test ?expiry () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
+      let expiry_ns = match expiry with None -> expiry_ns | Some t -> t in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~expiry_ns ~frontier_broadcast_pipe:tf_pipe_r
@@ -2059,7 +2040,7 @@ let%test_module _ =
           mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
             (mk_parties_cmds' pool))
 
-    let mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
+    let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
         () =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
@@ -2075,7 +2056,7 @@ let%test_module _ =
                 }))
 
     let mk_parties ?valid_period ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
-        ~nonce ~amount _ledger =
+        ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -2124,7 +2105,7 @@ let%test_module _ =
       in
       User_command.Parties parties
 
-    let mk_payment ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ()
+    let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
         =
       User_command.Signed_command
         (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
@@ -2262,7 +2243,9 @@ let%test_module _ =
           mk_expired_not_accepted_test assert_pool_txs pool ~padding:25
             (mk_parties_cmds pool))
 
-    let _mk_expired_txs_get_removed_test ~mk_transaction =
+    let%test_unit "Expired transactions that are already in the pool are \
+                   removed from the pool when best tip changes (user commands)"
+        =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2278,15 +2261,15 @@ let%test_module _ =
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
-          let%bind expires_later1 =
-            mk_transaction ~valid_until:curr_slot_plus_three ~sender_idx:0
+          let expires_later1 =
+            mk_payment ~valid_until:curr_slot_plus_three ~sender_idx:0
               ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9 ~amount:10_000_000_000
-              pool
+              ()
           in
-          let%bind expires_later2 =
-            mk_transaction ~valid_until:curr_slot_plus_seven ~sender_idx:0
+          let expires_later2 =
+            mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:0
               ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9 ~amount:10_000_000_000
-              pool
+              ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let cmds_wo_check =
@@ -2318,15 +2301,14 @@ let%test_module _ =
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           (* Add new commands, remove old commands some of which are now expired *)
-          let%bind expired_command =
-            mk_transaction ~valid_until:curr_slot ~sender_idx:9
-              ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000
-              pool
+          let expired_command =
+            mk_payment ~valid_until:curr_slot ~sender_idx:9 ~fee:1_000_000_000
+              ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
-          let%bind unexpired_command =
-            mk_transaction ~valid_until:curr_slot_plus_seven ~sender_idx:8
+          let unexpired_command =
+            mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:8
               ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000
-              pool
+              ()
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
@@ -2383,50 +2365,28 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           Deferred.unit)
 
-    (* let%test_unit "Expired transactions that are already in the pool are \
-                    removed from the pool when best tip changes (user cmds)" =
-       mk_expired_txs_get_removed_test (fun ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ledger pool)
-    *)
-
     let%test_unit "Expired transactions that are already in the pool are \
                    removed from the pool when best tip changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
+          let eight_block_time =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * 8L)
+            |> Int64.to_int |> Option.value_exn |> Time_ns.Span.of_int_ms
+          in
+          (* Since expiration for zkapp and transaction_pool uses the same constant, so I use the duration_of_the_test which is 8_slot + 1 sec as the expiration, so that the transaction won't be expired before the test is over. *)
+          let expiry = Time_ns.Span.(eight_block_time + of_sec 1.) in
+          let eight_block =
+            Block_time.Span.of_time_span
+            @@ Time_ns.Span.to_span_float_round_nearest eight_block_time
+          in
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
-            setup_test ()
+            setup_test ~expiry ()
           in
-          let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
-          let mk_ledger () =
-            (* the Snapp generators want a Ledger.t, these tests have Base_ledger.t map, so
-               we build the Ledger.t from the map
-            *)
-            let ledger =
-              Mina_ledger.Ledger.create
-                ~depth:precomputed_values.constraint_constants.ledger_depth ()
-            in
-            Account_id.Table.iteri best_tip_ledger
-              ~f:(fun ~key:acct_id ~data:acct ->
-                match
-                  Mina_ledger.Ledger.get_or_create_account ledger acct_id acct
-                with
-                | Error err ->
-                    failwithf
-                      "mk_parties_cmds: error adding account for account id: \
-                       %s, error: %s@."
-                      (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-                      (Error.to_string_hum err) ()
-                | Ok (`Existed, _) ->
-                    failwithf
-                      "mk_parties_cmds: account for account id already exists: \
-                       %s@."
-                      (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-                      ()
-                | Ok (`Added, _) ->
-                    ()) ;
-            ledger
-          in
-          let ledger = mk_ledger () in
           assert_pool_txs [] ;
-          let curr_time = Block_time.of_time (Time.now ()) in
+          let curr_time =
+            Block_time.sub (Block_time.of_time (Time.now ())) eight_block
+          in
           let n_block_times n =
             Int64.(
               Block_time.Span.to_ms consensus_constants.block_window_duration_ms
@@ -2443,14 +2403,14 @@ let%test_module _ =
           let expires_later1 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
-              ~fee_payer_idx:(1, 1) ~sender_idx:0 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ledger
+              ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(1, 2) ~sender_idx:0 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ledger
+              ~fee_payer_idx:(0, 2) ~sender_idx:2 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let cmds_wo_check =
@@ -2467,7 +2427,6 @@ let%test_module _ =
             [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2
             ; mk_account ~idx:1 ~balance:1_000_000_000_000_000 ~nonce:2
             ] ;
-          Core.eprintf "Before first write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2478,7 +2437,6 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
-          Core.eprintf "After first write\n%!" ;
           let cmds_wo_check =
             List.map ~f:User_command.forget_check
               (expires_later2 :: List.drop few_now 1)
@@ -2489,14 +2447,14 @@ let%test_module _ =
           let expired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
-              ~fee_payer_idx:(2, 1) ~sender_idx:4 ~fee:1_000_000_000 ~nonce:1
-              ~receiver_idx:5 ~amount:1_000_000_000 ledger
+              ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:3
+              ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_zkapp =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(3, 1) ~sender_idx:4 ~fee:1_000_000_000 ~nonce:2
-              ~receiver_idx:9 ~amount:1_000_000_000 ledger
+              ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:4
+              ~receiver_idx:9 ~amount:1_000_000_000 ()
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
@@ -2512,7 +2470,6 @@ let%test_module _ =
           let%bind () =
             after (Block_time.Span.to_time_span (n_block_times 3L))
           in
-          Core.eprintf "Before second write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands = [ mk_with_status valid_forever ]
@@ -2521,7 +2478,6 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
-          Core.eprintf "After second write\n%!" ;
           (* expired_command should not be in the pool because they are expired
              and (List.nth few_now 0) because it was committed in a block
           *)
@@ -2536,7 +2492,6 @@ let%test_module _ =
           let%bind () =
             after (Block_time.Span.to_time_span (n_block_times 5L))
           in
-          Core.eprintf "Before third write\n%!" ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands = []
@@ -2545,7 +2500,6 @@ let%test_module _ =
                 }
                 : Mock_transition_frontier.best_tip_diff )
           in
-          Core.eprintf "After third write\n%!" ;
           let cmds_wo_check =
             List.map ~f:User_command.forget_check (List.drop few_now 1)
           in
