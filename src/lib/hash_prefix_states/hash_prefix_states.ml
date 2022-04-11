@@ -108,9 +108,6 @@ let party_cons = salt party_cons
 
 let party_node = salt party_node
 
-let party_with_protocol_state_predicate =
-  salt party_with_protocol_state_predicate
-
 let zkapp_uri = salt zkapp_uri
 
 let zkapp_event = salt zkapp_event

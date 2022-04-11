@@ -376,9 +376,7 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~other_parties_hash : t =
-    Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| other_parties_hash |]
+  let create ~other_parties_hash : t = other_parties_hash
 
   let create_complete (t : t) ~memo_hash ~fee_payer_hash =
     Random_oracle.hash ~init:Hash_prefix.party_cons
@@ -387,10 +385,7 @@ module Transaction_commitment = struct
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~other_parties_hash =
-      Random_oracle.Checked.hash
-        ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| other_parties_hash |]
+    let create ~other_parties_hash = other_parties_hash
 
     let create_complete (t : t) ~memo_hash ~fee_payer_hash =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons

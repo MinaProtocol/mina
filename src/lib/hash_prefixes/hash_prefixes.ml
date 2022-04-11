@@ -91,8 +91,6 @@ let party_cons = create "MinaPartyCons"
 
 let party_node = create "MinaPartyNode"
 
-let party_with_protocol_state_predicate = create "MinaPartyStatePred"
-
 let zkapp_uri = create "MinaZkappUri"
 
 let zkapp_event = create "MinaZkappEvent"
