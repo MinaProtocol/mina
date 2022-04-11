@@ -6,7 +6,25 @@ open Mina_state
 module Stable = struct
   module V1 = struct
     type t = { header : Header.Stable.V1.t; body : Body.Stable.V1.t }
-    [@@deriving compare, fields, sexp, to_yojson]
+    [@@deriving compare, fields, sexp]
+
+    let to_yojson t =
+      `Assoc
+        [ ( "protocol_state"
+          , Protocol_state.value_to_yojson (Header.protocol_state t.header) )
+        ; ("protocol_state_proof", `String "<opaque>")
+        ; ("staged_ledger_diff", `String "<opaque>")
+        ; ("delta_transition_chain_proof", `String "<opaque>")
+        ; ( "current_protocol_version"
+          , `String
+              (Protocol_version.to_string
+                 (Header.current_protocol_version t.header)) )
+        ; ( "proposed_protocol_version"
+          , `String
+              (Option.value_map
+                 (Header.proposed_protocol_version_opt t.header)
+                 ~default:"<None>" ~f:Protocol_version.to_string) )
+        ]
 
     let to_latest = Fn.id
 
@@ -42,7 +60,7 @@ module Stable = struct
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp, to_yojson]
+type with_hash = t State_hash.With_state_hashes.t
 
 [%%define_locally
 Stable.Latest.(create, compare, header, body, t_of_sexp, sexp_of_t, to_yojson)]
