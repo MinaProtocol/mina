@@ -117,7 +117,7 @@ describe("Party", () => {
       },
       keypair.privateKey
     );
-    expect(parties.body).toBeDefined();
+    expect(parties.data).toBeDefined();
     expect(parties.signature).toBeDefined();
   });
 
@@ -135,7 +135,7 @@ describe("Party", () => {
       },
       keypair.privateKey
     ) as Signed<Party>;
-    expect(parties.body).toBeDefined();
+    expect(parties.data).toBeDefined();
     expect(parties.signature).toBeDefined();
   });
 });
