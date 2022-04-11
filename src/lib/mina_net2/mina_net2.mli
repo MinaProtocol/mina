@@ -108,6 +108,7 @@ module Keypair : sig
 end
 
 module Validation_callback = Validation_callback
+module Sink = Sink
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
@@ -161,6 +162,7 @@ val configure :
   -> max_connections:int
   -> validation_queue_size:int
   -> known_private_ip_nets:Core.Unix.Cidr.t list
+  -> topic_config:string list list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

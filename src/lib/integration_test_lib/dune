@@ -41,5 +41,8 @@
    currency
    mina_base.import
    mina_numbers
+   mina_transaction
+   data_hash_lib
    integers
+   transition_handler
 ))

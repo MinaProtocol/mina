@@ -23,6 +23,7 @@
    integration_test_lib
    signature_lib
    mina_base
+   mina_transaction
    file_system
    currency
    coda_runtime_config
@@ -39,6 +40,8 @@
    mina_base.import
    key_gen
    integers
+   user_command_input
+   participating_state
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))

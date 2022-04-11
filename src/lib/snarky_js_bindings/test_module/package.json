@@ -1,0 +1,10 @@
+{
+  "name": "snarkyjs-test",
+  "version": "0.1.0",
+  "main": "test.js",
+  "type": "module",
+  "dependencies": {
+    "mina-signer": "file:../../../../frontend/mina-signer",
+    "snarkyjs": "file:../snarkyjs"
+  }
+}

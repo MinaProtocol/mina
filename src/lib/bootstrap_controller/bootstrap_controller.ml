@@ -161,7 +161,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
+  Reader.iter sync_ledger_reader ~f:(fun (`Block incoming_transition, _) ->
       let (transition, _) : External_transition.Initial_validated.t =
         Envelope.Incoming.data incoming_transition
       in
@@ -227,13 +227,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                ( `Capacity 50
                , `Overflow
                    (Drop_head
-                      (fun head ->
+                      (fun (`Block block, `Valid_cb valid_cb) ->
                         Mina_metrics.(
                           Counter.inc_one
                             Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
                         External_transition.Initial_validated
-                        .handle_dropped_transition
-                          (Envelope.Incoming.data head)
+                        .handle_dropped_transition ?valid_cb
+                          (Envelope.Incoming.data block)
                           ~pipe_name:sync_ledger_pipe ~logger)) ))
         in
         don't_wait_for
@@ -384,8 +384,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     (let open Deferred.Let_syntax in
                     let temp_mask = Ledger.of_database temp_snarked_ledger in
                     (*TODO: is "snarked_local_state" passed here really snarked?*)
-                    let `Needs_some_work_for_snapps_on_mainnet =
-                      Mina_base.Util.todo_snapps
+                    let `Needs_some_work_for_zkapps_on_mainnet =
+                      Mina_base.Util.todo_zkapps
                     in
                     let%map result =
                       Staged_ledger
@@ -748,7 +748,9 @@ let%test_module "Bootstrap_controller tests" =
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
                     Strict_pipe.Writer.write sync_ledger_writer
-                      (downcast_breadcrumb ~sender:other.peer breadcrumb))
+                      ( `Block
+                          (downcast_breadcrumb ~sender:other.peer breadcrumb)
+                      , `Vallid_cb None ))
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred) ;
@@ -852,13 +854,16 @@ let%test_module "Bootstrap_controller tests" =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
           in
-          Envelope.Incoming.wrap
-            ~data:
-              ( Transition_frontier.best_tip peer_net.state.frontier
-              |> Transition_frontier.Breadcrumb.validated_transition
-              |> External_transition.Validated.to_initial_validated )
-            ~sender:(Envelope.Sender.Remote peer_net.peer)
-          |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
+          let block =
+            Envelope.Incoming.wrap
+              ~data:
+                ( Transition_frontier.best_tip peer_net.state.frontier
+                |> Transition_frontier.Breadcrumb.validated_transition
+                |> External_transition.Validated.to_initial_validated )
+              ~sender:(Envelope.Sender.Remote peer_net.peer)
+          in
+          Pipe_lib.Strict_pipe.Writer.write transition_writer
+            (`Block block, `Valid_cb None) ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap

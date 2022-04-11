@@ -247,13 +247,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   O1trace.background_thread "initially_validate_blocks" (fun () ->
-      Reader.iter transition_reader ~f:(fun network_transition ->
+      Reader.iter transition_reader
+        ~f:(fun
+             ( `Transition transition_env
+             , `Time_received time_received
+             , `Valid_cb valid_cb )
+           ->
           if Ivar.is_full initialization_finish_signal then (
-            let ( `Transition transition_env
-                , `Time_received time_received
-                , `Valid_cb valid_cb ) =
-              network_transition
-            in
             let blockchain_length =
               Envelope.Incoming.data transition_env
               |> External_transition.consensus_state
@@ -298,11 +298,11 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     >>= defer validate_protocol_versions)
                 with
                 | Ok verified_transition ->
-                    External_transition.poke_validation_callback
-                      (Envelope.Incoming.data transition_env)
-                      valid_cb ;
-                    Envelope.Incoming.wrap ~data:verified_transition ~sender
-                    |> Writer.write valid_transition_writer ;
+                    Writer.write valid_transition_writer
+                      ( `Block
+                          (Envelope.Incoming.wrap ~data:verified_transition
+                             ~sender)
+                      , `Valid_cb valid_cb ) ;
                     Mina_metrics.Transition_frontier
                     .update_max_blocklength_observed blockchain_length ;
                     Queue.enqueue Transition_frontier.validated_blocks

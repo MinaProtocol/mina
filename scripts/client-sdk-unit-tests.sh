@@ -6,8 +6,7 @@ set -eo pipefail
 
 echo "Building client SDK..."
 source ~/.profile
-dune b src/lib/crypto/kimchi_bindings/js/node_js --profile=dev
-dune b src/app/client_sdk/client_sdk.bc.js --profile=dev
+make client_sdk
 echo "Running unit tests in Javascript"
 node src/app/client_sdk/tests/run_unit_tests.js
 

@@ -7,41 +7,41 @@ open Integration_test_lib
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs.Engine
 
-  let send_snapp ~logger node parties =
-    [%log info] "Sending snapp"
+  let send_zkapp ~logger node parties =
+    [%log info] "Sending zkApp"
       ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
-    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
-    | Ok _snapp_id ->
-        [%log info] "Snapps transaction sent" ;
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    | Ok _zkapp_id ->
+        [%log info] "ZkApp transaction sent" ;
         Malleable_error.return ()
     | Error err ->
         let err_str = Error.to_string_mach err in
-        [%log error] "Error sending snapp"
+        [%log error] "Error sending zkApp"
           ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.soft_error_format ~value:() "Error sending snapp: %s"
-          err_str
+        Malleable_error.hard_error_format "Error sending zkApp: %s" err_str
 
-  let send_invalid_snapp ~logger node parties substring =
-    [%log info] "Sending snapp, expected to fail" ;
-    match%bind.Deferred Network.Node.send_snapp ~logger node ~parties with
-    | Ok _snapp_id ->
-        [%log error] "Snapps transaction succeeded, expected error \"%s\""
+  let send_invalid_zkapp ~logger node parties substring =
+    [%log info] "Sending zkApp, expected to fail" ;
+    match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
+    | Ok _zkapp_id ->
+        [%log error] "ZkApp transaction succeeded, expected error \"%s\""
           substring ;
-        Malleable_error.soft_error_format ~value:()
-          "Snapps transaction succeeded, expected error \"%s\"" substring
+        Malleable_error.hard_error_format
+          "ZkApp transaction succeeded, expected error \"%s\"" substring
     | Error err ->
         let err_str = Error.to_string_mach err in
         if String.is_substring ~substring err_str then (
-          [%log info] "Snapps transaction failed as expected"
+          [%log info] "ZkApp transaction failed as expected"
             ~metadata:[ ("error", `String err_str) ] ;
           Malleable_error.return () )
         else (
           [%log error]
-            "Error sending snapp, for a reason other than the expected \"%s\""
+            "Error sending zkApp, for a reason other than the expected \"%s\""
             substring
             ~metadata:[ ("error", `String err_str) ] ;
-          Malleable_error.soft_error_format ~value:()
-            "Snapp failed: %s, but expected \"%s\"" err_str substring )
+          Malleable_error.hard_error_format
+            "ZkApp transaction failed: %s, but expected \"%s\"" err_str
+            substring )
 
   let get_account_permissions ~logger node account_id =
     [%log info] "Getting permissions for account"
@@ -73,41 +73,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error (Error.of_string err_str)
 
-  let get_account_balance ~logger node account_id =
-    [%log info] "Getting balance for account"
-      ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-    match%bind.Deferred
-      Network.Node.get_balance_total ~logger node ~account_id
-    with
-    | Ok balance ->
-        [%log info] "Got account balance" ;
-        Malleable_error.return balance
-    | Error err ->
-        let err_str = Error.to_string_mach err in
-        [%log error] "Error getting account balance"
-          ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error (Error.of_string err_str)
-
-  let get_account_balance_locked ~logger node account_id =
-    [%log info] "Getting locked balance for account"
-      ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-    match%bind.Deferred
-      Network.Node.get_balance_locked ~logger node ~account_id
-    with
-    | Ok balance ->
-        [%log info] "Got account balance" ;
-        Malleable_error.return balance
-    | Error err ->
-        let err_str = Error.to_string_mach err in
-        [%log error] "Error getting account balance"
-          ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error (Error.of_string err_str)
-
   let compatible_item req_item ledg_item ~equal =
     match (req_item, ledg_item) with
-    | Mina_base.Snapp_basic.Set_or_keep.Keep, _ ->
+    | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
         true
-    | Set v1, Mina_base.Snapp_basic.Set_or_keep.Set v2 ->
+    | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
         equal v1 v2
     | Set _, Keep ->
         false
@@ -151,8 +121,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       compatible_item requested_update.permissions ledger_update.permissions
         ~equal:Mina_base.Permissions.equal
     in
-    let snapp_uris_compat =
-      compatible_item requested_update.snapp_uri ledger_update.snapp_uri
+    let zkapp_uris_compat =
+      compatible_item requested_update.zkapp_uri ledger_update.zkapp_uri
         ~equal:String.equal
     in
     let token_symbols_compat =
@@ -172,7 +142,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; delegates_compat
       ; verification_keys_compat
       ; permissions_compat
-      ; snapp_uris_compat
+      ; zkapp_uris_compat
       ; token_symbols_compat
       ; timings_compat
       ; voting_fors_compat

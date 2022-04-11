@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Unsigned
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
@@ -81,11 +80,6 @@ type pipes =
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
-  ; external_transitions_writer :
-      ( External_transition.t Envelope.Incoming.t
-      * Block_time.t
-      * Mina_net2.Validation_callback.t )
-      Pipe.Writer.t
   ; user_command_input_writer :
       ( command_inputs
         * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
@@ -100,24 +94,8 @@ type pipes =
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
-  ; user_command_writer :
-      ( User_command.t list
-        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
-              Or_error.t
-           -> unit)
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
-  ; local_snark_work_writer :
-      ( Network_pool.Snark_pool.Resource_pool.Diff.t
-        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
-              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
-              Or_error.t
-           -> unit)
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
+  ; tx_local_sink : Network_pool.Transaction_pool.Local_sink.t
+  ; snark_local_sink : Network_pool.Snark_pool.Local_sink.t
   }
 
 type t =
@@ -880,7 +858,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selection_method.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Strict_pipe.Writer.write t.pipes.local_snark_work_writer
+  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
@@ -916,7 +894,7 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
 
 let add_full_transactions t user_command =
   let result_ivar = Ivar.create () in
-  Strict_pipe.Writer.write t.pipes.user_command_writer
+  Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
     (user_command, Ivar.fill result_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
@@ -1126,6 +1104,34 @@ let stop_long_running_daemon t =
             go tm)
   in
   go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
+
+let offline_time
+    { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
+  (* This is a bit of a hack, see #3232. *)
+  let inactivity_ms = block_window_duration_ms * 8 in
+  Block_time.Span.of_ms @@ Int64.of_int inactivity_ms
+
+let setup_timer ~constraint_constants time_controller sync_state_broadcaster =
+  Block_time.Timeout.create time_controller (offline_time constraint_constants)
+    ~f:(fun _ ->
+      Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
+      |> don't_wait_for)
+
+let online_broadcaster ~constraint_constants time_controller =
+  let online_reader, online_writer = Broadcast_pipe.create `Offline in
+  let init =
+    Block_time.Timeout.create time_controller
+      (Block_time.Span.of_ms Int64.zero)
+      ~f:ignore
+  in
+  let current_timer = ref init in
+  let notify_online () =
+    let%map () = Broadcast_pipe.Writer.write online_writer `Online in
+    Block_time.Timeout.cancel time_controller !current_timer () ;
+    current_timer :=
+      setup_timer ~constraint_constants time_controller online_writer
+  in
+  (online_reader, notify_online)
 
 let start t =
   let set_next_producer_timing timing consensus_state =
@@ -1389,36 +1395,6 @@ let create ?wallets (config : Config.t) =
                     [ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
                   !"%s $rate_limiter" label)
           in
-          let external_transitions_reader, external_transitions_writer =
-            let rl =
-              Network_pool.Rate_limiter.create
-                ~capacity:
-                  ( (* Max of 20 transitions per slot per peer. *)
-                    20
-                  , `Per
-                      (Block_time.Span.to_time_span
-                         consensus_constants.slot_duration_ms) )
-            in
-            log_rate_limiter_occasionally rl ~label:"new_block" ;
-            let r, w = Strict_pipe.create Synchronous in
-            ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
-                  let sender = Envelope.Incoming.sender e in
-                  match
-                    Network_pool.Rate_limiter.add rl sender ~now:(Time.now ())
-                      ~score:1
-                  with
-                  | `Capacity_exceeded ->
-                      [%log' warn config.logger]
-                        "$sender has sent many blocks. This is very unusual."
-                        ~metadata:
-                          [ ("sender", Envelope.Sender.to_yojson sender) ] ;
-                      Mina_net2.Validation_callback.fire_if_not_already_fired cb
-                        `Reject ;
-                      None
-                  | `Within_capacity ->
-                      Some x)
-            , w )
-          in
           let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
           in
@@ -1588,9 +1564,79 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net)
           in
+          let txn_pool_config =
+            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+              ~pool_max_size:
+                config.precomputed_values.genesis_constants.txpool_max_size
+          in
+          let first_received_message_signal = Ivar.create () in
+          let online_status, notify_online_impl =
+            online_broadcaster
+              ~constraint_constants:config.net_config.constraint_constants
+              config.time_controller
+          in
+          let on_first_received_message ~f =
+            Ivar.read first_received_message_signal >>| f
+          in
+
+          (* TODO remove the line below after making sure notification will not lead
+             to a stale lock *)
+          let notify_online () =
+            Ivar.fill_if_empty first_received_message_signal () ;
+            notify_online_impl () |> don't_wait_for ;
+            Deferred.unit
+          in
+          let transaction_pool, tx_remote_sink, tx_local_sink =
+            (* make transaction pool return writer for local and incoming diffs *)
+            Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns:
+                (Time_ns.Span.of_hr
+                   (Float.of_int
+                      config.precomputed_values.genesis_constants
+                        .transaction_expiry_hr))
+              ~on_remote_push:notify_online
+              ~log_gossip_heard:
+                config.net_config.log_gossip_heard.transaction_pool_diff
+          in
+          let snark_pool_config =
+            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+              ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
+          in
+          let%bind snark_pool, snark_remote_sink, snark_local_sink =
+            Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns:
+                (Time_ns.Span.of_hr
+                   (Float.of_int
+                      config.precomputed_values.genesis_constants
+                        .transaction_expiry_hr))
+              ~on_remote_push:notify_online
+              ~log_gossip_heard:
+                config.net_config.log_gossip_heard.snark_pool_diff
+          in
+          let block_reader, block_sink =
+            Transition_handler.Block_sink.create
+              { logger = config.logger
+              ; slot_duration_ms =
+                  config.precomputed_values.consensus_constants.slot_duration_ms
+              ; on_push = notify_online
+              ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
+              ; time_controller = config.net_config.time_controller
+              ; consensus_constants = config.net_config.consensus_constants
+              }
+          in
+          let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
                 Mina_networking.create config.net_config ~get_some_initial_peers
+                  ~sinks
                   ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                     (fun query_env ->
                     O1trace.thread
@@ -1695,33 +1741,7 @@ let create ?wallets (config : Config.t) =
           let user_command_input_reader, user_command_input_writer =
             Strict_pipe.(create ~name:"local user transactions" Synchronous)
           in
-          let local_txns_reader, local_txns_writer =
-            Strict_pipe.(create ~name:"local transactions" Synchronous)
-          in
-          let local_snark_work_reader, local_snark_work_writer =
-            Strict_pipe.(create ~name:"local snark work" Synchronous)
-          in
           let block_produced_bvar = Bvar.create () in
-          let txn_pool_config =
-            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
-              ~pool_max_size:
-                config.precomputed_values.genesis_constants.txpool_max_size
-          in
-          let transaction_pool =
-            Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr))
-              ~logger:config.logger
-              ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
-              ~local_diffs:local_txns_reader
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-          in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (inputs, result_cb, get_current_nonce, get_account) ->
@@ -1739,9 +1759,10 @@ let create ?wallets (config : Config.t) =
                         Deferred.unit )
                       else
                         (*callback for the result from transaction_pool.apply_diff*)
-                        Strict_pipe.Writer.write local_txns_writer
-                          ( List.map user_commands ~f:(fun cmd ->
-                                User_command.Signed_command cmd)
+                        Network_pool.Transaction_pool.Local_sink.push
+                          tx_local_sink
+                          ( List.map user_commands ~f:(fun c ->
+                                User_command.Signed_command c)
                           , result_cb )
                   | Error e ->
                       [%log' error config.logger]
@@ -1754,7 +1775,7 @@ let create ?wallets (config : Config.t) =
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
-                  Strict_pipe.Writer.write local_txns_writer
+                  Network_pool.Transaction_pool.Local_sink.push tx_local_sink
                     ( List.map snapp_txns ~f:(fun cmd ->
                           User_command.Parties cmd)
                     , result_cb ))
@@ -1775,66 +1796,9 @@ let create ?wallets (config : Config.t) =
               ~persistent_frontier_location:config.persistent_frontier_location
               ~frontier_broadcast_pipe:
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-              ~catchup_mode
-              ~network_transition_reader:
-                (Strict_pipe.Reader.map external_transitions_reader
-                   ~f:(fun (tn, tm, cb) ->
-                     let lift_consensus_time =
-                       Fn.compose UInt32.to_int
-                         Consensus.Data.Consensus_time.to_uint32
-                     in
-                     let tn_production_consensus_time =
-                       External_transition.consensus_time_produced_at
-                         (Envelope.Incoming.data tn)
-                     in
-                     let tn_production_slot =
-                       lift_consensus_time tn_production_consensus_time
-                     in
-                     let tn_production_time =
-                       Consensus.Data.Consensus_time.to_time
-                         ~constants:consensus_constants
-                         tn_production_consensus_time
-                     in
-                     let tm_slot =
-                       lift_consensus_time
-                         (Consensus.Data.Consensus_time.of_time_exn
-                            ~constants:consensus_constants tm)
-                     in
-                     Mina_metrics.Block_latency.Gossip_slots.update
-                       (Float.of_int (tm_slot - tn_production_slot)) ;
-                     Mina_metrics.Block_latency.Gossip_time.update
-                       Block_time.(
-                         Span.to_time_span @@ diff tm tn_production_time) ;
-                     (`Transition tn, `Time_received tm, `Valid_cb cb)))
-              ~producer_transition_reader:
-                (Strict_pipe.Reader.map producer_transition_reader
-                   ~f:(fun breadcrumb ->
-                     let et =
-                       Transition_frontier.Breadcrumb.validated_transition
-                         breadcrumb
-                     in
-                     let validation_callback =
-                       Mina_net2.Validation_callback.create_without_expiration
-                         ()
-                     in
-                     External_transition.Validated.poke_validation_callback et
-                       validation_callback ;
-                     don't_wait_for
-                       (* this will never throw since the callback was created without expiration *)
-                       (let%map v =
-                          Mina_net2.Validation_callback.await_exn
-                            validation_callback
-                        in
-                        if
-                          Mina_net2.Validation_callback.equal_validation_result
-                            v `Accept
-                        then
-                          Mina_networking.broadcast_state net
-                            (External_transition.Validation
-                             .forget_validation_with_hash et)) ;
-                     breadcrumb))
-              ~most_recent_valid_block
-              ~precomputed_values:config.precomputed_values
+              ~catchup_mode ~network_transition_reader:block_reader
+              ~producer_transition_reader ~most_recent_valid_block
+              ~precomputed_values:config.precomputed_values ~notify_online
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -1844,7 +1808,8 @@ let create ?wallets (config : Config.t) =
             in
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
-                Fork.two (map downstream_pipe ~f:(fun (`Transition t, _) -> t)))
+                Fork.two
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
@@ -1863,12 +1828,13 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Transaction_pool.Resource_pool.Diff
                         .max_per_15_seconds x
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net x ;
-                  Deferred.unit)) ;
+                  Mina_networking.broadcast_transaction_pool_diff net x)) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
-                ~f:(fun (`Transition transition, `Source source) ->
+                ~f:(fun
+                     (`Transition transition, `Source source, `Valid_cb valid_cb)
+                   ->
                   let hash =
                     (External_transition.Validated.state_hashes transition)
                       .state_hash
@@ -1897,13 +1863,32 @@ let create ?wallets (config : Config.t) =
                               ]
                             (Rebroadcast_transition { state_hash = hash }) ;
                           (*send callback to libp2p to forward the gossiped transition*)
-                          External_transition.Validated.accept transition
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          External_transition.Validated.accept transition
+                          don't_wait_for
+                            (Mina_networking.broadcast_state net
+                               (External_transition.Validation
+                                .forget_validation_with_hash transition)) ;
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb
                       | `Catchup ->
                           (*Noop for directly downloaded transitions*)
-                          External_transition.Validated.accept transition )
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb )
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
@@ -1920,7 +1905,12 @@ let create ?wallets (config : Config.t) =
                         ; ("timing", timing_error_json)
                         ]
                       in
-                      External_transition.Validated.reject transition ;
+                      Option.iter
+                        ~f:
+                          (Fn.flip
+                             Mina_net2.Validation_callback
+                             .fire_if_not_already_fired `Reject)
+                        valid_cb ;
                       match source with
                       | `Catchup ->
                           ()
@@ -1933,10 +1923,6 @@ let create ?wallets (config : Config.t) =
                           [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ))) ;
-          don't_wait_for
-            (Strict_pipe.transfer
-               (Mina_networking.states net)
-               external_transitions_writer ~f:ident) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Mina_networking.ban_notification_reader net)
@@ -1953,25 +1939,6 @@ let create ?wallets (config : Config.t) =
             (Linear_pipe.iter
                (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit)) ;
-          let snark_pool_config =
-            Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
-          in
-          let%bind snark_pool =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~constraint_constants ~consensus_constants
-              ~time_controller:config.time_controller
-              ~expiry_ns:
-                (Time_ns.Span.of_hr
-                   (Float.of_int
-                      config.precomputed_values.genesis_constants
-                        .transaction_expiry_hr))
-              ~logger:config.logger
-              ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
-              ~local_diffs:local_snark_work_reader
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-          in
           let snark_jobs_state =
             Work_selector.State.init
               ~reassignment_wait:config.work_reassignment_wait
@@ -1999,8 +1966,7 @@ let create ?wallets (config : Config.t) =
                         Network_pool.Snark_pool.Resource_pool.Diff
                         .max_per_15_seconds x
                   in
-                  Mina_networking.broadcast_snark_pool_diff net x ;
-                  Deferred.unit)) ;
+                  Mina_networking.broadcast_snark_pool_diff net x)) ;
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]
@@ -2047,15 +2013,12 @@ let create ?wallets (config : Config.t) =
             create_sync_status_observer ~logger:config.logger ~net
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
-              ~online_status_incr:
-                ( Var.watch @@ of_broadcast_pipe
-                @@ Mina_networking.online_status net )
+              ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:
                 ( Var.watch @@ of_deferred
                 @@ Mina_networking.on_first_connect net ~f:Fn.id )
               ~first_message_incr:
-                ( Var.watch @@ of_deferred
-                @@ Mina_networking.on_first_received_message net ~f:Fn.id )
+                (Var.watch @@ of_deferred @@ on_first_received_message ~f:Fn.id)
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
@@ -2081,12 +2044,9 @@ let create ?wallets (config : Config.t) =
             ; pipes =
                 { validated_transitions_reader = valid_transitions_for_api
                 ; producer_transition_writer
-                ; external_transitions_writer =
-                    Strict_pipe.Writer.to_linear_pipe
-                      external_transitions_writer
                 ; user_command_input_writer
-                ; user_command_writer = local_txns_writer
-                ; local_snark_work_writer
+                ; tx_local_sink
+                ; snark_local_sink
                 }
             ; wallets
             ; coinbase_receiver = ref config.coinbase_receiver
@@ -2101,3 +2061,5 @@ let net { components = { net; _ }; _ } = net
 
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
+
+let verifier { processes = { verifier; _ }; _ } = verifier
