@@ -24,7 +24,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = RunInToolchain.runInToolchainBuster ([] : List Text) "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:$PATH cargo check"
+          commands = RunInToolchain.runInToolchainBullseye ([] : List Text) "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:$PATH cargo check"
           , label = "Rust lint steps; trace-tool"
           , key = "lint-trace-tool"
           , target = Size.Small

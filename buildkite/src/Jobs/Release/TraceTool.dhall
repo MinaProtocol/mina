@@ -25,7 +25,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = RunInToolchain.runInToolchainBuster ([] : List Text) "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:$PATH cargo build"
+          commands = RunInToolchain.runInToolchainBullseye ([] : List Text) "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:$PATH cargo build"
           , label = "Build trace-tool"
           , key = "build-trace-tool"
           , target = Size.Small
