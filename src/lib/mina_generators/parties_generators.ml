@@ -984,7 +984,7 @@ let gen_parties_from ?(succeed = true)
   (* replace dummy signatures in other parties *)
   let other_parties_with_valid_signatures =
     Parties.Call_forest.map parties_dummy_signatures.other_parties
-      ~f:(fun { body; authorization } ->
+      ~f:(fun ({ body; authorization } : Party.t) ->
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->

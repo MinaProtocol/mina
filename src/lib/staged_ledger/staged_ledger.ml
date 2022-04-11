@@ -2442,7 +2442,7 @@ let%test_module "staged ledger tests" =
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
                 Parties.Call_forest.map parties.other_parties
-                  ~f:(fun { body; authorization } ->
+                  ~f:(fun ({ body; authorization } : Party.t) ->
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
