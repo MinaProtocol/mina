@@ -42,3 +42,6 @@
 [submodule "src/external/wasm-bindgen-rayon"]
 	path = src/external/wasm-bindgen-rayon
 	url = https://github.com/o1-labs/wasm-bindgen-rayon.git
+[submodule "src/lib/snarky_js_bindings/snarkyjs"]
+	path = src/lib/snarky_js_bindings/snarkyjs
+	url = https://github.com/o1-labs/snarkyjs.git
