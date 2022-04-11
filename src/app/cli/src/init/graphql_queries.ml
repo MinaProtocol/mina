@@ -182,61 +182,6 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-module Send_create_token =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $receiver: PublicKey!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  createToken(input:
-    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewToken {
-      id
-    }
-  }
-}
-|}]
-
-module Send_create_token_account =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $tokenOwner: PublicKey!,
-          $receiver: PublicKey!,
-          $token: TokenId!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  createTokenAccount(input:
-    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewTokenAccount {
-      id
-    }
-  }
-}
-|}]
-
-module Send_mint_tokens =
-[%graphql
-{|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey,
-          $token: TokenId!,
-          $amount: UInt64!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  mintTokens(input:
-    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
-    mintTokens {
-      id
-    }
-  }
-}
-|}]
-
 module Export_logs =
 [%graphql
 {|
@@ -246,14 +191,6 @@ mutation ($basename: String) {
       tarfile
     }
   }
-}
-|}]
-
-module Get_token_owner =
-[%graphql
-{|
-query tokenOwner($token: TokenId!) {
-  tokenOwner(token: $token)
 }
 |}]
 
@@ -279,18 +216,12 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_string")
+    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_base58_check_exn")
   }
 }
 |}]
 
-module Next_available_token =
-[%graphql
-{|
-query next_available_token {
-  nextAvailableToken @bsDecoder(fn: "Decoders.token")
-}
-|}]
+module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Time_offset = [%graphql {|
 query time_offset {

@@ -61,13 +61,6 @@ module Make (A : T0) (A_value : T0) = struct
       lazy
         (Vector.init num_choices ~f:(fun _ ->
              let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
-             let g =
-               Array.create g
-                 ~len:
-                   (Common.index_commitment_length
-                      ~max_degree:Common.Max_degree.step
-                      Fix_domains.rough_domains.h)
-             in
              Verification_key.dummy_commitments g))
     in
     let prev_domains = prev ~self ~choices in

@@ -1,0 +1,8 @@
+(executable
+ (name chrome_test)
+ (modes js)
+ (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (libraries bindings_js_test marlin_plonk_bindings js_of_ocaml bindings_js chrome_backend)
+ (link_deps ../../chrome/plonk_wasm.js ../../chrome/plonk_wasm.wasm)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))

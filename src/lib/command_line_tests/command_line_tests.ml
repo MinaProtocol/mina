@@ -75,8 +75,8 @@ let%test_module "Command line tests" =
       let test_failed = ref false in
       let port = 1337 in
       let client_delay = 40. in
-      let retry_delay = 15. in
-      let retry_attempts = 15 in
+      let retry_delay = 30. in
+      let retry_attempts = 30 in
       let config_dir, genesis_ledger_dir = create_config_directories () in
       Monitor.protect
         ~finally:(fun () ->

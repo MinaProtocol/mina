@@ -53,7 +53,7 @@ Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${SHARED_DEPS}
 Section: base
@@ -85,7 +85,47 @@ ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
-###### deb without the proving keys
+##################################### SNAPP TEST TXN #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-zkapp-test-transaction
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: O(1)Labs <build@o1labs.org>
+Installed-Size:
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility to generate Snapp transactions in Mina GraphQL format
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-zkapp-test-transaction_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END SNAPP TEST TXN PACKAGE #######################################
+
+##################################### MAINNET PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "Building mainnet deb without keys:"
 
@@ -102,7 +142,7 @@ Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Client and Daemon
  Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}
@@ -137,7 +177,7 @@ mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
-# Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
+# Copy the genesis ledgers and proofs as these are fairly small and very valuable to have
 # Genesis Ledger/proof/epoch ledger Copy
 mkdir -p "${BUILDDIR}/var/lib/coda"
 for f in /tmp/coda_cache_dir/genesis*; do
@@ -149,6 +189,7 @@ done
 #copy config.json
 cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
 cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
 # The default configuration:
 cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
@@ -170,7 +211,9 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
-###### deb with testnet signatures
+##################################### END MAINNET PACKAGE #######################################
+
+##################################### DEVNET PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "Building testnet signatures deb without keys:"
 
@@ -185,7 +228,7 @@ Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
+Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Client and Daemon
  Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}
@@ -219,6 +262,60 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
+##################################### END MAINNET PACKAGE #######################################
+
+##################################### BERKELEY PACKAGE #######################################
+
+echo "------------------------------------------------------------"
+echo "Building Mina Berkeley testnet signatures deb without keys:"
+
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: mina-berkeley
+Version: ${MINA_DEB_VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
+Suggests: postgresql
+Conflicts: mina-mainnet
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: O(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+
+echo "------------------------------------------------------------"
+# Overwrite binaries (sudo to fix permissions error)
+sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+
+# Switch the default configuration to devnet.json:
+sudo cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
+# Overwrite the mina.service with a new default PEERS_URL
+rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/berkeley_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-berkeley_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END BERKELEY PACKAGE #######################################
+
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
 # For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
@@ -231,7 +328,7 @@ rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 # proof are not required in /tmp
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
+compile_keys=("step" "vk-step" "wrap" "vk-wrap")
 for key in ${compile_keys[*]}
 do
     echo -n "Looking for keys matching: ${key} -- "
@@ -265,6 +362,6 @@ done
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
-# Build mina block producer sidecar 
+# Build mina block producer sidecar
 ../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb

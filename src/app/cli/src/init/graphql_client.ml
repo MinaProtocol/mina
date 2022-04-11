@@ -41,6 +41,8 @@ let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
 
 let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
+let query_json_exn query_obj port = run_exn ~f:Client.query_json query_obj port
+
 module Signed_command = struct
   type t =
     { id : string

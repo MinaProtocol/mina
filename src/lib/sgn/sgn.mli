@@ -42,7 +42,7 @@ module Checked : sig
 
   val negate : var -> var
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
 
 [%%endif]

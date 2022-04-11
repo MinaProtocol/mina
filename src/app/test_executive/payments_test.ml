@@ -43,7 +43,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
           }
-          (* 30_000_000_000_000 mina is the total. initially, the balance will be 10k mina. after 8 global slots, the cliff is hit, although the cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+          (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
         ]
     ; num_snark_workers =
         3
@@ -70,21 +70,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_pub_key =
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
+    let receiver_account_id =
+      Account_id.create receiver_pub_key Token_id.default
+    in
     let txn_body =
       Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key
-        ; receiver_pk = receiver_pub_key
-        ; token_id = Token_id.default
-        ; amount
-        }
+        { source_pk = sender_pub_key; receiver_pk = receiver_pub_key; amount }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger untimed_node_b
-        ~public_key:sender_pub_key
+        ~account_id:sender_account_id
     in
     let user_command_input =
       User_command_input.create ~fee ~nonce:sender_current_nonce
-        ~fee_token:(Signed_command_payload.Body.token txn_body)
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
@@ -101,17 +100,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           failwith "get_current_nonce, don't call me")
         ~nonce_map:
           (Account_id.Map.of_alist_exn
-             [ ( Account_id.create sender_pub_key
-                   (Signed_command_payload.Body.token txn_body)
+             [ ( Account_id.create sender_pub_key Account_id.Digest.default
                , (sender_current_nonce, sender_current_nonce) )
              ])
-        ~get_account:(fun _ -> `Bootstrapping)
+        ~get_account:(fun _ : Account.t option Participating_state.t ->
+          `Bootstrapping)
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
     let (signed_cmmd, _)
           : Signed_command.t
-            * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
+            * (Mina_numbers.Account_nonce.t * Mina_numbers.Account_nonce.t)
+              Account_id.Map.t =
       txn_signed
     in
     (* setup complete *)
@@ -138,17 +138,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot.  timeouts are hardcoded because the intg test configurations aren't registering.  hardcoding should be removed when that's fixed *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)))
     in
     let%bind () =
       section
@@ -156,11 +147,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          txn"
         (let%bind { total_balance = node_a_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:receiver_pub_key
+             ~account_id:receiver_account_id
          in
          let%bind { total_balance = node_b_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:sender_pub_key
+             ~account_id:sender_account_id
          in
          let node_a_num_produced_blocks =
            Map.find (network_state t).blocks_produced_by_node
@@ -172,7 +163,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.id untimed_node_b)
            |> Option.value ~default:[] |> List.length
          in
-         let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in
+         let coinbase_reward = test_constants.coinbase_amount in
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let node_a_expected =
            (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
@@ -268,7 +259,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the nonce \
                is old.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
+              (Mina_numbers.Account_nonce.to_int nonce)
         | Error error ->
             (* expect GraphQL error due to bad nonce *)
             let err_str = Error.to_string_mach error in
@@ -317,7 +308,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the \
                signature is wrong.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
+              (Mina_numbers.Account_nonce.to_int nonce)
         | Error error ->
             (* expect GraphQL error due to invalid signature *)
             let err_str = Error.to_string_mach error in
@@ -342,32 +333,50 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = Util.pub_key_of_node receiver in
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let receiver_account_id =
+           Account_id.create receiver_pub_key Token_id.default
+         in
+         let%bind { total_balance = timed_node_c_total
+                  ; liquid_balance_opt = timed_node_c_liquid_opt
+                  ; locked_balance_opt = timed_node_c_locked_opt
+                  ; _
+                  } =
+           Network.Node.must_get_account_data ~logger timed_node_c
+             ~account_id:receiver_account_id
+         in
+         [%log info] "timed_node_c total balance: %s"
+           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+         [%log info] "timed_node_c liquid balance: %s"
+           (Currency.Balance.to_formatted_string
+              ( timed_node_c_liquid_opt
+              |> Option.value ~default:Currency.Balance.zero )) ;
+         [%log info] "timed_node_c liquid locked: %s"
+           (Currency.Balance.to_formatted_string
+              ( timed_node_c_locked_opt
+              |> Option.value ~default:Currency.Balance.zero )) ;
+         [%log info]
+           "Attempting to send txn from timed_node_c to untimed_node_a for \
+            amount of %s"
+           (Currency.Amount.to_formatted_string amount) ;
          let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~txn_hash:hash ~node_included_in:(`Node timed_node_c)
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = timed_node_c in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
+       let%bind sender_pub_key = Util.pub_key_of_node timed_node_c in
+       let sender_account_id =
+         Account_id.create sender_pub_key Token_id.default
+       in
        let%bind { total_balance = timed_node_c_total; _ } =
          Network.Node.must_get_account_data ~logger timed_node_c
-           ~public_key:sender_pub_key
+           ~account_id:sender_account_id
        in
        [%log info] "timed_node_c total balance: %s"
          (Currency.Balance.to_formatted_string timed_node_c_total) ;
@@ -378,8 +387,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
        match%bind
-         Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
-           ~amount ~fee
+         Node.send_payment ~logger timed_node_c ~sender_pub_key
+           ~receiver_pub_key ~amount ~fee
        with
        | Ok _ ->
            Malleable_error.soft_error_string ~value:()

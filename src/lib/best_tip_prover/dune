@@ -3,4 +3,25 @@
  (public_name best_tip_prover)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
- (libraries core_kernel mina_intf mina_base transition_frontier consensus transition_chain_prover))
+ (libraries
+   ;; opam libraries
+   core
+   core_kernel
+   async_kernel
+   ;; local libraries
+   with_hash
+   precomputed_values
+   proof_carrying_data
+   logger
+   truth
+   merkle_list_verifier
+   transition_frontier
+   mina_base
+   mina_intf
+   mina_state
+   mina_transition
+   data_hash_lib
+   transition_frontier_base
+   merkle_list_prover
+   non_empty_list
+))

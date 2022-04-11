@@ -131,9 +131,8 @@ module Api = struct
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
-      User_command_input.create ~signer:pk_of_sk ~fee
-        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk ~memo ~valid_until
-        ~body
+      User_command_input.create ~signer:pk_of_sk ~fee ~fee_payer_pk:pk_of_sk
+        ~memo ~valid_until ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
              (Keypair.of_private_key_exn sk))
@@ -163,8 +162,7 @@ module Api = struct
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
-      ~body:
-        (Payment { source_pk; receiver_pk; token_id = Token_id.default; amount })
+      ~body:(Payment { source_pk; receiver_pk; amount })
 
   let new_block t i key =
     run_online_worker
