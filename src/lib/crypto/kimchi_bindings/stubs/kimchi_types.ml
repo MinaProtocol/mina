@@ -1,88 +1,91 @@
 (* This file is generated automatically with ocaml_gen. *)
-type nonrec 'F or_infinity = Infinity | Finite of ('F * 'F)
+type nonrec 'f or_infinity = Infinity | Finite of ('f * 'f)
 
-type nonrec 'CamlF scalar_challenge = { inner : 'CamlF } [@@boxed]
+type nonrec 'caml_f scalar_challenge = { inner : 'caml_f } [@@boxed]
 
-type nonrec 'CamlF random_oracles =
-  { joint_combiner : 'CamlF scalar_challenge * 'CamlF
-  ; beta : 'CamlF
-  ; gamma : 'CamlF
-  ; alpha_chal : 'CamlF scalar_challenge
-  ; alpha : 'CamlF
-  ; zeta : 'CamlF
-  ; v : 'CamlF
-  ; u : 'CamlF
-  ; zeta_chal : 'CamlF scalar_challenge
-  ; v_chal : 'CamlF scalar_challenge
-  ; u_chal : 'CamlF scalar_challenge
+type nonrec 'caml_f random_oracles =
+  { joint_combiner : 'caml_f scalar_challenge * 'caml_f
+  ; beta : 'caml_f
+  ; gamma : 'caml_f
+  ; alpha_chal : 'caml_f scalar_challenge
+  ; alpha : 'caml_f
+  ; zeta : 'caml_f
+  ; v : 'caml_f
+  ; u : 'caml_f
+  ; zeta_chal : 'caml_f scalar_challenge
+  ; v_chal : 'caml_f scalar_challenge
+  ; u_chal : 'caml_f scalar_challenge
   }
 
-type nonrec 'CamlF lookup_evaluations =
-  { sorted : 'CamlF array array; aggreg : 'CamlF array; table : 'CamlF array }
+type nonrec 'caml_f lookup_evaluations =
+  { sorted : 'caml_f array array
+  ; aggreg : 'caml_f array
+  ; table : 'caml_f array
+  }
 
-type nonrec 'CamlF proof_evaluations =
+type nonrec 'caml_f proof_evaluations =
   { w :
-      'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-  ; z : 'CamlF array
+      'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+  ; z : 'caml_f array
   ; s :
-      'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-      * 'CamlF array
-  ; generic_selector : 'CamlF array
-  ; poseidon_selector : 'CamlF array
+      'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+      * 'caml_f array
+  ; generic_selector : 'caml_f array
+  ; poseidon_selector : 'caml_f array
   }
 
-type nonrec 'CamlG poly_comm =
-  { unshifted : 'CamlG array; shifted : 'CamlG option }
+type nonrec 'caml_g poly_comm =
+  { unshifted : 'caml_g array; shifted : 'caml_g option }
 
-type nonrec ('G, 'F) opening_proof =
-  { lr : ('G * 'G) array; delta : 'G; z1 : 'F; z2 : 'F; sg : 'G }
+type nonrec ('g, 'f) opening_proof =
+  { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
 
-type nonrec 'CamlG prover_commitments =
+type nonrec 'caml_g prover_commitments =
   { w_comm :
-      'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-      * 'CamlG poly_comm
-  ; z_comm : 'CamlG poly_comm
-  ; t_comm : 'CamlG poly_comm
+      'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+      * 'caml_g poly_comm
+  ; z_comm : 'caml_g poly_comm
+  ; t_comm : 'caml_g poly_comm
   }
 
-type nonrec ('CamlG, 'CamlF) prover_proof =
-  { commitments : 'CamlG prover_commitments
-  ; proof : ('CamlG, 'CamlF) opening_proof
-  ; evals : 'CamlF proof_evaluations * 'CamlF proof_evaluations
-  ; ft_eval1 : 'CamlF
-  ; public : 'CamlF array
-  ; prev_challenges : ('CamlF array * 'CamlG poly_comm) array
+type nonrec ('caml_g, 'caml_f) prover_proof =
+  { commitments : 'caml_g prover_commitments
+  ; proof : ('caml_g, 'caml_f) opening_proof
+  ; evals : 'caml_f proof_evaluations * 'caml_f proof_evaluations
+  ; ft_eval1 : 'caml_f
+  ; public : 'caml_f array
+  ; prev_challenges : ('caml_f array * 'caml_g poly_comm) array
   }
 
 type nonrec wire = { row : int; col : int }
@@ -100,53 +103,53 @@ type nonrec gate_type =
   | ChaCha2
   | ChaChaFinal
 
-type nonrec 'F circuit_gate =
+type nonrec 'f circuit_gate =
   { typ : gate_type
   ; wires : wire * wire * wire * wire * wire * wire * wire
-  ; coeffs : 'F array
+  ; coeffs : 'f array
   }
 
 type nonrec curr_or_next = Curr | Next
 
-type nonrec 'F oracles =
-  { o : 'F random_oracles
-  ; p_eval : 'F * 'F
-  ; opening_prechallenges : 'F array
-  ; digest_before_evaluations : 'F
+type nonrec 'f oracles =
+  { o : 'f random_oracles
+  ; p_eval : 'f * 'f
+  ; opening_prechallenges : 'f array
+  ; digest_before_evaluations : 'f
   }
 
 module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
-    type nonrec 'PolyComm t =
+    type nonrec 'poly_comm t =
       { lookup_used : lookups_used
-      ; lookup_table : 'PolyComm array
-      ; lookup_selectors : 'PolyComm array
+      ; lookup_table : 'poly_comm array
+      ; lookup_selectors : 'poly_comm array
       }
   end
 
-  type nonrec 'Fr domain = { log_size_of_group : int; group_gen : 'Fr }
+  type nonrec 'fr domain = { log_size_of_group : int; group_gen : 'fr }
 
-  type nonrec 'PolyComm verification_evals =
-    { sigma_comm : 'PolyComm array
-    ; coefficients_comm : 'PolyComm array
-    ; generic_comm : 'PolyComm
-    ; psm_comm : 'PolyComm
-    ; complete_add_comm : 'PolyComm
-    ; mul_comm : 'PolyComm
-    ; emul_comm : 'PolyComm
-    ; endomul_scalar_comm : 'PolyComm
-    ; chacha_comm : 'PolyComm array option
+  type nonrec 'poly_comm verification_evals =
+    { sigma_comm : 'poly_comm array
+    ; coefficients_comm : 'poly_comm array
+    ; generic_comm : 'poly_comm
+    ; psm_comm : 'poly_comm
+    ; complete_add_comm : 'poly_comm
+    ; mul_comm : 'poly_comm
+    ; emul_comm : 'poly_comm
+    ; endomul_scalar_comm : 'poly_comm
+    ; chacha_comm : 'poly_comm array option
     }
 
-  type nonrec ('Fr, 'SRS, 'PolyComm) verifier_index =
-    { domain : 'Fr domain
+  type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
+    { domain : 'fr domain
     ; max_poly_size : int
     ; max_quot_size : int
-    ; srs : 'SRS
-    ; evals : 'PolyComm verification_evals
-    ; shifts : 'Fr array
-    ; lookup_index : 'PolyComm Lookup.t option
+    ; srs : 'srs
+    ; evals : 'poly_comm verification_evals
+    ; shifts : 'fr array
+    ; lookup_index : 'poly_comm Lookup.t option
     }
 end
