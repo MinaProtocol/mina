@@ -1823,7 +1823,7 @@ let%test_module _ =
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
-              Mina_generators.Snapp_generators.gen_parties_from ~succeed:true
+              Mina_generators.Parties_generators.gen_parties_from ~succeed:true
                 ~keymap ~fee_payer_keypair ~ledger ()
             in
             User_command.Parties parties
@@ -1837,7 +1837,7 @@ let%test_module _ =
       (* add new accounts to best tip ledger *)
       let ledger_accounts =
         Mina_ledger.Ledger.to_list ledger
-        |> List.filter ~f:(fun acct -> Option.is_some acct.snapp)
+        |> List.filter ~f:(fun acct -> Option.is_some acct.zkapp)
       in
       List.iter ledger_accounts ~f:(fun account ->
           let account_id =
@@ -1957,7 +1957,7 @@ let%test_module _ =
               State_hash.gen
         ; timing = Account.Timing.Untimed
         ; permissions = Permissions.user_default
-        ; snapp = None
+        ; zkapp = None
         ; zkapp_uri = ""
         } )
 

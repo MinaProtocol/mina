@@ -275,6 +275,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     | Error (`Msg s) ->
         Error s
 
+  let to_yojson_full x = Repr.to_yojson (to_repr x)
+
   let to_yojson x = `String (to_base64 x)
 
   let of_yojson = function

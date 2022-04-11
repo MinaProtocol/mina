@@ -36,31 +36,6 @@ module Operations = struct
   let copy a = Array.map a ~f:Fn.id
 end
 
-[%%ifdef consensus_mechanism]
-
-module Inputs = Pickles.Tick_field_sponge.Inputs
-
-[%%else]
-
-module Inputs = struct
-  module Field = Field
-
-  let rounds_full = 55
-
-  let initial_ark = false
-
-  let rounds_partial = 0
-
-  (* Computes x^7 *)
-  let to_the_alpha x =
-    let open Field in
-    square (square x * x) * x
-
-  module Operations = Operations
-end
-
-[%%endif]
-
 module Digest = struct
   open Field
 
@@ -74,33 +49,7 @@ module Digest = struct
         List.take (unpack x) length
 end
 
-module Ocaml_permutation = Sponge.Poseidon (Inputs)
-
-[%%ifdef consensus_mechanism]
-
-module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
-  module Field = Field
-
-  let add_assign = Ocaml_permutation.add_assign
-
-  let copy = Ocaml_permutation.copy
-
-  let params = Kimchi_pasta_fp_poseidon.create ()
-
-  let block_cipher _params (s : Field.t array) =
-    let v = Kimchi_bindings.FieldVectors.Fp.create () in
-    Array.iter s ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back v) ;
-    Kimchi_pasta_fp_poseidon.block_cipher params v ;
-    Array.init (Array.length s) ~f:(Kimchi_bindings.FieldVectors.Fp.get v)
-end
-
-[%%else]
-
-module Permutation = Ocaml_permutation
-
-[%%endif]
-
-include Sponge.Make_hash (Permutation)
+include Sponge.Make_hash (Random_oracle_permutation)
 
 let update ~state = update ~state params
 
@@ -188,16 +137,6 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> make_checked (fun () -> Checked.hash [| x; y |]))
     (fun (x, y) -> hash [| x; y |])
     (x, y)
-
-let%test_unit "check rust implementation of block-cipher" =
-  let open Pickles.Impls.Step in
-  let module T = Internal_Basic in
-  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
-    ~f:(fun s ->
-      let s () = Array.of_list s in
-      [%test_eq: T.Field.t array]
-        (Ocaml_permutation.block_cipher params (s ()))
-        (Permutation.block_cipher params (s ())))
 
 [%%endif]
 

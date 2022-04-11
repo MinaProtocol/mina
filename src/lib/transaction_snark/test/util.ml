@@ -75,14 +75,16 @@ let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let apply_parties_with_merges ledger partiess =
+let check_parties_with_merges_exn ?(state_body = genesis_state_body)
+    ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
+    ?(apply = true) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
   Async.Deferred.List.iter partiess ~f:(fun parties ->
       let witnesses =
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
-                ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+                ~state_body ~fee_excess:Amount.Signed.zero
                 ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
                 [ parties ])
         with
@@ -122,13 +124,14 @@ let apply_parties_with_merges ledger partiess =
                 T.merge ~sok_digest prev curr)
       in
       let _p = Or_error.ok_exn p in
-      let _s =
-        Ledger.apply_parties_unchecked ~constraint_constants
-          ~state_view:(Mina_state.Protocol_state.Body.view genesis_state_body)
-          ledger parties
-        |> Or_error.ok_exn
-      in
-      ())
+      if apply then
+        let _applied =
+          Ledger.apply_parties_unchecked ~constraint_constants ~state_view
+            ledger parties
+          |> Or_error.ok_exn
+        in
+        ()
+      else ())
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
@@ -175,14 +178,14 @@ let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           (*create a snapp account*)
-          Transaction_snark.For_tests.create_trivial_snapp_account
+          Transaction_snark.For_tests.create_trivial_zkapp_account
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =
             Transaction_snark.For_tests.update_states ~snapp_prover
               ~constraint_constants test_spec
           in
-          apply_parties_with_merges ledger [ parties ]))
+          check_parties_with_merges_exn ledger [ parties ]))
 
 let permissions_from_update (update : Party.Update.t) ~auth =
   let default = Permissions.user_default in

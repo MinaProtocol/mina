@@ -1,7 +1,7 @@
 open Mina_base
 open Pickles
 
-module Test_input : Transaction_snark_tests.Test_snapp_update.Input_intf =
+module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "verification_key"
 
@@ -9,7 +9,7 @@ struct
     let new_verification_key :
         (Side_loaded.Verification_key.t, Zkapp_basic.F.t) With_hash.t =
       let data = Pickles.Side_loaded.Verification_key.dummy in
-      let hash = Snapp_account.dummy_vk_hash () in
+      let hash = Zkapp_account.dummy_vk_hash () in
       ({ data; hash } : _ With_hash.t)
     in
     { Party.Update.dummy with
@@ -19,5 +19,5 @@ end
 
 let%test_module "Update account verification key" =
   ( module struct
-    include Transaction_snark_tests.Test_snapp_update.Make (Test_input)
+    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
   end )
