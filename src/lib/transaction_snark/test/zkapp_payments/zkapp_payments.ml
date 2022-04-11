@@ -131,7 +131,9 @@ let%test_module "Snapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let parties = party_send (List.hd_exn specs) in
+              let parties =
+                party_send ~constraint_constants (List.hd_exn specs)
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
@@ -146,7 +148,7 @@ let%test_module "Snapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    party_send ~use_full_commitment s)
+                    party_send ~constraint_constants ~use_full_commitment s)
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
