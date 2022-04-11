@@ -376,24 +376,25 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash : t =
+  let create ~other_parties_hash : t =
     Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
+      [| other_parties_hash |]
 
-  let with_fee_payer (t : t) ~fee_payer_hash =
-    Random_oracle.hash ~init:Hash_prefix.party_cons [| fee_payer_hash; t |]
+  let create_complete (t : t) ~memo_hash ~fee_payer_hash =
+    Random_oracle.hash ~init:Hash_prefix.party_cons
+      [| memo_hash; fee_payer_hash; t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~other_parties_hash ~protocol_state_predicate_hash ~memo_hash =
+    let create ~other_parties_hash =
       Random_oracle.Checked.hash
         ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| protocol_state_predicate_hash; other_parties_hash; memo_hash |]
+        [| other_parties_hash |]
 
-    let with_fee_payer (t : t) ~fee_payer_hash =
+    let create_complete (t : t) ~memo_hash ~fee_payer_hash =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
-        [| fee_payer_hash; t |]
+        [| memo_hash; fee_payer_hash; t |]
   end
 end
 
@@ -401,10 +402,6 @@ let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create
     ~other_parties_hash:
       (Call_forest.With_hashes.other_parties_hash t.other_parties)
-    ~protocol_state_predicate_hash:
-      (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.body.protocol_state_precondition)
-    ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
 module Weight = struct
