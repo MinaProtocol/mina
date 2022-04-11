@@ -40,19 +40,25 @@ module Stable = struct
         -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
         -> body_reference:Body_reference.t
         -> ?proposed_protocol_version_opt:Protocol_version.t
+        -> ?current_protocol_version:Protocol_version.t
         -> unit
         -> 'a
 
       let map_creator c ~f ~protocol_state ~protocol_state_proof
           ~delta_block_chain_proof ~body_reference
-          ?proposed_protocol_version_opt () =
+          ?proposed_protocol_version_opt ?current_protocol_version () =
         f
           (c ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
-             ~body_reference ?proposed_protocol_version_opt ())
+             ~body_reference ?proposed_protocol_version_opt
+             ?current_protocol_version ())
 
       let create ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
-          ~body_reference ?proposed_protocol_version_opt () =
-        let current_protocol_version =
+          ~body_reference ?proposed_protocol_version_opt
+          ?current_protocol_version () =
+        let cur_ver_fun =
+          Option.(bind current_protocol_version ~f:(Fn.compose return const))
+        in
+        let cur_ver_fallback () =
           try Protocol_version.get_current ()
           with _ ->
             failwith
@@ -62,7 +68,8 @@ module Stable = struct
         { protocol_state
         ; protocol_state_proof
         ; delta_block_chain_proof
-        ; current_protocol_version
+        ; current_protocol_version =
+            Option.value ~default:cur_ver_fallback cur_ver_fun ()
         ; proposed_protocol_version_opt
         ; body_reference
         }

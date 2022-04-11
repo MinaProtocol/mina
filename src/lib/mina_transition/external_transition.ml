@@ -356,7 +356,7 @@ let decompose
     ; protocol_state_proof
     ; staged_ledger_diff
     ; delta_transition_chain_proof
-    ; current_protocol_version = _
+    ; current_protocol_version
     ; proposed_protocol_version_opt
     ; validation_callback = ()
     } =
@@ -365,7 +365,8 @@ let decompose
   let header =
     Header.create ~protocol_state ~protocol_state_proof
       ~delta_block_chain_proof:delta_transition_chain_proof
-      ?proposed_protocol_version_opt ~body_reference ()
+      ?proposed_protocol_version_opt ~body_reference ~current_protocol_version
+      ()
   in
   Block.create ~header ~body
 

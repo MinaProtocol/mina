@@ -18,6 +18,7 @@ val create :
   -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
   -> body_reference:Body_reference.t
   -> ?proposed_protocol_version_opt:Protocol_version.t
+  -> ?current_protocol_version:Protocol_version.t
   -> unit
   -> t
 
