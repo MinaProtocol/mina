@@ -2406,7 +2406,7 @@ let%test_module _ =
           let expires_later2 =
             mk_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(0, 2) ~sender_idx:2 ~receiver_idx:9
+              ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
@@ -2503,6 +2503,37 @@ let%test_module _ =
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           Deferred.unit)
+
+    let%test_unit "Aged-based expiry (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let expiry = Time_ns.Span.of_sec 1. in
+          let%bind assert_pool_txs, pool, best_tip_diff_w, _ =
+            setup_test ~expiry ()
+          in
+          assert_pool_txs [] ;
+          let party_transfer =
+            mk_parties ~fee_payer_idx:(0, 0) ~sender_idx:1 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0 ()
+          in
+          let valid_commands = [ party_transfer ] in
+          let cmds_wo_check =
+            List.map valid_commands ~f:User_command.forget_check
+          in
+          let%bind apply_res = verify_and_apply pool cmds_wo_check in
+          [%test_eq: pool_apply]
+            (accepted_commands apply_res)
+            (Ok cmds_wo_check) ;
+          assert_pool_txs cmds_wo_check ;
+          let%bind () = after (Time.Span.of_sec 2.) in
+          let%map _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = []
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          assert_pool_txs [])
 
     let%test_unit "Now-invalid transactions are removed from the pool when the \
                    transition frontier is recreated (user cmds)" =
