@@ -125,9 +125,10 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
   in
   let other_parties =
     Parties.Call_forest.map other_parties ~f:(function
-      | { body = { public_key; use_full_commitment; _ }
-        ; authorization = Signature _
-        } as party
+      | ({ body = { public_key; use_full_commitment; _ }
+         ; authorization = Signature _
+         } as party :
+          Party.t)
         when Public_key.Compressed.equal public_key pk_compressed ->
           let commitment =
             if use_full_commitment then full_commitment
