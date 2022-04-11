@@ -1436,6 +1436,7 @@ module Snapp_helpers = struct
           return Party.Account_precondition.Accept
     in
     let use_full_commitment = body_data.use_full_commitment in
+    let caller = Token_id.of_string body_data.caller in
     return
       ( { public_key
         ; update
@@ -1449,6 +1450,7 @@ module Snapp_helpers = struct
         ; protocol_state_precondition
         ; account_precondition
         ; use_full_commitment
+        ; caller
         }
         : Party.Body.t )
 

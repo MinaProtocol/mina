@@ -1090,6 +1090,7 @@ module Zkapp_party_body = struct
     ; zkapp_protocol_state_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
+    ; caller : string
     }
   [@@deriving fields, hlist]
 
@@ -1108,6 +1109,7 @@ module Zkapp_party_body = struct
         ; int
         ; int
         ; bool
+        ; string
         ]
 
   let table_name = "zkapp_party_body"
@@ -1158,6 +1160,7 @@ module Zkapp_party_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
+    let caller = Token_id.to_string body.caller in
     let value =
       { public_key_id
       ; update_id
@@ -1171,6 +1174,7 @@ module Zkapp_party_body = struct
       ; zkapp_protocol_state_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
+      ; caller
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
