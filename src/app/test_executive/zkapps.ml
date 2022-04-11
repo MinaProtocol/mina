@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
-    let keypair =
+    let keypair () =
       let private_key = Signature_lib.Private_key.create () in
       let public_key =
         Signature_lib.Public_key.of_private_key_exn private_key
@@ -31,7 +31,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "8000000000"; timing = Untimed }
         ; { balance = "1000000000"; timing = Untimed }
         ]
-    ; extra_genesis_accounts = [ { keypair; balance = "1000" } ]
+    ; extra_genesis_accounts =
+        [ { keypair = keypair (); balance = "1000" }
+        ; { keypair = keypair (); balance = "1000" }
+        ]
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
     ; work_delay = Some 1
@@ -92,14 +95,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
-    let%bind fee_payer_pk = Util.pub_key_of_node node in
-    let%bind fee_payer_sk = Util.priv_key_of_node node in
     let (keypair : Signature_lib.Keypair.t) =
-      { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
-      ; private_key = fee_payer_sk
-      }
+      (List.nth_exn config.extra_genesis_accounts 0).keypair
     in
-    let keypair2 = (List.hd_exn config.extra_genesis_accounts).keypair in
+    let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
     let num_zkapp_accounts = 3 in
     let snapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -110,7 +109,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
             Mina_base.Token_id.default)
     in
-    let fee = Currency.Fee.of_int 1_000_000 in
     let%bind parties_create_account =
       (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
       let open Mina_base in
@@ -119,6 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp create account"
       in
+      let fee = Currency.Fee.of_int 20_000_000 in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
@@ -145,6 +144,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp update permissions"
       in
+      (*Lower fee so that parties_create_account gets applied first*)
+      let fee = Currency.Fee.of_int 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
@@ -188,6 +189,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Snapp update all"
       in
+      let fee = Currency.Fee.of_int 10_000_000 in
       let app_state =
         let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
@@ -364,17 +366,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section_hard
-        "Wait for zkApp to create accounts to be included in transition \
+      section "Send a zkApp transaction to update permissions"
+        (send_zkapp ~logger node parties_update_permissions)
+    in
+    let%bind () =
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 12 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
+    in
+    let%bind () =
+      section
+        "Wait for snapp to create accounts to be included in transition \
          frontier"
         (wait_for_snapp parties_create_account)
     in
     let%bind () =
-      section_hard "Send a zkApp transaction to update permissions"
-        (send_zkapp ~logger node parties_update_permissions)
-    in
-    let%bind () =
-      section_hard
+      section
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
         (wait_for_snapp parties_update_permissions)
@@ -413,12 +425,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
-        "Wait for snapp to update all fields to be included in transition \
-         frontier"
+        "Wait for zkApp transaction to update all fields to be included in \
+         transition frontier"
         (wait_for_snapp parties_update_all)
     in
     let%bind () =
-      section_hard "Verify zkApp updates in ledger"
+      section "Send a zkApp transaction with an invalid nonce"
+        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
+    in
+    let%bind () =
+      section "Send a zkApp transaction with an invalid signature"
+        (send_invalid_zkapp ~logger node parties_invalid_signature
+           "Invalid_signature")
+    in
+    let%bind () =
+      section "Verify zkApp transaction updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:
@@ -446,25 +467,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible") )))
     in
     let%bind () =
-      let padding_payments =
-        (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 12 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
-    in
-    let%bind () =
-      section_hard "Send a zkApp transaction with an invalid nonce"
-        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
-    in
-    let%bind () =
-      section_hard "Send a zkApp transaction with an invalid signature"
-        (send_invalid_zkapp ~logger node parties_invalid_signature
-           "Invalid_signature")
-    in
-    let%bind () =
-      section_hard "Wait for proof to be emitted"
+      section "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()
