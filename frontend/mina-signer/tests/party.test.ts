@@ -85,6 +85,7 @@ let otherParties = {
           provedState: null,
         },
         useFullCommitment: true,
+        caller: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
       },
       authorization: {
         proof: null,
@@ -116,7 +117,7 @@ describe("Party", () => {
       },
       keypair.privateKey
     );
-    expect(parties.data).toBeDefined();
+    expect(parties.body).toBeDefined();
     expect(parties.signature).toBeDefined();
   });
 
@@ -134,7 +135,7 @@ describe("Party", () => {
       },
       keypair.privateKey
     ) as Signed<Party>;
-    expect(parties.data).toBeDefined();
+    expect(parties.body).toBeDefined();
     expect(parties.signature).toBeDefined();
   });
 });
