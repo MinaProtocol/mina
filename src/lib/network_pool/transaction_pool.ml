@@ -1195,9 +1195,6 @@ struct
                               let uc = User_command.of_verifiable c in
                               if Result.is_error !failures then (
                                 Mutex.release signer_lock ;
-                                let failures =
-                                  Result.error !failures |> Option.value_exn
-                                in
                                 return (Error `Other_command_failed) )
                               else if
                                 has_sufficient_fee t.pool ~pool_max_size uc
