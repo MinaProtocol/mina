@@ -1737,6 +1737,10 @@ module Types = struct
               Some
                 (Mina_transition.External_transition.Precomputed_block.Proof
                  .to_bin_string proof))
+        ; field "json" ~typ:json ~doc:"JSON-encoded proof"
+            ~args:Arg.[]
+            ~resolve:(fun _ proof ->
+              Some (Yojson.Safe.to_basic (Proof.to_yojson_full proof)))
         ])
 
   let block :
@@ -4304,6 +4308,17 @@ module Queries = struct
         Consensus_vrf.Layout.Evaluation.compute_vrf ~constraint_constants
           evaluation)
 
+  let blockchain_verification_key =
+    io_field "blockchainVerificationKey"
+      ~doc:"The pickles verification key for the protocol state proof"
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        let open Deferred.Result.Let_syntax in
+        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        |> Deferred.Result.map_error ~f:Error.to_string_hum
+        >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic)
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -4335,6 +4350,7 @@ module Queries = struct
     ; check_vrf
     ; runtime_config
     ; thread_graph
+    ; blockchain_verification_key
     ]
 end
 
