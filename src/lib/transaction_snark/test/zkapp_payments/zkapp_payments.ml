@@ -188,7 +188,7 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.apply_parties_with_merges ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ])))
 
     let%test_unit "snapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
@@ -233,9 +233,9 @@ let%test_module "Zkapp payments tests" =
                     :: ( List.take specs (receiver_count - 1)
                        |> List.map ~f:(fun s -> (s.receiver, amount)) )
                 ; amount = total_amount
-                ; snapp_account_keypairs = []
+                ; zkapp_account_keypairs = []
                 ; memo
-                ; new_snapp_account = false
+                ; new_zkapp_account = false
                 ; snapp_update = Party.Update.dummy
                 ; current_auth = Permissions.Auth_required.Signature
                 ; call_data = Snark_params.Tick.Field.zero
@@ -246,7 +246,7 @@ let%test_module "Zkapp payments tests" =
               let parties =
                 Transaction_snark.For_tests.multiple_transfers test_spec
               in
-              (U.apply_parties ledger [ parties ] : unit * unit) |> ignore ;
+              U.apply_parties ledger [ parties ] ;
               let _, (local_state, _) =
                 Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view:U.state_view ledger parties
