@@ -15,6 +15,7 @@ import {
   Perm,
   Mina,
   Permissions,
+  signFeePayer,
 } from "snarkyjs";
 import cached from "./cached.js";
 
@@ -67,13 +68,23 @@ if (command === "deploy") {
   Mina.setActiveInstance(Local);
   Local.addAccount(feePayerKeyJs.toPublicKey(), "30000000000");
 
-  let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
+  // let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
+  let verificationKey = await cached(async () => {
+    return (await compile(SimpleZkapp, zkappAddress)).verificationKey;
+  });
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
     initialBalance,
     initialBalanceFundingAccountKey: feePayerKeyJs,
   });
+
+  console.log(
+    await signFeePayer(partiesJson, feePayerKey, {
+      nonce: feePayerNonce,
+      transactionFee,
+    })
+  );
 
   // mina-signer part
   let client = new Client({ network: "testnet" });

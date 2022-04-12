@@ -11,7 +11,7 @@ import {
   isReady,
   shutdown,
   Mina,
-  signJsonTransaction,
+  signFeePayer,
   Perm,
   call,
   Permissions,
@@ -90,11 +90,9 @@ let partiesJsonUpdate = await callUnproved(
   [Field(3)],
   zkappKey
 );
-partiesJsonUpdate = await signJsonTransaction(
-  partiesJsonUpdate,
-  sender.privateKey,
-  { transactionFee }
-);
+partiesJsonUpdate = await signFeePayer(partiesJsonUpdate, sender.privateKey, {
+  transactionFee,
+});
 toc();
 
 tic("apply update transaction (no proof)");
@@ -114,7 +112,7 @@ let partiesJsonUpdateWithProof = await call(
   [Field(5)],
   provers
 );
-partiesJsonUpdateWithProof = await signJsonTransaction(
+partiesJsonUpdateWithProof = await signFeePayer(
   partiesJsonUpdateWithProof,
   sender.privateKey,
   { transactionFee }
