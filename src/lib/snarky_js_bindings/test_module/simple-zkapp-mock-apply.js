@@ -35,6 +35,8 @@ class SimpleZkapp extends SmartContract {
     this.self.update.permissions.setValue({
       ...Permissions.default(),
       editState: Perm.proofOrSignature(),
+      // TODO: this is  a workaround, can be removed once Parties_replay_check_failed is fixed
+      incrementNonce: Perm.proofOrSignature(),
     });
     this.x.set(initialState);
   }
