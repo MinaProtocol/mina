@@ -68,23 +68,13 @@ if (command === "deploy") {
   Mina.setActiveInstance(Local);
   Local.addAccount(feePayerKeyJs.toPublicKey(), "30000000000");
 
-  // let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
-  let verificationKey = await cached(async () => {
-    return (await compile(SimpleZkapp, zkappAddress)).verificationKey;
-  });
+  let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
     initialBalance,
     initialBalanceFundingAccountKey: feePayerKeyJs,
   });
-  // TODO make this work with mina-signer
-  console.log(
-    await signFeePayer(partiesJson, feePayerKeyJs, {
-      nonce: `${feePayerNonce}`,
-      transactionFee,
-    })
-  );
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
@@ -96,7 +86,7 @@ if (command === "deploy") {
   };
   let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
   let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
-  // console.log(data.parties);
+  console.log(data.parties);
 }
 
 if (command === "update") {
