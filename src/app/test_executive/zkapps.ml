@@ -181,7 +181,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (parties, new_permissions)
     in
-    let%bind.Deferred snapp_update_all, parties_update_all =
+    let%bind.Deferred ( snapp_update_all
+                      , parties_update_all
+                      , parties_insufficient_replace_fee
+                      , parties_insufficient_fee ) =
       let open Mina_base in
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
@@ -239,11 +242,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sequence_events = []
         }
       in
-      let%map.Deferred parties_update_all =
+      let%bind.Deferred parties_update_all =
         Transaction_snark.For_tests.update_states ~constraint_constants
           parties_spec
       in
-      (snapp_update, parties_update_all)
+      let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
+        { parties_spec with fee = Currency.Fee.of_int 999_999 }
+      in
+      let%bind.Deferred parties_insufficient_replace_fee =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_insufficient_replace_fee
+      in
+      let spec_insufficient_fee : Transaction_snark.For_tests.Spec.t =
+        { parties_spec with fee = Currency.Fee.of_int 1000 }
+      in
+      let%map.Deferred parties_insufficient_fee =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_insufficient_fee
+      in
+      ( snapp_update
+      , parties_update_all
+      , parties_insufficient_replace_fee
+      , parties_insufficient_fee )
     in
     let parties_invalid_nonce =
       let p = parties_update_all in
@@ -269,30 +289,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
       }
     in
-    let parties_insufficient_fee =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                balance_change = Currency.Fee.of_int 1000
-              ; account_precondition = Mina_base.Account.Nonce.of_int 2
-              }
-          }
-      }
-    in
     let parties_invalid_proof =
       let p = parties_update_all in
       Mina_base.Parties.
-        { fee_payer =
-            { p.fee_payer with
-              body =
-                { p.fee_payer.body with
-                  account_precondition = Mina_base.Account.Nonce.of_int 2
-                }
-            }
-        ; other_parties =
+        { p with
+          other_parties =
             List.map p.other_parties ~f:(fun other_p ->
                 match other_p.authorization with
                 | Proof _ ->
@@ -303,21 +304,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     }
                 | _ ->
                     other_p)
-        ; memo = p.memo
         }
-    in
-    let parties_insufficient_replace_fee =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                balance_change = Currency.Fee.of_int 999_999
-              ; account_precondition = Mina_base.Account.Nonce.of_int 1
-              }
-          }
-      }
     in
     let with_timeout =
       let soft_slots = 4 in
@@ -456,10 +443,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Error.of_string
                     "Ledger permissions do not match update permissions") )))
     in
+    let%bind () =
+      section "Send a snapp with an insufficient fee"
+        (send_invalid_zkapp ~logger node parties_insufficient_fee
+           "Insufficient_fee")
+    in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
         (send_zkapp ~logger node parties_update_all)
+    in
+    let%bind () =
+      section "Send a snapp with an invalid proof"
+        (send_invalid_zkapp ~logger node parties_invalid_proof
+           "Invalid_signature")
+    in
+    let%bind () =
+      section "Send a snapp with an insufficient replace fee"
+        (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
+           "Insufficient_replace_fee")
     in
     let%bind () =
       section_hard
@@ -513,16 +515,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_invalid_zkapp ~logger node parties_invalid_signature
            "Invalid_signature")
     in
-    let%bind () =
-      section "Send a snapp with an invalid proof"
-        (send_invalid_zkapp ~logger node parties_invalid_proof
-           "Invalid_signature")
-    in
-    let%bind () =
-      section "Send a snapp with an insufficient fee"
-        (send_invalid_zkapp ~logger node parties_insufficient_fee
-           "Insufficient_fee")
-    in
     (*
     let%bind () =
       section "Send a snapp with a duplicate txn"
@@ -530,11 +522,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            "Duplicate")
     in
     *)
-    let%bind () =
-      section "Send a snapp with an insufficient replace fee"
-        (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
-           "Insufficient_replace_fee")
-    in
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
