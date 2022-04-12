@@ -15,7 +15,6 @@ import {
   Perm,
   Mina,
   Permissions,
-  signFeePayer,
 } from "snarkyjs";
 import cached from "./cached.js";
 
