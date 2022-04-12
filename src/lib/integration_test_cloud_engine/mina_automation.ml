@@ -60,8 +60,9 @@ module Network_config = struct
 
   type t =
     { mina_automation_location : string
-    ; debug_arg : bool
-    ; keypairs : Network_keypair.t list
+    ; debug_arg : bool (* ; keypairs : Network_keypair.t list *)
+    ; block_producer_keypairs : Network_keypair.t list
+    ; extra_genesis_keypairs : Network_keypair.t list
     ; constants : Test_config.constants
     ; terraform : terraform_config
     }
@@ -122,7 +123,7 @@ module Network_config = struct
       List.map
         (List.zip_exn extra_genesis_accounts
            (List.take extra_keypairs (List.length extra_genesis_accounts)))
-        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, sk)) ->
           let timing =
             match timing with
             | Account.Timing.Untimed ->
@@ -140,27 +141,13 @@ module Network_config = struct
           let default = Runtime_config.Accounts.Single.default in
           { default with
             pk = Some (Public_key.Compressed.to_string pk)
-          ; sk = None
+          ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
               Balance.of_formatted_string balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
           })
-      (* match aux_account_balance with
-         | None ->
-             ([], [])
-         | Some balance when List.length aux_keypairs > 0 ->
-             let balance = Balance.of_formatted_string balance in
-             let default = Runtime_config.Accounts.Single.default in
-             ( List.map aux_keypairs ~f:(fun (pk, _) ->
-                   { default with
-                     pk = Some (Public_key.Compressed.to_string pk)
-                   ; balance
-                   })
-             , aux_keypairs )
-         | _ ->
-             failwith "there should be at least one aux keypair" *)
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
@@ -265,12 +252,15 @@ module Network_config = struct
       in
       Network_keypair.create_network_keypair ~keypair ~secret_name
     in
-    let aux_net_keypairs = List.mapi extra_keypairs ~f:mk_net_keypair in
+    let extra_genesis_net_keypairs =
+      List.mapi extra_keypairs ~f:mk_net_keypair
+    in
     let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; keypairs = bp_net_keypairs @ aux_net_keypairs
+    ; block_producer_keypairs = bp_net_keypairs
+    ; extra_genesis_keypairs = extra_genesis_net_keypairs
     ; constants
     ; terraform =
         { cluster_name
@@ -361,8 +351,9 @@ module Network_manager = struct
     ; snark_worker_workloads : Kubernetes_network.Workload.t list
     ; archive_workloads : Kubernetes_network.Workload.t list
     ; workloads_by_id : Kubernetes_network.Workload.t String.Map.t
-    ; mutable deployed : bool
-    ; keypairs : Keypair.t list
+    ; mutable deployed : bool (* ; keypairs : Keypair.t list *)
+    ; block_producer_keypairs : Keypair.t list
+    ; extra_genesis_keypairs : Keypair.t list
     }
 
   let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
@@ -496,8 +487,12 @@ module Network_manager = struct
       ; archive_workloads
       ; workloads_by_id
       ; deployed = false
-      ; keypairs =
-          List.map network_config.keypairs ~f:(fun { keypair; _ } -> keypair)
+      ; block_producer_keypairs =
+          List.map network_config.block_producer_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
+      ; extra_genesis_keypairs =
+          List.map network_config.extra_genesis_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
       }
     in
     [%log info] "Initializing terraform" ;
@@ -553,7 +548,8 @@ module Network_manager = struct
       ; archive_nodes
       ; nodes_by_pod_id
       ; testnet_log_filter = t.testnet_log_filter
-      ; keypairs = t.keypairs
+      ; block_producer_keypairs = t.block_producer_keypairs
+      ; extra_genesis_keypairs = t.extra_genesis_keypairs
       }
     in
     let nodes_to_string =
