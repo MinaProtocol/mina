@@ -1908,8 +1908,20 @@ module Base = struct
                 pending_coinbase_stack_after
             in
             let%bind valid_init_state =
-              Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
-                pending_coinbase_stack_before
+              (* Stack update is performed once per scan state tree and the
+                 following is true only for the first transaction per block per
+                 tree*)
+              let%bind equal_source =
+                Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                  pending_coinbase_stack_before
+              in
+              (*for the rest, both source and target are the same*)
+              let%bind equal_source_with_state =
+                Pending_coinbase.Stack.equal_var
+                  computed_pending_coinbase_stack_after
+                  pending_coinbase_stack_before
+              in
+              Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all
               [ correct_coinbase_target_stack; valid_init_state ]))
@@ -3601,21 +3613,26 @@ let rec accumulate_call_stack_hashes ~(hash_frame : 'frame -> field)
       in
       { stack_hash = Parties.Call_forest.hash_cons h_f h_tl; elt = f } :: tl
 
-let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
-    ~pending_coinbase_init_stack ledger partiess =
+let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
+    (partiess :
+      ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
+      * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+      * Parties.t )
+      list) =
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
         Sparse_ledger.of_ledger_subset_exn ledger
-          (List.concat_map ~f:Parties.accounts_accessed partiess)
+          (List.concat_map
+             ~f:(fun (_, _, parties) -> Parties.accounts_accessed parties)
+             partiess)
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
   in
-  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let _, _, states_rev =
     List.fold_left ~init:(fee_excess, sparse_ledger, []) partiess
-      ~f:(fun (fee_excess, sparse_ledger, statess_rev) parties ->
+      ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, parties) ->
         let _, states =
           Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
             ~constraint_constants ~state_view ~fee_excess parties
@@ -3627,7 +3644,9 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let states = List.rev states_rev in
   let states_rev =
     group_by_parties_rev
-      ([] :: List.map ~f:Parties.parties partiess)
+      ( []
+      :: List.map ~f:(fun (_, _, parties) -> Parties.parties parties) partiess
+      )
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
   let tx_statement commitment full_commitment use_full_commitment
@@ -3650,10 +3669,23 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let remaining_parties =
     let partiess =
       List.map partiess
-        ~f:(fun parties : _ Mina_transaction_logic.Parties_logic.Start_data.t ->
-          { parties; memo_hash = Signed_command_memo.hash parties.memo })
+        ~f:(fun
+             (pending_coinbase_init_stack, pending_coinbase_stack_state, parties)
+           ->
+          ( pending_coinbase_init_stack
+          , pending_coinbase_stack_state
+          , { Mina_transaction_logic.Parties_logic.Start_data.parties
+            ; memo_hash = Signed_command_memo.hash parties.memo
+            } ))
     in
     ref partiess
+  in
+  let pending_coinbase_init_stack = ref Pending_coinbase.Stack.empty in
+  let pending_coinbase_stack_state =
+    ref
+      { Pending_coinbase_stack_state.source = Pending_coinbase.Stack.empty
+      ; target = Pending_coinbase.Stack.empty
+      }
   in
   List.fold_right states_rev ~init:[]
     ~f:(fun
@@ -3683,7 +3715,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         | _ ->
             None
       in
-      let start_parties, next_commitment, next_full_commitment =
+      let ( start_parties
+          , next_commitment
+          , next_full_commitment
+          , pending_coinbase_init_stack
+          , pending_coinbase_stack_state ) =
         let empty_if_last (mk : unit -> field * field) : field * field =
           match (target_local.parties, target_local.call_stack) with
           | [], [] ->
@@ -3712,29 +3748,60 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
               empty_if_last (fun () ->
                   (current_commitment, current_full_commitment))
             in
-            ([], next_commitment, next_full_commitment)
+            ( []
+            , next_commitment
+            , next_full_commitment
+            , !pending_coinbase_init_stack
+            , !pending_coinbase_stack_state )
         | `New -> (
             match !remaining_parties with
-            | parties :: rest ->
+            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+              , parties )
+              :: rest ->
                 let commitment', full_commitment' =
                   mk_next_commitments parties.parties
                 in
                 remaining_parties := rest ;
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
-                ([ parties ], commitment', full_commitment')
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
+                ( [ parties ]
+                , commitment'
+                , full_commitment'
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
         | `Two_new -> (
             match !remaining_parties with
-            | parties1 :: parties2 :: rest ->
+            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+              , parties1 )
+              :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
+                 , `Pending_coinbase_of_statement pending_coinbase_stack_state2
+                 , parties2 )
+                 :: rest ->
                 let commitment', full_commitment' =
                   mk_next_commitments parties2.parties
                 in
                 remaining_parties := rest ;
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
-                ([ parties1; parties2 ], commitment', full_commitment')
+                (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state :=
+                  { pending_coinbase_stack_state1 with
+                    Pending_coinbase_stack_state.target =
+                      pending_coinbase_stack_state2
+                        .Pending_coinbase_stack_state.target
+                  } ;
+                ( [ parties1; parties2 ]
+                , commitment'
+                , full_commitment'
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
       in
@@ -3822,7 +3889,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         in
         { source =
             { ledger = Sparse_ledger.merkle_root source_global.ledger
-            ; pending_coinbase_stack = pending_coinbase_init_stack
+            ; pending_coinbase_stack = pending_coinbase_stack_state.source
             ; local_state =
                 { source_local with
                   parties = Parties.Call_forest.hash source_local.parties
@@ -3832,9 +3899,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             }
         ; target =
             { ledger = Sparse_ledger.merkle_root target_global.ledger
-            ; pending_coinbase_stack =
-                Pending_coinbase.Stack.push_state state_body_hash
-                  pending_coinbase_init_stack
+            ; pending_coinbase_stack = pending_coinbase_stack_state.target
             ; local_state =
                 { target_local with
                   parties = Parties.Call_forest.hash target_local.parties
@@ -4104,7 +4169,9 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties spec ~update ~account_precondition =
+  let create_parties spec
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~update
+      ~account_precondition =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; receivers
@@ -4166,8 +4233,7 @@ module For_tests = struct
     let snapp_parties : Party.t list =
       let num_keypairs = List.length zkapp_account_keypairs in
       let account_creation_fee =
-        Amount.of_fee
-          Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        Amount.of_fee constraint_constants.account_creation_fee
       in
       (* if creating new snapp accounts, amount must be enough for account creation fees for each *)
       assert (
@@ -4318,7 +4384,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~update:update_vk
+      create_parties spec ~constraint_constants ~update:update_vk
         ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
@@ -4348,7 +4414,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~update:spec.snapp_update
+      create_parties spec ~constraint_constants ~update:spec.snapp_update
         ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
@@ -4426,7 +4492,9 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
-      create_parties spec ~update:spec.snapp_update
+      create_parties spec
+        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+        ~update:spec.snapp_update
         ~account_precondition:Party.Account_precondition.Accept
     in
     assert (Option.is_some sender_party) ;
