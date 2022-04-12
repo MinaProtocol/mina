@@ -6,7 +6,7 @@ testnetName: "mainnet"
 image:
   repository: minaprotocol/mina-daemon
   pullPolicy: IfNotPresent
-  tag: latest
+  tag: focal-latest
 
 features:
   logsnarkworkgossip:
@@ -24,7 +24,7 @@ features:
   uploadBlocksToGCloud:
     enabled: false
   seedPeersLists:
-    enabled: false
+    enabled: true
   customEntrypoint:
     enabled: false
     command: ""
@@ -64,7 +64,7 @@ archive:
   image:
     repository: minaprotocol/mina-archive
     pullPolicy: IfNotPresent
-    tag: latest
+    tag: focal-latest
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
@@ -98,7 +98,7 @@ ports:
 resources:
   limits:
   requests:
-    memory: "16Gi"
+    memory: "8Gi"
     cpu: "12"
     rayonThreads: "6"
 
