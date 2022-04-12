@@ -78,10 +78,10 @@ if (command === "deploy") {
     initialBalance,
     initialBalanceFundingAccountKey: feePayerKeyJs,
   });
-
+  // TODO make this work with mina-signer
   console.log(
-    await signFeePayer(partiesJson, feePayerKey, {
-      nonce: feePayerNonce,
+    await signFeePayer(partiesJson, feePayerKeyJs, {
+      nonce: `${feePayerNonce}`,
       transactionFee,
     })
   );
@@ -96,7 +96,7 @@ if (command === "deploy") {
   };
   let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
   let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
-  console.log(data.parties);
+  // console.log(data.parties);
 }
 
 if (command === "update") {
