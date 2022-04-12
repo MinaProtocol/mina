@@ -1579,7 +1579,7 @@ let zkapp_statement_typ =
     ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let dummy_constraints =
-  let module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas in
+  let module Inner_curve = Kimchi_pasta.Pasta.Pallas in
   let module Step_main_inputs = Pickles.Step_main_inputs in
   let inner_curve_typ : (Field.t * Field.t, Inner_curve.t) Typ.t =
     Typ.transport Step_main_inputs.Inner_curve.typ
@@ -2808,6 +2808,45 @@ module Ledger = struct
 
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
+  let check_party_signatures ?(check_fee_payer = true) parties =
+    let ({ fee_payer; other_parties; _ } : Parties.t) = parties in
+    let tx_commitment = Parties.commitment parties in
+    let full_tx_commitment =
+      Parties.Transaction_commitment.with_fee_payer tx_commitment
+        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
+    in
+    let key_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
+    let check_signature s pk msg =
+      match Signature_lib.Public_key.decompress pk with
+      | None ->
+          failwith
+            (sprintf "Check signature: Invalid key %s" (key_to_string pk))
+      | Some pk_ ->
+          if
+            not
+              (Signature_lib.Schnorr.Chunked.verify s
+                 (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+                 (Random_oracle_input.Chunked.field msg))
+          then
+            failwith
+              (sprintf "Check signature: Invalid signature for key %s"
+                 (key_to_string pk))
+          else ()
+    in
+    if check_fee_payer then
+      check_signature fee_payer.authorization fee_payer.body.public_key
+        full_tx_commitment ;
+    List.iter other_parties ~f:(fun p ->
+        let commitment =
+          if p.body.use_full_commitment then full_tx_commitment
+          else tx_commitment
+        in
+        match p.authorization with
+        | Signature s ->
+            check_signature s p.body.public_key commitment
+        | Proof _ | None_given ->
+            ())
+
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
@@ -2885,6 +2924,7 @@ module Ledger = struct
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
 
   let apply_parties_transaction l (txn : Parties.t) =
+    check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
       T.apply_parties_unchecked ~state_view:dummy_state_view
