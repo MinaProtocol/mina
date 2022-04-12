@@ -84,12 +84,12 @@ module Network_config = struct
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
+        ; extra_genesis_accounts
         ; num_snark_workers
         ; num_archive_nodes
         ; log_precomputed_blocks
         ; snark_worker_fee
-        ; snark_worker_public_key
-        ; aux_account_balance
+        ; snark_worker_public_key (* ; aux_account_balance *)
         } =
       test_config
     in
@@ -104,7 +104,7 @@ module Network_config = struct
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
-    let bp_keypairs, aux_keypairs =
+    let bp_keypairs, extra_keypairs =
       List.split_n
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
         (List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1)
@@ -113,25 +113,51 @@ module Network_config = struct
     if List.length bp_keypairs < num_block_producers then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    let aux_accounts, aux_keypairs =
-      match aux_account_balance with
-      | None ->
-          ([], [])
-      | Some balance when List.length aux_keypairs > 0 ->
-          let balance = Balance.of_formatted_string balance in
+    let extra_accounts =
+      List.map (List.zip_exn extra_genesis_accounts extra_keypairs)
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
+                      t.initial_minimum_balance
+                  ; cliff_time = t.cliff_time
+                  ; cliff_amount = t.cliff_amount
+                  ; vesting_period = t.vesting_period
+                  ; vesting_increment = t.vesting_increment
+                  }
+          in
           let default = Runtime_config.Accounts.Single.default in
-          ( List.map aux_keypairs ~f:(fun (pk, _) ->
-                { default with
-                  pk = Some (Public_key.Compressed.to_string pk)
-                ; balance
-                })
-          , aux_keypairs )
-      | _ ->
-          failwith "there should be at least one aux keypair"
+          { default with
+            pk = Some (Public_key.Compressed.to_string pk)
+          ; sk = None
+          ; balance =
+              Balance.of_formatted_string balance
+              (* delegation currently unsupported *)
+          ; delegate = None
+          ; timing
+          })
+      (* match aux_account_balance with
+         | None ->
+             ([], [])
+         | Some balance when List.length aux_keypairs > 0 ->
+             let balance = Balance.of_formatted_string balance in
+             let default = Runtime_config.Accounts.Single.default in
+             ( List.map aux_keypairs ~f:(fun (pk, _) ->
+                   { default with
+                     pk = Some (Public_key.Compressed.to_string pk)
+                   ; balance
+                   })
+             , aux_keypairs )
+         | _ ->
+             failwith "there should be at least one aux keypair" *)
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
-        ~f:(fun ({ Test_config.Block_producer.balance; timing }, (pk, _)) ->
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
           let timing =
             match timing with
             | Account.Timing.Untimed ->
@@ -193,7 +219,7 @@ module Network_config = struct
           (* was: Some proof_config; TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
-            { base = Accounts (bp_accounts @ aux_accounts)
+            { base = Accounts (bp_accounts @ extra_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -232,7 +258,7 @@ module Network_config = struct
       in
       Network_keypair.create_network_keypair ~keypair ~secret_name
     in
-    let aux_net_keypairs = List.mapi aux_keypairs ~f:mk_net_keypair in
+    let aux_net_keypairs = List.mapi extra_keypairs ~f:mk_net_keypair in
     let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location

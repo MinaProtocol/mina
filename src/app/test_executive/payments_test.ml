@@ -20,7 +20,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test snark work *)
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -44,6 +44,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~vesting_increment:5_000_000_000_000
           }
           (* 30_000_000_000_000 mina is the total. initially, the balance will be 10k mina. after 8 global slots, the cliff is hit, although the cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+        ]
+    ; extra_genesis_accounts =
+        [ { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"
+          ; timing =
+              make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+                ~cliff_amount:0 ~vesting_period:4
+                ~vesting_increment:5_000_000_000_000
+          }
         ]
     ; num_snark_workers =
         3

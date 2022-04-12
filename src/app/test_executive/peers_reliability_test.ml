@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     { default with
       requires_graphql = true
     ; block_producers =

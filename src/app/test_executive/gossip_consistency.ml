@@ -23,9 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         List.init n ~f:(fun _ ->
-            { Block_producer.balance = block_producer_balance
-            ; timing = Untimed
-            })
+            { Wallet.balance = block_producer_balance; timing = Untimed })
     }
 
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
