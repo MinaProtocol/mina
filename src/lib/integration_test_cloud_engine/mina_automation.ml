@@ -113,6 +113,11 @@ module Network_config = struct
     if List.length bp_keypairs < num_block_producers then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
+    assert (List.length bp_keypairs >= num_block_producers) ;
+    if List.length bp_keypairs < num_block_producers then
+      failwith
+        "not enough sample keypairs for specified number of extra keypairs" ;
+    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
     let extra_accounts =
       List.map
         (List.zip_exn extra_genesis_accounts
