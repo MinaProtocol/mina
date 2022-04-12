@@ -110,7 +110,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_int64 block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
-  (* commands to be filled in later *)
+  (* commands, accounts_accessed, accounts_created to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
@@ -128,7 +128,10 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; timestamp
     ; user_cmds = []
     ; internal_cmds = []
+    ; zkapp_cmds = []
     ; chain_status
+    ; accounts_accessed = []
+    ; accounts_created = []
     }
 
 let fill_in_user_commands pool block_state_hash =
@@ -176,7 +179,7 @@ let fill_in_user_commands pool block_state_hash =
       let%bind block_user_cmd =
         query_db ~item:"block user commands" ~f:(fun db ->
             Processor.Block_and_signed_command.load db ~block_id
-              ~user_command_id)
+              ~user_command_id ~sequence_no)
       in
       let status = block_user_cmd.status in
       let failure_reason =
@@ -225,22 +228,7 @@ let fill_in_internal_commands pool block_state_hash =
         Sql.Blocks_and_internal_commands.run db ~block_id)
   in
   Deferred.List.map internal_cmd_info
-    ~f:(fun
-         { internal_command_id
-         ; sequence_no
-         ; secondary_sequence_no
-         ; receiver_account_creation_fee_paid
-         ; receiver_balance_id
-         }
-       ->
-      let%bind { balance = receiver_balance_int64; _ } =
-        query_db ~item:"receiver balance" ~f:(fun db ->
-            Processor.Balance.load db ~id:receiver_balance_id)
-      in
-      let receiver_balance =
-        Unsigned.UInt64.of_int64 receiver_balance_int64
-        |> Currency.Balance.of_uint64
-      in
+    ~f:(fun { internal_command_id; sequence_no; secondary_sequence_no } ->
       (* pieces from the internal_commands table *)
       let%bind internal_cmd =
         query_db ~item:"blocks internal commands" ~f:(fun db ->
@@ -253,17 +241,11 @@ let fill_in_internal_commands pool block_state_hash =
       in
       let token = internal_cmd.token |> Token_id.of_string in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
-      let receiver_account_creation_fee_paid =
-        Option.map receiver_account_creation_fee_paid ~f:(fun fee ->
-            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64)
-      in
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
         ; typ
         ; receiver
-        ; receiver_account_creation_fee_paid
-        ; receiver_balance
         ; fee
         ; token
         ; hash

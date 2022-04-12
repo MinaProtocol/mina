@@ -1942,6 +1942,33 @@ module T = struct
                     (List.map ~f:List.rev detailed) )
               ] ;
         { Staged_ledger_diff.With_valid_signatures_and_proofs.diff })
+
+  let accounts_created t =
+    let scan_state = scan_state t in
+    let base_jobs =
+      Scan_state.base_jobs_on_latest_tree scan_state
+      @ Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state
+    in
+    let transactions_applied =
+      List.map base_jobs ~f:(fun { transaction_with_info; _ } ->
+          transaction_with_info.varying)
+    in
+    List.map transactions_applied ~f:(function
+      | Command (Signed_command cmd) -> (
+          match cmd.body with
+          | Payment { previous_empty_accounts } ->
+              previous_empty_accounts
+          | Stake_delegation _ ->
+              []
+          | Failed ->
+              [] )
+      | Command (Parties _) ->
+          failwith "TODO: add previous_empty_accounts for parties"
+      | Fee_transfer { previous_empty_accounts; _ } ->
+          previous_empty_accounts
+      | Coinbase { previous_empty_accounts; _ } ->
+          previous_empty_accounts)
+    |> List.concat
 end
 
 include T

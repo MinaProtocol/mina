@@ -220,3 +220,8 @@ val check_commands :
   -> User_command.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
+
+(** account ids from the previous_empty_accounts in the commands in the latest and next-to-latest
+    trees of the scan state
+*)
+val accounts_created : t -> Account_id.t list

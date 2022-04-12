@@ -103,18 +103,16 @@ module Blocks_and_internal_commands = struct
     { internal_command_id : int
     ; sequence_no : int
     ; secondary_sequence_no : int
-    ; receiver_account_creation_fee_paid : int64 option
-    ; receiver_balance_id : int
     }
   [@@deriving hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; option int64; int ]
+      Caqti_type.[ int; int; int ]
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_account_creation_fee_paid, receiver_balance
+      {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no
             FROM (blocks_internal_commands
               INNER JOIN blocks
               ON blocks.id = blocks_internal_commands.block_id)

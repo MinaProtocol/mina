@@ -8,6 +8,9 @@ open Mina_base
 type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
 
+type _ Caqti_type.field +=
+  | Array_nullable_string : string option array Caqti_type.field
+
 module Type_spec = struct
   type (_, _) t =
     | [] : (unit, unit) t
@@ -48,28 +51,29 @@ module Type_spec = struct
     Caqti_type.custom ~encode ~decode (to_rep tys)
 end
 
-(* register coding for nullable int arrays.
-   for example, the ocaml int array `[| 0; 1; 2 |]` would be encoded to
-   `'{0, 1, 2}'` for postgresql. There is no need to add the single quotes,
+(* build coding for array type that can be interpreted as a string
+
+   for example, the ocaml string array `[| "foo"; "bar"; "baz" |]` would be encoded to
+   `'{foo, bar, baz}'` for postgresql. There is no need to add the single quotes,
    as caqti does this when using a string representation.
-   type annotations are necessary for int array values in postgresql, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = '{0,1,2,...}'::int[]` *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
+   type annotations are necessary for array values in postgresql, e.g.
+   `SELECT id FROM zkapp_states WHERE element_ids = '{foo,bar,baz,...}'::string[]`
+ *)
+let make_coding (type a) ~(elem_to_string : a -> string)
+    ~(elem_of_string : string -> a) =
   let encode xs =
-    Array.map xs ~f:(Option.value_map ~f:Int.to_string ~default:"NULL")
+    Array.map xs ~f:(Option.value_map ~f:elem_to_string ~default:"NULL")
     |> String.concat_array ~sep:", "
     |> sprintf "{ %s }" |> Result.return
   in
   let decode s =
     let open Result.Let_syntax in
-    let error = "Failed to decode nullable int array" in
+    let error = "Failed to decode nullable array" in
     let decode_elem = function
       | "NULL" | "null" ->
           return None
       | elem -> (
-          try return @@ Option.some @@ Int.of_string elem
+          try return @@ Option.some @@ elem_of_string elem
           with _ -> Result.fail error )
     in
     String.chop_prefix ~prefix:"{" s
@@ -82,6 +86,15 @@ let () =
     |> String.split ~on:',' |> List.map ~f:decode_elem |> Result.all
     >>| List.to_array
   in
+  (encode, decode)
+
+(* register coding for nullable int arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Int.to_string ~elem_of_string:Int.of_string
+  in
   let get_coding : type a. _ -> a t -> a coding =
    fun _ -> function
     | Array_nullable_int ->
@@ -90,6 +103,22 @@ let () =
         assert false
   in
   define_coding Array_nullable_int { get_coding }
+
+(* register coding for nullable string arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
+  in
+  let get_coding : type a. _ -> a t -> a coding =
+   fun _ -> function
+    | Array_nullable_string ->
+        Coding { rep; encode; decode }
+    | _ ->
+        assert false
+  in
+  define_coding Array_nullable_string { get_coding }
 
 (* this type may require type annotations in queries, eg.
   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
@@ -107,6 +136,23 @@ let array_int_typ : int array Caqti_type.t =
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
+
+(* this type may require type annotations in queries, e.g.
+  `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
+*)
+let array_nullable_string_typ : string option array Caqti_type.t =
+  Caqti_type.field Array_nullable_string
+
+let array_string_typ : string array Caqti_type.t =
+  let open Result.Let_syntax in
+  let encode xs = return @@ Array.map ~f:Option.some xs in
+  let decode xs =
+    Option.all (Array.to_list xs)
+    |> Result.of_option
+         ~error:"Failed to decode string array, encountered NULL value"
+    >>| Array.of_list
+  in
+  Caqti_type.custom array_nullable_string_typ ~encode ~decode
 
 (* process a Caqti query on list of items
    if we were instead to simply map the query over the list,

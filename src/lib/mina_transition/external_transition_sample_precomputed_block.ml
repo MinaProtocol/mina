@@ -2987,7 +2987,9 @@ let sample_block_sexp =
      ()))))
  (delta_transition_chain_proof
   (3108991348073215148864502385781811212776162989653883172258224572034746506990
-   ())))
+   ()))
+ (accounts_accessed ())
+ (accounts_created ()))
 |sexp}
 
 let sample_block_json =
@@ -7244,6 +7246,8 @@ let sample_block_json =
   },
   "delta_transition_chain_proof": [
     "jxuaqW9PAALZnZjnEP1CvtRKNhYkb3Fr8ox3gGyJdtXRy7g8wWZ", []
-  ]
+  ],
+  "accounts_accessed":[],
+  "accounts_created":[]
 }
 |json}

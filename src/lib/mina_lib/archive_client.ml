@@ -69,7 +69,9 @@ let transfer ~logger ~archive_location
       Broadcast_pipe.Reader.t) =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-          let diff = Archive_lib.Diff.Builder.breadcrumb_added breadcrumb in
+          let diff =
+            Archive_lib.Diff.Builder.breadcrumb_added ~logger breadcrumb
+          in
           match%map dispatch archive_location (Transition_frontier diff) with
           | Ok () ->
               ()

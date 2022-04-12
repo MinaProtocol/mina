@@ -156,16 +156,16 @@ CREATE TABLE account_ids
 CREATE TABLE accounts_accessed
 ( ledger_index            int     NOT NULL
 , block_id                int     NOT NULL  REFERENCES blocks(id)
-, account_id              int     NOT NULL  REFERENCES account_ids(id)
+, account_id_id           int     NOT NULL  REFERENCES account_ids(id)
 , token_symbol            text    NOT NULL
 , balance                 bigint  NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
 , delegate                int               REFERENCES public_keys(id)
 , voting_for              text    NOT NULL
-, timing                  int               REFERENCES timing_info(id)
-, permissions             int     NOT NULL  REFERENCES zkapp_permissions(id)
-, zkapp                   int               REFERENCES zkapp_accounts(id)
+, timing_id               int               REFERENCES timing_info(id)
+, permissions_id          int     NOT NULL  REFERENCES zkapp_permissions(id)
+, zkapp_id                int               REFERENCES zkapp_accounts(id)
 , PRIMARY KEY (block_id,account_id)
 );
 
@@ -218,7 +218,7 @@ CREATE TABLE blocks_zkapp_commands
 , zkapp_command_id                int                 NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
 , sequence_no                     int                 NOT NULL
 , status                          user_command_status NOT NULL
-, failure_reasons                 int[]
+, failure_reasons_ids             int[]
 , PRIMARY KEY (block_id, zkapp_command_id, sequence_no)
 );
 
