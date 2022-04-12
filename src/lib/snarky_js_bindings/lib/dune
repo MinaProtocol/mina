@@ -8,6 +8,7 @@
    integers
    sexplib0
    yojson
+   ppx_deriving_yojson.runtime
    ;; local libraries ;;
    mina_base
    mina_base.import
@@ -20,17 +21,20 @@
    kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.common
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    block_time
    currency
    data_hash_lib
    fields_derivers
-   fields_derivers_snapps
+   fields_derivers_zkapps
    genesis_constants
    mina_numbers
    mina_transaction
    mina_transaction_logic
    random_oracle
+   random_oracle_input
    sgn
    signature_lib
    snark_keys_header

@@ -25,7 +25,7 @@ module type Inputs_intf = sig
 
     type t
 
-    val wrap : t -> Kimchi.Protocol.wire -> Kimchi.Protocol.wire -> unit
+    val wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
   end
 
   module Urs : sig
@@ -81,7 +81,7 @@ module type Inputs_intf = sig
       ( Scalar_field.t
       , Urs.t
       , Poly_comm.Backend.t )
-      Kimchi.Protocol.VerifierIndex.verifier_index
+      Kimchi_types.VerifierIndex.verifier_index
 
     val create : Index.t -> t
   end
@@ -176,10 +176,10 @@ module Make (Inputs : Inputs_intf) = struct
           assert false
     in
     { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Permuts.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
           ~f:(fun i -> g t.evals.sigma_comm.(i))
     ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Columns.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
           ~f:(fun i -> g t.evals.coefficients_comm.(i))
     ; generic_comm = g t.evals.generic_comm
     ; psm_comm = g t.evals.psm_comm

@@ -26,9 +26,9 @@ let%test_module "Initialize state test" =
         , p_module
         , Pickles.Provers.[ initialize_prover; update_state_prover; _ ] ) =
       Pickles.compile ~cache:Cache_dir.cache
-        (module Snapp_statement.Checked)
-        (module Snapp_statement)
-        ~typ:Snapp_statement.typ
+        (module Zkapp_statement.Checked)
+        (module Zkapp_statement)
+        ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N3)
         ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"empty_update"
@@ -46,30 +46,28 @@ let%test_module "Initialize state test" =
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
     module Deploy_party = struct
-      let party_body : Party.Predicated.t =
-        { body =
-            { Party.Body.dummy with
-              public_key = pk_compressed
-            ; update =
-                { Party.Update.dummy with
-                  verification_key =
-                    Set
-                      { data = vk
-                      ; hash =
-                          (* TODO: This function should live in
-                             [Side_loaded_verification_key].
-                          *)
-                          Snapp_account.digest_vk vk
-                      }
-                }
-            ; use_full_commitment = true
+      let party_body : Party.Body.t =
+        { Party.Body.dummy with
+          public_key = pk_compressed
+        ; update =
+            { Party.Update.dummy with
+              verification_key =
+                Set
+                  { data = vk
+                  ; hash =
+                      (* TODO: This function should live in
+                         [Side_loaded_verification_key].
+                      *)
+                      Zkapp_account.digest_vk vk
+                  }
             }
-        ; predicate = Accept
+        ; use_full_commitment = true
+        ; account_precondition = Accept
         }
 
       let party : Party.t =
         (* TODO: This is a pain. *)
-        { data = party_body; authorization = Signature Signature.dummy }
+        { body = party_body; authorization = Signature Signature.dummy }
     end
 
     module Initialize_party = struct
@@ -79,12 +77,12 @@ let%test_module "Initialize state test" =
       let party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             initialize_prover []
-              { transaction = Party.Predicated.digest party_body
+              { transaction = Party.Body.digest party_body
               ; at_party = Parties.Call_forest.empty
               })
 
       let party : Party.t =
-        { data = party_body; authorization = Proof party_proof }
+        { body = party_body; authorization = Proof party_proof }
     end
 
     module Update_state_party = struct
@@ -99,22 +97,22 @@ let%test_module "Initialize state test" =
             update_state_prover
               ~handler:(Zkapps_initialize_state.update_state_handler new_state)
               []
-              { transaction = Party.Predicated.digest party_body
+              { transaction = Party.Body.digest party_body
               ; at_party = Parties.Call_forest.empty
               })
 
       let party : Party.t =
-        { data = party_body; authorization = Proof party_proof }
+        { body = party_body; authorization = Proof party_proof }
     end
 
-    let protocol_state = Snapp_predicate.Protocol_state.accept
+    let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 
     let test_parties parties =
       let ps =
         (* TODO: This is a pain. *)
         Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-          (List.map parties ~f:(fun party -> party.Party.data))
+          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          parties
         |> Parties.Call_forest.accumulate_hashes_predicated
       in
       let memo = Signed_command_memo.empty in
@@ -122,33 +120,29 @@ let%test_module "Initialize state test" =
         (* TODO: This is a pain. *)
         let other_parties_hash = Parties.Call_forest.hash ps in
         let protocol_state_predicate_hash =
-          Snapp_predicate.Protocol_state.digest protocol_state
+          Zkapp_precondition.Protocol_state.digest protocol_state_precondition
         in
         let memo_hash = Signed_command_memo.hash memo in
         Parties.Transaction_commitment.create ~other_parties_hash
           ~protocol_state_predicate_hash ~memo_hash
       in
       let fee_payer_body =
-        { Party.Predicated.Fee_payer.dummy with
-          body =
-            { Party.Body.Fee_payer.dummy with
-              public_key = pk_compressed
-            ; balance_change = Currency.Fee.(of_int 100)
-            ; protocol_state
-            }
+        { Party.Body.Fee_payer.dummy with
+          public_key = pk_compressed
+        ; balance_change = Currency.Fee.(of_int 100)
+        ; protocol_state_precondition
         }
       in
       let full_commitment =
         Parties.Transaction_commitment.with_fee_payer transaction_commitment
           ~fee_payer_hash:
-            (Party.Predicated.digest
-               (Party.Predicated.of_fee_payer fee_payer_body))
+            (Party.Body.digest (Party.Body.of_fee_payer fee_payer_body))
       in
       let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
           =
         let fee_payer =
           match fee_payer with
-          | { data = { body = { public_key; _ }; _ }; _ }
+          | { body = { public_key; _ }; _ }
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
@@ -160,7 +154,7 @@ let%test_module "Initialize state test" =
         in
         let other_parties =
           List.map other_parties ~f:(function
-            | { data = { body = { public_key; use_full_commitment; _ }; _ }
+            | { body = { public_key; use_full_commitment; _ }
               ; authorization = Signature _
               } as party
               when Public_key.Compressed.equal public_key pk_compressed ->
@@ -182,7 +176,7 @@ let%test_module "Initialize state test" =
       let parties : Parties.t =
         sign_all
           { fee_payer =
-              { data = fee_payer_body; authorization = Signature.dummy }
+              { body = fee_payer_body; authorization = Signature.dummy }
           ; other_parties = parties
           ; memo
           }
@@ -197,17 +191,17 @@ let%test_module "Initialize state test" =
             Ledger.get_or_create_account ledger account_id account
             |> Or_error.ok_exn
           in
-          let (), () = apply_parties ledger [ parties ] in
+          let () = apply_parties ledger [ parties ] in
           Ledger.get ledger loc |> Option.value_exn)
 
     let%test_unit "Initialize" =
       let account =
         test_parties [ Deploy_party.party; Initialize_party.party ]
       in
-      let snapp_state = (Option.value_exn account.snapp).app_state in
+      let zkapp_state = (Option.value_exn account.zkapp).app_state in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
-        snapp_state
+        zkapp_state
 
     let%test_unit "Initialize and update" =
       let account =
@@ -217,10 +211,10 @@ let%test_module "Initialize state test" =
           ; Update_state_party.party
           ]
       in
-      let snapp_state = (Option.value_exn account.snapp).app_state in
+      let zkapp_state = (Option.value_exn account.zkapp).app_state in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
-        snapp_state
+        zkapp_state
 
     let%test_unit "Initialize and multiple update" =
       let account =
@@ -231,23 +225,23 @@ let%test_module "Initialize state test" =
           ; Update_state_party.party
           ]
       in
-      let snapp_state = (Option.value_exn account.snapp).app_state in
+      let zkapp_state = (Option.value_exn account.zkapp).app_state in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
-        snapp_state
+        zkapp_state
 
     let%test_unit "Update without initialize fails" =
       let account =
         test_parties [ Deploy_party.party; Update_state_party.party ]
       in
-      assert (Option.is_none account.snapp)
+      assert (Option.is_none account.zkapp)
 
     let%test_unit "Double initialize fails" =
       let account =
         test_parties
           [ Deploy_party.party; Initialize_party.party; Initialize_party.party ]
       in
-      assert (Option.is_none account.snapp)
+      assert (Option.is_none account.zkapp)
 
     let%test_unit "Initialize after update fails" =
       let account =
@@ -258,5 +252,5 @@ let%test_module "Initialize state test" =
           ; Initialize_party.party
           ]
       in
-      assert (Option.is_none account.snapp)
+      assert (Option.is_none account.zkapp)
   end )

@@ -175,7 +175,7 @@ module Network_config = struct
               ; set_delegate = None
               ; set_permissions = None
               ; set_verification_key = None
-              ; set_snapp_uri = None
+              ; set_zkapp_uri = None
               ; edit_sequence_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
@@ -268,7 +268,7 @@ module Network_config = struct
     in
     let mina_archive_schema_aux_files =
       [ mina_archive_base_url ^ "create_schema.sql"
-      ; mina_archive_base_url ^ "snapp_tables.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
       ]
     in
     let mk_net_keypair index (pk, sk) =

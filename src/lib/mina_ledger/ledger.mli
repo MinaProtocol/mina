@@ -210,14 +210,14 @@ val apply_coinbase :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
 val apply_parties_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
@@ -247,7 +247,7 @@ val has_locked_tokens :
 
 val merkle_root_after_parties_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Parties.Valid.t
   -> Ledger_hash.t
@@ -264,17 +264,6 @@ val create_empty_exn : t -> Account_id.t -> Path.t * Account.t
 
 val num_accounts : t -> int
 
-(** Generate an initial ledger state. There can't be a regular Quickcheck
-    generator for this type because you need to detach a mask from it's parent
-    when you're done with it - the GC doesn't take care of that. *)
-val gen_initial_ledger_state :
-  ( Signature_lib.Keypair.t
-  * Currency.Amount.t
-  * Mina_numbers.Account_nonce.t
-  * Account_timing.t )
-  array
-  Quickcheck.Generator.t
-
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
@@ -282,6 +271,11 @@ type init_state =
   * Account_timing.t )
   array
 [@@deriving sexp_of]
+
+(** Generate an initial ledger state. There can't be a regular Quickcheck
+    generator for this type because you need to detach a mask from it's parent
+    when you're done with it - the GC doesn't take care of that. *)
+val gen_initial_ledger_state : init_state Quickcheck.Generator.t
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit

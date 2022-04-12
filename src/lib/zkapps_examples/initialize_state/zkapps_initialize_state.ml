@@ -56,7 +56,7 @@ let update_state public_key =
       party |> Party_under_construction.In_circuit.assert_state_proved
       |> Party_under_construction.In_circuit.set_full_state new_state)
 
-let main_value ([] : _ H1.T(Id).t) (_ : Snapp_statement.t) :
+let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
     _ H1.T(E01(Core_kernel.Bool)).t =
   []
 

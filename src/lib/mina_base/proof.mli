@@ -12,5 +12,9 @@ module Stable : sig
 
   module V2 : sig
     type nonrec t = t [@@deriving compare, sexp, yojson]
+
+    val to_yojson_full : t -> Yojson.Safe.t
   end
 end]
+
+val to_yojson_full : t -> Yojson.Safe.t

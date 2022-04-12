@@ -7,7 +7,7 @@
    ;; local libraries
    crypto_params
    currency
-   kimchi
+   pasta_bindings
    kimchi_backend
    kimchi_backend_common
    kimchi_pasta

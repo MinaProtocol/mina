@@ -44,6 +44,7 @@
    mina_metrics
    syncable_ledger
    mina_ledger
+   transition_handler
    o1trace
  )
  (inline_tests)

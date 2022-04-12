@@ -15,7 +15,7 @@
    currency
    data_hash_lib
    genesis_constants
-   kimchi
+   pasta_bindings
    kimchi_backend
    kimchi_pasta
    merkle_ledger

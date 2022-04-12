@@ -16,7 +16,7 @@ let main public_key =
 (* TODO: This shouldn't exist, the circuit should just return the requisite
          values.
 *)
-let main_value ([] : _ H1.T(Id).t) (_ : Snapp_statement.t) :
+let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
     _ H1.T(E01(Core_kernel.Bool)).t =
   []
 

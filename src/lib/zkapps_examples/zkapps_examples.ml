@@ -11,9 +11,9 @@ module Party_under_construction = struct
 
     let create () = { state_proved = None }
 
-    let to_predicate ({ state_proved } : t) : Snapp_predicate.Account.t =
+    let to_predicate ({ state_proved } : t) : Zkapp_precondition.Account.t =
       (* TODO: Don't do this. *)
-      let default : Snapp_predicate.Account.t =
+      let default : Zkapp_precondition.Account.t =
         { balance = Ignore
         ; nonce = Ignore
         ; receipt_chain_hash = Ignore
@@ -30,7 +30,7 @@ module Party_under_construction = struct
         | None ->
             default.proved_state
         | Some state_proved ->
-            Snapp_basic.Or_ignore.Check state_proved
+            Zkapp_basic.Or_ignore.Check state_proved
       in
       { default with proved_state }
 
@@ -52,7 +52,7 @@ module Party_under_construction = struct
   end
 
   module Update = struct
-    type t = { app_state : Field.Constant.t option Snapp_state.V.t }
+    type t = { app_state : Field.Constant.t option Zkapp_state.V.t }
 
     let create () =
       { app_state = [ None; None; None; None; None; None; None; None ] }
@@ -63,14 +63,14 @@ module Party_under_construction = struct
         ; delegate = Keep
         ; verification_key = Keep
         ; permissions = Keep
-        ; snapp_uri = Keep
+        ; zkapp_uri = Keep
         ; token_symbol = Keep
         ; timing = Keep
         ; voting_for = Keep
         }
       in
       let app_state =
-        Pickles_types.Vector.map ~f:Snapp_basic.Set_or_keep.of_option app_state
+        Pickles_types.Vector.map ~f:Zkapp_basic.Set_or_keep.of_option app_state
       in
       { default with app_state }
 
@@ -106,46 +106,45 @@ module Party_under_construction = struct
     ; update = Update.create ()
     }
 
-  let to_party (t : t) : Party.Predicated.t =
-    { body =
-        { public_key = t.public_key
-        ; token_id = t.token_id
-        ; update = Update.to_parties_update t.update
-        ; balance_change = { magnitude = Amount.zero; sgn = Pos }
-        ; increment_nonce = false
-        ; events = []
-        ; sequence_events = []
-        ; call_data = Field.Constant.zero
-        ; call_depth = 0
-        ; protocol_state =
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
+  let to_party (t : t) : Party.Body.t =
+    { public_key = t.public_key
+    ; token_id = t.token_id
+    ; update = Update.to_parties_update t.update
+    ; balance_change = { magnitude = Amount.zero; sgn = Pos }
+    ; increment_nonce = false
+    ; events = []
+    ; sequence_events = []
+    ; call_data = Field.Constant.zero
+    ; call_depth = 0
+    ; protocol_state_precondition =
+        { snarked_ledger_hash = Ignore
+        ; timestamp = Ignore
+        ; blockchain_length = Ignore
+        ; min_window_density = Ignore
+        ; last_vrf_output = ()
+        ; total_currency = Ignore
+        ; global_slot_since_hard_fork = Ignore
+        ; global_slot_since_genesis = Ignore
+        ; staking_epoch_data =
+            { ledger =
+                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+            ; seed = Ignore
+            ; start_checkpoint = Ignore
+            ; lock_checkpoint = Ignore
+            ; epoch_length = Ignore
             }
-        ; use_full_commitment = false
+        ; next_epoch_data =
+            { ledger =
+                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+            ; seed = Ignore
+            ; start_checkpoint = Ignore
+            ; lock_checkpoint = Ignore
+            ; epoch_length = Ignore
+            }
         }
-    ; predicate = Full (Account_condition.to_predicate t.account_condition)
+    ; use_full_commitment = false
+    ; account_precondition =
+        Full (Account_condition.to_predicate t.account_condition)
     }
 
   let assert_state_unproved (t : t) =
@@ -170,14 +169,15 @@ module Party_under_construction = struct
       let create () = { state_proved = None }
 
       let to_predicate ({ state_proved } : t) :
-          Snapp_predicate.Account.Checked.t =
+          Zkapp_precondition.Account.Checked.t =
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
           Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.constant
         in
         let default =
-          var_of_t (Party.Predicate.typ ())
+          var_of_t
+            (Party.Account_precondition.typ ())
             (Full
                { balance = Ignore
                ; nonce = Ignore
@@ -204,7 +204,7 @@ module Party_under_construction = struct
           | None ->
               default.proved_state
           | Some state_proved ->
-              Snapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
+              Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
                 state_proved
         in
         { default with proved_state }
@@ -227,7 +227,7 @@ module Party_under_construction = struct
     end
 
     module Update = struct
-      type t = { app_state : Field.t option Snapp_state.V.t }
+      type t = { app_state : Field.t option Zkapp_state.V.t }
 
       let create () =
         { app_state = [ None; None; None; None; None; None; None; None ] }
@@ -244,7 +244,7 @@ module Party_under_construction = struct
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
-            ; snapp_uri = Keep
+            ; zkapp_uri = Keep
             ; token_symbol = Keep
             ; timing = Keep
             ; voting_for = Keep
@@ -256,9 +256,9 @@ module Party_under_construction = struct
                 (* TODO: Shouldn't need to know that the dummy is Field.zero
                    here. Functor, perhaps?
                 *)
-                Snapp_basic.Set_or_keep.Checked.keep ~dummy:Field.zero
+                Zkapp_basic.Set_or_keep.Checked.keep ~dummy:Field.zero
             | Some x ->
-                Snapp_basic.Set_or_keep.Checked.set x)
+                Zkapp_basic.Set_or_keep.Checked.set x)
         in
         { default with app_state }
 
@@ -295,57 +295,52 @@ module Party_under_construction = struct
       ; update = Update.create ()
       }
 
-    let to_party (t : t) : Party.Predicated.Checked.t =
+    let to_party (t : t) : Party.Body.Checked.t =
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
         Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.constant
       in
-      { body =
-          { public_key = t.public_key
-          ; token_id = t.token_id
-          ; update = Update.to_parties_update t.update
-          ; balance_change =
-              var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
-          ; increment_nonce = Boolean.false_
-          ; events = var_of_t Snapp_account.Events.typ []
-          ; sequence_events = var_of_t Snapp_account.Events.typ []
-          ; call_data = Field.zero
-          ; call_depth = As_prover.Ref.create (fun () -> 0)
-          ; protocol_state =
-              var_of_t Snapp_predicate.Protocol_state.typ
-                { snarked_ledger_hash = Ignore
-                ; timestamp = Ignore
-                ; blockchain_length = Ignore
-                ; min_window_density = Ignore
-                ; last_vrf_output = ()
-                ; total_currency = Ignore
-                ; global_slot_since_hard_fork = Ignore
-                ; global_slot_since_genesis = Ignore
-                ; staking_epoch_data =
-                    { ledger =
-                        { Epoch_ledger.Poly.hash = Ignore
-                        ; total_currency = Ignore
-                        }
-                    ; seed = Ignore
-                    ; start_checkpoint = Ignore
-                    ; lock_checkpoint = Ignore
-                    ; epoch_length = Ignore
-                    }
-                ; next_epoch_data =
-                    { ledger =
-                        { Epoch_ledger.Poly.hash = Ignore
-                        ; total_currency = Ignore
-                        }
-                    ; seed = Ignore
-                    ; start_checkpoint = Ignore
-                    ; lock_checkpoint = Ignore
-                    ; epoch_length = Ignore
-                    }
+      { public_key = t.public_key
+      ; token_id = t.token_id
+      ; update = Update.to_parties_update t.update
+      ; balance_change =
+          var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
+      ; increment_nonce = Boolean.false_
+      ; events = var_of_t Zkapp_account.Events.typ []
+      ; sequence_events = var_of_t Zkapp_account.Events.typ []
+      ; call_data = Field.zero
+      ; call_depth = As_prover.Ref.create (fun () -> 0)
+      ; protocol_state_precondition =
+          var_of_t Zkapp_precondition.Protocol_state.typ
+            { snarked_ledger_hash = Ignore
+            ; timestamp = Ignore
+            ; blockchain_length = Ignore
+            ; min_window_density = Ignore
+            ; last_vrf_output = ()
+            ; total_currency = Ignore
+            ; global_slot_since_hard_fork = Ignore
+            ; global_slot_since_genesis = Ignore
+            ; staking_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
                 }
-          ; use_full_commitment = Boolean.false_
-          }
-      ; predicate = Account_condition.to_predicate t.account_condition
+            ; next_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
+            }
+      ; use_full_commitment = Boolean.false_
+      ; account_precondition =
+          Account_condition.to_predicate t.account_condition
       }
 
     let assert_state_unproved (t : t) =
@@ -382,7 +377,7 @@ let dummy_constraints () =
     ( Pickles.Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
       : Pickles.Step_main_inputs.Inner_curve.t ) ;
   ignore
-    ( Pickles.Pairing_main.Scalar_challenge.endo g ~num_bits:4
+    ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
@@ -390,12 +385,12 @@ let dummy_constraints () =
          Modify snarky to do this.
 *)
 let party_circuit f ([] : _ H1.T(Id).t)
-    ({ transaction; at_party } : Snapp_statement.Checked.t) :
+    ({ transaction; at_party } : Zkapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Predicated.Checked.digest party in
+  let returned_transaction = Party.Checked.digest party in
   let returned_at_party =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
