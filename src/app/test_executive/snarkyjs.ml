@@ -102,7 +102,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Mina_base.Parties.of_json (Yojson.Safe.from_string parties_contract_str)
       in
       let%bind () = Deferred.return unit_with_error in
+      let%bind () = send_zkapp ~logger node parties_contract in
       (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
+      (*
       let uri = Network.Node.graphql_uri node in
       let parties_query = Lazy.force Mina_base.Parties.inner_query in
       let%bind.Deferred () =
@@ -116,6 +118,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let%map _stdout = wait_and_stdout ~logger process in
         ()
       in
+      *)
       return parties_contract
     in
     let%bind parties_deploy_contract = make_sign_and_send `Deploy in
