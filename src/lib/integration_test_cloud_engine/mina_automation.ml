@@ -114,7 +114,9 @@ module Network_config = struct
       failwith
         "not enough sample keypairs for specified number of block producers" ;
     let extra_accounts =
-      List.map (List.zip_exn extra_genesis_accounts extra_keypairs)
+      List.map
+        (List.zip_exn extra_genesis_accounts
+           (List.take extra_keypairs (List.length extra_genesis_accounts)))
         ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
           let timing =
             match timing with
