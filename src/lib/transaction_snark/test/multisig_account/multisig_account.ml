@@ -363,7 +363,6 @@ let%test_module "multisig_account" =
                 ; authorization = Signature Signature.dummy
                 }
               in
-              let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
@@ -372,15 +371,9 @@ let%test_module "multisig_account" =
                 |> Parties.Call_forest.accumulate_hashes_predicated
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
-              let protocol_state_predicate_hash =
-                (*FIXME: is this ok? *)
-                Zkapp_precondition.Protocol_state.digest protocol_state
-              in
               let transaction : Parties.Transaction_commitment.t =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
-                  ~protocol_state_predicate_hash
-                  ~memo_hash:(Signed_command_memo.hash memo)
               in
               let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
@@ -417,7 +410,8 @@ let%test_module "multisig_account" =
               in
               let fee_payer =
                 let txn_comm =
-                  Parties.Transaction_commitment.with_fee_payer transaction
+                  Parties.Transaction_commitment.create_complete transaction
+                    ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
                 in
                 { fee_payer with
