@@ -106,6 +106,8 @@ if (
   throw Error("Inconsistent fee payer signature");
 toc();
 
+feePayerNonce++;
+
 // sign update txn
 tic("sign update transaction");
 let signedUpdate = client.signTransaction(
@@ -114,7 +116,7 @@ let signedUpdate = client.signTransaction(
     feePayer: {
       feePayer: feePayerAddress,
       fee: `${transactionFee}`,
-      nonce: feePayerNonce++,
+      nonce: feePayerNonce,
     },
   },
   feePayerKey
@@ -135,7 +137,5 @@ if (
 toc();
 
 console.log("success! created and signed two transactions.");
-console.log(signedDeploy.data.parties);
-console.log(signedUpdate.data.parties);
 
 shutdown();
