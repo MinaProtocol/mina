@@ -119,10 +119,11 @@ module Network_config = struct
       failwith
         "not enough sample keypairs for specified number of extra keypairs" ;
     assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+    let extra_keypairs_cut =
+      List.take extra_keypairs (List.length extra_genesis_accounts)
+    in
     let extra_accounts =
-      List.map
-        (List.zip_exn extra_genesis_accounts
-           (List.take extra_keypairs (List.length extra_genesis_accounts)))
+      List.map (List.zip_exn extra_genesis_accounts extra_keypairs_cut)
         ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, sk)) ->
           let timing =
             match timing with
@@ -253,7 +254,7 @@ module Network_config = struct
       Network_keypair.create_network_keypair ~keypair ~secret_name
     in
     let extra_genesis_net_keypairs =
-      List.mapi extra_keypairs ~f:mk_net_keypair
+      List.mapi extra_keypairs_cut ~f:mk_net_keypair
     in
     let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
