@@ -78,8 +78,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.extra_genesis_keypairs network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_int 100_000_000_000 in
-    let fee = Currency.Fee.of_int 1_000_000_000 in
+    let amount = Currency.Amount.of_string "10" in
+    let fee = Currency.Fee.of_string "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
       fish1.public_key |> Signature_lib.Public_key.compress
