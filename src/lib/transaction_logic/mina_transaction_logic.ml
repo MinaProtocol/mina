@@ -63,6 +63,7 @@ module Transaction_applied = struct
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V2.t
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -206,6 +207,7 @@ module type S = sig
       type t = Transaction_applied.Parties_applied.t =
         { accounts : (Account_id.t * Account.t option) list
         ; command : Parties.t With_status.t
+        ; previous_empty_accounts : Account_id.t list
         }
       [@@deriving sexp]
     end
@@ -1642,6 +1644,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     | Error e ->
         Error e
     | Ok (s, failure_status_tbl) ->
+        let account_ids_originally_not_in_ledger =
+          List.filter_map original_account_states
+            ~f:(fun (acct_id, loc_and_acct) ->
+              if Option.is_none loc_and_acct then Some acct_id else None)
+        in
+        (* accounts not originally in ledger, now present in ledger *)
+        let previous_empty_accounts =
+          List.filter_map account_ids_originally_not_in_ledger
+            ~f:(fun acct_id ->
+              Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
+                  acct_id))
+        in
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
@@ -1654,6 +1668,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                     then Applied
                     else Failed failure_status_tbl )
                 }
+            ; previous_empty_accounts
             }
           , s )
 
@@ -2009,7 +2024,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         failwith "Transaction_applied/command mismatch"
 
   let undo_parties ~constraint_constants:_ ledger
-      { Transaction_applied.Parties_applied.accounts; command = _ } =
+      { Transaction_applied.Parties_applied.accounts; _ } =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
           match a with Some a -> `Fst (id, a) | None -> `Snd id)
