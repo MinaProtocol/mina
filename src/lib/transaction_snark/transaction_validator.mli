@@ -1,7 +1,8 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
-module Hashless_ledger : Transaction_logic.Ledger_intf
+module Hashless_ledger : Ledger_intf.S
 
 val create : Mina_ledger.Ledger.t -> Hashless_ledger.t
 
@@ -14,7 +15,7 @@ val apply_user_command :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> Hashless_ledger.t
   -> Transaction.t
   -> Transaction_status.t Or_error.t

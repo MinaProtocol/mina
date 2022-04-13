@@ -20,12 +20,15 @@ module Poly = struct
   end]
 end
 
-let hash_abstract ~hash_body
+let hashes_abstract ~hash_body
     ({ previous_state_hash; body } : (State_hash.t, _) Poly.t) =
-  let body : State_body_hash.t = hash_body body in
-  Random_oracle.hash ~init:Hash_prefix.protocol_state
-    [| (previous_state_hash :> Field.t); (body :> Field.t) |]
-  |> State_hash.of_hash
+  let state_body_hash : State_body_hash.t = hash_body body in
+  let state_hash =
+    Random_oracle.hash ~init:Hash_prefix.protocol_state
+      [| (previous_state_hash :> Field.t); (state_body_hash :> Field.t) |]
+    |> State_hash.of_hash
+  in
+  { State_hash.State_hashes.state_hash; state_body_hash = Some state_body_hash }
 
 module Body = struct
   module Poly = struct
@@ -56,22 +59,6 @@ module Body = struct
         [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          ( State_hash.Stable.V1.t
-          , Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
-
-        let to_latest (t : t) : V2.t =
-          { t with
-            blockchain_state =
-              Blockchain_state.Value.Stable.V1.to_latest t.blockchain_state
-          }
       end
     end]
   end
@@ -139,12 +126,11 @@ module Body = struct
 
   let consensus_state { Poly.consensus_state; _ } = consensus_state
 
-  let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
+  let view_checked (t : var) : Zkapp_precondition.Protocol_state.View.Checked.t
+      =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger
-    ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length_var cs
     ; min_window_density = C.min_window_density_var cs
@@ -163,12 +149,10 @@ module Body = struct
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
 
-  let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
+  let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger
-    ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length cs
     ; min_window_density = C.min_window_density cs
@@ -179,6 +163,11 @@ module Body = struct
     ; staking_epoch_data = C.staking_epoch_data cs
     ; next_epoch_data = C.next_epoch_data cs
     }
+
+  module For_tests = struct
+    let with_consensus_state (t : Value.t) consensus_state =
+      { t with consensus_state }
+  end
 end
 
 module Value = struct
@@ -189,14 +178,6 @@ module Value = struct
       [@@deriving sexp, hash, compare, equal, yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, hash, compare, equal, yojson]
-
-      let to_latest (t : t) : V2.t =
-        { t with body = Body.Value.Stable.V1.to_latest t.body }
     end
   end]
 
@@ -283,17 +264,22 @@ let genesis_state_hash_checked ~state_hash state =
 
 [%%endif]
 
-let hash = hash_abstract ~hash_body:Body.hash
+let hashes = hashes_abstract ~hash_body:Body.hash
 
-let hash_with_body t ~body_hash =
-  hash_abstract ~hash_body:Fn.id
+let hashes_with_body t ~body_hash =
+  hashes_abstract ~hash_body:Fn.id
     { Poly.previous_state_hash = t.Poly.previous_state_hash; body = body_hash }
 
 let genesis_state_hash ?(state_hash = None) state =
   (*If this is the genesis state then simply return its hash
     otherwise return its the genesis_state_hash*)
   if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
-  then match state_hash with None -> hash state | Some hash -> hash
+  then
+    match state_hash with
+    | None ->
+        (hashes state).state_hash
+    | Some hash ->
+        hash
   else state.body.genesis_state_hash
 
 [%%if call_logger]
@@ -314,9 +300,6 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
             ~consensus_constants
             ~genesis_ledger_hash:
               (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
-            ~snarked_next_available_token:
-              (Mina_ledger.Ledger.next_available_token
-                 (Lazy.force genesis_ledger))
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger

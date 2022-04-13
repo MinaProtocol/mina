@@ -31,21 +31,6 @@ module Value = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Blockchain_state.Value.Stable.V1.t
-        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
-        , Pending_coinbase.Update.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-
-      let to_latest (t : t) : V2.t =
-        { t with
-          blockchain_state =
-            Blockchain_state.Value.Stable.V1.to_latest t.blockchain_state
-        }
-    end
   end]
 end
 
@@ -74,8 +59,6 @@ let genesis ~constraint_constants ~consensus_constants ~genesis_ledger : value =
   { Poly.blockchain_state =
       Blockchain_state.genesis ~constraint_constants ~consensus_constants
         ~genesis_ledger_hash:(Mina_ledger.Ledger.merkle_root genesis_ledger)
-        ~snarked_next_available_token:
-          (Mina_ledger.Ledger.next_available_token genesis_ledger)
   ; consensus_transition = Consensus.Data.Consensus_transition.genesis
   ; pending_coinbase_update = Pending_coinbase.Update.genesis
   }

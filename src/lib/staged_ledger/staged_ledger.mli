@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 
@@ -48,8 +49,10 @@ module Scan_state : sig
   (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
   val check_required_protocol_states :
        t
-    -> protocol_states:Mina_state.Protocol_state.value list
-    -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
+    -> protocol_states:
+         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+    -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+       Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -122,7 +125,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -140,7 +143,7 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -163,7 +166,7 @@ val create_diff :
   -> t
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

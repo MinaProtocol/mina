@@ -2,8 +2,17 @@
  (name sgn)
  (public_name sgn_nonconsensus)
  (library_flags -linkall)
- (libraries sgn_type snark_params_nonconsensus core_kernel ppx_deriving_yojson.runtime
-            yojson)
+ (libraries
+   ;;opam libraries
+   bin_prot.shape
+   sexplib0
+   core_kernel
+   base
+   base.caml
+   ;;local libraries
+   snark_params_nonconsensus
+   sgn_type
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_compare ppx_deriving_yojson))

@@ -48,7 +48,7 @@ module type Inputs_intf = sig
       include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = Base_field.t Kimchi.Foundations.or_infinity
+        type t = Base_field.t Kimchi_types.or_infinity
       end
 
       val of_backend :
@@ -63,7 +63,7 @@ module type Inputs_intf = sig
     type t = Base_field.t Poly_comm.t
 
     module Backend : sig
-      type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
+      type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
     end
 
     val of_backend_with_degree_bound : Backend.t -> t
@@ -74,12 +74,11 @@ module type Inputs_intf = sig
   end
 
   module Opening_proof_backend : sig
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
   end
 
   module Evaluations_backend : sig
-    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
+    type t = Scalar_field.t Kimchi_types.proof_evaluations
   end
 
   module Index : sig
@@ -91,8 +90,7 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.prover_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.prover_proof
 
     val create :
          Index.t
@@ -108,11 +106,11 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Deferred.t
+      -> t Promise.t
 
     val verify : Verifier_index.t -> t -> bool
 
-    val batch_verify : Verifier_index.t array -> t array -> bool Deferred.t
+    val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
   end
 end
 
@@ -164,25 +162,24 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
           , Fq.Stable.V1.t array )
-          Pickles_types.Dlog_plonk_types.Proof.Stable.V2.t
+          Pickles_types.Plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let id = "plong_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
-             messages:
-               G.Affine.t Pickles_types.Dlog_plonk_types.Messages.Stable.V2.t
+             messages:G.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
                , Fq.t array )
-               Pickles_types.Dlog_plonk_types.Openings.Stable.V2.t
+               Pickles_types.Plonk_types.Openings.Stable.V2.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Dlog_plonk_types.Proof in
+          let open Pickles_types.Plonk_types.Proof in
           { messages; openings }
       end
 
@@ -225,7 +222,7 @@ module Make (Inputs : Inputs_intf) = struct
       (g g1, g g2)
     in
     let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
-    { Pickles_types.Dlog_plonk_types.Openings.Bulletproof.lr =
+    { Pickles_types.Plonk_types.Openings.Bulletproof.lr =
         Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
@@ -239,7 +236,7 @@ module Make (Inputs : Inputs_intf) = struct
       (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
-             Pickles_types.Dlog_plonk_types.Evals.
+             Pickles_types.Plonk_types.Evals.
                { w = tuple15_to_vec e.w
                ; z = e.z
                ; s = tuple6_to_vec e.s
@@ -266,7 +263,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
 
   let eval_to_backend
-      { Pickles_types.Dlog_plonk_types.Evals.w
+      { Pickles_types.Plonk_types.Evals.w
       ; z
       ; s
       ; generic_selector
@@ -309,8 +306,8 @@ module Make (Inputs : Inputs_intf) = struct
         Array.of_list_map chal_polys
           ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
             ( challenges
-            , { Kimchi.Protocol.shifted = None
-              ; unshifted = [| Kimchi.Foundations.Finite (x, y) |]
+            , { Kimchi_types.shifted = None
+              ; unshifted = [| Kimchi_types.Finite (x, y) |]
               } ))
     }
 
@@ -348,7 +345,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Deferred res =
+    let%map.Promise res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res

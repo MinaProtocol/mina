@@ -110,14 +110,13 @@ module Json_layout = struct
         end
 
         type t =
-          { stake : bool [@default false]
-          ; edit_state : Auth_required.t [@default None]
+          { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
-          ; set_snapp_uri : Auth_required.t [@default None]
+          ; set_zkapp_uri : Auth_required.t [@default None]
           ; edit_sequence_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
@@ -126,14 +125,13 @@ module Json_layout = struct
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
-          [| "stake"
-           ; "edit_state"
+          [| "edit_state"
            ; "send"
            ; "receive"
            ; "set_delegate"
            ; "set_permissions"
            ; "set_verification_key"
-           ; "set_snapp_uri"
+           ; "set_zkapp_uri"
            ; "edit_sequence_state"
            ; "set_token_symbol"
            ; "increment_nonce"
@@ -157,7 +155,7 @@ module Json_layout = struct
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
-      module Snapp_account = struct
+      module Zkapp_account = struct
         module Field = struct
           type t = Snark_params.Tick.Field.t
           [@@deriving sexp, bin_io_unversioned]
@@ -172,7 +170,7 @@ module Json_layout = struct
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
                 Error
-                  "Invalid JSON in runtime config Snapp_account.state, \
+                  "Invalid JSON in runtime config Zkapp_account.state, \
                    expected string"
         end
 
@@ -195,22 +193,22 @@ module Json_layout = struct
             | _ ->
                 Error
                   "Invalid JSON in runtime config \
-                   Snapp_account.verification_key, expected string"
+                   Zkapp_account.verification_key, expected string"
         end
 
-        module Snapp_version = struct
-          type t = Mina_numbers.Snapp_version.Stable.Latest.t
+        module Zkapp_version = struct
+          type t = Mina_numbers.Zkapp_version.Stable.Latest.t
           [@@deriving bin_io_unversioned]
 
           include (
-            Mina_numbers.Snapp_version :
-              module type of Mina_numbers.Snapp_version with type t := t )
+            Mina_numbers.Zkapp_version :
+              module type of Mina_numbers.Zkapp_version with type t := t )
         end
 
         type t =
           { state : Field.t list
           ; verification_key : Verification_key.t option
-          ; snapp_version : Snapp_version.t
+          ; zkapp_version : Zkapp_version.t
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
@@ -220,7 +218,7 @@ module Json_layout = struct
         let fields =
           [| "state"
            ; "verification_key"
-           ; "snapp_version"
+           ; "zkapp_version"
            ; "sequence_state"
            ; "last_sequence_slot"
            ; "proved_state"
@@ -235,16 +233,16 @@ module Json_layout = struct
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
-        ; token : Unsigned_extended.UInt64.t option [@default None]
+        ; token : string option [@default None]
         ; token_permissions : Token_permissions.t option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
         ; receipt_chain_hash : string option [@default None]
         ; voting_for : string option [@default None]
-        ; snapp : Snapp_account.t option [@default None]
+        ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
-        ; snapp_uri : string option [@default None]
+        ; zkapp_uri : string option [@default None]
         }
       [@@deriving sexp, yojson, dhall_type]
 
@@ -259,10 +257,10 @@ module Json_layout = struct
          ; "nonce"
          ; "receipt_chain_hash"
          ; "voting_for"
-         ; "snapp"
+         ; "zkapp"
          ; "permissions"
          ; "token_symbol"
-         ; "snapp_uri"
+         ; "zkapp_uri"
         |]
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
@@ -278,10 +276,10 @@ module Json_layout = struct
         ; nonce = Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash = None
         ; voting_for = None
-        ; snapp = None
+        ; zkapp = None
         ; permissions = None
         ; token_symbol = None
-        ; snapp_uri = None
+        ; zkapp_uri = None
         }
     end
 
@@ -487,7 +485,7 @@ module Accounts = struct
 
     module Permissions = Json_layout.Accounts.Single.Permissions
     module Token_permissions = Json_layout.Accounts.Single.Token_permissions
-    module Snapp_account = Json_layout.Accounts.Single.Snapp_account
+    module Zkapp_account = Json_layout.Accounts.Single.Zkapp_account
 
     type t = Json_layout.Accounts.Single.t =
       { pk : string option
@@ -495,15 +493,15 @@ module Accounts = struct
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
       ; timing : Timed.t option
-      ; token : Unsigned_extended.UInt64.Stable.Latest.t option
+      ; token : string option
       ; token_permissions : Token_permissions.t option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
       ; voting_for : string option
-      ; snapp : Snapp_account.t option
+      ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
-      ; snapp_uri : string option
+      ; zkapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -526,15 +524,15 @@ module Accounts = struct
     ; balance : Currency.Balance.t
     ; delegate : string option
     ; timing : Single.Timed.t option
-    ; token : Unsigned_extended.UInt64.t option
+    ; token : string option
     ; token_permissions : Single.Token_permissions.t option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
     ; voting_for : string option
-    ; snapp : Single.Snapp_account.t option
+    ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
-    ; snapp_uri : string option
+    ; zkapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
@@ -707,6 +705,8 @@ module Proof_keys = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
+
+    let small : t = Log_2 2
   end
 
   type t =

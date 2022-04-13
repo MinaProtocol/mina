@@ -3,19 +3,40 @@
  (name delegation_compliance)
  (public_name delegation_compliance)
  (libraries
+   ;; opam libraries
+   stdio
+   uri
+   integers
+   sexplib0
+   bin_prot.shape
+   result
+   base
+   core_kernel
+   caqti-driver-postgresql
+   caqti
    async_kernel
    core
-   caqti
    caqti-async
-   caqti-driver-postgresql
+   yojson
+   async
+   base.caml
+   base.base_internalhash_types
+   async.async_command
+   async_unix
+   ;; local libraries
    archive_lib
+   logger
+   signature_lib
+   genesis_constants
+   mina_caqti
    mina_base
    mina_ledger
-   mina_caqti
    mina_state
-   genesis_constants
    genesis_ledger_helper
-   yojson
+   coda_runtime_config
+   currency
+   coda_genesis_ledger
+   mina_base.import
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

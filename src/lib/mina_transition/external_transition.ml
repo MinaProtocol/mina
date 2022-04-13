@@ -3,12 +3,11 @@ open Core_kernel
 open Mina_base
 open Mina_state
 
+(* this module exists only as a stub to keep the bin_io for external transition from changing *)
 module Validate_content = struct
-  type t = Mina_net2.Validation_callback.t
+  type t = unit
 
-  let bin_read_t buf ~pos_ref =
-    bin_read_unit buf ~pos_ref ;
-    Mina_net2.Validation_callback.create_without_expiration ()
+  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref
 
   let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
@@ -16,7 +15,7 @@ module Validate_content = struct
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Mina_net2.Validation_callback.create_without_expiration ()
+  let t_of_sexp _ = ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -53,8 +52,7 @@ module Stable = struct
         include T
 
         let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-            ~delta_transition_chain_proof ~validation_callback
-            ?proposed_protocol_version_opt () =
+            ~delta_transition_chain_proof ?proposed_protocol_version_opt () =
           let current_protocol_version =
             try Protocol_version.get_current ()
             with _ ->
@@ -68,7 +66,7 @@ module Stable = struct
           ; delta_transition_chain_proof
           ; current_protocol_version
           ; proposed_protocol_version_opt
-          ; validation_callback
+          ; validation_callback = ()
           }
 
         type 'a creator =
@@ -76,18 +74,16 @@ module Stable = struct
           -> protocol_state_proof:Proof.t
           -> staged_ledger_diff:Staged_ledger_diff.t
           -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-          -> validation_callback:Validate_content.t
           -> ?proposed_protocol_version_opt:Protocol_version.t
           -> unit
           -> 'a
 
         let map_creator c ~f ~protocol_state ~protocol_state_proof
             ~staged_ledger_diff ~delta_transition_chain_proof
-            ~validation_callback ?proposed_protocol_version_opt () =
+            ?proposed_protocol_version_opt () =
           f
             (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-               ~delta_transition_chain_proof ~validation_callback
-               ?proposed_protocol_version_opt ())
+               ~delta_transition_chain_proof ?proposed_protocol_version_opt ())
       end) :
         sig
           val create :
@@ -96,7 +92,6 @@ module Stable = struct
             -> staged_ledger_diff:Staged_ledger_diff.t
             -> delta_transition_chain_proof:
                  State_hash.t * State_body_hash.t list
-            -> validation_callback:Validate_content.t
             -> ?proposed_protocol_version_opt:Protocol_version.t
             -> unit
             -> t
@@ -118,8 +113,6 @@ Stable.Latest.
   , delta_transition_chain_proof
   , current_protocol_version
   , proposed_protocol_version_opt
-  , validation_callback
-  , set_validation_callback
   , compare
   , create
   , sexp_of_t
@@ -135,7 +128,6 @@ type t_ = Raw_versioned__.t =
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_protocol_version: Protocol_version.t
   ; proposed_protocol_version_opt: Protocol_version.t option
-  ; mutable validation_callback: Validate_content.t }
 *)
 
 module Precomputed_block = struct
@@ -272,7 +264,7 @@ let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
 let blockchain_state = Fn.compose Protocol_state.blockchain_state protocol_state
 
-let state_hash = Fn.compose Protocol_state.hash protocol_state
+let state_hashes = Fn.compose Protocol_state.hashes protocol_state
 
 let parent_hash = Fn.compose Protocol_state.previous_state_hash protocol_state
 
@@ -345,16 +337,6 @@ let payments t =
         Some { With_status.data = c; status }
     | _ ->
         None)
-
-let accept t =
-  Mina_net2.Validation_callback.fire_if_not_already_fired
-    (validation_callback t) `Accept
-
-let reject t =
-  Mina_net2.Validation_callback.fire_if_not_already_fired
-    (validation_callback t) `Reject
-
-let poke_validation_callback t cb = set_validation_callback t cb
 
 let timestamp =
   Fn.compose Blockchain_state.timestamp
@@ -431,7 +413,7 @@ module Validation = struct
        , 'staged_ledger_diff
        , 'protocol_versions )
        with_transition =
-    (external_transition, State_hash.t) With_hash.t
+    external_transition State_hash.With_state_hashes.t
     * ( 'time_received
       , 'genesis_state
       , 'proof
@@ -811,7 +793,11 @@ let validate_proofs tvs ~verifier ~genesis_state_hash =
   let open Deferred.Let_syntax in
   let to_verify =
     List.filter_map tvs ~f:(fun (t, _validation) ->
-        if State_hash.equal (With_hash.hash t) genesis_state_hash then
+        if
+          State_hash.equal
+            (State_hash.With_state_hashes.state_hash t)
+            genesis_state_hash
+        then
           (* Don't require a valid proof for the genesis block, since the
              peer may not have one.
           *)
@@ -886,7 +872,7 @@ let skip_protocol_versions_validation
 module With_validation = struct
   let compare (t1, _) (t2, _) = compare (With_hash.data t1) (With_hash.data t2)
 
-  let state_hash (t, _) = With_hash.hash t
+  let state_hashes (t, _) = With_hash.hash t
 
   let lift f (t, _) = With_hash.data t |> f
 
@@ -933,24 +919,25 @@ module With_validation = struct
 
   let protocol_version_status t = lift protocol_version_status t
 
-  let accept t = lift accept t
-
-  let reject t = lift reject t
-
-  let poke_validation_callback t = lift poke_validation_callback t
-
-  let handle_dropped_transition ?pipe_name ~logger t =
+  let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
     [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
       ~metadata:
-        [ ("state_hash", State_hash.to_yojson (state_hash t))
+        [ ( "state_hash"
+          , State_hash.(to_yojson (state_hashes block).State_hashes.state_hash)
+          )
         ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
         ] ;
-    reject t
+    Option.iter
+      ~f:
+        (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
+           `Reject)
+      valid_cb
 end
 
 module Initial_validated = struct
   type t =
-    (external_transition, State_hash.t) With_hash.t * Validation.initial_valid
+    external_transition State_hash.With_state_hashes.t
+    * Validation.initial_valid
 
   type nonrec protocol_version_status = protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -960,7 +947,7 @@ end
 
 module Almost_validated = struct
   type t =
-    (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+    external_transition State_hash.With_state_hashes.t * Validation.almost_valid
 
   type nonrec protocol_version_status = protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -975,9 +962,9 @@ module Validated = struct
     *)
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          (Stable.V2.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+          Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
           * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
         [@@deriving sexp]
 
@@ -988,9 +975,9 @@ module Validated = struct
 
   [%%versioned_binable
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        (Stable.V2.t, State_hash.t) With_hash.t
+        Stable.V2.t State_hash.With_state_hashes.t
         * ( [ `Time_received ] * (unit, Truth.True.t) Truth.t
           , [ `Genesis_state ] * (unit, Truth.True.t) Truth.t
           , [ `Proof ] * (unit, Truth.True.t) Truth.t
@@ -1001,9 +988,11 @@ module Validated = struct
           , [ `Protocol_versions ] * (unit, Truth.True.t) Truth.t )
           Validation.t
 
+      let equal (a, _) (b, _) = State_hash.With_state_hashes.equal equal a b
+
       let to_latest = Fn.id
 
-      let erase (transition_with_hash, validation) =
+      let erase ((transition_with_hash, validation) : t) =
         ( transition_with_hash
         , Validation.extract_delta_transition_chain_witness validation )
 
@@ -1018,7 +1007,7 @@ module Validated = struct
           , (`Protocol_versions, Truth.True ()) ) )
 
       include Sexpable.Of_sexpable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1028,7 +1017,7 @@ module Validated = struct
                 end)
 
       include Binable.Of_binable
-                (Erased.Stable.V2)
+                (Erased.Stable.V3)
                 (struct
                   type nonrec t = t
 
@@ -1038,7 +1027,7 @@ module Validated = struct
                 end)
 
       let to_yojson (transition_with_hash, _) =
-        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
+        State_hash.With_state_hashes.to_yojson to_yojson transition_with_hash
 
       let create_unsafe_pre_hashed t =
         `I_swear_this_is_safe_see_my_comment
@@ -1058,7 +1047,7 @@ module Validated = struct
                `This_transition_has_valid_protocol_versions )
 
       let create_unsafe t =
-        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
+        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hashes)
 
       include With_validation
     end
@@ -1078,15 +1067,12 @@ module Validated = struct
     , current_protocol_version
     , proposed_protocol_version_opt
     , protocol_version_status
-    , accept
-    , reject
-    , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
     , blockchain_length
     , staged_ledger_diff
     , consensus_state
-    , state_hash
+    , state_hashes
     , parent_hash
     , consensus_time_produced_at
     , block_producer
@@ -1108,6 +1094,10 @@ module Validated = struct
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
 
+  let state_body_hash ((transition, _) : t) =
+    State_hash.With_state_hashes.state_body_hash transition
+      ~compute_hashes:(Fn.compose Protocol_state.hashes T.protocol_state)
+
   let commands (t : t) =
     List.map (commands t) ~f:(fun x ->
         (* This is safe because at this point the stage ledger diff has been
@@ -1120,7 +1110,7 @@ end
 
 let genesis ~precomputed_values =
   let genesis_protocol_state =
-    Precomputed_values.genesis_state_with_hash precomputed_values
+    Precomputed_values.genesis_state_with_hashes precomputed_values
   in
   let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
@@ -1136,8 +1126,6 @@ let genesis ~precomputed_values =
                *)
              ~protocol_state_proof:Proof.blockchain_dummy
              ~staged_ledger_diff:empty_diff
-             ~validation_callback:
-               (Mina_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              ()))
@@ -1146,12 +1134,10 @@ let genesis ~precomputed_values =
 
 module For_tests = struct
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ~validation_callback
-      ?proposed_protocol_version_opt () =
+      ~delta_transition_chain_proof ?proposed_protocol_version_opt () =
     Protocol_version.(set_current zero) ;
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ~validation_callback
-      ?proposed_protocol_version_opt ()
+      ~delta_transition_chain_proof ?proposed_protocol_version_opt ()
 
   let genesis ~precomputed_values =
     Protocol_version.(set_current zero) ;
@@ -1175,7 +1161,7 @@ struct
   let validate_frontier_dependencies (t, validation) ~consensus_constants
       ~logger ~frontier =
     let open Result.Let_syntax in
-    let hash = With_hash.hash t in
+    let hash = State_hash.With_state_hashes.state_hash t in
     let root_transition =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
@@ -1279,7 +1265,8 @@ module Staged_ledger_validation = struct
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)
            in
-           ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
+           ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
+               .state_hash
            , body_hash ))
         ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->

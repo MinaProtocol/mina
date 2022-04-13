@@ -20,11 +20,10 @@ let field_size : Bigint.R.t = Field.size
 
 module Verification_key = struct
   type t =
-    ( Kimchi.Foundations.Fp.t
-    , Kimchi.Protocol.SRS.Fp.t
-    , Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
-      Kimchi.Protocol.poly_comm )
-    Kimchi.Protocol.VerifierIndex.verifier_index
+    ( Pasta_bindings.Fp.t
+    , Kimchi_bindings.Protocol.SRS.Fp.t
+    , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm )
+    Kimchi_types.VerifierIndex.verifier_index
 
   let to_string _ = failwith __LOC__
 
@@ -34,25 +33,26 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make (Field) (Kimchi.Protocol.Gates.Vector.Fp)
+  Plonk_constraint_system.Make
+    (Field)
+    (Kimchi_bindings.Protocol.Gates.Vector.Fp)
     (struct
       let params =
         Sponge.Params.(
-          map pasta_p_3 ~f:(fun x ->
+          map pasta_p_kimchi ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x)))
     end)
 
 module Var = Var
 
-let lagrange : int -> _ Kimchi.Protocol.poly_comm array =
+let lagrange : int -> _ Kimchi_types.poly_comm array =
   Memo.general ~hashable:Int.hashable (fun domain_log2 ->
       Array.map
         Precomputed.Lagrange_precomputations.(
           vesta.(index_of_domain_log2 domain_log2))
         ~f:(fun unshifted ->
-          { Kimchi.Protocol.unshifted =
-              Array.map unshifted ~f:(fun (x, y) ->
-                  Kimchi.Foundations.Finite (x, y))
+          { Kimchi_types.unshifted =
+              Array.map unshifted ~f:(fun (x, y) -> Kimchi_types.Finite (x, y))
           ; shifted = None
           }))
 
@@ -72,13 +72,13 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   let name = "vesta"
 
   module Rounds = Rounds
-  module Urs = Kimchi.Protocol.SRS.Fp
-  module Index = Kimchi.Protocol.Index.Fp
+  module Urs = Kimchi_bindings.Protocol.SRS.Fp
+  module Index = Kimchi_bindings.Protocol.Index.Fp
   module Curve = Curve
   module Poly_comm = Fp_poly_comm
   module Scalar_field = Field
-  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
-  module Gate_vector = Kimchi.Protocol.Gates.Vector.Fp
+  module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
+  module Gate_vector = Kimchi_bindings.Protocol.Gates.Vector.Fp
   module Constraint_system = R1CS_constraint_system
 end)
 
@@ -90,17 +90,14 @@ module Proof = Plonk_dlog_proof.Make (struct
 
   module Backend = struct
     type t =
-      ( Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
-      , Kimchi.Foundations.Fp.t )
-      Kimchi.Protocol.prover_proof
+      ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fp.t )
+      Kimchi_types.prover_proof
 
-    include Kimchi.Protocol.Proof.Fp
+    include Kimchi_bindings.Protocol.Proof.Fp
 
-    let verify = with_lagrange verify
-
-    let batch_verify =
-      with_lagranges (fun lgrs vks ts ->
-          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
+    let batch_verify vks ts =
+      Promise.run_in_thread (fun () -> batch_verify vks ts)
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
@@ -132,23 +129,22 @@ module Proof = Plonk_dlog_proof.Make (struct
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
         ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Run_in_thread.run_in_thread (fun () ->
+          Promise.run_in_thread (fun () ->
               create pk auxiliary_input prev_challenges prev_sgs))
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create
   end
 
-  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
+  module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
   module Index = Keypair
 
   module Evaluations_backend = struct
-    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
+    type t = Scalar_field.t Kimchi_types.proof_evaluations
   end
 
   module Opening_proof_backend = struct
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
   end
 
   module Poly_comm = Fp_poly_comm
@@ -183,7 +179,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    include Kimchi.Protocol.Oracles.Fp
+    include Kimchi_bindings.Protocol.Oracles.Fp
 
     let create = with_lagrange create
   end

@@ -25,7 +25,7 @@ module Base = struct
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Snapp_statement.t
+           * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
          | invalid ]
@@ -39,6 +39,9 @@ module Base = struct
          t
       -> (ledger_proof * Mina_base.Sok_message.t) list
       -> bool Or_error.t Deferred.t
+
+    val get_blockchain_verification_key :
+      t -> Pickles.Verification_key.t Or_error.t Deferred.t
   end
 end
 

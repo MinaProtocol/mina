@@ -110,7 +110,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOnGitEnv,
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
           deb_codename="${DebianVersions.lowerName debVersion}",
@@ -121,17 +120,17 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep rosettaSpec,
 
-        -- Snapp test transaction image
-        let snappTestTxnSpec = DockerImage.ReleaseSpec::{
+        -- ZkApp test transaction image
+        let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
-          service="mina-snapp-test-transaction",
+          service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="snapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
 
-        DockerImage.generateStep snappTestTxnSpec
+        DockerImage.generateStep zkappTestTxnSpec
 
       ]
     }

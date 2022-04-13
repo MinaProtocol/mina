@@ -12,9 +12,6 @@ let DockerImage = ../../Command/DockerImage.dhall
 let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
 
-let dependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-let deployEnv = "export-git-env-vars.sh"
-
 in
 
 Pipeline.build
@@ -35,7 +32,6 @@ Pipeline.build
 
       -- mina-toolchain Debian 11 "Bullseye" Toolchain
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="bullseye",
         extra_args="--no-cache",
@@ -48,7 +44,6 @@ Pipeline.build
 
       -- mina-toolchain Debian 10 "Buster" Toolchain
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="buster",
         extra_args="--no-cache",
@@ -61,7 +56,6 @@ Pipeline.build
 
       -- mina-toolchain Debian 9 "Stretch" Toolchain
       let toolchainStretchSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="stretch",
         extra_args="--no-cache",
@@ -74,7 +68,6 @@ Pipeline.build
 
       -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
       let toolchainFocalSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
         service="mina-toolchain",
         deb_codename="focal",
         extra_args="--no-cache",
@@ -87,3 +80,4 @@ Pipeline.build
 
     ]
   }
+

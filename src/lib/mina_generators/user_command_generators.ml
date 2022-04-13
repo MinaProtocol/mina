@@ -22,7 +22,7 @@ let parties_with_ledger () =
      We'll put the fee payer account and max_other_parties accounts in the
      ledger, and have max_other_parties keypairs available for new accounts
   *)
-  let num_keypairs = (Snapp_generators.max_other_parties * 2) + 2 in
+  let num_keypairs = (Parties_generators.max_other_parties * 2) + 2 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty
@@ -30,7 +30,7 @@ let parties_with_ledger () =
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key)
   in
-  let num_keypairs_in_ledger = Snapp_generators.max_other_parties + 1 in
+  let num_keypairs_in_ledger = Parties_generators.max_other_parties + 1 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
@@ -66,7 +66,7 @@ let parties_with_ledger () =
       ; set_delegate = Either
       ; set_permissions = Either
       ; set_verification_key = Either
-      ; set_snapp_uri = Either
+      ; set_zkapp_uri = Either
       ; edit_sequence_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
@@ -77,11 +77,11 @@ let parties_with_ledger () =
       Some
         With_hash.
           { data = Side_loaded_verification_key.dummy
-          ; hash = Snapp_account.dummy_vk_hash ()
+          ; hash = Zkapp_account.dummy_vk_hash ()
           }
     in
-    let snapp = Some { Snapp_account.default with verification_key } in
-    { account with permissions; snapp }
+    let zkapp = Some { Zkapp_account.default with verification_key } in
+    { account with permissions; zkapp }
   in
   (* half Snapp accounts, half non-Snapp accounts *)
   let accounts =
@@ -105,7 +105,7 @@ let parties_with_ledger () =
       | Ok (`Added, _) ->
           ()) ;
   let%bind parties =
-    Snapp_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
+    Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
   in
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)

@@ -145,7 +145,7 @@ module Root_diff : sig
   module Stable : sig
     module V2 : sig
       type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
     end
@@ -202,3 +202,5 @@ val config : t -> Config.t
 val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
+
+val verifier : t -> Verifier.t

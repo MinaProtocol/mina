@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
+module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
@@ -31,8 +31,21 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
   include Impl
+  module Verification_key = Tick.Verification_key
+  module Proving_key = Tick.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tick.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     (* Tick.Field.t = p < q = Tock.Field.t *)
@@ -113,7 +126,7 @@ module Step = struct
   module Challenge = Challenge.Make (Impl)
 
   let input ~branching ~wrap_rounds =
-    let open Types.Pairing_based.Statement in
+    let open Types.Step.Statement in
     let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ
@@ -136,6 +149,19 @@ module Wrap = struct
   module Digest = Digest.Make (Impl)
   module Wrap_field = Tock.Field
   module Step_field = Tick.Field
+  module Verification_key = Tock.Verification_key
+  module Proving_key = Tock.Proving_key
+
+  module Keypair = struct
+    type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
+
+    let create = Fields.create
+
+    let generate cs =
+      let open Tock.Keypair in
+      let keypair = create cs in
+      { pk = pk keypair; vk = vk keypair }
+  end
 
   module Other_field = struct
     module Constant = Tick.Field
@@ -195,7 +221,7 @@ module Wrap = struct
 
   let input () =
     let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
-    let open Types.Dlog_based.Statement in
+    let open Types.Wrap.Statement in
     let (T (typ, f)) =
       Spec.packed_typ
         (module Impl)

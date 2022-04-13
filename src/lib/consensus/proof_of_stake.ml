@@ -12,9 +12,7 @@ module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
 module Length = Mina_numbers.Length
 
-let make_checked t =
-  let open Snark_params.Tick in
-  with_state (As_prover.return ()) (Run.make_checked t)
+let make_checked t = Snark_params.Tick.Run.make_checked t
 
 let name = "proof_of_stake"
 
@@ -694,7 +692,10 @@ module Data = struct
       in
       let%bind () =
         [%with_label "Account is for the default token"]
-          Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
+          (make_checked (fun () ->
+               Token_id.(
+                 Checked.Assert.equal account.token_id
+                   (Checked.constant default))))
       in
       let%bind () =
         [%with_label "Block stake winner matches account pk"]
@@ -2962,10 +2963,16 @@ module Hooks = struct
 
   let select ~constants ~existing:existing_with_hash
       ~candidate:candidate_with_hash ~logger =
-    let { With_hash.hash = existing_hash; data = existing } =
+    let { With_hash.hash =
+            { Mina_base.State_hash.State_hashes.state_hash = existing_hash; _ }
+        ; data = existing
+        } =
       existing_with_hash
     in
-    let { With_hash.hash = candidate_hash; data = candidate } =
+    let { With_hash.hash =
+            { Mina_base.State_hash.State_hashes.state_hash = candidate_hash; _ }
+        ; data = candidate
+        } =
       candidate_with_hash
     in
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
@@ -3433,7 +3440,7 @@ module Hooks = struct
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
           (   previous_protocol_state:
-                (Protocol_state.Value.t, Mina_base.State_hash.t) With_hash.t
+                Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
            -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
            -> coinbase_receiver:Public_key.Compressed.t
            -> supercharge_coinbase:bool
@@ -3449,7 +3456,7 @@ module Hooks = struct
         let%bind slot_advancement = gen_slot_advancement in
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
-               (Protocol_state.Value.t, Mina_base.State_hash.t) With_hash.t)
+               Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t)
             ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
             ~coinbase_receiver ~supercharge_coinbase ->
           let prev =
@@ -3480,7 +3487,9 @@ module Hooks = struct
               (prev.staking_epoch_data, prev.next_epoch_data)
               prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch
               ~next_slot:curr_slot
-              ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
+              ~prev_protocol_state_hash:
+                (Mina_base.State_hash.With_state_hashes.state_hash
+                   previous_protocol_state)
               ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
               ~total_currency
           in
@@ -3706,9 +3715,8 @@ let%test_module "Proof of stake tests" =
         let%map `Success _, var = Snark_params.Tick.handle result handler in
         As_prover.read (typ ~constraint_constants) var
       in
-      let (), checked_value =
-        Or_error.ok_exn
-        @@ Snark_params.Tick.run_and_check checked_computation ()
+      let checked_value =
+        Or_error.ok_exn @@ Snark_params.Tick.run_and_check checked_computation
       in
       let diff =
         Sexp_diff_kernel.Algo.diff
@@ -3840,7 +3848,10 @@ let%test_module "Proof of stake tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind data = gen in
       let%map hash = State_hash.gen in
-      { With_hash.data; hash }
+      { With_hash.data
+      ; hash =
+          { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
+      }
 
     let gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta n =
       let open Quickcheck.Generator.Let_syntax in
@@ -4230,8 +4241,20 @@ let%test_module "Proof of stake tests" =
           ?next_start_checkpoint ?next_lock_checkpoint ?gen_staking_epoch_length
           ?gen_next_epoch_length ?gen_curr_epoch_position ?gen_vrf_output ()
       in
-      ( With_hash.{ data = a; hash = hash_a }
-      , With_hash.{ data = b; hash = hash_b } )
+      ( With_hash.
+          { data = a
+          ; hash =
+              { State_hash.State_hashes.state_hash = hash_a
+              ; state_body_hash = None
+              }
+          }
+      , With_hash.
+          { data = b
+          ; hash =
+              { State_hash.State_hashes.state_hash = hash_b
+              ; state_body_hash = None
+              }
+          } )
 
     let gen_spot_pair_short_aligned ?blockchain_length_relativity
         ?vrf_output_relativity () =
@@ -4298,8 +4321,20 @@ let%test_module "Proof of stake tests" =
           ~next_start_checkpoint:b_next_start_checkpoint
           ~next_lock_checkpoint:b_next_lock_checkpoint ()
       in
-      ( With_hash.{ data = a; hash = hash_a }
-      , With_hash.{ data = b; hash = hash_b } )
+      ( With_hash.
+          { data = a
+          ; hash =
+              { State_hash.State_hashes.state_hash = hash_a
+              ; state_body_hash = None
+              }
+          }
+      , With_hash.
+          { data = b
+          ; hash =
+              { State_hash.State_hashes.state_hash = hash_b
+              ; state_body_hash = None
+              }
+          } )
 
     let gen_spot_pair =
       let open Quickcheck.Generator.Let_syntax in
@@ -4408,7 +4443,14 @@ let%test_module "Proof of stake tests" =
       Quickcheck.test
         (Quickcheck.Generator.tuple2 State_hash.gen (gen_spot ()))
         ~f:(fun (hash, state) ->
-          let hashed_state = { With_hash.data = state; hash } in
+          let hashed_state =
+            { With_hash.data = state
+            ; hash =
+                { State_hash.State_hashes.state_hash = hash
+                ; state_body_hash = None
+                }
+            }
+          in
           assert_not_selected (hashed_state, hashed_state))
 
     let%test_unit "selection case: aligned checkpoints & different lengths" =
@@ -4430,8 +4472,10 @@ let%test_module "Proof of stake tests" =
         (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
            ~vrf_output_relativity:`Equal ())
         ~f:(fun (a, b) ->
-          if State_hash.(With_hash.hash b > With_hash.hash a) then
-            assert_selected (a, b)
+          if
+            State_hash.(
+              With_state_hashes.state_hash b > With_state_hashes.state_hash a)
+          then assert_selected (a, b)
           else assert_selected (b, a))
 
     let%test_unit "selection case: misaligned checkpoints & different lengths" =

@@ -248,7 +248,7 @@ module Transaction_pool = struct
     | `Valid_assuming of
       User_command.Verifiable.t
       * ( Pickles.Side_loaded.Verification_key.t
-        * Snapp_statement.t
+        * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
         list ]
   [@@deriving sexp]
@@ -284,7 +284,11 @@ module Transaction_pool = struct
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)))
 
   let create verifier : t =
-    create ~compare_init:compare_envelope (fun (ds : input list) ->
+    let logger = Logger.create () in
+    create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
+        [%log info]
+          "Dispatching $num_proofs transaction pool proofs to verifier"
+          ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
         let open Deferred.Or_error.Let_syntax in
         let result = init_result ds in
         (* Extract all the transactions that have not yet been fully validated and hold on to their
@@ -389,6 +393,7 @@ module Snark_pool = struct
     match%map verify t p with Ok () -> true | Error _ -> false
 
   let create verifier : t =
+    let logger = Logger.create () in
     create
     (* TODO: Make this a proper config detail once we have data on what a
            good default would be.
@@ -396,8 +401,10 @@ module Snark_pool = struct
       ~max_weight_per_call:
         (Option.value_map ~default:1000 ~f:Int.of_string
            (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE"))
-      ~compare_init:compare_envelope
+      ~compare_init:compare_envelope ~logger
       (fun ps0 ->
+        [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
+          ~metadata:[ ("num_proofs", `Int (List.length ps0)) ] ;
         let ps =
           List.concat_map ps0 ~f:(function
               | `Partially_validated env | `Init env ->
@@ -405,7 +412,8 @@ module Snark_pool = struct
               One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list)
         in
         let open Deferred.Or_error.Let_syntax in
-        match%map Verifier.verify_transaction_snarks verifier ps with
+        let%map result = Verifier.verify_transaction_snarks verifier ps in
+        match result with
         | true ->
             List.map ps0 ~f:(fun _ -> `Valid ())
         | false ->

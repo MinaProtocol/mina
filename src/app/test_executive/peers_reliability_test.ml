@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
         ]
     ; num_snark_workers = 0
     }
@@ -32,17 +32,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let[@warning "-8"] [ node_a; node_b; node_c ] =
-      Network.block_producers network
-    in
     [%log info] "peers_list"
       ~metadata:
         [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
         ] ;
-    (* TODO: let%bind () = wait_for t (Wait_condition.nodes_to_initialize [node_a; node_b; node_c]) in *)
-    let%bind () =
-      Malleable_error.List.iter all_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
+    let[@warning "-8"] [ node_a; node_b; node_c ] =
+      Network.block_producers network
     in
     let%bind initial_connectivity_data =
       Util.fetch_connectivity_data ~logger all_nodes

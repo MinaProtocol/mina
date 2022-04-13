@@ -25,7 +25,6 @@ module type S = sig
        Transaction_snark.Statement.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
-       , Token_id.t
        , Mina_state.Local_state.t )
        Mina_state.Registers.t
 

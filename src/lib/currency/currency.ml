@@ -174,7 +174,7 @@ end = struct
 
   let var_of_t (t : t) : var = Field.Var.constant (Field.project (to_bits t))
 
-  let if_ cond ~then_ ~else_ : (var, _) Checked.t =
+  let if_ cond ~then_ ~else_ : var Checked.t =
     Field.Checked.if_ cond ~then_ ~else_
 
   let () = assert (Int.(length_in_bits mod 16 = 0))
@@ -187,13 +187,135 @@ end = struct
         in
         actual_packed)
 
+  (** [range_check t] asserts that [0 <= t < 2^length_in_bits].
+
+      Any value consumed or returned by functions in this module must satisfy
+      this assertion.
+  *)
   let range_check t =
     let%bind actual = range_check' t in
     Field.Checked.Assert.equal actual t
 
+  (** [range_check_flag t] returns a [Boolean.var] that is true when
+      [0 <= t < 2^length_in_bits], and false otherwise.
+
+      This function MUST NOT be used to constrain return values. Use
+      [range_adjust_flagged] instead.
+
+      This function should only be used for comparison operations, where the
+      result of an addition or subtraction is unused. For example,
+      [let ( <= ) x y = range_check_flag (Field.Var.sub y x)].
+  *)
   let range_check_flag t =
     let%bind actual = range_check' t in
     Field.Checked.equal actual t
+
+  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
+
+  let modulus_as_field =
+    lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
+
+  let double_modulus_as_field =
+    lazy (Field.(mul (of_int 2)) (Lazy.force modulus_as_field))
+
+  (** [range_adjust_flagged kind t] returns [t'] that fits in [length_in_bits]
+      bits, and satisfies [t' = t + k * 2^length_in_bits] for some [k].
+      The [`Overflow b] return value is false iff [t' = t].
+
+      This function should be used when [t] was computed via addition or
+      subtraction, to calculate the equivalent value that would be returned by
+      overflowing or underflowing an integer with [length_in_bits] bits.
+
+      The [`Add] and [`Sub] values for [kind] are specializations that use
+      fewer constraints and perform fewer calculations. Any inputs that satisfy
+      the invariants for [`Add] or [`Sub] will return the same value if
+      [`Add_or_sub] is used instead.
+
+      Invariants:
+      * if [kind] is [`Add], [0 <= t < 2 * 2^length_in_bits - 1];
+      * if [kind] is [`Sub], [- 2^length_in_bits < t < 2^length_in_bits];
+      * if [kind] is [`Add_or_sub],
+        [- 2^length_in_bits < t < 2 * 2^length_in_bits - 1].
+  *)
+  let range_adjust_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
+    let%bind adjustment_factor =
+      exists Field.typ
+        ~compute:
+          As_prover.(
+            let%map t = read Field.typ t in
+            match kind with
+            | `Add ->
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* Within range. *)
+                  Field.zero
+                else
+                  (* Overflowed. We compensate by subtracting [modulus_as_field]. *)
+                  Field.(negate one)
+            | `Sub ->
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* Within range. *)
+                  Field.zero
+                else
+                  (* Underflowed, but appears as an overflow because of wrapping in
+                     the field (that is, -1 is the largest field element, -2 is the
+                     second largest, etc.). Compensate by adding [modulus_as_field].
+                  *)
+                  Field.one
+            | `Add_or_sub ->
+                (* This case is a little more nuanced: -modulus_as_field < t <
+                   2*modulus_as_field, and we need to detect which 'side of 0' we
+                   are. Thus, we have 3 cases:
+                *)
+                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
+                  (* 1. we are already in the desired range, no adjustment; *)
+                  Field.zero
+                else if
+                  Int.(Field.compare t (Lazy.force double_modulus_as_field) < 0)
+                then
+                  (* 2. we are in the range
+                        [modulus_as_field <= t < 2 * modulus_as_field],
+                        so this was an addition that overflowed, and we should
+                        compensate by subtracting [modulus_as_field];
+                  *)
+                  Field.(negate one)
+                else
+                  (* 3. we are outside of either range, so this must be the
+                        underflow of a subtraction, and we should compensate by
+                        adding [modulus_as_field].
+                  *)
+                  Field.one)
+    in
+    let%bind out_of_range =
+      match kind with
+      | `Add ->
+          (* 0 or -1 => 0 or 1 *)
+          Boolean.of_field (Field.Var.negate adjustment_factor)
+      | `Sub ->
+          (* Already 0 or 1 *)
+          Boolean.of_field adjustment_factor
+      | `Add_or_sub ->
+          (* The return flag [out_of_range] is a boolean represented by either 0
+             when [t] is in range or 1 when [t] is out-of-range.
+             Notice that [out_of_range = adjustment_factor^2] gives us exactly
+             the desired values, and moreover we can ensure that
+             [adjustment_factor] is exactly one of -1, 0 or 1 by checking that
+             [out_of_range] is boolean.
+          *)
+          Field.Checked.mul adjustment_factor adjustment_factor
+          >>= Boolean.of_field
+    in
+    (* [t_adjusted = t + adjustment_factor * modulus_as_field] *)
+    let t_adjusted =
+      let open Field.Var in
+      add t (scale adjustment_factor (Lazy.force modulus_as_field))
+    in
+    let%bind t_adjusted = seal t_adjusted in
+    let%bind actual = range_check' t_adjusted in
+    let%map () =
+      with_label "range_adjust_flagged"
+        (Field.Checked.Assert.equal actual t_adjusted)
+    in
+    (t_adjusted, `Overflow out_of_range)
 
   let of_field (x : Field.t) : t =
     of_bits (List.take (Field.unpack x) length_in_bits)
@@ -204,8 +326,6 @@ end = struct
     Typ.transport
       { Field.typ with check = range_check }
       ~there:to_field ~back:of_field
-
-  let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
 
   [%%endif]
 
@@ -493,7 +613,7 @@ end = struct
         in
         { sgn; magnitude }
 
-      let if_ cond ~(then_ : var) ~(else_ : var) : (var, _) Checked.t =
+      let if_ cond ~(then_ : var) ~(else_ : var) : var Checked.t =
         let%bind repr =
           match (then_.repr, else_.repr) with
           | Some r1, Some r2 ->
@@ -526,15 +646,35 @@ end = struct
             ~compute:
               (let open As_prover in
               let%map x = read typ x and y = read typ y in
-              Option.value_map (add x y) ~f:(fun r -> r.sgn) ~default:Sgn.Pos)
+              match add x y with
+              | Some r ->
+                  r.sgn
+              | None -> (
+                  match (x.sgn, y.sgn) with
+                  | Sgn.Neg, Sgn.Neg ->
+                      (* Ensure that we provide a value in the range
+                         [-modulus_as_field < magnitude < 2*modulus_as_field]
+                         for [range_adjust_flagged].
+                      *)
+                      Sgn.Neg
+                  | _ ->
+                      Sgn.Pos ))
         in
-        let%bind res_value = seal (Field.Var.add xv yv) in
+        let value = Field.Var.add xv yv in
         let%bind magnitude =
-          Tick.Field.Checked.mul (sgn :> Field.Var.t) res_value
+          Tick.Field.Checked.mul (sgn :> Field.Var.t) value
         in
-        let%map no_overflow = range_check_flag magnitude in
-        ( { Signed_var.repr = Some { magnitude; sgn }; value = Some res_value }
-        , `Overflow (Boolean.not no_overflow) )
+        let%bind res_magnitude, `Overflow overflow =
+          range_adjust_flagged `Add_or_sub magnitude
+        in
+        (* Recompute the result from [res_magnitude], since it may have been
+           adjusted.
+        *)
+        let%map res_value = Field.Checked.mul (sgn :> Field.Var.t) magnitude in
+        ( { Signed_var.repr = Some { magnitude = res_magnitude; sgn }
+          ; value = Some res_value
+          }
+        , `Overflow overflow )
 
       let add (x : var) (y : var) =
         let%bind xv = value x and yv = value y in
@@ -587,8 +727,8 @@ end = struct
 
     let sub_flagged x y =
       let%bind z = seal (Field.Var.sub x y) in
-      let%map no_underflow = range_check_flag z in
-      (z, `Underflow (Boolean.not no_underflow))
+      let%map z, `Overflow underflow = range_adjust_flagged `Sub z in
+      (z, `Underflow underflow)
 
     let sub_or_zero x y =
       make_checked (fun () ->
@@ -638,8 +778,8 @@ end = struct
 
     let add_flagged x y =
       let%bind z = seal (Field.Var.add x y) in
-      let%map no_overflow = range_check_flag z in
-      (z, `Overflow (Boolean.not no_overflow))
+      let%map z, `Overflow overflow = range_adjust_flagged `Add z in
+      (z, `Overflow overflow)
 
     let ( - ) = sub
 
@@ -654,8 +794,8 @@ end = struct
     let add_signed_flagged (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       let%bind res = seal (Field.Var.add t d) in
-      let%map no_overflow = range_check_flag res in
-      (res, `Overflow (Boolean.not no_overflow))
+      let%map res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
+      (res, `Overflow overflow)
 
     let scale (f : Field.Var.t) (t : var) =
       let%bind res = Field.Checked.mul t f in
@@ -664,11 +804,10 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
-        let expect_failure err c =
-          if Or_error.is_ok (check c ()) then failwith err
+        let expect_failure err c = if Or_error.is_ok (check c) then failwith err
 
         let expect_success err c =
-          match check c () with
+          match check c with
           | Ok () ->
               ()
           | Error e ->
@@ -1053,7 +1192,7 @@ let%test_module "sub_flagged module" =
 
       module Checked : sig
         val sub_flagged :
-          var -> var -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
+          var -> var -> (var * [ `Underflow of Boolean.var ]) Tick.Checked.t
       end
     end
 

@@ -13,10 +13,10 @@ module Poly : sig
   end]
 end
 
-val hash_abstract :
+val hashes_abstract :
      hash_body:('body -> State_body_hash.t)
   -> (State_hash.t, 'body) Poly.t
-  -> State_hash.t
+  -> State_hash.State_hashes.t
 
 module Body : sig
   module Poly : sig
@@ -40,18 +40,6 @@ module Body : sig
           Poly.Stable.V1.t
         [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
       end
-
-      module V1 : sig
-        type t =
-          ( State_hash.Stable.V1.t
-          , Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving equal, ord, hash, sexp, to_yojson]
-
-        val to_latest : t -> V2.t
-      end
     end]
   end
 
@@ -70,13 +58,18 @@ module Body : sig
 
   val hash : Value.t -> State_body_hash.t
 
-  val hash_checked : var -> (State_body_hash.var, _) Checked.t
+  val hash_checked : var -> State_body_hash.var Checked.t
 
   val consensus_state : (_, _, 'a, _) Poly.t -> 'a
 
-  val view : Value.t -> Snapp_predicate.Protocol_state.View.t
+  val view : Value.t -> Zkapp_precondition.Protocol_state.View.t
 
-  val view_checked : var -> Snapp_predicate.Protocol_state.View.Checked.t
+  val view_checked : var -> Zkapp_precondition.Protocol_state.View.Checked.t
+
+  module For_tests : sig
+    val with_consensus_state :
+      Value.t -> Consensus.Data.Consensus_state.Value.t -> Value.t
+  end
 end
 
 module Value : sig
@@ -85,13 +78,6 @@ module Value : sig
     module V2 : sig
       type t = (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson]
-    end
-
-    module V1 : sig
-      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, yojson]
-
-      val to_latest : t -> V2.t
     end
   end]
 
@@ -134,7 +120,7 @@ val genesis_state_hash :
   ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
 val genesis_state_hash_checked :
-  state_hash:State_hash.var -> var -> (State_hash.var, _) Checked.t
+  state_hash:State_hash.var -> var -> State_hash.var Checked.t
 
 val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
 
@@ -147,11 +133,12 @@ val negative_one :
   -> consensus_constants:Consensus.Constants.t
   -> Value.t
 
-val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
+val hash_checked : var -> (State_hash.var * State_body_hash.var) Checked.t
 
-val hash : Value.t -> State_hash.t
+val hashes : Value.t -> State_hash.State_hashes.t
 
 (** Same as [hash], but accept the [body_hash] directly to avoid re-computing
     it.
 *)
-val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t
+val hashes_with_body :
+  Value.t -> body_hash:State_body_hash.t -> State_hash.State_hashes.t
