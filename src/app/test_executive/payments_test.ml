@@ -69,6 +69,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
       Network.block_producers network
     in
+    [%log info] "extra genesis keypairs: %s"
+      (List.to_string (Network.extra_genesis_keypairs network)
+         ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
+           public_key |> Signature_lib.Public_key.to_bigstring
+           |> Bigstring.to_string)) ;
     let[@warning "-8"] [ fish1; fish2; fish3_timed ] =
       Network.extra_genesis_keypairs network
     in
