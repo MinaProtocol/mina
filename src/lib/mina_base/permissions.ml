@@ -236,8 +236,24 @@ module Auth_required = struct
            {constant= false; signature_necessary= true; signature_sufficient= true}
       *)
       let open Pickles.Impls.Step.Boolean in
-      signature_sufficient
-      &&& (constant ||| ((not constant) &&& signature_verifies))
+      let b =
+        signature_sufficient
+        &&& (constant ||| ((not constant) &&& signature_verifies))
+      in
+      let _p =
+        let open Pickles.Impls.Step.As_prover in
+        as_prover (fun _ ->
+            let s = read Boolean.typ signature_sufficient in
+            let c = read Boolean.typ constant in
+            let v = read Boolean.typ signature_verifies in
+            let result = read Boolean.typ b in
+            printf
+              "No Proof: signature_sufficient %b constant %b \
+               signature_verifies %b Result %b\n\
+               %!"
+              s c v result)
+      in
+      b
 
     let eval_proof ({ constant; signature_necessary; signature_sufficient } : t)
         =
@@ -249,9 +265,9 @@ module Auth_required = struct
          - Proof
            {constant= false; signature_necessary= false; signature_sufficient= false}
       *)
-      let open Pickles.Impls.Step.Boolean in
-      let impossible = constant &&& not signature_sufficient in
-      (not signature_necessary) &&& not impossible
+      let open Pickles.Impls.Step in
+      let impossible = Boolean.(constant &&& not signature_sufficient) in
+      Boolean.((not signature_necessary) &&& not impossible)
 
     let spec_eval ({ constant; signature_necessary; signature_sufficient } : t)
         ~signature_verifies =

@@ -51,7 +51,6 @@ val dummy_rule :
 *)
 val check_parties_with_merges_exn :
      ?state_body:Transaction_protocol_state.Block_data.t
-  -> ?state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?apply:bool
   -> Ledger.t
   -> Parties.t list
@@ -76,6 +75,7 @@ val gen_snapp_ledger :
 
 val test_snapp_update :
      ?snapp_permissions:Permissions.t
+  -> ?state_body:Transaction_protocol_state.Block_data.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:
        ( unit

@@ -85,6 +85,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       let timing_account_id =
@@ -125,6 +127,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -155,6 +159,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -193,6 +199,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       Transaction_snark.For_tests.update_states ~constraint_constants

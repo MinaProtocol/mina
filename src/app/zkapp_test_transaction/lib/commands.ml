@@ -318,6 +318,8 @@ let create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let parties =
@@ -351,6 +353,8 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =
@@ -389,6 +393,8 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let parties = Transaction_snark.For_tests.multiple_transfers spec in
@@ -415,6 +421,8 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =
@@ -449,6 +457,8 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =
@@ -485,6 +495,8 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =
@@ -519,6 +531,8 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =
@@ -554,6 +568,8 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
+    ; protocol_state_precondition = None
+    ; account_precondition = None
     }
   in
   let%bind parties =

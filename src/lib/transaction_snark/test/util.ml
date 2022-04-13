@@ -117,11 +117,29 @@ let trivial_snapp =
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
 let check_parties_with_merges_exn ?(state_body = genesis_state_body)
-    ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
     ?(apply = true) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
+  let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
+      if apply then (
+        let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
+        let new_ledger = Ledger.register_mask ledger new_mask in
+        let _applied =
+          Ledger.apply_parties_unchecked ~constraint_constants ~state_view
+            new_ledger parties
+          |> Or_error.ok_exn
+        in
+        let _a = Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger in
+        match (fst _applied).command.status with
+        | Transaction_status.Applied _ ->
+            ()
+        | Failed (tbl, _) ->
+            Core.printf "Ledger.apply_parties_unchecked failed with %s\n%!"
+              ( Transaction_status.Failure.Collection.to_yojson tbl
+              |> Yojson.Safe.to_string ) ;
+            () )
+      else () ;
       let witnesses =
         match
           Or_error.try_with (fun () ->
@@ -140,7 +158,17 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
               (sprintf "parties_witnesses_exn failed with %s"
                  (Error.to_string_hum e))
       in
-      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
+      let print_statement spec stmt witness =
+        Core.printf
+          !"spec: %s statement: %s witness: %s\n%!"
+          ( Transaction_snark.Parties_segment.Basic.to_yojson spec
+          |> Yojson.Safe.to_string )
+          ( Transaction_snark.Statement.With_sok.to_yojson stmt
+          |> Yojson.Safe.to_string )
+          ( Transaction_snark.Parties_segment.Witness.to_yojson witness
+          |> Yojson.Safe.to_string )
+      in
+      let _deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
       let%map p =
         match List.rev witnesses with
@@ -148,18 +176,20 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
             failwith "no witnesses generated"
         | (witness, spec, stmt, snapp_statement) :: rest ->
             let open Async.Deferred.Or_error.Let_syntax in
+            print_statement spec stmt witness ;
             let%bind p1 =
-              T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                ~snapp_statement
-              |> deferred_or_error
+              Async.Deferred.Or_error.try_with (fun () ->
+                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                    ~snapp_statement)
             in
             Async.Deferred.List.fold ~init:(Ok p1) rest
               ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
+                print_statement spec stmt witness ;
                 let%bind prev = Async.Deferred.return acc in
                 let%bind curr =
-                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                    ~snapp_statement
-                  |> deferred_or_error
+                  Async.Deferred.Or_error.try_with (fun () ->
+                      T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                        ~snapp_statement)
                 in
                 let sok_digest =
                   Sok_message.create ~fee:Fee.zero
@@ -169,14 +199,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
                 T.merge ~sok_digest prev curr)
       in
       let _p = Or_error.ok_exn p in
-      if apply then
-        let _applied =
-          Ledger.apply_parties_unchecked ~constraint_constants ~state_view
-            ledger parties
-          |> Or_error.ok_exn
-        in
-        ()
-      else ())
+      ())
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
@@ -216,7 +239,7 @@ let gen_snapp_ledger =
   in
   (test_spec, kp)
 
-let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
+let test_snapp_update ?snapp_permissions ?state_body ~vk ~snapp_prover test_spec
     ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -230,7 +253,7 @@ let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
             Transaction_snark.For_tests.update_states ~snapp_prover
               ~constraint_constants test_spec
           in
-          check_parties_with_merges_exn ledger [ parties ]))
+          check_parties_with_merges_exn ?state_body ledger [ parties ]))
 
 let permissions_from_update (update : Party.Update.t) ~auth =
   let default = Permissions.user_default in

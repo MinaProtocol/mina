@@ -1639,6 +1639,13 @@ module Base = struct
 
           let increment_nonce (t : t) = t.party.data.increment_nonce
 
+          let no_authorization_given _t =
+            match (auth_type, snapp_statement) with
+            | None_given, None ->
+                Boolean.true_
+            | _ ->
+                Boolean.false_
+
           let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)
               ({ party; control; _ } : t) =
@@ -4103,6 +4110,8 @@ module For_tests = struct
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
+      ; account_precondition : Party.Account_precondition.t option
       }
     [@@deriving sexp]
   end
@@ -4171,7 +4180,7 @@ module For_tests = struct
 
   let create_parties spec
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~update
-      ~account_precondition =
+      =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; receivers
@@ -4182,9 +4191,15 @@ module For_tests = struct
         ; sequence_events
         ; events
         ; call_data
+        ; protocol_state_precondition
+        ; account_precondition
         ; _
         } =
       spec
+    in
+    let protocol_state_precondition =
+      Option.value protocol_state_precondition
+        ~default:Zkapp_precondition.Protocol_state.accept
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer =
@@ -4198,8 +4213,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
+          ; protocol_state_precondition
           ; account_precondition = sender_nonce
           ; use_full_commitment = ()
           }
@@ -4218,7 +4232,7 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; protocol_state_precondition
         ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
         ; use_full_commitment = false
         }
@@ -4277,9 +4291,10 @@ module For_tests = struct
               ; sequence_events
               ; call_data
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
-              ; account_precondition
+              ; protocol_state_precondition
+              ; account_precondition =
+                  Option.value account_precondition
+                    ~default:Party.Account_precondition.Accept
               ; use_full_commitment = true
               }
           ; authorization =
@@ -4298,21 +4313,19 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition
               ; account_precondition = Accept
               ; use_full_commitment = false
               }
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
       @ snapp_parties @ other_receivers
     in
     let protocol_state_predicate_hash =
-      Zkapp_precondition.Protocol_state.digest protocol_state
+      Zkapp_precondition.Protocol_state.digest protocol_state_precondition
     in
     let ps =
       Parties.Call_forest.of_parties_list
@@ -4385,7 +4398,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~constraint_constants ~update:update_vk
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4415,7 +4427,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~constraint_constants ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4495,7 +4506,6 @@ module For_tests = struct
       create_parties spec
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
         ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
@@ -4503,6 +4513,13 @@ module For_tests = struct
       Option.value_exn sender_party :: parties.other_parties
     in
     { parties with other_parties }
+
+  let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
+    let id = Account_id.create pk Token_id.default in
+    { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
+      permissions
+    ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+    }
 
   let create_trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk
       ~ledger pk =
@@ -4517,12 +4534,7 @@ module For_tests = struct
           ()
     in
     let id = Account_id.create pk Token_id.default in
-    let account : Account.t =
-      { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
-        permissions
-      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
-      }
-    in
+    let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
     create ledger id account
 
   let create_trivial_predicate_snapp ~constraint_constants

@@ -177,6 +177,8 @@ let%test_module "Snapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =

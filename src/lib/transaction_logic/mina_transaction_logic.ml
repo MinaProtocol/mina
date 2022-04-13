@@ -1444,6 +1444,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
+      let no_authorization_given t = Control.equal t.authorization None_given
+
       let check_authorization ~commitment:_ ~at_party:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
