@@ -295,16 +295,18 @@ module Rpcs = struct
         type query = State_hash.Stable.V1.t list
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = External_transition.Stable.V2.t list option
+        type response = External_transition.Raw.Stable.V2.t list option
         [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model =
+          Option.map ~f:(List.map ~f:External_transition.compose)
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response =
+          Option.map ~f:(List.map ~f:External_transition.decompose)
       end
 
       module T' =
@@ -450,6 +452,10 @@ module Rpcs = struct
     end
   end
 
+  let map_proof_caryying_data_option ~f =
+    Option.map ~f:(fun { Proof_carrying_data.data; proof = hashes, block } ->
+        { Proof_carrying_data.data = f data; proof = (hashes, f block) })
+
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -500,9 +506,9 @@ module Rpcs = struct
         [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Stable.V2.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V2.t
-          )
+          ( External_transition.Raw.Stable.V2.t
+          , State_body_hash.Stable.V1.t list
+            * External_transition.Raw.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]
@@ -511,9 +517,11 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model =
+          map_proof_caryying_data_option ~f:External_transition.compose
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response =
+          map_proof_caryying_data_option ~f:External_transition.decompose
       end
 
       module T' =
@@ -636,9 +644,9 @@ module Rpcs = struct
         type query = unit [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Stable.V2.t
-          , State_body_hash.Stable.V1.t list * External_transition.Stable.V2.t
-          )
+          ( External_transition.Raw.Stable.V2.t
+          , State_body_hash.Stable.V1.t list
+            * External_transition.Raw.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]
@@ -647,9 +655,11 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model =
+          map_proof_caryying_data_option ~f:External_transition.compose
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response =
+          map_proof_caryying_data_option ~f:External_transition.decompose
       end
 
       module T' =
