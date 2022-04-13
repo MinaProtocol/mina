@@ -1567,6 +1567,12 @@ module Zkapp_statement = struct
     type t = Field.Constant.t zkapp_statement
 
     let to_field_elements = zkapp_statement_to_fields
+
+    let to_js ({ transaction; at_party } : t) =
+      to_js
+        { transaction = Field.constant transaction
+        ; at_party = Field.constant at_party
+        }
   end
 end
 
@@ -2783,19 +2789,21 @@ module Ledger = struct
     in
     if use_full_commitment then full_commitment else commitment
 
-  let proof_statement ({ other_parties; _ } as tx : Parties.t)
-      (party_index : int) =
+  let transaction_statement (tx_json : Js.js_string Js.t) (party_index : int) =
+    let tx =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
     let at_party =
       let ps =
         Parties.Call_forest.of_parties_list
           ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
-          (List.drop other_parties party_index)
+          (List.drop tx.other_parties party_index)
         |> Parties.Call_forest.accumulate_hashes_predicated
       in
       Parties.Call_forest.hash ps
     in
     let transaction = tx_commitment tx (Other_party party_index) in
-    { transaction; at_party }
+    Zkapp_statement.Constant.to_js { transaction; at_party }
 
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
@@ -2989,6 +2997,7 @@ module Ledger = struct
     static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
+    static_method "transactionStatement" transaction_statement ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
     static_method "publicKeyToString" public_key_to_string ;
