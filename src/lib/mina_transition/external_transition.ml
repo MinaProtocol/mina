@@ -89,30 +89,9 @@ module Raw = struct
     include Raw_versioned__
   end)
 
-  [%%define_locally
-  Raw_versioned__.
-    (protocol_state, current_protocol_version, proposed_protocol_version_opt)]
+  [%%define_locally Raw_versioned__.(protocol_state)]
 
   [%%define_locally Stable.Latest.(create, sexp_of_t, t_of_sexp)]
-
-  let to_yojson t =
-    `Assoc
-      [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
-      ; ("protocol_state_proof", `String "<opaque>")
-      ; ("staged_ledger_diff", `String "<opaque>")
-      ; ("delta_transition_chain_proof", `String "<opaque>")
-      ; ( "current_protocol_version"
-        , `String (Protocol_version.to_string (current_protocol_version t)) )
-      ; ( "proposed_protocol_version"
-        , `String
-            (Option.value_map
-               (proposed_protocol_version_opt t)
-               ~default:"<None>" ~f:Protocol_version.to_string) )
-      ]
-
-  let equal =
-    Comparable.lift Consensus.Data.Consensus_state.Value.equal
-      ~f:(Fn.compose Protocol_state.consensus_state protocol_state)
 end
 
 type external_transition = Raw.t

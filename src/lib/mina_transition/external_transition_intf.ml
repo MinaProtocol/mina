@@ -62,7 +62,7 @@ module type External_transition_base_intf = sig
   type t = Block.t [@@deriving sexp, to_yojson]
 
   module Raw : sig
-    type t [@@deriving sexp, to_yojson, equal]
+    type t [@@deriving sexp]
 
     [%%versioned:
     module Stable : sig
