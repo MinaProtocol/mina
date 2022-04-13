@@ -12,7 +12,6 @@ import {
   shutdown,
   Mina,
   signFeePayer,
-  Perm,
   Permissions,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
@@ -34,7 +33,7 @@ class SimpleZkapp extends SmartContract {
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
       ...Permissions.default(),
-      editState: Perm.proofOrSignature(),
+      editState: Permissions.proofOrSignature(),
     });
     this.x.set(initialState);
   }

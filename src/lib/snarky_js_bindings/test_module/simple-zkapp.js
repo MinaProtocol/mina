@@ -12,7 +12,6 @@ import {
   isReady,
   shutdown,
   PublicKey,
-  Perm,
   Mina,
   Permissions,
 } from "snarkyjs";
@@ -33,7 +32,7 @@ class SimpleZkapp extends SmartContract {
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
       ...Permissions.default(),
-      editState: Perm.proof(),
+      editState: Permissions.proof(),
     });
     this.x.set(initialState);
   }

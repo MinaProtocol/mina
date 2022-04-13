@@ -12,7 +12,6 @@ import {
   shutdown,
   Mina,
   signFeePayer,
-  Perm,
   call,
   Permissions,
 } from "snarkyjs";
@@ -34,9 +33,9 @@ class SimpleZkapp extends SmartContract {
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
       ...Permissions.default(),
-      editState: Perm.proofOrSignature(),
+      editState: Permissions.proofOrSignature(),
       // TODO: this is  a workaround, can be removed once Parties_replay_check_failed is fixed
-      incrementNonce: Perm.proofOrSignature(),
+      incrementNonce: Permissions.proofOrSignature(),
     });
     this.x.set(initialState);
   }
