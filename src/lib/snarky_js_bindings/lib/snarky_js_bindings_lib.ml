@@ -232,6 +232,9 @@ let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
 
 let of_js_field (x : field_class Js.t) : Field.t = x##.value
 
+let to_js_field_unchecked x : field_class Js.t =
+  x |> Field.constant |> to_js_field
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -1878,7 +1881,10 @@ module Ledger = struct
     ; authorization : Party_authorization.t Js.prop >
     Js.t
 
-  type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
+  type fee_payer_party =
+    < body : fee_payer_party_body Js.prop
+    ; authorization : Party_authorization.t Js.prop >
+    Js.t
 
   type parties =
     < feePayer : fee_payer_party Js.prop
@@ -2353,10 +2359,22 @@ module Ledger = struct
     | s ->
         failwithf "bad authorization type: %s" s ()
 
+  let fee_payer_authorization (a : Party_authorization.t) :
+      Mina_base.Signature.t =
+    match Js.to_string a##.kind with
+    | "none" ->
+        Mina_base.Signature.dummy
+    | "signature" ->
+        let signature : Js.js_string Js.t = Obj.magic a##.value in
+        Mina_base.Signature.of_base58_check_exn (Js.to_string signature)
+    | s ->
+        failwithf "bad authorization type: %s" s ()
+
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { body = fee_payer_party_body parties##.feePayer
-        ; authorization = Mina_base.Signature.dummy (* TODO *)
+        ; authorization =
+            fee_payer_authorization parties##.feePayer##.authorization
         }
     ; other_parties =
         Js.to_array parties##.otherParties
@@ -2708,6 +2726,14 @@ module Ledger = struct
 
     let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
 
+    let signature (sg : Signature_lib.Schnorr.Chunked.Signature.t) =
+      let r, s = sg in
+      object%js
+        val r = to_js_field_unchecked r
+
+        val s = to_js_scalar s
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2773,7 +2799,7 @@ module Ledger = struct
 
   type party_index = Fee_payer | Other_party of int
 
-  let tx_commitment ({ fee_payer; other_parties; _ } as tx : Parties.t)
+  let transaction_commitment ({ fee_payer; other_parties; _ } as tx : Parties.t)
       (party_index : party_index) =
     let commitment = Parties.commitment tx in
     let full_commitment =
@@ -2789,6 +2815,21 @@ module Ledger = struct
     in
     if use_full_commitment then full_commitment else commitment
 
+  let transaction_commitments (tx_json : Js.js_string Js.t) =
+    let tx =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    let commitment = Parties.commitment tx in
+    let full_commitment =
+      Parties.Transaction_commitment.with_fee_payer commitment
+        ~fee_payer_hash:Party.(digest (of_fee_payer tx.fee_payer))
+    in
+    object%js
+      val commitment = to_js_field_unchecked commitment
+
+      val fullCommitment = to_js_field_unchecked full_commitment
+    end
+
   let transaction_statement (tx_json : Js.js_string Js.t) (party_index : int) =
     let tx =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
@@ -2802,8 +2843,13 @@ module Ledger = struct
       in
       Parties.Call_forest.hash ps
     in
-    let transaction = tx_commitment tx (Other_party party_index) in
+    let transaction = transaction_commitment tx (Other_party party_index) in
     Zkapp_statement.Constant.to_js { transaction; at_party }
+
+  let sign_field_element (x : js_field) (key : private_key) =
+    Signature_lib.Schnorr.Chunked.sign (private_key key)
+      (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
+    |> Mina_base.Signature.to_base58_check |> Js.string
 
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
@@ -2812,7 +2858,8 @@ module Ledger = struct
     in
     let signature =
       Signature_lib.Schnorr.Chunked.sign (private_key key)
-        (Random_oracle.Input.Chunked.field (tx_commitment tx party_index))
+        (Random_oracle.Input.Chunked.field
+           (transaction_commitment tx party_index))
     in
     ( match party_index with
     | Fee_payer ->
@@ -2997,7 +3044,9 @@ module Ledger = struct
     static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
+    static_method "transactionCommitments" transaction_commitments ;
     static_method "transactionStatement" transaction_statement ;
+    static_method "signFieldElement" sign_field_element ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
     static_method "publicKeyToString" public_key_to_string ;
