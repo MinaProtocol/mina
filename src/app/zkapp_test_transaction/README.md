@@ -1,60 +1,59 @@
-# Snapp test transaction tool
+# ZkApp test transaction tool
 
-A tool to generate snapp transactions that can be sent to a mina test network. For more information on snapps, checkout the following resources: https://docs.minaprotocol.com/en/snapps.
-The WIP progress spec [here](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/index.html) proposes the structure and behavior of mina snapp transactions.
+A tool to generate zkapp transactions that can be sent to a mina test network. For more information on zkapps, checkout the following resources: https://docs.minaprotocol.com/en/zkapps.
+The WIP progress spec [here](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/index.html) proposes the structure and behavior of mina zkapp transactions.
 
 The smart contract (which users might write using snarkyJS) used in the tool is intended only for testing as it does no operation on the state and simply accepts any update. The tool provides options to deploy this smart contract to a mina account and make various updates to the account
 
 #### Usage
 
-The tool generates a graphQL `sendSnapp` mutation that can be sent to the graphQL server the daemon starts by default at port 3085. One can use the UI to interact with the local graphQL server mounted at http://localhost:3085/graphql and paste the graphQL object that the tool prints
+The tool generates a graphQL `sendZkapp` mutation that can be sent to the graphQL server the daemon starts by default at port 3085. One can use the UI to interact with the local graphQL server mounted at http://localhost:3085/graphql and paste the graphQL object that the tool prints
 
 The commands proivded by this tool are-
 
 ```shell
-$mina-snapp-test-transaction -help
-Snapp test transaction
+$mina-zkapp-test-transaction -help
+ZkApp test transaction
 
-  mina-snapp-test-transaction SUBCOMMAND
+  zkapp_test_transaction.exe SUBCOMMAND
 
 === subcommands ===
 
-  create-snapp-account            Generate a snapp transaction that creates a
-                                  snapp account
-  upgrade-snapp                   Generate a snapp transaction that updates the
+  create-zkapp-account            Generate a zkApp transaction that creates a
+                                  zkApp account
+  upgrade-zkapp                   Generate a zkApp transaction that updates the
                                   verification key
-  transfer-funds                  Generate a snapp transaction that makes
+  transfer-funds                  Generate a zkApp transaction that makes
                                   multiple transfers from one account
-  update-state                    Generate a snapp transaction that updates
-                                  snapp state
-  update-snapp-uri                Generate a snapp transaction that updates the
-                                  snapp uri
-  update-sequence-state           Generate a snapp transaction that updates
-                                  snapp state
-  update-token-symbol             Generate a snapp transaction that updates
+  update-state                    Generate a zkApp transaction that updates
+                                  zkApp state
+  update-zkapp-uri                Generate a zkApp transaction that updates the
+                                  zkApp uri
+  update-sequence-state           Generate a zkApp transaction that updates
+                                  zkApp state
+  update-token-symbol             Generate a zkApp transaction that updates
                                   token symbol
-  update-permissions              Generate a snapp transaction that updates the
-                                  permissions of a snapp account
-  test-snapp-with-genesis-ledger  Generate a trivial snapp transaction and
+  update-permissions              Generate a zkApp transaction that updates the
+                                  permissions of a zkApp account
+  test-zkapp-with-genesis-ledger  Generate a trivial zkApp transaction and
                                   genesis ledger with verification key for
                                   testing
   version                         print version information
   help                            explain a given subcommand (perhaps
                                   recursively)
-
 ```
 
 ### Example usage
 
-#### 1. Create a snapp account / Deploy the test smart contract
+#### 1. Create a zkapp account / Deploy the test smart contract
 
-`create-snapp-account` command takes the following input to create a snapp account and deploy the test smart contract. 
+`create-zkapp-account` command takes the following input to create a zkapp account and deploy the test smart contract. 
 
 ```shell
-$mina-snapp-test-transaction create-snapp-account -help
-Generate a snapp transaction that creates a snapp account
+$mina-zkapp-test-transaction create-zkapp-account -help
+Generate a zkApp transaction that creates a zkApp account
 
-  mina-snapp-test-transaction create-snapp-account 
+  zkapp_test_transaction.exe create-zkapp-account 
 
 === flags ===
 
@@ -62,7 +61,7 @@ Generate a snapp transaction that creates a snapp account
                                transaction (should already be in the ledger)
   --nonce NN                   Nonce of the fee payer account
   --receiver-amount NN         Receiver amount in Mina
-  --snapp-account-key KEYFILE  Private key file to create a new snapp account
+  --zkapp-account-key KEYFILE  Private key file to create a new zkApp account
   [--debug]                    Debug mode, generates transaction snark
   [--fee FEE]                  Amount you are willing to pay to process the
                                transaction (default: 1) (minimum: 0.003)
@@ -74,179 +73,218 @@ Generate a snapp transaction that creates a snapp account
 For example:
 
 ```shell
-$mina-snapp-test-transaction create-snapp-account --fee-payer-key my-fee-payer --nonce 0 --receiver-amount 2 --snapp-account-key my-snapp-key
+$mina-zkapp-test-transaction create-zkapp-account --fee-payer-key my-fee-payer --nonce 0 --receiver-amount 2 --zkapp-account-key my-zkapp-key
 ```
 
-generates the following graphQL object- a snapp transaction as input to the `sendSnapp` mutation. A snapp transaction is basically a list of parties where each [party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html) is an update performed on an account.
+generates the following graphQL object- a zkapp transaction as input to the `sendZkapp` mutation. A zkapp transaction is basically a list of parties where each [party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html) is an update performed on an account.
 
-The snapp transaction here has three parties-
+The zkapp transaction here has three parties-
 
 1. the fee payer party which specifies who pays the transaction fees and how much
-2. A party that pays the account creation fee to create the new snapp snapp account which in this case is the same as the fee payer
-3. A party to create a new snapp account, set its verification key associated with the test smart contract, and update `editState` and `editSequenceState` permissions to use proofs as [authorization](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/enum.PartyAuthorization.html).
+2. A party that pays the account creation fee to create the new zkapp account which in this case is the same as the fee payer
+3. A party to create a new zkapp account, set its verification key associated with the test smart contract, and update `editState` and `editSequenceState` permissions to use proofs as [authorization](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/enum.PartyAuthorization.html).
 
 The authorization used in each of the parties here is a signature of the respective accounts i.e., the updates on these accounts are authorized as per the accounts' permissions.
 
 ```
 mutation MyMutation {
   __typename
-  sendSnapp(input: {
-    feePayer:{data:{body:{publicKey:"B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:null,
-          permissions:null,
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        fee:"10000000000",
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}}},
-      predicate:"0"},
-    authorization:"7mXCpPWUUybaLKWQZC7jQc4EQNgAoS5aX5AX7TkrWw73bA2P1q616Drqk4gBeZasx1MNMP5mNUEzvXZGUFb2CHaCXTYrDGGr"},
-    otherParties:[{data:{body:{publicKey:"B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:null,
-          permissions:null,
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        tokenId:"1",
-        balanceChange:{magnitude:"2000000000",
-          sign:MINUS},
-        incrementNonce:true,
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}},
-        useFullCommitment:false},
-      predicate:{nonce:"1"}},
-    authorization:{signature:"7mXLzcQEYLofdZHMbrSP3euqa1GVHESowB2f2ExtV7tosVcC4Jw32oydZa9XnfvfFo3wDHfturq6WP5tryM2jy4ZJ6jeKyn5"}},
-    {data:{body:{publicKey:"B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:{verificationKey:"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", hash:"0x18F78C4C0BE6CC4E27B232CF5B41ADAA63D881ABAA68155AA5035769C2A11C85"},
-          permissions:{stake:true,
-            editState:Proof,
-            send:Signature,
-            receive:None,
-            setDelegate:Signature,
-            setPermissions:Signature,
-            setVerificationKey:Signature,
-            setSnappUri:Signature,
-            editSequenceState:Proof,
-            setTokenSymbol:Signature,
-            incrementNonce:Signature,
-            setVotingFor:Signature},
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        tokenId:"1",
-        balanceChange:{magnitude:"2000000000",
-          sign:PLUS},
-        incrementNonce:false,
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}},
-        useFullCommitment:true},
-      predicate:{account:null,
-        nonce:null}},
-    authorization:{signature:"7mXHY5h3g4ghS4SBMGzs1yZBNE5EjMK5q6XHXFeE1FYSJgb8vAjuT81mzrC8J3DPWQSDq3EHAKm1L2Pf7YuTHTMNjUioK7Pq"}}] })
+  sendZkapp(
+    input: {
+      parties: {
+        feePayer: {
+          body: {
+            publicKey: "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww"
+            update: {
+              appState: [null, null, null, null, null, null, null, null]
+              delegate: null
+              verificationKey: null
+              permissions: null
+              zkappUri: null
+              tokenSymbol: null
+              timing: null
+              votingFor: null
+            }
+            balanceChange: "1000000000"
+            events: []
+            sequenceEvents: []
+            callData: "0"
+            callDepth: 0
+            protocolStatePrecondition: {
+              snarkedLedgerHash: null
+              timestamp: null
+              blockchainLength: null
+              minWindowDensity: null
+              totalCurrency: null
+              globalSlotSinceHardFork: null
+              globalSlotSinceGenesis: null
+              stakingEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+              nextEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+            }
+            accountPrecondition: "0"
+          }
+          authorization: "7mXEzaufjDaZ3BkxpCnFziJt4L99gHzUPA13pGGTspt4gndnnxaMUvdQXprzQ3u4MEQixHb2iDbaKFUZSWgHEo7xyTa5f6Rh"
+        }
+        otherParties: [
+          {
+            body: {
+              publicKey: "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww"
+              tokenId: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+              update: {
+                appState: [null, null, null, null, null, null, null, null]
+                delegate: null
+                verificationKey: null
+                permissions: null
+                zkappUri: null
+                tokenSymbol: null
+                timing: null
+                votingFor: null
+              }
+              balanceChange: { magnitude: "10000000000", sgn: "Negative" }
+              incrementNonce: true
+              events: []
+              sequenceEvents: []
+              callData: "0"
+              callDepth: 0
+              protocolStatePrecondition: {
+                snarkedLedgerHash: null
+                timestamp: null
+                blockchainLength: null
+                minWindowDensity: null
+                totalCurrency: null
+                globalSlotSinceHardFork: null
+                globalSlotSinceGenesis: null
+                stakingEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+                nextEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+              }
+              accountPrecondition: {
+                balance: null
+                nonce: { lower: "1", upper: "1" }
+                receiptChainHash: null
+                publicKey: null
+                delegate: null
+                state: [null, null, null, null, null, null, null, null]
+                sequenceState: null
+                provedState: null
+              }
+              useFullCommitment: false
+            }
+            authorization: {
+              proof: null
+              signature: "7mXA83gWTqA3cEPPcNuNnMneJV6nxTjrQ1QPciJWxijkPYgqP2uD3zytzi6VD1jV1ZkcJkCsfjT82t1PuoxJ93Leu3YB5bRi"
+            }
+          }
+          {
+            body: {
+              publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z"
+              tokenId: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+              update: {
+                appState: [null, null, null, null, null, null, null, null]
+                delegate: null
+                verificationKey: {
+                  data: "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"
+                  hash: "19079293979474920563146704039152670161084248765333687110610215570697279088632"
+                }
+                permissions: {
+                  editState: "Proof"
+                  send: "Signature"
+                  receive: "None"
+                  setDelegate: "Signature"
+                  setPermissions: "Signature"
+                  setVerificationKey: "Signature"
+                  setZkappUri: "Signature"
+                  editSequenceState: "Proof"
+                  setTokenSymbol: "Signature"
+                  incrementNonce: "Signature"
+                  setVotingFor: "Signature"
+                }
+                zkappUri: null
+                tokenSymbol: null
+                timing: null
+                votingFor: null
+              }
+              balanceChange: { magnitude: "10000000000", sgn: "Positive" }
+              incrementNonce: false
+              events: []
+              sequenceEvents: []
+              callData: "0"
+              callDepth: 0
+              protocolStatePrecondition: {
+                snarkedLedgerHash: null
+                timestamp: null
+                blockchainLength: null
+                minWindowDensity: null
+                totalCurrency: null
+                globalSlotSinceHardFork: null
+                globalSlotSinceGenesis: null
+                stakingEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+                nextEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+              }
+              accountPrecondition: {
+                balance: null
+                nonce: null
+                receiptChainHash: null
+                publicKey: null
+                delegate: null
+                state: [null, null, null, null, null, null, null, null]
+                sequenceState: null
+                provedState: null
+              }
+              useFullCommitment: true
+            }
+            authorization: {
+              proof: null
+              signature: "7mXM47EwEYXagt1AvxVqUjteeEJeFwi2yLx51j1SxZzjtJiGC1EALuL85MmgYLFU1MyHkQahnuwMW4nM9MfJoyQgpDGy18QR"
+            }
+          }
+        ]
+        memo: "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+      }
+    }
+  )
 }
 ```
 
-After the transaction is sent and included in a block, a new snapp account with the verification of the test smart contract gets created. The account information can be queried through the graphQL `account` query.
+Send the generated graphQL object to the local daemon via GraphiQL interface at http://localhost:3085/graphql ![Screenshot](res/deploy-zkapp.png)
+
+
+After the transaction is sent and included in a block, a new zkapp account with the verification of the test smart contract gets created. The account information can be queried through the graphQL `account` query.
 
 ```
 query MyQuery {
@@ -267,15 +305,15 @@ query MyQuery {
       send
       setDelegate
       setPermissions
-      setSnappUri
+      setZkappUri
       setTokenSymbol
       setVerificationKey
       setVotingFor
-      stake
     }
   }
 }
 ```
+
 
 Query result:
 
@@ -297,27 +335,27 @@ Query result:
         "send": "Signature",
         "setDelegate": "Signature",
         "setPermissions": "Signature",
-        "setSnappUri": "Signature",
+        "setZkappUri": "Signature",
         "setTokenSymbol": "Signature",
         "setVerificationKey": "Signature",
         "setVotingFor": "Signature",
-        "stake": true
       },
       "nonce": "0"
     }
   }
 }
 ```
+![Screenshot](res/account-after-deploy.png)
 
-#### 2. Update snapp state
+#### 2. Update zkapp state
 
-A snapp transaction to update the 8 field elements representing the on-chain state of a smart contract
+A zkapp transaction to update the 8 field elements representing the on-chain state of a smart contract
 
 ```shell
-$mina-snapp-test-transaction update-state -help
-Generate a snapp transaction that updates snapp state
+$mina-zkapp-test-transaction update-state -help
+Generate a zkApp transaction that updates zkApp state
 
-  mina-snapp-test-transaction update-state 
+  zkapp_test_transaction.exe update-state 
 
 === flags ===
 
@@ -326,8 +364,8 @@ Generate a snapp transaction that updates snapp state
                                                   (should already be in the
                                                   ledger)
   --nonce NN                                      Nonce of the fee payer account
-  --snapp-account-key KEYFILE                     Private key file to create a
-                                                  new snapp account
+  --zkapp-account-key KEYFILE                     Private key file to create a
+                                                  new zkApp account
   [--debug]                                       Debug mode, generates
                                                   transaction snark
   [--fee FEE]                                     Amount you are willing to pay
@@ -335,8 +373,8 @@ Generate a snapp transaction that updates snapp state
                                                   (default: 1) (minimum: 0.003)
   [--memo STRING]                                 Memo accompanying the
                                                   transaction
-  [--snapp-state String(hash)|Integer(field] ...  element) a list of 8 elements
-                                                  that represent the snapp state
+  [--zkapp-state String(hash)|Integer(field] ...  element) a list of 8 elements
+                                                  that represent the zkApp state
                                                   (Use empty string for no-op)
   [-help]                                         print this help text and exit
                                                   (alias: -?)
@@ -346,113 +384,132 @@ Generate a snapp transaction that updates snapp state
 For example:
 
 ```shell
-$mina-snapp-test-transaction update-state --fee-payer-key my-fee-payer --nonce 2 --snapp-account-key my-snapp-key --fee 5 --snapp-state 1 --snapp-state 2 --snapp-state 3 --snapp-state 4 --snapp-state 5 --snapp-state 6 --snapp-state 7 --snapp-state 8
+$mina-zkapp-test-transaction update-state --fee-payer-key my-fee-payer --nonce 2 --zkapp-account-key my-zkapp-key --fee 5 --zkapp-state 1 --zkapp-state 2 --zkapp-state 3 --zkapp-state 4 --zkapp-state 5 --zkapp-state 6 --zkapp-state 7 --zkapp-state 8
 ```
 
-The snapp transaction here has two parties-
+The zkapp transaction here has two parties-
 
 1. The fee payer party which specifies who pays the transaction fees and how much
-2. A party that updates the `app_state` of the snapp account. The authorization required to update the state is a proof (as updated the by deploy-snapp transaction above `editState: Proof`)
+2. A party that updates the `app_state` of the zkapp account. The authorization required to update the state is a proof (as updated the by deploy-zkapp transaction above `editState: Proof`)
 
 ```
 mutation MyMutation {
   __typename
-  sendSnapp(input: {
-    feePayer:{data:{body:{publicKey:"B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:null,
-          permissions:null,
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        fee:"10000000000",
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}}},
-      predicate:"2"},
-    authorization:"7mXJhuKym4S8h2h5XDaTDUS6Nd5kFtj23tnBvn8J8X2ukyUNjv9Pr8fidh3UWv89DaLfj19y4Aix1Z5JjxramGcsyjRVULbU"},
-    otherParties:[{data:{body:{publicKey:"B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z",
-        update:{appState:["0x0000000000000000000000000000000000000000000000000000000000000001",
-            "0x0000000000000000000000000000000000000000000000000000000000000002",
-            "0x0000000000000000000000000000000000000000000000000000000000000003",
-            "0x0000000000000000000000000000000000000000000000000000000000000004",
-            "0x0000000000000000000000000000000000000000000000000000000000000005",
-            "0x0000000000000000000000000000000000000000000000000000000000000006",
-            "0x0000000000000000000000000000000000000000000000000000000000000007",
-            "0x0000000000000000000000000000000000000000000000000000000000000008"],
-          delegate:null,
-          verificationKey:null,
-          permissions:null,
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        tokenId:"1",
-        balanceChange:{magnitude:"0",
-          sign:PLUS},
-        incrementNonce:false,
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}},
-        useFullCommitment:true},
-      predicate:{account:null,
-        nonce:null}},
-    authorization:{proof:"KChzdGF0ZW1lbnQoKHByb29mX3N0YXRlKChkZWZlcnJlZF92YWx1ZXMoKHBsb25rKChhbHBoYSgoaW5uZXIoNTk1NGM0NmNiNWUxYzJhMSA4YWJmNWQyMGE2MDlkNzYzKSkpKShiZXRhKDA5MmEyNjYwNzJmYjZjNjYgODYyMTVlODkwMWRjY2NlMCkpKGdhbW1hKGIzNGViY2I4NzZjNWY4MGUgMjZjZjZmNjlhZTAyNDY0YykpKHpldGEoKGlubmVyKDhjMGU4ODllNjY4ODJiNjUgZjliZTA0MGNmNzFkNTE0YikpKSkpKShjb21iaW5lZF9pbm5lcl9wcm9kdWN0KFNoaWZ0ZWRfdmFsdWUgMHgwRkRFNDE0QzgxODk3ODFBMjI0OENCODM4MjFBQkVGN0VCM0Q5M0VFQ0NFNkVBODVENDI2NEQzQTU1NTNERTZDKSkoYihTaGlmdGVkX3ZhbHVlIDB4M0IwMjE5NDExMkQ2RDRBQ0VBMTYyNzA4OTMxQjRBMzU5OEIzNEI1MEIwOUQwQzEyOTI4OUE0OEQ1QjlDQkI2MikpKHhpKChpbm5lcig4ZmU0N2IyMmVjMGY3NzE3IDdlZjQ4YjVhZTlhYTViYTEpKSkpKGJ1bGxldHByb29mX2NoYWxsZW5nZXMoKChwcmVjaGFsbGVuZ2UoKGlubmVyKGQ3ODU5ZWM2NmM4ODZkNzYgODMxMDliYjk0YjQ1ZDBiZikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGQ1ZGUyMzc2MDBlZmQzNTQgODI2YzkxZWNhOGEwOGZkMCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDUxMzY4MzUxNzBhZDU1M2MgZWJiZTMyNjNlY2U5NDlhMykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDA5N2RiYjAwYzNiNTc0NDQgZTEyZjg0ZDNlOTBlM2YxYSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDgyYTc3YjM5ZDNjNjQxYjAgZDMyZmJhYjM0NzUyYTJiZCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDFkZGFjOTYwNzgwYTIyOTIgM2MwNzQzMWJlMjY5NWQ1NykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDllYWQ0NTdkMzNmMWFkOTggMmZmMzU3NWI5ZGI2NzM3ZikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDkzOWFlZTg5NGU1MTI0MzcgNzMyMGNjZGQ5MmQ5NGM3NykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDIyZGMzMWUyYzQyOWZkNTQgMGZmZGZlNTFiMDg0YTY4MCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGRlNzY1NTE5ZWU1ZTBjMTUgNTJjOWE2NTgwYjU1MzZlYykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGYzMzU5OTBlMTIyNTM1MGIgODI4M2MwZjA5YmU3NGZkNykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGM3YTY3MmM2ZjEyYjE1ZTkgMTkxNzQzYzc5NjE3ZmZhNCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDhlNzliNGVmNjIzYTU1ZjggY2ZiOWVlNTAwOTZhZjkwYSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDg0NjZlY2NjMGViMWQ3ODYgOWRlZjkwNTY3OWRhN2Y2OSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGExOTMzZDJiN2M2YjIxOTMgYjQyZTAzMjhiNmU5ZmU3YykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDliZjJlNTM0OTJmNTA2ZDMgYzU2MWFmNGI5NjAzYTQ0YSkpKSkpKSkod2hpY2hfYnJhbmNoIlwwMDAiKSkpKHNwb25nZV9kaWdlc3RfYmVmb3JlX2V2YWx1YXRpb25zKDljNTA5NzlmYzFlZjdjMDcgNWQ0Zjg5ODRkYjdhY2UxMSBmMTIxODY4NDMyNzZkZjE5IDA4ZGE2ZjliODczY2U0ZjEpKShtZV9vbmx5KChzZygweDI1QkE2NDJCQ0FEMDgzNzk2NkQ5ODU2RTREREYxNzkxNUM4MDEwMkFCRjA3QTlDQUUyRUM4M0Y1MEY4RjM0MzkgMHgzREQ2QzMwQjMxMTc0QUQ2MTBEM0VGRTYwMzFDRDM4MzcyQ0JDREZBNzk5QTQwMEE0RDA1RUIzRURFOTk1RERGKSkob2xkX2J1bGxldHByb29mX2NoYWxsZW5nZXMoKCgocHJlY2hhbGxlbmdlKChpbm5lcigzMzgyYjNjOWFjZTZiZjZmIDc5OTc0MzU4Zjk3NjE4NjMpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihkZDNhMmIwNmU5ODg4Nzk3IGRkN2FlNjQwMjk0NGExYzcpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihjNmU4ZTUzMGY0OWM5ZmNiIDA3ZGRiYjY1Y2RhMDljZGQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig1MzJjNTlhMjg3NjkxYTEzIGE5MjFiY2IwMmE2NTZmN2IpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihlMjljNzdiMThmMTAwNzhiIGY4NWM1ZjAwZGY2YjBjZWUpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigxZGJkYTcyZDA3YjA5Yzg3IDRkMWI5N2UyZTk1ZjI2YTApKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5Yzc1NzQ3YzU2ODA1ZjExIGExZmU2MzY5ZmFjZWYxZTgpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig1YzJiOGFkZmRiZTk2MDRkIDVhOGM3MThjZjIxMGY3OWIpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigyMmMwYjM1YzUxZTA2YjQ4IGE2ODg4YjczNDBhOTZkZWQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5MDA3ZDdiNTVlNzY2NDZlIGMxYzY4YjM5ZGI0ZThlMTIpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0NDQ1ZTM1ZTM3M2YyYmM5IDlkNDBjNzE1ZmM4Y2NkZTUpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0Mjk4ODI4NDRiYmNhYTRlIDk3YTkyN2Q3ZDBhZmI3YmMpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5OWNhM2Q1YmZmZmQ2ZTc3IGVmZTY2YTU1MTU1YzQyOTQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0YjdkYjI3MTIxOTc5OTU0IDk1MWZhMmUwNjE5M2M4NDApKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigyY2QxY2NiZWIyMDc0N2IzIDViZDFkZTNjZjI2NDAyMWQpKSkpKSkoKChwcmVjaGFsbGVuZ2UoKGlubmVyKDMzODJiM2M5YWNlNmJmNmYgNzk5NzQzNThmOTc2MTg2MykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGRkM2EyYjA2ZTk4ODg3OTcgZGQ3YWU2NDAyOTQ0YTFjNykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGM2ZThlNTMwZjQ5YzlmY2IgMDdkZGJiNjVjZGEwOWNkZCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDUzMmM1OWEyODc2OTFhMTMgYTkyMWJjYjAyYTY1NmY3YikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGUyOWM3N2IxOGYxMDA3OGIgZjg1YzVmMDBkZjZiMGNlZSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDFkYmRhNzJkMDdiMDljODcgNGQxYjk3ZTJlOTVmMjZhMCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDljNzU3NDdjNTY4MDVmMTEgYTFmZTYzNjlmYWNlZjFlOCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDVjMmI4YWRmZGJlOTYwNGQgNWE4YzcxOGNmMjEwZjc5YikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDIyYzBiMzVjNTFlMDZiNDggYTY4ODhiNzM0MGE5NmRlZCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDkwMDdkN2I1NWU3NjY0NmUgYzFjNjhiMzlkYjRlOGUxMikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDQ0NDVlMzVlMzczZjJiYzkgOWQ0MGM3MTVmYzhjY2RlNSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDQyOTg4Mjg0NGJiY2FhNGUgOTdhOTI3ZDdkMGFmYjdiYykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDk5Y2EzZDViZmZmZDZlNzcgZWZlNjZhNTUxNTVjNDI5NCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDRiN2RiMjcxMjE5Nzk5NTQgOTUxZmEyZTA2MTkzYzg0MCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDJjZDFjY2JlYjIwNzQ3YjMgNWJkMWRlM2NmMjY0MDIxZCkpKSkpKSkpKSkpKShwYXNzX3Rocm91Z2goKGFwcF9zdGF0ZSgpKShzZygpKShvbGRfYnVsbGV0cHJvb2ZfY2hhbGxlbmdlcygpKSkpKSkocHJldl9ldmFscygoZXZhbHMoKChwdWJsaWNfaW5wdXQgMHgxMDQyREQ0ODcwOTI2QUVBMERFOTUxQjFBRkVDMjhCNTRFNjI1Qzk4MzRGOTk0NzIzQjdCQjg0QTkxQjUwNDNCKShldmFscygodygoMHgzNDMyRUE4OUQyQTEyMTk5RDk4M0NCNjBDRDgzNUY1M0M1M0NDM0YzMzhBNEZGQTc1MzU1RERCNzA0MjE4M0E4KSgweDMwOTI1MDhEMUVBNTI1QUU5RTVGMDVBQjI5QThCRkI0NDgxODQwQzRDM0Y0OTc0RjMyRDU1MzgzQzgzMTJFQUEpKDB4MzdCQTJBMDg5MjNDMDJEMUQ0NzNEN0NCODY2MzY5MDAxMDc4MUIyRkJGNzc1OURDNTlBMDY3OURBN0VGRUZGMikoMHgwNDJGQ0UwM0U2ODhFN0U3OTVGODg1QTNGNTkzQjVFNDYwNzQyQkU4ODlGODYwRUQ5MjBDOThBQTRFNzQ3NjgwKSgweDNGRUIyRTgxNTE5NUM5M0FBMjlBMUVGNTk1NDM4M0E5MDA5Rjc0QTZCNDYxNzM4Q0U0RjczNjI3MUFFOEI5QzIpKDB4M0U3MDE4QTlDQzQzOEUxOEExQjc0NDkwMjM1NEZGQjFGQjI0NTJCNTFFRTJDNEY4M0IxMUIwNzkzNkI0NDJFQSkoMHgxRTQ0N0ZFMzgxRjg0QjE1RTM4MUQ1N0MyQjZFNzVFRDA2MEVDMjk3MTgzODEyM0RGRkU5MUNEQUU1Q0E1MkM3KSgweDNGOUJFMTE2NTJGQUE0NTRGOTA0MkQ4OEJCRTJCQjYxMDI1RUFGNkVBNDNDNUIzQ0Y3MzUzMEEyQzg1RDkzNjUpKDB4MTUzMzFGRTg2MkQ4RjlGMTI3MDU4OEZBOTVDQzk5OEI4Nzg3MTRCQ0E0NUJBRDFGOUQ0M0Y5MTFFNEU5RDEzQykoMHgwQzYyNTUxM0U1MDY4M0RDNDlEMUE4N0Y3QkQ3MTA5MDZBQTQzRjRBQTE4RURGMzY3MUZDRTg1NjU2QzI3QkYwKSgweDNFNUZBQ0M3RjhDMTdCREM5OUMwM0E0QkE5NUM3QzAyNkM5M0JDNzEwMjAyNUM4ODVGRjkzMUJDQjIzRDgzNTEpKDB4MjVBMjBERDlENDc0NkRFMDdBOTQ0NTZGM0NDNzVENkI5MTUyQTA2MTkxQTEwNjAxMjg1NjU3MDkyNTU1RUQzNCkoMHgyMjdFNkMwOUVBQzc5NzQ0MzI5MEM3NEZBQUNGRDhEMENCQTNFNDMyQjVEN0IxRjcyNDYwNkZCNkQ2NjQ2MURGKSgweDAwOEJDQjJGRURBMkI4QThCQ0Q1ODdBQjIzODg2QTZGQzcyRTNEMTQ1NEZEOEQwMkFENEQ2QkVBRkMxMTMxMzApKDB4MUNERDVEQjAyODExNkIyOEExNDZEMzNGODEwMEUyRDFBMEQ3OUVDMUVDMjI0RjRBMkQyNzBEREZEODg4RTAyNSkpKSh6KDB4MTBGMTNERTdDMjVCNkE4REI1RDBCRUZBMEZBODVEMkFERjREOUE1NjVDRkE1MUQwN0MzMTQ3NTA5NDU0NTFFQykpKHMoKDB4MjhFNTMyMDE3MjczMTA1QTAxMzkwMkVEQjIwREYyMjcyM0RFNTQ3NTcwOThGQkNCNkQ4NUU2Mzg0OUNGMzE4RCkoMHgyOTFERkRBMTA4QjdFNkM4Qjk4RTFGNjUzNTlBMUUzMDc2QzlDMkU2RjQxMTM3Mjc3Q0QyQjBFREVFRkVCRkQzKSgweDFDRTFFRjU4RjY1RjlERjI0NkEyNDJCMzQzQTZCQjNGMTQ0QzY1RERFMTgwQTE0MDBDQzEyOUNFNjhBQ0RFMDIpKDB4MTU3QTJFM0IxRjc4MDBBMTJEQjMyNzBBNjNFOURGOTg3RjUyM0YxMkFCQTkxMUE2NzM2REQwMTRBQkRENkIzMSkoMHgwQkMwRjUxNURBMkNGNjBDNDQxMzgzOTlGN0YwMDBCNkFDRTUyQ0I3NUVCNDk2M0U0Q0NCNDQ2MDMxNEI4RDY2KSgweDNGRUIxNjA0ODhENTYxNURGNDhBMEM2MkJBNkIwOTRDNjQ3QTVCQ0UwMTEwNDgwNDUxNDVDNEQxRDY3RjdBQUYpKSkoZ2VuZXJpY19zZWxlY3RvcigweDFGRTA5RkVFOEZGNzYwQURDOEQyNzMyMTc0QjI3NzA4MDU5NDlCNDc5M0ZDQjA2ODQ4M0VFRDY1NUFCOUQyRTUpKShwb3NlaWRvbl9zZWxlY3RvcigweDFFODZCRDZGQjUyQUI2MTVBODMyNDVDOTI4ODZFN0MwRTA3MDBCMDI3MzdFQUFBRTc1ODc2OUJERERFNjUzQjMpKSkpKSgocHVibGljX2lucHV0IDB4MDQyRThGRkJDQTIyOEFEMzJEOEJEOUI4NzZDODVCMDg1MzdFQ0JCQzVFNTRCRDk0RUVBMzE4OTNGNDY2MUQzOCkoZXZhbHMoKHcoKDB4MTk5MUUzQ0VCRDQzRUZBOTIyQzk1QjBCNzhBRDczNzM5M0Q4NUEwQ0ExNTY1RDQ3NzRGNEExQjVEQzVGNTk4QykoMHgzMDM0MTczNTUxRUQ4NzIyQkJFMjU0MjFFRUUyNEVERTY2QTA4M0RGQzdFOTk3MDAxMTZFQkRDQTA4QTJBQUUyKSgweDJCRjlEQzhGQkJCMzQzN0RGMDQ5OTUyREU3RTBBNERBOTcyRDEyM0ZEMjVDMDRCQzJEREM3NDcwMTVDMEY1MkMpKDB4MTI5MTAyODNGREJFNkIyNEQzNDkxRkRCNjk0MzBGNzNEMjgxQzQ0MzZDMUMxNTY1MUMzRUM5RDVBMkRDRTAyQikoMHgxNjVBNjAwQzQwMDBDMkYxM0MyMDUwNjA3NzcyNUFGMzZCRDY2MjNDMzIyMjAxN0Y2Nzg5OEYzRDM1MkI1RjgxKSgweDA3NEM4QTMyQTI1MTFBRkM0RjM3OEVENzE2N0I5QTYzODEyNUY4OUI2MzM2RkZENDJERTI2NzY2QzEzQkJGMjcpKDB4MEU1QkM4NTQ1NzIzNDlGNEZDREE4Qzc4MUM0MURENEUwNzg1Q0MxNkYwQkYzMDg0MkU0MjMwOUYzMDQ2MzhFMSkoMHgxMjhFQUIyNTk0MEJDOEMzMkI2MDhBMTQ1QzMwMTExMDYyOTM3Rjg0NjY0NzZEMTcxNkExOUEzNDA1OUMwNUVBKSgweDA4MENGNDQwRkMyNDFFOTM4QjA2QTI3MzQxRkQ0RTIwOTZBQ0VCOEY5RjAyMjI1MTJCRkE2RkYzQTMzRDdGMEMpKDB4MEI5RDI2MENDNzUwNkJCRTBGMUM4RTBCMzNBN0FCMkE3RkUyMUJBRjQwRTQ5RDE3NDE1NTg1NDFFRjg1MjNFMSkoMHgxNjBENjFENThDOTYwQkRCNjBEMTVEMDFCQjMzODQ3Q0VBQUQ4NTM0OTc1RTNCMTlFRTFBQzI2MTY5RDAxRDUxKSgweDI3MTA4NjNBRUI5REQ5RDVEMTQzOTlGRTcxNkY0QzIyOTAyRDJDM0EzNENERThGMDlGNzE5RTk2RDMyRkE0NEUpKDB4M0IzMDk1NDUzMTFDMzg3QjIyRTBDREYzN0VCRUNFNjY5ODA0MTk2QkMwNzdGNDFFM0FBQjlERjQ0MTZDM0EzMikoMHgyNjRBRjk3NURDOTA5NEFCNDFFOEIxQTcwNjQ3MUU5NkY0RUQyMkI5OTcxNDQ2MzVGQUE5QTI2ODNBRTk3ODNDKSgweDNGMDdFOURCNEEzRTFBRUZERUE2OERGN0U3Qzg3MTI1NDI0QUQ5OEMyQzkzMzQxMDI0QTEyMTEyQzk3MDU3RkEpKSkoeigweDA1NzlGNzI4MjE4QzBERkRDQjI1RTRCMjkzQkM4MTk4Q0YzMEVFMTRCNzkyRjM0NDM2MEZCMDQ2QjBDNjg0MTMpKShzKCgweDA2Mjk3MjM0NjkzNTc2QzYwMUZCQTU3MTBGNUZENDI3NEI3QjI3NjRBOEM1REU4MkNDNzhGOUUxMUVDMzM3M0UpKDB4MUIxQjYyRDEwMzQxODZCQjRCOTM5Q0VDOEZDMzM5MTMzQUVEMUVBQzI5NDg4MzYyRTVFQkRDNjhDOTYzNjVGNSkoMHgwQzVFMDYzQkNDQjNGRDQwQjMwODcyQTBBNzBCMTRFNzdGQzZGMzNGNjQ5MkNBODVFMUFFRDE0QTJCQTUxQzVCKSgweDNCMjI3N0MzMUQ4RjdEM0U1NThBNkVDMUFDN0I0QUE2QTY4QzJFNUU3RDk0QkZCNjYyNEJEMUVCODkzOEJCREIpKDB4MTI5MTg0RjYwNEM5ODhCRkJBMTUxMkI5REJEMDA1OTRDQzY4RTVGNzk0MkIzRDk3M0U1RkMwNkIxMTg1OTY4NikoMHgxNTlDREFDRTQxNTg3NDJBOUNFNDNFNDk5NjlBNDRCMDM1MDgxNTI3NjBCMDFFOUNBQzRFQzBEQjA5QkVFODdBKSkpKGdlbmVyaWNfc2VsZWN0b3IoMHgyQTdEMDE5MjlCNjJGMzc3QkEyNUM3QzRGNzZEQjg1QjhGMkQ0RDNGRDJCMjAyN0FBRjgzQzRFNDg0RTEwM0IyKSkocG9zZWlkb25fc2VsZWN0b3IoMHgxRjc3QzM1RUYzRjFEQjAyQkFBM0NFNEE4QzJDQTlENjRCOTE2NEM4NTA5OTAwRkU2RURFMTQ1QTIyOEJGQzE5KSkpKSkpKShmdF9ldmFsMSAweDA5NzI3RUU3QzA2QjlDRERDMEI2M0M2NkM5QzI3REJCMjQxQ0MzRDA4RUU4MTZFNEQ2NzQ5MkZEMzVFNDMxODUpKSkocHJvb2YoKG1lc3NhZ2VzKCh3X2NvbW0oKCgweDEzNDQ2RTQ3MEM5MjZFQTEzQjdEMUZEQjYwMTE1MjFDN0FBQ0QzNUFGNjY0MzQ1RjFCNDIzQTY3OTBDMEFFMkMgMHgwODVENjU3NTBEMEJBMTI4MTEzMDU5NDg1NDcxRTFFNDU0NTAxQzA0Q0UzQzZENzBCRjJGMDYyMEIzQzAyQ0MwKSkoKDB4MUEzMUM2N0REODUxRjFDOEQ0Nzg4MTM0QjQyMDcwQzUyNkFGRUVERUI2NThBMTI1N0NFQjAzNDFEMjY3N0UwRSAweDMyODk4NUI5QjI5MDYyRkNENkMwN0YxRjM0MjcwQTY3ODdGRUJFMThBNEY5OTJCQjQxNEZDMkQ3RTRCRDVBMDUpKSgoMHgxMTJBOUI0QzA4NDE1RUEzNDQxOENFQkY1QTdFMDQ5MUNDOUIyRjJFQjY3NzI1NEE5N0I1MEFBOTQ5NTM1QTQxIDB4MERCMUY2NUQ5MDM1Nzk1MkNCRkI2QzlGRkJDMDZCQTZDN0M0RDRBRDlGQjlDMUFBMkQxMUE5NjA3QTYxMzU0NykpKCgweDIzNTBCNEQxRjlFODhEMkRBOTc3REQwQ0MxMDU5NDVBMjE3NzU5NDI0MkJGQTE5N0NGNzAzQ0MwOEI4MjJCM0EgMHgzMjM0NDJEOURGOTg2QTM2OEYyRDc1MEQyNzYzMkFGQTcwODYxMzEwOTBBN0M2MjA4QjM3MEE3RjMyQjcwOTEyKSkoKDB4MTUyNUJDMkQzRDFERkUwQjBGMUJERjdFNjQ2QkE0NzdDMTFBMzUzNDE0Njc4NjVFN0U2QTkxMzRFRUI3RDMwQyAweDM3QzVGMTgyMTlEMDMyQTIwNzlCNUY4N0U2OTYwRjczNTE5OEVGNERGRDlFQ0JEODE3NDJDMDcyQjNCOURFNTkpKSgoMHgxNzVCODNBNTg0OEY1OTkzOUI0QUFBODlCRjM2MUQzQkE4QzY3NzI5RTBDOEI2REY3MDNGMTNBRDgwNzhGQjI2IDB4M0JFMkYyODY2MEFCM0MyODRCMjI0QkRFNjM0RDMzQjZFRjZFNzBDNDJBQ0Q0NkNGRkY3QkY5ODE4Nzg0QkY4QikpKCgweDBCQ0I2MTZBMzcyQkRCNTU4ODA1MzVBM0M1RTIwRDJBNDdDMDY1NTFFNUZGMTlFRDQ1ODQ1ODc0ODRDQ0YxRDcgMHgxRTNCNzYwMzU3N0ZGQjE5RTdCRDI2NzhBQjNCQTM4MTkzNzlEMTA0NDI3NzBCOTk4MDRBODdBQkZEMDUxQ0E5KSkoKDB4MUVFRTQzQjNDQzRDMkJGNTk3N0JEOUYzMzY5MTJEMjVDQzM3NDUxQ0FGMzBGNDYyRjc2MkU5NDg0NzkzRUFBNiAweDIxRkU5Njk5MjYxMzZFREM2RjZCMTlBQ0QxNTg1RURDNkIyNjNDQzU4MEM1NTQyOEJGOTI0NUNCMUU0MDY5OTgpKSgoMHgyNzk2RTFEQzc3MEMzRUU2QTA0NDg4MUFDMDc4NEMyQjhBNkY1RjBDNjlBRTA1NjNFRjI0MjdFRTRCQzE2NUQ4IDB4MzZEQzY4NTFERTZDRkU5Qjg4QzhFQTIxMzAyQUI0MzA2NTk3RjczNjNDRTM5ODY4QzI5NjAxRjUyNjdBOTQ5OSkpKCgweDI3RDYwREVGOUVDQTA1MjA1NEEyOEY5MkYwOUFFQjVBRDQ2OEExQTMxOUM5QkE5QUNFREUxQUVENjI0NkFFMzUgMHgzNUFFMTFDNDFCNDRFNjJDODIzRENEQUUxMzEwMEJDNzM5OTU0MkI3N0MyNjFFNzIwNTg0NTlGMjMwN0ZCQkY3KSkoKDB4MzIwMThFMjM5QkVEODkzQzRDREJERkUzMENENzVGRjM5ODk5QUQyNjI2Mzc2OEEyNkJBMkZEQUVDRjFDMEQ0NiAweDEwRTMzNzg1MTVCMzg4MzVDNzNEQUY4MkJENDg4Q0U5RkU3RjdCNjM4MkU3QTU1RTUzQ0Q2MzI5QTREQTA1RDgpKSgoMHgzODZFNjhCODQxMUEyMTExOTYwNTRERUVEOUI1MkMwNDVGQzM1MTY0RDMzMDQ4MzYwQTUxNzY1RjkwMzNGM0VFIDB4M0MzRjg2RTM5NjU5NzM4Qzc2NTAyMjk2MkU4QzMzOUVCNjk5RTI0RTY1RjFCRjExNDc5MjE0MEFGRDA5NUJGQSkpKCgweDNEODNCRjY0MTgwREY0OUU0ODc2MzY4NEM5NzYwNjE5MjM1Mjg2MzA2QjRCMkMyOTQ4OEYxRTFCMkEwNEMzNDYgMHgwNEI2QUFDQjA1M0JGOTBEQ0Q5QzU0ODRDNjBFQzUwNTU2RjY5RUYwNTZDNzFCMTA5ODhFNEY5ODNCNThCNUU4KSkoKDB4MDU2RDBCNzYyOEQxQUVBQTk1MTI4NTBBREExMjBGMEFCMkQ3MkUyMTFCMjk2OTBGMzlBOEZERjQ5MTRCQkNCNyAweDAwMzdDNzA4OEMzRDRFQUM4REUwMEJCOTYxMkI3RThGRjUzRUU4MzRGNkQ1NjREN0E1OThENEFDMDMyNzRENkIpKSgoMHgyNzNGMzg0OEZFRTJFNkYzMUU5RDIyRUU3OTFGRTNEOTEwMjVEQzQ5QjJCN0IwNEU0Q0ZCQTI2MzU3MTBDQzFEIDB4MDBDNTFEOTQ0OEUwREYzMUFCQTFFRjQxNUJBM0I5NDlCMEEwM0RDODRERDEzRjE0RjZDRkI5ODI1ODVCNjkyNCkpKSkoel9jb21tKCgweDFCNzdFOEFCREI2MURCQUQzOTNBQjMxRkUxRTA0ODg0OTQzMTk0MkU4NEY2QjdBMEExOUJDNDZDNDJCOUE0RkEgMHgzQkIzOENEMjlCMEE1OTQ4QkM1QUU3MTI1MUU4Mjc4Q0U2MTlGNEE5RjQxOTBCOEZFM0Q0MkI0QzZENEE1M0E1KSkpKHRfY29tbSgoMHgyRjU5NkI0N0ExNDBEMDc5QkZERTM5QkU5Qzc0NDBDMkRGOEUzMjREQ0Y0ODBBMkNDMTM2M0VBQzQ0NDVENTVBIDB4M0YyMTQ2M0Q5OUFCMkJBNTlCQUZDMDI4MUU0QjBEQ0MwQkNDNURDNDlBNzRGMjA1QzJEMkFBRDkwQTBCQ0E0MCkoMHgyMEJBMjBBRDJDQTJFQjBEMUQyMzcwOTAzQURFNzQwRDdDODZFMjA2NzY0NEMyOUY5RDJDQUMyNDdENEY1RjI0IDB4MTNGRkY2MTEyOEMxNjk3RTcwQjM0Q0YwNzEzN0M3N0VFNjdBOEU0QjBCMzM5REY5Q0M5NDA4OTJCNzUzODY2QykoMHgxMTRCNTQ4QkU5NUVERDc1REVDMjQ4MkE2RTUyOTcwQUNDNUU2MjgxQjM5MTlGMThBRjkwMTk0N0UxNkQyNzdDIDB4MzcyQTA5RkMzQ0EwRUE2QjA3Q0JGMjA4MDI5NUI3RkI2N0Q1NTY0MDBBNTVGQjBFQjUwQUQxOTlFQTc0QzFGRSkoMHgyQUFCQ0FBN0NEN0ZFNjY1QzA3RjVFRTgzMUExQUJCMkNDQ0E2MzhDOTgwQUFCRDRFNDE5QTdCRUIyOEExREZGIDB4MzgzMkY4NEY2Njg5MUZERDhFMzZFNDI4ODNGQjgzODJCRjFGQTdBRDc4RUY0QkQ5OTg4QkNEMUM1RjY4NUIyNCkoMHgwQTI0QUEwN0EyNzlCMzA2QUJEMDFCQTMxQTJEOEYyQzkzNDczRTQxMkE0NEYyMUU4QUI2QTUxMEMxRDk0MzUxIDB4MjE2REQxMURCNEVBMkE4NjFEQzM1Mzk2QjZGNDE2RTkyRjdEQkMxRTM3ODE2MDZDODIxMDg5Q0VCNjUyN0NGOCkoMHgyREJBNTI5RkZBRTQzMzg3NjEwOTAwNjEzMTgwNDEzODQ0MTlCQzNEM0EzMUYwNTAwMEY1QTc4MDQyQzQyMjBDIDB4MzA4ODY2RDQ5NjgwNjlBQkRBNTc4QkQ0MDQyOTE5RkNFN0Q1MEMyRkY0QTRCRjBCRjBDQUE5QjQwMjA1QUI5OSkoMHgwRkZENTczRjk4QTcyNENDRjU2RDE3Q0E3QzAxOUJBMDY3OTJDMzAwMTA3QUU1NDY0ODY1NUM0NzNEQjk2NUREIDB4MTZBMEMyMzg5RkNEM0RFN0Y4Mjg4N0I0OEIxNTM4M0FEQkI5OUYwMkRGMDc1QkMxNDc4Njc3NEJCN0ZGMTQ3RCkpKSkpKG9wZW5pbmdzKChwcm9vZigobHIoKCgweDFFQ0U4OTQzOURENDdDRjVENDlDMjI5OTZDRkExRjUyOTNDNTZCODQwMERCODlFMjQ5Q0RFM0VFNEU4OUYyREUgMHgzRUREMUI3MjJFMkQzRTM4M0Q4MTkzRERCNjdFRkQ0RTY0QzlCRDFGMTYzQUFFQkFENUYyNjE1QTFBNzE2RThGKSgweDM5OTVFRUU2OERFNTdDNjc2Q0Y4QUU5NEY1RTlCODQ2MTA3MTEyNTc0QzkwODc3MkUxOTQ3MTFCMzREOUZEMEEgMHgxQUM1QTE3NjUxMTMwNTE4NkJGNTZCNkUzNkRENjJERjQ5Qjc3NjYzNDBDRTBCM0I5NkZFNjA3NEJGM0Q5RjNEKSkoKDB4M0U4RDJDRkFGOEIyOUUyRDAwMzRDRDA3OTlBMjJDNjhEOTY3MzExNDU4MzJDQzVEREY3MUYwRUVBQUVBMUNDQyAweDI2N0Y3RDI3QzM1OTVEMzMyMjhGQkU5MzA1QTA3NUZCOTMzQzdGQTcyNzI4QzI5N0ZENDQ0Q0U1ODhDMkM3MUEpKDB4MTNBRERDREE4OTZBNDUwQ0YzMUZGNTVDOUFFMUU4QzE0QzdGOEJGQzNGNDYxMDQ2RUJGNzkwQUI1NzRGNTZEQyAweDMwNUVDMTZGOEM2NDUzNTgyNzQ2MDhFODE4QTlBQ0I1NEMxRTlDNDc5RDE4NDkyNDNBNUEwODE5RUYwQjcwOTQpKSgoMHgwOTY0MUQyMDdBRjA4RTI3QjRDRjE5MzE4RkJCOEZENzZEOEQ3RTY0MkMxOENCOUU0QjFFRkFGMDVDRDZBQjNEIDB4MDVFQjFBODg2MTE3MUQxRDI1QTVCQjAxQkJERDBDODRFOTdFNDlCNDA2OUNBNEI4NUI3NDZFQzdDQkU5Qjg3RSkoMHgzOEQ1RDA4RTRGQTE3RDhBOTFCMDIzQjMyMTg2RUU2M0I5Q0ZEODZBQUYyMkNCNjZCRUU4QkNDNzU1NzdBMjdFIDB4M0RCNDQyQjBENkUyQzkwNjJCNzJFNTVCNzY4RjcxQzc3RjNCRkE0ODEzNEQ1NTQ1NTc5NUU5RkRFRjcwMTU5RCkpKCgweDBBNkFCNUMxNjU1QTVBOEU5M0YxMkNEQUY3OUMyMzI3RjEzRkU4OTMyQjQ2QUM5NkM1OTIzOTYyNEZCMjdBQ0UgMHgzQjc2OEFENEI2REY5MEQxNTlEMjVDNUMyRUQzQjY0RjdCMDJEOTJDMjExQjExODI3RDk5Qjk1RUIyNkZBNjQxKSgweDE4NDAzMEY3MEIwQzlFNjQ5MUFDRjdBMUEyMTE2NkY5NDg3RTlEQTdCNEI3MkNEQ0M1MjQ0Mjg4MzZCNkJGQzMgMHgyQjQ5MTg0RUU3NkY5NUI4RkY3NkU5MTVFMzE0M0E4RTQ2NjJCQzE2MTAyN0M5M0M0N0E5REQyREE2RDEwNUYzKSkoKDB4MjY1QUJCOUFENzU3QTg5QTgxMUE5QjY3NDIzODE5N0NCNUY2RjMyQTc5RjNGRDMwRUMyQTQyNDExRUMyMUQ2QSAweDExQ0U3NDg4MUZDMDM2NEI2QUQ2RTE1MTg0MzZBQ0VGRTAyRjlFNjYwODhGNjRBQkY3NTkxNDIzNUEwMzVCQTMpKDB4MUE1RTI1NDY5RkFCRTJFNjhFQjc5NUM0NDhCQkM5MzZEQ0IwQTEyODYzOTUzODI0QzIwQTMzQUZDNkFEMzc1MyAweDEzRERCNDIwRUY2QzY2QUM3N0JFRTc0NzRCNkI1RkJFOUVENTVDNjA1Q0EzQjM1QTQ1QzlGN0QxMTAwQkY5MkUpKSgoMHgyRjNENEE5RDQxNEJEM0Q5N0U5NUE3NUI5NENEREY3Nzg2MDU4QkYwODgwMDBFMjBBMjg2RTkzQjc5ODE2OEM2IDB4MjFEODI2NUNBNTQ3QzhCMkRCRjhFOTkyQjFBQ0VFNDI5Qzk5MEVFRDczRDQzNUM1N0RCODc4Njc2MkNENDI1RikoMHgyMjY4NDJCNURFRUNGRjIyNzNGMEFBNTY5RUYwNUM0QkREQUY5RDA3NzIxQjc2OUJDRUZBMTFBMkMyODNDRDIyIDB4MEY4RDk5ODRCQzg1NTlFMEE5MkUyRTk1MzM0NDQzRUZCNTdGNEJBRkJENDgwNTU1RTcxM0Q5MTk3OEY3MTEzRSkpKCgweDJGMEY2REYyREU3NEYyMjAyQTJGNEQ0OERFNzMzQUQxMDA2MzA5RUYxMzBDMDhEM0EzRDBCNkVFQzE0NUI4NzggMHgyQjJCNjlEMkExODhGRjBDQjE4RUVBRTJDNEFDQTI5RDI3N0E2MEM2MERFQUY4MUU0MzhCOUQ4NUFGNTA5MDFBKSgweDJBRjk4QzgyRTlFQTM4NEJBMkI0RTZDRTkxQUVFQjVBREMwREFDMTVFMTMzMkM4Qzc2QTc0ODI3MDFCNzI5OTUgMHgwNDEyNDYzRjVGQzExMDUwQzc2NjRBQ0FCNENENUQ4RDhGQzhDN0Y4RENGMUNDOUNDQkUyQzQ5NDQ2RDhBOTU0KSkoKDB4MEEyREI1QzJGNENFQTVDMjVGOUVDNDkzMzEwQTgxM0I3NThGNjg5NDQ5M0Y2OENDOTBDQjU1NzM2OUREOTRCNyAweDJBNTU0NjI0QzM5NUY2NTg1OERDM0EyNjM5OTFCOUQ2NjgxMkU3MTg0MURGRDAwMjVFN0ZGQTc4NkFDQTQ3QzEpKDB4MUUwNTI3NTNDRjhDMzQ0NUVEODk2NjMxRDU3QjNBNTRDRDExNzBFMDI2MDRBMDJGMjk5RThBRjZGNDIzNDFCNSAweDM3MkQ4MDFERDY5Mzg3OTI0NEYxQTUzRDQ1NDkxRkQ1QjMzNjgyRTZCMkM5RDAxMkQzQTRDNTFBM0U1QTY2RTIpKSgoMHgwRUI0NEVGRTFDMjM4MERCNkJEQkY5OTkyMjAyQzc4MzM0OEYxNzMyOTdBNzZDM0IyMEFFM0VFMzRGMUQ5MzlCIDB4MjVGQzZCNTY5NDYzOTAwRjREN0Q2RTU1RUIwODc0REUzRUM2RjY3MkQxQzlFMEVGODFDMDg5ODFENjEzMjZCRCkoMHgxRkJFRTdDQzRFOEIwQzE0M0Q1NTI1NzZERkE0QjhGNzM4OTIyOUIxM0Q4MTk4ODc4QjY0QjI5QUIyNjM0QzUwIDB4MkI3MkYxODZDMzc5QjMyMzgyRTczNTU0N0YxNDVEMDQzNDQyRTI3Mzk2NEY3MDAxNzg3QkUwODM0N0U1MkY5QSkpKCgweDJDNkVEMEZERDA2MzNGNzNERTczMzYzM0YzOUE3Q0U5ODE5QjQwMUIxRTQ2MjZCM0I4NTRFMzY1QkUwRjEyMzEgMHgyOTJCMTBFMEFFRDlEMkU0N0U1OEFBODgyRTNFQUQyMjdCQjVBMUM4RDY3RkNBNDI3MjhBQUNFNEQ0MjI2RjlFKSgweDI0QUEyRTFGQjVGNEQ4QkZBN0RCQjk3REIxNkE4RkU1QjJCNzBGNDUyREM2QzYxMzMzOEMyOTVFODg3QUMzMjQgMHgzN0JFNEQyREEzQzA0RjgwMDEwNkQzNzg5NDFCREEwQjE4RkJFQTUxNzY2NTk4ODU1QUI2NEFBRUFCRDZEOTFBKSkoKDB4MTk1QkM1MTI2QkQwNTM3NEM4M0Q0NTA4OTgwQjZFRjIwRjc4NUIwMUUwNjgxQjMxMTZGOTFCRkYzMzU5MzI1NSAweDA2NkU2MDAyNjM2MjgzQUM2Q0EzNzk0NTBFRDY1N0NGOTk0MTk3QTJCMDQxRERGMTQxNjA2QkFDRkUzNDc5Q0UpKDB4MzA0QjgxNUZDNzQxOEZGRTk2OUYxNDczQTY3NDAxOUVENUFGMUU1MDFBMUU4QTgzNUUxMTE0REU3OUNGNTc5RCAweDFBODBFQTI5MDUwOTI1OTA3Q0YwRERCMUY2ODNGQjUwQTcxN0VFRjM1NEQ5QzM3QTkwNTc0MUU1NDVEQUJGMDQpKSgoMHgzMjBBODQ0Q0ZFNkFGMkNCRjk4MDBGODQ0RjMyRDhDQjJGNjg1RUY5NDNENzcwNzE0QThGNTAxM0RFM0IwRDczIDB4MUNFRjA1M0M4QTJFRDUwMTY3NUFFRjAxQzUzOTIwRjREODYyQzg5RENENUMwRTAxM0RENjY2RkU4QUQ0ODdEQikoMHgwNEZGRjAzRERBNUI3NDY2QzE5ODc0NTFBOTI4NDA3NDNENDUxQjdFOUM4MzNDMzU4Q0RGMzRFQzA1RUU5MzMzIDB4MzY3MTMzQTFDMTVGOTBBMEExNDQ5MkQzMTM1Q0REM0FDMzM5OTA4OTUxMzk3NUZGQjI5REQwOTcxNDE3RkU1MCkpKCgweDBDNzg5RjQ2QkVEQUNFQ0VCNDMyMkNGNDFCNUM2MzA4MTExOThCNkM0QUQ1OEY1MkYwOTZGNjczQjY5MUU3OTEgMHgxNDdEMzVGMjYyNjc3QTBFMkM0MDQ2NjI4Qzc3QzBCMjE4ODA2QjFGNjc0MjhEQkI2NTdGREMwRjAwMkJCQ0ExKSgweDA3NEVBMDE1N0Y5NzM1RTY2MkU0ODM2MjdBNjQ3MzIxQzRDOTk1NUIxRUZEQkQ4REExQUM4QUQzQ0RFQjA2RDMgMHgyMzdGNTk1QjQ1OURBNTFEMEY4REQzRjE4RTZFMEVDMUVBRjI1NENDNjJBQjc4QTEyQjQ0Q0VFMzY2REVBNTY1KSkoKDB4MEM4RDk4NjAzNjBFNjU5MEI3MjAyNjM1REU2QTdBNTNFQzA3MzJGMjAwMjgyREQ0Q0YzODkxMDg4MEY4OUYzNyAweDFDRTI2RTFGNjJFMzA2Q0JCNzc4NEY0RTRFMTU4Qzk2MzU1Mjc5MzkwNEZCOUJBQTAxRTM1Q0NBNDRFNDgzOUYpKDB4M0IyMEQ2MkM2QTVEMUU4MDlGQ0QwMTE0RUI1M0M0RUY2RTBBM0ExODE4NzMyNjFGMUVGNTVBNkRBQzVGNDY0RCAweDA4MEIwN0QxNzMxMDFGMTRBNEIwNjlFQjYyQTM1MEY2NTg4QzQ5NzE0NUZCQTk4MTVBRUM5MTg3QjVCOUI5RTYpKSgoMHgwRjMwRUI4OTZCRUY5OEI0MDYyMDIzQTRDMTY5NTkzODY5Q0Y1Q0E3QUUzN0IwNjQ2ODA1Q0VERUU2NDBENjk4IDB4MUE5OUY0RkVFQzIwRDQ0QTcxQUNFMTBDOEE2RjlBMDU1NjkyMEE3RUI3OEEwRkNEOTEwRjMwMzE2NUJGMjEzNykoMHgwRDIyRjBGRDg1RjY5NkE0NkI3REEwQTU2OUI3NEI5ODhBQTZGMjcwRkI0RERERTI5NUZBRjRFNjYxOTI5MEJGIDB4MTg5QTk3MTVGOTEzNEZFMTU3QzFCOTYzNjRBNTk5MzE4NjVGNkQ2QjcwODgyOEM1MkZFNkZEQUJERjVBQjVBQikpKSkoel8xIDB4MEQ2RDdDRDk0MjFDQkFBMzlFMkE4N0JBNTY1QjUxQkM0QjY0RDdFMTg5RUJGQjVGRDIwQzYwNkU5NDBEQkREMikoel8yIDB4MEMxMzdEM0I0MUNEQkY2N0Y4QzUwQzdFRDcyODZFNDE5NEU5QzE3Rjg5REI0RThBQkUwNTEwMzEwODFENjY0RikoZGVsdGEoMHgzNUZENkIxQ0QyRkFEOEY2QkREM0ExMkYzRDhFNzgwODBGQzAxNjkyODhGNTU0RDM5REExNUI0Mzk1MkVBOEMzIDB4MkQ4MDE4NDIxQ0E4NENBQkQ3ODM3NTBDN0JFQTc0Rjg2NTdENkIzNEY5MEZCNjZCMkJBQjJBQjA5N0YxODE0OSkpKHNnKDB4MkFBODFCQzUzMTI2REFEQ0I0NjhBMDRGNjQ0QTE3NTMyRDlEQjQ3OEYyQjFGRjY1MjU3MTY1QkFBQTg4MEYwQSAweDFGNzUzODQxNTIyRTYzOTI5NUNFMzJCOEZCRDBENzBGQTJFMzc2RjBFNTc1RTZDQTEwNDFGMzA4MTNDMkVGRjQpKSkpKGV2YWxzKCgodygoMHgwNzZEMDNEQTkyMkMzMjQ4M0FCMUVEMTRBRkIwODVGNjNGOTFGODA2NjhFNjM0RDg1RUNGNjhFRjNBRURBNEVDKSgweDAxN0I0RUI1Njg0NDJCQ0EwQTQ3MkNEMkJFMTA1NEIxNzU0MEVBNjlEQTMyMTZBRUU0MzgyOTYxMjQ4MDM0OUEpKDB4Mjc3ODI4RDIzMDY4ODRFQjM4RTFENDc2RTE5MTMwNDA5RTY4QUFGM0Q3RjQ4OTAwODIyMDI3NDYxQUE1RDA0QSkoMHgxOEJDMDI3QzAxMkVDRkIzOUMzQUEwNzg2QTZBODM2N0FENjU4Q0IwNkY3QTA1MTAwRkM3RUQ1MUZFNDk5NTA1KSgweDJEMDhEOEQ3MjhGOUZDNkQ3RDY2MTMzMDUzNDE1ODMzMkQyNTczREY4N0FDMzk3QzA0NTk5NzA5NkU1Rjg4MzcpKDB4MEM0Mzc5NjNFOTZERDg2RTZCQTUzN0Q1QUExOTg3MUJDMzVCRTZFQzI2OTMzMkZCNjRGMzI1NzUzMUMwMDExMykoMHgzRjMzQTU3Q0I1OUJEMDMwNjUwOUM5NUEyQUQ2QjVFOEE3RTk1MDA4M0Y5NzZFMTkxNTFBQzZDRkIwMUNEOEYzKSgweDNBN0Y1OUZEODdDRkM2RDI2ODcxNTZBMzM0QzA0RDY5NDcyRUUzQzVGNUFFNkJGM0ZFMkU1RThFQzJFOUUzQUIpKDB4MTRGNTY3MjZDNDlDRTcwMjg4NkZDMEY2OEEwNzNGRDY5QjJFRkM5RjcxM0Q2QUU5MEFGQUVCRDRDMjk2NEE0MCkoMHgxRjY1RThERkM5RTZEQjQ2MDhENEI4NDgzNzkyNTRENkIwNzNBQzQ3NjY1QTg2Rjg2ODI4RTZDMEVENTBGMDkxKSgweDBCNjA1NEMyRkEzNjA4RTlDRkM4RDYwN0U5N0U3MUUxNTcxRDIzQzk0QUY1MjgwM0E1RDVGRDFBNEUwMzYzOTUpKDB4M0U2RDU1MDQ2RDM5RkQ1QUNFNTdDRjc3MUNGOUNEQzE4MENGRkM1MUVGQUE5QUEwRDcwMEFGQ0IxNTlFNzU3RSkoMHgyQ0E5OTNBQTY4MURCQTVFNTg2QjA4QzlDRkIwMjAzNDZFNDhFQTA1REM5OTA1RUM4NUNBMDlGQkNEMzJERTZBKSgweDBCOTJCRDVFMjJEMTM0MDhBRjdCMDRFMzU2MkY2QkExMkUyMTgwODM5Q0Y3QzZBODhEQ0FDQTFCMzRGNjREQUQpKDB4MEU2QTZCNjdDQjVDQTg3MjBGQ0FFNTFBRjQwODkyNDM3RDUwNDNBNTgzRENFMkI1QjMzOTY2NUY0QTk3Qjk5MSkpKSh6KDB4MDY4Q0I4M0JEN0E4MUUzNjM1M0NCNzZCNDA1MjA5MjlCM0E1MDM4NTJCMjhGRTdFMTlDQjA0REEwQzI5NUVCRCkpKHMoKDB4MDkwQjMyRDY0NEUyMEUzRTcwODJCRkQ5ODcwNDdDRjA5OENDMjFGMzM3Nzk0RDNCNzg3RTA3QTU2RkE5QUE0MSkoMHgwNDE1OEQ2MjBCMDA2M0VDMDNGODA5MjM0MDc1MjFBQ0I5NDI2ODVGNTk0Q0FGNUM1QzNGM0RCM0RFQTQzOTVBKSgweDM2NDU0MDRBNzBEMDExQkQ0QjQwQzFFREIyRjJCMjA1RUI5RDc4NDU2OTgwMDkxNUU5NTExMzRCNDlFRTE4MUEpKDB4MUI2NzlGRDUxOTgyMkEzODQ2MTU0RjA5NThBQTUwMkU1NUYxREVCMjI5NUI0NEI2N0ZEN0EwODdDMkVCODlDQykoMHgzNDkwM0Q0OEM4NEJENEQ5QkYxRUI4RjZEN0FGMTMyRTJEODVCNkVDQkI5OTRDODM3NzEyMERGQjU5OEEyOTUzKSgweDI3REM2NTVFMzg0NzhEMjFEMjdDNTdDQjMwOTQ2RTlCNjkzRjQxMTM5NDI4RDQ1ODEyRDY5MjBFODlBODhCMTYpKSkoZ2VuZXJpY19zZWxlY3RvcigweDAyNzc0NzM4QTM4NUI2MEZFNzkwMzZBN0FCOUNEMENDQzVGMTUyM0MzQjRCODI0NzU1QzEyMjVDQTRFOEUzMTMpKShwb3NlaWRvbl9zZWxlY3RvcigweDMwNTRCQTAyNjU5MzJGODc4MTBFMzlBMUU4MDZGMTU4RTE2REZCMEE0NzVBNUJGODgxQjE2MkVFMUVBNTI0NjcpKSkoKHcoKDB4MkFDN0I1NzU3MDdDRjE4M0VCNDAwM0VFMTU5N0EyRjBDNjFCN0IyOTc2RTFGMzkxRjgzMDdERDQwODA0ODM3RCkoMHgxQjU4MUQ2RDQ2RkUwMUVENEFCN0FEMEVEMTdFNkMxOUEyQjUwQjMwNUJGRDgyMTg5MUE2QzlEMEU0MDY1RTNFKSgweDFGODYxMzFFNURCOTFGQjY1RTI2ODg2NzZDMzhGQzNERTkwNjVERDQ4M0I4MzAyQTc5NTFDMDk3RTFDMjc5RDcpKDB4MTFFREU5RkM4QjA2RkJDRTlBMDE0M0I5Q0NDN0I3MjAyNjQyNUQyQjA3NkU5MzczNjA3MTMxMTgyRTM1MTAzQSkoMHgzMDcxNUVFMjk5NUQ4NjAzRDI5OEQ4MjAxRjdGQTkyMTc3QUMzOUYyMjlENTU4Q0U1MkE3QTdCMzdDRTVFM0ZCKSgweDI5RjMzNDJGNzkyMDkwRkVBNkUxMzZFODg4QzVBREQ4NkY3QzFFNkFENkIyN0E1Mzc0QjMzQTVFRTlCRTgyMTMpKDB4MDM4ODBEOTdFOUQzNDFFREQ5QjM0RTBCNjI4N0ZFRjI3QkZFNUJCRUE1NjQxRjUyMzk1MUNCQjI1QkIzRUJCMykoMHgzNTMxMzUzQzQyMjgxRDU4RkRCMjc3OTA2QUQxMDIwODY2Rjg5OEE4RTE0MDNCRDA4NEQ5NERGODA5RDQ0M0E1KSgweDJFOEI3QTk0Nzg5Rjg3MkJFRUU2QzY5N0NFNzFBRUEwMjM1RDc1Mjg4OUQ0ODQ4QkVDODAxRTRBNThDNjE1NzgpKDB4MTMwREFERjU1OTQ0NjdCNUVGOUFGQUNFNTVGMTkzMjQ0RDFCQzU2OTcyQ0M3MTk0RjcxRDkzQTBERDhFREMxRSkoMHgzNkQzQTVBOUE0Q0REN0NDRUEwNjRGQTc3NTI1OThBNzJFRDEwNEFEMTFDQkE0NUJBRTVDQjc0RjJENzE4QkFBKSgweDIyNzdEOUJDRDFEMUFDQjVBMzY0OTNGMzc4QzIzRDc3MDgzM0ZDOTg1MDlCOTk1NzlBMkI2NTYwQzRCMDg4NUUpKDB4M0NGMzZCMzU2RjE4NjhENEM0NkI0OTMxNEI2MTY3QjA1QjkwREY1RDE4NzMwNTE0MUZCRDkxNkYwNDVCNjIwNikoMHgwNzREQTY0RUZEREUxNkU0RTM4QTU5NUU5QTQ0MDA3OTU5MDE4Nzg0OTMyNTIyQzJEN0RGMEE3ODZCMUMwMUZCKSgweDM0NDYzMEM1Qzk4NkUxQUFGQzJENkQ4MzZEODY5MUM2OTZCN0ZENzlDRDA5NjNEOEI3RDU5QjYxRTVFQjFEMkUpKSkoeigweDJDOUMzNTVFOUIyN0FEQUIwQzRDMzBFOTI5M0U4QkZBMkNCNDdBRkZGRkNDODBCNDM1MzJDNUQwOTBENjEzMTEpKShzKCgweDMxRUJFRjkxM0RBRjVBNzRENTYzMTVEMzA1RjM3N0I2NDJENjY1NTMzMUYxNDI2NzMwQjFBMkQ4NEMwOUVGQjIpKDB4MDFBRTc1RjdENTAyMzEzRjg4MDBGRUM4RUIxMUJDQTc4M0JDOTM1Qzg2NkI0ODU5MDk2QkZBMURFQzk3QkVCMikoMHgyRjQ2REE2RDFCOTJEQzcyM0ExRDQ1MDVDQzE1MjVCQUU2MUY2RjA1MTAzNUEyRURGREY2ODdBQ0REQUM2OTRFKSgweDA1N0NFQjFBNkNBMzRCMDBBRUQxODQwQzI5Qjg1NTQ4MzRFRDYxMzQxRjU4NkFCNjlFMzUzN0I3RkE2Mjc4RjIpKDB4MkFCRTAwQTBBMjI2QzA1OTRGRjI4NDFCRDhFN0UxOERGNURCQkJFNzcxQjU1MkU1OEJENDc4QzBGNkQzREFENCkoMHgzODZFRTk0Qzg5RUEyQ0I3REI1OTMzMDQ5Q0NFOTA2QTE1MTJERTY2RkNEMzFBMDI5MkQ4M0Y5MzM5OTlFQkY1KSkpKGdlbmVyaWNfc2VsZWN0b3IoMHgyNDI3NkI4QUY5RDkwOTFGQ0RCOUI0MzlENkJENThBN0JGNjg0N0JEREE1RDRFQUY0QzBCRDI4Qzc0RTlDQTg3KSkocG9zZWlkb25fc2VsZWN0b3IoMHgyQkJFMzJBRUUzOThFQ0M5QjYyOTE4OTc0RDIzMTFDRTlGOTA0MkRERjczMEM2NDIxNzk4MkU5MkIxN0MxMUVCKSkpKSkoZnRfZXZhbDEgMHgwMkRFMzREQkM0RTA0NUJFNjQzNDlCRkE2M0FGRjRFOEU4MTlDQkYxNkI4QzYyMjIyRkZCNTgzQTQ2N0IwNUJBKSkpKSkp"}}] })
+  sendZkapp(
+    input: {
+      parties: {
+        feePayer: {
+          body: {
+            publicKey: "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww"
+            update: {
+              appState: [null, null, null, null, null, null, null, null]
+              delegate: null
+              verificationKey: null
+              permissions: null
+              zkappUri: null
+              tokenSymbol: null
+              timing: null
+              votingFor: null
+            }
+            balanceChange: "5000000000"
+            events: []
+            sequenceEvents: []
+            callData: "0"
+            callDepth: 0
+            protocolStatePrecondition: {
+              snarkedLedgerHash: null
+              timestamp: null
+              blockchainLength: null
+              minWindowDensity: null
+              totalCurrency: null
+              globalSlotSinceHardFork: null
+              globalSlotSinceGenesis: null
+              stakingEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+              nextEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+            }
+            accountPrecondition: "2"
+          }
+          authorization: "7mX8xyRkwtjoNA6B5VCjLGVQQUhgLrm5X7vLA9yj4aMUKDWKb9HgMxuX2Jw41qLFjvN8BiVVJJXG8syyteva9V52VW5RFChq"
+        }
+        otherParties: [
+          {
+            body: {
+              publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z"
+              tokenId: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+              update: {
+                appState: ["1", "2", "3", "4", "5", "6", "7", "8"]
+                delegate: null
+                verificationKey: null
+                permissions: null
+                zkappUri: null
+                tokenSymbol: null
+                timing: null
+                votingFor: null
+              }
+              balanceChange: { magnitude: "0", sgn: "Positive" }
+              incrementNonce: false
+              events: []
+              sequenceEvents: []
+              callData: "0"
+              callDepth: 0
+              protocolStatePrecondition: {
+                snarkedLedgerHash: null
+                timestamp: null
+                blockchainLength: null
+                minWindowDensity: null
+                totalCurrency: null
+                globalSlotSinceHardFork: null
+                globalSlotSinceGenesis: null
+                stakingEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+                nextEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+              }
+              accountPrecondition: {
+                balance: null
+                nonce: null
+                receiptChainHash: null
+                publicKey: null
+                delegate: null
+                state: [null, null, null, null, null, null, null, null]
+                sequenceState: null
+                provedState: null
+              }
+              useFullCommitment: true
+            }
+            authorization: {
+              proof: "KChzdGF0ZW1lbnQoKHByb29mX3N0YXRlKChkZWZlcnJlZF92YWx1ZXMoKHBsb25rKChhbHBoYSgoaW5uZXIoNDdiYjY3MDUzOTM1MjZiZCA2NTgxYmMwNDhlOWI0NWYyKSkpKShiZXRhKDczMGE3OWZiYTgxNDkyZmUgYWFhZGNiZGJmYmRkMmUyNSkpKGdhbW1hKDdmNzY5YTAxYzA1ZWEwNGYgNDBkMDQ3NTE0NGVmNWVmOSkpKHpldGEoKGlubmVyKDlmZDdhYmU1Y2UzNDI5NDYgZTEyNTI0OTYzZTFlOWFhMykpKSkpKShjb21iaW5lZF9pbm5lcl9wcm9kdWN0KFNoaWZ0ZWRfdmFsdWUgMHgwQjVBMDI0RjI0REMwREZBNTU2NDQxNzUyMTVFQzE4NEM2MDJBNzcyRjk1QjRFNUIxMzBFQzhDQzc5NkFFRjY1KSkoYihTaGlmdGVkX3ZhbHVlIDB4Mzc3RUYzMTREMzcwQjcxQzhDQTU1OUE0Q0IyOUQ1NzNGMTE4MUQ3MkFFRjFDQ0ZGQjUxRjhGQTBFNTFEODY5QSkpKHhpKChpbm5lcig3OTA3OWU4YjE4NzEwYjMzIDFlNWM2MzEyZGYwNjI2MmUpKSkpKGJ1bGxldHByb29mX2NoYWxsZW5nZXMoKChwcmVjaGFsbGVuZ2UoKGlubmVyKGVkY2NiMDJjNTg5MGJhMTQgMWYwZWI3MjA3YmZlNDAzNykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGNhNDk1NDg5MmViOTI1ZmYgN2FjZGU3NzZlNjE0MWViYykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDNkMjdlY2E1YzczMmY2YjkgZjY3MTYwMmE2YmU4NGE3NCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDg1OWE1OWUzZjYxOGUyNzYgNTBiNDllODc1NTY2OWVkNikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDIyNzViMGJmZWIzNGVhNjMgYmQ0YmFlNmEzNTJjOTk2NCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGJkN2QyODg1NDY4MmU1ODggMWVhMTMwMjAyOTViZWY2NSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGE1NmEyZjRlNTNlNGY1MzcgYjg2NzM1YjVlYzlhMzNhZikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDZhMTMxNTEwMjEzZjhjMDAgMzI3NGY2MzllM2NmMjI1OSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGZjMmI5YWEzMDMzZTVkMDMgZjA3YTE4ZWZkNmNiYTc5MikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGJjZDc3OTM2YWFjNTZkMzcgNDRmYTc1YjJlZGU0ZjYyOCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDgzODljOWM1MGQwNDIyNGYgYzZmM2M4MjQ0ZmYyMjZjNikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDI3ZTEzNTM5NDM5NDQ0N2UgZWFiMGVmNmE5ZTY3ZjIwOSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGQyZTE3OWZmN2IzZDAzMjggOWQ5M2U4MmZmNDNjOGFmNykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGU0YzIwYThlYmRmMzgyZTkgZTg5YjU0NWEwOWQ5YTM2YSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDgwOTEwNDIzOGEwYmYxMjIgZWY3NTE0ZTIwODdiYzdlMykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDdhMDdiODRmODIxZmE3NDMgNjgwN2ZkNTAyM2E2NzIxOCkpKSkpKSkod2hpY2hfYnJhbmNoIlwwMDAiKSkpKHNwb25nZV9kaWdlc3RfYmVmb3JlX2V2YWx1YXRpb25zKDhlZmJiMGVkMmVhYjhiMWYgMDJkMDI0ZmE2YWE5YWQyZCA4YmQ3Y2RkYzhhZTA4NzJjIDAzOTVmYjUwMmJkODYwYTcpKShtZV9vbmx5KChzZygweDNFMDk3Njc4MjgyRTU3NTlDN0FGMTE2RENCRjgyODE1RDc5QzAyRjE1ODczNzREMUY3QUM4OEZEQTQ4RjE3NjAgMHgyNEQ1RkY4QUM1NzA1RjEyQUJFMjYxRDI3MzcyNjU2MkE5Mzk4NDhGMEY2NDEyNkM5RTYyN0VCQzgxMTAzRUVGKSkob2xkX2J1bGxldHByb29mX2NoYWxsZW5nZXMoKCgocHJlY2hhbGxlbmdlKChpbm5lcigzMzgyYjNjOWFjZTZiZjZmIDc5OTc0MzU4Zjk3NjE4NjMpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihkZDNhMmIwNmU5ODg4Nzk3IGRkN2FlNjQwMjk0NGExYzcpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihjNmU4ZTUzMGY0OWM5ZmNiIDA3ZGRiYjY1Y2RhMDljZGQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig1MzJjNTlhMjg3NjkxYTEzIGE5MjFiY2IwMmE2NTZmN2IpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcihlMjljNzdiMThmMTAwNzhiIGY4NWM1ZjAwZGY2YjBjZWUpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigxZGJkYTcyZDA3YjA5Yzg3IDRkMWI5N2UyZTk1ZjI2YTApKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5Yzc1NzQ3YzU2ODA1ZjExIGExZmU2MzY5ZmFjZWYxZTgpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig1YzJiOGFkZmRiZTk2MDRkIDVhOGM3MThjZjIxMGY3OWIpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigyMmMwYjM1YzUxZTA2YjQ4IGE2ODg4YjczNDBhOTZkZWQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5MDA3ZDdiNTVlNzY2NDZlIGMxYzY4YjM5ZGI0ZThlMTIpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0NDQ1ZTM1ZTM3M2YyYmM5IDlkNDBjNzE1ZmM4Y2NkZTUpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0Mjk4ODI4NDRiYmNhYTRlIDk3YTkyN2Q3ZDBhZmI3YmMpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig5OWNhM2Q1YmZmZmQ2ZTc3IGVmZTY2YTU1MTU1YzQyOTQpKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcig0YjdkYjI3MTIxOTc5OTU0IDk1MWZhMmUwNjE5M2M4NDApKSkpKSgocHJlY2hhbGxlbmdlKChpbm5lcigyY2QxY2NiZWIyMDc0N2IzIDViZDFkZTNjZjI2NDAyMWQpKSkpKSkoKChwcmVjaGFsbGVuZ2UoKGlubmVyKDMzODJiM2M5YWNlNmJmNmYgNzk5NzQzNThmOTc2MTg2MykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGRkM2EyYjA2ZTk4ODg3OTcgZGQ3YWU2NDAyOTQ0YTFjNykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGM2ZThlNTMwZjQ5YzlmY2IgMDdkZGJiNjVjZGEwOWNkZCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDUzMmM1OWEyODc2OTFhMTMgYTkyMWJjYjAyYTY1NmY3YikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKGUyOWM3N2IxOGYxMDA3OGIgZjg1YzVmMDBkZjZiMGNlZSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDFkYmRhNzJkMDdiMDljODcgNGQxYjk3ZTJlOTVmMjZhMCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDljNzU3NDdjNTY4MDVmMTEgYTFmZTYzNjlmYWNlZjFlOCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDVjMmI4YWRmZGJlOTYwNGQgNWE4YzcxOGNmMjEwZjc5YikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDIyYzBiMzVjNTFlMDZiNDggYTY4ODhiNzM0MGE5NmRlZCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDkwMDdkN2I1NWU3NjY0NmUgYzFjNjhiMzlkYjRlOGUxMikpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDQ0NDVlMzVlMzczZjJiYzkgOWQ0MGM3MTVmYzhjY2RlNSkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDQyOTg4Mjg0NGJiY2FhNGUgOTdhOTI3ZDdkMGFmYjdiYykpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDk5Y2EzZDViZmZmZDZlNzcgZWZlNjZhNTUxNTVjNDI5NCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDRiN2RiMjcxMjE5Nzk5NTQgOTUxZmEyZTA2MTkzYzg0MCkpKSkpKChwcmVjaGFsbGVuZ2UoKGlubmVyKDJjZDFjY2JlYjIwNzQ3YjMgNWJkMWRlM2NmMjY0MDIxZCkpKSkpKSkpKSkpKShwYXNzX3Rocm91Z2goKGFwcF9zdGF0ZSgpKShzZygpKShvbGRfYnVsbGV0cHJvb2ZfY2hhbGxlbmdlcygpKSkpKSkocHJldl9ldmFscygoZXZhbHMoKChwdWJsaWNfaW5wdXQgMHgyMDlGOTlGMTQ2MDJDNTIxMzQ1NTMxODgwNUI0OEJCMjc1RjgyREVFQTNCMDA3MEFENEQxQ0JGOEM5N0NCOEE0KShldmFscygodygoMHgwREZCMjM5OTk2NkE0NTYxQzdDQjdFNEI0Q0Q1RTAxNDAwNTg0ODNCQTQzMEVBQjlBNDdDQkY3NDc0MkVGOTZFKSgweDI2OUFBMThCRDkyQUYxN0IyNzgzRjlFQzIxNEU3QzM2NUNBMDBCQzg3OTlENDdBRERCNjQ4RTAyOERENkFDOUUpKDB4MjgwRTI4NzUxQjk4QzQ0OERDQkZENjE0NEZDQTY2NUI4NjUwOTRDNEI4RjFCNTdEMzU5MkRBNTQ2Nzk4RjVFNCkoMHgwM0UwQzA4MjkwMjNFNEYyQzUwNUI3RkE1NERDMzJDRTRFMUUxMDExNDNGQTc0N0I1MEM3M0ZBNEFFQkM0NTA0KSgweDA2QzA3REZGMENDQ0M5MTI1NzIyMUNCMTc0NERGQzE3RjczOTJEODBBM0JBMENBRTgzNDU5MzNFQTAxOTYwREQpKDB4MURGMUZFMkU3ODBENDIyRDk5MjA4QTQ5RDEzOTgxNUMyODRFNzVGQzQxRjM2RThDOEFGNzI3MDMyNkFFQ0RDQSkoMHgzMzYxOUJBQTE0MzZDRDREQzYyNzhDMzE2NDA2NTNERjg5OThCNTY5NDlERThFODlBNjgzNEQ3MDEyOTA4MTYzKSgweDNGMkFBQTBBQjRGMjZCNTk3MjE3RjYyOTA0QjRDQTJFQkUzQURCNzc1MkVDMDBDREI4NUVDQkQwMDJCQkY0MzEpKDB4MjMzRjIyOTI2MjhBMUM1QUE2ODBEOTQ4RkUzQjY2QTIwM0VGNjFGOUYwOTY0QTY5M0I1RDBEQjc1MTgxMTVFMikoMHgyOUJDREJGQjVBNTUxMTA0M0U2MDY2QkEyMTc1OENBMUFGQTA5QzAyQUYwNjA4NEVCNjU0OTUwN0E5Q0JGREI2KSgweDJBNUEyMUYwQzIzRDAwMTM2QzM0OUVEQzdDMzA5RUJGRjE0OThDQTU4MkE5MDdCMjk0M0Q5Qjc5QTBBMkZCNjEpKDB4MUQzNkREREU5MjVBRDFENTNERkFFMEY0MzI2NTY1OTk5QUFDNDVERDY2OUFEQTU2ODg2MzMxOTZDQ0MzM0UzNikoMHgzOTdGREEyM0I4OTMzOTlGNjgwRjNFNTNFMUE1ODEzNTRBQ0RGRUNGMEM2NDUxQTYyNkZGQzBEQjQ0RURDMjc0KSgweDI1ODI4Q0IxQ0M2NkJGRDA0Q0RFNzVEMTdDMDYxNzZDNTREQkE1QTg4RERBRjI1NzBCRUIxNzIwNTJCNjlBNEMpKDB4Mzc0OUVGMDA4RkY0MTFDNjY5M0E1Rjg1MkE1NkEwOTE5ODIwRjlCOUIyNTg3RDkwRDNDMTg1RjVCN0U5MzlFMCkpKSh6KDB4MEI5QjBEM0VDN0MxNTBBOTg4RDA0NDZBRTcxMThFOUE3ODgzQTdGN0QzOTgxRTcyMUQzNUYxOUY3MDdGRDczRSkpKHMoKDB4MkQxMTgwRDlDMzVGODVFOUIwQjYwMjI3OTVBNUM3OTI4NzA0RDMwNTRFODhBNkQyMERBNjIyODUzNjY4NjBGQikoMHgyMDYyMjMzMDhBNjM5RTREQkEwM0ZBMTBCMjAxNzg5NUM4OTIwNUQ3MkEwOTc0QUU3MjE5OTQwOTlDMTg0MzczKSgweDAwNDgyRjM3OUQ4NzFGRTk4MjhCNzE0RjI0RTEzMjc5NDFDNzU4NjQxQjAyNzZBNkE3MDVCRjg3MkE0Mjg3QUIpKDB4MTI1ODNFMzNFMTcwOTRDNjYzRTVGMEE2NzlDMzEwQUFEQ0MwMjIxRUYxNzA0MkM0NTVEOEU1REM1NDIzNzhCQikoMHgwRDVCQjZDMDcwNzFDNEU0QkExMTZFNEM0MUUwQTdBMEIzQjg1QUYyRkU1NjQ2NkYxNzIxOEM1MzAyRDg3ODkyKSgweDA3REY5MTUyNTM0NTdCOUIxRkRCNjMyQ0Q0MEU0OTFCN0YxQ0I1Q0YzODQ5RDIwMUEzNjE4ODIwQkFGQkY4N0IpKSkoZ2VuZXJpY19zZWxlY3RvcigweDAwNDdCODhCNEFEMjkwMjFCRUU4RThFQUM5M0FFODQwQ0FDRTA0N0I3NkYxMEE2RjFGNzI0RERBNDg1RUIyNDUpKShwb3NlaWRvbl9zZWxlY3RvcigweDI1NDQ2NTM3QkMwNDk5OEEzRDY2OUU0MTcwQzUzMzhFRDdEODZDQkMxRTExMjI2RTY2RkNCNTBBOTM1RjcyMDcpKSkpKSgocHVibGljX2lucHV0IDB4MkNGN0Y4RTJCNEZEREU4OTM1Q0E5MDE2NzIzOEVFOUFGQUJEODBGMjA2MTBGRTkzNTFEOTA1RjlCMDZGQTJENikoZXZhbHMoKHcoKDB4MTE5QTE0N0VEMEQ2MkI0MTA2Q0NCNDFCQzhCRjdBQjM0NTgyMUM1NUNBRkFCMEY2NUE0RTVDMjNDN0FBQzI2RikoMHgxNThFNzdBMEY0RjBGOTYxMjBBODI2QzNCNTNCMTJDQUQ4QUVDRTgyMzQyNkRFNjAzOTQ1RTI5M0ExREFFNTEzKSgweDM2QUM0MzFGRTJGREQ5RTE1QkY1RDk5OTc5RTc5QUE5MUM5QTE0REExQ0U2NUU2ODY3M0I4MEM1RUFGQTFEREMpKDB4MENDMzczMjk0ODIyQkQyMTMzN0UzNzAzRDFDRTRDRkVDQTlDOTY0MEZBNzYzNEI3MTQwMTk4QzY5NEQ5NEUwNCkoMHgzQzMzNkI2M0JGQjlENjU5RjZFRjE3QjZEOTlGREVBRkI4NENBNjc1RTBFMENENDk4OTAyMDI0NjNFMzBEQTlCKSgweDM1NUM4NjAyRUEyREQyRkNCODg2MjhGNDA0Qzk4NkIyOUU0NjU3MEVDNkQwRDQ1ODU5NzZEOTFGMDg5MjY2MUYpKDB4MTBCMjRBQjZBMUNGNjg0MzlCN0M1NUZGMzk2OEM5MTFGQjdGRUE4QUVFMUE5QkQ0NTM3OUQ5MzM5REVCOUFEMCkoMHgxMkI5OTE1QkE5NEUzMDBGMjY3MUU0Mzc2NUQzRkMxNUM4QTRBNjZGNDNCMzgxNUUzRTQxQzhDQ0E3MDUzQUI3KSgweDMxREE3NkVDMTY0OTlGQkE0MjZBMjZFOTU4MEYyRDRDMUUyMjA5NDdGMkE5NkQxNjNCOUE3QzA0M0ZDNEU4MzApKDB4MDFDQ0NGRjYxQjMwMjczODk5Q0Y3Q0VEQzNCOTQ0NjM2QkQ2MEFBQ0JENDgxNTIwOTBGMzEzRTgwNUQyMDVGMikoMHgxMjgwQ0UxODdBMTU4MjA0RkNEQzI3ODE2NTk2Qzg2OTQwNjE3MDc3MjIyMkVEQkNDQzY5NzlCODE3NzFDNjE4KSgweDMwODgxRDlBMDYyMDFCQjY4NzgwRDBFODQ4ODlDRjNCODlDMUE4M0EyMkJGRDg3MDM5Rjc4NTIxRkMyMEY2MEYpKDB4MjBFOTJEOEE0RENBOUQxMEFEMEEyM0RCOTQwNkI2REQ2NEUzRURGRTg3Q0QzNDk2MEE3MDcyRDRBMjBCN0ZCRCkoMHgyNTNBRUY5MUY2NDAzNTA4QTc0NTJBNEQxNkZDQzE1N0Y2MENDRTYzOEZGMjM3MjUxRDcwNzI3QjlFQTA1M0ZDKSgweDFDNDE2QUYyNEYyODdDNDA5RDBBMEFDRDg4MjZBMkE2MDI4RkVBNDlEQjE0MTc1OUYyMzAxMTczMzZENEYyMUYpKSkoeigweDIzQUQ3NDBGQjg2NTRDOTFEQTdEMDEwMEFFRTUxMjMwNTVEMDY0QTlFN0EyNTdGRjJCQjA5MDU0NzMxNDMyOUUpKShzKCgweDMzOTZCMEY4RTVGQjA1NTlFRjZGQzVCQzc1MzFEMDg1RDU0MTE5OUU2QzkzNkM1NEI0NjY5NjhCRjI1QzJFNkEpKDB4MDM2NDk1NzRBQkMyRjhEMDU4NTdGMkI1NEUwMDM1QzkxRkVFOTZEMEE3MzY3NzcyODBBOTFCOEQxNTEwRkZDNikoMHgyRkM1MUU1MTUwQTA2RjU3N0M0NEMxOEFDODNCNUQ2Q0FGNUFFMzg5NDg3MDYwN0VBMzI1QjAyMDdEMEE4MUE4KSgweDA5RENGRDBCQzM0RTUwNTE3REY5RTdGQTQyRENCNzRDNDc0OEEwOUU1Qzg3Q0FCNTFCMkM1MkRCRDFCNzEwNjEpKDB4MDVGNzJFRkU4OTFFRDE0NUM5NTIxOEI4NDYxQkIwRTgwQUJDNjRCRUFGQUYyQkY1OUU4QkQ5OTJDQTM3NUMzRCkoMHgyNUEzRDcwMEUyQkNFQzI4OENGNkYwNjQ1MjA2NTI5NTU2OUI4NDUyMDNCNTYyQjVFN0FEMjI4N0VGMUM0RTU4KSkpKGdlbmVyaWNfc2VsZWN0b3IoMHgxRjI4Rjc1QTIwNzExOTJBQTkwOTZDNjc0NUFEOEM2MTVCQzIwRUUxQTMwQTI2N0UzMjlGODU3RDQ5MDgzMEMxKSkocG9zZWlkb25fc2VsZWN0b3IoMHgxMjczQkU3RURCMzdDMTdENTlEREJENzYzMEMwNUI3MEFFMDhDRDg0RkRCODAzQjkwNEQwQkE3OUI0QjVFN0UxKSkpKSkpKShmdF9ldmFsMSAweDBEODcwQTI0QUEwQUJDMzZERjQ5NDZBOEM1RjFFM0Y1M0ZENzE5NDBCNDA1Q0MyQzk1MTQ2QkQ1RDhCNDgxQkYpKSkocHJvb2YoKG1lc3NhZ2VzKCh3X2NvbW0oKCgweDNFQjk2MTc2MkNCRjM3RUI4QjFDRTRDNzEyRTRCNkJDQTI2NDM2NDFDMTVDQjk1QjMwOEYzRENCRUM5NEY2NTQgMHgzOTIyMzVCQ0VGNTg1MEVGMjlGOTFCREM5ODY1MUQ2RjAzOUZFNkE4NzI4NEVGMDcyRDE5RThFMERDOUE2NjM2KSkoKDB4MEQ5RkNEMTMzNDFGNDg5RTU4NUUwQzg4NEQ0NkZDNzYwQkVBMDNDREZCRjdEMDIwMzY5OTdGQzM2QzhCMjRENSAweDI5MkRFRDlGRDYzRTc3QTY4MEVFNUQ0ODlGRUFERDYzRjIwMjVGRTZFOTg2NkU1RjAyRTkxQTFGMTNCOEMzRDIpKSgoMHgzNTExRDIzNTJBMzE5M0UxRjFEQkQwMjE0NkNFNzNBOURGRDJGNDNCMTNDMjk4MjAyRUJCN0REMUNFOUZFOEFCIDB4MTI2RUQ4MjdGQUFDQjU4QjQyRkFCRURBOEMyOUYxOTg0NTRGQUNBQ0U2MUI1OEZFNzM0M0Y4REZBRThDNDNENSkpKCgweDFFOUU4NjQ1RERERjFFODlGMEIxOUI0M0RCREY4QkU0RjEyRTQ1QTc2NjJCQkI4NkNFMkM3MDAxMDE2RDk0RDQgMHgzOUFCMkMzNkI0RjVFRTY4RjBBNDA3QjI0N0JDMURBRDY4QkE0MjNENkQxRkNBMzk2RTEwOTEyNzY4OTMwOTJEKSkoKDB4MzM1NURDOTE4QjgyNzE5RUMxRjQxQzIzOTUzMDUxNUY0NzVGMUE2MzRBRDU1NTFDNTFBRDE1NEQzODMxMjU5NyAweDI0QUIwNzlFQ0IwQjAxNjE1NkRBMjM5RjEyNjREQUI3N0VFNjUwOEM3RkU4NDg5QzIyODcxQkJDQUI0MDdCQjgpKSgoMHgyNTFBREY4MkY3NkYwRUVFMzc4RDg2RjgxRjdBMjlBNjZCODZBNzY4RDZEOEVCOEU5QkNGQzZFQzg1ODJGRTlFIDB4MjVDMDM1QTVGMDJGNkFEQkU4NkQzNjlCNTY0NjFGMTg1NzA4RDc3MzA5QkJBRTdCODlDMTRBNDlFMzBCNDMzMikpKCgweDBCQzczQTQ3NzVDMUQzNjJFM0NEQUUzQ0Q3MUE3MEIxNjI1QjFCNkI3QTlDOTJFMTVDODM3OTc3RDMxRjc5QjggMHgxN0UwQzBGQzlDNUQ3ODIyM0JGOTk5ODE3N0RDMTVCNjY0MURGNzRDQzgxRUYwN0Q2Njc4NUNBQjZBOEUwODZGKSkoKDB4MjhDN0YxODc3ODJCQjkxQTI3MUExQjY4QzJDMkUzNDFEOUQ1MDk0NkM1NTY2RjBFQUQ2Qzg0QjBEQzJFNjcxRSAweDM2M0M0QTA3M0Q0OTIwMTdEMTA2MUJGNTRBNDY0NEM0MDZDMTJENTlCQjY2RTA0MEUzOENBNUQyOTE5RTg1QzEpKSgoMHgyNDVDOTBCQUFCMEEwMTFDMzAzMDVBM0M2REFEQzFGNUIyQkUzMkVDREY5MUI4MDFGREEwREUwNUM4RDFCMDM0IDB4MzcxMzQ2Q0U5MUIxNkMxRkI2MDNGNEI2RUFBNzFEM0UzMUI1MkY5QURBOEE4ODQxNzg5NDRCNUQzNjU3MDJFRSkpKCgweDM4OTk0RDFBM0Q1MzlCNDUxRDY5NUIzQTFENzc2ODA5NTJDQzAzQjI2ODcxRjI0RDY4RDQ1OTFBOTFFQjhGNEMgMHgwQUVGN0VGNkUyMzY0MjlDQ0MxNjcyNEZCQTYyOTYyNzc4MkM0OEMyNkFGMDg2RTRDRjJFMjQ0NTA0ODcyNjdBKSkoKDB4M0U4MUNCNkREMzRGMTlGREQ0MDc4NjA4NjZEOTE0MjA3RUY5OEY4MTI5MzVBOUUxMEQ0RTZBNTdFOTE4QTZERCAweDE0RUUwOUVGQUM0NDMyN0FDQTY1RjE5Mjg1MjVCNkFFNzE5NjQyQjYyM0JDRjRBODI2QTA3MjFFOTFBQjNFMDMpKSgoMHgyQzdBMjUyMzFENjRDMjUyMjgxQTY2OENCMjExNDlENjZGRkQzQzg5Q0MyOTI5MTcwMEFFQzIwODIzNTk4NzQyIDB4MjgzMTU4NTk2M0U2RDZENTQ0RUQ0MDk0NzNBNDcyMUVGRTIzOUQ2OTI0QTJENjIzOTk4MUIzRjEzQzJFMEE1QykpKCgweDA4OEQxMjk0MzUzRTAxRUNDRUU2REYyNjg0QzZENEFBRTI0ODBGREEwMUEyRjI2NkE0QzVGRTg5NTFDRDhBNDcgMHgyN0NCNTdFQzc2RDIwQkVENENDN0YxMDNGMTAwRjlGN0NGOUI0NDI0NjI4QjE3NTdBMEY0MDIxQjc0QTAyQzgzKSkoKDB4MUU4Nzg5RkU2RTBERDJDNTIwODJERDJEN0ZFMzU1OTU5NDk1ODg3QjYxMEZEQ0I2ODMyNTQxQjI4NzA0Q0MyNyAweDJFOEQ4QkUxQTIzMTBGMDM4RjRBNTI2OEU4QzY0QTZFNTVBMTUwMDVFNzEwN0VFMzdCQjlEMTVFODlFOTA5Q0EpKSgoMHgxRjZFNjBEQkY3REUzQjNFNUE1OUU5QkQ5QzQxNzFBQTdGRERGMTZCMTk0RTFFNDM0RjYyNkQ3NUQ0MEY3ODIwIDB4MEJFOTkwRDM0OTMyNDg2Q0Y2OUY5NjlGQThCRUQzNDFCQUExNTUwN0FFNjRGRUFBRDgyNEQ5QTI1QUQxMTNFMikpKSkoel9jb21tKCgweDNGNTJDNjU1QjMwMTJFNkFERjk4QTIxOEFDQTU0QjM3RUQwMDg3RERCNzVCMzg4OTc5NTkzNDAzQjJEMTRBRTQgMHgyNEU5QTREOEIxRjg1ODc1Njc4QjI5OEU5OTZCMzgyMjE0RjI0NkYxMkI4Qjk1ODQxQTk2MEI4MDI4MkY1N0U3KSkpKHRfY29tbSgoMHgwMkMyMUIxNjZDMDU3RURBMjk2RkQ4QkIxNDU3QUEzRjZBOEY1MEMwRENCNzQwNzYxMENCRDNGQUE2QjAyNDhDIDB4MUExMDlFQjFFMEVGNDBDN0MwRjcwN0I2QkE0M0I5N0NFN0Q5RUFCQ0FEMUFGRDgxQUYyMEFCM0IxQjI4MjE3NSkoMHgzMDBCMjBBRjAxQUUyQzRCQ0U1NTA1QTRBNDc3RTkwRTNCOUYzMEE3ODJEOTQwMzQzMEUwQTNFRUREQkVDRDdDIDB4M0RDNzE2NDVFQzU3QTI5QTlFMEJCNTFFM0Q4MzQxMjAxNTFFODk3MTQ5NzIzQkUxRUE0NTE1N0IzNzhFQ0QwRCkoMHgyMEFFMzdFMkZDRkMzMEExM0I2OTkxQjdGQkRFMkI4ODg2NjdCMkE5MjlBQzMzMkM2RjVGRDIxNjMyNkVDMTM2IDB4MjhERkFCQ0E2MDRBNTBBNEREMzAzMTBGNDVGRUExMjYxRjlDNkE2MjlFQzg4NzYxNDUwODg0NDQzRTk3QTRGRSkoMHgxRUM4NTU1NEU2MjVDODJDRUYzNUZDNDUzRDQwNENGQzI0RkJGMEM4REU5RDY0MkFCOUE4NkMxNjBBMkQ1N0Y4IDB4MDQ4Nzc4OUUxM0RCODgwMDU0ODBDMEE2QTdFNTgwOTYwNTdCMjIzQ0EyMTg1N0Q4QjYyMUNEMzMwRDUxNDgwMikoMHgxNTFBQjVCQjY5QTkwM0JFRUI2MzNEOTgzRTdFMjMxNjVFRjRBQTFBNjA1MTg4MzZCRkE1REM3RDVBNjRDRDlGIDB4MUE2QUFERDdBQjZBQzAzRDAwNEU0NDlFREE4MUU4RjRGOEYwQjZCQjczQjAwNzQ1RkFBNzYzRThDOTExMjNGNSkoMHgzQTM3ODNGMkJDN0JDNkZBN0RCNzNBOUZGMTVGQzRBNjJBRkUzRDg1NERBQTMzREJCMzYwOUJDREU2N0I4Rjc4IDB4MkQ2MUVBMEYwRkE2Q0UxMDZBOTY0NTJGRUIyNTg2QkRERTUzMUQzNEU1QUM0RDYxODlDMTZBMUU2QjgzQjcwMSkoMHgwREI2NjJGQTkwQjEyQzBFRjE3QUNGREQyMjlFNzAyQTYyMkRBODMwMTczRkE2NEJFMUY0Qzg4NTk5RDEzMEI0IDB4MTNGNUVBQkFENzRBRDEwNkQzMDU4NzJDNUExMjE4QkZEQ0NBNEQxQTUwNTY1OENCQTY1NDNENEQ2MjlCNjE0NikpKSkpKG9wZW5pbmdzKChwcm9vZigobHIoKCgweDNCMTY1MUE5Q0E5RERERkM1M0UzMTk5QzczMjYwRTlBNzlCQ0VCREJDMTYwNjRDNzE1REJFRjVDQTdERDc0QzEgMHgxQzVFNjM3NkI5QjFFODkyNUQwMUI1NzM4NjM4N0EzREI0NkM3QThEOEY1Nzk5RkQwOEE0ODJFMTAyNjVBODcwKSgweDAwRkU5N0YwNzVFNkUwMTI1QzY0QTVGOEU2OTZCQUE3ODFGNEYyNzA4NUVGNUU5MDg0NEU1QTNGNUI0MDc3OTggMHgwRDUzNzJGRjg4QTQ4QUJEQTExMTBCRDFERDQyMzZCMjg1NkIzQ0Y5RDBCMkFBREVCMkExOUUxOEM1NERCOTAwKSkoKDB4M0U2RTg3OTRCRjQyRjc2OTY2NTY3RkMyNEUyNjQ2NDFGNzE3QTY0MjMxQUExRjA5OUYxMDU1NUVGRTQ3RjMyMyAweDJGN0JBRkVCQzgxMzg5NkFGQzEwRkU5Nzg4NURDOEM5QkEzQUZFMEYzOUQ5RjlEOEFGQTlFQUM2RTUxNTlFQTMpKDB4MjRGNkFGQTNDMzcyQkNGNjFGRDM2Mzk0OTFGRkM5OUZEM0M2NjY2ODQ4ODM0QkIzQUEwMjZBNzFDMzZDRTMxRSAweDAyMjZCQkY0MDI1QTdEQURDNjBDNjI1NDE5NTg3NDhEQkFEQjQwOEVBNzk0NDI3NDkzOENFRjZFNjdDM0MxODUpKSgoMHgzQzI5NjkzRTVFRTZBODc4NTg4MTIwMjAyNDE1RjM5MjlDNkQwRUU2QzYxNzA5OTQyMDZFODkzMDcwNkRGNTFGIDB4MzYxMjEzNzkwOTcxN0E2NEQ0MjY0RTdBMzNDQjQyQTRFRURGRjUwODY5N0EwNDA1QzM4M0YwQkZBNkQ2MjNFQikoMHgyN0NCM0U1OUMxQ0U0RTlBODI4MDk4RjJEQ0UyNTYyRUVBMTQyMjY1NkRCMzg2RDUxM0ZGNDUzNTUwMzM0NTIwIDB4MkVENjA1MEVGRjBENjlEMTlBNzQ5MjIwMEE4RTQ5ODhGNkFCNEYzMzFBQTNFMjI3ODIzQ0FFQkYyNDZFNDY5NSkpKCgweDIwNTJFMzE5MTJGMTUyMzVEOEM0RTQ3MUJCMkM5QUM0MTJCMUUxNEU0NTI3Q0NBNTA5OUZBODkyNkM3QUY0MEQgMHgwMjk4OThERDI1QjBCMzY3NzJGMzQ2ODE1NDMzNzI1MjY5MkFBQUEyM0M1OUMyMDIyRjcyRTg0RjBGRTc5NTlEKSgweDMwMzQyMzUzRTEyMDcwOTlGMjQ5RkMxODdEQjJDOTZBRTkyRUYwRTEyMEE5QjNBRkYwREUzNDdGODI0QkIwNTIgMHgwNTIxMTlGNzI0ODdCNDg5QUIzODQ4NUYxRDg1M0ZCQTk4MzdGNkMwRDQ4RUY1ODAxMTNGMDBBMzBBMzk4MUU5KSkoKDB4Mjc2MUMwRDI2Q0YxQ0Q5MzBDRTA0QTI4MTdERUQ3QUM4Qjk1QTAwMDNCOTdGMTQ5RTE2NDI2NDBGODBGMDdEQyAweDBGM0UyNDlCMURERDQwNjdGOTMxRTlBQ0ZDQUY2OUE0OERCOTdFNjlCODUyM0NDQUNFNDk0NTZCNUE2QzM2RjIpKDB4MDY1NDg2QzQ1RkVBMUMwRkE1ODEwMUI0MDgwQjUyOTA2ODVEN0YwNTQ3NTU2RUM1MDgwRkEwQzkzOURDRTUwOSAweDE4NzQ3OUJDQzIxOEI3MkVCMzIwODZDOUI0NDM0RjU3NjVFREVBMzAxMjEzMEQwN0I4ODRCMjIyREFDN0Q0QUMpKSgoMHgxMEU3RkUxNjhFMUQ2OUI2NjVBNDhDM0NFQUQwN0M0QzIxMTBGQkZEQUFENUI2NzNEMEM1MTM3QUQyRDQ5MUIwIDB4M0M4MDRBMjg0QzgyMDdGQjYyQTJFQkFDNzZBNkRENTZENkRCRkZBRjNFQjdFRTRBQ0NERDFGREMyMzdENkQ5RSkoMHgyQ0Y0QzUyOTkzQTRFQzI5MzhCOTM0RUVBQ0I0RDAxN0M0RjA4QTM5OTZGMzM1ODI1MTNBMEYxNEQ4N0VBQzIxIDB4MUYwNzBEOTFCMTdEQjZGN0U4RTg0MDBGMzE1NkI1MzgzOTY2MzFEQkVDMTFCODQyMkNFNUFBOUUwOTlFOUE4OCkpKCgweDBGMjkwQUYxMkMyMTFDQjU5NjBBQ0VFMUI4MzEyOTQzRjkyQjExNTQ0NTZBNUU1MkMzRkZFODM4RTczRDI4NkQgMHgzODhEMDUzNjYwOUI3RDVGNzg2OEJBQ0I0NjI2RjRDN0RFNDlBMjA4RkY1MDhCMjBEODM5N0EyMzkxNzk4MkI0KSgweDAxMTQ2QkEyOTk1M0I0NkI1QjA5QzM3NzU1OTc1OURFODZDMkEwMjMxREJFQjUxQ0Q0RUFBQkE3MzRERjg5RkEgMHgxMjMzQkE3MzZEMTcwMUVBREI2NDhDM0Q2QTYzRDI0ODYzRDZBRDkyQTgyNTU5Qjk5N0RCQzcwOUM0QUEyQzhDKSkoKDB4M0JBODlCQkIxMUI3NDgxNkRDQTJBQjk4QTBDQ0YxRUUyRENCQUM1N0FCRjFBMDk4NUZCMkE1N0QzRjhFNERFNSAweDMxQkM2REU1NjAyQzcwQjI1QTMxNUQxNUNDODAwM0JEQjFDQkIzMTlERjgxQjUxRDIxQTEyRDkzNDdGNzAzRTApKDB4MzQ3MDkwMUNERDJBRDgwMEQxNTM2RkMwQTZBMzBDRTNDNzZEQ0JBOTE4MUFBOTBBNEM5NDVGQzRBQTIyN0EzNCAweDFCQ0ZBRjgwOUZBNkNEMDc0QjVCQ0I5QjE1M0Q2NkZERjhGNUQzOTM3MDI5NTM3RTE4RDQ3MDhBQkEyNTQ5QjIpKSgoMHgwNUMxNERCODU4MjdFMEM3MDE0MUY4NkZBREIxQzYwMjMzOTk4NDgwMDZCNDMyRkNDMjYxMDgwOUIzOEQ4RjNFIDB4MTEzQjg5Q0E4NjlGNTc5NjMyMzU4NkQyQjdGMzA2QTIyNjBCRTUwMTA3NDhGODk4RjBDMzUwODREQTRBOENFMykoMHgyQTM2MDQzNEY0M0RBQkRCRjM3RUY5MkUyMERCNDUwODNFNkNGMjhENjQ1MTRBOEIwMDU3RjI4NzM5MDU3QUQ4IDB4M0FFQkM4QkIzQzExNzVDOTg3RkIzRTY2MEM1QTYxOUI1NUNDQ0IzMkRDMkYwMzE5NzQ1NjE1QUZBMTJFNTY1OCkpKCgweDEwMEVDMzUxQTUxNjBFNTVCOTEzRDkyMjM2REI4NkM3OTdGN0QxRURGMDI3M0Q1RTM0REZEQzEwRTU2MzlENTkgMHgzRjZENTE1QTc4NEQwQUNEQUJFMjc4MDcxQkYyQkFGOEQyNTczMENEOERENDZCMTc1REJERDRFODAwNjc1NUU4KSgweDIxRjAwRTNEMDNFMTVERDMwMDJCMEZDQzNDM0M4OEEzNkVCQjg5OUYyOURFNzhFNzYwQzQwN0UxMkY5QjhGNkEgMHgxNTY4MjI3N0M1RTM5RDY0OUJBQjlGRTFFMkQ1MjZGQ0U1QjkxRjE3MjQwRjk2ODU1QzZDRThEQUU0NTZCMTlCKSkoKDB4MUVGOTkyQkZENjg2RDEwMUUyOUI0MDgwREQwMTNGNDFEMjM0NjE4MDNBNTkxOTg5MkY0QzZFRjNDNzA3Njk2MiAweDNBOURCQUJERDgxNEI2QjUzNjNGQTVDMkE0OTk0QzRDNTQ2N0IzQzU3Qjc4RDU0NTNEMzcxMDgwQkJCRTZEOUEpKDB4MDZBQzBBRkQ5NkQ5REFEMzJDREUzNDBCNkYyQzNCN0E0MzY5QUY3QjM1NDE1MEFEQUJCNUREQjZBQTkxQ0Q1QiAweDAxMzEyQjQ3RDc4NkJBOUFFMjEzRkQ1OEY4QjNGRjU1QTU3MEZEOTE4NjE5N0RDMjY3NzYwRkRCN0ZBNDlDNUMpKSgoMHgzNzFDNjBDNzkxODcyMzk5MjBCMjE1RjY3OTAxOTYxRDJGQjhGOEFGNUQwQUQ3NDg3OTBDNUI2QUU0RDU5MjcxIDB4MTE1MTM5MkNDNjc0MkJGRTY4RDcwNUQzNjhEQjVDQTgyQ0IzNjkwNEQ2QTkwODAxNEZCOEE0MDVBRDYxOEMzOSkoMHgwN0FENDhBREFGOTI1RTFCNEIxRkZBRUUyRUIyREExQTZDMjhGNTg2QjZEQkNDNDU0QzUzNkEwQzZCRjk1ODY5IDB4MzI5M0Q2MDI2NDVEOTk1NUIxNjVBNjA5OUVGRDYzOUZEM0I3Qjg2RUQ2NDVCMUM0MjBDRTQ4QTg5NkVDNEU5OCkpKCgweDA4ODlGNDdCRDUwN0M4RDJBQzQ4QzdFMDhCRDFFNzc3NDI0M0U3MTY2NDYzM0U2OTIzOTc1ODJGMkYwMzEwMkMgMHgyMzlGNDJCQTRENzEwNkUwNTg5MUEzRDY1QzgyNkZGQTA1MEZCNzdDMDUxNjc3OEQwMTlFNkYwRjhDNzIzRTAwKSgweDBFOUUyMUVBRUU1MERGMjQxQUNFNTUzOTMzMkFDQUU3OTg4NTVEOThFNjAzNDk0Rjc5MDVCMDE5OUI3Q0RDQjUgMHgyNkFDODNBNTk2QTMyMjFFQkMyQ0I0N0M5QjlCOTdGQkNBMzlBODM4N0JDODY2M0VBQTdDRUNFNjMyQjJDQ0VDKSkoKDB4MTMzQzZDQjJFQjQ0REM3RTAzQkRFQzEzNUM3QjIzRDVDRTMxQTE3OTA0RUQ3RjlENjEwQUVCN0VFMzczN0I5OCAweDNGNzFCODg2QjQ3OTlGQUIxMTRGQ0QzREM1NjY5MkUzN0U3RUFGQTZCMDc1NjNERkM3Q0U4MDlERUU3MjExMUIpKDB4MjlENzA4Qzk5QUQ4MDRBMTk1QURGQ0ZCN0Y4NkQ3QzlEMUI0MzI2OUU0OTdDNjhEN0ZEMDFFNjc2MDZDMkQ2OCAweDFGMUI0NTVFOTJFOEJCNEQyNjJFQzA3RDhGQjFENTg3MUFCNkEzRURFMThDMTE0QzY4MkE3MEE0MzQyNUUyQTcpKSgoMHgwQzVCNjA0MkM3MDlCOTYyQjYxODNCNEUzMzgzM0MyQzI5NzAwQkRBMDRGOUI5MjY2MDMyQzQ2REVERTI3QTJDIDB4MjYyQUVGMEYyNTMyMDYyNjhBMUVDMDk4NkQ1MDkwNTNEMzEzMDk0NkE4NTRBMDNGMjIwNDQ0RDAzRERENUI2OCkoMHgxRjdFOTk3NjlDN0MyRkU0MzhGMDJENkRGNDM0N0ZEMEE1NUE3MDE0NUM2NjY0MzBFOTcyNTI5Qjc0MzRGMjQ0IDB4M0VBOEZBMzU5RjQ5QUJDQTIxMDI5QUI3NkVDRjUyOUExNzc5NjA0MzgwNjJBMjg2MUUyQzVFMkVCMzA5NTVENikpKSkoel8xIDB4MzdCRDVGN0FFQUNCOERBQ0NGMEYyOTEyRDExQzg4QUE3NzdDNUZGQUI1NjlFNDQyMDAyRDIwMDJEODEyQjMzNikoel8yIDB4MTQ2RDg3MDM5QzMxMTQ5QkJCMTY4NEZCNTdERjc5MkMyNTREMDBGREQ4MTQyNzE4MDI1REIxQkE2RTY2ODY1MSkoZGVsdGEoMHgzNzIzRkMxMUY1MTkwRUQ2OTdERDQ5MzI3Njk3Q0VCRTI2NzAxMUUzQzgyRjAwNzkxRTUzQzMzRTNGRUZEMzdFIDB4MzIxMDcyRENDQTExMjczRUM4RjQxQ0Y3ODRBNzk4NjRBQzVGOTg0QzE1RDQzNzhCMjIzNEI2QUEyMTE0QUQ0QikpKHNnKDB4MkY3QkZCNjVERjZFQUJEN0FDNEFGRjA2QTJFODUzOUEyMzY0MjQxMUZEMUFBRDA4MTNDMkM0MjkyOUY4Q0FDMCAweDM0MTM1QTdFQjU1OEY3MzgzNEQyOTQyOUMwOUM3NkYyREJDRUFFODAxRUMwREEyOEJCNDJBQTJCQUNEQTZEQjQpKSkpKGV2YWxzKCgodygoMHgzOTM2OEUxOUQzMTRFODFGRDEzOUQyQzE2QTIyNjY2NTU3MUY4OTAxNTE2NzI3QzhBMDNCRkRBREQyQzFGOEVBKSgweDA1OUZBQjc2MjFGODlFOEQxQjU1NkVDRjI0RjQ3RkQ3N0RDNDIyQ0Y5M0Q5NDdFNTgxRDQzNDA4MkYxRUE4MzEpKDB4MUZCQUMwOTJBMUFEMzJEMUI1NjJFNzIxOTRCOUIzMTIyQkRGRDdGMDYxQjBFRjQ2MjI5MTI2RjQ5OTBGQUQ2RSkoMHgzQ0JBOUJEODkwQjhBRkE5QjY1NDdEN0U0MTZBQ0VBRkI5QUYzODJFOUY4ODc5QzYxMUFEOUMzODRBM0E3NEU3KSgweDEyNkQ4QkY0RDc0QkNCOERBMEQxQjE2QUMxQTJDQjEwRkRFQjYyMTYzMEE4NjIzQjFCQTYxQTFCQkVGNUMxMzMpKDB4MDZGNEUwNDY2Q0M2OUNFMkM4RjlFNzM2MTcwM0QxRTJFMzBCMURCMzJDNzZDNUVBQzVEMEJDRTA0M0QyQzRCRSkoMHgwQTVCRjkyQjYyQjhGQ0VFNkUzMzcyRUY2RjFCRTRGODUxMzlCMDk2OEYzMzExMzQzNUIzOTQyNEYwRkNFNzM1KSgweDNFQTgyQzEwOUQ4QUNFMzYxMkU3NEIxQjM5QzE3M0ZFNjE4NzhCMDNGNTQ1QzNGNDlFOEY1RjIxMEIxOUQ0RUUpKDB4M0NFRUVCRkZDQjY3QTk3NzcyMTg3RDE4ODQyQjE4NkY5OUNERjVCRjMxQzU3MzA5QjIyNzhERThCQTU5MEM3NykoMHgyM0FBRDIwRUQ1RDA4QTBCN0M2REJGRjA3Q0I5MjQ2MjYxMzM5MUIzNEI0NjMxMzY5QzhGNjQ2QkFDODRERTQwKSgweDM0MDRDQTM3NzIxRkEzRUM2REE2MTM5RDE0NDU3NzRDRjg1NTU2MkM3NjE1RDVFQjNBQzMwRTEyMTczRTUzMjQpKDB4MTkxNUI5QzRCNDU2RDk4MTA1RDM5RkYwNUM1Q0Q3QzY2MkFBNzJBQUM2QkZBMTNFMjc2NzA5QUE3OTNBRUVBRCkoMHgxNThDQzNEQjE2OTZGNjJEQTEzREIzREI1NDNEODdDQ0MwNzY1RTBCMjFBNjA2N0FGQTk3MjQ4NzA5Mjg4MjJEKSgweDJEQjhENzMxRDIwNUVENTczQ0IwMkVDQjM4QzlGODNDOEMyN0JBODc2QzEzMUI3MTY4RkIzOUQwOUFFMjhEMDMpKDB4MkFERUY0QzM4MzlGQkIwN0ZFNDgyNDk1REIwQzFCNkVGRjg4OUIwN0M0Qzc5OTI4N0E5M0I1QThBNUUxNzk5NSkpKSh6KDB4MTZBRkY5RkI4QUVENjNEMTM1NTA4MUIxQkE1QTI0NjJFMUU0RTE2M0JCODcyMERCNjZCRUNFQjJBQkRGNTBGQykpKHMoKDB4MTMxNzU5RjJGNjA0NTQyNzVEOUVCNzQwNDhBRjYwNjNCMEYzMUMzMjJBNkVCNUUwRUQyQjc4QkVGQUNBNUIwRCkoMHgwQTM2NTNBNzhFQTgyNjUyMDcxRjNCQjJGM0I4ODY2RThFQUQ3RkM0QjZEMkJEMEI3Qzc4NTM2RDkxQzhFODJDKSgweDIwOEQxRDczQkMxNjAyOTNGQzhFRkE1NjYyRDkxNDU2NzQ3MzMzNkZDQTdBNTI0NDJERkI2MkQzRjJDMTZBNzQpKDB4M0JFNUZCMDJCRTk5QUU0QzgwOEY1MTVEMTUxMEVEQTdGMDQzMzQ4MjdEMjc0N0UxNjY2OEU2M0RDQzc1RjBCOSkoMHgwMjcxN0U5MTlBMDgwQ0FDNjEwNUE4REY3RTBEMDAyRjFGMUZCNjQ5MDE1QTMzOTlGNDg5NTI5RUYyNEVDMjFGKSgweDMxNzgyMEIzMDIwMTU5NTJDREJEREZERjhFNUU1QzQzM0U1NzY2NUQwOUNDMzQwRjc5OUU0NDMzOTlFRDgwRjkpKSkoZ2VuZXJpY19zZWxlY3RvcigweDFCQkM0RUU3MDVDMUE4NTYxMEUzNUYzN0FGMTZFQjRDQ0YxRDM3NkQ5RkY0MUVDMjU4RUU0ODdEOEIzMzRBQTkpKShwb3NlaWRvbl9zZWxlY3RvcigweDNDNTQyMDJDMzk2MDQ4Q0JDNzVCMjRDQjlBRTkzMDlDODVDQ0RENjk2QUQ2RjczQjY4QUQ1NDg3NkRERkU0NUMpKSkoKHcoKDB4M0QwOUMwQkMxQjlCOTMzQTQ3NEZDOTExNTM1ODMzRTQ0NDE0OEVEODYzMjZFMDkyRkFDQTM2N0MzQTYxNjQzMikoMHgxNTI1OUUxNkQ1QjkzOUI0MDBCNTAwMUFGQjc5NTlBMTcwQkRERjczOERDQUU0OTk0MkYyQURENjU5QTZDNzUwKSgweDFGNDRENzU3QzlGODVCODE5QTUyMEJBNjBDRTY1MjFFMzg4MkRCQkUxMjdBODIxM0E5NkRDRDVCQ0QzOUE3NUMpKDB4M0MyQzM3NzgwNDU3RTEwRDcyQThFMUJDRjQ1NUFFODdBRjc1Njg3MkQ1QTY3M0M5NUZCNDY2QTgyMjU4RjM5MCkoMHgwRjM1RDIwOEU3RjlEMThENjBEMkIyOTNDOEZDODg1RjJDMzhDRUQ0M0U1MjkyRDJCQjNCREMxMTkwMkQ0QTA1KSgweDNCOERBNTM4NUFEQjkzODM3QTMwNDdFQUY4OEY1OTdCODdFMzkzNzA4N0YzMTBFMjk1RkNCRUYwMjkyMDdGNUYpKDB4MDMwMUU4QzhFODNDMEMzNjk2NUZENUUwNEU4MDY2OTczMUM3NzMzMEZGNUUwN0VGRUMzQkY5NDcwQjc4OTBDNikoMHgxQTk5QkZDRURCMTBFODNCRURCQjBFMTY1NzkwRTY2RUY1MzFFMjAwMkVENERFRjc1RTYyQjZCNDE0NEMzMTQzKSgweDE4QkI4RDczRTNERUNGN0JCQ0U5NTk5QjlFNUFDOTg2MDJERjNDQkU2REFDMDQzNDczQTNDQ0YzQ0E2NDlFNzQpKDB4Mjc1QUI0MTI5NDM3QjcwRDVGMzMyMTA1QzAyMEQ2RkRFNEI1QjQyMTk2MDMwNTdGQzg0Qjg5MEZFRDNFMEVCNykoMHgxODY1N0M0RTA3MERDMjU3ODc3NjMwMkNBMDQyNUY4OTRCNEFERUZGOTZCNDNGRjM3RDFCNURDODQ5MEVGOENBKSgweDNDRUI5M0M2NDcyMTREQzBEQTcyMzI4OURGRUU0MzEyMUFFMEMyOEVEQjBERDMzQzMzOUM3NzY0RjZBODlGNzkpKDB4MjE3RkJCMDIyQkMwQTZBM0ZCODhGOEYwOTc5RTFCRUY5NTNEOTI1RUFCQTRGN0JCNjVBNTBDRkY5QzMwRTlGNykoMHgxM0JCRjBFQ0FDREQ0MTU4NEMwM0U0QUY2NTMzNUY3QTFBNDRBNEU3RkQ0NjMyMzc0RTA4MzFBOTk2RUY0OEFDKSgweDE0OTdEREJENTI3OUI0OEZDNzkyMzUwNUZCMTU1NTE3RDIwMDREMDI3MzBBMjZDODkyNjA4RkVCODRDQ0YzN0UpKSkoeigweDNDRDRCOEQ1NzRDQzU3REFEQzExMDQ3ODAyNEJDNjI1MjhBOEIyQzRCRDY4NTlBRDMyRUZFQUEwOEMyNUI3REMpKShzKCgweDM3NTNDMUIzQzE5REY5RjgzRDFCNjA3NDU1ODZBRkQwNjc2RUMzQUE1REE5NDkzRkUzQTE2Njc4QjAxQzA2N0MpKDB4MTg3NUEyMDBFOTcxRkJFOUY2QTVDQTg0MUVBMEE0NkFCQkIwQjdBMjA5Q0JBOURCRDgxQTgyQkIwQTIyQkQyMCkoMHgwMEY3QjAyMzQyN0E2NjYxMkEyNzM0MjQ3MEVCQjg0RDgxOTY0QkY4NjA4QUJGQkIyNEMzMzkzQkQxNTlDMDA5KSgweDI3MjVBMEQ3MTQ0OTBDNzc4OUQzREREQTNDMTgyQzE5RUI5QTI3QUNGQjRBQkIzMENGMzEwOTU0N0MxNTYzRjcpKDB4MTExQjU3QTJENjcwQ0JFOTA2ODAwRjQ4OTE5NDc2REIyMjQ4OUVBMkU1OUFCMzlEQTBBNzE5Rjg4OEEzNUUyQikoMHgxMDNBNUZBREJCMDlGQjYxMEY3NzA4MDYzNTIzQTFFRDkxOENDMzIwQUE0NDA2QTA0NzU0MDdDRUVDRURDNjk0KSkpKGdlbmVyaWNfc2VsZWN0b3IoMHgyMzhGNjFBQzI2NTM0NkY0REExQkJEMzM4MDg3M0FDRTc3MzcxRDFDMjcwM0QzRkIwQ0FCRDREQzNBNUNDMURDKSkocG9zZWlkb25fc2VsZWN0b3IoMHgyNTVGREVGRDY5ODhBMEI3RDY0RjgzMDhFOEZDMEY3OUY4QUY5NEU1NUM3NTZBREU0MkU2OUU1RjI1RTZCRTczKSkpKSkoZnRfZXZhbDEgMHgxQzBEQjBCNjJFNzJFRkRDODE2QkY5MTkyMEJERkVFMDhEMzBDMUU3REVEREI3RjE0NTc0NUNGRDczMDBFNzQzKSkpKSkp"
+              signature: null
+            }
+          }
+        ]
+        memo: "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+      }
+    }
+  )
 }
-  
 ```
 
 Account state after the above transaction is included in a block
@@ -461,7 +518,7 @@ Account state after the above transaction is included in a block
 query MyQuery {
   account(publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z") {
     nonce
-    snappState
+    zkappState
   }
 }
 ```
@@ -473,7 +530,7 @@ Result of the query
   "data": {
     "account": {
       "nonce": "0",
-      "snappState": [
+      "zkappState": [
         "1",
         "2",
         "3",
@@ -487,171 +544,188 @@ Result of the query
   }
 }
 ```
+![Screenshot](res/account-after-state-update.png)
 
 #### 3. Update Account Permissions
 
-A snapp transaction to update the account's permissions.
+A zkapp transaction to update the account's permissions.
 
 ```shell
-$mina-snapp-test-transaction update-permissions -help
-Generate a snapp transaction that updates the permissions of a snapp account
+$mina-zkapp-test-transaction update-permissions -help
+Generate a zkApp transaction that updates the permissions of a zkApp account
 
-  mina-snapp-test-transaction update-permissions 
+  zkapp_test_transaction.exe update-permissions 
 
 === flags ===
 
-  --current-auth Proof|Signature|Both|Either|None  Current authorization in the
-                                                   account to change permissions
-  --edit-stake _                                   Proof|Signature|Both|Either|None
-  --fee-payer-key KEYFILE                          Private key file for the fee
-                                                   payer of the transaction
-                                                   (should already be in the
-                                                   ledger)
-  --increment-nonce _                              Proof|Signature|Both|Either|None
-  --nonce NN                                       Nonce of the fee payer
-                                                   account
-  --receive _                                      Proof|Signature|Both|Either|None
-  --send _                                         Proof|Signature|Both|Either|None
-  --set-delegate _                                 Proof|Signature|Both|Either|None
-  --set-permissions _                              Proof|Signature|Both|Either|None
-  --set-sequence-state _                           Proof|Signature|Both|Either|None
-  --set-snapp-uri _                                Proof|Signature|Both|Either|None
-  --set-token-symbol _                             Proof|Signature|Both|Either|None
-  --set-verification-key _                         Proof|Signature|Both|Either|None
-  --set-voting-for _                               Proof|Signature|Both|Either|None
-  --snapp-account-key KEYFILE                      Private key file to create a
-                                                   new snapp account
-  [--debug]                                        Debug mode, generates
-                                                   transaction snark
-  [--fee FEE]                                      Amount you are willing to pay
-                                                   to process the transaction
-                                                   (default: 1) (minimum: 0.003)
-  [--memo STRING]                                  Memo accompanying the
-                                                   transaction
-  [-help]                                          print this help text and exit
-                                                   (alias: -?)
+  --current-auth Proof|Signature|Either|None  Current authorization in the
+                                              account to change permissions
+  --edit-state _                              Proof|Signature|Either|None
+  --fee-payer-key KEYFILE                     Private key file for the fee payer
+                                              of the transaction (should already
+                                              be in the ledger)
+  --increment-nonce _                         Proof|Signature|Either|None
+  --nonce NN                                  Nonce of the fee payer account
+  --receive _                                 Proof|Signature|Either|None
+  --send _                                    Proof|Signature|Either|None
+  --set-delegate _                            Proof|Signature|Either|None
+  --set-permissions _                         Proof|Signature|Either|None
+  --set-sequence-state _                      Proof|Signature|Either|None
+  --set-token-symbol _                        Proof|Signature|Either|None
+  --set-verification-key _                    Proof|Signature|Either|None
+  --set-voting-for _                          Proof|Signature|Either|None
+  --set-zkapp-uri _                           Proof|Signature|Either|None
+  --zkapp-account-key KEYFILE                 Private key file to create a new
+                                              zkApp account
+  [--debug]                                   Debug mode, generates transaction
+                                              snark
+  [--fee FEE]                                 Amount you are willing to pay to
+                                              process the transaction (default:
+                                              1) (minimum: 0.003)
+  [--memo STRING]                             Memo accompanying the transaction
+  [-help]                                     print this help text and exit
+                                              (alias: -?)
 
 ```
 
 For example: To change the permission required to edit permissions from Signature to Proof
 
 ```shell
-$mina-snapp-test-transaction update-permissions --fee-payer-key ..my-fee-payer --nonce 4 --snapp-account-key my-snapp-key --current-auth signature --edit-stake Proof --receive None --set-permissions Proof --set-delegate Signature --set-verification-key Signature --set-snapp-uri Signature --set-sequence-state Proof --set-token-symbol Signature --send Signature --increment-nonce Signature --set-voting-for Signature
+$mina-zkapp-test-transaction update-permissions --fee-payer-key ..my-fee-payer --nonce 4 --zkapp-account-key my-zkapp-key --current-auth signature --edit-state Proof --receive None --set-permissions Proof --set-delegate Signature --set-verification-key Signature --set-zkapp-uri Signature --set-sequence-state Proof --set-token-symbol Signature --send Signature --increment-nonce Signature --set-voting-for Signature
 ```
 
 ```
 mutation MyMutation {
   __typename
-  sendSnapp(input: {
-    feePayer:{data:{body:{publicKey:"B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:null,
-          permissions:null,
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        fee:"1000000000",
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}}},
-      predicate:"4"},
-    authorization:"7mXNK9nxCy71RyhLb5NjRSdYi3Lvhx5SCgjRmGKtSXNved7CWCwc3Vn5eHjTUvNrzyDuWSbb8f49Bjtr7KS3kxU59uhmpEyd"},
-    otherParties:[{data:{body:{publicKey:"B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z",
-        update:{appState:[null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null],
-          delegate:null,
-          verificationKey:null,
-          permissions:{stake:true,
-            editState:Proof,
-            send:Signature,
-            receive:None,
-            setDelegate:Signature,
-            setPermissions:Proof,
-            setVerificationKey:Signature,
-            setSnappUri:Signature,
-            editSequenceState:Proof,
-            setTokenSymbol:Signature,
-            incrementNonce:Signature,
-            setVotingFor:Signature},
-          snappUri:null,
-          tokenSymbol:null,
-          timing:null,
-          votingFor:null},
-        tokenId:"1",
-        balanceChange:{magnitude:"0",
-          sign:PLUS},
-        incrementNonce:false,
-        events:[],
-        sequenceEvents:[],
-        callData:"0x0000000000000000000000000000000000000000000000000000000000000000",
-        callDepth:0,
-        protocolState:{snarkedLedgerHash:null,
-          snarkedNextAvailableToken:null,
-          timestamp:null,
-          blockchainLength:null,
-          minWindowDensity:null,
-          lastVrfOutput:null,
-          totalCurrency:null,
-          globalSlotSinceHardFork:null,
-          globalSlotSinceGenesis:null,
-          stakingEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null},
-          nextEpochData:{ledger:{hash:null,
-              totalCurrency:null},
-            seed:null,
-            startCheckpoint:null,
-            lockCheckpoint:null,
-            epochLength:null}},
-        useFullCommitment:true},
-      predicate:{account:null,
-        nonce:null}},
-    authorization:{signature:"7mXX6EYzQw2S3ZDUj4A8ECyuefJZLNRhGf6DLeinnbApfGVjYMkVZyzNGWnAaYqCuNDtNePL47G6EkrGQCcamgQw72rrR4qz"}}] })
+  sendZkapp(
+    input: {
+      parties: {
+        feePayer: {
+          body: {
+            publicKey: "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww"
+            update: {
+              appState: [null, null, null, null, null, null, null, null]
+              delegate: null
+              verificationKey: null
+              permissions: null
+              zkappUri: null
+              tokenSymbol: null
+              timing: null
+              votingFor: null
+            }
+            balanceChange: "5000000000"
+            events: []
+            sequenceEvents: []
+            callData: "0"
+            callDepth: 0
+            protocolStatePrecondition: {
+              snarkedLedgerHash: null
+              timestamp: null
+              blockchainLength: null
+              minWindowDensity: null
+              totalCurrency: null
+              globalSlotSinceHardFork: null
+              globalSlotSinceGenesis: null
+              stakingEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+              nextEpochData: {
+                ledger: { hash: null, totalCurrency: null }
+                seed: null
+                startCheckpoint: null
+                lockCheckpoint: null
+                epochLength: null
+              }
+            }
+            accountPrecondition: "3"
+          }
+          authorization: "7mWyHxNKM1WG5syxbayM2xPLethzreaD5eijCXhabBfJMTnFo4LkhLXtKUq3YnouWduVmoSgd4buYyHh2XgRamUZVNuUjpWp"
+        }
+        otherParties: [
+          {
+            body: {
+              publicKey: "B62qmQDtbNTymWXdZAcp4JHjfhmWmuqHjwc6BamUEvD8KhFpMui2K1Z"
+              tokenId: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+              update: {
+                appState: [null, null, null, null, null, null, null, null]
+                delegate: null
+                verificationKey: null
+                permissions: {
+                  editState: "Proof"
+                  send: "Signature"
+                  receive: "None"
+                  setDelegate: "Signature"
+                  setPermissions: "Proof"
+                  setVerificationKey: "Signature"
+                  setZkappUri: "Signature"
+                  editSequenceState: "Proof"
+                  setTokenSymbol: "Signature"
+                  incrementNonce: "Signature"
+                  setVotingFor: "Signature"
+                }
+                zkappUri: null
+                tokenSymbol: null
+                timing: null
+                votingFor: null
+              }
+              balanceChange: { magnitude: "0", sgn: "Positive" }
+              incrementNonce: false
+              events: []
+              sequenceEvents: []
+              callData: "0"
+              callDepth: 0
+              protocolStatePrecondition: {
+                snarkedLedgerHash: null
+                timestamp: null
+                blockchainLength: null
+                minWindowDensity: null
+                totalCurrency: null
+                globalSlotSinceHardFork: null
+                globalSlotSinceGenesis: null
+                stakingEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+                nextEpochData: {
+                  ledger: { hash: null, totalCurrency: null }
+                  seed: null
+                  startCheckpoint: null
+                  lockCheckpoint: null
+                  epochLength: null
+                }
+              }
+              accountPrecondition: {
+                balance: null
+                nonce: null
+                receiptChainHash: null
+                publicKey: null
+                delegate: null
+                state: [null, null, null, null, null, null, null, null]
+                sequenceState: null
+                provedState: null
+              }
+              useFullCommitment: true
+            }
+            authorization: {
+              proof: null
+              signature: "7mXL44M3nJbyHpbYoQ9ak2XUFS4g8THc63ejMR1Wyz3uxd1NY4bnDaGxuCSD4jnbXo9apnDeQgzrdUvHuSFz8uaMjkF5ogey"
+            }
+          }
+        ]
+        memo: "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+      }
+    }
+  )
 }
-  
 ```
-
-Account state after the above transaction is included in a block
+Account state after the above transaction is sent and included in a block
 
 ```
 query MyQuery {
@@ -664,15 +738,12 @@ query MyQuery {
       send
       setDelegate
       setPermissions
-      setSnappUri
+      setZkappUri
       setTokenSymbol
       setVerificationKey
       setVotingFor
-      stake
     }
   }
-}
-
 }
 ```
 
@@ -690,13 +761,13 @@ Result of the query
         "send": "Signature",
         "setDelegate": "Signature",
         "setPermissions": "Proof",
-        "setSnappUri": "Signature",
+        "setZkappUri": "Signature",
         "setTokenSymbol": "Signature",
         "setVerificationKey": "Signature",
         "setVotingFor": "Signature",
-        "stake": true
       }
     }
   }
 }
 ```
+![Screenshot](res/account-after-setting-permissions.png)
