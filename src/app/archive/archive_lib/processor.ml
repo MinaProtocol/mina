@@ -12,6 +12,10 @@ open Pipe_lib
 open Signature_lib
 open Pickles_types
 
+let applied_str = "applied"
+
+let failed_str = "failed"
+
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
@@ -2103,10 +2107,10 @@ module Block_and_signed_command = struct
     let status_str, failure_reason =
       match status with
       | Applied ->
-          ("applied", None)
+          (applied_str, None)
       | Failed failures ->
           (* for signed commands, there's exactly one failure *)
-          ("failed", Some (List.concat failures |> List.hd_exn))
+          (failed_str, Some (List.concat failures |> List.hd_exn))
     in
     add
       (module Conn)
@@ -2201,7 +2205,8 @@ module Block_and_zkapp_command = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
       ~zkapp_command_id ~sequence_no ~status
-      ~(failure_reasons : Transaction_status.Failure.Collection.t option) =
+      ~(failure_reasons : Transaction_status.Failure.Collection.display option)
+      =
     let open Deferred.Result.Let_syntax in
     let%bind failure_reasons_ids =
       match failure_reasons with
@@ -2209,8 +2214,8 @@ module Block_and_zkapp_command = struct
           return None
       | Some reasons ->
           let%map failure_reasons_ids_list =
-            Mina_caqti.deferred_result_list_mapi reasons
-              ~f:(fun ndx failure_reasons ->
+            Mina_caqti.deferred_result_list_map reasons
+              ~f:(fun (ndx, failure_reasons) ->
                 Zkapp_party_failures.add_if_doesn't_exist
                   (module Conn)
                   ndx failure_reasons)
@@ -2701,7 +2706,22 @@ module Block = struct
                         ~status:user_command.status
                       >>| ignore
                   | Parties _ ->
-                      Deferred.Result.return ()
+                      let status, failure_reasons =
+                        match user_command.status with
+                        | Applied ->
+                            (applied_str, None)
+                        | Failed failures ->
+                            let display =
+                              Transaction_status.Failure.Collection.to_display
+                                failures
+                            in
+                            (failed_str, Some display)
+                      in
+                      Block_and_zkapp_command.add_if_doesn't_exist
+                        (module Conn)
+                        ~block_id ~zkapp_command_id:id ~sequence_no ~status
+                        ~failure_reasons
+                      >>| ignore
                 in
                 (sequence_no + 1, nonce_map)
             | { data = Fee_transfer fee_transfer_bundled; _ } ->

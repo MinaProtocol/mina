@@ -207,8 +207,9 @@ CREATE INDEX idx_blocks_internal_commands_secondary_sequence_no ON blocks_intern
    sequence_no gives the order within all transactions in the block
 
    The `failure_reasons` column is not NULL iff `status` is `failed`. The
-   entries in the array are unenforced foreign key references to `zkapp_party_failures(id)`,
-   and are not NULL.
+   entries in the array are unenforced foreign key references to `zkapp_party_failures(id)`.
+   Each element of the array refers to the failures for a party in `other_parties`, and
+   is not NULL.
 
    Blocks command convention
 */
