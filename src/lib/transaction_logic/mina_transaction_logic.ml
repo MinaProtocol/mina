@@ -58,7 +58,7 @@ module Transaction_applied = struct
   module Parties_applied = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t =
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
@@ -78,7 +78,7 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           | Signed_command of Signed_command_applied.Stable.V2.t
-          | Parties of Parties_applied.Stable.V2.t
+          | Parties of Parties_applied.Stable.V1.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
