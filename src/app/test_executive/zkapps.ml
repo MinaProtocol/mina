@@ -131,6 +131,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       return
@@ -174,6 +176,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       let%map.Deferred parties =
@@ -239,6 +243,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       let%map.Deferred parties_update_all =

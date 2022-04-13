@@ -39,6 +39,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -64,6 +66,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -88,6 +92,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update
@@ -116,6 +122,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update
@@ -146,6 +154,8 @@ let%test_module "Fee payer tests" =
                 ; call_data = Snark_params.Tick.Field.zero
                 ; events = []
                 ; sequence_events = []
+                ; protocol_state_precondition = None
+                ; account_precondition = None
                 }
               in
               let parties =

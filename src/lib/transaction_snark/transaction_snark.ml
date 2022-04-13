@@ -1796,6 +1796,13 @@ module Base = struct
             Mina_transaction_logic.Parties_logic.Local_state.t
 
           let add_check (t : t) _failure b =
+            let _b' =
+              as_prover
+                As_prover.(
+                  fun () ->
+                    let b = read Bool.typ b in
+                    Core.printf "success = %b\n%!" b)
+            in
             { t with success = Bool.(t.success &&& b) }
 
           let update_failure_status_tbl (t : t) _failure_status b =
@@ -1935,10 +1942,12 @@ module Base = struct
         exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
           ~compute:(fun () -> !witness.state_body)
       in
+      Core.printf "loc %s\n%!" __LOC__ ;
       let pending_coinbase_stack_init =
         exists Pending_coinbase.Stack.typ ~compute:(fun () ->
             !witness.init_stack)
       in
+      Core.printf "loc %s\n%!" __LOC__ ;
       let module V = Prover_value in
       run_checked
         (check_protocol_state ~pending_coinbase_stack_init
@@ -1946,6 +1955,7 @@ module Base = struct
              statement.source.pending_coinbase_stack
            ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
            state_body) ;
+      Core.printf "loc %s\n%!" __LOC__ ;
       let init :
           Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
           =
@@ -1982,9 +1992,11 @@ module Base = struct
         in
         (g, l)
       in
+      Core.printf "loc %s\n%!" __LOC__ ;
       let start_parties =
         As_prover.Ref.create (fun () -> !witness.start_parties)
       in
+      Core.printf "loc %s\n%!" __LOC__ ;
       let (global, local), snapp_statements =
         List.fold_left spec ~init:(init, snapp_statements)
           ~f:(fun (((_, local) as acc), statements) party_spec ->
@@ -1999,6 +2011,7 @@ module Base = struct
                   | s :: ss ->
                       (Some s, ss) )
             in
+            Core.printf "loc %s\n%!" __LOC__ ;
             let module S = Single (struct
               let constraint_constants = constraint_constants
 
@@ -2018,6 +2031,7 @@ module Base = struct
                       |> List.map ~f:(fun party -> (party, ()))
                       |> Parties.Call_forest.With_hashes.of_parties_list)
               in
+              Core.printf "loc %s\n%!" __LOC__ ;
               let h =
                 exists Field.typ ~compute:(fun () ->
                     Parties.Call_forest.hash (V.get ps))
@@ -2034,6 +2048,7 @@ module Base = struct
                             p.memo_hash)
                 }
               in
+              Core.printf "loc %s\n%!" __LOC__ ;
               let global_state, local_state =
                 S.apply ~constraint_constants
                   ~is_start:
@@ -2047,6 +2062,7 @@ module Base = struct
                   S.{ perform }
                   acc
               in
+              Core.printf "loc %s\n%!" __LOC__ ;
               (* replace any transaction failure with unit value *)
               (global_state, { local_state with failure_status_tbl = () })
             in
@@ -2091,6 +2107,7 @@ module Base = struct
                           `Start p)
                   |> finish
             in
+            Core.printf "loc %s\n%!" __LOC__ ;
             (acc', statements))
       in
       with_label __LOC__ (fun () -> assert (List.is_empty snapp_statements)) ;
@@ -4103,6 +4120,8 @@ module For_tests = struct
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
+      ; account_precondition : Party.Account_precondition.t option
       }
     [@@deriving sexp]
   end
@@ -4171,7 +4190,7 @@ module For_tests = struct
 
   let create_parties spec
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~update
-      ~account_precondition =
+      =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; receivers
@@ -4182,9 +4201,19 @@ module For_tests = struct
         ; sequence_events
         ; events
         ; call_data
+        ; protocol_state_precondition
+        ; account_precondition
         ; _
         } =
       spec
+    in
+    let protocol_state_precondition =
+      Option.value protocol_state_precondition
+        ~default:Zkapp_precondition.Protocol_state.accept
+    in
+    let account_precondition =
+      Option.value account_precondition
+        ~default:Party.Account_precondition.Accept
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer =
@@ -4198,8 +4227,7 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
+          ; protocol_state_precondition
           ; account_precondition = sender_nonce
           ; use_full_commitment = ()
           }
@@ -4218,7 +4246,7 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; protocol_state_precondition
         ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
         ; use_full_commitment = false
         }
@@ -4277,8 +4305,7 @@ module For_tests = struct
               ; sequence_events
               ; call_data
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition
               ; account_precondition
               ; use_full_commitment = true
               }
@@ -4298,8 +4325,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition
               ; account_precondition = Accept
               ; use_full_commitment = false
               }
@@ -4385,7 +4411,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~constraint_constants ~update:update_vk
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4415,7 +4440,6 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties spec ~constraint_constants ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4495,7 +4519,6 @@ module For_tests = struct
       create_parties spec
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
         ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
