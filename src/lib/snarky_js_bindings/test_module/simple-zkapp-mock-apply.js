@@ -70,9 +70,8 @@ let partiesJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
   initialBalance,
-  initialBalanceFundingAccountKey: sender.privateKey,
-  shouldSignFeePayer: true,
   feePayerKey: sender.privateKey,
+  shouldSignFeePayer: true,
   transactionFee,
 });
 toc();

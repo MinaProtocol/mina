@@ -71,7 +71,7 @@ if (command === "deploy") {
     zkappKey,
     verificationKey,
     initialBalance,
-    initialBalanceFundingAccountKey: feePayerKeyJs,
+    feePayerKey: feePayerKeyJs,
   });
 
   // mina-signer part
@@ -82,7 +82,7 @@ if (command === "deploy") {
     fee: `${transactionFee}`,
     nonce: feePayerNonce,
   };
-  let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
+  let parties = JSON.parse(partiesJson);
   let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
   console.log(data.parties);
 }
