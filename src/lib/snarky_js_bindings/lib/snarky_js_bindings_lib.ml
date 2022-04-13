@@ -2808,7 +2808,7 @@ module Ledger = struct
 
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
-  let check_party_signatures ?(check_fee_payer = true) parties =
+  let check_party_signatures parties =
     let ({ fee_payer; other_parties; _ } : Parties.t) = parties in
     let tx_commitment = Parties.commitment parties in
     let full_tx_commitment =
@@ -2816,11 +2816,12 @@ module Ledger = struct
         ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
     in
     let key_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
-    let check_signature s pk msg =
+    let check_signature who s pk msg =
       match Signature_lib.Public_key.decompress pk with
       | None ->
           failwith
-            (sprintf "Check signature: Invalid key %s" (key_to_string pk))
+            (sprintf "Check signature: Invalid key on %s: %s" who
+               (key_to_string pk))
       | Some pk_ ->
           if
             not
@@ -2829,21 +2830,22 @@ module Ledger = struct
                  (Random_oracle_input.Chunked.field msg))
           then
             failwith
-              (sprintf "Check signature: Invalid signature for key %s"
+              (sprintf "Check signature: Invalid signature on %s for key %s" who
                  (key_to_string pk))
           else ()
     in
-    if check_fee_payer then
-      check_signature fee_payer.authorization fee_payer.body.public_key
-        full_tx_commitment ;
-    List.iter other_parties ~f:(fun p ->
+
+    check_signature "fee payer" fee_payer.authorization
+      fee_payer.body.public_key full_tx_commitment ;
+    List.iteri other_parties ~f:(fun i p ->
         let commitment =
           if p.body.use_full_commitment then full_tx_commitment
           else tx_commitment
         in
         match p.authorization with
         | Signature s ->
-            check_signature s p.body.public_key commitment
+            check_signature (sprintf "party %d" i) s p.body.public_key
+              commitment
         | Proof _ | None_given ->
             ())
 
