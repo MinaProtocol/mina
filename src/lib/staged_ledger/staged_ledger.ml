@@ -1962,8 +1962,8 @@ module T = struct
               []
           | Failed ->
               [] )
-      | Command (Parties _) ->
-          failwith "TODO: add previous_empty_accounts for parties"
+      | Command (Parties { previous_empty_accounts; _ }) ->
+          previous_empty_accounts
       | Fee_transfer { previous_empty_accounts; _ } ->
           previous_empty_accounts
       | Coinbase { previous_empty_accounts; _ } ->
