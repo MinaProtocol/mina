@@ -22,7 +22,7 @@ module T : Transaction_snark.S
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
-val state_view : Zkapp_precondition.Protocol_state.View.t
+val genesis_state_view : Zkapp_precondition.Protocol_state.View.t
 
 val genesis_state_body_hash : State_hash.t
 

@@ -190,7 +190,7 @@ let%test_module "Zkapp payments tests" =
                     init_ledger ledger ;
                   U.check_parties_with_merges_exn ledger [ parties ])))
 
-    let%test_unit "snapps payments failed due to insufficient funds" =
+    let%test_unit "zkapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -249,7 +249,7 @@ let%test_module "Zkapp payments tests" =
               U.apply_parties ledger [ parties ] ;
               let _, (local_state, _) =
                 Ledger.apply_parties_unchecked ~constraint_constants
-                  ~state_view:U.state_view ledger parties
+                  ~state_view:U.genesis_state_view ledger parties
                 |> Or_error.ok_exn
               in
               let failure_status =
