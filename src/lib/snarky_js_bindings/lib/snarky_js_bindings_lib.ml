@@ -2350,7 +2350,7 @@ module Ledger = struct
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { body = fee_payer_party_body parties##.feePayer
-        ; authorization = Mina_base.Signature.dummy
+        ; authorization = Mina_base.Signature.dummy (* TODO *)
         }
     ; other_parties =
         Js.to_array parties##.otherParties
@@ -2782,6 +2782,20 @@ module Ledger = struct
           (List.nth_exn other_parties i).body.use_full_commitment
     in
     if use_full_commitment then full_commitment else commitment
+
+  let proof_statement ({ other_parties; _ } as tx : Parties.t)
+      (party_index : int) =
+    let at_party =
+      let ps =
+        Parties.Call_forest.of_parties_list
+          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          (List.drop other_parties party_index)
+        |> Parties.Call_forest.accumulate_hashes_predicated
+      in
+      Parties.Call_forest.hash ps
+    in
+    let transaction = tx_commitment tx (Other_party party_index) in
+    { transaction; at_party }
 
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =

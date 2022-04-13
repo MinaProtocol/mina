@@ -60,7 +60,10 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
+let { verificationKey, provers, verify } = await compile(
+  SimpleZkapp,
+  zkappAddress
+);
 toc();
 
 tic("create deploy transaction");
@@ -112,7 +115,8 @@ let partiesJsonUpdateWithProof = await call(
   zkappAddress,
   "update",
   [Field(5)],
-  provers
+  provers,
+  verify
 );
 partiesJsonUpdateWithProof = await signFeePayer(
   partiesJsonUpdateWithProof,
