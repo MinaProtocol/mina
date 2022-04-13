@@ -221,7 +221,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
-      let zkapp_update : Party.Update.t =
+      let snapp_update : Party.Update.t =
         { app_state
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
@@ -266,7 +266,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_fee
       in
-      ( zkapp_update
+      ( snapp_update
       , parties_update_all
       , parties_insufficient_replace_fee
       , parties_insufficient_fee )
