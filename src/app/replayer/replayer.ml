@@ -1402,8 +1402,9 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
                         "Expected account id for account precondition of kind \
                          Full"
                   | Some account_id ->
-                      query_db pool ~item:"Snapp account" ~f:(fun db ->
-                          Processor.Zkapp_account.load db account_id)
+                      query_db pool ~item:"Zkapp account" ~f:(fun db ->
+                          Processor.Zkapp_precondition_account.load db
+                            account_id)
                 in
                 let%map zkapp_account =
                   let%bind balance =

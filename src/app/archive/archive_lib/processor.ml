@@ -12,6 +12,10 @@ open Pipe_lib
 open Signature_lib
 open Pickles_types
 
+let applied_str = "applied"
+
+let failed_str = "failed"
+
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
@@ -117,6 +121,31 @@ module Zkapp_states = struct
       id
 end
 
+module Zkapp_sequence_states = struct
+  let table_name = "zkapp_sequence_states"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
+    let open Deferred.Result.Let_syntax in
+    let%bind (element_ids : int array) =
+      Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
+          Zkapp_state_data.add_if_doesn't_exist (module Conn) field)
+      >>| Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      element_ids
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]))
+      id
+end
+
 module Zkapp_verification_keys = struct
   type t = { verification_key : string; hash : string }
   [@@deriving fields, hlist]
@@ -131,7 +160,7 @@ module Zkapp_verification_keys = struct
       (vk :
         ( Pickles.Side_loaded.Verification_key.t
         , Pickles.Backend.Tick.Field.t )
-        With_hash.Stable.Latest.t) =
+        With_hash.t) =
     let verification_key =
       Binable.to_string
         (module Pickles.Side_loaded.Verification_key.Stable.Latest)
@@ -442,7 +471,7 @@ module Zkapp_nonce_bounds = struct
       id
 end
 
-module Zkapp_account = struct
+module Zkapp_precondition_account = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -468,7 +497,7 @@ module Zkapp_account = struct
         ; option bool
         ]
 
-  let table_name = "zkapp_account"
+  let table_name = "zkapp_precondition_accounts"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -572,7 +601,8 @@ module Zkapp_account_precondition = struct
     let%bind account_id =
       match account_precondition with
       | Party.Account_precondition.Full acct ->
-          Zkapp_account.add_if_doesn't_exist (module Conn) acct >>| Option.some
+          Zkapp_precondition_account.add_if_doesn't_exist (module Conn) acct
+          >>| Option.some
       | _ ->
           return None
     in
@@ -2077,10 +2107,10 @@ module Block_and_signed_command = struct
     let status_str, failure_reason =
       match status with
       | Applied ->
-          ("applied", None)
+          (applied_str, None)
       | Failed failures ->
           (* for signed commands, there's exactly one failure *)
-          ("failed", Some (List.concat failures |> List.hd_exn))
+          (failed_str, Some (List.concat failures |> List.hd_exn))
     in
     add
       (module Conn)
@@ -2108,10 +2138,10 @@ module Block_and_signed_command = struct
           (module Conn)
           ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
 
-  let load (module Conn : CONNECTION) ~block_id ~user_command_id =
+  let load (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 int int)
+         Caqti_type.(tup3 int int int)
          typ
          {sql| SELECT block_id, user_command_id,
                sequence_no,
@@ -2125,8 +2155,357 @@ module Block_and_signed_command = struct
                FROM blocks_user_commands
                WHERE block_id = $1
                AND user_command_id = $2
+               AND sequence_no = $3
            |sql})
-      (block_id, user_command_id)
+      (block_id, user_command_id, sequence_no)
+end
+
+module Zkapp_party_failures = struct
+  type t = { index : int; failures : string array } [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; Mina_caqti.array_string_typ ]
+
+  let table_name = "zkapp_party_failures"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) index failures =
+    let failures =
+      List.map failures ~f:Transaction_status.Failure.to_string |> Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "index"; "failures" ], typ)
+      (module Conn)
+      { index; failures }
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name
+            ~cols:[ "index"; "failures" ]))
+      id
+end
+
+module Block_and_zkapp_command = struct
+  type t =
+    { block_id : int
+    ; zkapp_command_id : int
+    ; sequence_no : int
+    ; status : string
+    ; failure_reasons_ids : int array option
+    }
+  [@@deriving hlist]
+
+  let table_name = "blocks_zkapp_commands"
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int; string; option Mina_caqti.array_int_typ ]
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
+      ~zkapp_command_id ~sequence_no ~status
+      ~(failure_reasons : Transaction_status.Failure.Collection.display option)
+      =
+    let open Deferred.Result.Let_syntax in
+    let%bind failure_reasons_ids =
+      match failure_reasons with
+      | None ->
+          return None
+      | Some reasons ->
+          let%map failure_reasons_ids_list =
+            Mina_caqti.deferred_result_list_map reasons
+              ~f:(fun (ndx, failure_reasons) ->
+                Zkapp_party_failures.add_if_doesn't_exist
+                  (module Conn)
+                  ndx failure_reasons)
+          in
+          Some (Array.of_list failure_reasons_ids_list)
+    in
+    Mina_caqti.select_insert_into_cols
+      ~select:
+        ( "block_id, zkapp_command_id, sequence_no"
+        , Caqti_type.(tup3 int int int) )
+      ~table_name
+      ~cols:
+        ( [ "block_id"
+          ; "zkapp_command_id"
+          ; "sequence_no"
+          ; "status"
+          ; "failure_reasons_ids"
+          ]
+        , typ )
+      (module Conn)
+      { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
+
+  let load (module Conn : CONNECTION) ~block_id ~zkapp_command_id ~sequence_no =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         typ
+         (Mina_caqti.select_cols_from_id ~table_name
+            ~cols:
+              [ "block_id"
+              ; "zkapp_command_id"
+              ; "sequence_no"
+              ; "status"
+              ; "failure_reasons_ids"
+              ]))
+      (block_id, zkapp_command_id, sequence_no)
+end
+
+module Account_identifiers = struct
+  type t = { public_key_id : int; token : string; token_owner : int }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; string; int ]
+
+  let table_name = "account_identifiers"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~account_id ~token_owner =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    let token = Account_id.token_id account_id |> Token_id.to_string in
+    let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
+    let t = { public_key_id; token; token_owner } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+end
+
+module Zkapp_uri = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_uris"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "uri" ], typ)
+      (module Conn)
+      zkapp_uri
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "uri" ]))
+      id
+end
+
+module Zkapp_account = struct
+  type t =
+    { app_state_id : int
+    ; verification_key_id : int option
+    ; zkapp_version : int64
+    ; sequence_state_id : int
+    ; last_sequence_slot : int64
+    ; proved_state : bool
+    ; zkapp_uri_id : int
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; option int; int64; int; int64; bool; int ]
+
+  let table_name = "zkapp_accounts"
+
+  (* TODO: when zkapp_uri moved to Zkapp.Account in OCaml, no need to pass it in separately *)
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri zkapp_account =
+    let open Deferred.Result.Let_syntax in
+    let ({ app_state
+         ; verification_key
+         ; zkapp_version
+         ; sequence_state
+         ; last_sequence_slot
+         ; proved_state
+         }
+          : Mina_base.Zkapp_account.t) =
+      zkapp_account
+    in
+    let app_state = Vector.map app_state ~f:(fun field -> Some field) in
+    let%bind app_state_id =
+      Zkapp_states.add_if_doesn't_exist (module Conn) app_state
+    in
+    let%bind verification_key_id =
+      Option.value_map verification_key ~default:(return None) ~f:(fun vk ->
+          let%map id =
+            Zkapp_verification_keys.add_if_doesn't_exist (module Conn) vk
+          in
+          Some id)
+    in
+    let zkapp_version = zkapp_version |> Unsigned.UInt32.to_int64 in
+    let%bind sequence_state_id =
+      Zkapp_sequence_states.add_if_doesn't_exist (module Conn) sequence_state
+    in
+    let last_sequence_slot =
+      Mina_numbers.Global_slot.to_uint32 last_sequence_slot
+      |> Unsigned.UInt32.to_int64
+    in
+    let%bind zkapp_uri_id =
+      Zkapp_uri.add_if_doesn't_exist (module Conn) zkapp_uri
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      { app_state_id
+      ; verification_key_id
+      ; zkapp_version
+      ; sequence_state_id
+      ; last_sequence_slot
+      ; proved_state
+      ; zkapp_uri_id
+      }
+end
+
+module Accounts_accessed = struct
+  type t =
+    { ledger_index : int
+    ; block_id : int
+    ; account_id_id : int
+    ; token_symbol : string
+    ; balance : int64
+    ; nonce : int64
+    ; receipt_chain_hash : string
+    ; delegate : string option
+    ; voting_for : string
+    ; timing_id : int
+    ; permissions_id : int
+    ; zkapp_id : int option
+    }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; int64
+        ; string
+        ; option string
+        ; string
+        ; int
+        ; int
+        ; option int
+        ]
+
+  let table_name = "accounts_accessed"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) block_id
+      (ledger_index, (account : Account.t)) =
+    let open Deferred.Result.Let_syntax in
+    let account_id = Account_id.create account.public_key account.token_id in
+    let%bind account_id_id =
+      Account_identifiers.add_if_doesn't_exist
+        (module Conn)
+        ~account_id ~token_owner:0
+      (* TODO!!! TEMP!!!! need to get token owner *)
+    in
+    let token_symbol = account.token_symbol in
+    let balance =
+      account.balance |> Currency.Balance.to_uint64 |> Unsigned.UInt64.to_int64
+    in
+    let nonce =
+      account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
+    in
+    let receipt_chain_hash =
+      account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
+    in
+    let delegate =
+      Option.map account.delegate
+        ~f:Signature_lib.Public_key.Compressed.to_base58_check
+    in
+    let voting_for = account.voting_for |> State_hash.to_base58_check in
+    let%bind timing_id =
+      Timing_info.add_if_doesn't_exist (module Conn) account
+    in
+    let%bind permissions_id =
+      Zkapp_permissions.add_if_doesn't_exist (module Conn) account.permissions
+    in
+    let%bind zkapp_id =
+      (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
+      Option.value_map account.zkapp ~default:(return None) ~f:(fun zkapp ->
+          let%map id =
+            Zkapp_account.add_if_doesn't_exist
+              (module Conn)
+              account.zkapp_uri zkapp
+          in
+          Some id)
+    in
+    let account_accessed : t =
+      { ledger_index
+      ; block_id
+      ; account_id_id
+      ; token_symbol
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing_id
+      ; permissions_id
+      ; zkapp_id
+      }
+    in
+    Mina_caqti.select_insert_into_cols
+      ~select:("block_id,account_id", Caqti_type.(tup2 int int))
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      account_accessed
+
+  let add_accounts_if_don't_exist (module Conn : CONNECTION) block_id
+      (accounts : (int * Account.t) list) =
+    let%map results =
+      Deferred.List.map accounts ~f:(fun account ->
+          add_if_doesn't_exist (module Conn) block_id account)
+    in
+    Result.all results
+end
+
+module Accounts_created = struct
+  type t = { block_id : int; account_id_id : int; creation_fee : int64 }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int64 ]
+
+  let table_name = "accounts_created"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) block_id account_id
+      creation_fee =
+    let open Deferred.Result.Let_syntax in
+    let%bind account_id_id =
+      (* TODO: TEMP!!!! -- add real token owner *)
+      Account_identifiers.add_if_doesn't_exist
+        (module Conn)
+        ~account_id ~token_owner:0
+    in
+    let creation_fee =
+      Currency.Fee.to_uint64 creation_fee |> Unsigned.UInt64.to_int64
+    in
+    let t = { block_id; account_id_id; creation_fee } in
+    Mina_caqti.select_insert_into_cols
+      ~select:("block_id,public_key_id", Caqti_type.(tup2 int int))
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let add_accounts_created_if_don't_exist (module Conn : CONNECTION) block_id
+      accounts_created =
+    let%map results =
+      Deferred.List.map accounts_created ~f:(fun (pk, creation_fee) ->
+          add_if_doesn't_exist (module Conn) block_id pk creation_fee)
+    in
+    Result.all results
 end
 
 module Block = struct
@@ -2357,7 +2736,22 @@ module Block = struct
                         ~status:user_command.status
                       >>| ignore
                   | Parties _ ->
-                      Deferred.Result.return ()
+                      let status, failure_reasons =
+                        match user_command.status with
+                        | Applied ->
+                            (applied_str, None)
+                        | Failed failures ->
+                            let display =
+                              Transaction_status.Failure.Collection.to_display
+                                failures
+                            in
+                            (failed_str, Some display)
+                      in
+                      Block_and_zkapp_command.add_if_doesn't_exist
+                        (module Conn)
+                        ~block_id ~zkapp_command_id:id ~sequence_no ~status
+                        ~failure_reasons
+                      >>| ignore
                 in
                 (sequence_no + 1, nonce_map)
             | { data = Fee_transfer fee_transfer_bundled; _ } ->
@@ -2555,6 +2949,48 @@ module Block = struct
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no)
+    in
+    (* add zkApp commands *)
+    let%bind zkapp_cmds_ids_and_seq_nos =
+      let%map zkapp_cmds_and_ids_rev =
+        Mina_caqti.deferred_result_list_fold block.zkapp_cmds ~init:[]
+          ~f:(fun acc ({ parties; _ } as zkapp_cmd) ->
+            let%map cmd_id =
+              User_command.Zkapp_command.add_if_doesn't_exist
+                (module Conn)
+                parties
+            in
+            (zkapp_cmd, cmd_id) :: acc)
+      in
+      let sequence_nos =
+        List.map block.zkapp_cmds ~f:(fun { sequence_no; _ } -> sequence_no)
+      in
+      List.zip_exn (List.rev zkapp_cmds_and_ids_rev) sequence_nos
+    in
+    (* add zkapp commands to join table *)
+    let%bind () =
+      Mina_caqti.deferred_result_list_fold zkapp_cmds_ids_and_seq_nos ~init:()
+        ~f:(fun () ((zkapp_command, zkapp_command_id), sequence_no) ->
+          let%map _block_id, _cmd_id, _sequence_no =
+            Block_and_zkapp_command.add_if_doesn't_exist
+              (module Conn)
+              ~block_id ~zkapp_command_id ~sequence_no
+              ~status:zkapp_command.status
+              ~failure_reasons:zkapp_command.failure_reasons
+          in
+          ())
+    in
+    (* add accounts accessed *)
+    let%bind _block_and_account_ids =
+      Accounts_accessed.add_accounts_if_don't_exist
+        (module Conn)
+        block_id block.accounts_accessed
+    in
+    (* add accounts created *)
+    let%bind _block_and_pk_ids =
+      Accounts_created.add_accounts_created_if_don't_exist
+        (module Conn)
+        block_id block.accounts_created
     in
     return block_id
 
@@ -2794,17 +3230,19 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
-    pool block =
+let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+    ~delete_older_than ~accounts_accessed ~accounts_created block =
+  let state_hash = hash block in
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
+
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
-              [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
+              [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
@@ -2826,52 +3264,136 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
         | Error e as err ->
             (*Error in the current transaction*)
             [%log warn]
-              "Error when adding block data to the database, rolling it back: \
-               $error"
+              "Error when adding block data to the database, rolling back \
+               transaction: $error"
               ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
             let%map _ = Conn.rollback () in
             err
-        | Ok _ ->
-            [%log info] "Committing block data for $state_hash"
-              ~metadata:
-                [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
-            Conn.commit ())
+        | Ok _ -> (
+            (* added block data, now add accounts accessed *)
+            match%bind
+              Caqti_async.Pool.use
+                (fun (module Conn : CONNECTION) ->
+                  Block.find (module Conn) ~state_hash)
+                pool
+            with
+            | Error err ->
+                [%log warn]
+                  "Could not get block id for block just archived; can't store \
+                   accounts accessed, rolling back transaction"
+                  ~metadata:
+                    [ ("block", State_hash.to_yojson state_hash)
+                    ; ("error", `String (Caqti_error.show err))
+                    ] ;
+                Conn.rollback ()
+            | Ok block_id -> (
+                [%log info]
+                  "Adding accounts accessed in block to archive database"
+                  ~metadata:
+                    [ ("block", State_hash.to_yojson state_hash)
+                    ; ( "num_accounts_accessed"
+                      , `Int (List.length accounts_accessed) )
+                    ] ;
+                match%bind
+                  Caqti_async.Pool.use
+                    (fun (module Conn : CONNECTION) ->
+                      Accounts_accessed.add_accounts_if_don't_exist
+                        (module Conn)
+                        block_id accounts_accessed)
+                    pool
+                with
+                | Error err ->
+                    [%log error]
+                      "Could not add accounts accessed in block to archive \
+                       database, rolling back transaction"
+                      ~metadata:
+                        [ ("state_hash", State_hash.to_yojson state_hash)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    Conn.rollback ()
+                | Ok _block_and_account_ids -> (
+                    [%log info]
+                      "Adding account creation fees to archive database"
+                      ~metadata:
+                        [ ("block", State_hash.to_yojson state_hash)
+                        ; ( "num_accounts_created"
+                          , `Int (List.length accounts_created) )
+                        ] ;
+                    match%bind
+                      Caqti_async.Pool.use
+                        (fun (module Conn : CONNECTION) ->
+                          Accounts_created.add_accounts_created_if_don't_exist
+                            (module Conn)
+                            block_id accounts_created)
+                        pool
+                    with
+                    | Ok _block_and_public_key_ids ->
+                        [%log info]
+                          "Added block data, accounts accessed, and accounts \
+                           created for $state_hash, committing transaction"
+                          ~metadata:
+                            [ ( "state_hash"
+                              , Mina_base.State_hash.to_yojson (hash block) )
+                            ] ;
+                        Conn.commit ()
+                    | Error err ->
+                        [%log warn]
+                          "Could not add account creation fees in block to \
+                           archive database, rolling back transaction"
+                          ~metadata:
+                            [ ("state_hash", State_hash.to_yojson state_hash)
+                            ; ("error", `String (Caqti_error.show err))
+                            ] ;
+                        Conn.rollback () ) ) ))
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
-let add_block_aux_precomputed ~constraint_constants =
-  add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
+let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
+    ~delete_older_than block =
+  add_block_aux ~logger ?retries ~pool ~delete_older_than
+    ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
       ( block.External_transition.Precomputed_block.protocol_state
       |> Protocol_state.hashes )
         .state_hash)
+    ~accounts_accessed:
+      block.External_transition.Precomputed_block.accounts_accessed
+    ~accounts_created:
+      block.External_transition.Precomputed_block.accounts_created block
 
-let add_block_aux_extensional =
-  add_block_aux ~add_block:Block.add_from_extensional
+let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
+  add_block_aux ~logger ?retries ~pool ~delete_older_than
+    ~add_block:Block.add_from_extensional
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
+    ~accounts_accessed:block.Extensional.Block.accounts_accessed
+    ~accounts_created:block.Extensional.Block.accounts_created block
 
-let run pool reader ~constraint_constants ~logger ~delete_older_than =
+let run pool reader ~constraint_constants ~logger ~delete_older_than :
+    unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
-    | Diff.Transition_frontier (Breadcrumb_added { block; _ }) -> (
+    | Diff.Transition_frontier
+        (Breadcrumb_added { block; accounts_accessed; accounts_created; _ })
+      -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
-        match%map
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool block
+        let state_hash = hash block in
+        match%bind
+          add_block_aux ~logger ~delete_older_than ~hash ~add_block
+            ~accounts_accessed ~accounts_created ~pool block
         with
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ( "block"
-                  , State_hash.With_state_hashes.state_hash block
-                    |> State_hash.to_yojson )
+                [ ("block", State_hash.to_yojson state_hash)
                 ; ("error", `String (Caqti_error.show e))
                 ]
-              "Failed to archive block: $block, see $error"
+              "Failed to archive block: $block, see $error" ;
+            Deferred.unit
         | Ok () ->
-            () )
+            Deferred.unit )
     | Transition_frontier _ ->
-        Deferred.return ()
+        Deferred.unit
     | Transaction_pool { added; removed = _ } ->
         let%map _ =
           Caqti_async.Pool.use
@@ -3025,8 +3547,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~constraint_constants
-              ~delete_older_than pool precomputed_block
+            add_block_aux_precomputed ~logger ~pool ~constraint_constants
+              ~delete_older_than precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -3037,13 +3559,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                         .state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
-          | Ok () ->
+          | Ok _block_id ->
               ())
       |> don't_wait_for ;
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~logger ~delete_older_than pool
+            add_block_aux_extensional ~logger ~pool ~delete_older_than
               extensional_block
           with
           | Error e ->
@@ -3054,7 +3576,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                     , extensional_block.state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
-          | Ok () ->
+          | Ok _block_id ->
               ())
       |> don't_wait_for ;
       Deferred.ignore_m

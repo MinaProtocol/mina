@@ -1942,6 +1942,36 @@ module T = struct
                     (List.map ~f:List.rev detailed) )
               ] ;
         { Staged_ledger_diff.With_valid_signatures_and_proofs.diff })
+
+  let latest_block_accounts_created t ~previous_block_state_hash =
+    let scan_state = scan_state t in
+    (* filter leaves by state hash from previous block *)
+    let base_jobs =
+      Scan_state.base_jobs_on_latest_tree scan_state
+      @ Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state
+      |> List.filter ~f:(fun { state_hash = leaf_block_hash, _; _ } ->
+             State_hash.equal leaf_block_hash previous_block_state_hash)
+    in
+    let block_transactions_applied =
+      List.map base_jobs ~f:(fun { transaction_with_info; _ } ->
+          transaction_with_info.varying)
+    in
+    List.map block_transactions_applied ~f:(function
+      | Command (Signed_command cmd) -> (
+          match cmd.body with
+          | Payment { previous_empty_accounts } ->
+              previous_empty_accounts
+          | Stake_delegation _ ->
+              []
+          | Failed ->
+              [] )
+      | Command (Parties { previous_empty_accounts; _ }) ->
+          previous_empty_accounts
+      | Fee_transfer { previous_empty_accounts; _ } ->
+          previous_empty_accounts
+      | Coinbase { previous_empty_accounts; _ } ->
+          previous_empty_accounts)
+    |> List.concat
 end
 
 include T

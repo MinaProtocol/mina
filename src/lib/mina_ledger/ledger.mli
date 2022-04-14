@@ -134,6 +134,7 @@ module Transaction_applied : sig
     type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
       ; command : Parties.t With_status.t
+      ; previous_empty_accounts : Account_id.t list
       }
     [@@deriving sexp]
   end

@@ -112,7 +112,7 @@ single table, because they contain differing numbers of elements.
 Add a new table `accounts_created`:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
-  public_key_id       int                NOT NULL  REFERENCES public_keys(id)
+  account_id_id       int                NOT NULL  REFERENCES account_ids(id)
   creation_fee        bigint             NOT NULL
 ```
 

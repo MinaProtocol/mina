@@ -48,7 +48,9 @@ module Failure = struct
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson]
+    (* bin_io used to archive extensional blocks, doesn't need versioning *)
+    type display = (int * Stable.Latest.t list) list
+    [@@deriving equal, yojson, bin_io_unversioned]
 
     [%%versioned
     module Stable = struct

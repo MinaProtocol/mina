@@ -50,9 +50,6 @@ module Internal_command = struct
     ; secondary_sequence_no : int
     ; typ : string
     ; receiver : Public_key.Compressed.Stable.Latest.t
-    ; receiver_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; receiver_balance : Currency.Balance.Stable.Latest.t
     ; fee : Currency.Fee.Stable.Latest.t
     ; token : Token_id.Stable.Latest.t
     ; hash : Transaction_hash.Stable.Latest.t
@@ -62,7 +59,21 @@ module Internal_command = struct
   [@@deriving yojson, equal, bin_io_unversioned]
 end
 
+module Zkapp_command = struct
+  type t =
+    { sequence_no : int
+    ; parties : Parties.Stable.Latest.t
+    ; hash : Transaction_hash.Stable.Latest.t
+          [@to_yojson Transaction_hash.to_yojson]
+          [@of_yojson Transaction_hash.of_yojson]
+    ; status : string
+    ; failure_reasons : Transaction_status.Failure.Collection.display option
+    }
+  [@@deriving yojson, equal, bin_io_unversioned]
+end
+
 module Block = struct
+  (* in accounts_accessed, the int is the ledger index *)
   type t =
     { state_hash : State_hash.Stable.Latest.t
     ; parent_hash : State_hash.Stable.Latest.t
@@ -80,7 +91,11 @@ module Block = struct
     ; timestamp : Block_time.Stable.Latest.t
     ; user_cmds : User_command.t list
     ; internal_cmds : Internal_command.t list
+    ; zkapp_cmds : Zkapp_command.t list
     ; chain_status : Chain_status.t
+    ; accounts_accessed : (int * Account.Stable.Latest.t) list
+    ; accounts_created :
+        (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
