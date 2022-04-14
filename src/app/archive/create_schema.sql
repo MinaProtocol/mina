@@ -142,11 +142,11 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
-CREATE TABLE account_ids
+CREATE TABLE account_identifiers
 ( id                 serial  PRIMARY KEY
 , public_key_id      int     NOT NULL     REFERENCES public_keys(id) ON DELETE CASCADE
 , token              text    NOT NULL
-, token_owner        int                  REFERENCES account_ids(id)
+, token_owner        int                  REFERENCES account_identifiers(id)
 );
 
 /* accounts accessed in a block, representing the account
@@ -156,7 +156,7 @@ CREATE TABLE account_ids
 CREATE TABLE accounts_accessed
 ( ledger_index            int     NOT NULL
 , block_id                int     NOT NULL  REFERENCES blocks(id)
-, account_id_id           int     NOT NULL  REFERENCES account_ids(id)
+, account_identifier_id   int     NOT NULL  REFERENCES account_identifiers(id)
 , token_symbol            text    NOT NULL
 , balance                 bigint  NOT NULL
 , nonce                   bigint  NOT NULL

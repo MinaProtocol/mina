@@ -2254,7 +2254,7 @@ module Block_and_zkapp_command = struct
       (block_id, zkapp_command_id, sequence_no)
 end
 
-module Account_ids = struct
+module Account_identifiers = struct
   type t = { public_key_id : int; token : string; token_owner : int }
   [@@deriving hlist, fields]
 
@@ -2262,7 +2262,7 @@ module Account_ids = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; string; int ]
 
-  let table_name = "account_ids"
+  let table_name = "account_identifiers"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~account_id ~token_owner =
     let open Deferred.Result.Let_syntax in
@@ -2276,6 +2276,27 @@ module Account_ids = struct
       t
 end
 
+module Zkapp_uri = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_uris"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "uri" ], typ)
+      (module Conn)
+      zkapp_uri
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "uri" ]))
+      id
+end
+
 module Zkapp_account = struct
   type t =
     { app_state_id : int
@@ -2284,16 +2305,18 @@ module Zkapp_account = struct
     ; sequence_state_id : int
     ; last_sequence_slot : int64
     ; proved_state : bool
+    ; zkapp_uri_id : int
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; option int; int64; int; int64; bool ]
+      Caqti_type.[ int; option int; int64; int; int64; bool; int ]
 
   let table_name = "zkapp_accounts"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_account =
+  (* TODO: when zkapp_uri moved to Zkapp.Account in OCaml, no need to pass it in separately *)
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri zkapp_account =
     let open Deferred.Result.Let_syntax in
     let ({ app_state
          ; verification_key
@@ -2324,6 +2347,9 @@ module Zkapp_account = struct
       Mina_numbers.Global_slot.to_uint32 last_sequence_slot
       |> Unsigned.UInt32.to_int64
     in
+    let%bind zkapp_uri_id =
+      Zkapp_uri.add_if_doesn't_exist (module Conn) zkapp_uri
+    in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2333,6 +2359,7 @@ module Zkapp_account = struct
       ; sequence_state_id
       ; last_sequence_slot
       ; proved_state
+      ; zkapp_uri_id
       }
 end
 
@@ -2377,7 +2404,9 @@ module Accounts_accessed = struct
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
     let%bind account_id_id =
-      Account_ids.add_if_doesn't_exist (module Conn) ~account_id ~token_owner:0
+      Account_identifiers.add_if_doesn't_exist
+        (module Conn)
+        ~account_id ~token_owner:0
       (* TODO!!! TEMP!!!! need to get token owner *)
     in
     let token_symbol = account.token_symbol in
@@ -2402,8 +2431,13 @@ module Accounts_accessed = struct
       Zkapp_permissions.add_if_doesn't_exist (module Conn) account.permissions
     in
     let%bind zkapp_id =
+      (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
       Option.value_map account.zkapp ~default:(return None) ~f:(fun zkapp ->
-          let%map id = Zkapp_account.add_if_doesn't_exist (module Conn) zkapp in
+          let%map id =
+            Zkapp_account.add_if_doesn't_exist
+              (module Conn)
+              account.zkapp_uri zkapp
+          in
           Some id)
     in
     let account_accessed : t =
@@ -2451,7 +2485,9 @@ module Accounts_created = struct
     let open Deferred.Result.Let_syntax in
     let%bind account_id_id =
       (* TODO: TEMP!!!! -- add real token owner *)
-      Account_ids.add_if_doesn't_exist (module Conn) ~account_id ~token_owner:0
+      Account_identifiers.add_if_doesn't_exist
+        (module Conn)
+        ~account_id ~token_owner:0
     in
     let creation_fee =
       Currency.Fee.to_uint64 creation_fee |> Unsigned.UInt64.to_int64

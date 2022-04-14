@@ -94,15 +94,16 @@ module Builder = struct
             None)
     in
     let accounts_created =
-      let constraint_constants = precomputed_values.constraint_constants in
-      let account_creation_fee = constraint_constants.account_creation_fee in
-      let latest_block_transactions =
-        External_transition.Validated.transactions ~constraint_constants
-          validated_block
+      let account_creation_fee =
+        precomputed_values.constraint_constants.account_creation_fee
+      in
+      let previous_block_state_hash =
+        External_transition.Validated.protocol_state validated_block
+        |> Mina_state.Protocol_state.previous_state_hash
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~latest_block_transactions) ~f:(fun acct_id ->
+           ~previous_block_state_hash) ~f:(fun acct_id ->
           (acct_id, account_creation_fee))
     in
     Transition_frontier.Breadcrumb_added

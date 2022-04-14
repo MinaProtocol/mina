@@ -1341,10 +1341,12 @@ module Precomputed_block = struct
     in
     let accounts_created =
       let account_creation_fee = constraint_constants.account_creation_fee in
-      let latest_block_transactions = transactions ~constraint_constants t in
+      let previous_block_state_hash =
+        protocol_state t |> Mina_state.Protocol_state.previous_state_hash
+      in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~latest_block_transactions) ~f:(fun acct_id ->
+           ~previous_block_state_hash) ~f:(fun acct_id ->
           (acct_id, account_creation_fee))
     in
     { scheduled_time
