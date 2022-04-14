@@ -413,15 +413,13 @@ struct
       go pool @@ Sequence.empty
 
     let has_sufficient_fee ~pool_max_size pool cmd : bool =
-      if not (User_command.has_insufficient_fee cmd) then
-        match Indexed_pool.min_fee pool with
-        | None ->
-            true
-        | Some min_fee ->
-            if Indexed_pool.size pool >= pool_max_size then
-              Currency.Fee_rate.(User_command.fee_per_wu cmd > min_fee)
-            else true
-      else false
+      match Indexed_pool.min_fee pool with
+      | None ->
+          true
+      | Some min_fee ->
+          if Indexed_pool.size pool >= pool_max_size then
+            Currency.Fee_rate.(User_command.fee_per_wu cmd > min_fee)
+          else true
 
     let diff_error_of_indexed_pool_error :
         Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
