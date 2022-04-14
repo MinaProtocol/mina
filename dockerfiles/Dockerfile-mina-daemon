@@ -24,9 +24,6 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
-# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
-RUN chmod a+r -cR /etc/apt/trusted.gpg.d/
-
 # Dependencies
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \

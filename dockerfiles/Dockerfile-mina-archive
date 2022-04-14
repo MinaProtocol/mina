@@ -12,9 +12,6 @@ RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
-RUN chmod a+r -cR /etc/apt/trusted.gpg.d/
-
 # Dependencies
 RUN apt-get update --quiet --yes \
     && apt-get upgrade --quiet --yes \
