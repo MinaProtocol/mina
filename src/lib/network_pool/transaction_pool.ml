@@ -2114,7 +2114,6 @@ let%test_module _ =
             Some (fee_payer_kp, fee_payer_nonce)
       in
       let fee = Currency.Fee.of_int fee in
-      (*let snapp_kp = Signature_lib.Keypair.create () in*)
       let protocol_state_precondition =
         match valid_period with
         | None ->

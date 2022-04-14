@@ -4192,41 +4192,30 @@ module For_tests = struct
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
-      match fee_payer_opt with
-      | None ->
-          { body =
-              { public_key = sender_pk
-              ; update = Party.Update.noop
-              ; token_id = ()
-              ; balance_change = fee
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state_precondition
-              ; account_precondition = sender_nonce
-              ; use_full_commitment = ()
-              }
-          ; authorization = Signature.dummy
+      let public_key, account_precondition =
+        match fee_payer_opt with
+        | None ->
+            (sender_pk, sender_nonce)
+        | Some (fee_payer_kp, fee_payer_nonce) ->
+            (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
+      in
+
+      { body =
+          { public_key
+          ; update = Party.Update.noop
+          ; token_id = ()
+          ; balance_change = fee
+          ; increment_nonce = ()
+          ; events = []
+          ; sequence_events = []
+          ; call_data = Field.zero
+          ; call_depth = 0
+          ; protocol_state_precondition
+          ; account_precondition
+          ; use_full_commitment = ()
           }
-      | Some (fee_payer_kp, fee_payer_nonce) ->
-          { body =
-              { public_key = fee_payer_kp.public_key |> Public_key.compress
-              ; update = Party.Update.noop
-              ; token_id = ()
-              ; balance_change = fee
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state_precondition
-              ; account_precondition = fee_payer_nonce
-              ; use_full_commitment = ()
-              }
-          ; authorization = Signature.dummy
-          }
+      ; authorization = Signature.dummy
+      }
     in
     let sender_party : Party.t option =
       let sender_party_data : Party.Body.t =
