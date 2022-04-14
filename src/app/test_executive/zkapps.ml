@@ -462,7 +462,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node parties_insufficient_fee
-           "Insufficient_fee")
+           "at least one user command had an insufficient fee")
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
@@ -472,7 +472,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger node parties_invalid_proof
-           "Invalid_signature")
+           "Verification_failed")
     in
     let%bind () =
       section "Send a zkapp with an insufficient replace fee"
@@ -492,7 +492,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
-           "Invalid_signature")
+           "Verification_failed")
     in
     let%bind () =
       section "Verify zkApp transaction updates in ledger"

@@ -69,7 +69,7 @@ module Diff_versioned = struct
       module V1 = struct
         type t =
           | Insufficient_replace_fee
-          | Invalid_signature
+          | Verification_failed
           | Duplicate
           | Sender_account_does_not_exist
           | Invalid_nonce
@@ -91,7 +91,7 @@ module Diff_versioned = struct
      * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
-      | Invalid_signature
+      | Verification_failed
       | Duplicate
       | Sender_account_does_not_exist
       | Invalid_nonce
@@ -107,8 +107,8 @@ module Diff_versioned = struct
     let to_string_name = function
       | Insufficient_replace_fee ->
           "insufficient_replace_fee"
-      | Invalid_signature ->
-          "invalid_signature"
+      | Verification_failed ->
+          "verification_failed"
       | Duplicate ->
           "duplicate"
       | Sender_account_does_not_exist ->
@@ -134,8 +134,8 @@ module Diff_versioned = struct
       | Insufficient_replace_fee ->
           "This transaction would have replaced an existing transaction in the \
            pool, but the fee was too low"
-      | Invalid_signature ->
-          "This transaction had an invalid signature"
+      | Verification_failed ->
+          "This transaction had an invalid proof/signature"
       | Duplicate ->
           "This transaction is a duplicate of one already in the pool"
       | Sender_account_does_not_exist ->
@@ -435,8 +435,8 @@ struct
           Overflow
       | Bad_token ->
           Bad_token
-      | Invalid_transaction ->
-          Invalid_signature
+      | Verification_failed ->
+          Verification_failed
       | Unwanted_fee_token _ ->
           Unwanted_fee_token
       | Expired _ ->
@@ -462,7 +462,7 @@ struct
           []
       | Bad_token ->
           []
-      | Invalid_transaction ->
+      | Verification_failed ->
           []
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
@@ -471,6 +471,12 @@ struct
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
           ; ( "current_global_slot"
+            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
+          ]
+      | Expired
+          ( `Timestamp_predicate
+          , `Global_slot_since_genesis global_slot_since_genesis ) ->
+          [ ( "current_global_slot"
             , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
 
@@ -916,7 +922,7 @@ struct
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
           | Insufficient_replace_fee
-          | Invalid_signature
+          | Verification_failed
           | Duplicate
           | Sender_account_does_not_exist
           | Invalid_nonce
@@ -1014,8 +1020,8 @@ struct
                   "invalid nonce"
               | Insufficient_funds _ ->
                   "insufficient funds"
-              | Invalid_transaction ->
-                  "transaction had bad signature or was malformed"
+              | Verification_failed ->
+                  "transaction had bad proof/signature or was malformed"
               | Insufficient_replace_fee _ ->
                   "insufficient replace fee"
               | Overflow ->
@@ -1063,7 +1069,7 @@ struct
                   ; ("token", Token_id.to_yojson fee_token)
                   ] ;
               Deferred.unit
-          | Invalid_transaction ->
+          | Verification_failed ->
               trust_record
                 ( Trust_system.Actions.Sent_useless_gossip
                 , Some
@@ -1101,6 +1107,20 @@ struct
         let pool_max_size = t.config.pool_max_size in
         let sender = Envelope.Incoming.sender diffs in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
+        let diffs_are_valid () =
+          List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
+              let is_valid = not (User_command.has_insufficient_fee cmd) in
+              if not is_valid then
+                [%log' debug t.logger]
+                  "Filtering user command with insufficient fee from \
+                   transaction-pool diff $cmd from $sender"
+                  ~metadata:
+                    [ ("cmd", User_command.to_yojson cmd)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
+                    ] ;
+              is_valid)
+        in
         let h = Lru_cache.T.hash diffs.data in
         let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
         if (not allow_failures_for_tests) && already_mem && not is_sender_local
@@ -1110,6 +1130,9 @@ struct
              rebroadcast but also never made it into a block for some reason.
           *)
           Deferred.Or_error.error_string "already saw this"
+        else if (not allow_failures_for_tests) && not (diffs_are_valid ()) then
+          Deferred.Or_error.error_string
+            "at least one user command had an insufficient fee"
         else
           match t.best_tip_ledger with
           | None ->

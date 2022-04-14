@@ -301,7 +301,7 @@ module type Transaction_pool_diff_intf = sig
   module Diff_error : sig
     type t =
       | Insufficient_replace_fee
-      | Invalid_signature
+      | Verification_failed
       | Duplicate
       | Sender_account_does_not_exist
       | Invalid_nonce
