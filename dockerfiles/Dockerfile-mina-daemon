@@ -25,9 +25,7 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libjemalloc2
 
 # --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
-RUN test "$deb_codename" = "jammy" \
-  && chmod a+r -cR /etc/apt/trusted.gpg.d/ \
-  || exit 0
+RUN chmod a+r -cR /etc/apt/trusted.gpg.d/
 
 # Dependencies
 RUN apt-get update --quiet --yes \

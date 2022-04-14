@@ -15,9 +15,7 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ENV DEBIAN_FRONTEND noninteractive
 
 # --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
-RUN test "$deb_codename" = "jammy" \
-  && chmod a+r -cR /etc/apt/trusted.gpg.d/ \
-  || exit 0
+RUN chmod a+r -cR /etc/apt/trusted.gpg.d/
 
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
