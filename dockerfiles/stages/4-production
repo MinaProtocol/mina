@@ -14,6 +14,11 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 
 ENV DEBIAN_FRONTEND noninteractive
 
+# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround to allow unsigned packages
+RUN test "$deb_codename" = "jammy" \
+  && echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/99-unsafe-jammy-workaround
+  || exit 0
+
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
