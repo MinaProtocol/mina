@@ -1,6 +1,6 @@
 ---
 backend:
-  image: gcr.io/mina-mainnet-303900/delegation-backend:1.1.0
+  image: gcr.io/mina-mainnet-303900/delegation-backend:1.1.1
   port: 80
   secret: foundation-delegation-creds
   tlsSecret: minaprotocol-uptime-backend-cert
