@@ -31,7 +31,9 @@ features:
   prometheus:
     enabled: true
   snarkcoordinator:
-    enables: false
+    enabled: false
+  logging:
+    enabled: true
   persistence:
     # for every deploy the name must be unique
     enabled: true

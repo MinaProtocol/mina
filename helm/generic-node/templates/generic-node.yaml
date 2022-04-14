@@ -101,7 +101,6 @@ spec:
         - "daemon"
         - "--log-level"
         - "Debug"
-        - "--log-json"
         - "--client-port"
         - "$(DAEMON_CLIENT_PORT)"
         - "--rest-port"
@@ -110,6 +109,9 @@ spec:
         - "$(DAEMON_EXTERNAL_PORT)"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
+        {{- if .Values.features.logging.enabled}}
+        - "--log-json"
+        {{- end }}
         {{- if .Values.features.snarkcoordinator.enabled}}
         - "-run-snark-coordinator"
         - {{ $.Values.publicKey | quote }}
