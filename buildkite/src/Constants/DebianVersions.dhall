@@ -4,13 +4,14 @@ let ContainerImages = ./ContainerImages.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let DebVersion = < Bullseye | Buster | Stretch | Focal | Bionic >
+let DebVersion = < Bullseye | Buster | Stretch | Jammy | Focal | Bionic >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
     Bullseye = "Bullseye"
     , Buster = "Buster"
     , Stretch = "Stretch"
+    , Jammy = "Jammy"
     , Focal = "Focal"
     , Bionic = "Bionic"
   } debVersion
@@ -20,6 +21,7 @@ let lowerName = \(debVersion : DebVersion) ->
     Bullseye = "bullseye"
     , Buster = "buster"
     , Stretch = "stretch"
+    , Jammy = "jammy"
     , Focal = "focal"
     , Bionic = "bionic"
   } debVersion
@@ -31,6 +33,7 @@ let toolchainRunner = \(debVersion : DebVersion) ->
     Bullseye = RunInToolchain.runInToolchainBullseye
     , Buster = RunInToolchain.runInToolchainBuster
     , Stretch = RunInToolchain.runInToolchainStretch
+    , Jammy = RunInToolchain.runInToolchainBullseye
     , Focal = RunInToolchain.runInToolchainBullseye
     , Bionic = RunInToolchain.runInToolchainStretch
   } debVersion
@@ -42,6 +45,7 @@ let toolchainImage = \(debVersion : DebVersion) ->
     Bullseye = ContainerImages.minaToolchainBullseye
     , Buster = ContainerImages.minaToolchainBuster
     , Stretch = ContainerImages.minaToolchainStretch
+    , Jammy = ContainerImages.minaToolchainBullseye
     , Focal = ContainerImages.minaToolchainBullseye
     , Bionic = ContainerImages.minaToolchainStretch
   } debVersion
@@ -51,8 +55,9 @@ let dependsOn = \(debVersion : DebVersion) ->
     Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
     , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
     , Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
-    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
+    , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
     , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
+    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
@@ -84,8 +89,9 @@ let dirtyWhen = \(debVersion : DebVersion) ->
     Bullseye = bullseyeDirtyWhen
     , Buster = minimalDirtyWhen
     , Stretch = minimalDirtyWhen
-    , Bionic = minimalDirtyWhen
+    , Jammy = minimalDirtyWhen
     , Focal = minimalDirtyWhen
+    , Bionic = minimalDirtyWhen
   } debVersion
 
 in
