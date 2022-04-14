@@ -51,7 +51,6 @@ let zkappKey = PrivateKey.fromJSON(keyPair.privateKey);
 
 let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
 feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
-console.assert(PrivateKey.fromBase58(feePayerKey).toBase58() === feePayerKey);
 
 if (command === "deploy") {
   // snarkyjs part
