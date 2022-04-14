@@ -1135,9 +1135,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let loc, acct =
           Or_error.ok_exn (get_with_location l (Party.account_id p))
         in
+        printf "Get account %s\n%!"
+          (Account.to_yojson acct |> Yojson.Safe.to_string) ;
         (acct, loc)
 
       let set_account l (a, loc) =
+        printf "Set account %s\n%!"
+          (Account.to_yojson a |> Yojson.Safe.to_string) ;
         Or_error.ok_exn (set_with_location l loc a) ;
         l
 

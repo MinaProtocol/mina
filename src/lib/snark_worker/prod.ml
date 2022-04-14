@@ -193,7 +193,16 @@ module Inputs = struct
                                   (M.of_parties_segment_exn ~snapp_statement
                                      ~witness)
                               in
-
+                              [%log info] "Witness $witness, stmt $stmt, "
+                                ~metadata:
+                                  [ ( "witness"
+                                    , Transaction_witness
+                                      .Parties_segment_witness
+                                      .to_yojson witness )
+                                  ; ( "$stmt"
+                                    , Transaction_snark.Statement.With_sok
+                                      .to_yojson stmt )
+                                  ] ;
                               let%map (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
                                   ~f:(fun
@@ -203,6 +212,16 @@ module Inputs = struct
                                     let%bind (prev : Ledger_proof.t) =
                                       Deferred.return acc
                                     in
+                                    [%log info] "Witness $witness, stmt $stmt, "
+                                      ~metadata:
+                                        [ ( "witness"
+                                          , Transaction_witness
+                                            .Parties_segment_witness
+                                            .to_yojson witness )
+                                        ; ( "$stmt"
+                                          , Transaction_snark.Statement.With_sok
+                                            .to_yojson stmt )
+                                        ] ;
                                     let%bind (curr : Ledger_proof.t) =
                                       log_base_snark
                                         ~statement:{ stmt with sok_digest }
