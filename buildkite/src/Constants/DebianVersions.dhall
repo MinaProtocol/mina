@@ -4,11 +4,12 @@ let ContainerImages = ./ContainerImages.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let DebVersion = < Bullseye | Buster | Stretch | Jammy | Focal | Bionic >
+let DebVersion = < Bookworm | Bullseye | Buster | Stretch | Jammy | Focal | Bionic >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = "Bullseye"
+    Bookworm = "Bookworm"
+    , Bullseye = "Bullseye"
     , Buster = "Buster"
     , Stretch = "Stretch"
     , Jammy = "Jammy"
@@ -18,7 +19,8 @@ let capitalName = \(debVersion : DebVersion) ->
 
 let lowerName = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = "bullseye"
+    Bookworm = "bookworm"
+    , Bullseye = "bullseye"
     , Buster = "buster"
     , Stretch = "stretch"
     , Jammy = "jammy"
@@ -26,33 +28,38 @@ let lowerName = \(debVersion : DebVersion) ->
     , Bionic = "bionic"
   } debVersion
 
---- Bionic and Stretch are so similar that they share a toolchain image
+--- Bionic and Stretch are so similar that they share a toolchain runner
 --- Same with Bullseye and Focal
+--- Same with Bookworm and Jammy
 let toolchainRunner = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = RunInToolchain.runInToolchainBullseye
+    Bookworm = RunInToolchain.runInToolchainBookworm
+    , Bullseye = RunInToolchain.runInToolchainBullseye
     , Buster = RunInToolchain.runInToolchainBuster
     , Stretch = RunInToolchain.runInToolchainStretch
-    , Jammy = RunInToolchain.runInToolchainBullseye
+    , Jammy = RunInToolchain.runInToolchainBookworm
     , Focal = RunInToolchain.runInToolchainBullseye
     , Bionic = RunInToolchain.runInToolchainStretch
   } debVersion
 
 --- Bionic and Stretch are so similar that they share a toolchain image
 --- Same with Bullseye and Focal
+--- Same with Bookworm and Jammy
 let toolchainImage = \(debVersion : DebVersion) ->
   merge { 
-    Bullseye = ContainerImages.minaToolchainBullseye
+    Bookworm = ContainerImages.minaToolchainBookworm
+    , Bullseye = ContainerImages.minaToolchainBullseye
     , Buster = ContainerImages.minaToolchainBuster
     , Stretch = ContainerImages.minaToolchainStretch
-    , Jammy = ContainerImages.minaToolchainBullseye
+    , Jammy = ContainerImages.minaToolchainBookworm
     , Focal = ContainerImages.minaToolchainBullseye
     , Bionic = ContainerImages.minaToolchainStretch
   } debVersion
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "MinaArtifactBookworm", key = "build-deb-pkg" }]
+    , Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
     , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
     , Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
     , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
@@ -86,7 +93,8 @@ in
 
 let dirtyWhen = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = bullseyeDirtyWhen
+    Bookworm = minimalDirtyWhen
+    , Bullseye = bullseyeDirtyWhen
     , Buster = minimalDirtyWhen
     , Stretch = minimalDirtyWhen
     , Jammy = minimalDirtyWhen

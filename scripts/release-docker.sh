@@ -49,7 +49,7 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|sid)
+  stretch|buster|bullseye|bookworm|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac

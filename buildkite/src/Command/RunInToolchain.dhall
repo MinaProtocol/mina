@@ -5,6 +5,17 @@ let S = ../Lib/SelectFiles.dhall
 
 let r = Cmd.run
 
+let runInToolchainBookworm : List Text -> Text -> List Cmd.Type =
+  \(environment : List Text) ->
+  \(innerScript : Text) ->
+    [ Mina.fixPermissionsCommand ] # [
+      Cmd.runInDocker
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBookworm, extraEnv = environment })
+        (innerScript)
+    ]
+
+in
+
 let runInToolchainBullseye : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
@@ -38,6 +49,7 @@ in
 
 {
   runInToolchain = runInToolchainBullseye
+  , runInToolchainBookworm = runInToolchainBookworm
   , runInToolchainBullseye = runInToolchainBullseye
   , runInToolchainBuster = runInToolchainBuster
   , runInToolchainStretch = runInToolchainStretch
