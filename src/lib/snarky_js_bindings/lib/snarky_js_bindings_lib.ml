@@ -1029,9 +1029,10 @@ module Poseidon_sponge =
 
 let sponge_params_checked =
   Sponge.Params.(
-    map pasta_p_3 ~f:(Fn.compose Field.constant Field.Constant.of_string))
+    map pasta_p_kimchi ~f:(Fn.compose Field.constant Field.Constant.of_string))
 
-let sponge_params = Sponge.Params.(map pasta_p_3 ~f:Field.Constant.of_string)
+let sponge_params =
+  Sponge.Params.(map pasta_p_kimchi ~f:Field.Constant.of_string)
 
 type sponge =
   | Checked of Poseidon_sponge_checked.t
