@@ -23,6 +23,7 @@
    transition_frontier_persistent_root
    transition_frontier_base
    consensus
+   mina_ledger
    mina_transition
    data_hash_lib
    precomputed_values

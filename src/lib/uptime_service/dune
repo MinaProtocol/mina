@@ -18,6 +18,9 @@
    cohttp
    uri
    ;; local libraries
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    network_peer
    block_time
    transaction_witness
@@ -52,8 +55,8 @@
    transaction_snark
    pickles.backend
    consensus
-   marlin_plonk_bindings_pasta_fp
-   pasta
+   mina_base.import
+   kimchi_backend.pasta
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))

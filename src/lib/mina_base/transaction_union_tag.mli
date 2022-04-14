@@ -25,7 +25,7 @@ val gen : t Quickcheck.Generator.t
 
 val to_bits : t -> bool list
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
 [%%ifdef consensus_mechanism]
 
@@ -37,7 +37,8 @@ module Bits : sig
 
   val to_bits : var -> Boolean.var list
 
-  val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val to_input_legacy :
+    var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
 
 val bits_of_t : t -> Bits.var
@@ -66,7 +67,8 @@ module Unpacked : sig
 
   val to_bits : var -> Boolean.var list
 
-  val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val to_input_legacy :
+    var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
 
 val unpacked_of_t : t -> Unpacked.var

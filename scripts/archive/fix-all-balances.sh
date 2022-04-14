@@ -26,7 +26,7 @@ REPLAYER_INPUT=replayer_input.json
 curl -s "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/genesis_ledgers/${NETWORK}.json" | jq '{target_epoch_ledgers_state_hash:"'${STATE_HASH}'",genesis_ledger:{add_genesis_winner: true, accounts: .ledger.accounts}}' > $REPLAYER_INPUT
 
 echo "---- Running replayer (takes over an hour, please be patient. Run tail -f ${REPLAYER_LOG} in another terminal to follow along.)"
-$REPLAYER --archive-uri "${ARCHIVE_URI}" --input-file replayer_input.json --output-file /dev/null > ${REPLAYER_LOG}
+$REPLAYER --archive-uri "${ARCHIVE_URI}" --input-file replayer_input.json --output-file /dev/null --continue-on-error > ${REPLAYER_LOG}
 
 rm -f $REPLAYER_INPUT
 

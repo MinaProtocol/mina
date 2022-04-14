@@ -21,6 +21,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/multiformats/go-multiaddr"
+	"golang.org/x/crypto/blake2b"
 )
 
 type BeginAdvertisingReqT = ipc.Libp2pHelperInterface_BeginAdvertising_Request
@@ -154,6 +155,18 @@ func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrI
 			pubsub.WithMaxMessageSize(1024 * 1024 * 32),
 			pubsub.WithDirectPeers(directPeers),
 			pubsub.WithValidateQueueSize(validationQueueSize),
+			pubsub.WithMessageIdFn(func(pmsg *pb.Message) string {
+				hmacKey := []byte(pmsg.GetTopic())
+				if len(hmacKey) > 64 {
+					hmacKey2 := blake2b.Sum256(hmacKey)
+					hmacKey = hmacKey2[:]
+				}
+				hash, err := blake2b.New256(hmacKey)
+				panicOnErr(err)
+				_, err = hash.Write(pmsg.GetData())
+				panicOnErr(err)
+				return string(hash.Sum(nil))
+			}),
 		}, opts...)...,
 	)
 	app.P2p.Pubsub = ps

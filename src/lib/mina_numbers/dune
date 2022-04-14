@@ -30,7 +30,7 @@
    random_oracle_input
    bitstring_lib
    test_util
-   snarky_integer
+   kimchi_backend.common
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

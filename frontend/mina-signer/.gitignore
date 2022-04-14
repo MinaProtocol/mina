@@ -3,6 +3,8 @@
 npm-debug.log
 /node_modules/
 *.bc.js
+*.wasm
+*/plonk.js
 yarn-error.log
 .vscode
 

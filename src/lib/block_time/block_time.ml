@@ -67,29 +67,23 @@ module Time = struct
 
     let create offset = offset
 
-    let basic ~logger () =
+    let basic ~logger:_ () =
       match !time_offset with
       | Some offset ->
           offset
       | None ->
           let offset =
             let env = "MINA_TIME_OFFSET" in
-            (* TODO: remove eventually *)
-            let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
-              match (Core.Sys.getenv env, Core.Sys.getenv env_deprecated) with
-              | Some tm, _ ->
+              match Core_kernel.Sys.getenv_opt env with
+              | Some tm ->
                   Int.of_string tm
-              | _, Some tm ->
-                  [%log warn]
-                    "Using deprecated environment variable %s, please use %s \
-                     instead"
-                    env_deprecated env ;
-                  Int.of_string tm
-              | None, None ->
-                  [%log debug]
-                    "Environment variable %s not found, using default of 0" env ;
-                  0
+              | None ->
+                  let default = 0 in
+                  eprintf
+                    "Environment variable %s not found, using default of %d\n%!"
+                    env default ;
+                  default
             in
             Core_kernel.Time.Span.of_int_sec env_offset
           in
@@ -120,25 +114,33 @@ module Time = struct
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
+  module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
+
+  let to_input (t : t) =
+    Random_oracle_input.Chunked.packed (Tick.Field.project (Bits.to_bits t), 64)
 
   module Checked = struct
-    type t = Unpacked.var
+    type t = N.var
 
-    module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
+    module Unsafe = N.Unsafe
 
-    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
-      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
-      f (g x) (g y)
+    let typ = N.typ
 
-    let ( = ) x = op N.( = ) x
+    let to_input (t : t) = N.to_input t
 
-    let ( <= ) x = op N.( <= ) x
+    let to_field = N.to_field
 
-    let ( >= ) x = op N.( >= ) x
+    open N
 
-    let ( < ) x = op N.( < ) x
+    let ( = ) = ( = )
 
-    let ( > ) x = op N.( > ) x
+    let ( <= ) = ( <= )
+
+    let ( >= ) = ( >= )
+
+    let ( < ) = ( < )
+
+    let ( > ) = ( > )
   end
 
   module Span = struct
@@ -187,6 +189,10 @@ module Time = struct
     let min = UInt64.min
 
     let zero = UInt64.zero
+
+    let to_input = to_input
+
+    module Checked = Checked
   end
 
   include Comparable.Make (Stable.Latest)
@@ -238,6 +244,10 @@ module Time = struct
   let to_int64 = Fn.compose Span.to_ms to_span_since_epoch
 
   let of_int64 = Fn.compose of_span_since_epoch Span.of_ms
+
+  let of_uint64 : UInt64.t -> t = of_span_since_epoch
+
+  let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
   let to_string = Fn.compose Int64.to_string to_int64
 

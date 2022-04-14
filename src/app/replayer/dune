@@ -34,12 +34,16 @@
    genesis_ledger_helper.lib
    genesis_ledger_helper
    mina_state
+   mina_ledger
    mina_base
+   mina_caqti
    genesis_constants
    coda_runtime_config
    logger
+   kimchi_backend.pasta
    block_time
    data_hash_lib
+   mina_base.import
    pickles
    sgn
    unsigned_extended

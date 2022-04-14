@@ -17,6 +17,7 @@
    ppx_inline_test.config
    async_unix
    ;; local libraries
+   mina_base.import
    pickles.backend
    one_or_two
    transition_frontier_extensions
@@ -58,7 +59,6 @@
    transaction_snark_work
    pickles
    snark_params
+   kimchi_backend.pasta
    o1trace
-   marlin_plonk_bindings_pasta_fp
-   pasta
 ))

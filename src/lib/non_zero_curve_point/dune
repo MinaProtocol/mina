@@ -25,7 +25,7 @@
    base58_check
    random_oracle
    bitstring_lib
-   pasta
+   kimchi_backend.pasta
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

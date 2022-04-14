@@ -17,7 +17,9 @@
    integers
    base_quickcheck
    ;;local libraries
+   fields_derivers_zkapps_nonconsensus
    sgn_nonconsensus
+   mina_base_nonconsensus.import
    random_oracle_nonconsensus
    unsigned_extended_nonconsensus
    snark_params_nonconsensus
@@ -31,21 +33,23 @@
    outside_hash_image_nonconsensus
    signature_lib_nonconsensus
    quickcheck_lib_nonconsensus
+   mina_base_nonconsensus.util
    mina_signature_kind
    fold_lib
    snarkette
+   fields_derivers.graphql
    base58_check
    pickles_base
    pickles_types
    with_hash
    random_oracle_input
+   fields_derivers.json
    codable
    blake2
-   bignum_bigint
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord
+  (pps ppx_annot ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord
        ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson h_list.ppx ppx_inline_test
  ))
  (instrumentation (backend bisect_ppx))

@@ -33,7 +33,10 @@ type t =
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
   ; snark_worker_fee : string
-  ; snark_worker_public_key : string (* ; aux_account_balance : string option *)
+  ; snark_worker_public_key : string
+  ; work_delay : int option
+  ; transaction_capacity :
+      Runtime_config.Proof_keys.Transaction_capacity.t option
   }
 
 let default =
@@ -51,7 +54,8 @@ let default =
   ; log_precomputed_blocks = false
   ; snark_worker_fee = "0.025"
   ; snark_worker_public_key =
-      (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
+      (let pk, _ = (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
-      (* ; aux_account_balance = None *)
+  ; work_delay = None
+  ; transaction_capacity = None
   }

@@ -15,12 +15,16 @@
    result
    ;;local libraries
    base58_check
+   fields_derivers.json
    random_oracle_input
+   fields_derivers
    codable
+   fields_derivers.graphql
    fold_lib
    outside_hash_image_nonconsensus
    snark_params_nonconsensus
    random_oracle_nonconsensus
+   fields_derivers_zkapps_nonconsensus
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

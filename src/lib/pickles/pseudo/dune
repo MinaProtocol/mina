@@ -13,7 +13,5 @@
    pickles.one_hot_vector
    snarky.backendless
    pickles_base
-   marlin_plonk_bindings
-   marlin_plonk_bindings_types
  )
 )

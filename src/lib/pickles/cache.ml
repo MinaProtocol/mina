@@ -34,7 +34,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Pasta_fp_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ()))
                 path
             in
@@ -50,7 +50,7 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fp_index.write ~append:true
+                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
                    t.Backend.Tick.Keypair.index)
               header path))
 
@@ -62,7 +62,7 @@ module Step = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset path ->
-                  Marlin_plonk_bindings.Pasta_fp_verifier_index.read ~offset
+                  Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ())
                     path)
                 path
@@ -79,8 +79,7 @@ module Step = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fp_verifier_index.write
-                   ~append:true x)
+                (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path))
 
   let read_or_generate cache k_p k_v typ main =
@@ -99,7 +98,7 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  generate_keypair ~exposing:[ typ ] main)
+                  constraint_system ~exposing:[ typ ] main |> Keypair.generate)
             in
             Timer.clock __LOC__ ;
             ignore
@@ -161,7 +160,7 @@ module Wrap = struct
             let%map header_read, index =
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
-                  Marlin_plonk_bindings.Pasta_fq_index.read ~offset
+                  Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
                     (Backend.Tock.Keypair.load_urs ()))
                 path
             in
@@ -177,8 +176,7 @@ module Wrap = struct
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
-                (Marlin_plonk_bindings.Pasta_fq_index.write ~append:true
-                   t.index)
+                (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path))
 
   let read_or_generate step_domains cache k_p k_v typ main =
@@ -197,7 +195,7 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   generate_keypair ~exposing:[ typ ] main)
+                   constraint_system ~exposing:[ typ ] main |> Keypair.generate)
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
@@ -250,16 +248,10 @@ module Wrap = struct
              let vk : Vk.t =
                { index = vk
                ; commitments =
-                   Pickles_types.Plonk_verification_key_evals.map vk.evals
-                     ~f:(fun x ->
-                       Array.map x.unshifted ~f:(function
-                         | Infinity ->
-                             failwith "Unexpected zero curve point"
-                         | Finite x ->
-                             x))
+                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
                ; step_domains
                ; data =
-                   (let open Marlin_plonk_bindings.Pasta_fq_index in
+                   (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })
                }
              in

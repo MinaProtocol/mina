@@ -58,6 +58,7 @@
    trust_system
    currency
    data_hash_lib
+   mina_base.import
    signature_lib
    )
  (preprocess

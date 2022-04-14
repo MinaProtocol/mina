@@ -9,7 +9,6 @@
    sexplib0
    result
    base.base_internalhash_types
-   core
    ;;local libraries
    with_hash
    mina_transition
@@ -19,6 +18,7 @@
    mina_base
    transition_frontier_base
    transition_frontier_full_frontier
+   mina_ledger
    logger
    mina_state
    staged_ledger

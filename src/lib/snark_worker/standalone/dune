@@ -13,7 +13,9 @@
    ;; local libraries
    mina_base
    currency
+   key_gen
    snark_worker
+   mina_base.import
    genesis_constants
    signature_lib
  )

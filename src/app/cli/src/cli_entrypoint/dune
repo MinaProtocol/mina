@@ -28,6 +28,7 @@
    pipe_lib
    gossip_net
    data_hash_lib
+   mina_ledger
    precomputed_values
    mina_networking
    cache_dir
@@ -45,6 +46,7 @@
    child_processes
    node_addrs_and_ports
    mina_plugins
+   logger.file_system
    cli_lib
    genesis_constants
    blake2

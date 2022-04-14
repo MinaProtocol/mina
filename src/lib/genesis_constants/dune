@@ -23,7 +23,7 @@
    mina_compile_config
    pickles.backend
    snark_keys_header
-   pasta
+   kimchi_backend.pasta
    )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

@@ -6,8 +6,8 @@
    core_kernel
    ;; local libraries
    pickles_types
-   zexe_backend
-   pasta
+   kimchi_backend
+   kimchi_backend.pasta
  )
  (ppx_runtime_libraries base)
  (preprocess

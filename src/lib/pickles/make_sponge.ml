@@ -2,26 +2,33 @@ module D = Composition_types.Digest
 open Core_kernel
 
 module Rounds = struct
-  let rounds_full = 63
+  let rounds_full = 55
 
-  let initial_ark = true
+  let initial_ark = false
 
   let rounds_partial = 0
 end
 
 let high_entropy_bits = 128
 
-module Make (Field : Zexe_backend.Field.S) = struct
+module Make (Field : Kimchi_backend.Field.S) = struct
   module Inputs = struct
     include Rounds
     module Field = Field
 
+    (* x^7 *)
     let to_the_alpha x =
+      (* square |> mul x |> square |> mul x *)
+      (* 7 = 1 + 2 (1 + 2) *)
       let open Field in
       let res = square x in
-      Mutable.square res ; (* x^4 *)
-                           res *= x ; (* x^5 *)
-                                      res
+      res *= x ;
+      (* x^3 *)
+      Mutable.square res ;
+      (* x^6 *)
+      res *= x ;
+      (* x^7 *)
+      res
 
     module Operations = struct
       let add_assign ~state i x = Field.(state.(i) += x)
@@ -64,7 +71,7 @@ end
 module T (M : Sponge.Intf.T) = M
 
 module Test
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (S_constant : Sponge.Intf.Sponge
                     with module Field := T(Impl.Field.Constant)
                      and module State := Sponge.State

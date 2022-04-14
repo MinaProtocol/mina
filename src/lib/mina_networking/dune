@@ -43,8 +43,9 @@
    genesis_constants
    mina_metrics
    syncable_ledger
-   o1trace
+   mina_ledger
    transition_handler
+   o1trace
  )
  (inline_tests)
  (preprocess

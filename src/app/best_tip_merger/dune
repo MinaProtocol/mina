@@ -24,6 +24,7 @@
    mina_state
    transition_frontier_extensions
    mina_base
+   logger.file_system
    logger
    cli_lib
    transition_frontier

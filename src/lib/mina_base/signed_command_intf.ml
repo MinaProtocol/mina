@@ -2,7 +2,7 @@
 
 [%%import "/src/config.mlh"]
 
-open Import
+open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
 open Mina_numbers
@@ -22,9 +22,8 @@ module type Gen_intf = sig
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
-      -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -39,9 +38,8 @@ module type Gen_intf = sig
          ?sign_type:[ `Fake | `Real ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
-      -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -50,7 +48,6 @@ module type Gen_intf = sig
          key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
-      -> ?fee_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -58,7 +55,6 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
-      -> ?fee_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -105,11 +101,13 @@ module type S = sig
 
   val source_pk : t -> Public_key.Compressed.t
 
-  val source : next_available_token:Token_id.t -> t -> Account_id.t
+  val source : t -> Account_id.t
 
   val receiver_pk : t -> Public_key.Compressed.t
 
-  val receiver : next_available_token:Token_id.t -> t -> Account_id.t
+  val receiver : t -> Account_id.t
+
+  val public_keys : t -> Public_key.Compressed.t list
 
   val amount : t -> Currency.Amount.t option
 
@@ -126,15 +124,8 @@ module type S = sig
 
   val tag_string : t -> string
 
-  val next_available_token : t -> Token_id.t -> Token_id.t
-
-  val to_input :
-    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.t
-
-  (** Check that the command is used with compatible tokens. This check is fast
-      and cheap, to be used for filtering.
-  *)
-  val check_tokens : t -> bool
+  val to_input_legacy :
+    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.Legacy.t
 
   include Gen_intf with type t := t
 
@@ -147,7 +138,7 @@ module type S = sig
         include Gen_intf with type t := t
       end
 
-      module V1 = Latest
+      module V2 = Latest
     end
 
     type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
@@ -178,6 +169,8 @@ module type S = sig
     -> Signed_command_payload.t
     -> With_valid_signature.t option
 
+  val check_valid_keys : t -> bool
+
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -187,7 +180,10 @@ module type S = sig
       -> With_valid_signature.t
   end
 
+  (** checks signature and keys *)
   val check : t -> With_valid_signature.t option
+
+  val check_only_for_signature : t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t
@@ -197,8 +193,7 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed :
-    next_available_token:Token_id.t -> t -> Account_id.t list
+  val accounts_accessed : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 

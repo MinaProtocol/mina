@@ -13,6 +13,7 @@
    base.base_internalhash_types
    async_kernel
    integers
+   result
    ;; local libraries
    error_json
    data_hash_lib
@@ -43,7 +44,6 @@
    non_empty_list
    network_pool
    mina_net2
-   result
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane)))

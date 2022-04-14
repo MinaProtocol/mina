@@ -17,6 +17,7 @@
    ppx_inline_test.config
    core
    ;; local libraries
+   mina_ledger
    mina_numbers
    unsigned_extended
    ledger_proof
@@ -32,6 +33,7 @@
    mina_state
    mina_net2
    mina_base
+   mina_transaction
    truth
    transition_chain_verifier
    staged_ledger

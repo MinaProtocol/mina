@@ -6,6 +6,7 @@
   (backend bisect_ppx))
  (preprocess
   (pps
+   ppx_annot
    ppx_jane
    ppx_deriving_yojson
    ppx_deriving.std

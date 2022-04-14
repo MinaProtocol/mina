@@ -21,9 +21,11 @@
    data_hash_lib
    signature_lib
    logger
+   mina_caqti
    block_time
    mina_numbers
    mina_base
+   mina_transaction
    currency
    unsigned_extended
    error_json
