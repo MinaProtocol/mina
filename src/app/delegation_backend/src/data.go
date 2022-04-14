@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/btcsuite/btcutil/base58"
 	"time"
+
+	"github.com/btcsuite/btcutil/base58"
 )
 
 // Just a different interface for Unmarshal
@@ -18,7 +19,7 @@ func JSONToString(b []byte) (s string, err error) {
 func StringToPk(pk *Pk, s string) error {
 	bs, ver, err := base58.CheckDecode(s)
 	if err == nil && ver != BASE58CHECK_VERSION_PK {
-		return errors.New("Unexpected base58check version for Pk")
+		return errors.New("unexpected base58check version for Pk")
 	}
 	if err == nil {
 		prefixLen := len(PK_PREFIX)
@@ -26,10 +27,10 @@ func StringToPk(pk *Pk, s string) error {
 			if bytes.Equal(bs[:prefixLen], PK_PREFIX[:]) {
 				copy(pk[:], bs[prefixLen:])
 			} else {
-				err = errors.New("Unexpected prefix of Pk")
+				err = errors.New("unexpected prefix of Pk")
 			}
 		} else {
-			err = errors.New(fmt.Sprintf("Public key of an unexpected size %d", len(bs)))
+			err = fmt.Errorf("public key of an unexpected size %d", len(bs))
 		}
 	}
 	return err
@@ -37,7 +38,7 @@ func StringToPk(pk *Pk, s string) error {
 func StringToSig(sig *Sig, s string) error {
 	bs, ver, err := base58.CheckDecode(s)
 	if err == nil && ver != BASE58CHECK_VERSION_SIG {
-		return errors.New("Unexpected base58check version for Sig")
+		return errors.New("unexpected base58check version for Sig")
 	}
 	if err == nil {
 		prefixLen := len(SIG_PREFIX)
@@ -45,10 +46,10 @@ func StringToSig(sig *Sig, s string) error {
 			if bytes.Equal(bs[:prefixLen], SIG_PREFIX[:]) {
 				copy(sig[:], bs[prefixLen:])
 			} else {
-				err = errors.New("Unexpected prefix of signature")
+				err = errors.New("unexpected prefix of signature")
 			}
 		} else {
-			err = errors.New(fmt.Sprintf("Signature of an unexpected size %d", len(bs)))
+			err = fmt.Errorf("signature of an unexpected size %d", len(bs))
 		}
 	}
 	return err
@@ -76,14 +77,14 @@ func (pk *Pk) UnmarshalJSON(b []byte) error {
 	}
 	return err
 }
-func (d Pk) MarshalJSON() ([]byte, error) {
-	return json.Marshal(base58.CheckEncode(append(PK_PREFIX[:], d[:]...), BASE58CHECK_VERSION_PK))
+func (pk Pk) MarshalJSON() ([]byte, error) {
+	return json.Marshal(pk.String())
 }
 func (pk Pk) Format() string {
 	return pk.String()
 }
 func (pk Pk) String() string {
-	return base58.CheckEncode(pk[:], BASE58CHECK_VERSION_PK)
+	return base58.CheckEncode(append(PK_PREFIX[:], pk[:]...), BASE58CHECK_VERSION_PK)
 }
 
 type Base64 struct {
@@ -127,7 +128,7 @@ func (boe *BufferOrError) Write(b []byte) {
 }
 
 type submitRequestData struct {
-	PeerId    *Base64   `json:"peer_id"`
+	PeerId    string    `json:"peer_id"`
 	Block     *Base64   `json:"block"`
 	SnarkWork *Base64   `json:"snark_work,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
@@ -137,9 +138,11 @@ type submitRequest struct {
 	Submitter Pk                `json:"submitter"`
 	Sig       Sig               `json:"signature"`
 }
-type metaToBeSaved struct {
-	SubmittedAt time.Time `json:"submitted_at"`
-	PeerId      *Base64   `json:"peer_id"`
-	SnarkWork   *Base64   `json:"snark_work,omitempty"`
-	RemoteAddr  string    `json:"remote_addr"`
+type MetaToBeSaved struct {
+	CreatedAt  string  `json:"created_at"`
+	PeerId     string  `json:"peer_id"`
+	SnarkWork  *Base64 `json:"snark_work,omitempty"`
+	RemoteAddr string  `json:"remote_addr"`
+	Submitter  Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
+	BlockHash  string  `json:"block_hash"` // is base58check-encoded hash of a block
 }

@@ -1,7 +1,26 @@
 (executable
  (name gen)
- (libraries async crs core digestif snarky.backendless tuple_lib ppxlib
-            crypto_params signature_lib yojson)
+ (libraries
+   ;;opam libraries
+   base.caml
+   core_kernel
+   compiler-libs
+   yojson
+   async
+   core
+   digestif
+   ppxlib
+   ppxlib.ast
+   ocaml-migrate-parsetree
+   stdio
+   ocaml-compiler-libs.common
+   ;;local libraries
+   signature_lib
+   crypto_params
+   crs
+   snarky.backendless
+   tuple_lib
+ )
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))

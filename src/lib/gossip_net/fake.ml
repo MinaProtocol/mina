@@ -258,7 +258,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast_state t state =
+    let broadcast_state ?origin_topic t state =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me state
         (fun (Any_sinks (sinksM, (sink_block, _, _))) (env, vc) ->
           let time = Block_time.now t.time_controller in
@@ -266,13 +267,15 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           M.Block_sink.push sink_block
             (`Transition env, `Time_received time, `Valid_cb vc))
 
-    let broadcast_snark_pool_diff t diff =
+    let broadcast_snark_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work)
 
-    let broadcast_transaction_pool_diff t diff =
+    let broadcast_transaction_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
       Network.broadcast t.network ~sender:t.me diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in
