@@ -15,6 +15,8 @@ apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
 TESTNET_NAME="mainnet"
 
+git config --global --add safe.directory /workdir
+
 source buildkite/scripts/export-git-env-vars.sh
 
 echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
