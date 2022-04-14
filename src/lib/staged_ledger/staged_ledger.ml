@@ -1943,17 +1943,28 @@ module T = struct
               ] ;
         { Staged_ledger_diff.With_valid_signatures_and_proofs.diff })
 
-  let accounts_created t =
+  let latest_block_accounts_created t
+      ~(latest_block_transactions : Transaction.t With_status.t list) =
     let scan_state = scan_state t in
     let base_jobs =
       Scan_state.base_jobs_on_latest_tree scan_state
       @ Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state
     in
-    let transactions_applied =
+    let candidate_transactions_applied =
       List.map base_jobs ~f:(fun { transaction_with_info; _ } ->
-          transaction_with_info.varying)
+          transaction_with_info)
     in
-    List.map transactions_applied ~f:(function
+    (* most blocks have few transactions, searching a list is acceptably fast *)
+    let block_transactions_applied =
+      List.filter candidate_transactions_applied ~f:(fun txn_applied ->
+          let txn = Ledger.Transaction_applied.transaction txn_applied in
+          List.mem latest_block_transactions txn
+            ~equal:(With_status.equal Transaction.equal))
+    in
+    let block_transactions_applied_varying =
+      List.map block_transactions_applied ~f:(fun { varying; _ } -> varying)
+    in
+    List.map block_transactions_applied_varying ~f:(function
       | Command (Signed_command cmd) -> (
           match cmd.body with
           | Payment { previous_empty_accounts } ->

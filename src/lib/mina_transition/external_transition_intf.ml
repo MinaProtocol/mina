@@ -131,6 +131,7 @@ module type S = sig
 
     val of_external_transition :
          logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> scheduled_time:Block_time.Time.t
       -> staged_ledger:Staged_ledger.t
       -> external_transition

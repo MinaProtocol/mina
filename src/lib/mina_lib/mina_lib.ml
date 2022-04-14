@@ -1979,6 +1979,7 @@ let create ?wallets (config : Config.t) =
                     , `Int (Host_and_port.port archive_process_port.value) )
                   ] ;
               Archive_client.run ~logger:config.logger
+                ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port) ;
           let precomputed_block_writer =

@@ -153,8 +153,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             With_hash.data block_with_hash
                           in
                           External_transition.Precomputed_block
-                          .of_external_transition ~logger ~staged_ledger
-                            ~scheduled_time external_transition
+                          .of_external_transition ~logger ~constraint_constants
+                            ~staged_ledger ~scheduled_time external_transition
                         in
                         External_transition.Precomputed_block.to_yojson
                           precomputed_block)

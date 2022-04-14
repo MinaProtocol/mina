@@ -235,7 +235,8 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added ~logger breadcrumb))
+                  (Diff.Builder.breadcrumb_added ~logger ~precomputed_values
+                     breadcrumb))
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;

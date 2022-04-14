@@ -45,7 +45,8 @@ type t =
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
-  let breadcrumb_added ~logger breadcrumb =
+  let breadcrumb_added ~logger ~(precomputed_values : Precomputed_values.t)
+      breadcrumb =
     let ((block, _) as validated_block) =
       Breadcrumb.validated_transition breadcrumb
     in
@@ -93,10 +94,15 @@ module Builder = struct
             None)
     in
     let accounts_created =
-      let account_creation_fee =
-        Genesis_constants.Constraint_constants.compiled.account_creation_fee
+      let constraint_constants = precomputed_values.constraint_constants in
+      let account_creation_fee = constraint_constants.account_creation_fee in
+      let latest_block_transactions =
+        External_transition.Validated.transactions ~constraint_constants
+          validated_block
       in
-      List.map (Staged_ledger.accounts_created staged_ledger) ~f:(fun acct_id ->
+      List.map
+        (Staged_ledger.latest_block_accounts_created staged_ledger
+           ~latest_block_transactions) ~f:(fun acct_id ->
           (acct_id, account_creation_fee))
     in
     Transition_frontier.Breadcrumb_added

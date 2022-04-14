@@ -1316,8 +1316,9 @@ module Precomputed_block = struct
     end
   end]
 
-  let of_external_transition ~logger ~scheduled_time ~staged_ledger
-      (t : external_transition) =
+  let of_external_transition ~logger
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~scheduled_time ~staged_ledger (t : external_transition) =
     let ledger = Staged_ledger.ledger staged_ledger in
     let account_ids_accessed = account_ids_accessed t in
     let accounts_accessed =
@@ -1339,10 +1340,11 @@ module Precomputed_block = struct
             None)
     in
     let accounts_created =
-      let account_creation_fee =
-        Genesis_constants.Constraint_constants.compiled.account_creation_fee
-      in
-      List.map (Staged_ledger.accounts_created staged_ledger) ~f:(fun acct_id ->
+      let account_creation_fee = constraint_constants.account_creation_fee in
+      let latest_block_transactions = transactions ~constraint_constants t in
+      List.map
+        (Staged_ledger.latest_block_accounts_created staged_ledger
+           ~latest_block_transactions) ~f:(fun acct_id ->
           (acct_id, account_creation_fee))
     in
     { scheduled_time

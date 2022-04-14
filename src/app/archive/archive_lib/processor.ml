@@ -2284,13 +2284,12 @@ module Zkapp_account = struct
     ; sequence_state_id : int
     ; last_sequence_slot : int64
     ; proved_state : bool
-    ; zkapp_uri_id : int
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; option int; int64; int; int64; bool; int ]
+      Caqti_type.[ int; option int; int64; int; int64; bool ]
 
   let table_name = "zkapp_accounts"
 
@@ -2306,9 +2305,6 @@ module Zkapp_account = struct
           : Mina_base.Zkapp_account.t) =
       zkapp_account
     in
-    (* zkapp_states table allow NULL elements in array, but the app state here
-       has no NULL elements: TODO: do we need to be able to store NULLs in zkapp_states?
-    *)
     let app_state = Vector.map app_state ~f:(fun field -> Some field) in
     let%bind app_state_id =
       Zkapp_states.add_if_doesn't_exist (module Conn) app_state
@@ -2328,7 +2324,6 @@ module Zkapp_account = struct
       Mina_numbers.Global_slot.to_uint32 last_sequence_slot
       |> Unsigned.UInt32.to_int64
     in
-    let zkapp_uri_id = 0 (* TODO!!!! TEMP!!! does this still exist? *) in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -2338,7 +2333,6 @@ module Zkapp_account = struct
       ; sequence_state_id
       ; last_sequence_slot
       ; proved_state
-      ; zkapp_uri_id
       }
 end
 
