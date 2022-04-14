@@ -25,7 +25,7 @@ ARG RUST_VERSION=1.52.1
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
-RUN apt-get install --no-install-recomments --quiet --yes \
+RUN apt-get install --no-install-recommends --quiet --yes \
   ca-certificates \
   pkg-config \
   libssl-dev
