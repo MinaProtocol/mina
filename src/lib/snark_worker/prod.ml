@@ -199,7 +199,7 @@ module Inputs = struct
                                     , Transaction_witness
                                       .Parties_segment_witness
                                       .to_yojson witness )
-                                  ; ( "$stmt"
+                                  ; ( "stmt"
                                     , Transaction_snark.Statement.With_sok
                                       .to_yojson stmt )
                                   ] ;
@@ -218,7 +218,7 @@ module Inputs = struct
                                           , Transaction_witness
                                             .Parties_segment_witness
                                             .to_yojson witness )
-                                        ; ( "$stmt"
+                                        ; ( "stmt"
                                           , Transaction_snark.Statement.With_sok
                                             .to_yojson stmt )
                                         ] ;

@@ -1135,14 +1135,16 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let loc, acct =
           Or_error.ok_exn (get_with_location l (Party.account_id p))
         in
-        printf "Get account %s\n%!"
-          (Account.to_yojson acct |> Yojson.Safe.to_string) ;
+        printf "Get account %s\n merkle root %s%!"
+          (Account.to_yojson acct |> Yojson.Safe.to_string)
+          (L.merkle_root l |> Ledger_hash.to_yojson |> Yojson.Safe.to_string) ;
         (acct, loc)
 
       let set_account l (a, loc) =
-        printf "Set account %s\n%!"
-          (Account.to_yojson a |> Yojson.Safe.to_string) ;
         Or_error.ok_exn (set_with_location l loc a) ;
+        printf "Set account %s\n merkle root %s%!"
+          (Account.to_yojson a |> Yojson.Safe.to_string)
+          (L.merkle_root l |> Ledger_hash.to_yojson |> Yojson.Safe.to_string) ;
         l
 
       let check_inclusion _ledger (_account, _loc) = ()
