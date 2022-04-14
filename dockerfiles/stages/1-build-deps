@@ -25,9 +25,10 @@ ARG RUST_VERSION=1.52.1
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
-# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround to allow unsigned packages
+# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
 RUN test "$deb_codename" = "jammy" \
-  && echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/99-unsafe-jammy-workaround \
+  && echo 'trying to fix permissions for Jammy Jellyfish gpg keys' \
+  && chmod a+r -cR /etc/apt/trusted.gpg.d/ \
   || exit 0
 
 # --- OS package dependencies

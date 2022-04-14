@@ -24,9 +24,9 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
-# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround to allow unsigned packages
+# --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
 RUN test "$deb_codename" = "jammy" \
-  && echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/99-unsafe-jammy-workaround \
+  && chmod a+r -cR /etc/apt/trusted.gpg.d/ \
   || exit 0
 
 # Dependencies
