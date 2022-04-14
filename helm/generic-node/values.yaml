@@ -54,7 +54,7 @@ persistence:
   enabled: false
 
 coordinator:
-  enabled: false
+  enabless: false
   publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
   snarkFee: "0.025"
   workSelectionAlgorithm: seq #seq OR rand
@@ -68,7 +68,7 @@ archive:
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
-  enabled: true
+  enabled: false
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
