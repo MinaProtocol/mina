@@ -26,7 +26,7 @@ ARG RUST_VERSION=1.52.1
 ARG ROCKSDB_VERSION=v5.18.4
 
 # --- Ubuntu 22.04 "Jammy Jellyfish" Workaround
-RUN chmod a+r -cR /etc/apt/trusted.gpg.d/
+RUN chmod 775 -vR /etc/apt/trusted.gpg.d/
 
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
