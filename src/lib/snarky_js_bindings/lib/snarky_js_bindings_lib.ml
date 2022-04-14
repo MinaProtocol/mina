@@ -1657,18 +1657,51 @@ type proof = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
 module Statement_with_proof =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
+let nat_modules_list : (module Pickles_types.Nat.Intf) list =
+  let open Pickles_types.Nat in
+  [ (module N0)
+  ; (module N1)
+  ; (module N2)
+  ; (module N3)
+  ; (module N4)
+  ; (module N5)
+  ; (module N6)
+  ; (module N7)
+  ; (module N8)
+  ; (module N9)
+  ; (module N10)
+  ; (module N11)
+  ; (module N12)
+  ; (module N13)
+  ; (module N14)
+  ; (module N15)
+  ; (module N16)
+  ; (module N17)
+  ; (module N18)
+  ; (module N19)
+  ; (module N20)
+  ]
+
+let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
+  List.nth_exn nat_modules_list i
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
+  let branches = List.length choices + 1 in
   let choices ~self =
-    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ] |> Obj.magic
+    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ]
   in
+  let (module Branches) = nat_module branches in
+  (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices
+    Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
-      ~branches:(module Pickles_types.Nat.N2)
-      ~max_branching:(module Pickles_types.Nat.N2)
+      ~branches:(module Branches)
+      ~max_branching:
+        (module Pickles_types.Nat.N2)
+        (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name:"smart-contract"
       ~constraint_constants:
         (* TODO these are dummy values *)
