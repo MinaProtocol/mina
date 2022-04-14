@@ -13,6 +13,7 @@ import {
   shutdown,
   PublicKey,
   Mina,
+  Ledger,
 } from "snarkyjs";
 import cached from "./cached.js";
 
@@ -92,6 +93,12 @@ if (command === "update") {
     provers
   );
 
+  let statement = Ledger.transactionStatement(partiesJson, 0);
+  console.log(
+    "transaction statement after proving (hex):\n",
+    statementToJson(statement)
+  );
+
   // mina-signer part
   let client = new Client({ network: "testnet" });
   let feePayerAddress = client.derivePublicKey(feePayerKey);
@@ -102,6 +109,13 @@ if (command === "update") {
   };
   let parties = JSON.parse(partiesJson);
   let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+
+  statement = Ledger.transactionStatement(data.parties, 0);
+  console.log(
+    "transaction statement after signing (hex):\n",
+    statementToJson(statement)
+  );
+
   console.log(data.parties);
 }
 
@@ -115,4 +129,11 @@ function parseCommandLineArgs() {
       return arg;
     }
   });
+}
+
+function statementToJson(statement) {
+  let toHex = (x) => "0x" + BigInt(x.toString()).toString(16).toUpperCase();
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(statement).map(([k, v]) => [k, toHex(v)]))
+  );
 }
