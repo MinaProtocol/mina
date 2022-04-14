@@ -63,6 +63,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -115,6 +116,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (sender_keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = [ (receiver_key, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
@@ -145,6 +147,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (sender_keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = [ (receiver_key, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
@@ -183,6 +186,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ timed_account_keypair ]

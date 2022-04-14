@@ -308,6 +308,7 @@ let create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -341,6 +342,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -379,6 +381,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers
     ; amount
     ; zkapp_account_keypairs = []
@@ -405,6 +408,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -439,6 +443,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -475,6 +480,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -509,6 +515,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -544,6 +551,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]

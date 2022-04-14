@@ -7,7 +7,7 @@ type t =
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   }
 
-type invalid = Common.invalid [@@deriving bin_io_unversioned]
+type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_string = Common.invalid_to_string
 

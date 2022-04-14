@@ -506,6 +506,7 @@ module For_tests : sig
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
@@ -565,5 +566,8 @@ module For_tests : sig
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Parties.t
+  val multiple_transfers :
+       ?protocol_state_precondition:Zkapp_precondition.Protocol_state.t
+    -> Spec.t
+    -> Parties.t
 end
