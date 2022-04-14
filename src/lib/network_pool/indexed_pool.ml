@@ -96,7 +96,8 @@ module Command_error = struct
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t | `Timestamp_predicate ]
+        [ `Valid_until of Mina_numbers.Global_slot.t
+        | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
     | Verification_failed
@@ -1008,7 +1009,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             else
               Error
                 (Expired
-                   ( `Timestamp_predicate
+                   ( `Timestamp_predicate (Time_ns.Span.to_string_hum expiry_ns)
                    , `Global_slot_since_genesis
                        (global_slot_since_genesis config) ))
           in
@@ -1560,13 +1561,15 @@ let%test_module _ =
                       global_slot_since_genesis valid_until ()
                 | Error
                     (Expired
-                      ( `Timestamp_predicate
+                      ( `Timestamp_predicate expiry_ns
                       , `Global_slot_since_genesis global_slot_since_genesis ))
                   ->
                     failwithf
                       !"Expired zkapp. Current global slot is \
-                        %{sexp:Mina_numbers.Global_slot.t}."
-                      global_slot_since_genesis () )
+                        %{sexp:Mina_numbers.Global_slot.t}. Transaction \
+                        expired or will expire in the pool based on the \
+                        current expiry duration of %s"
+                      global_slot_since_genesis expiry_ns () )
           in
           go cmds)
 

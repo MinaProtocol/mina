@@ -472,9 +472,10 @@ struct
             , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
       | Expired
-          ( `Timestamp_predicate
+          ( `Timestamp_predicate expiry_ns
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
-          [ ( "current_global_slot"
+          [ ("expiry_ns", `String expiry_ns)
+          ; ( "current_global_slot"
             , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
 
