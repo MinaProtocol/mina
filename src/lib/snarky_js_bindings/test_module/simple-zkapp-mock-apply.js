@@ -35,9 +35,10 @@ class SimpleZkapp extends SmartContract {
     this.self.update.permissions.setValue({
       ...Permissions.default(),
       editState: Permissions.proofOrSignature(),
-      // TODO: this is  a workaround, can be removed once Parties_replay_check_failed is fixed
-      incrementNonce: Permissions.proofOrSignature(),
     });
+  }
+
+  initialize() {
     this.x.set(initialState);
   }
 
@@ -47,7 +48,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethodArguments(SimpleZkapp, { initialize: [], update: [Field] });
 
 // setup mock mina
 let Local = Mina.LocalBlockchain();
@@ -81,7 +82,27 @@ tic("apply deploy transaction");
 Local.applyJsonTransaction(partiesJsonDeploy);
 toc();
 
-// check that deploy txn was applied
+tic("create initialize transaction (with proof)");
+let partiesJsonInitialize = await call(
+  SimpleZkapp,
+  zkappAddress,
+  "initialize",
+  [],
+  provers,
+  verify
+);
+partiesJsonInitialize = await signFeePayer(
+  partiesJsonInitialize,
+  sender.privateKey,
+  { transactionFee }
+);
+toc();
+
+tic("apply initialize transaction");
+Local.applyJsonTransaction(partiesJsonInitialize);
+toc();
+
+// check that deploy and initialize txns were applied
 let zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
 zkappState.assertEquals(1);
 console.log("got initial state: " + zkappState);

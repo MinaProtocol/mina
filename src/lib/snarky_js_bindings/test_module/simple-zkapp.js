@@ -13,7 +13,6 @@ import {
   shutdown,
   PublicKey,
   Mina,
-  Permissions,
 } from "snarkyjs";
 import cached from "./cached.js";
 
@@ -75,7 +74,7 @@ if (command === "deploy") {
   let feePayerAddress = client.derivePublicKey(feePayerKey);
   let feePayer = {
     feePayer: feePayerAddress,
-    fee: `${transactionFee}`,
+    fee: transactionFee,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson);
