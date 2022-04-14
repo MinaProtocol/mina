@@ -23,7 +23,14 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
-  bullseye)
+  jammy)
+    # libffi7 and libffi8 both exist in jammy, but libffi-dev = v8
+    #   use libffi7 here because we build the jammy package in bullseye
+    #   but this will change in the next debian release and/or
+    #   if jammy gets a unique toolchain conatiner
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
+    ;;
+  bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   buster)
@@ -31,9 +38,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
-    ;;
-  focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
