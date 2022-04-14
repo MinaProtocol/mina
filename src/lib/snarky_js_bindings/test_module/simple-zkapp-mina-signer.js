@@ -29,8 +29,8 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
-    this.self.update.permissions.setValue(Permissions.default());
+  deploy(args) {
+    super.deploy(args);
     this.x.set(initialState);
   }
 

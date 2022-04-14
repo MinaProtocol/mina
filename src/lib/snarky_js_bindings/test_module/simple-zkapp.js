@@ -28,12 +28,8 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
-    // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
-    this.self.update.permissions.setValue({
-      ...Permissions.default(),
-      editState: Permissions.proof(),
-    });
+  deploy(args) {
+    super.deploy(args);
     this.x.set(initialState);
   }
 
