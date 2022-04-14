@@ -14,7 +14,7 @@ RUN chmod +x /entrypoint.sh
 
 # --- Ubuntu 22.04 "Jammy Jellyfish" Workaround to allow unsigned packages
 RUN test "$deb_codename" = "jammy" \
-  && echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/99-unsafe-jammy-workaround
+  && echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/99-unsafe-jammy-workaround \
   || exit 0
 
 # Dependencies
