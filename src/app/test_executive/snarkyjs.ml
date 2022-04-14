@@ -45,8 +45,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
     if not (String.is_empty output.stderr) then
       [%log warn] "Stderr: $stderr"
-        ~metadata:[ ("stdout", `String output.stderr) ] ;
-    stdout
+        ~metadata:[ ("stderr", `String output.stderr) ] ;
+    String.split stdout ~on:'\n' |> List.last_exn
 
   let run network t =
     let open Malleable_error.Let_syntax in
