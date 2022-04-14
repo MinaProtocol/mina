@@ -5,7 +5,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
-let dependsOnBullseye = [
+let dependsOn = [
   { name = "MinaArtifactBullseye", key = "daemon-mainnet-bullseye-docker-image" }
 ]
 
@@ -20,6 +20,6 @@ in Pipeline.build Pipeline.Config::{
     name = "ConnectToMainnet"
   },
   steps = [
-    ConnectToTestnet.step dependsOnBullseye
+    ConnectToTestnet.step dependsOn
   ]
 }
