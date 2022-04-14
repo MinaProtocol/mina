@@ -48,12 +48,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; extra_genesis_accounts =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"
-          ; timing =
-              make_timing ~min_balance:800_000_000_000 ~cliff_time:8
-                ~cliff_amount:0 ~vesting_period:4
-                ~vesting_increment:200_000_000_000
-          }
         ]
     ; num_snark_workers =
         3
@@ -74,7 +68,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string)) ;
-    let[@warning "-8"] [ fish1; fish2; fish3_timed ] =
+    let[@warning "-8"] [ fish1; fish2 ] =
       Network.extra_genesis_keypairs network
     in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
@@ -334,15 +328,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_formatted_string "10" in
-         let receiver = fish1 in
-         let receiver_pub_key =
-           receiver.public_key |> Signature_lib.Public_key.compress
-         in
-         let sender = fish3_timed in
-         let sender_pub_key =
-           sender.public_key |> Signature_lib.Public_key.compress
-         in
+        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+         let receiver = untimed_node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = timed_node_c in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
          let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
@@ -352,7 +342,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
     in
     section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_formatted_string "900" in
+      (let amount = Currency.Amount.of_int 25_000_000_000_000 in
        let receiver = untimed_node_b in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
        let sender = timed_node_c in
@@ -361,10 +351,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Network.Node.must_get_account_data ~logger timed_node_c
            ~public_key:sender_pub_key
        in
-       [%log info] "fish3_timed total balance: %s"
+       [%log info] "timed_node_c total balance: %s"
          (Currency.Balance.to_formatted_string timed_node_c_total) ;
        [%log info]
-         "Attempting to send txn from fish3_timed to fish1 for amount of %s"
+         "Attempting to send txn from timed_node_c to untimed_node_a for \
+          amount of %s"
          (Currency.Amount.to_formatted_string amount) ;
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
