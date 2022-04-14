@@ -31,7 +31,7 @@ Pipeline.build
     steps = [
 
       -- mina-toolchain Debian 12 "Bookworm" Toolchain
-      let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
+      let toolchainBookwormSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="bookworm",
         extra_args="--no-cache",
