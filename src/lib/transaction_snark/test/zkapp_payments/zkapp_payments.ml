@@ -192,7 +192,7 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "zkapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test U.gen_snapp_ledger
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
