@@ -66,7 +66,7 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           | Insufficient_replace_fee
           | Verification_failed
@@ -167,8 +167,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V1.t) list
+      module V3 = struct
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
