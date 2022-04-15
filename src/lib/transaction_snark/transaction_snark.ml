@@ -4091,6 +4091,7 @@ module For_tests = struct
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
@@ -4169,11 +4170,14 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties spec
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~update
-      ~account_precondition =
+  let create_parties
+      ?(protocol_state_precondition = Zkapp_precondition.Protocol_state.accept)
+      ?(account_precondition = Party.Account_precondition.Accept)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
+      ~update =
     let { Spec.fee
         ; sender = sender, sender_nonce
+        ; fee_payer = fee_payer_opt
         ; receivers
         ; amount
         ; new_zkapp_account
@@ -4187,9 +4191,17 @@ module For_tests = struct
       spec
     in
     let sender_pk = sender.public_key |> Public_key.compress in
-    let fee_payer =
-      { Party.Fee_payer.body =
-          { public_key = sender_pk
+    let fee_payer : Party.Fee_payer.t =
+      let public_key, account_precondition =
+        match fee_payer_opt with
+        | None ->
+            (sender_pk, sender_nonce)
+        | Some (fee_payer_kp, fee_payer_nonce) ->
+            (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
+      in
+
+      { body =
+          { public_key
           ; update = Party.Update.noop
           ; token_id = ()
           ; balance_change = fee
@@ -4198,12 +4210,10 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
-          ; account_precondition = sender_nonce
+          ; protocol_state_precondition
+          ; account_precondition
           ; use_full_commitment = ()
           }
-          (*To be updated later*)
       ; authorization = Signature.dummy
       }
     in
@@ -4218,8 +4228,11 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-        ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
+        ; protocol_state_precondition
+        ; account_precondition =
+            ( if Option.is_none fee_payer_opt then
+              Nonce (Account.Nonce.succ sender_nonce)
+            else Nonce sender_nonce )
         ; use_full_commitment = false
         }
       in
@@ -4277,8 +4290,7 @@ module For_tests = struct
               ; sequence_events
               ; call_data
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition
               ; account_precondition
               ; use_full_commitment = true
               }
@@ -4298,21 +4310,19 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; protocol_state_precondition
               ; account_precondition = Accept
               ; use_full_commitment = false
               }
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
       @ snapp_parties @ other_receivers
     in
     let protocol_state_predicate_hash =
-      Zkapp_precondition.Protocol_state.digest protocol_state
+      Zkapp_precondition.Protocol_state.digest protocol_state_precondition
     in
     let ps =
       Parties.Call_forest.of_parties_list
@@ -4332,8 +4342,13 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.Chunked.sign sender.private_key
-          (Random_oracle.Input.Chunked.field full_commitment)
+        match fee_payer_opt with
+        | None ->
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
+        | Some (fee_payer_kp, _) ->
+            Signature_lib.Schnorr.Chunked.sign fee_payer_kp.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
@@ -4384,8 +4399,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~constraint_constants ~update:update_vk
-        ~account_precondition:Party.Account_precondition.Accept
+      create_parties ~constraint_constants spec ~update:update_vk
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4414,8 +4428,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~constraint_constants ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
+      create_parties ~constraint_constants spec ~update:spec.snapp_update
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4486,16 +4499,15 @@ module For_tests = struct
     let parties : Parties.t = { fee_payer; other_parties; memo } in
     parties
 
-  let multiple_transfers (spec : Spec.t) =
+  let multiple_transfers ?protocol_state_precondition (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
-      create_parties spec
+      create_parties
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-        ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
+        spec ~update:spec.snapp_update ?protocol_state_precondition
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
