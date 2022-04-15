@@ -15,9 +15,8 @@ import {
 } from "snarkyjs";
 
 await isReady;
-const totalFeePayerSpend = 10_000_000_000;
+const zkappTargetBalance = 10_000_000_000;
 const transactionFee = 10_000_000;
-const initialZkappBalance = totalFeePayerSpend - 2 * transactionFee;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
@@ -65,7 +64,7 @@ if (command === "deploy") {
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
-    initialBalance: initialZkappBalance,
+    initialBalance: zkappTargetBalance,
     feePayerKey,
   });
 

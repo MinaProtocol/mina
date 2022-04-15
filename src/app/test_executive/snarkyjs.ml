@@ -17,6 +17,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let initial_fee_payer_balance = Currency.Balance.of_formatted_string "8000000"
 
+  let zkapp_target_balance = Currency.Balance.of_formatted_string "10"
+
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
@@ -151,9 +153,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ( [%log info] "Verifying account state change"
             ~metadata:
               [ ("account_id", Mina_base.Account_id.to_yojson my_account_id) ] ;
-          let%bind { total_balance = fee_payer_balance; _ } =
+          let%bind { total_balance = zkapp_balance; _ } =
             Network.Node.must_get_account_data ~logger node
-              ~account_id:my_account_id
+              ~account_id:zkapp_account_id
           in
           let%bind zkapp_account_update =
             Network.Node.get_account_update ~logger node
@@ -189,33 +191,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 (Error.of_string
                    "State update not witnessed from smart contract execution")
           in
-          if
-            Currency.Balance.(
-              equal fee_payer_balance
-                ( match
-                    initial_fee_payer_balance
-                    - Currency.Amount.of_formatted_string "10"
-                  with
-                | Some x ->
-                    x
-                | None ->
-                    failwithf
-                      "Failed to subtract initial_balance %s with amount 10.0 \
-                       MINA"
-                      (Currency.Balance.to_formatted_string
-                         initial_fee_payer_balance)
-                      () ))
-          then (
+          if Currency.Balance.(equal zkapp_balance zkapp_target_balance) then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
             return () )
           else (
             [%log error]
-              "Ledger does not see balance $balance change from zkapp \
-               execution (-10 MINA from initial_balance $initial_balance)"
+              "Ledger does not see zkapp balance $balance = $target (10 MINA)"
               ~metadata:
-                [ ("balance", Currency.Balance.to_yojson fee_payer_balance)
-                ; ( "initial_balance"
-                  , Currency.Balance.to_yojson initial_fee_payer_balance )
+                [ ("balance", Currency.Balance.to_yojson zkapp_balance)
+                ; ("target", Currency.Balance.to_yojson zkapp_target_balance)
                 ] ;
             Malleable_error.hard_error
               (Error.of_string
