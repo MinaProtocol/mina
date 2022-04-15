@@ -280,4 +280,5 @@ spec:
       resources:
         requests:
           storage: {{.Values.features.persistence.size}}
+{{- end}}
 ---
