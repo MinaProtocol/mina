@@ -14,7 +14,11 @@ let graphql_zkapp_command (parties : Parties.t) =
     {|
 mutation MyMutation {
   __typename
-  sendZkapp(input: { parties: %s })
+  sendZkapp(input: { parties: %s }) {
+    zkapp {
+      hash
+    }
+  }
 }
     |}
     (Parties.arg_query_string parties)
