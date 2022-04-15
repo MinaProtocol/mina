@@ -253,7 +253,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           parties_spec
       in
       let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
-        { parties_spec with fee = Currency.Fee.of_int 999_999 }
+        { parties_spec with fee = Currency.Fee.of_int 5_000_000 }
       in
       let%bind.Deferred parties_insufficient_replace_fee =
         Transaction_snark.For_tests.update_states ~constraint_constants
