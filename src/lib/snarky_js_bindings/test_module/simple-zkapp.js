@@ -16,6 +16,8 @@ import {
 
 await isReady;
 const zkappTargetBalance = 10_000_000_000;
+const accountCreationFee = 1_000_000_000;
+const initialBalance = zkappTargetBalance + accountCreationFee;
 const transactionFee = 10_000_000;
 const initialState = Field(1);
 
@@ -64,7 +66,7 @@ if (command === "deploy") {
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
-    initialBalance: zkappTargetBalance,
+    initialBalance,
     feePayerKey,
   });
 
