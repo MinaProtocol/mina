@@ -314,7 +314,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             let err_str = Error.to_string_mach error in
             let err_str_lowercase = String.lowercase err_str in
             if
-              String.is_substring ~substring:"verification_failed"
+              String.is_substring ~substring:"Invalid_signature"
                 err_str_lowercase
             then (
               [%log info] "Got expected invalid signature error from GraphQL" ;
