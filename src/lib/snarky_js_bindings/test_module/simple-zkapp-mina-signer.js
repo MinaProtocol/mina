@@ -11,7 +11,6 @@ import {
   call,
   isReady,
   shutdown,
-  Permissions,
   signFeePayer,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
