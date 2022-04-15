@@ -41,7 +41,7 @@ let check :
         | None ->
             let err = `Invalid_signature (Signed_command.public_keys c) in
             let logger = Logger.create () in
-            [%log warn] "Invalid signature branch 2 $keys"
+            [%log warn] "Invalid sigature branch 2 $keys"
               ~metadata:[ ("keys", `String (invalid_to_string err)) ] ;
             err )
   | Parties { fee_payer; other_parties; memo } ->
@@ -73,7 +73,7 @@ let check :
                     `Invalid_signature [ Signature_lib.Public_key.compress pk ]
                   in
                   let logger = Logger.create () in
-                  [%log warn] "Invalid signature branch 1 $call $keys"
+                  [%log warn] "Invalid sigature branch 1 $call $keys"
                     ~metadata:
                       [ ("keys", `String (invalid_to_string err))
                       ; ("call", `String call)
@@ -113,12 +113,6 @@ let check :
                           ; at_party
                           }
                         in
-                        let logger = Logger.create () in
-                        [%log warn]
-                          "Verifier.Common.check: Computed transaction \
-                           statement $statement"
-                          ~metadata:
-                            [ ("statement", Zkapp_statement.to_yojson stmt) ] ;
                         Some (vk, stmt, pi) ))
           in
           let v =
