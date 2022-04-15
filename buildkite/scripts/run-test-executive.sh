@@ -10,12 +10,6 @@ if [[ "${TEST_NAME:0:4}" == "opt-" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   exit 0
 fi
 
-# if [[ "$TEST_NAME" == "snarkyjs" ]]; then
-#   echo "--- install node"
-#   curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-#   sudo apt install -y nodejs
-# fi
-
 ./test_executive.exe cloud "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
