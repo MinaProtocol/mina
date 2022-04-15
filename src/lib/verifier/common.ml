@@ -39,11 +39,7 @@ let check :
         | Some c ->
             `Valid (User_command.Signed_command c)
         | None ->
-            let err = `Invalid_signature (Signed_command.public_keys c) in
-            let logger = Logger.create () in
-            [%log warn] "Invalid sigature branch 2 $keys"
-              ~metadata:[ ("keys", `String (invalid_to_string err)) ] ;
-            err )
+            `Invalid_signature (Signed_command.public_keys c) )
   | Parties { fee_payer; other_parties; memo } ->
       with_return (fun { return } ->
           let other_parties_hash = Parties.Call_forest.hash other_parties in
@@ -58,7 +54,7 @@ let check :
             Parties.Transaction_commitment.with_fee_payer tx_commitment
               ~fee_payer_hash:(Party.digest (Party.of_fee_payer fee_payer))
           in
-          let check_signature ~call s pk msg =
+          let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
             | None ->
                 return (`Invalid_keys [ pk ])
@@ -68,21 +64,14 @@ let check :
                     (Signature_lib.Schnorr.Chunked.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
                        (Random_oracle_input.Chunked.field msg))
-                then (
-                  let err =
-                    `Invalid_signature [ Signature_lib.Public_key.compress pk ]
-                  in
-                  let logger = Logger.create () in
-                  [%log warn] "Invalid sigature branch 1 $call $keys"
-                    ~metadata:
-                      [ ("keys", `String (invalid_to_string err))
-                      ; ("call", `String call)
-                      ] ;
-                  return err )
+                then
+                  return
+                    (`Invalid_signature
+                      [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization ~call:"fee_payer pk"
-            fee_payer.body.public_key full_tx_commitment ;
+          check_signature fee_payer.authorization fee_payer.body.public_key
+            full_tx_commitment ;
           let parties_with_hashes_list =
             Parties.Call_forest.With_hashes.to_parties_with_hashes_list
               other_parties
@@ -96,8 +85,7 @@ let check :
                 in
                 match p.authorization with
                 | Signature s ->
-                    check_signature ~call:"non-fee_payer" s p.body.public_key
-                      commitment ;
+                    check_signature s p.body.public_key commitment ;
                     None
                 | None_given ->
                     None
