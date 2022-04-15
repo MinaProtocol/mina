@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_balance = Currency.Balance.of_formatted_string "8000000"
+  let initial_fee_payer_balance = Currency.Balance.of_formatted_string "8000000"
 
   let config =
     let open Test_config in
@@ -30,7 +30,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = Currency.Balance.to_formatted_string initial_balance
+        [ { balance =
+              Currency.Balance.to_formatted_string initial_fee_payer_balance
           ; timing = Untimed
           }
         ]
@@ -62,7 +63,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
-      [%log info] "Snapps transaction included in transition frontier"
+      [%log info] "zkApp transaction included in transition frontier"
     in
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
@@ -70,6 +71,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind my_sk = Util.priv_key_of_node node in
     let my_account_id =
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
+    in
+    let ({ private_key = zkapp_sk; public_key = zkapp_pk }
+          : Signature_lib.Keypair.t) =
+      Signature_lib.Keypair.create ()
+    in
+    let zkapp_pk = Signature_lib.Public_key.compress zkapp_pk in
+    let zkapp_account_id =
+      Mina_base.Account_id.create zkapp_pk Mina_base.Token_id.default
     in
     let make_sign_and_send which =
       let which_str, nonce =
@@ -90,6 +99,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                ~args:
                  [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
                  ; which_str
+                 ; Signature_lib.Private_key.to_base58_check zkapp_sk
                  ; Signature_lib.Private_key.to_base58_check my_sk
                  ; nonce
                  ]
@@ -102,8 +112,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Mina_base.Parties.of_json (Yojson.Safe.from_string parties_contract_str)
       in
       let%bind () = Deferred.return unit_with_error in
+      (* TODO: switch to external sending script once the rest is working *)
       let%bind () = send_zkapp ~logger node parties_contract in
-      (* Note: Sending the snapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
+      (* Note: Sending the zkapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
       (*
       let uri = Network.Node.graphql_uri node in
       let parties_query = Lazy.force Mina_base.Parties.inner_query in
@@ -140,25 +151,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ( [%log info] "Verifying account state change"
             ~metadata:
               [ ("account_id", Mina_base.Account_id.to_yojson my_account_id) ] ;
-          let%bind { total_balance = balance; _ } =
+          let%bind { total_balance = fee_payer_balance; _ } =
             Network.Node.must_get_account_data ~logger node
               ~account_id:my_account_id
           in
-          let%bind account_update =
+          let%bind zkapp_account_update =
             Network.Node.get_account_update ~logger node
-              ~account_id:my_account_id
+              ~account_id:zkapp_account_id
             |> Deferred.bind ~f:Malleable_error.or_hard_error
           in
           let%bind () =
-            let first_state =
-              Mina_base.Zkapp_state.V.to_list account_update.app_state
+            let zkapp_first_state =
+              Mina_base.Zkapp_state.V.to_list zkapp_account_update.app_state
               |> List.hd_exn
             in
             let module Set_or_keep = Mina_base.Zkapp_basic.Set_or_keep in
             let module Field = Snark_params.Tick0.Field in
             let expected = Set_or_keep.Set (Field.of_int 3) in
             if
-              Set_or_keep.equal Field.equal first_state
+              Set_or_keep.equal Field.equal zkapp_first_state
                 (Set_or_keep.Set (Field.of_int 3))
             then (
               [%log info] "Ledger sees state update in zkapp execution" ;
@@ -172,7 +183,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  execution ( actual $actual )"
                 ~metadata:
                   [ ("expected", to_yojson expected)
-                  ; ("actual", to_yojson first_state)
+                  ; ("actual", to_yojson zkapp_first_state)
                   ] ;
               Malleable_error.hard_error
                 (Error.of_string
@@ -180,9 +191,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           in
           if
             Currency.Balance.(
-              equal balance
+              equal fee_payer_balance
                 ( match
-                    initial_balance - Currency.Amount.of_formatted_string "10"
+                    initial_fee_payer_balance
+                    - Currency.Amount.of_formatted_string "10"
                   with
                 | Some x ->
                     x
@@ -190,7 +202,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     failwithf
                       "Failed to subtract initial_balance %s with amount 10.0 \
                        MINA"
-                      (Currency.Balance.to_formatted_string initial_balance)
+                      (Currency.Balance.to_formatted_string
+                         initial_fee_payer_balance)
                       () ))
           then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
@@ -200,8 +213,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               "Ledger does not see balance $balance change from zkapp \
                execution (-10 MINA from initial_balance $initial_balance)"
               ~metadata:
-                [ ("balance", Currency.Balance.to_yojson balance)
-                ; ("initial_balance", Currency.Balance.to_yojson initial_balance)
+                [ ("balance", Currency.Balance.to_yojson fee_payer_balance)
+                ; ( "initial_balance"
+                  , Currency.Balance.to_yojson initial_fee_payer_balance )
                 ] ;
             Malleable_error.hard_error
               (Error.of_string

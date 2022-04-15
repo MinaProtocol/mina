@@ -11,14 +11,13 @@ import {
   call,
   isReady,
   shutdown,
-  PublicKey,
   Mina,
 } from "snarkyjs";
-import cached from "./cached.js";
 
 await isReady;
+const totalFeePayerSpend = 10_000_000_000;
 const transactionFee = 10_000_000;
-const initialBalance = 10_000_000_000;
+const initialZkappBalance = totalFeePayerSpend - 2 * transactionFee;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
@@ -40,44 +39,49 @@ class SimpleZkapp extends SmartContract {
 declareState(SimpleZkapp, { x: Field });
 declareMethodArguments(SimpleZkapp, { update: [Field] });
 
-// create new random zkapp key, or read from cache
-let keyPair = await cached(() => {
-  let privateKey = PrivateKey.random();
-  let publicKey = privateKey.toPublicKey().toJSON();
-  return { privateKey: privateKey.toJSON(), publicKey };
-});
-let zkappAddress = PublicKey.fromJSON(keyPair.publicKey);
-let zkappKey = PrivateKey.fromJSON(keyPair.privateKey);
+// parse command line; for local testing, use random keys as fallback
+let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =
+  process.argv.slice(2);
+zkappKeyBase58 ||= PrivateKey.random().toBase58();
+feePayerKeyBase58 ||= PrivateKey.random().toBase58();
+feePayerNonce ||= command === "update" ? "2" : "0";
+console.log(
+  `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce}`
+);
 
-let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
-feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
+let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
+let zkappAddress = zkappKey.toPublicKey();
 
 if (command === "deploy") {
   // snarkyjs part
-  let feePayerKeyJs = PrivateKey.fromBase58(feePayerKey);
-  // FIXME: this is a hack, we need something like "add cached account" for testing
+  let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
+  // FIXME: this is a hack; it ensures deploy "magically" finds the nonce (= 0) of the feePayer, for the account precondition
+  // we need something explicit like "add cached account" for testing
   let Local = Mina.LocalBlockchain();
   Mina.setActiveInstance(Local);
-  Local.addAccount(feePayerKeyJs.toPublicKey(), "30000000000");
+  Local.addAccount(feePayerKey.toPublicKey(), "30000000000");
 
   let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
-    initialBalance,
-    feePayerKey: feePayerKeyJs,
+    initialBalance: initialZkappBalance,
+    feePayerKey,
   });
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
-  let feePayerAddress = client.derivePublicKey(feePayerKey);
+  let feePayerAddress = client.derivePublicKey(feePayerKeyBase58);
   let feePayer = {
     feePayer: feePayerAddress,
     fee: transactionFee,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson);
-  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+  let { data } = client.signTransaction(
+    { parties, feePayer },
+    feePayerKeyBase58
+  );
   console.log(data.parties);
 }
 
@@ -94,25 +98,18 @@ if (command === "update") {
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
-  let feePayerAddress = client.derivePublicKey(feePayerKey);
+  let feePayerAddress = client.derivePublicKey(feePayerKeyBase58);
   let feePayer = {
     feePayer: feePayerAddress,
     fee: transactionFee,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson);
-  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+  let { data } = client.signTransaction(
+    { parties, feePayer },
+    feePayerKeyBase58
+  );
   console.log(data.parties);
 }
 
 shutdown();
-
-function parseCommandLineArgs() {
-  return process.argv.slice(2).map((arg) => {
-    try {
-      return JSON.parse(arg);
-    } catch {
-      return arg;
-    }
-  });
-}
