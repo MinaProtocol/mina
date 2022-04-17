@@ -14,6 +14,8 @@ export DEBIAN_FRONTEND=noninteractive
 /bin/echo -e "12\n10" | apt-get install -y tzdata
 apt-get install -y git postgresql apt-transport-https ca-certificates curl
 
+git config --global --add safe.directory /workdir
+
 source buildkite/scripts/export-git-env-vars.sh
 
 echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
