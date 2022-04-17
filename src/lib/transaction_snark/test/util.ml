@@ -118,7 +118,7 @@ let trivial_snapp =
 
 let check_parties_with_merges_exn ?(state_body = genesis_state_body)
     ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
-    ?(apply = true) ledger partiess =
+    ledger partiess =
   (*TODO: merge multiple snapp transactions*)
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
@@ -168,15 +168,31 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
                 in
                 T.merge ~sok_digest prev curr)
       in
-      let _p = Or_error.ok_exn p in
-      if apply then
-        let _applied =
-          Ledger.apply_parties_unchecked ~constraint_constants ~state_view
-            ledger parties
-          |> Or_error.ok_exn
-        in
-        ()
-      else ())
+      let p = Or_error.ok_exn p in
+      let target_ledger_root_snark =
+        (Transaction_snark.statement p).target.ledger
+      in
+      let applied =
+        Ledger.apply_transaction ~constraint_constants
+          ~txn_state_view:state_view ledger
+          (Mina_transaction.Transaction.Command (Parties parties))
+        |> Or_error.ok_exn
+      in
+      ( match applied.varying with
+      | Command (Parties { command; _ }) -> (
+          match command.status with
+          | Applied _ ->
+              ()
+          | Failed (failure_tbl, _) ->
+              failwith
+                (sprintf
+                   !"Application failed. Failure statuses: %{sexp: \
+                     Mina_base.Transaction_status.Failure.Collection.t}"
+                   failure_tbl) )
+      | _ ->
+          failwith "parties expected" ) ;
+      let target_ledger_root = Ledger.merkle_root ledger in
+      [%test_eq: Ledger_hash.t] target_ledger_root target_ledger_root_snark)
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"

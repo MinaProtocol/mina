@@ -8,6 +8,8 @@ let%test_module "Snapp deploy tests" =
   ( module struct
     let memo = Signed_command_memo.create_from_string_exn "Snapp deploy tests"
 
+    let constraint_constants = U.constraint_constants
+
     let%test_unit "create a new snapp account/deploy a smart contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -23,6 +25,46 @@ let%test_module "Snapp deploy tests" =
                     ; receivers = []
                     ; amount
                     ; zkapp_account_keypairs = [ new_kp ]
+                    ; memo
+                    ; new_zkapp_account = true
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    }
+                  in
+                  let parties =
+                    Transaction_snark.For_tests.deploy_snapp test_spec
+                      ~constraint_constants
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_parties_with_merges_exn ledger [ parties ])))
+
+    let%test_unit "deploy multiple ZkApps" =
+      let open Mina_transaction_logic.For_tests in
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind spec, kp1 = U.gen_snapp_ledger in
+        let%map kps =
+          Quickcheck.Generator.list_with_length 2 Signature_lib.Keypair.gen
+        in
+        (spec, kp1 :: kps)
+      in
+      Quickcheck.test ~trials:1 gen ~f:(fun ({ init_ledger; specs }, kps) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let spec = List.hd_exn specs in
+                  let fee = Currency.Fee.of_int 1_000_000 in
+                  let amount = Currency.Amount.of_int 7_000_000_000 in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; receivers = []
+                    ; amount
+                    ; zkapp_account_keypairs = kps
                     ; memo
                     ; new_zkapp_account = true
                     ; snapp_update = Party.Update.dummy

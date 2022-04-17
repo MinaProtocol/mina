@@ -262,7 +262,7 @@ module Make (Input : Input_intf) = struct
             let parties =
               Async.Thread_safe.block_on_async_exn (fun () ->
                   Transaction_snark.For_tests.update_states test_spec
-                    ~snapp_prover ~constraint_constants)
+                    ~snapp_prover ~constraint_constants:U.constraint_constants)
             in
             Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
             (*Create snapp transaction*)
@@ -270,7 +270,8 @@ module Make (Input : Input_intf) = struct
               ~permissions:(U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~ledger snapp_pk ;
             ( match
-                Ledger.apply_transaction ledger ~constraint_constants
+                Ledger.apply_transaction ledger
+                  ~constraint_constants:U.constraint_constants
                   ~txn_state_view:
                     (Mina_state.Protocol_state.Body.view U.genesis_state_body)
                   (Transaction.Command (Parties parties))

@@ -2548,11 +2548,6 @@ module For_tests = struct
 
   let txn_global_slot = Global_slot.zero
 
-  let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
-      account_creation_fee = Fee.of_int 1
-    }
-
   let iter_err ts ~f =
     List.fold_until ts
       ~finish:(fun () -> Ok ())

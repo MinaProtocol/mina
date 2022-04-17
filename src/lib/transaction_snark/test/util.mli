@@ -44,15 +44,11 @@ val dummy_rule :
 
 (** Generates base and merge snarks of all the party segments
 
-    if apply is true, then also run unchecked apply
-
-    raises if either the snark generation or application fails
-    but does not examine the failure table created by the application
+    Raises if either the snark generation or application fails
 *)
 val check_parties_with_merges_exn :
      ?state_body:Transaction_protocol_state.Block_data.t
   -> ?state_view:Zkapp_precondition.Protocol_state.View.t
-  -> ?apply:bool
   -> Ledger.t
   -> Parties.t list
   -> unit Async.Deferred.t

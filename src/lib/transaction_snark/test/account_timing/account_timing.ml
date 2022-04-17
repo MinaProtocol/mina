@@ -847,22 +847,10 @@ let%test_module "account timing check" =
       ledger_copy
 
     let apply_zkapp_commands_at_slot ledger slot (partiess : Parties.t list) =
-      let state_body, state_view = state_body_and_view_at_slot slot in
+      let state_body, _state_view = state_body_and_view_at_slot slot in
       Async.Deferred.List.iter partiess ~f:(fun parties ->
-          let ledger_copy = copy_ledger ledger in
-          match
-            Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
-              ~state_view ledger parties
-          with
-          | Ok (_parties_applied, (local_state, _amount)) ->
-              let failure_statuses =
-                local_state.failure_status_tbl |> List.concat
-              in
-              assert (List.is_empty failure_statuses) ;
-              Transaction_snark_tests.Util.check_parties_with_merges_exn
-                ~state_body ~apply:false ledger_copy [ parties ]
-          | Error err ->
-              failwithf "Transaction failed: %s" (Error.to_string_hum err) ())
+          Transaction_snark_tests.Util.check_parties_with_merges_exn ~state_body
+            ledger [ parties ])
       |> Fn.flip Async.upon (fun () -> ())
 
     let check_zkapp_failure expected_failure = function
