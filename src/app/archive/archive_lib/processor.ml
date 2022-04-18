@@ -1118,6 +1118,7 @@ module Zkapp_party_body = struct
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     }
   [@@deriving fields, hlist]
@@ -1132,6 +1133,7 @@ module Zkapp_party_body = struct
         ; bool
         ; Mina_caqti.array_int_typ
         ; Mina_caqti.array_int_typ
+        ; int
         ; int
         ; int
         ; int
@@ -1167,6 +1169,11 @@ module Zkapp_party_body = struct
         (module Conn)
         body.protocol_state_precondition
     in
+    let%bind zkapp_account_precondition_id =
+      Zkapp_account_precondition.add_if_doesn't_exist
+        (module Conn)
+        body.account_precondition
+    in
     let token_id = Token_id.to_string body.token_id in
     let balance_change =
       let magnitude =
@@ -1192,6 +1199,7 @@ module Zkapp_party_body = struct
       ; call_data_id
       ; call_depth
       ; zkapp_protocol_state_precondition_id
+      ; zkapp_account_precondition_id
       ; use_full_commitment
       }
     in
@@ -1210,11 +1218,7 @@ module Zkapp_party_body = struct
 end
 
 module Zkapp_party = struct
-  type t =
-    { body_id : int
-    ; account_precondition_id : int
-    ; authorization_kind : Control.Tag.t
-    }
+  type t = { body_id : int; authorization_kind : Control.Tag.t }
   [@@deriving fields, hlist]
 
   let authorization_kind_typ =
@@ -1240,22 +1244,17 @@ module Zkapp_party = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; authorization_kind_typ ]
+      Caqti_type.[ int; authorization_kind_typ ]
 
   let table_name = "zkapp_party"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Zkapp_party_body.add_if_doesn't_exist (module Conn) party.data.body
-    in
-    let%bind account_precondition_id =
-      Zkapp_account_precondition.add_if_doesn't_exist
-        (module Conn)
-        party.data.account_precondition
+      Zkapp_party_body.add_if_doesn't_exist (module Conn) party.body
     in
     let authorization_kind = Control.tag party.authorization in
-    let value = { body_id; account_precondition_id; authorization_kind } in
+    let value = { body_id; authorization_kind } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1269,24 +1268,21 @@ module Zkapp_party = struct
 end
 
 module Zkapp_fee_payers = struct
-  type t = { body_id : int; nonce : int64 } [@@deriving fields, hlist]
+  type t = { body_id : int } [@@deriving fields, hlist]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64 ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
 
   let table_name = "zkapp_fee_payers"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fp : Party.Preconditioned.Fee_payer.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (fp : Party.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
       Zkapp_party_body.add_if_doesn't_exist
         (module Conn)
         (Party.Body.of_fee_payer fp.body)
     in
-    let nonce = fp.account_precondition |> Unsigned.UInt32.to_int64 in
-    let value = { body_id; nonce } in
+    let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1528,7 +1524,7 @@ module User_command = struct
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
       let%bind zkapp_fee_payer_id =
-        Zkapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer.data
+        Zkapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer
       in
       let%bind zkapp_other_parties_ids =
         Mina_caqti.deferred_result_list_map ps.other_parties

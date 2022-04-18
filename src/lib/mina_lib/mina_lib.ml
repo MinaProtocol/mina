@@ -1797,35 +1797,7 @@ let create ?wallets (config : Config.t) =
               ~frontier_broadcast_pipe:
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
-              ~producer_transition_reader:
-                (Strict_pipe.Reader.map producer_transition_reader
-                   ~f:(fun breadcrumb ->
-                     let et =
-                       Transition_frontier.Breadcrumb.validated_transition
-                         breadcrumb
-                     in
-                     let validation_callback =
-                       Mina_net2.Validation_callback.create_without_expiration
-                         ()
-                     in
-                     External_transition.Validated.poke_validation_callback et
-                       validation_callback ;
-                     don't_wait_for
-                       (* this will never throw since the callback was created without expiration *)
-                       (let%bind v =
-                          Mina_net2.Validation_callback.await_exn
-                            validation_callback
-                        in
-                        if
-                          Mina_net2.Validation_callback.equal_validation_result
-                            v `Accept
-                        then
-                          Mina_networking.broadcast_state net
-                            (External_transition.Validation
-                             .forget_validation_with_hash et)
-                        else Deferred.unit) ;
-                     breadcrumb))
-              ~most_recent_valid_block
+              ~producer_transition_reader ~most_recent_valid_block
               ~precomputed_values:config.precomputed_values ~notify_online
           in
           let ( valid_transitions_for_network
@@ -1836,7 +1808,8 @@ let create ?wallets (config : Config.t) =
             in
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
-                Fork.two (map downstream_pipe ~f:(fun (`Transition t, _) -> t)))
+                Fork.two
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
@@ -1859,7 +1832,9 @@ let create ?wallets (config : Config.t) =
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
-                ~f:(fun (`Transition transition, `Source source) ->
+                ~f:(fun
+                     (`Transition transition, `Source source, `Valid_cb valid_cb)
+                   ->
                   let hash =
                     (External_transition.Validated.state_hashes transition)
                       .state_hash
@@ -1888,13 +1863,32 @@ let create ?wallets (config : Config.t) =
                               ]
                             (Rebroadcast_transition { state_hash = hash }) ;
                           (*send callback to libp2p to forward the gossiped transition*)
-                          External_transition.Validated.accept transition
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          External_transition.Validated.accept transition
+                          don't_wait_for
+                            (Mina_networking.broadcast_state net
+                               (External_transition.Validation
+                                .forget_validation_with_hash transition)) ;
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb
                       | `Catchup ->
                           (*Noop for directly downloaded transitions*)
-                          External_transition.Validated.accept transition )
+                          Option.iter
+                            ~f:
+                              (Fn.flip
+                                 Mina_net2.Validation_callback
+                                 .fire_if_not_already_fired `Accept)
+                            valid_cb )
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
@@ -1911,7 +1905,12 @@ let create ?wallets (config : Config.t) =
                         ; ("timing", timing_error_json)
                         ]
                       in
-                      External_transition.Validated.reject transition ;
+                      Option.iter
+                        ~f:
+                          (Fn.flip
+                             Mina_net2.Validation_callback
+                             .fire_if_not_already_fired `Reject)
+                        valid_cb ;
                       match source with
                       | `Catchup ->
                           ()

@@ -3,12 +3,11 @@ open Core_kernel
 open Mina_base
 open Mina_state
 
+(* this module exists only as a stub to keep the bin_io for external transition from changing *)
 module Validate_content = struct
-  type t = Mina_net2.Validation_callback.t
+  type t = unit
 
-  let bin_read_t buf ~pos_ref =
-    bin_read_unit buf ~pos_ref ;
-    Mina_net2.Validation_callback.create_without_expiration ()
+  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref
 
   let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
@@ -16,7 +15,7 @@ module Validate_content = struct
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Mina_net2.Validation_callback.create_without_expiration ()
+  let t_of_sexp _ = ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -53,8 +52,7 @@ module Stable = struct
         include T
 
         let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-            ~delta_transition_chain_proof ~validation_callback
-            ?proposed_protocol_version_opt () =
+            ~delta_transition_chain_proof ?proposed_protocol_version_opt () =
           let current_protocol_version =
             try Protocol_version.get_current ()
             with _ ->
@@ -68,7 +66,7 @@ module Stable = struct
           ; delta_transition_chain_proof
           ; current_protocol_version
           ; proposed_protocol_version_opt
-          ; validation_callback
+          ; validation_callback = ()
           }
 
         type 'a creator =
@@ -76,18 +74,16 @@ module Stable = struct
           -> protocol_state_proof:Proof.t
           -> staged_ledger_diff:Staged_ledger_diff.t
           -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-          -> validation_callback:Validate_content.t
           -> ?proposed_protocol_version_opt:Protocol_version.t
           -> unit
           -> 'a
 
         let map_creator c ~f ~protocol_state ~protocol_state_proof
             ~staged_ledger_diff ~delta_transition_chain_proof
-            ~validation_callback ?proposed_protocol_version_opt () =
+            ?proposed_protocol_version_opt () =
           f
             (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-               ~delta_transition_chain_proof ~validation_callback
-               ?proposed_protocol_version_opt ())
+               ~delta_transition_chain_proof ?proposed_protocol_version_opt ())
       end) :
         sig
           val create :
@@ -96,7 +92,6 @@ module Stable = struct
             -> staged_ledger_diff:Staged_ledger_diff.t
             -> delta_transition_chain_proof:
                  State_hash.t * State_body_hash.t list
-            -> validation_callback:Validate_content.t
             -> ?proposed_protocol_version_opt:Protocol_version.t
             -> unit
             -> t
@@ -118,8 +113,6 @@ Stable.Latest.
   , delta_transition_chain_proof
   , current_protocol_version
   , proposed_protocol_version_opt
-  , validation_callback
-  , set_validation_callback
   , compare
   , create
   , sexp_of_t
@@ -135,7 +128,6 @@ type t_ = Raw_versioned__.t =
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_protocol_version: Protocol_version.t
   ; proposed_protocol_version_opt: Protocol_version.t option
-  ; mutable validation_callback: Validate_content.t }
 *)
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
@@ -225,16 +217,6 @@ let payments t =
         Some { With_status.data = c; status }
     | _ ->
         None)
-
-let accept t =
-  Mina_net2.Validation_callback.fire_if_not_already_fired
-    (validation_callback t) `Accept
-
-let reject t =
-  Mina_net2.Validation_callback.fire_if_not_already_fired
-    (validation_callback t) `Reject
-
-let poke_validation_callback t cb = set_validation_callback t cb
 
 let timestamp =
   Fn.compose Blockchain_state.timestamp
@@ -819,21 +801,19 @@ module With_validation = struct
 
   let protocol_version_status t = lift protocol_version_status t
 
-  let accept t = lift accept t
-
-  let reject t = lift reject t
-
-  let poke_validation_callback t = lift poke_validation_callback t
-
-  let handle_dropped_transition ?pipe_name ~logger t =
+  let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
     [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
       ~metadata:
         [ ( "state_hash"
-          , State_hash.to_yojson
-              (state_hashes t).State_hash.State_hashes.state_hash )
+          , State_hash.(to_yojson (state_hashes block).State_hashes.state_hash)
+          )
         ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
         ] ;
-    reject t
+    Option.iter
+      ~f:
+        (Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired
+           `Reject)
+      valid_cb
 end
 
 module Initial_validated = struct
@@ -969,9 +949,6 @@ module Validated = struct
     , current_protocol_version
     , proposed_protocol_version_opt
     , protocol_version_status
-    , accept
-    , reject
-    , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
     , blockchain_length
@@ -1032,8 +1009,6 @@ let genesis ~precomputed_values =
                *)
              ~protocol_state_proof:Proof.blockchain_dummy
              ~staged_ledger_diff:empty_diff
-             ~validation_callback:
-               (Mina_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              ()))
@@ -1042,12 +1017,10 @@ let genesis ~precomputed_values =
 
 module For_tests = struct
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ~validation_callback
-      ?proposed_protocol_version_opt () =
+      ~delta_transition_chain_proof ?proposed_protocol_version_opt () =
     Protocol_version.(set_current zero) ;
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ~validation_callback
-      ?proposed_protocol_version_opt ()
+      ~delta_transition_chain_proof ?proposed_protocol_version_opt ()
 
   let genesis ~precomputed_values =
     Protocol_version.(set_current zero) ;

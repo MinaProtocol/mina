@@ -159,11 +159,11 @@ module Call_forest = struct
         { elt = node; stack_hash = hash_cons node_hash (hash xs) } :: xs
 
   let accumulate_hashes' xs =
-    let hash_party (p : Party.t) = Party.Preconditioned.digest p.data in
+    let hash_party (p : Party.t) = Party.digest p in
     accumulate_hashes ~hash_party xs
 
   let accumulate_hashes_predicated xs =
-    accumulate_hashes ~hash_party:Party.Preconditioned.digest xs
+    accumulate_hashes ~hash_party:Party.digest xs
 
   module With_hashes = struct
     [%%versioned
@@ -179,13 +179,13 @@ module Call_forest = struct
 
     let empty = empty
 
-    let hash_party ((p : Party.t), _) = Party.Preconditioned.digest p.data
+    let hash_party ((p : Party.t), _) = Party.digest p
 
     let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
 
     let of_parties_list xs : _ t =
       of_parties_list
-        ~party_depth:(fun ((p : Party.t), _) -> p.data.body.call_depth)
+        ~party_depth:(fun ((p : Party.t), _) -> p.body.call_depth)
         xs
       |> accumulate_hashes
 
@@ -231,10 +231,10 @@ end
 
 let check_depths (t : t) =
   try
-    assert (t.fee_payer.data.body.call_depth = 0) ;
+    assert (t.fee_payer.body.call_depth = 0) ;
     let (_ : int) =
       List.fold ~init:0 t.other_parties ~f:(fun depth party ->
-          let new_depth = party.data.body.call_depth in
+          let new_depth = party.body.call_depth in
           if new_depth >= 0 && new_depth <= depth + 1 then new_depth
           else assert false)
     in
@@ -245,24 +245,16 @@ let check (t : t) : bool = check_depths t
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
-  let body = Party.Body.of_fee_payer p.data.body in
-  { authorization = Control.Signature p.authorization
-  ; data =
-      { body
-      ; account_precondition =
-          Party.Account_precondition.Nonce p.data.account_precondition
-      }
-  }
-  :: t.other_parties
+  Party.of_fee_payer p :: t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.data.body.balance_change
+let fee (t : t) : Currency.Fee.t = t.fee_payer.body.balance_change
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
 let fee_payer (t : t) = Party.Fee_payer.account_id (fee_payer_party t)
 
 let nonce (t : t) : Account.Nonce.t =
-  (fee_payer_party t).data.account_precondition
+  (fee_payer_party t).body.account_precondition
 
 let fee_token (_t : t) = Token_id.default
 
@@ -271,16 +263,14 @@ let fee_excess (t : t) =
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
-      Account_id.create p.data.body.public_key p.data.body.token_id)
+      Account_id.create p.body.public_key p.body.token_id)
   |> List.stable_dedup
 
-let fee_payer_pk (t : t) = t.fee_payer.data.body.public_key
+let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
 module Virtual = struct
-  module First_party = Party
-
   module Bool = struct
     type t = bool
 
@@ -413,7 +403,7 @@ let commitment (t : t) : Transaction_commitment.t =
       (Call_forest.With_hashes.other_parties_hash t.other_parties)
     ~protocol_state_predicate_hash:
       (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.data.body.protocol_state_precondition)
+         t.fee_payer.body.protocol_state_precondition)
     ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
@@ -466,17 +456,10 @@ let arg_query_string x =
 
 let dummy =
   let party : Party.t =
-    { data =
-        { body = Party.Body.dummy
-        ; account_precondition = Party.Account_precondition.Accept
-        }
-    ; authorization = Control.dummy_of_tag Signature
-    }
+    { body = Party.Body.dummy; authorization = Control.dummy_of_tag Signature }
   in
   let fee_payer : Party.Fee_payer.t =
-    { data = Party.Preconditioned.Fee_payer.dummy
-    ; authorization = Signature.dummy
-    }
+    { body = Party.Body.Fee_payer.dummy; authorization = Signature.dummy }
   in
   { fee_payer; other_parties = [ party ]; memo = Signed_command_memo.empty }
 

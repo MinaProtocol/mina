@@ -834,6 +834,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "accountPrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -972,64 +988,6 @@
                 }
               },
               "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyPreconditionedFeePayerInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountPrecondition",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "body",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
             },
             {
               "name": "accountPrecondition",
@@ -1056,7 +1014,7 @@
           "description": null,
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -1064,7 +1022,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPreconditionedFeePayerInput",
+                  "name": "FeePayerPartyBodyInput",
                   "ofType": null
                 }
               },
@@ -1090,14 +1048,14 @@
           ],
           "inputFields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPreconditionedFeePayerInput",
+                  "name": "FeePayerPartyBodyInput",
                   "ofType": null
                 }
               },
@@ -2612,404 +2570,6 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyBodyInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "update",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "balanceChange",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BalanceChangeInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "incrementNonce",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "events",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "Field",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "sequenceEvents",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "Field",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "protocolStatePrecondition",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "useFullCommitment",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "publicKey",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "update",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "balanceChange",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "BalanceChangeInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "incrementNonce",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "events",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "Field",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "sequenceEvents",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "Field",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "callData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "protocolStatePrecondition",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "useFullCommitment",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
           "name": "BalanceIntervalInput",
           "description": null,
           "fields": [
@@ -3318,11 +2878,43 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyPreconditionedInput",
+          "name": "PartyBodyInput",
           "description": null,
           "fields": [
             {
-              "name": "body",
+              "name": "publicKey",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "tokenId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "update",
               "description": null,
               "args": [],
               "type": {
@@ -3330,7 +2922,147 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "PartyUpdateInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "balanceChange",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "BalanceChangeInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "events",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "Field",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sequenceEvents",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "Field",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callData",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callDepth",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "protocolStatePrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -3352,18 +3084,188 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "useFullCommitment",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
             {
-              "name": "body",
+              "name": "publicKey",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "tokenId",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "update",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "PartyUpdateInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "balanceChange",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "BalanceChangeInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "events",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "Field",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "sequenceEvents",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "Field",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callData",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callDepth",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "protocolStatePrecondition",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
@@ -3378,6 +3280,20 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "AccountPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "useFullCommitment",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },
@@ -3450,7 +3366,7 @@
           "description": "A party to a zkApp transaction",
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -3458,7 +3374,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPreconditionedInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -3484,14 +3400,14 @@
           ],
           "inputFields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPreconditionedInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -7237,6 +7153,22 @@
               "deprecationReason": null
             },
             {
+              "name": "accountPrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountPrecondition",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "useFullCommitment",
               "description": null,
               "args": [],
@@ -7260,8 +7192,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappPartyPreconditioned",
-          "description": null,
+          "name": "ZkappParty",
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "body",
@@ -7273,49 +7205,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "PartyBody",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountPrecondition",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "AccountPrecondition",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ZkappParty",
-          "description": "A party to a zkApp transaction",
-          "fields": [
-            {
-              "name": "data",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ZkappPartyPreconditioned",
                   "ofType": null
                 }
               },
@@ -8409,33 +8298,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ZkappPartyPreconditionedFeePayer",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "FeePayerPartyBody",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             },
             {
               "name": "accountPrecondition",
@@ -8465,7 +8327,7 @@
           "description": null,
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -8473,7 +8335,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappPartyPreconditionedFeePayer",
+                  "name": "FeePayerPartyBody",
                   "ofType": null
                 }
               },

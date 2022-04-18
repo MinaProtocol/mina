@@ -2430,8 +2430,7 @@ let%test_module "staged ledger tests" =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
-                Party.Preconditioned.of_fee_payer parties.fee_payer.data
-                |> Party.Preconditioned.digest
+                Party.of_fee_payer parties.fee_payer |> Party.digest
               in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -2471,11 +2470,11 @@ let%test_module "staged ledger tests" =
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
                 List.map parties.other_parties
-                  ~f:(fun { data; authorization } ->
+                  ~f:(fun { body; authorization } ->
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
-                          let pk = data.body.public_key in
+                          let pk = body.public_key in
                           let sk =
                             match
                               Signature_lib.Public_key.Compressed.Map.find
@@ -2491,18 +2490,16 @@ let%test_module "staged ledger tests" =
                                    .to_base58_check pk)
                                   ()
                           in
-                          let use_full_commitment =
-                            data.body.use_full_commitment
-                          in
+                          let use_full_commitment = body.use_full_commitment in
                           let signature =
                             sign_for_other_party ~use_full_commitment sk
-                              data.body.protocol_state_precondition
+                              body.protocol_state_precondition
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->
                           authorization
                     in
-                    { Party.data
+                    { Party.body
                     ; authorization = authorization_with_valid_signature
                     })
               in

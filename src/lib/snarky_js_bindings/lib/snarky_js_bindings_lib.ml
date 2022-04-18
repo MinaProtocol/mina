@@ -1753,6 +1753,13 @@ module Ledger = struct
     ; vestingIncrement : js_uint64 Js.prop >
     Js.t
 
+  module Account_precondition = struct
+    type precondition
+
+    type t =
+      < type_ : Js.js_string Js.t Js.prop ; value : precondition Js.prop > Js.t
+  end
+
   type party_body =
     < publicKey : public_key Js.prop
     ; update : party_update Js.prop
@@ -1763,6 +1770,22 @@ module Ledger = struct
     ; callData : js_field Js.prop
     ; depth : int Js.prop
     ; protocolState : protocol_state_predicate Js.prop
+    ; accountPrecondition : Account_precondition.t Js.prop
+    ; useFullCommitment : js_bool Js.prop
+    ; incrementNonce : js_bool Js.prop >
+    Js.t
+
+  type fee_payer_party_body =
+    < publicKey : public_key Js.prop
+    ; update : party_update Js.prop
+    ; tokenId : js_field Js.prop
+    ; delta : js_int64 Js.prop
+    ; events : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; sequenceEvents : js_field Js.js_array Js.t Js.js_array Js.t Js.prop
+    ; callData : js_field Js.prop
+    ; depth : int Js.prop
+    ; protocolState : protocol_state_predicate Js.prop
+    ; accountPrecondition : js_uint32 Js.prop
     ; useFullCommitment : js_bool Js.prop
     ; incrementNonce : js_bool Js.prop >
     Js.t
@@ -1778,19 +1801,11 @@ module Ledger = struct
     ; provedState : bool_class Js.t or_ignore Js.prop >
     Js.t
 
-  module Party_predicate = struct
-    type party_predicate
+  (*Reviewer: Leave this structure as is for authorization to be added later or
+    should it be an alias of party_body?*)
+  type party = < body : party_body Js.prop > Js.t
 
-    type t =
-      < type_ : Js.js_string Js.t Js.prop ; value : party_predicate Js.prop >
-      Js.t
-  end
-
-  type party =
-    < body : party_body Js.prop ; predicate : Party_predicate.t Js.prop > Js.t
-
-  type fee_payer_party =
-    < body : party_body Js.prop ; predicate : js_uint32 Js.prop > Js.t
+  type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
 
   type parties =
     < feePayer : fee_payer_party Js.prop
@@ -2020,6 +2035,40 @@ module Ledger = struct
              e##.epochLength)
     }
 
+  let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
+    match Js.to_string t##.type_ with
+    | "accept" ->
+        Accept
+    | "nonce" ->
+        Nonce
+          (Mina_numbers.Account_nonce.of_uint32
+             (uint32 (Obj.magic t##.value : js_uint32)))
+    | "full" ->
+        let p : full_account_predicate = Obj.magic t##.value in
+        Full
+          { balance =
+              Check
+                (closed_interval
+                   (Fn.compose Currency.Balance.of_uint64 uint64)
+                   p##.balance)
+          ; nonce =
+              Check
+                (closed_interval
+                   (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
+                   p##.nonce)
+          ; receipt_chain_hash = or_ignore field p##.receiptChainHash
+          ; public_key = or_ignore public_key p##.publicKey
+          ; delegate = or_ignore public_key p##.delegate
+          ; state =
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
+          ; sequence_state = or_ignore field p##.sequenceState
+          ; proved_state =
+              or_ignore (fun x -> Js.to_bool x##toBoolean) p##.provedState
+          }
+    | s ->
+        failwithf "bad predicate type: %s" s ()
+
   let protocol_state (p : protocol_state_predicate) :
       Zkapp_precondition.Protocol_state.t =
     let ( ^ ) = Fn.compose in
@@ -2102,9 +2151,10 @@ module Ledger = struct
     ; increment_nonce = bool b##.incrementNonce
     ; use_full_commitment = bool b##.useFullCommitment
     ; protocol_state_precondition = protocol_state b##.protocolState
+    ; account_precondition = predicate b##.accountPrecondition
     }
 
-  let fee_payer_body (b : party_body) : Party.Body.Fee_payer.t =
+  let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
     { public_key = public_key b##.publicKey
     ; update = update b##.update
     ; token_id = ()
@@ -2124,65 +2174,26 @@ module Ledger = struct
     ; increment_nonce = ()
     ; use_full_commitment = ()
     ; protocol_state_precondition = protocol_state b##.protocolState
-    }
-
-  let fee_payer_party (party : fee_payer_party) :
-      Party.Preconditioned.Fee_payer.t =
-    { body = fee_payer_body party##.body
     ; account_precondition =
-        uint32 party##.predicate |> Mina_numbers.Account_nonce.of_uint32
+        uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
     }
 
-  let predicate (t : Party_predicate.t) : Party.Account_precondition.t =
-    match Js.to_string t##.type_ with
-    | "accept" ->
-        Accept
-    | "nonce" ->
-        Nonce
-          (Mina_numbers.Account_nonce.of_uint32
-             (uint32 (Obj.magic t##.value : js_uint32)))
-    | "full" ->
-        let p : full_account_predicate = Obj.magic t##.value in
-        Full
-          { balance =
-              Check
-                (closed_interval
-                   (Fn.compose Currency.Balance.of_uint64 uint64)
-                   p##.balance)
-          ; nonce =
-              Check
-                (closed_interval
-                   (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
-                   p##.nonce)
-          ; receipt_chain_hash = or_ignore field p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
-          ; delegate = or_ignore public_key p##.delegate
-          ; state =
-              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
-                ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
-          ; sequence_state = or_ignore field p##.sequenceState
-          ; proved_state =
-              or_ignore (fun x -> Js.to_bool x##toBoolean) p##.provedState
-          }
-    | s ->
-        failwithf "bad predicate type: %s" s ()
+  let fee_payer_party_body (party : fee_payer_party) : Party.Body.Fee_payer.t =
+    fee_payer_body party##.body
 
-  let party (party : party) : Party.Preconditioned.t =
-    { body = body party##.body
-    ; account_precondition = predicate party##.predicate
-    }
+  let party_body (party : party) : Party.Body.t = body party##.body
 
   (* TODO: enable proper authorization *)
   (* the fact that we don't leads to mock tx with state update being rejected *)
   let parties (parties : parties) : Parties.t =
     { fee_payer =
-        { data = fee_payer_party parties##.feePayer
+        { body = fee_payer_party_body parties##.feePayer
         ; authorization = Mina_base.Signature.dummy
         }
     ; other_parties =
         Js.to_array parties##.otherParties
         |> Array.map ~f:(fun p : Party.t ->
-               { data = party p; authorization = None_given })
+               { body = party_body p; authorization = None_given })
         |> Array.to_list
     ; memo = Mina_base.Signed_command_memo.empty
     }
@@ -2328,6 +2339,51 @@ module Ledger = struct
       ; next_epoch_data = epoch_data p##.nextEpochData
       }
 
+    let predicate_accept () : Party.Account_precondition.Checked.t =
+      let pk_dummy = public_key_dummy () in
+      { balance = numeric balance max_interval_uint64
+      ; nonce = numeric nonce max_interval_uint32
+      ; receipt_chain_hash =
+          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
+      ; public_key = ignore pk_dummy
+      ; delegate = ignore pk_dummy
+      ; state =
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+              ignore Field.zero)
+      ; sequence_state = ignore Field.zero
+      ; proved_state = ignore Boolean.false_
+      }
+
+    let predicate (t : Account_precondition.t) :
+        Party.Account_precondition.Checked.t =
+      match Js.to_string t##.type_ with
+      | "accept" ->
+          predicate_accept ()
+      | "nonce" ->
+          let nonce_js : js_uint32 = Obj.magic t##.value in
+          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
+      | "full" ->
+          let ( ^ ) = Fn.compose in
+          let predicate : full_account_predicate = Obj.magic t##.value in
+          { balance = numeric balance predicate##.balance
+          ; nonce = numeric nonce predicate##.nonce
+          ; receipt_chain_hash =
+              or_ignore
+                (* TODO: assumes constant *)
+                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
+                predicate##.receiptChainHash
+          ; public_key = or_ignore public_key predicate##.publicKey
+          ; delegate = or_ignore public_key predicate##.delegate
+          ; state =
+              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                ~f:(fun i ->
+                  or_ignore field (array_get_exn predicate##.state i))
+          ; sequence_state = or_ignore field predicate##.sequenceState
+          ; proved_state = or_ignore bool predicate##.provedState
+          }
+      | s ->
+          failwithf "bad predicate type: %s" s ()
+
     let timing_info_dummy () : Party.Update.Timing_info.Checked.t =
       { initial_minimum_balance =
           Currency.Balance.Checked.Unsafe.of_field Field.zero
@@ -2390,75 +2446,80 @@ module Ledger = struct
       ; increment_nonce = bool b##.incrementNonce
       ; use_full_commitment = bool b##.useFullCommitment
       ; protocol_state_precondition = protocol_state b##.protocolState
+      ; account_precondition = predicate b##.accountPrecondition
       }
 
-    let fee_payer_party (party : fee_payer_party) :
-        Party.Preconditioned.Fee_payer.Checked.t =
-      { (* TODO: is it OK that body is the same for fee_payer as for party?
+    let fee_payer_body (b : fee_payer_party_body) : Party.Body.Checked.t =
+      let account_precondition =
+        let nonce_js : js_uint32 = Obj.magic b##.accountPrecondition##.value in
+        { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
+      in
+      (*TODO: duplicated most of the function body above*)
+      let update : Party.Update.Checked.t =
+        let u = b##.update in
+        { app_state =
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+                set_or_keep field (array_get_exn u##.appState i))
+        ; delegate = set_or_keep public_key u##.delegate
+        ; (* TODO *) verification_key =
+            keep
+              { Zkapp_basic.Flagged_option.is_some = Boolean.false_
+              ; data =
+                  Mina_base.Data_as_hash.make_unsafe
+                    (Field.constant @@ Mina_base.Zkapp_account.dummy_vk_hash ())
+                    (As_prover.Ref.create (fun () ->
+                         { With_hash.data = None; hash = Field.Constant.zero }))
+              }
+        ; permissions = keep Mina_base.Permissions.(Checked.constant empty)
+        ; zkapp_uri =
+            keep
+              (Mina_base.Data_as_hash.make_unsafe Field.zero
+                 (As_prover.Ref.create (fun () -> "")))
+        ; token_symbol = keep Field.zero
+        ; timing = keep (timing_info_dummy ())
+        ; voting_for =
+            Zkapp_basic.Set_or_keep.Checked.map
+              (set_or_keep field u##.votingFor)
+              ~f:Mina_base.State_hash.var_of_hash_packed
+        }
+      in
+      { public_key = public_key b##.publicKey
+      ; update
+      ; token_id = token_id b##.tokenId
+      ; balance_change = int64 b##.delta
+      ; events = events b##.events
+      ; sequence_events = events b##.sequenceEvents
+      ; call_data = field b##.callData
+      ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
+      ; increment_nonce = bool b##.incrementNonce
+      ; use_full_commitment = bool b##.useFullCommitment
+      ; protocol_state_precondition = protocol_state b##.protocolState
+      ; account_precondition
+      }
+
+    let fee_payer_party (party : fee_payer_party) : Party.Checked.t =
+      (* TODO: is it OK that body is the same for fee_payer as for party?
            what about fee vs. delta and other differences in the unchecked version?
-        *)
-        body = body party##.body
-      ; account_precondition = nonce party##.predicate
-      }
+      *)
+      fee_payer_body party##.body
 
-    let predicate_accept () : Party.Account_precondition.Checked.t =
-      let pk_dummy = public_key_dummy () in
-      { balance = numeric balance max_interval_uint64
-      ; nonce = numeric nonce max_interval_uint32
-      ; receipt_chain_hash =
-          ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
-      ; public_key = ignore pk_dummy
-      ; delegate = ignore pk_dummy
-      ; state =
-          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
-              ignore Field.zero)
-      ; sequence_state = ignore Field.zero
-      ; proved_state = ignore Boolean.false_
-      }
-
-    let predicate (t : Party_predicate.t) : Party.Account_precondition.Checked.t
-        =
-      match Js.to_string t##.type_ with
-      | "accept" ->
-          predicate_accept ()
-      | "nonce" ->
-          let nonce_js : js_uint32 = Obj.magic t##.value in
-          { (predicate_accept ()) with nonce = numeric_equal nonce nonce_js }
-      | "full" ->
-          let ( ^ ) = Fn.compose in
-          let predicate : full_account_predicate = Obj.magic t##.value in
-          { balance = numeric balance predicate##.balance
-          ; nonce = numeric nonce predicate##.nonce
-          ; receipt_chain_hash =
-              or_ignore
-                (* TODO: assumes constant *)
-                (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
-                predicate##.receiptChainHash
-          ; public_key = or_ignore public_key predicate##.publicKey
-          ; delegate = or_ignore public_key predicate##.delegate
-          ; state =
-              Pickles_types.Vector.init Zkapp_state.Max_state_size.n
-                ~f:(fun i ->
-                  or_ignore field (array_get_exn predicate##.state i))
-          ; sequence_state = or_ignore field predicate##.sequenceState
-          ; proved_state = or_ignore bool predicate##.provedState
-          }
-      | s ->
-          failwithf "bad predicate type: %s" s ()
-
-    let party (party : party) : Party.Preconditioned.Checked.t =
-      { body = body party##.body
-      ; account_precondition = predicate party##.predicate
-      }
+    let party (party : party) : Party.Checked.t = body party##.body
   end
 
   (* TODO hash two parties together in the correct way *)
 
   let hash_party (p : party) =
-    p |> party |> Party.Preconditioned.digest |> Field.constant |> to_js_field
+    let party =
+      (*using dummy authorization to construct Party.t. Alternatively, one
+        could use Party.Body.digest which is what Party.digest calls*)
+      { Party.body = p |> party_body
+      ; authorization = Signature Mina_base.Signature.dummy
+      }
+    in
+    Party.digest party |> Field.constant |> to_js_field
 
   let hash_party_checked p =
-    p |> Checked.party |> Party.Preconditioned.Checked.digest |> to_js_field
+    p |> Checked.party |> Party.Checked.digest |> to_js_field
 
   let hash_protocol_state (p : protocol_state_predicate) =
     p |> protocol_state |> Zkapp_precondition.Protocol_state.digest

@@ -1311,6 +1311,130 @@ module Snapp_helpers = struct
       ; next_epoch_data
       }
     in
+    let%bind (account_precondition : Party.Account_precondition.t) =
+      let%bind account_precondition_data =
+        query_db pool ~item:"ZkApp account precondition" ~f:(fun db ->
+            Processor.Zkapp_account_precondition.load db
+              body_data.zkapp_account_precondition_id)
+      in
+      match account_precondition_data.kind with
+      | Full ->
+          let%bind zkapp_account_data =
+            match account_precondition_data.account_id with
+            | None ->
+                failwith
+                  "Expected account id for account precondition of kind Full"
+            | Some account_id ->
+                query_db pool ~item:"Snapp account" ~f:(fun db ->
+                    Processor.Zkapp_account.load db account_id)
+          in
+          let%map zkapp_account =
+            let%bind balance =
+              match zkapp_account_data.balance_id with
+              | None ->
+                  return Zkapp_basic.Or_ignore.Ignore
+              | Some balance_id ->
+                  let%map bounds =
+                    query_db pool ~item:"Snapp balance" ~f:(fun db ->
+                        Processor.Zkapp_balance_bounds.load db balance_id)
+                  in
+                  let to_balance i64 =
+                    i64 |> Unsigned.UInt64.of_int64
+                    |> Currency.Balance.of_uint64
+                  in
+                  let lower = to_balance bounds.balance_lower_bound in
+                  let upper = to_balance bounds.balance_upper_bound in
+                  Zkapp_basic.Or_ignore.Check
+                    ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
+            in
+            let%bind nonce =
+              match zkapp_account_data.nonce_id with
+              | None ->
+                  return Zkapp_basic.Or_ignore.Ignore
+              | Some balance_id ->
+                  let%map bounds =
+                    query_db pool ~item:"Snapp nonce" ~f:(fun db ->
+                        Processor.Zkapp_nonce_bounds.load db balance_id)
+                  in
+                  let to_nonce i64 =
+                    i64 |> Unsigned.UInt32.of_int64
+                    |> Mina_numbers.Account_nonce.of_uint32
+                  in
+                  let lower = to_nonce bounds.nonce_lower_bound in
+                  let upper = to_nonce bounds.nonce_upper_bound in
+                  Zkapp_basic.Or_ignore.Check
+                    ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
+            in
+            let receipt_chain_hash =
+              Option.value_map zkapp_account_data.receipt_chain_hash
+                ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
+                  Zkapp_basic.Or_ignore.Check
+                    (Receipt.Chain_hash.of_base58_check_exn s))
+            in
+            let pk_check_or_ignore_of_id id =
+              Option.value_map id ~default:(return Zkapp_basic.Or_ignore.Ignore)
+                ~f:(fun pk_id ->
+                  let%map pk = pk_of_pk_id pool pk_id in
+                  Zkapp_basic.Or_ignore.Check pk)
+            in
+            let%bind public_key =
+              pk_check_or_ignore_of_id zkapp_account_data.public_key_id
+            in
+            let%bind delegate =
+              pk_check_or_ignore_of_id zkapp_account_data.delegate_id
+            in
+            let%bind state =
+              let%bind snapp_state_ids =
+                query_db pool ~item:"Snapp state id" ~f:(fun db ->
+                    Processor.Zkapp_states.load db zkapp_account_data.state_id)
+              in
+              let%map state_data = state_data_of_ids ~pool snapp_state_ids in
+              Array.map state_data ~f:Zkapp_basic.Or_ignore.of_option
+              |> Array.to_list |> Pickles_types.Vector.Vector_8.of_list_exn
+            in
+            let%bind sequence_state =
+              Option.value_map zkapp_account_data.sequence_state_id
+                ~default:(return Zkapp_basic.Or_ignore.Ignore)
+                ~f:(fun state_id ->
+                  let%map state_data_str =
+                    query_db pool ~item:"Snapp state data" ~f:(fun db ->
+                        Processor.Zkapp_state_data.load db state_id)
+                  in
+                  let state_data =
+                    Pickles.Backend.Tick.Field.of_string state_data_str
+                  in
+                  Zkapp_basic.Or_ignore.Check state_data)
+            in
+            let proved_state =
+              Option.value_map zkapp_account_data.proved_state
+                ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
+                  Zkapp_basic.Or_ignore.Check b)
+            in
+            return
+              ( { balance
+                ; nonce
+                ; receipt_chain_hash
+                ; public_key
+                ; delegate
+                ; state
+                ; sequence_state
+                ; proved_state
+                }
+                : Zkapp_precondition.Account.t )
+          in
+          Party.Account_precondition.Full zkapp_account
+      | Nonce -> (
+          match account_precondition_data.nonce with
+          | None ->
+              failwith "Expected nonce for account precondition of kind Nonce"
+          | Some nonce ->
+              return
+                (Party.Account_precondition.Nonce
+                   (Mina_numbers.Account_nonce.of_uint32
+                      (Unsigned.UInt32.of_int64 nonce))) )
+      | Accept ->
+          return Party.Account_precondition.Accept
+    in
     let use_full_commitment = body_data.use_full_commitment in
     return
       ( { public_key
@@ -1323,6 +1447,7 @@ module Snapp_helpers = struct
         ; call_data
         ; call_depth
         ; protocol_state_precondition
+        ; account_precondition
         ; use_full_commitment
         }
         : Party.Body.t )
@@ -1341,6 +1466,17 @@ module Snapp_helpers = struct
             "fee_payer_body_of_id: expected positive balance change for fee \
              payer"
     in
+    let fee_payer_account_precondition =
+      match body.account_precondition with
+      | Party.Account_precondition.Nonce n ->
+          n
+      | p ->
+          failwith
+            (sprintf
+               "Expected Nonce for fee payer account precondition but received \
+                %s"
+               (Party.Account_precondition.to_yojson p |> Yojson.Safe.to_string))
+    in
     ( { public_key = body.public_key
       ; update = body.update
       ; token_id = ()
@@ -1351,6 +1487,7 @@ module Snapp_helpers = struct
       ; call_data = body.call_data
       ; call_depth = body.call_depth
       ; protocol_state_precondition = body.protocol_state_precondition
+      ; account_precondition = fee_payer_account_precondition
       ; use_full_commitment = ()
       }
       : Party.Body.Fee_payer.t )
@@ -1364,17 +1501,10 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
       ~item:"Snapp fee payer"
   in
   let%bind (fee_payer : Party.Fee_payer.t) =
-    let%bind (data : Party.Preconditioned.Fee_payer.t) =
-      let%bind (body : Party.Body.Fee_payer.t) =
-        Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
-      in
-      let account_precondition =
-        fee_payer_data.nonce |> Unsigned.UInt32.of_int64
-        |> Mina_numbers.Account_nonce.of_uint32
-      in
-      return { Party.Preconditioned.Poly.body; account_precondition }
+    let%bind (body : Party.Body.Fee_payer.t) =
+      Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
     in
-    return { Party.Fee_payer.data; authorization = Signature.dummy }
+    return { Party.Fee_payer.body; authorization = Signature.dummy }
   in
   let%bind (other_parties : Party.t list) =
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
@@ -1535,7 +1665,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
           | Control.Tag.None_given ->
               Control.None_given
         in
-        return ({ data; authorization } : Party.t))
+        return ({ body; authorization } : Party.t))
   in
   (* memo contents don't affect ability to replay snapp *)
   let memo = Mina_base.Signed_command_memo.dummy in
