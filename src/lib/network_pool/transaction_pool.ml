@@ -3,7 +3,7 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests. *)
+(* Only show stdout for failed inline tests.*)
 open Inline_test_quiet_logs
 open Core
 open Async
@@ -80,7 +80,7 @@ module Diff_versioned = struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
       end
@@ -169,16 +169,16 @@ module Diff_versioned = struct
 
       module V3 = struct
         type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, yojson]
+    type t = Stable.Latest.t [@@deriving sexp, yojson, compare]
   end
 
-  type rejected = Rejected.t [@@deriving sexp, yojson]
+  type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
   type verified =
     { accepted :
@@ -248,6 +248,7 @@ struct
   type verification_failure =
     | Command_failure of Indexed_pool.Command_error.t
     | Invalid_failure of Verifier.invalid
+  [@@deriving to_yojson]
 
   module Breadcrumb = Transition_frontier.Breadcrumb
 
@@ -932,18 +933,19 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
       end
 
       module Rejected = struct
-        type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
+        type t = (User_command.t * Diff_error.t) list
+        [@@deriving sexp, yojson, compare]
 
         type _unused = unit constraint t = Diff_versioned.Rejected.t
       end
 
-      type rejected = Rejected.t [@@deriving sexp, yojson]
+      type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
       type verified = Diff_versioned.verified =
         { accepted :
@@ -1353,7 +1355,6 @@ struct
                   let data =
                     List.filter_map diffs' ~f:(function
                       | Error (`Invalid_command | `Other_command_failed) ->
-                          (* If this happens, we should be in the Error branch for !failure above *)
                           assert false
                       | Error `Account_not_found ->
                           (* We can just skip this set of commands *)
@@ -1775,13 +1776,14 @@ let%test_module _ =
       in
       assert (List.is_sorted txns ~compare)
 
-    let setup_test () =
+    let setup_test ?expiry () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
+      let expiry_ns = match expiry with None -> expiry_ns | Some t -> t in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~expiry_ns ~frontier_broadcast_pipe:tf_pipe_r
@@ -2084,7 +2086,7 @@ let%test_module _ =
           mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
             (mk_parties_cmds' pool))
 
-    let mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
+    let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
         () =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
@@ -2099,7 +2101,56 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_int amount
                 }))
 
-    let mk_payment ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ()
+    let mk_parties ?valid_period ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
+        ~nonce ~amount () =
+      let sender_kp = test_keys.(sender_idx) in
+      let sender_nonce = Account.Nonce.of_int nonce in
+      let sender = (sender_kp, sender_nonce) in
+      let amount = Currency.Amount.of_int amount in
+      let receiver_kp = test_keys.(receiver_idx) in
+      let receiver =
+        receiver_kp.public_key |> Signature_lib.Public_key.compress
+      in
+      let fee_payer =
+        match fee_payer_idx with
+        | None ->
+            None
+        | Some (idx, nonce) ->
+            let fee_payer_kp = test_keys.(idx) in
+            let fee_payer_nonce = Account.Nonce.of_int nonce in
+            Some (fee_payer_kp, fee_payer_nonce)
+      in
+      let fee = Currency.Fee.of_int fee in
+      let protocol_state_precondition =
+        match valid_period with
+        | None ->
+            Zkapp_precondition.Protocol_state.accept
+        | Some time ->
+            Zkapp_precondition.Protocol_state.valid_until time
+      in
+      let test_spec : Transaction_snark.For_tests.Spec.t =
+        { sender
+        ; fee_payer
+        ; fee
+        ; receivers = [ (receiver, amount) ]
+        ; amount
+        ; zkapp_account_keypairs = []
+        ; memo = Signed_command_memo.create_from_string_exn "expiry tests"
+        ; new_zkapp_account = false
+        ; snapp_update = Party.Update.dummy
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        }
+      in
+      let parties =
+        Transaction_snark.For_tests.multiple_transfers
+          ~protocol_state_precondition test_spec
+      in
+      User_command.Parties parties
+
+    let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
         =
       User_command.Signed_command
         (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
@@ -2238,7 +2289,8 @@ let%test_module _ =
             (mk_parties_cmds pool))
 
     let%test_unit "Expired transactions that are already in the pool are \
-                   removed from the pool when best tip changes (user cmds)" =
+                   removed from the pool when best tip changes (user commands)"
+        =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
@@ -2357,6 +2409,179 @@ let%test_module _ =
           let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           Deferred.unit)
+
+    let%test_unit "Expired transactions that are already in the pool are \
+                   removed from the pool when best tip changes (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let eight_block_time =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * 8L)
+            |> Int64.to_int |> Option.value_exn |> Time_ns.Span.of_int_ms
+          in
+          (* Since expiration for zkapp and transaction_pool uses the same constant, so I use the duration_of_the_test which is 8_slot + 1 sec as the expiration, so that the transaction won't be expired before the test is over. *)
+          let expiry = Time_ns.Span.(eight_block_time + of_sec 1.) in
+          let eight_block =
+            Block_time.Span.of_time_span
+            @@ Time_ns.Span.to_span_float_round_nearest eight_block_time
+          in
+          let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
+            setup_test ~expiry ()
+          in
+          assert_pool_txs [] ;
+          let curr_time =
+            Block_time.sub (Block_time.of_time (Time.now ())) eight_block
+          in
+          let n_block_times n =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * n)
+            |> Block_time.Span.of_ms
+          in
+          let three_slot = n_block_times 3L in
+          let seven_slot = n_block_times 7L in
+          let curr_time_plus_three = Block_time.add curr_time three_slot in
+          let curr_time_plus_seven = Block_time.add curr_time seven_slot in
+          let few_now =
+            List.take independent_cmds (List.length independent_cmds / 2)
+          in
+          let expires_later1 =
+            mk_parties
+              ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
+              ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ()
+          in
+          let expires_later2 =
+            mk_parties
+              ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
+              ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
+          in
+          let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
+          let cmds_wo_check =
+            List.map valid_commands ~f:User_command.forget_check
+          in
+          let%bind apply_res = verify_and_apply pool cmds_wo_check in
+          [%test_eq: pool_apply]
+            (accepted_commands apply_res)
+            (Ok cmds_wo_check) ;
+          assert_pool_txs cmds_wo_check ;
+          (* new commands from best tip diff should be removed from the pool *)
+          (* update the nonce to be consistent with the commands in the block *)
+          map_set_multi !best_tip_ref
+            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2
+            ; mk_account ~idx:1 ~balance:1_000_000_000_000_000 ~nonce:2
+            ] ;
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands =
+                    List.map ~f:mk_with_status
+                      [ List.nth_exn few_now 0; expires_later1 ]
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check
+              (expires_later2 :: List.drop few_now 1)
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          (* Add new commands, remove old commands some of which are now expired *)
+          let expired_zkapp =
+            mk_parties
+              ~valid_period:{ lower = curr_time; upper = curr_time }
+              ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:3
+              ~receiver_idx:5 ~amount:1_000_000_000 ()
+          in
+          let unexpired_zkapp =
+            mk_parties
+              ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
+              ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:4
+              ~receiver_idx:9 ~amount:1_000_000_000 ()
+          in
+          let valid_forever = List.nth_exn few_now 0 in
+          let removed_commands =
+            [ valid_forever; expires_later1; expired_zkapp; unexpired_zkapp ]
+            |> List.map ~f:mk_with_status
+          in
+          let n_block_times n =
+            Int64.(
+              Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+              * n)
+            |> Block_time.Span.of_ms
+          in
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 3L))
+          in
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = [ mk_with_status valid_forever ]
+                ; removed_commands
+                ; reorg_best_tip = true
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          (* expired_command should not be in the pool because they are expired
+             and (List.nth few_now 0) because it was committed in a block
+          *)
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check
+              ( expires_later1 :: expires_later2 :: unexpired_zkapp
+              :: List.drop few_now 1 )
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          (* after 5 block times there should be no expired transactions *)
+          let%bind () =
+            after (Block_time.Span.to_time_span (n_block_times 5L))
+          in
+          let%bind _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = []
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          let cmds_wo_check =
+            List.map ~f:User_command.forget_check (List.drop few_now 1)
+          in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+          assert_pool_txs cmds_wo_check ;
+          Deferred.unit)
+
+    let%test_unit "Aged-based expiry (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let expiry = Time_ns.Span.of_sec 1. in
+          let%bind assert_pool_txs, pool, best_tip_diff_w, _ =
+            setup_test ~expiry ()
+          in
+          assert_pool_txs [] ;
+          let party_transfer =
+            mk_parties ~fee_payer_idx:(0, 0) ~sender_idx:1 ~receiver_idx:9
+              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0 ()
+          in
+          let valid_commands = [ party_transfer ] in
+          let cmds_wo_check =
+            List.map valid_commands ~f:User_command.forget_check
+          in
+          let%bind apply_res = verify_and_apply pool cmds_wo_check in
+          [%test_eq: pool_apply]
+            (accepted_commands apply_res)
+            (Ok cmds_wo_check) ;
+          assert_pool_txs cmds_wo_check ;
+          let%bind () = after (Time.Span.of_sec 2.) in
+          let%map _ =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              ( { new_commands = []
+                ; removed_commands = []
+                ; reorg_best_tip = false
+                }
+                : Mock_transition_frontier.best_tip_diff )
+          in
+          assert_pool_txs [])
 
     let%test_unit "Now-invalid transactions are removed from the pool when the \
                    transition frontier is recreated (user cmds)" =

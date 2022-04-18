@@ -1278,17 +1278,30 @@ module Protocol_state = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
+  let epoch_data : Epoch_data.t =
+    { ledger = { hash = Ignore; total_currency = Ignore }
+    ; seed = Ignore
+    ; start_checkpoint = Ignore
+    ; lock_checkpoint = Ignore
+    ; epoch_length = Ignore
+    }
+
   let accept : t =
-    let epoch_data : Epoch_data.t =
-      { ledger = { hash = Ignore; total_currency = Ignore }
-      ; seed = Ignore
-      ; start_checkpoint = Ignore
-      ; lock_checkpoint = Ignore
-      ; epoch_length = Ignore
-      }
-    in
     { snarked_ledger_hash = Ignore
     ; timestamp = Ignore
+    ; blockchain_length = Ignore
+    ; min_window_density = Ignore
+    ; last_vrf_output = ()
+    ; total_currency = Ignore
+    ; global_slot_since_hard_fork = Ignore
+    ; global_slot_since_genesis = Ignore
+    ; staking_epoch_data = epoch_data
+    ; next_epoch_data = epoch_data
+    }
+
+  let valid_until time : t =
+    { snarked_ledger_hash = Ignore
+    ; timestamp = Check time
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()

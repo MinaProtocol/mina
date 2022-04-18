@@ -29,6 +29,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -54,6 +55,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -78,6 +80,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -106,6 +109,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -136,6 +140,7 @@ let%test_module "Fee payer tests" =
               let test_spec : Spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
+                ; fee_payer = None
                 ; receivers = []
                 ; amount
                 ; zkapp_account_keypairs = [ fst spec.sender ]

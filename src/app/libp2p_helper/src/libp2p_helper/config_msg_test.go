@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"testing"
 	"time"
+	"os"
 
 	ipc "libp2p_ipc"
 
@@ -91,6 +92,9 @@ func TestDHTDiscovery_ThreeNodes(t *testing.T) {
 }
 
 func TestMDNSDiscovery(t *testing.T) {
+	if os.Getenv("NO_MDNS_TEST") != "" {
+		return
+	}
 	appA, appAPort := newTestApp(t, nil, true)
 	appA.NoDHT = true
 
