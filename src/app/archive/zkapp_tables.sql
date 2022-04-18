@@ -75,7 +75,7 @@ CREATE TABLE zkapp_permissions
 , edit_sequence_state      zkapp_auth_required_type    NOT NULL
 , set_token_symbol         zkapp_auth_required_type    NOT NULL
 , increment_nonce          zkapp_auth_required_type    NOT NULL
-, set_voting_for               zkapp_auth_required_type    NOT NULL
+, set_voting_for           zkapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE zkapp_timing_info

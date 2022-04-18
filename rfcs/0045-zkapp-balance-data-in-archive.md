@@ -112,7 +112,7 @@ single table, because they contain differing numbers of elements.
 Add a new table `accounts_created`:
 ```
   block_id            int                NOT NULL  REFERENCES blocks(id)
-  public_key_id       int                NOT NULL  REFERENCES public_keys(id)
+  account_id_id       int                NOT NULL  REFERENCES account_ids(id)
   creation_fee        bigint             NOT NULL
 ```
 
@@ -173,16 +173,6 @@ Information to be added:
   creation fees burned for the block, with fields for the public key
   of the created account and the fee amount. That information can be
   extracted from the scan state of the staged ledger in the breadcrumb.
-
-Types to modify:
-
-- The type `Mina_transaction_logic.Transaction_applied.Signed_command_applied`
-  contains the field `user_command` with a status, which will contain
-  the account creation fees.  Modify the nearby types
-  `Fee_transfer_applied` and `Coinbase_applied` to contain those
-  fees. We could use `With_status.t` for that purpose, or, since those
-  commands always succeed, add new fields to those types to hold the
-  account creation fee list.
 
 Removing the information from transaction statuses changes the
 structure of blocks, which use a versioned type. While the version

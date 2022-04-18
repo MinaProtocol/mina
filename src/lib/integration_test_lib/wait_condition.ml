@@ -178,9 +178,9 @@ struct
             let actual_status = cmd_with_status.With_status.status in
             let was_applied =
               match actual_status with
-              | Transaction_status.Applied _ ->
+              | Transaction_status.Applied ->
                   true
-              | _ ->
+              | Failed _ ->
                   false
             in
             if was_applied then Predicate_passed
@@ -232,7 +232,7 @@ struct
           let actual_status = cmd_with_status.With_status.status in
           let successful =
             match actual_status with
-            | Transaction_status.Applied _ ->
+            | Transaction_status.Applied ->
                 not has_failures
             | Failed _ ->
                 has_failures

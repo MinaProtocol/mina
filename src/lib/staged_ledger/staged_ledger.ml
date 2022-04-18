@@ -1677,8 +1677,6 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
-          ; internal_command_balances =
-              (* These will get filled in by the caller. *) []
           })
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1688,8 +1686,6 @@ module T = struct
       { commands = Sequence.to_list_rev res.commands_rev
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
-      ; internal_command_balances =
-          (* These will get filled in by the caller. *) []
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -1946,6 +1942,36 @@ module T = struct
                     (List.map ~f:List.rev detailed) )
               ] ;
         { Staged_ledger_diff.With_valid_signatures_and_proofs.diff })
+
+  let latest_block_accounts_created t ~previous_block_state_hash =
+    let scan_state = scan_state t in
+    (* filter leaves by state hash from previous block *)
+    let base_jobs =
+      Scan_state.base_jobs_on_latest_tree scan_state
+      @ Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state
+      |> List.filter ~f:(fun { state_hash = leaf_block_hash, _; _ } ->
+             State_hash.equal leaf_block_hash previous_block_state_hash)
+    in
+    let block_transactions_applied =
+      List.map base_jobs ~f:(fun { transaction_with_info; _ } ->
+          transaction_with_info.varying)
+    in
+    List.map block_transactions_applied ~f:(function
+      | Command (Signed_command cmd) -> (
+          match cmd.body with
+          | Payment { previous_empty_accounts } ->
+              previous_empty_accounts
+          | Stake_delegation _ ->
+              []
+          | Failed ->
+              [] )
+      | Command (Parties { previous_empty_accounts; _ }) ->
+          previous_empty_accounts
+      | Fee_transfer { previous_empty_accounts; _ } ->
+          previous_empty_accounts
+      | Coinbase { previous_empty_accounts; _ } ->
+          previous_empty_accounts)
+    |> List.concat
 end
 
 include T
@@ -2682,7 +2708,6 @@ let%test_module "staged ledger tests" =
                 @@ ( { completed_works = List.take completed_works job_count1
                      ; commands = List.take txns slots
                      ; coinbase = Zero
-                     ; internal_command_balances = []
                      }
                    , None )
             }
@@ -2692,7 +2717,6 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
-                ; internal_command_balances = []
                 }
               , Some
                   { completed_works =
@@ -2700,7 +2724,6 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
-                  ; internal_command_balances = []
                   } )
             in
             { diff = compute_statuses ~ledger ~coinbase_amount diff }
@@ -2710,7 +2733,6 @@ let%test_module "staged ledger tests" =
             ( { completed_works = []
               ; commands = []
               ; coinbase = Staged_ledger_diff.At_most_two.Zero
-              ; internal_command_balances = []
               }
             , None )
         }
@@ -2744,10 +2766,7 @@ let%test_module "staged ledger tests" =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
                              { With_status.data = (cmd :> User_command.t)
-                             ; status =
-                                 Applied
-                                   ( Transaction_status.Auxiliary_data.empty
-                                   , Transaction_status.Balance_data.empty )
+                             ; status = Applied
                              })
                     in
                     let diff =
@@ -3665,14 +3684,9 @@ let%test_module "staged ledger tests" =
                       { data = invalid_command
                       ; status =
                           Transaction_status.Failed
-                            ( Transaction_status.Failure.(
-                                Collection.of_single_failure
-                                  Amount_insufficient_to_create_account)
-                            , Transaction_status.Balance_data.
-                                { fee_payer_balance = None
-                                ; source_balance = None
-                                ; receiver_balance = None
-                                } )
+                            Transaction_status.Failure.(
+                              Collection.of_single_failure
+                                Amount_insufficient_to_create_account)
                       }
                   in
                   (*Replace the valid command with an invalid command)*)

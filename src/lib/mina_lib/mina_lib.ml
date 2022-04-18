@@ -11,7 +11,7 @@ open Network_peer
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
@@ -109,7 +109,7 @@ type t =
   ; snark_job_state : Work_selector.State.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
-  ; subscriptions : Coda_subscriptions.t
+  ; subscriptions : Mina_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
   ; precomputed_block_writer :
       ([ `Path of string ] option * [ `Log ] option) ref
@@ -681,10 +681,10 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
 let snark_job_state t = t.snark_job_state
 
 let add_block_subscriber t public_key =
-  Coda_subscriptions.add_block_subscriber t.subscriptions public_key
+  Mina_subscriptions.add_block_subscriber t.subscriptions public_key
 
 let add_payment_subscriber t public_key =
-  Coda_subscriptions.add_payment_subscriber t.subscriptions public_key
+  Mina_subscriptions.add_payment_subscriber t.subscriptions public_key
 
 let transaction_pool t = t.components.transaction_pool
 
@@ -1978,6 +1978,7 @@ let create ?wallets (config : Config.t) =
                     , `Int (Host_and_port.port archive_process_port.value) )
                   ] ;
               Archive_client.run ~logger:config.logger
+                ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port) ;
           let precomputed_block_writer =
@@ -1987,7 +1988,7 @@ let create ?wallets (config : Config.t) =
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
-            Coda_subscriptions.create ~logger:config.logger
+            Mina_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
