@@ -282,7 +282,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "attempt to send again the same signed transaction command as before, \
          but changing the nonce, to conduct a replay attack.  expecting a \
-         Verification_failed"
+         Invalid_signature"
         (let open Deferred.Let_syntax in
         match%bind
           Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
@@ -314,7 +314,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             let err_str = Error.to_string_mach error in
             let err_str_lowercase = String.lowercase err_str in
             if
-              String.is_substring ~substring:"Invalid_signature"
+              String.is_substring ~substring:"invalid_signature"
                 err_str_lowercase
             then (
               [%log info] "Got expected invalid signature error from GraphQL" ;
