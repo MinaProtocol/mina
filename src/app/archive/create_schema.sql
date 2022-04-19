@@ -36,13 +36,19 @@ CREATE TABLE tokens
 CREATE INDEX idx_tokens_id ON tokens(id);
 CREATE INDEX idx_tokens_value ON tokens(value);
 
+CREATE TABLE account_identifiers
+( id                 serial  PRIMARY KEY
+, public_key_id      int     NOT NULL UNIQUE  REFERENCES public_keys(id) ON DELETE CASCADE
+, token_id           int     NOT NULL         REFERENCES tokens(id)
+, token_owner        int                      REFERENCES account_identifiers(id)
+);
+
 /* the initial balance is the balance at genesis, whether the account is timed or not
-   for untimed accounts, the fields other than id, public_key_id, and token are 0
+   for untimed accounts, the fields other than id, account_identifier_id, and token are 0
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
-, public_key_id           int       NOT NULL REFERENCES public_keys(id)
-, token_id                int       NOT NULL REFERENCES tokens(id)
+, account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
@@ -51,7 +57,7 @@ CREATE TABLE timing_info
 , vesting_increment       bigint    NOT NULL
 );
 
-CREATE INDEX idx_public_key_id ON timing_info(public_key_id);
+CREATE INDEX idx_account_identifier_id ON timing_info(account_identifier_id);
 
 CREATE TABLE snarked_ledger_hashes
 ( id    serial PRIMARY KEY
@@ -149,13 +155,6 @@ CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
-
-CREATE TABLE account_identifiers
-( id                 serial  PRIMARY KEY
-, public_key_id      int     NOT NULL     REFERENCES public_keys(id) ON DELETE CASCADE
-, token_id           int     NOT NULL     REFERENCES tokens(id)
-, token_owner        int                  REFERENCES account_identifiers(id)
-);
 
 /* accounts accessed in a block, representing the account
    state after all transactions in the block have been executed

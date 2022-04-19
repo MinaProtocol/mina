@@ -498,6 +498,10 @@ WITH RECURSIVE chain AS (
       end
     end in
     let open M.Let_syntax in
+    let get_token_by_id id =
+      Archive_lib.Processor.Token.find_by_id (module Conn) id
+      |> Errors.Lift.sql ~context:"Finding token by id"
+    in
     let%bind block_id, raw_block, block_extras =
       match%bind
         Block.run (module Conn) input
@@ -533,7 +537,7 @@ WITH RECURSIVE chain AS (
     in
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
-          let%map kind =
+          let%bind kind =
             match ic.Archive_lib.Processor.Internal_command.typ with
             | "fee_transfer" ->
                 M.return `Fee_transfer
@@ -552,11 +556,12 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          let%map token_id = get_token_by_id ic.token_id in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
           ; fee= Unsigned.UInt64.of_int64 ic.fee
-          ; token= `Token_id ic.token
+          ; token= `Token_id token_id
           ; sequence_no=Internal_commands.Extras.sequence_no extras
           ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
           ; hash= ic.hash } )
@@ -580,6 +585,8 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          let%bind fee_token = get_token_by_id uc.fee_token_id in
+          let%bind token = get_token_by_id uc.token_id in
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
@@ -619,8 +626,8 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= `Token_id uc.fee_token
-          ; token= `Token_id uc.token
+          ; fee_token= `Token_id fee_token
+          ; token= `Token_id token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
           ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
           ; fee= Unsigned.UInt64.of_int64 uc.fee

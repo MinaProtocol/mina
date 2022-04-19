@@ -76,6 +76,65 @@ module Token = struct
       (Token_id.to_string token_id)
 end
 
+module Account_identifiers = struct
+  type t = { public_key_id : int; token_id : int; token_owner : int }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int ]
+
+  let table_name = "account_identifiers"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~account_id ~token_owner =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    (* this token_id is Token_id.t *)
+    let token_id = Account_id.token_id account_id in
+    let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
+    (* this token_id is a Postgresql table id *)
+    let%bind token_id = Token.add_if_doesn't_exist (module Conn) token_id in
+    let t = { public_key_id; token_id; token_owner } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let find (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    let%bind public_key_id = Public_key.find (module Conn) pk in
+    let token = Account_id.token_id account_id in
+    let%bind token_id = Token.find (module Conn) token in
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name
+            ~cols:[ "public_key_id"; "token_id" ]
+            ()))
+      (public_key_id, token_id)
+
+  (* public keys are unique, so it's sufficient to provide one,
+     rather than an account identifier, if that's all we have
+  *)
+  let find_by_pk (module Conn : CONNECTION) pk =
+    let open Deferred.Result.Let_syntax in
+    let%bind public_key_id = Public_key.find (module Conn) pk in
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name
+            ~cols:[ "public_key_id" ] ()))
+      public_key_id
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name
+            ~cols:[ "public_key_id"; "token_id"; "token_owner" ]))
+      id
+end
+
 module Zkapp_state_data = struct
   let table_name = "zkapp_state_data"
 
@@ -830,8 +889,7 @@ end
 
 module Timing_info = struct
   type t =
-    { public_key_id : int
-    ; token_id : int
+    { account_identifier_id : int
     ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
@@ -843,36 +901,42 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; int64; int64; int64; int64; int64; int64 ]
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_id = Public_key.find (module Conn) acc.public_key in
+    let%bind account_identifier_id =
+      let account_id = Account_id.create acc.public_key acc.token_id in
+      Account_identifiers.find (module Conn) account_id
+    in
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT public_key_id, token_id, initial_balance,
+         {sql| SELECT account_identifier_id, initial_balance,
                       initial_minimum_balance, cliff_time, cliff_amount,
                       vesting_period, vesting_increment
                FROM timing_info
-               WHERE public_key_id = ?
+               WHERE account_identifier_id = ?
          |sql})
-      pk_id
+      account_identifier_id
 
-  let find_by_pk_id_opt (module Conn : CONNECTION) pk_id =
+  let find_by_account_identifier_id_opt (module Conn : CONNECTION)
+      account_identifier_id =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.int typ
-         {sql| SELECT public_key_id, token_id, initial_balance,
+         {sql| SELECT account_identifier_id, initial_balance,
                      initial_minimum_balance, cliff_time, cliff_amount,
                      vesting_period, vesting_increment
                FROM timing_info
-               WHERE public_key_id = ?
+               WHERE account_identifier_id = ?
          |sql})
-      pk_id
+      account_identifier_id
 
-  let find_by_pk_opt (module Conn : CONNECTION) public_key =
+  let find_by_pk_opt (module Conn : CONNECTION) pk =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_id = Public_key.find (module Conn) public_key in
-    find_by_pk_id_opt (module Conn) pk_id
+    let%bind account_identifier_id =
+      Account_identifiers.find_by_pk (module Conn) pk
+    in
+    find_by_account_identifier_id_opt (module Conn) account_identifier_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -883,24 +947,26 @@ module Timing_info = struct
     let slot_to_int64 x =
       Mina_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
     in
-    let%bind public_key_id =
-      Public_key.add_if_doesn't_exist (module Conn) acc.public_key
+    let%bind account_identifier_id =
+      let account_id = Account_id.create acc.public_key acc.token_id in
+      (* TODO: TEMP!!!! add real token owner *)
+      Account_identifiers.add_if_doesn't_exist
+        (module Conn)
+        ~account_id ~token_owner:0
     in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.int Caqti_type.int
-           "SELECT id FROM timing_info WHERE public_key_id = ?")
-        public_key_id
+           "SELECT id FROM timing_info WHERE account_identifier_id = ?")
+        account_identifier_id
     with
     | Some id ->
         return id
     | None ->
-        let%bind values =
-          let%map token_id = Token.find (module Conn) (Account.token acc) in
+        let values =
           match acc.timing with
           | Timed timing ->
-              { public_key_id
-              ; token_id
+              { account_identifier_id
               ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance =
                   balance_to_int64 timing.initial_minimum_balance
@@ -911,8 +977,7 @@ module Timing_info = struct
               }
           | Untimed ->
               let zero = Int64.zero in
-              { public_key_id
-              ; token_id
+              { account_identifier_id
               ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance = zero
               ; cliff_time = zero
@@ -924,9 +989,9 @@ module Timing_info = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
-                    (public_key_id,token_id,initial_balance,initial_minimum_balance,
+                    (account_identifier_id,initial_balance,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           values
@@ -2336,38 +2401,6 @@ module Block_and_zkapp_command = struct
               ; "failure_reasons_ids"
               ]))
       (block_id, zkapp_command_id, sequence_no)
-end
-
-module Account_identifiers = struct
-  type t = { public_key_id : int; token_id : int; token_owner : int }
-  [@@deriving hlist, fields]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int ]
-
-  let table_name = "account_identifiers"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~account_id ~token_owner =
-    let open Deferred.Result.Let_syntax in
-    let pk = Account_id.public_key account_id in
-    (* this token_id is Token_id.t *)
-    let token_id = Account_id.token_id account_id in
-    let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
-    (* this token_id is a Postgresql table id *)
-    let%bind token_id = Token.add_if_doesn't_exist (module Conn) token_id in
-    let t = { public_key_id; token_id; token_owner } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      t
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name
-            ~cols:[ "public_key_id"; "token_id"; "token_owner" ]))
-      id
 end
 
 module Zkapp_account = struct
