@@ -51,6 +51,31 @@ module Public_key = struct
           public_key
 end
 
+module Token = struct
+  let typ = Caqti_type.string
+
+  let table_name = "tokens"
+
+  let find_by_id (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]))
+      id
+
+  let find (module Conn : CONNECTION) token_id =
+    Conn.find
+      (Caqti_request.find Caqti_type.string Caqti_type.int
+         (Mina_caqti.select_cols ~table_name ~select:"id" ~cols:[ "value" ] ()))
+      (Token_id.to_string token_id)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      (Token_id.to_string token_id)
+end
+
 module Zkapp_state_data = struct
   let table_name = "zkapp_state_data"
 
@@ -324,13 +349,34 @@ module Zkapp_timing_info = struct
       id
 end
 
+module Zkapp_uri = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_uris"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "uri" ], typ)
+      (module Conn)
+      zkapp_uri
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "uri" ]))
+      id
+end
+
 module Zkapp_updates = struct
   type t =
     { app_state_id : int
     ; delegate_id : int option
     ; verification_key_id : int option
     ; permissions_id : int option
-    ; zkapp_uri : string option
+    ; zkapp_uri_id : int option
     ; token_symbol : string option
     ; timing_id : int option
     ; voting_for : string option
@@ -344,7 +390,7 @@ module Zkapp_updates = struct
         ; option int
         ; option int
         ; option int
-        ; option string
+        ; option int
         ; option string
         ; option int
         ; option string
@@ -379,7 +425,11 @@ module Zkapp_updates = struct
         (Zkapp_timing_info.add_if_doesn't_exist (module Conn))
         update.timing
     in
-    let zkapp_uri = Zkapp_basic.Set_or_keep.to_option update.zkapp_uri in
+    let%bind zkapp_uri_id =
+      Mina_caqti.add_if_zkapp_set
+        (Zkapp_uri.add_if_doesn't_exist (module Conn))
+        update.zkapp_uri
+    in
     let token_symbol = Zkapp_basic.Set_or_keep.to_option update.token_symbol in
     let voting_for =
       Option.map ~f:State_hash.to_base58_check
@@ -390,7 +440,7 @@ module Zkapp_updates = struct
       ; delegate_id
       ; verification_key_id
       ; permissions_id
-      ; zkapp_uri
+      ; zkapp_uri_id
       ; token_symbol
       ; timing_id
       ; voting_for
@@ -781,7 +831,7 @@ end
 module Timing_info = struct
   type t =
     { public_key_id : int
-    ; token : string
+    ; token_id : int
     ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
@@ -793,16 +843,27 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; string; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; int; int64; int64; int64; int64; int64; int64 ]
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
     let%bind pk_id = Public_key.find (module Conn) acc.public_key in
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT public_key_id, token, initial_balance,
+         {sql| SELECT public_key_id, token_id, initial_balance,
                       initial_minimum_balance, cliff_time, cliff_amount,
                       vesting_period, vesting_increment
+               FROM timing_info
+               WHERE public_key_id = ?
+         |sql})
+      pk_id
+
+  let find_by_pk_id_opt (module Conn : CONNECTION) pk_id =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         {sql| SELECT public_key_id, token_id, initial_balance,
+                     initial_minimum_balance, cliff_time, cliff_amount,
+                     vesting_period, vesting_increment
                FROM timing_info
                WHERE public_key_id = ?
          |sql})
@@ -811,15 +872,7 @@ module Timing_info = struct
   let find_by_pk_opt (module Conn : CONNECTION) public_key =
     let open Deferred.Result.Let_syntax in
     let%bind pk_id = Public_key.find (module Conn) public_key in
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.int typ
-         {sql| SELECT public_key_id, token, initial_balance,
-                     initial_minimum_balance, cliff_time, cliff_amount,
-                     vesting_period, vesting_increment
-               FROM timing_info
-               WHERE public_key_id = ?
-         |sql})
-      pk_id
+    find_by_pk_id_opt (module Conn) pk_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -842,12 +895,12 @@ module Timing_info = struct
     | Some id ->
         return id
     | None ->
-        let values =
-          let token = Token_id.to_string (Account.token acc) in
+        let%bind values =
+          let%map token_id = Token.find (module Conn) (Account.token acc) in
           match acc.timing with
           | Timed timing ->
               { public_key_id
-              ; token
+              ; token_id
               ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance =
                   balance_to_int64 timing.initial_minimum_balance
@@ -859,7 +912,7 @@ module Timing_info = struct
           | Untimed ->
               let zero = Int64.zero in
               { public_key_id
-              ; token
+              ; token_id
               ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance = zero
               ; cliff_time = zero
@@ -871,7 +924,7 @@ module Timing_info = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
-                    (public_key_id,token,initial_balance,initial_minimum_balance,
+                    (public_key_id,token_id,initial_balance,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    RETURNING id
@@ -1008,7 +1061,7 @@ module Zkapp_epoch_data = struct
       id
 end
 
-module Zkapp_protocol_state_precondition = struct
+module Zkapp_precondition_protocol_state = struct
   type t =
     { snarked_ledger_hash_id : int option
     ; timestamp_id : int option
@@ -1036,7 +1089,7 @@ module Zkapp_protocol_state_precondition = struct
         ; int
         ]
 
-  let table_name = "zkapp_protocol_state_precondition"
+  let table_name = "zkapp_precondition_protocol_state"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1106,15 +1159,44 @@ module Zkapp_protocol_state_precondition = struct
       id
 end
 
+module Zkapp_events = struct
+  type t = int array
+
+  let typ = Mina_caqti.array_int_typ
+
+  let table_name = "zkapp_events"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (events : Party.Body.Events'.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind (element_ids : int array) =
+      Mina_caqti.deferred_result_list_map events
+        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
+      >>| Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      element_ids
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]))
+      id
+end
+
 module Zkapp_party_body = struct
   type t =
     { public_key_id : int
+    ; token_id : int
     ; update_id : int
-    ; token_id : string
     ; balance_change : int64
     ; increment_nonce : bool
-    ; events_ids : int array
-    ; sequence_events_ids : int array
+    ; events_id : int
+    ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_protocol_state_precondition_id : int
@@ -1126,19 +1208,7 @@ module Zkapp_party_body = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int
-        ; int
-        ; string
-        ; int64
-        ; bool
-        ; Mina_caqti.array_int_typ
-        ; Mina_caqti.array_int_typ
-        ; int
-        ; int
-        ; int
-        ; int
-        ; bool
-        ]
+        [ int; int; int; int64; bool; int; int; int; int; int; int; bool ]
 
   let table_name = "zkapp_party_body"
 
@@ -1151,21 +1221,17 @@ module Zkapp_party_body = struct
       Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
-    let%bind events_ids =
-      Mina_caqti.deferred_result_list_map body.events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
-    let%bind sequence_events_ids =
-      Mina_caqti.deferred_result_list_map body.sequence_events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind sequence_events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
     let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+      Zkapp_precondition_protocol_state.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in
@@ -1174,7 +1240,9 @@ module Zkapp_party_body = struct
         (module Conn)
         body.account_precondition
     in
-    let token_id = Token_id.to_string body.token_id in
+    let%bind token_id =
+      Token.add_if_doesn't_exist (module Conn) body.token_id
+    in
     let balance_change =
       let magnitude =
         Currency.Amount.to_uint64 body.balance_change.magnitude
@@ -1194,8 +1262,8 @@ module Zkapp_party_body = struct
       ; token_id
       ; balance_change
       ; increment_nonce
-      ; events_ids
-      ; sequence_events_ids
+      ; events_id
+      ; sequence_events_id
       ; call_data_id
       ; call_depth
       ; zkapp_protocol_state_precondition_id
@@ -1268,10 +1336,9 @@ module Zkapp_party = struct
 end
 
 module Zkapp_fee_payers = struct
-  type t = { body_id : int } [@@deriving fields, hlist]
+  type t = int
 
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
+  let typ = Caqti_type.int
 
   let table_name = "zkapp_fee_payers"
 
@@ -1282,16 +1349,16 @@ module Zkapp_fee_payers = struct
         (module Conn)
         (Party.Body.of_fee_payer fp.body)
     in
-    let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name
+      ~cols:([ "body_id" ], typ)
       (module Conn)
-      value
+      body_id
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "body_id" ]))
       id
 end
 
@@ -1377,8 +1444,8 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; fee_token : string
-      ; token : string
+      ; fee_token_id : int
+      ; token_id : int
       ; nonce : int
       ; amount : int64 option
       ; fee : int64
@@ -1395,8 +1462,8 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; string
-          ; string
+          ; int
+          ; int
           ; int
           ; option int64
           ; int64
@@ -1416,7 +1483,7 @@ module User_command = struct
       Conn.find
         (Caqti_request.find Caqti_type.int typ
            {sql| SELECT type,fee_payer_id,source_id,receiver_id,
-                 fee_token,token,
+                 fee_token_id,token_id,
                  nonce,amount,fee,valid_until,memo,hash
                  FROM user_commands
                  WHERE id = ?
@@ -1466,11 +1533,19 @@ module User_command = struct
                 ( slot |> Mina_numbers.Global_slot.to_uint32
                 |> Unsigned.UInt32.to_int64 )
           in
+          let%bind fee_token_id =
+            Token.add_if_doesn't_exist
+              (module Conn)
+              (Signed_command.fee_token t)
+          in
+          let%bind token_id =
+            Token.add_if_doesn't_exist (module Conn) (Signed_command.token t)
+          in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, fee_token, token, nonce, amount, fee,
+                      receiver_id, fee_token_id, token_id, nonce, amount, fee,
                       valid_until, memo, hash)
                     VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id |sql})
@@ -1483,8 +1558,8 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; fee_token = Signed_command.fee_token t |> Token_id.to_string
-            ; token = Signed_command.token t |> Token_id.to_string
+            ; fee_token_id
+            ; token_id
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount =
                 Signed_command.amount t
@@ -1499,27 +1574,93 @@ module User_command = struct
                 Signed_command.memo t |> Signed_command_memo.to_base58_check
             ; hash = transaction_hash |> Transaction_hash.to_base58_check
             }
+
+    let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
+        (user_cmd : Extensional.User_command.t) =
+      let open Deferred.Result.Let_syntax in
+      match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
+      | Some id ->
+          return id
+      | None ->
+          let amount_opt_to_int64_opt amt_opt =
+            Option.map amt_opt
+              ~f:(Fn.compose Unsigned.UInt64.to_int64 Currency.Amount.to_uint64)
+          in
+          let open Deferred.Result.Let_syntax in
+          let%bind fee_payer_id =
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
+          in
+          let%bind source_id =
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
+          in
+          let%bind receiver_id =
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
+          in
+          let%bind fee_token_id =
+            Token.add_if_doesn't_exist (module Conn) user_cmd.fee_token
+          in
+          let%bind token_id =
+            Token.add_if_doesn't_exist (module Conn) user_cmd.token
+          in
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+               {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
+                      receiver_id, fee_token_id, token_id, nonce, amount, fee,
+                      valid_until, memo, hash)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+         |sql})
+            { typ = user_cmd.typ
+            ; fee_payer_id
+            ; source_id
+            ; receiver_id
+            ; fee_token_id
+            ; token_id
+            ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
+            ; amount = user_cmd.amount |> amount_opt_to_int64_opt
+            ; fee =
+                user_cmd.fee
+                |> Fn.compose Unsigned.UInt64.to_int64 Currency.Fee.to_uint64
+            ; valid_until =
+                Option.map user_cmd.valid_until
+                  ~f:
+                    (Fn.compose Unsigned.UInt32.to_int64
+                       Mina_numbers.Global_slot.to_uint32)
+            ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
+            ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
+            }
   end
 
   module Zkapp_command = struct
     type t =
       { zkapp_fee_payer_id : int
       ; zkapp_other_parties_ids : int array
+      ; memo : string
       ; hash : string
       }
     [@@deriving fields, hlist]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ int; Mina_caqti.array_int_typ; string ]
+        Caqti_type.[ int; Mina_caqti.array_int_typ; string; string ]
+
+    let table_name = "zkapp_commands"
 
     let find_opt (module Conn : CONNECTION)
         ~(transaction_hash : Transaction_hash.t) =
       Conn.find_opt
         ( Caqti_request.find_opt Caqti_type.string Caqti_type.int
-        @@ Mina_caqti.select_cols ~select:"id" ~table_name:"zkapp_commands"
-             [ "hash" ] )
+        @@ Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()
+        )
         (Transaction_hash.to_base58_check transaction_hash)
+
+    let load (module Conn : CONNECTION) id =
+      Conn.find
+        ( Caqti_request.find Caqti_type.int typ
+        @@ Mina_caqti.select_cols_from_id ~table_name
+             ~cols:[ "zkapp_fee_payer_id"; "zkapp_other_parties_ids"; "hash" ]
+        )
+        id
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
@@ -1531,17 +1672,17 @@ module User_command = struct
           ~f:(Zkapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
+      let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
         Transaction_hash.hash_command (Parties ps)
         |> Transaction_hash.to_base58_check
       in
-      let value = { zkapp_fee_payer_id; zkapp_other_parties_ids; hash } in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
         ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
         ~tannot:(function
           | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None)
         (module Conn)
-        value
+        { zkapp_fee_payer_id; zkapp_other_parties_ids; memo; hash }
   end
 
   let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =
@@ -1575,62 +1716,6 @@ module User_command = struct
       >>| Option.map ~f:(fun id -> `Zkapp_command_id id)
     in
     Option.first_some signed_command_id zkapp_command_id
-
-  (* meant to work with either a signed command, or a zkapp *)
-  let add_extensional (module Conn : CONNECTION)
-      (user_cmd : Extensional.User_command.t) =
-    let amount_opt_to_int64_opt amt_opt =
-      Option.map amt_opt
-        ~f:(Fn.compose Unsigned.UInt64.to_int64 Currency.Amount.to_uint64)
-    in
-    let open Deferred.Result.Let_syntax in
-    let%bind fee_payer_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
-    in
-    let%bind source_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
-    in
-    let%bind receiver_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
-    in
-    Conn.find
-      (Caqti_request.find Signed_command.typ Caqti_type.int
-         {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, fee_token, token, nonce, amount, fee,
-                      valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id
-         |sql})
-      { typ = user_cmd.typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token = user_cmd.fee_token |> Token_id.to_string
-      ; token = user_cmd.token |> Token_id.to_string
-      ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
-      ; amount = user_cmd.amount |> amount_opt_to_int64_opt
-      ; fee =
-          user_cmd.fee
-          |> Fn.compose Unsigned.UInt64.to_int64 Currency.Fee.to_uint64
-      ; valid_until =
-          Option.map user_cmd.valid_until
-            ~f:
-              (Fn.compose Unsigned.UInt32.to_int64
-                 Mina_numbers.Global_slot.to_uint32)
-      ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-      ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
-      }
-
-  let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
-      (user_cmd : Extensional.User_command.t) =
-    let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
-    | None ->
-        add_extensional (module Conn) user_cmd
-    | Some (`Signed_command_id user_cmd_id) ->
-        return user_cmd_id
-    | Some (`Zkapp_command_id _user_cmd_id) ->
-        failwith "Unexpected zkapp command"
 end
 
 module Internal_command = struct
@@ -1638,16 +1723,16 @@ module Internal_command = struct
     { typ : string
     ; receiver_id : int
     ; fee : int64
-    ; token : string
+    ; token_id : int
     ; hash : string
     }
 
   let typ =
-    let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
-    let decode ((typ, receiver_id, fee, token), hash) =
-      Ok { typ; receiver_id; fee; token; hash }
+    let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token_id), t.hash) in
+    let decode ((typ, receiver_id, fee, token_id), hash) =
+      Ok { typ; receiver_id; fee; token_id; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -1663,7 +1748,7 @@ module Internal_command = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT type,receiver_id,fee,token,hash
+         {sql| SELECT type,receiver_id,fee,token_id,hash
                FROM internal_commands
                WHERE id = ?
          |sql})
@@ -1683,10 +1768,13 @@ module Internal_command = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
+        let%bind token_id =
+          Token.add_if_doesn't_exist (module Conn) internal_cmd.token
+        in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token,hash)
+                    (type, receiver_id, fee, token_id, hash)
                    VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
@@ -1695,7 +1783,7 @@ module Internal_command = struct
           ; fee =
               internal_cmd.fee |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token = internal_cmd.token |> Token_id.to_string
+          ; token_id
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -2251,45 +2339,34 @@ module Block_and_zkapp_command = struct
 end
 
 module Account_identifiers = struct
-  type t = { public_key_id : int; token : string; token_owner : int }
+  type t = { public_key_id : int; token_id : int; token_owner : int }
   [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; string; int ]
+      Caqti_type.[ int; int; int ]
 
   let table_name = "account_identifiers"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~account_id ~token_owner =
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
-    let token = Account_id.token_id account_id |> Token_id.to_string in
+    (* this token_id is Token_id.t *)
+    let token_id = Account_id.token_id account_id in
     let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
-    let t = { public_key_id; token; token_owner } in
+    (* this token_id is a Postgresql table id *)
+    let%bind token_id = Token.add_if_doesn't_exist (module Conn) token_id in
+    let t = { public_key_id; token_id; token_owner } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       t
-end
-
-module Zkapp_uri = struct
-  type t = string
-
-  let typ = Caqti_type.string
-
-  let table_name = "zkapp_uris"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "uri" ], typ)
-      (module Conn)
-      zkapp_uri
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "uri" ]))
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name
+            ~cols:[ "public_key_id"; "token_id"; "token_owner" ]))
       id
 end
 
@@ -2357,13 +2434,19 @@ module Zkapp_account = struct
       ; proved_state
       ; zkapp_uri_id
       }
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+      id
 end
 
 module Accounts_accessed = struct
   type t =
     { ledger_index : int
     ; block_id : int
-    ; account_id_id : int
+    ; account_identifier_id : int
     ; token_symbol : string
     ; balance : int64
     ; nonce : int64
@@ -2373,6 +2456,7 @@ module Accounts_accessed = struct
     ; timing_id : int
     ; permissions_id : int
     ; zkapp_id : int option
+    ; zkapp_uri_id : int
     }
   [@@deriving hlist, fields]
 
@@ -2391,6 +2475,7 @@ module Accounts_accessed = struct
         ; int
         ; int
         ; option int
+        ; int
         ]
 
   let table_name = "accounts_accessed"
@@ -2399,7 +2484,7 @@ module Accounts_accessed = struct
       (ledger_index, (account : Account.t)) =
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
-    let%bind account_id_id =
+    let%bind account_identifier_id =
       Account_identifiers.add_if_doesn't_exist
         (module Conn)
         ~account_id ~token_owner:0
@@ -2436,10 +2521,13 @@ module Accounts_accessed = struct
           in
           Some id)
     in
+    let%bind zkapp_uri_id =
+      Zkapp_uri.add_if_doesn't_exist (module Conn) account.zkapp_uri
+    in
     let account_accessed : t =
       { ledger_index
       ; block_id
-      ; account_id_id
+      ; account_identifier_id
       ; token_symbol
       ; balance
       ; nonce
@@ -2449,6 +2537,7 @@ module Accounts_accessed = struct
       ; timing_id
       ; permissions_id
       ; zkapp_id
+      ; zkapp_uri_id
       }
     in
     Mina_caqti.select_insert_into_cols
@@ -2464,10 +2553,21 @@ module Accounts_accessed = struct
           add_if_doesn't_exist (module Conn) block_id account)
     in
     Result.all results
+
+  let all_from_block (module Conn : CONNECTION) block_id =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         {sql| SELECT ledger_index, block_id, account_id_id, token_symbol, balance, nonce,
+                      receipt_chain_hash, delegate, voting_for, timing_id, permissions_id,
+                      zkapp_id
+               FROM accounts_accessed
+               WHERE block_id = ?
+         |sql})
+      block_id
 end
 
 module Accounts_created = struct
-  type t = { block_id : int; account_id_id : int; creation_fee : int64 }
+  type t = { block_id : int; account_identifier_id : int; creation_fee : int64 }
   [@@deriving hlist, fields]
 
   let typ =
@@ -2479,7 +2579,7 @@ module Accounts_created = struct
   let add_if_doesn't_exist (module Conn : CONNECTION) block_id account_id
       creation_fee =
     let open Deferred.Result.Let_syntax in
-    let%bind account_id_id =
+    let%bind account_identifier_id =
       (* TODO: TEMP!!!! -- add real token owner *)
       Account_identifiers.add_if_doesn't_exist
         (module Conn)
@@ -2488,7 +2588,7 @@ module Accounts_created = struct
     let creation_fee =
       Currency.Fee.to_uint64 creation_fee |> Unsigned.UInt64.to_int64
     in
-    let t = { block_id; account_id_id; creation_fee } in
+    let t = { block_id; account_identifier_id; creation_fee } in
     Mina_caqti.select_insert_into_cols
       ~select:("block_id,public_key_id", Caqti_type.(tup2 int int))
       ~table_name ~cols:(Fields.names, typ)
@@ -2502,6 +2602,15 @@ module Accounts_created = struct
           add_if_doesn't_exist (module Conn) block_id pk creation_fee)
     in
     Result.all results
+
+  let all_from_block (module Conn : CONNECTION) block_id =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         {sql| SELECT block_id, account_identifier_id, creation_fee
+               FROM accounts_created
+               WHERE block_id = ?
+         |sql})
+      block_id
 end
 
 module Block = struct
@@ -2897,7 +3006,7 @@ module Block = struct
         Mina_caqti.deferred_result_list_fold block.user_cmds ~init:[]
           ~f:(fun acc user_cmd ->
             let%map cmd_id =
-              User_command.add_extensional_if_doesn't_exist
+              User_command.Signed_command.add_extensional_if_doesn't_exist
                 (module Conn)
                 user_cmd
             in
@@ -2950,11 +3059,19 @@ module Block = struct
     let%bind zkapp_cmds_ids_and_seq_nos =
       let%map zkapp_cmds_and_ids_rev =
         Mina_caqti.deferred_result_list_fold block.zkapp_cmds ~init:[]
-          ~f:(fun acc ({ parties; _ } as zkapp_cmd) ->
+          ~f:(fun acc ({ fee_payer; other_parties; memo; _ } as zkapp_cmd) ->
+            (* add authorizations, not stored in the db *)
+            let (fee_payer : Party.Fee_payer.t) =
+              { body = fee_payer; authorization = Signature.dummy }
+            in
+            let (other_parties : Party.t list) =
+              List.map other_parties ~f:(fun body : Party.t ->
+                  { body; authorization = None_given })
+            in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                parties
+                { fee_payer; other_parties; memo }
             in
             (zkapp_cmd, cmd_id) :: acc)
       in

@@ -34,33 +34,26 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
-
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('field, 'boolean) t
+        type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
       end
-
-      module Latest = V1
-    end
-    with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+    end]
   end
 
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
-
-  include Codable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
+      type t = (Field.t, bool) Poly.t [@@deriving sexp, equal, compare, hash]
 
       include Codable.S with type t := t
 
       include Hashable.S_binable with type t := t
     end
+  end]
 
-    module Latest = V1
-  end
+  include Codable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 

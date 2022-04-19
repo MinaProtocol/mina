@@ -195,13 +195,13 @@ let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
 
-(* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...]`
+(* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...] ()`
    creates the string
    `"SELECT s0 FROM t0 WHERE col0 = ? AND col1 = ? AND..."`.
    The optional `tannot` function maps column names to type annotations. *)
 let select_cols ~(select : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) (cols : string list) :
-    string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
+    : string =
   List.map cols ~f:(fun col ->
       let annot =
         match tannot col with None -> "" | Some tannot -> "::" ^ tannot
@@ -241,7 +241,8 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
     ( Caqti_request.find_opt (snd cols) (snd select)
-    @@ select_cols ~select:(fst select) ~table_name ?tannot (fst cols) )
+    @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
+    )
     value
   >>= function
   | Some id ->

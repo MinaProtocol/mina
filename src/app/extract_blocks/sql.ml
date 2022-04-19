@@ -122,3 +122,16 @@ module Blocks_and_internal_commands = struct
   let run (module Conn : Caqti_async.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
+
+module Blocks_and_zkapp_commands = struct
+  let query =
+    Caqti_request.collect Caqti_type.int
+      Caqti_type.(tup2 int int)
+      {sql| SELECT zkapp_command_id, sequence_no
+            FROM blocks_zkapp_commands
+            WHERE block_id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end

@@ -59,10 +59,13 @@ module Internal_command = struct
   [@@deriving yojson, equal, bin_io_unversioned]
 end
 
+(* for fee payer, other parties, authorizations are omitted; signatures, proofs not in archive db *)
 module Zkapp_command = struct
   type t =
     { sequence_no : int
-    ; parties : Parties.Stable.Latest.t
+    ; fee_payer : Party.Body.Fee_payer.Stable.Latest.t
+    ; other_parties : Party.Body.Stable.Latest.t list
+    ; memo : Signed_command_memo.Stable.Latest.t
     ; hash : Transaction_hash.Stable.Latest.t
           [@to_yojson Transaction_hash.to_yojson]
           [@of_yojson Transaction_hash.of_yojson]

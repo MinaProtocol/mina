@@ -28,13 +28,21 @@ CREATE TABLE public_keys
 CREATE INDEX idx_public_keys_id ON public_keys(id);
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
+CREATE TABLE tokens
+( id    serial PRIMARY KEY
+, value text   NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_tokens_id ON tokens(id);
+CREATE INDEX idx_tokens_value ON tokens(value);
+
 /* the initial balance is the balance at genesis, whether the account is timed or not
    for untimed accounts, the fields other than id, public_key_id, and token are 0
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , public_key_id           int       NOT NULL REFERENCES public_keys(id)
-, token                   text      NOT NULL
+, token_id                int       NOT NULL REFERENCES tokens(id)
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
@@ -52,7 +60,7 @@ CREATE TABLE snarked_ledger_hashes
 
 CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 
-CREATE TYPE user_command_type AS ENUM ('payment', 'delegation', 'create_token', 'create_account', 'mint_tokens');
+CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
 
 CREATE TYPE user_command_status AS ENUM ('applied', 'failed');
 
@@ -62,8 +70,8 @@ CREATE TABLE user_commands
 , fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token      text                NOT NULL
-, token          text                NOT NULL
+, fee_token_id   int                 NOT NULL REFERENCES tokens(id)
+, token_id       int                 NOT NULL REFERENCES tokens(id)
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -79,7 +87,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, token       text                  NOT NULL
+, token_id    int                   NOT NULL REFERENCES tokens(id)
 , hash        text                  NOT NULL
 , UNIQUE (hash,type)
 );
@@ -99,6 +107,7 @@ CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
 , zkapp_fee_payer_id                    int            NOT NULL REFERENCES zkapp_fee_payers(id)
 , zkapp_other_parties_ids               int[]          NOT NULL
+, memo                                  text           NOT NULL
 , hash                                  text           NOT NULL UNIQUE
 );
 
@@ -144,7 +153,7 @@ CREATE INDEX idx_chain_status      ON blocks(chain_status);
 CREATE TABLE account_identifiers
 ( id                 serial  PRIMARY KEY
 , public_key_id      int     NOT NULL     REFERENCES public_keys(id) ON DELETE CASCADE
-, token              text    NOT NULL
+, token_id           int     NOT NULL     REFERENCES tokens(id)
 , token_owner        int                  REFERENCES account_identifiers(id)
 );
 
@@ -165,11 +174,11 @@ CREATE TABLE accounts_accessed
 , timing_id               int               REFERENCES timing_info(id)
 , permissions_id          int     NOT NULL  REFERENCES zkapp_permissions(id)
 , zkapp_id                int               REFERENCES zkapp_accounts(id)
-, PRIMARY KEY (block_id,account_id)
+, PRIMARY KEY (block_id,account_identifier_id)
 );
 
 CREATE INDEX idx_accounts_accessed_block_id ON accounts_accessed(block_id);
-CREATE INDEX idx_accounts_accessed_block_account_id ON accounts_accessed(account_id);
+CREATE INDEX idx_accounts_accessed_block_account_id ON accounts_accessed(account_identifier_id);
 
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE

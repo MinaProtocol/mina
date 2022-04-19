@@ -217,7 +217,7 @@ module Failure = struct
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
     | _ ->
-        Error "Signed_command_status.Failure.of_string: Unknown value"
+        Error "Transaction_status.Failure.of_string: Unknown value"
 
   let%test_unit "of_string(to_string) roundtrip" =
     for i = failure_min to failure_max do
