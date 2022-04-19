@@ -240,7 +240,7 @@ module User_command = struct
     Conn.collect_list query user_cmd_id
 end
 
-module Snapp_command_ids = struct
+module Zkapp_command_ids = struct
   let query =
     Caqti_request.collect
       Caqti_type.(tup2 string int64)
@@ -251,7 +251,7 @@ module Snapp_command_ids = struct
     Conn.collect_list query (state_hash, start_slot)
 end
 
-module Snapp_command = struct
+module Zkapp_command = struct
   type t =
     { fee_payer_id : int
     ; other_party_ids : int array
