@@ -179,11 +179,14 @@ let command =
         ~on_handler_error:
           (`Call
             (fun _net exn ->
-              [%log error]
+              [%log fatal]
                 "Exception while handling Rosetta server request: $error"
                 ~metadata:
                   [ ("error", `String (Exn.to_string_mach exn))
-                  ; ("context", `String "rest_server") ] ))
+                  ; ("context", `String "rest_server") ];
+              (* server becomes unresponsive after these errors *)
+              ignore (exit 1)
+            ))
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
         (server_handler ~pool ~graphql_uri ~logger)
     in
