@@ -897,11 +897,13 @@ module Timing_info = struct
     ; vesting_period : int64
     ; vesting_increment : int64
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; int64; int64; int64; int64; int64; int64 ]
+
+  let table_name = "timing_info"
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -995,6 +997,18 @@ module Timing_info = struct
                    RETURNING id
              |sql})
           values
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+      id
+
+  let load_opt (module Conn : CONNECTION) id =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+      id
 end
 
 module Snarked_ledger_hash = struct

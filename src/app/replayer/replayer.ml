@@ -1531,7 +1531,7 @@ module Zkapp_helpers = struct
       : Party.Body.Fee_payer.t )
 end
 
-let parties_of_snapp_command ~pool (cmd : Sql.Zkapp_command.t) :
+let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     Parties.t Deferred.t =
   let%bind fee_payer_body_id =
     query_db pool
@@ -1709,7 +1709,7 @@ let parties_of_snapp_command ~pool (cmd : Sql.Zkapp_command.t) :
   let memo = Mina_base.Signed_command_memo.dummy in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
-let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
+let run_zkapp_command ~logger ~pool ~ledger ~continue_on_error:_
     (cmd : Sql.Zkapp_command.t) =
   [%log info]
     "Applying zkApp command at global slot since genesis %Ld, and sequence \
@@ -1718,7 +1718,7 @@ let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
   let%bind state_view =
     Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
-  let%bind parties = parties_of_snapp_command ~pool cmd in
+  let%bind parties = parties_of_zkapp_command ~pool cmd in
   match
     Ledger.apply_parties_unchecked ~constraint_constants ~state_view ledger
       parties

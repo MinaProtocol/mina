@@ -586,3 +586,52 @@ let get_party_body ~pool body_id =
       ; use_full_commitment
       }
       : Party.Body.t )
+
+(* useful so we can load a body from the db like any party body, then convert it
+   to a fee payer body
+
+   it's perhaps dangerous to offer this for general use, so don't put this in
+   Party.Body
+*)
+
+let party_body_to_fee_payer_body_exn body : Party.Body.Fee_payer.t =
+  let ({ public_key
+       ; token_id = _
+       ; update
+       ; balance_change
+       ; increment_nonce = _
+       ; events
+       ; sequence_events
+       ; call_data
+       ; call_depth
+       ; protocol_state_precondition
+       ; account_precondition
+       ; use_full_commitment = _
+       }
+        : Party.Body.t) =
+    body
+  in
+  let balance_change =
+    Currency.Fee.of_uint64
+      (balance_change.magnitude |> Currency.Amount.to_uint64)
+  in
+  let account_precondition =
+    match account_precondition with
+    | Nonce nonce ->
+        Mina_numbers.Account_nonce.of_uint32 nonce
+    | Full _ | Accept ->
+        failwith "Expected a nonce for fee payer account precondition"
+  in
+  { public_key
+  ; token_id = ()
+  ; update
+  ; balance_change
+  ; increment_nonce = ()
+  ; events
+  ; sequence_events
+  ; call_data
+  ; call_depth
+  ; protocol_state_precondition
+  ; account_precondition
+  ; use_full_commitment = ()
+  }
