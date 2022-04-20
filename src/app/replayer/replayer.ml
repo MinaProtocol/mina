@@ -335,8 +335,7 @@ let account_creation_fee_uint64 =
 let account_creation_fee_int64 =
   Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
 
-let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~continue_on_error:_ =
+let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
@@ -411,7 +410,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
-let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error:_
+let apply_combined_fee_transfer ~logger ~pool ~ledger
     (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
@@ -481,8 +480,7 @@ module User_command_helpers = struct
         failwithf "Invalid user command type: %s" type_ ()
 end
 
-let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~continue_on_error:_ =
+let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
@@ -1235,8 +1233,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
   let memo = Mina_base.Signed_command_memo.dummy in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
-let run_zkapp_command ~logger ~pool ~ledger ~continue_on_error:_
-    (cmd : Sql.Zkapp_command.t) =
+let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
   [%log info]
     "Applying zkApp command at global slot since genesis %Ld, and sequence \
      number %d"
@@ -1590,12 +1587,36 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
         let check_account_accessed () =
+          [%log info] "Checking accounts accessed in block just processed"
+            ~metadata:[ ("block_id", `Int last_block_id) ] ;
           let%bind accounts_accessed_db =
             query_db ~item:"accounts accessed"
               ~f:(fun db ->
                 Processor.Accounts_accessed.all_from_block db last_block_id)
               pool
           in
+          let%bind accounts_created_db =
+            query_db ~item:"accounts created"
+              ~f:(fun db ->
+                Processor.Accounts_created.all_from_block db last_block_id)
+              pool
+          in
+          (* every account created in preceding block is an accessed account in preceding block *)
+          List.iter accounts_created_db
+            ~f:(fun { account_identifier_id = acct_id_created; _ } ->
+              if
+                Option.is_none
+                  (List.find accounts_accessed_db
+                     ~f:(fun { account_identifier_id = acct_id_accessed; _ } ->
+                       acct_id_accessed = acct_id_created))
+              then (
+                [%log error] "Created account not present in accessed accounts"
+                  ~metadata:
+                    [ ("created_account_identifier_id", `Int acct_id_created)
+                    ; ("block_id", `Int last_block_id)
+                    ] ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 )) ;
           let%map accounts_accessed =
             Deferred.List.map accounts_accessed_db
               ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
@@ -1617,10 +1638,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 else Core_kernel.exit 1 ) ;
               match Ledger.location_of_account ledger account_id with
               | None ->
-                  [%log error]
-                    "After applying all commands at global slot since genesis \
-                     %Ld, accessed account not in ledger"
-                    last_global_slot_since_genesis ;
+                  [%log error] "Accessed account not in ledger"
+                    ~metadata:
+                      [ ("account_id", Account_id.to_yojson account_id) ] ;
                   if continue_on_error then incr error_count
                   else Core_kernel.exit 1
               | Some loc ->
@@ -1701,8 +1721,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 run_checks_on_slot_change ic.global_slot_since_genesis
               in
               let%bind () =
-                apply_combined_fee_transfer ~logger ~pool ~ledger
-                  ~continue_on_error ic ic2
+                apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
               in
               apply_commands ics2 user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1712,9 +1731,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               let%bind () =
                 run_checks_on_slot_change ic.global_slot_since_genesis
               in
-              let%bind () =
-                run_internal_command ~logger ~pool ~ledger ~continue_on_error ic
-              in
+              let%bind () = run_internal_command ~logger ~pool ~ledger ic in
               apply_commands ics user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
@@ -1742,28 +1759,25 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           let%bind () =
             run_checks_on_slot_change uc.global_slot_since_genesis
           in
-          let%bind () =
-            run_user_command ~logger ~pool ~ledger ~continue_on_error uc
-          in
+          let%bind () = run_user_command ~logger ~pool ~ledger uc in
           apply_commands internal_cmds ucs zkapp_cmds
             ~last_global_slot_since_genesis:uc.global_slot_since_genesis
             ~last_block_id:uc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
-        let run_zkapp_commands (sc : Sql.Zkapp_command.t) scs =
+        let run_zkapp_commands (zkc : Sql.Zkapp_command.t) zkcs =
           let%bind () =
-            run_checks_on_slot_change sc.global_slot_since_genesis
+            run_checks_on_slot_change zkc.global_slot_since_genesis
           in
-          let%bind () =
-            run_zkapp_command ~logger ~pool ~ledger ~continue_on_error sc
-          in
-          apply_commands internal_cmds user_cmds scs
-            ~last_global_slot_since_genesis:sc.global_slot_since_genesis
-            ~last_block_id:sc.block_id ~staking_epoch_ledger ~next_epoch_ledger
+          let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
+          apply_commands internal_cmds user_cmds zkcs
+            ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
+            ~last_block_id:zkc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
         match (internal_cmds, user_cmds, zkapp_cmds) with
         | [], [], [] ->
             (* all done *)
             check_ledger_hash_after_last_slot () ;
+            let%bind () = check_account_accessed () in
             Deferred.return
               ( last_global_slot_since_genesis
               , staking_epoch_ledger
@@ -1809,12 +1823,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 combine_or_run_internal_cmds ic ics
             | `User_command ->
                 run_user_commands uc ucs )
-        | ic :: ics, uc :: ucs, sc :: scs -> (
+        | ic :: ics, uc :: ucs, zkc :: zkcs -> (
             (* internal, user, and zkApp commands *)
             let seqs =
               [ get_internal_cmd_sequence ic
               ; get_user_cmd_sequence uc
-              ; get_zkapp_cmd_sequence sc
+              ; get_zkapp_cmd_sequence zkc
               ]
             in
             match command_type_of_sequences seqs with
@@ -1824,18 +1838,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 let%bind () =
                   run_checks_on_slot_change uc.global_slot_since_genesis
                 in
-                let%bind () =
-                  run_user_command ~logger ~pool ~ledger ~continue_on_error uc
-                in
-                apply_commands internal_cmds ucs scs
+                let%bind () = run_user_command ~logger ~pool ~ledger uc in
+                apply_commands internal_cmds ucs zkcs
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger
             | `Zkapp_command ->
-                let%bind () =
-                  run_zkapp_command ~logger ~pool ~ledger ~continue_on_error sc
-                in
-                apply_commands internal_cmds ucs scs
+                let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
+                apply_commands internal_cmds ucs zkcs
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger )
