@@ -3373,12 +3373,13 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
       -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
-        match%map
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool
+        match%bind
+          add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
+            ~accounts_accessed ~accounts_created
             (With_hash.map ~f:External_transition.decompose block)
         with
         | Error e ->
-          let state_hash = hash block in
+            let state_hash = hash block in
             [%log warn]
               ~metadata:
                 [ ("block", State_hash.to_yojson state_hash)

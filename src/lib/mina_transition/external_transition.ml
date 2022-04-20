@@ -1350,11 +1350,11 @@ module Precomputed_block = struct
     end
   end]
 
-  let of_external_transition ~logger
+  let of_block ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~scheduled_time ~staged_ledger (t : external_transition) =
+      ~scheduled_time ~staged_ledger block =
     let ledger = Staged_ledger.ledger staged_ledger in
-    let account_ids_accessed = account_ids_accessed t in
+    let account_ids_accessed = account_ids_accessed block in
     let accounts_accessed =
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           try
@@ -1376,7 +1376,7 @@ module Precomputed_block = struct
     let accounts_created =
       let account_creation_fee = constraint_constants.account_creation_fee in
       let previous_block_state_hash =
-        protocol_state t |> Mina_state.Protocol_state.previous_state_hash
+        protocol_state block |> Mina_state.Protocol_state.previous_state_hash
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
@@ -1384,10 +1384,10 @@ module Precomputed_block = struct
           (acct_id, account_creation_fee))
     in
     { scheduled_time
-    ; protocol_state = t.protocol_state
-    ; protocol_state_proof = t.protocol_state_proof
-    ; staged_ledger_diff = t.staged_ledger_diff
-    ; delta_transition_chain_proof = t.delta_transition_chain_proof
+    ; protocol_state = protocol_state block
+    ; protocol_state_proof = protocol_state_proof block
+    ; staged_ledger_diff = staged_ledger_diff block
+    ; delta_transition_chain_proof = delta_transition_chain_proof block
     ; accounts_accessed
     ; accounts_created
     }

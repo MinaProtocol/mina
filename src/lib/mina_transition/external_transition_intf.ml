@@ -127,12 +127,12 @@ module type S = sig
       end
     end]
 
-    val of_external_transition :
+    val of_block :
          logger:Logger.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> scheduled_time:Block_time.Time.t
       -> staged_ledger:Staged_ledger.t
-      -> external_transition
+      -> Block.t
       -> t
   end
 

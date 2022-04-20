@@ -146,15 +146,16 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             Transition_frontier.Breadcrumb.staged_ledger
                               breadcrumb
                           in
-                          let external_transition =
+                          let block =
                             let block_with_hash, _ =
                               External_transition.Validated.erase new_block
                             in
                             With_hash.data block_with_hash
+                            |> External_transition.decompose
                           in
-                          External_transition.Precomputed_block
-                          .of_external_transition ~logger ~constraint_constants
-                            ~staged_ledger ~scheduled_time external_transition
+                          External_transition.Precomputed_block.of_block ~logger
+                            ~constraint_constants ~staged_ledger ~scheduled_time
+                            block
                         in
                         External_transition.Precomputed_block.to_yojson
                           precomputed_block)

@@ -1169,7 +1169,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
-      ; delta_transition_chain_proof=delta_block_chain_proof
+      ; delta_transition_chain_proof = delta_block_chain_proof
       ; accounts_accessed = _
       ; accounts_created = _
       } =
