@@ -39,7 +39,7 @@ module Constant = struct
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
-  let dummy : t =
+  let dummy () : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
     let alpha = scalar_chal () in

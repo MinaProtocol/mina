@@ -77,7 +77,7 @@ let _ =
            { fee_payer with authorization = fee_payer_signature_auth }
          in
          { Parties.fee_payer; other_parties; memo }
-         |> Parties.parties_to_json |> Yojson.Safe.to_string
+         |> Parties.parties_to_json |> Yojson.Safe.to_string |> Js.string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =

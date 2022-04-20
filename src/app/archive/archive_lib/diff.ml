@@ -15,7 +15,7 @@ module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
         { block :
-            External_transition.Stable.Latest.t
+            External_transition.Raw.Stable.Latest.t
             State_hash.With_state_hashes.Stable.Latest.t
               (* ledger index, account *)
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
@@ -107,7 +107,7 @@ module Builder = struct
           (acct_id, account_creation_fee))
     in
     Transition_frontier.Breadcrumb_added
-      { block
+      { block = With_hash.map ~f:External_transition.compose block
       ; accounts_accessed
       ; accounts_created
       ; sender_receipt_chains_from_parent_ledger

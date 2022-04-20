@@ -29,6 +29,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -54,6 +55,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -78,6 +80,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -106,6 +109,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -136,6 +140,7 @@ let%test_module "Fee payer tests" =
               let test_spec : Spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
+                ; fee_payer = None
                 ; receivers = []
                 ; amount
                 ; zkapp_account_keypairs = [ fst spec.sender ]
@@ -170,9 +175,13 @@ let%test_module "Fee payer tests" =
                 Or_error.try_with (fun () ->
                     Transaction_snark.parties_witnesses_exn
                       ~constraint_constants ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero
-                      ~pending_coinbase_init_stack:U.init_stack (`Ledger ledger)
-                      [ parties ])
+                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+                      [ ( `Pending_coinbase_init_stack U.init_stack
+                        , `Pending_coinbase_of_statement
+                            (U.pending_coinbase_state_stack
+                               ~state_body_hash:U.genesis_state_body_hash)
+                        , parties )
+                      ])
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"

@@ -13,7 +13,7 @@ module Base = struct
       | `Invalid_proof
       | `Missing_verification_key of Signature_lib.Public_key.Compressed.t list
       ]
-    [@@deriving bin_io]
+    [@@deriving bin_io, to_yojson]
 
     val invalid_to_string : invalid -> string
 
@@ -39,6 +39,9 @@ module Base = struct
          t
       -> (ledger_proof * Mina_base.Sok_message.t) list
       -> bool Or_error.t Deferred.t
+
+    val get_blockchain_verification_key :
+      t -> Pickles.Verification_key.t Or_error.t Deferred.t
   end
 end
 

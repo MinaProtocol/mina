@@ -117,7 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* setup complete *)
     let%bind () =
       section "send a single payment between 2 untimed accounts"
-        (let%bind { nonce; _ } =
+        (let%bind { hash; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
@@ -139,9 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-              ~command_type:Send_payment
-              ~node_included_in:(`Node untimed_node_b)))
+              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)))
     in
     let%bind () =
       section
@@ -360,14 +358,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
            (Currency.Amount.to_formatted_string amount) ;
-         let%bind { nonce; _ } =
+         let%bind { hash; _ } =
            Network.Node.must_send_payment ~logger sender ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-              ~command_type:Send_payment ~node_included_in:(`Node timed_node_c)))
+              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
