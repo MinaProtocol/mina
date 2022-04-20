@@ -151,6 +151,9 @@ let get_slot_hashes ~logger slot =
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
 
+(* cache of tokens *)
+let token_tbl : (int, Token_id.t) Hashtbl.t = Int.Table.create ()
+
 let query_db pool ~f ~item =
   match%bind Caqti_async.Pool.use f pool with
   | Ok v ->
@@ -164,26 +167,24 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
   match Hashtbl.find pk_tbl pk_id with
   | Some pk ->
       return pk
-  | None -> (
-      (* not in cache, consult database *)
-      match%map
-        Caqti_async.Pool.use (fun db -> Sql.Public_key.run db pk_id) pool
-      with
-      | Ok (Some pk) -> (
-          match Signature_lib.Public_key.Compressed.of_base58_check pk with
-          | Ok pk ->
-              Hashtbl.add_exn pk_tbl ~key:pk_id ~data:pk ;
-              pk
-          | Error err ->
-              Error.tag_arg err "Error decoding public key"
-                (("public_key", pk), ("id", pk_id))
-                [%sexp_of: (string * string) * (string * int)]
-              |> Error.raise )
-      | Ok None ->
-          failwithf "Could not find public key with id %d" pk_id ()
-      | Error msg ->
-          failwithf "Error retrieving public key with id %d, error: %s" pk_id
-            (Caqti_error.show msg) () )
+  | None ->
+      let%map pk =
+        Archive_lib.Load_data.pk_of_id ~item:"a public key" pool pk_id
+      in
+      Hashtbl.add_exn pk_tbl ~key:pk_id ~data:pk ;
+      pk
+
+let token_of_token_id pool token_id : Token_id.t Deferred.t =
+  let open Deferred.Let_syntax in
+  match Hashtbl.find token_tbl token_id with
+  | Some token ->
+      return token
+  | None ->
+      let%map token =
+        Archive_lib.Load_data.token_of_id ~item:"a token" pool token_id
+      in
+      Hashtbl.add_exn token_tbl ~key:token_id ~data:token ;
+      token
 
 let internal_command_to_balance_block_data
     (internal_cmd : Sql.Internal_command.t) =
@@ -1565,7 +1566,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           update_next_epoch_data ~logger pool ~last_block_id ~ledger
             ~next_epoch_ledger
         in
-        let log_ledger_hash_after_last_slot () =
+        let check_ledger_hash_after_last_slot () =
           let _state_hash, expected_ledger_hash =
             get_slot_hashes ~logger last_global_slot_since_genesis
           in
@@ -1588,6 +1589,80 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               last_global_slot_since_genesis ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
+        let check_account_accessed () =
+          let%bind accounts_accessed_db =
+            query_db ~item:"accounts accessed"
+              ~f:(fun db ->
+                Processor.Accounts_accessed.all_from_block db last_block_id)
+              pool
+          in
+          let%map accounts_accessed =
+            Deferred.List.map accounts_accessed_db
+              ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
+          in
+          List.iter accounts_accessed
+            ~f:(fun (index, { public_key; token_id; balance; nonce; _ }) ->
+              let account_id = Account_id.create public_key token_id in
+              let index_in_ledger =
+                Ledger.index_of_account_exn ledger account_id
+              in
+              if index <> index_in_ledger then (
+                [%log error]
+                  "Index in ledger does not match index in account accessed"
+                  ~metadata:
+                    [ ("index_in_ledger", `Int index_in_ledger)
+                    ; ("index_in_account_accessed", `Int index)
+                    ] ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 ) ;
+              match Ledger.location_of_account ledger account_id with
+              | None ->
+                  [%log error]
+                    "After applying all commands at global slot since genesis \
+                     %Ld, accessed account not in ledger"
+                    last_global_slot_since_genesis ;
+                  if continue_on_error then incr error_count
+                  else Core_kernel.exit 1
+              | Some loc ->
+                  let account_in_ledger =
+                    match Ledger.get ledger loc with
+                    | Some acct ->
+                        acct
+                    | None ->
+                        (* should be unreachable *)
+                        failwith
+                          "Account not in ledger, even though there's a \
+                           location for it"
+                  in
+                  let balance_in_ledger = account_in_ledger.balance in
+                  if not (Currency.Balance.equal balance balance_in_ledger) then (
+                    [%log error]
+                      "Balance in ledger does not match balance in account \
+                       accessed"
+                      ~metadata:
+                        [ ( "balance_in_ledger"
+                          , Currency.Balance.to_yojson balance_in_ledger )
+                        ; ( "balance_in_account_accessed"
+                          , Currency.Balance.to_yojson balance )
+                        ] ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1 ) ;
+                  let nonce_in_ledger = account_in_ledger.nonce in
+                  if
+                    not (Mina_numbers.Account_nonce.equal nonce nonce_in_ledger)
+                  then (
+                    [%log error]
+                      "Nonce in ledger does not match nonce in account accessed"
+                      ~metadata:
+                        [ ( "balance_in_ledger"
+                          , Mina_numbers.Account_nonce.to_yojson nonce_in_ledger
+                          )
+                        ; ( "balance_in_account_accessed"
+                          , Mina_numbers.Account_nonce.to_yojson nonce )
+                        ] ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1 ))
+        in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
             get_slot_hashes ~logger curr_global_slot_since_genesis
@@ -1600,16 +1675,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
              $state_hash at global slot since genesis %Ld"
             curr_global_slot_since_genesis
         in
-        let log_on_slot_change curr_global_slot_since_genesis =
+        let run_checks_on_slot_change curr_global_slot_since_genesis =
           if
             Int64.( > ) curr_global_slot_since_genesis
               last_global_slot_since_genesis
           then (
-            log_ledger_hash_after_last_slot () ;
-            (* TODO: START HERE!!! check balances, nonces
-               every account created is an account accessed
-            *)
+            check_ledger_hash_after_last_slot () ;
+            let%map () = check_account_accessed () in
             log_state_hash_on_next_slot curr_global_slot_since_genesis )
+          else Deferred.unit
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -1623,7 +1697,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
-              log_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_checks_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger
                   ~continue_on_error ic ic2
@@ -1633,7 +1709,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              log_on_slot_change ic.global_slot_since_genesis ;
+              let%bind () =
+                run_checks_on_slot_change ic.global_slot_since_genesis
+              in
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~continue_on_error ic
               in
@@ -1661,7 +1739,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           cmd_ty
         in
         let run_user_commands (uc : Sql.User_command.t) ucs =
-          log_on_slot_change uc.global_slot_since_genesis ;
+          let%bind () =
+            run_checks_on_slot_change uc.global_slot_since_genesis
+          in
           let%bind () =
             run_user_command ~logger ~pool ~ledger ~continue_on_error uc
           in
@@ -1670,7 +1750,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             ~last_block_id:uc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
         let run_zkapp_commands (sc : Sql.Zkapp_command.t) scs =
-          log_on_slot_change sc.global_slot_since_genesis ;
+          let%bind () =
+            run_checks_on_slot_change sc.global_slot_since_genesis
+          in
           let%bind () =
             run_zkapp_command ~logger ~pool ~ledger ~continue_on_error sc
           in
@@ -1681,7 +1763,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         match (internal_cmds, user_cmds, zkapp_cmds) with
         | [], [], [] ->
             (* all done *)
-            log_ledger_hash_after_last_slot () ;
+            check_ledger_hash_after_last_slot () ;
             Deferred.return
               ( last_global_slot_since_genesis
               , staking_epoch_ledger
@@ -1739,7 +1821,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             | `Internal_command ->
                 combine_or_run_internal_cmds ic ics
             | `User_command ->
-                log_on_slot_change uc.global_slot_since_genesis ;
+                let%bind () =
+                  run_checks_on_slot_change uc.global_slot_since_genesis
+                in
                 let%bind () =
                   run_user_command ~logger ~pool ~ledger ~continue_on_error uc
                 in

@@ -2512,17 +2512,6 @@ module Accounts_accessed = struct
     in
     Result.all results
 
-  let load_from_block (module Conn : CONNECTION) block_id =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.int typ
-         {sql| SELECT ledger_index, block_id, account_identifier_id, token_symbol, balance, nonce,
-                      receipt_chain_hash, delegate, voting_for, timing_id, permissions_id,
-                      zkapp_id
-               FROM accounts_accessed
-               WHERE block_id = ?
-         |sql})
-      block_id
-
   let all_from_block (module Conn : CONNECTION) block_id =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.collect_list
