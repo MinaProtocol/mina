@@ -275,9 +275,9 @@ module Zkapp_command = struct
                    blocks.id,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,fee_payer_balance,hash
 
-            FROM (SELECT * FROM snapp_commands WHERE id = ?) AS sc
+            FROM (SELECT * FROM zkapp_commands WHERE id = ?) AS sc
 
-            INNER JOIN blocks_snapp_commands AS bsc
+            INNER JOIN blocks_zkapp_commands AS bsc
 
             ON sc.id = bsc.user_command_id
 
