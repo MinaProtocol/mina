@@ -115,18 +115,6 @@ module Account_identifiers = struct
             ()))
       (public_key_id, token_id)
 
-  (* public keys are unique, so it's sufficient to provide one,
-     rather than an account identifier, if that's all we have
-  *)
-  let find_by_pk (module Conn : CONNECTION) pk =
-    let open Deferred.Result.Let_syntax in
-    let%bind public_key_id = Public_key.find (module Conn) pk in
-    Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.int
-         (Mina_caqti.select_cols ~select:"id" ~table_name
-            ~cols:[ "public_key_id" ] ()))
-      public_key_id
-
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
@@ -932,13 +920,6 @@ module Timing_info = struct
                WHERE account_identifier_id = ?
          |sql})
       account_identifier_id
-
-  let find_by_pk_opt (module Conn : CONNECTION) pk =
-    let open Deferred.Result.Let_syntax in
-    let%bind account_identifier_id =
-      Account_identifiers.find_by_pk (module Conn) pk
-    in
-    find_by_account_identifier_id_opt (module Conn) account_identifier_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
