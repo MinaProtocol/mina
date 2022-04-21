@@ -343,8 +343,16 @@ let gen_epoch_data_predicate
     Zkapp_basic.Or_ignore.gen @@ return epoch_data.lock_checkpoint
   in
   let%map epoch_length =
-    Zkapp_basic.Or_ignore.gen @@ return
-    @@ closed_interval_exact epoch_data.epoch_length
+    let open Mina_numbers in
+    let%bind epsilon1 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    let%bind epsilon2 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    Zkapp_precondition.Closed_interval.
+      { lower =
+          Length.sub epoch_data.epoch_length epsilon1
+          |> Option.value ~default:Length.zero
+      ; upper = Length.add epoch_data.epoch_length epsilon2
+      }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   { Epoch_data.Poly.ledger
   ; seed
@@ -357,33 +365,90 @@ let gen_protocol_state_precondition
     (psv : Zkapp_precondition.Protocol_state.View.t) :
     Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
+  let open Zkapp_precondition.Closed_interval in
   let%bind snarked_ledger_hash =
     Zkapp_basic.Or_ignore.gen @@ return psv.snarked_ledger_hash
   in
   let%bind timestamp =
-    Zkapp_precondition.Closed_interval.
-      { lower = psv.timestamp; upper = Block_time.max_value }
+    let%bind epsilon1 =
+      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
+    in
+    let%bind epsilon2 =
+      Int64.gen_incl 0L 60_000_000L >>| Block_time.Span.of_ms
+    in
+    { lower = Block_time.sub psv.timestamp epsilon1
+    ; upper = Block_time.add psv.timestamp epsilon2
+    }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind blockchain_length =
-    Zkapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.blockchain_length)
+    let open Mina_numbers in
+    let%bind epsilon1 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    let%bind epsilon2 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    { lower =
+        Length.sub psv.blockchain_length epsilon1
+        |> Option.value ~default:Length.zero
+    ; upper = Length.add psv.blockchain_length epsilon2
+    }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind min_window_density =
-    Zkapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.min_window_density)
+    let open Mina_numbers in
+    let%bind epsilon1 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    let%bind epsilon2 = Length.gen_incl (Length.of_int 0) (Length.of_int 10) in
+    { lower =
+        Length.sub psv.min_window_density epsilon1
+        |> Option.value ~default:Length.zero
+    ; upper = Length.add psv.min_window_density epsilon2
+    }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind total_currency =
-    Zkapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.total_currency)
+    let open Currency in
+    let%bind epsilon1 =
+      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+    in
+    let%bind epsilon2 =
+      Amount.gen_incl (Amount.of_int 0) (Amount.of_int 1_000_000_000)
+    in
+    { lower =
+        Amount.sub psv.total_currency epsilon1
+        |> Option.value ~default:Amount.zero
+    ; upper =
+        Amount.add psv.total_currency epsilon2
+        |> Option.value ~default:psv.total_currency
+    }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind global_slot_since_hard_fork =
-    Zkapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.global_slot_since_hard_fork)
+    let open Mina_numbers in
+    let%bind epsilon1 =
+      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+    in
+    let%bind epsilon2 =
+      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+    in
+    { lower =
+        Global_slot.sub psv.global_slot_since_hard_fork epsilon1
+        |> Option.value ~default:Global_slot.zero
+    ; upper = Global_slot.add psv.global_slot_since_hard_fork epsilon2
+    }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind global_slot_since_genesis =
-    Zkapp_basic.Or_ignore.gen
-      (return @@ closed_interval_exact psv.global_slot_since_genesis)
+    let open Mina_numbers in
+    let%bind epsilon1 =
+      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+    in
+    let%bind epsilon2 =
+      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+    in
+    { lower =
+        Global_slot.sub psv.global_slot_since_genesis epsilon1
+        |> Option.value ~default:Global_slot.zero
+    ; upper = Global_slot.add psv.global_slot_since_genesis epsilon2
+    }
+    |> return |> Zkapp_basic.Or_ignore.gen
   in
   let%bind staking_epoch_data =
     gen_epoch_data_predicate psv.staking_epoch_data
