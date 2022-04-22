@@ -5,6 +5,7 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Processor = Archive_lib.Processor
+module Load_data = Archive_lib.Load_data
 
 (* identify a target block B containing staking and next epoch ledgers
    to be used in a hard fork, by giving its state hash
@@ -40,7 +41,7 @@ type output =
   }
 [@@deriving yojson]
 
-type command_type = [ `Internal_command | `User_command | `Snapp_command ]
+type command_type = [ `Internal_command | `User_command | `Zkapp_command ]
 
 module type Get_command_ids = sig
   val run :
@@ -148,47 +149,23 @@ let get_slot_hashes ~logger slot =
   in
   go slot
 
-(* cache of account keys *)
-let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
+(* cache of account identifiers *)
+let account_identifier_tbl : (int, Account_id.t) Hashtbl.t = Int.Table.create ()
 
-let query_db pool ~f ~item =
-  match%bind Caqti_async.Pool.use f pool with
-  | Ok v ->
-      return v
-  | Error msg ->
-      failwithf "Error getting %s from db, error: %s" item
-        (Caqti_error.show msg) ()
-
-let pk_of_pk_id pool pk_id : Account.key Deferred.t =
+let account_identifer_of_id pool account_identifier_id : Account_id.t Deferred.t
+    =
   let open Deferred.Let_syntax in
-  match Hashtbl.find pk_tbl pk_id with
-  | Some pk ->
-      return pk
-  | None -> (
+  match Hashtbl.find account_identifier_tbl account_identifier_id with
+  | Some acct_id ->
+      return acct_id
+  | None ->
       (* not in cache, consult database *)
-      match%map
-        Caqti_async.Pool.use (fun db -> Sql.Public_key.run db pk_id) pool
-      with
-      | Ok (Some pk) -> (
-          match Signature_lib.Public_key.Compressed.of_base58_check pk with
-          | Ok pk ->
-              Hashtbl.add_exn pk_tbl ~key:pk_id ~data:pk ;
-              pk
-          | Error err ->
-              Error.tag_arg err "Error decoding public key"
-                (("public_key", pk), ("id", pk_id))
-                [%sexp_of: (string * string) * (string * int)]
-              |> Error.raise )
-      | Ok None ->
-          failwithf "Could not find public key with id %d" pk_id ()
-      | Error msg ->
-          failwithf "Error retrieving public key with id %d, error: %s" pk_id
-            (Caqti_error.show msg) () )
-
-let balance_info_of_id pool ~id =
-  query_db pool
-    ~f:(fun db -> Archive_lib.Processor.Balance.load db ~id)
-    ~item:"balance info of id"
+      let%map acct_id =
+        Load_data.account_identifier_of_id pool account_identifier_id
+      in
+      Hashtbl.add_exn account_identifier_tbl ~key:account_identifier_id
+        ~data:acct_id ;
+      acct_id
 
 let internal_command_to_balance_block_data
     (internal_cmd : Sql.Internal_command.t) =
@@ -257,20 +234,16 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
 
 let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
     ~staking_epoch_ledger =
+  let query_db = Mina_caqti.query pool in
   let%bind state_hash =
-    query_db pool
-      ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
-      ~item:"block state hash for staking epoch data"
+    query_db ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
   in
   let%bind staking_epoch_id =
-    query_db pool
-      ~f:(fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
-      ~item:"staking epoch id"
+    query_db ~f:(fun db ->
+        Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
   in
   let%map { epoch_ledger_hash; epoch_data_seed } =
-    query_db pool
-      ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
-      ~item:"staking epoch data"
+    query_db ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
   in
   let ledger =
     update_epoch_ledger ~logger ~name:"staking" ~ledger
@@ -280,20 +253,15 @@ let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
 
 let update_next_epoch_data ~logger pool ~ledger ~last_block_id
     ~next_epoch_ledger =
+  let query_db = Mina_caqti.query pool in
   let%bind state_hash =
-    query_db pool
-      ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
-      ~item:"block state hash for next epoch data"
+    query_db ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
   in
   let%bind next_epoch_id =
-    query_db pool
-      ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
-      ~item:"next epoch id"
+    query_db ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
   in
   let%map { epoch_ledger_hash; epoch_data_seed } =
-    query_db pool
-      ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
-      ~item:"next epoch data"
+    query_db ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
   in
   let ledger =
     update_epoch_ledger ~logger ~name:"next" ~ledger
@@ -319,7 +287,10 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
     =
   match internal_cmd.type_ with
   | "fee_transfer_via_coinbase" ->
-      let%map receiver_pk = pk_of_pk_id pool internal_cmd.receiver_id in
+      let%map receiver_acct_id =
+        Load_data.account_identifier_of_id pool internal_cmd.receiver_id
+      in
+      let receiver_pk = Account_id.public_key receiver_acct_id in
       let fee =
         Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 internal_cmd.fee)
       in
@@ -333,283 +304,21 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
   | _ ->
       Deferred.unit
 
-(* balance_block_data come from a loaded internal or user command, which
-    includes data from the blocks table and
-   - for internal commands, the tables internal_commands and blocks_internals_commands
-   - for user commands, the tables user_commands and blocks_user_commands
-     we compare those against the same-named values in the balances row
-*)
-let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token
-    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error :
-    unit Deferred.t =
-  let%bind pk = pk_of_pk_id pool pk_id in
-  let%bind balance_info = balance_info_of_id pool ~id:balance_id in
-  let token = Token_id.of_string token in
-  let account_id = Account_id.create pk token in
-  let account =
-    match Ledger.location_of_account ledger account_id with
-    | Some loc -> (
-        match Ledger.get ledger loc with
-        | Some account ->
-            account
-        | None ->
-            failwithf
-              "Could not find account in ledger for public key %s and token id \
-               %s"
-              (Signature_lib.Public_key.Compressed.to_base58_check pk)
-              (Token_id.to_string token) () )
-    | None ->
-        failwithf
-          "Could not get location of account for public key %s and token id %s"
-          (Signature_lib.Public_key.Compressed.to_base58_check pk)
-          (Token_id.to_string token) ()
-  in
-  let actual_balance = account.balance in
-  let claimed_balance =
-    balance_info.balance |> Unsigned.UInt64.of_int64
-    |> Currency.Balance.of_uint64
-  in
-  if not (Currency.Balance.equal actual_balance claimed_balance) then (
-    [%log error] "Claimed balance does not match actual balance in ledger"
-      ~metadata:
-        [ ("who", `String who)
-        ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
-        ; ("actual_balance", Currency.Balance.to_yojson actual_balance)
-        ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
-  let { block_id; block_height; sequence_no; secondary_sequence_no } =
-    balance_block_data
-  in
-  if not (block_id = balance_info.block_id) then (
-    [%log error]
-      "Block id from command does not match block id in balances table"
-      ~metadata:
-        [ ("who", `String who)
-        ; ("block_id_command", `Int block_id)
-        ; ("block_id_balances", `Int balance_info.block_id)
-        ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
-  if not (Int64.equal block_height balance_info.block_height) then (
-    [%log error]
-      "Block height from command does not match block height in balances table"
-      ~metadata:
-        [ ("who", `String who)
-        ; ("block_height_command", `String (Int64.to_string block_height))
-        ; ( "block_height_balances"
-          , `String (Int64.to_string balance_info.block_height) )
-        ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
-  if not (sequence_no = balance_info.block_sequence_no) then (
-    [%log error]
-      "Sequence no from command does not match sequence no in balances table"
-      ~metadata:
-        [ ("who", `String who)
-        ; ("block_sequence_no_command", `Int sequence_no)
-        ; ("block_sequence_no_balances", `Int balance_info.block_sequence_no)
-        ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
-  if not (secondary_sequence_no = balance_info.block_secondary_sequence_no) then (
-    [%log error]
-      "Secondary sequence no from command does not match secondary sequence no \
-       in balances table"
-      ~metadata:
-        [ ("who", `String who)
-        ; ("block_secondary_sequence_no_command", `Int secondary_sequence_no)
-        ; ( "block_secondary_sequence_no_balances"
-          , `Int balance_info.block_secondary_sequence_no )
-        ] ;
-    if continue_on_error then incr error_count else Core_kernel.exit 1 ) ;
-  let ledger_nonce = account.nonce in
-  match balance_info.nonce with
-  | None ->
-      if set_nonces then (
-        [%log info] "Inserting missing nonce into archive db"
-          ~metadata:
-            [ ("balance_id", `Int balance_id)
-            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
-            ] ;
-        let nonce =
-          Account.Nonce.to_uint32 ledger_nonce |> Unsigned.UInt32.to_int64
-        in
-        query_db pool
-          ~f:(fun db -> Sql.Balances.insert_nonce db ~id:balance_id ~nonce)
-          ~item:"chain from state hash" )
-      else (
-        [%log error] "Missing nonce in archive db"
-          ~metadata:
-            [ ("balance_id", `Int balance_id)
-            ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
-            ] ;
-        return
-        @@ if continue_on_error then incr error_count else Core_kernel.exit 1 )
-  | Some nonce ->
-      let db_nonce =
-        nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
-      in
-      if not (Account.Nonce.equal ledger_nonce db_nonce) then
-        if repair_nonces then (
-          [%log info] "Repairing incorrect nonce in balances table"
-            ~metadata:
-              [ ("who", `String who)
-              ; ("balance_id", `Int balance_id)
-              ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
-              ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
-              ] ;
-          let correct_nonce =
-            ledger_nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
-          in
-          query_db pool
-            ~f:(fun db ->
-              Sql.Balances.insert_nonce db ~id:balance_id ~nonce:correct_nonce)
-            ~item:"repairing nonce" )
-        else (
-          [%log error] "Ledger nonce does not match nonce in balances table"
-            ~metadata:
-              [ ("who", `String who)
-              ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
-              ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
-              ] ;
-          return
-          @@ if continue_on_error then incr error_count else Core_kernel.exit 1
-          )
-      else Deferred.unit
-
 let account_creation_fee_uint64 =
   Currency.Fee.to_uint64 constraint_constants.account_creation_fee
 
 let account_creation_fee_int64 =
   Currency.Fee.to_int constraint_constants.account_creation_fee |> Int64.of_int
 
-let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-    ~balance_id ~fee ?additional_fee ~continue_on_error () =
-  let%map balance_info = balance_info_of_id pool ~id:balance_id in
-  let claimed_balance =
-    balance_info.balance |> Unsigned.UInt64.of_int64
-    |> Currency.Balance.of_uint64
-  in
-  let balance_uint64 = Currency.Balance.to_uint64 claimed_balance in
-  (* for coinbases, an additional fee may be deducted from the amount
-     given to the receiver beyond the account creation fee *)
-  let total_creation_deduction_uint64 =
-    match additional_fee with
-    | None ->
-        account_creation_fee_uint64
-    | Some fee' ->
-        Unsigned.UInt64.add account_creation_fee_uint64
-          (Currency.Fee.to_uint64 fee')
-  in
-  let fee_uint64 = Currency.Fee.to_uint64 fee in
-  let add_additional_fee_to_metadata metadata =
-    match additional_fee with
-    | None ->
-        metadata
-    | Some fee ->
-        metadata @ [ ("fee_transfer_fee", Currency.Fee.to_yojson fee) ]
-  in
-  if Unsigned_extended.UInt64.( >= ) fee_uint64 total_creation_deduction_uint64
-  then (
-    (* account may have been created *)
-    let fee_less_total_creation_deduction_uint64 =
-      Unsigned.UInt64.sub fee_uint64 total_creation_deduction_uint64
-    in
-    if
-      Unsigned.UInt64.equal balance_uint64
-        fee_less_total_creation_deduction_uint64
-    then
-      match receiver_account_creation_fee with
-      | None ->
-          [%log error]
-            "In the archive database, the account balance equals the internal \
-             command fee minus the account creation fee (and for coinbases, \
-             also less any fee transfer fee), but the receiver account \
-             creation fee is NULL"
-            ~metadata:
-              (add_additional_fee_to_metadata
-                 [ ( "account_balance"
-                   , Currency.Balance.to_yojson claimed_balance )
-                 ; ("fee", Currency.Fee.to_yojson fee)
-                 ; ( "constraint_constants.account_creation_fee"
-                   , Currency.Fee.to_yojson
-                       constraint_constants.account_creation_fee )
-                 ]) ;
-          if continue_on_error then incr error_count else Core_kernel.exit 1
-      | Some amount_int64 ->
-          if Int64.equal amount_int64 account_creation_fee_int64 then
-            (* account creation fee in db has the expected value *)
-            ()
-          else (
-            [%log error]
-              "In the archive database, the account balance equals the \
-               internal command fee minus the account creation fee (and for \
-               coinbases, also less any fee transfer fee), but the receiver \
-               account creation fee differs from the account creation fee"
-              ~metadata:
-                (add_additional_fee_to_metadata
-                   [ ( "account_balance"
-                     , Currency.Balance.to_yojson claimed_balance )
-                   ; ("fee", Currency.Fee.to_yojson fee)
-                   ; ( "constraint_constants.account_creation_fee"
-                     , Currency.Fee.to_yojson
-                         constraint_constants.account_creation_fee )
-                   ; ( "receiver_account_creation_fee"
-                     , `String (Int64.to_string amount_int64) )
-                   ]) ;
-            if continue_on_error then incr error_count else Core_kernel.exit 1 )
-    else
-      match receiver_account_creation_fee with
-      | None ->
-          ()
-      | Some amount_int64 ->
-          [%log error]
-            "In the archive database, the account balance is different than \
-             the internal command fee minus the account creation fee (and for \
-             coinbases, also less any fee transfer fee), but the receiver \
-             account creation fee is not NULL"
-            ~metadata:
-              (add_additional_fee_to_metadata
-                 [ ( "account_balance"
-                   , Currency.Balance.to_yojson claimed_balance )
-                 ; ("fee", Currency.Fee.to_yojson fee)
-                 ; ( "constraint_constants.account_creation_fee"
-                   , Currency.Fee.to_yojson
-                       constraint_constants.account_creation_fee )
-                 ; ( "receiver_account_creation_fee"
-                   , `String (Int64.to_string amount_int64) )
-                 ]) ;
-          if continue_on_error then incr error_count else Core_kernel.exit 1 )
-  else
-    (* fee less than account creation fee *)
-    match receiver_account_creation_fee with
-    | None ->
-        ()
-    | Some amount_int64 ->
-        [%log error]
-          "The internal command fee is less than the account creation fee (for \
-           coinbases the creation fee plus any fee transfer fee), so no \
-           account should have been created, but in the archive database, the \
-           receiver account creation fee is not NULL"
-          ~metadata:
-            (add_additional_fee_to_metadata
-               [ ("account_balance", Currency.Balance.to_yojson claimed_balance)
-               ; ("fee", Currency.Fee.to_yojson fee)
-               ; ( "constraint_constants.account_creation_fee"
-                 , Currency.Fee.to_yojson
-                     constraint_constants.account_creation_fee )
-               ; ( "receiver_account_creation_fee"
-                 , `String (Int64.to_string amount_int64) )
-               ]) ;
-        if continue_on_error then incr error_count else Core_kernel.exit 1
-
-let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
     cmd.type_ cmd.global_slot_since_genesis cmd.sequence_no
     cmd.secondary_sequence_no ;
-  let%bind receiver_pk = pk_of_pk_id pool cmd.receiver_id in
+  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
+  let%bind receiver_account_id = account_identifier_of_id cmd.receiver_id in
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
-  let fee_token = Token_id.of_string cmd.token in
   let txn_global_slot =
     cmd.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
@@ -621,18 +330,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       [%sexp_of: (string * int64) * (string * int)]
     |> Error.raise
   in
-  let pk_id = cmd.receiver_id in
-  let balance_id = cmd.receiver_balance_id in
-  let token = cmd.token in
-  let receiver_account_creation_fee = cmd.receiver_account_creation_fee_paid in
-  let balance_block_data = internal_command_to_balance_block_data cmd in
   let open Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
-      let%bind () =
-        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-          ~balance_id ~fee ~continue_on_error ()
-      in
+      let fee_token = Account_id.token_id receiver_account_id in
+      let receiver_pk = Account_id.public_key receiver_account_id in
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
@@ -642,9 +344,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       in
       match undo_or_error with
       | Ok _undo ->
-          verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
-            ~balance_id ~pk_id ~token ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+          Deferred.unit
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -663,6 +363,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
           cmd.global_slot_since_genesis cmd.sequence_no
           cmd.secondary_sequence_no ;
       let coinbase =
+        let receiver_pk = Account_id.public_key receiver_account_id in
         match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
         | Ok cb ->
             cb
@@ -670,47 +371,34 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
-      let additional_fee = Option.map fee_transfer ~f:(fun { fee; _ } -> fee) in
-      let%bind () =
-        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-          ~balance_id ~fee ?additional_fee ~continue_on_error ()
-      in
       let undo_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
       match undo_or_error with
       | Ok _undo ->
-          verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
-            ~balance_id ~pk_id ~token ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+          Deferred.unit
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
-      let%bind () =
-        verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
-          ~balance_id ~fee ~continue_on_error ()
-      in
-      let%bind () =
-        verify_balance ~logger ~pool ~ledger
-          ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id ~token
-          ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error
-      in
       (* the actual application is in the "coinbase" case *)
       Deferred.unit
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
-let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-    ~continue_on_error (cmd1 : Sql.Internal_command.t)
-    (cmd2 : Sql.Internal_command.t) =
+let apply_combined_fee_transfer ~logger ~pool ~ledger
+    (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
+  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let fee_transfer_of_cmd (cmd : Sql.Internal_command.t) =
     if not (String.equal cmd.type_ "fee_transfer") then
       failwithf "Expected fee transfer, got: %s" cmd.type_ () ;
-    let%map receiver_pk = pk_of_pk_id pool cmd.receiver_id in
+    let%map receiver_account_identifier =
+      account_identifier_of_id cmd.receiver_id
+    in
     let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
-    let fee_token = Token_id.of_string cmd.token in
+    let receiver_pk = Account_id.public_key receiver_account_identifier in
+    let fee_token = Account_id.token_id receiver_account_identifier in
     Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token
   in
   let%bind fee_transfer1 = fee_transfer_of_cmd cmd1 in
@@ -733,18 +421,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
   in
   match applied_or_error with
   | Ok _ ->
-      let balance_block_data = internal_command_to_balance_block_data cmd1 in
-      let%bind () =
-        verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
-          ~balance_id:cmd1.receiver_balance_id ~pk_id:cmd1.receiver_id
-          ~token:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
-      in
-      let balance_block_data = internal_command_to_balance_block_data cmd2 in
-      verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
-        ~balance_id:cmd2.receiver_balance_id ~pk_id:cmd2.receiver_id
-        ~token:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
-        ~continue_on_error
+      Deferred.unit
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -757,8 +434,11 @@ module User_command_helpers = struct
         Sql.User_command.t) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
-    let%bind source_pk = pk_of_pk_id pool source_id in
-    let%map receiver_pk = pk_of_pk_id pool receiver_id in
+    let account_identifier_of_id = Load_data.account_identifier_of_id pool in
+    let%bind source_account_id = account_identifier_of_id source_id in
+    let%map receiver_account_id = account_identifier_of_id receiver_id in
+    let source_pk = Account_id.public_key source_account_id in
+    let receiver_pk = Account_id.public_key receiver_account_id in
     let amount =
       Option.map amount
         ~f:(Fn.compose Currency.Amount.of_uint64 Unsigned.UInt64.of_int64)
@@ -779,14 +459,15 @@ module User_command_helpers = struct
         failwithf "Invalid user command type: %s" type_ ()
 end
 
-let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
     cmd.type_ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
+  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let%bind body = User_command_helpers.body_of_sql_user_cmd pool cmd in
-  let%bind fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
+  let%bind fee_payer_account_id = account_identifier_of_id cmd.fee_payer_id in
+  let fee_payer_pk = Account_id.public_key fee_payer_account_id in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
@@ -822,31 +503,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
       valid_signed_cmd
   with
   | Ok _undo ->
-      (* verify balances in database against current ledger *)
-      let token = Token_id.(to_string default) in
-      let balance_block_data = user_command_to_balance_block_data cmd in
-      let%bind () =
-        match cmd.source_balance_id with
-        | Some balance_id ->
-            verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
-              ~pk_id:cmd.source_id ~token ~balance_block_data ~set_nonces
-              ~repair_nonces ~continue_on_error
-        | None ->
-            return ()
-      in
-      let%bind () =
-        match cmd.receiver_balance_id with
-        | Some balance_id ->
-            verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
-              ~pk_id:cmd.receiver_id ~token ~balance_block_data ~set_nonces
-              ~repair_nonces ~continue_on_error
-        | None ->
-            return ()
-      in
-      verify_balance ~logger ~pool ~ledger ~who:"fee payer"
-        ~balance_id:cmd.fee_payer_balance_id ~pk_id:cmd.fee_payer_id
-        ~token:cmd.fee_token ~balance_block_data ~set_nonces ~repair_nonces
-        ~continue_on_error
+      Deferred.unit
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -854,27 +511,22 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise
 
-module Snapp_helpers = struct
+module Zkapp_helpers = struct
   let get_parent_state_view ~pool block_id :
       Zkapp_precondition.Protocol_state.View.t Deferred.t =
-    (* when a Snapp is applied, use the protocol state associated with the parent block
+    (* when a zkAppp is applied, use the protocol state associated with the parent block
        of the block containing the transaction
     *)
+    let query_db = Mina_caqti.query pool in
     let%bind parent_id =
-      query_db pool
-        ~f:(fun db -> Sql.Block.get_parent_id db block_id)
-        ~item:"block parent id"
+      query_db ~f:(fun db -> Sql.Block.get_parent_id db block_id)
     in
     let%bind parent_block =
-      query_db pool
-        ~f:(fun db -> Processor.Block.load db ~id:parent_id)
-        ~item:"parent block"
+      query_db ~f:(fun db -> Processor.Block.load db ~id:parent_id)
     in
     let%bind snarked_ledger_hash_str =
-      query_db pool
-        ~f:(fun db ->
+      query_db ~f:(fun db ->
           Sql.Snarked_ledger_hashes.run db parent_block.snarked_ledger_hash_id)
-        ~item:"parent block snarked ledger hash"
     in
     let snarked_ledger_hash =
       Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
@@ -905,10 +557,8 @@ module Snapp_helpers = struct
     let epoch_data_of_raw_epoch_data (raw_epoch_data : Processor.Epoch_data.t) :
         Mina_base.Epoch_data.Value.t Deferred.t =
       let%bind hash_str =
-        query_db pool
-          ~f:(fun db ->
+        query_db ~f:(fun db ->
             Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
-          ~item:"epoch ledger hash"
       in
       let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
       let total_currency =
@@ -936,19 +586,15 @@ module Snapp_helpers = struct
         }
     in
     let%bind staking_epoch_raw =
-      query_db pool
-        ~f:(fun db ->
+      query_db ~f:(fun db ->
           Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
-        ~item:"staking epoch data"
     in
     let%bind (staking_epoch_data : Mina_base.Epoch_data.Value.t) =
       epoch_data_of_raw_epoch_data staking_epoch_raw
     in
     let%bind next_epoch_raw =
-      query_db pool
-        ~f:(fun db ->
+      query_db ~f:(fun db ->
           Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
-        ~item:"staking epoch data"
     in
     let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
     return
@@ -963,724 +609,42 @@ module Snapp_helpers = struct
       ; staking_epoch_data
       ; next_epoch_data
       }
-
-  let get_field_arrays ~pool array_id_arrays =
-    let array_ids = Array.to_list array_id_arrays in
-    Deferred.List.map array_ids ~f:(fun array_id ->
-        let%bind element_id_array =
-          query_db pool
-            ~f:(fun db -> Processor.Zkapp_state_data_array.load db array_id)
-            ~item:"Snapp state data array"
-        in
-        let element_ids = Array.to_list element_id_array in
-        let%bind field_strs =
-          Deferred.List.map element_ids ~f:(fun elt_id ->
-              query_db pool ~item:"Snapp field element" ~f:(fun db ->
-                  Processor.Zkapp_state_data.load db elt_id))
-        in
-        let fields =
-          List.map field_strs ~f:(fun field_str ->
-              Snark_params.Tick.Field.of_string field_str)
-        in
-        return (Array.of_list fields))
-
-  let state_data_of_ids ~pool ids =
-    Deferred.Array.map ids ~f:(fun state_data_id ->
-        match state_data_id with
-        | None ->
-            return None
-        | Some id ->
-            let%map field_str =
-              query_db pool
-                ~f:(fun db -> Processor.Zkapp_state_data.load db id)
-                ~item:"Snapp state data"
-            in
-            Some (Snark_params.Tick.Field.of_string field_str))
-
-  let party_body_of_id ~pool body_id =
-    let%bind (body_data : Processor.Zkapp_party_body.t) =
-      query_db pool
-        ~f:(fun db -> Processor.Zkapp_party_body.load db body_id)
-        ~item:"Snapp party body"
-    in
-    let%bind public_key = pk_of_pk_id pool body_data.public_key_id in
-    let%bind update_data =
-      query_db pool
-        ~f:(fun db -> Processor.Zkapp_updates.load db body_data.update_id)
-        ~item:"snapp updates"
-    in
-    let%bind app_state_data_ids =
-      query_db pool
-        ~f:(fun db -> Processor.Zkapp_states.load db update_data.app_state_id)
-        ~item:"snapp app state ids"
-    in
-    let%bind app_state_data = state_data_of_ids ~pool app_state_data_ids in
-    let app_state =
-      Array.map app_state_data ~f:Zkapp_basic.Set_or_keep.of_option
-      |> Array.to_list |> Pickles_types.Vector.Vector_8.of_list_exn
-    in
-    let%bind delegate =
-      match update_data.delegate_id with
-      | Some id ->
-          let%map pk = pk_of_pk_id pool id in
-          Zkapp_basic.Set_or_keep.Set pk
-      | None ->
-          return Zkapp_basic.Set_or_keep.Keep
-    in
-    let%bind verification_key =
-      match update_data.verification_key_id with
-      | Some id ->
-          let%map ({ verification_key; hash }
-                    : Processor.Zkapp_verification_keys.t) =
-            query_db pool
-              ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
-              ~item:"snapp verification key"
-          in
-          let data =
-            Pickles.Side_loaded.Verification_key.of_base58_check_exn
-              verification_key
-          in
-          let hash = Snark_params.Tick.Field.of_string hash in
-          Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
-      | None ->
-          return Zkapp_basic.Set_or_keep.Keep
-    in
-    let%bind permissions =
-      match update_data.permissions_id with
-      | Some id ->
-          let%map perms_data =
-            query_db pool
-              ~f:(fun db -> Processor.Zkapp_permissions.load db id)
-              ~item:"snapp verification key"
-          in
-          let perms : Mina_base.Permissions.t =
-            { edit_state = perms_data.edit_state
-            ; send = perms_data.send
-            ; receive = perms_data.receive
-            ; set_delegate = perms_data.set_delegate
-            ; set_permissions = perms_data.set_permissions
-            ; set_verification_key = perms_data.set_verification_key
-            ; set_zkapp_uri = perms_data.set_zkapp_uri
-            ; edit_sequence_state = perms_data.edit_sequence_state
-            ; set_token_symbol = perms_data.set_token_symbol
-            ; increment_nonce = perms_data.increment_nonce
-            ; set_voting_for = perms_data.set_voting_for
-            }
-          in
-          Zkapp_basic.Set_or_keep.Set perms
-      | None ->
-          return Zkapp_basic.Set_or_keep.Keep
-    in
-    let zkapp_uri =
-      update_data.zkapp_uri |> Zkapp_basic.Set_or_keep.of_option
-    in
-    let token_symbol =
-      update_data.token_symbol |> Zkapp_basic.Set_or_keep.of_option
-    in
-    let voting_for =
-      update_data.voting_for
-      |> Option.map ~f:State_hash.of_base58_check_exn
-      |> Zkapp_basic.Set_or_keep.of_option
-    in
-    let%bind timing =
-      match update_data.timing_id with
-      | None ->
-          return Zkapp_basic.Set_or_keep.Keep
-      | Some id ->
-          let%map tm_info =
-            query_db pool
-              ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
-              ~item:"snapp timing info"
-          in
-          Zkapp_basic.Set_or_keep.Set
-            { Party.Update.Timing_info.initial_minimum_balance =
-                tm_info.initial_minimum_balance |> Unsigned.UInt64.of_int64
-                |> Currency.Balance.of_uint64
-            ; cliff_time =
-                tm_info.cliff_time |> Unsigned.UInt32.of_int64
-                |> Mina_numbers.Global_slot.of_uint32
-            ; cliff_amount =
-                tm_info.cliff_amount |> Unsigned.UInt64.of_int64
-                |> Currency.Amount.of_uint64
-            ; vesting_period =
-                tm_info.vesting_period |> Unsigned.UInt32.of_int64
-                |> Mina_numbers.Global_slot.of_uint32
-            ; vesting_increment =
-                tm_info.vesting_increment |> Unsigned.UInt64.of_int64
-                |> Currency.Amount.of_uint64
-            }
-    in
-    let update : Party.Update.t =
-      { app_state
-      ; delegate
-      ; verification_key
-      ; permissions
-      ; zkapp_uri
-      ; token_symbol
-      ; timing
-      ; voting_for
-      }
-    in
-    let token_id = body_data.token_id |> Token_id.of_string in
-    let balance_change =
-      let magnitude =
-        body_data.balance_change |> Int64.abs |> Unsigned.UInt64.of_int64
-        |> Currency.Amount.of_uint64
-      in
-      let sgn =
-        if Int64.is_negative body_data.balance_change then Sgn.Neg else Sgn.Pos
-      in
-      ({ magnitude; sgn } : _ Currency.Signed_poly.t)
-    in
-    let increment_nonce = body_data.increment_nonce in
-    let%bind events = get_field_arrays ~pool body_data.events_ids in
-    let%bind sequence_events =
-      get_field_arrays ~pool body_data.sequence_events_ids
-    in
-    let%bind call_data_str =
-      query_db pool
-        ~f:(fun db -> Processor.Zkapp_state_data.load db body_data.call_data_id)
-        ~item:"Snapp call data"
-    in
-    let call_data = Snark_params.Tick.Field.of_string call_data_str in
-    let call_depth = body_data.call_depth in
-    let%bind protocol_state_data =
-      query_db pool
-        ~f:(fun db ->
-          Processor.Zkapp_protocol_state_precondition.load db
-            body_data.zkapp_protocol_state_precondition_id)
-        ~item:"Snapp account_precondition protocol state"
-    in
-    let%bind snarked_ledger_hash =
-      match protocol_state_data.snarked_ledger_hash_id with
-      | None ->
-          return Zkapp_precondition.Hash.Ignore
-      | Some id ->
-          let%map hash_str =
-            query_db pool ~item:"snarked ledger hash" ~f:(fun db ->
-                Processor.Snarked_ledger_hash.load db id)
-          in
-          Zkapp_precondition.Hash.Check
-            (Frozen_ledger_hash.of_base58_check_exn hash_str)
-    in
-    let%bind timestamp =
-      match protocol_state_data.timestamp_id with
-      | None ->
-          return Zkapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp timestamp bounds" ~f:(fun db ->
-                Processor.Zkapp_timestamp_bounds.load db id)
-          in
-          let to_timestamp i64 = i64 |> Block_time.of_int64 in
-          let lower = to_timestamp bounds.timestamp_lower_bound in
-          let upper = to_timestamp bounds.timestamp_upper_bound in
-          Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-    in
-    let length_bounds_of_id = function
-      | None ->
-          return Zkapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp length bounds" ~f:(fun db ->
-                Processor.Zkapp_length_bounds.load db id)
-          in
-          let to_length i64 =
-            i64 |> Unsigned.UInt32.of_int64 |> Mina_numbers.Length.of_uint32
-          in
-          let lower = to_length bounds.length_lower_bound in
-          let upper = to_length bounds.length_upper_bound in
-          Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-    in
-    let%bind blockchain_length =
-      length_bounds_of_id protocol_state_data.blockchain_length_id
-    in
-    let%bind min_window_density =
-      length_bounds_of_id protocol_state_data.min_window_density_id
-    in
-    let total_currency_of_id = function
-      | None ->
-          return Zkapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp currency bounds" ~f:(fun db ->
-                Processor.Zkapp_amount_bounds.load db id)
-          in
-          let to_amount i64 =
-            i64 |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64
-          in
-          let lower = to_amount bounds.amount_lower_bound in
-          let upper = to_amount bounds.amount_upper_bound in
-          Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-    in
-    (* TODO: this will change *)
-    let last_vrf_output = () in
-    let%bind total_currency =
-      total_currency_of_id protocol_state_data.total_currency_id
-    in
-    let global_slot_of_id = function
-      | None ->
-          return Zkapp_basic.Or_ignore.Ignore
-      | Some id ->
-          let%map bounds =
-            query_db pool ~item:"Snapp global slot bounds" ~f:(fun db ->
-                Processor.Zkapp_global_slot_bounds.load db id)
-          in
-          let to_slot i64 =
-            i64 |> Unsigned.UInt32.of_int64
-            |> Mina_numbers.Global_slot.of_uint32
-          in
-          let lower = to_slot bounds.global_slot_lower_bound in
-          let upper = to_slot bounds.global_slot_upper_bound in
-          Zkapp_basic.Or_ignore.Check
-            ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-    in
-    let%bind global_slot_since_hard_fork =
-      global_slot_of_id protocol_state_data.curr_global_slot_since_hard_fork
-    in
-    let%bind global_slot_since_genesis =
-      global_slot_of_id protocol_state_data.global_slot_since_genesis
-    in
-    let epoch_data_of_id id =
-      let%bind epoch_data_raw =
-        query_db pool ~item:"Snapp epoch data" ~f:(fun db ->
-            Processor.Zkapp_epoch_data.load db id)
-      in
-      let%bind ledger =
-        let%bind epoch_ledger_data =
-          query_db pool ~item:"Snapp epoch ledger" ~f:(fun db ->
-              Processor.Zkapp_epoch_ledger.load db id)
-        in
-        let%bind hash =
-          Option.value_map epoch_ledger_data.hash_id
-            ~default:(return Zkapp_basic.Or_ignore.Ignore) ~f:(fun id ->
-              let%map hash_str =
-                query_db pool ~item:"Snapp epoch ledger hash" ~f:(fun db ->
-                    Processor.Snarked_ledger_hash.load db id)
-              in
-              Zkapp_basic.Or_ignore.Check
-                (Frozen_ledger_hash.of_base58_check_exn hash_str))
-        in
-        let%map total_currency =
-          total_currency_of_id epoch_ledger_data.total_currency_id
-        in
-        { Epoch_ledger.Poly.hash; total_currency }
-      in
-      let seed =
-        Option.value_map epoch_data_raw.epoch_seed
-          ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
-            Zkapp_basic.Or_ignore.Check (Epoch_seed.of_base58_check_exn s))
-      in
-      let checkpoint_of_str str =
-        Option.value_map str ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
-            Zkapp_basic.Or_ignore.Check (State_hash.of_base58_check_exn s))
-      in
-      let start_checkpoint =
-        checkpoint_of_str epoch_data_raw.start_checkpoint
-      in
-      let lock_checkpoint = checkpoint_of_str epoch_data_raw.lock_checkpoint in
-      let%map epoch_length =
-        length_bounds_of_id epoch_data_raw.epoch_length_id
-      in
-      { Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger
-      ; seed
-      ; start_checkpoint
-      ; lock_checkpoint
-      ; epoch_length
-      }
-    in
-    let%bind staking_epoch_data =
-      epoch_data_of_id protocol_state_data.staking_epoch_data_id
-    in
-    let%bind next_epoch_data =
-      epoch_data_of_id protocol_state_data.next_epoch_data_id
-    in
-    let protocol_state_precondition : Zkapp_precondition.Protocol_state.t =
-      { snarked_ledger_hash
-      ; timestamp
-      ; blockchain_length
-      ; min_window_density
-      ; last_vrf_output
-      ; total_currency
-      ; global_slot_since_hard_fork
-      ; global_slot_since_genesis
-      ; staking_epoch_data
-      ; next_epoch_data
-      }
-    in
-    let%bind (account_precondition : Party.Account_precondition.t) =
-      let%bind account_precondition_data =
-        query_db pool ~item:"ZkApp account precondition" ~f:(fun db ->
-            Processor.Zkapp_account_precondition.load db
-              body_data.zkapp_account_precondition_id)
-      in
-      match account_precondition_data.kind with
-      | Full ->
-          let%bind zkapp_account_data =
-            match account_precondition_data.account_id with
-            | None ->
-                failwith
-                  "Expected account id for account precondition of kind Full"
-            | Some account_id ->
-                query_db pool ~item:"Snapp account" ~f:(fun db ->
-                    Processor.Zkapp_account.load db account_id)
-          in
-          let%map zkapp_account =
-            let%bind balance =
-              match zkapp_account_data.balance_id with
-              | None ->
-                  return Zkapp_basic.Or_ignore.Ignore
-              | Some balance_id ->
-                  let%map bounds =
-                    query_db pool ~item:"Snapp balance" ~f:(fun db ->
-                        Processor.Zkapp_balance_bounds.load db balance_id)
-                  in
-                  let to_balance i64 =
-                    i64 |> Unsigned.UInt64.of_int64
-                    |> Currency.Balance.of_uint64
-                  in
-                  let lower = to_balance bounds.balance_lower_bound in
-                  let upper = to_balance bounds.balance_upper_bound in
-                  Zkapp_basic.Or_ignore.Check
-                    ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-            in
-            let%bind nonce =
-              match zkapp_account_data.nonce_id with
-              | None ->
-                  return Zkapp_basic.Or_ignore.Ignore
-              | Some balance_id ->
-                  let%map bounds =
-                    query_db pool ~item:"Snapp nonce" ~f:(fun db ->
-                        Processor.Zkapp_nonce_bounds.load db balance_id)
-                  in
-                  let to_nonce i64 =
-                    i64 |> Unsigned.UInt32.of_int64
-                    |> Mina_numbers.Account_nonce.of_uint32
-                  in
-                  let lower = to_nonce bounds.nonce_lower_bound in
-                  let upper = to_nonce bounds.nonce_upper_bound in
-                  Zkapp_basic.Or_ignore.Check
-                    ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t)
-            in
-            let receipt_chain_hash =
-              Option.value_map zkapp_account_data.receipt_chain_hash
-                ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
-                  Zkapp_basic.Or_ignore.Check
-                    (Receipt.Chain_hash.of_base58_check_exn s))
-            in
-            let pk_check_or_ignore_of_id id =
-              Option.value_map id ~default:(return Zkapp_basic.Or_ignore.Ignore)
-                ~f:(fun pk_id ->
-                  let%map pk = pk_of_pk_id pool pk_id in
-                  Zkapp_basic.Or_ignore.Check pk)
-            in
-            let%bind public_key =
-              pk_check_or_ignore_of_id zkapp_account_data.public_key_id
-            in
-            let%bind delegate =
-              pk_check_or_ignore_of_id zkapp_account_data.delegate_id
-            in
-            let%bind state =
-              let%bind snapp_state_ids =
-                query_db pool ~item:"Snapp state id" ~f:(fun db ->
-                    Processor.Zkapp_states.load db zkapp_account_data.state_id)
-              in
-              let%map state_data = state_data_of_ids ~pool snapp_state_ids in
-              Array.map state_data ~f:Zkapp_basic.Or_ignore.of_option
-              |> Array.to_list |> Pickles_types.Vector.Vector_8.of_list_exn
-            in
-            let%bind sequence_state =
-              Option.value_map zkapp_account_data.sequence_state_id
-                ~default:(return Zkapp_basic.Or_ignore.Ignore)
-                ~f:(fun state_id ->
-                  let%map state_data_str =
-                    query_db pool ~item:"Snapp state data" ~f:(fun db ->
-                        Processor.Zkapp_state_data.load db state_id)
-                  in
-                  let state_data =
-                    Pickles.Backend.Tick.Field.of_string state_data_str
-                  in
-                  Zkapp_basic.Or_ignore.Check state_data)
-            in
-            let proved_state =
-              Option.value_map zkapp_account_data.proved_state
-                ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
-                  Zkapp_basic.Or_ignore.Check b)
-            in
-            return
-              ( { balance
-                ; nonce
-                ; receipt_chain_hash
-                ; public_key
-                ; delegate
-                ; state
-                ; sequence_state
-                ; proved_state
-                }
-                : Zkapp_precondition.Account.t )
-          in
-          Party.Account_precondition.Full zkapp_account
-      | Nonce -> (
-          match account_precondition_data.nonce with
-          | None ->
-              failwith "Expected nonce for account precondition of kind Nonce"
-          | Some nonce ->
-              return
-                (Party.Account_precondition.Nonce
-                   (Mina_numbers.Account_nonce.of_uint32
-                      (Unsigned.UInt32.of_int64 nonce))) )
-      | Accept ->
-          return Party.Account_precondition.Accept
-    in
-    let use_full_commitment = body_data.use_full_commitment in
-    return
-      ( { public_key
-        ; update
-        ; token_id
-        ; balance_change
-        ; increment_nonce
-        ; events
-        ; sequence_events
-        ; call_data
-        ; call_depth
-        ; protocol_state_precondition
-        ; account_precondition
-        ; use_full_commitment
-        }
-        : Party.Body.t )
-
-  (* fee payer body is like a party body, except the balance change is a fee, not signed,
-     and some fields are placeholders with the unit value
-  *)
-  let fee_payer_body_of_id ~pool body_id =
-    let%map body = party_body_of_id ~pool body_id in
-    let balance_change =
-      match body.balance_change with
-      | { magnitude; sgn = Sgn.Pos } ->
-          Currency.Amount.to_uint64 magnitude |> Currency.Fee.of_uint64
-      | _ ->
-          failwith
-            "fee_payer_body_of_id: expected positive balance change for fee \
-             payer"
-    in
-    let fee_payer_account_precondition =
-      match body.account_precondition with
-      | Party.Account_precondition.Nonce n ->
-          n
-      | p ->
-          failwith
-            (sprintf
-               "Expected Nonce for fee payer account precondition but received \
-                %s"
-               (Party.Account_precondition.to_yojson p |> Yojson.Safe.to_string))
-    in
-    ( { public_key = body.public_key
-      ; update = body.update
-      ; token_id = ()
-      ; balance_change
-      ; increment_nonce = ()
-      ; events = body.events
-      ; sequence_events = body.sequence_events
-      ; call_data = body.call_data
-      ; call_depth = body.call_depth
-      ; protocol_state_precondition = body.protocol_state_precondition
-      ; account_precondition = fee_payer_account_precondition
-      ; use_full_commitment = ()
-      }
-      : Party.Body.Fee_payer.t )
 end
 
-let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
+let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     Parties.t Deferred.t =
-  let%bind fee_payer_data =
-    query_db pool
-      ~f:(fun db -> Processor.Zkapp_fee_payers.load db cmd.fee_payer_id)
-      ~item:"Snapp fee payer"
+  let query_db = Mina_caqti.query pool in
+  let%bind fee_payer_body_id =
+    query_db ~f:(fun db -> Processor.Zkapp_fee_payers.load db cmd.fee_payer_id)
   in
+  (* use dummy authorizations, memo *)
   let%bind (fee_payer : Party.Fee_payer.t) =
     let%bind (body : Party.Body.Fee_payer.t) =
-      Snapp_helpers.fee_payer_body_of_id ~pool fee_payer_data.body_id
+      let%map raw_body =
+        Archive_lib.Load_data.get_party_body ~pool fee_payer_body_id
+      in
+      Party.Body.to_fee_payer_exn raw_body
     in
-    return { Party.Fee_payer.body; authorization = Signature.dummy }
+    return ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
   let%bind (other_parties : Party.t list) =
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
-        let%bind snapp_party_data =
-          query_db pool
-            ~f:(fun db -> Processor.Zkapp_party.load db id)
-            ~item:"Snapp party"
-        in
-        let%bind (data : Party.Preconditioned.t) =
-          let%bind (body : Party.Body.t) =
-            Snapp_helpers.party_body_of_id ~pool snapp_party_data.body_id
-          in
-          let%bind (account_precondition : Party.Account_precondition.t) =
-            let%bind account_precondition_data =
-              query_db pool ~item:"Snapp account precondition" ~f:(fun db ->
-                  Processor.Zkapp_account_precondition.load db
-                    snapp_party_data.account_precondition_id)
-            in
-            match account_precondition_data.kind with
-            | Full ->
-                let%bind zkapp_account_data =
-                  match account_precondition_data.account_id with
-                  | None ->
-                      failwith
-                        "Expected account id for account precondition of kind \
-                         Full"
-                  | Some account_id ->
-                      query_db pool ~item:"Zkapp account" ~f:(fun db ->
-                          Processor.Zkapp_precondition_account.load db
-                            account_id)
-                in
-                let%map zkapp_account =
-                  let%bind balance =
-                    match zkapp_account_data.balance_id with
-                    | None ->
-                        return Zkapp_basic.Or_ignore.Ignore
-                    | Some balance_id ->
-                        let%map bounds =
-                          query_db pool ~item:"Snapp balance" ~f:(fun db ->
-                              Processor.Zkapp_balance_bounds.load db balance_id)
-                        in
-                        let to_balance i64 =
-                          i64 |> Unsigned.UInt64.of_int64
-                          |> Currency.Balance.of_uint64
-                        in
-                        let lower = to_balance bounds.balance_lower_bound in
-                        let upper = to_balance bounds.balance_upper_bound in
-                        Zkapp_basic.Or_ignore.Check
-                          ( { lower; upper }
-                            : _ Zkapp_precondition.Closed_interval.t )
-                  in
-                  let%bind nonce =
-                    match zkapp_account_data.nonce_id with
-                    | None ->
-                        return Zkapp_basic.Or_ignore.Ignore
-                    | Some balance_id ->
-                        let%map bounds =
-                          query_db pool ~item:"Snapp nonce" ~f:(fun db ->
-                              Processor.Zkapp_nonce_bounds.load db balance_id)
-                        in
-                        let to_nonce i64 =
-                          i64 |> Unsigned.UInt32.of_int64
-                          |> Mina_numbers.Account_nonce.of_uint32
-                        in
-                        let lower = to_nonce bounds.nonce_lower_bound in
-                        let upper = to_nonce bounds.nonce_upper_bound in
-                        Zkapp_basic.Or_ignore.Check
-                          ( { lower; upper }
-                            : _ Zkapp_precondition.Closed_interval.t )
-                  in
-                  let receipt_chain_hash =
-                    Option.value_map zkapp_account_data.receipt_chain_hash
-                      ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun s ->
-                        Zkapp_basic.Or_ignore.Check
-                          (Receipt.Chain_hash.of_base58_check_exn s))
-                  in
-                  let pk_check_or_ignore_of_id id =
-                    Option.value_map id
-                      ~default:(return Zkapp_basic.Or_ignore.Ignore)
-                      ~f:(fun pk_id ->
-                        let%map pk = pk_of_pk_id pool pk_id in
-                        Zkapp_basic.Or_ignore.Check pk)
-                  in
-                  let%bind public_key =
-                    pk_check_or_ignore_of_id zkapp_account_data.public_key_id
-                  in
-                  let%bind delegate =
-                    pk_check_or_ignore_of_id zkapp_account_data.delegate_id
-                  in
-                  let%bind state =
-                    let%bind snapp_state_ids =
-                      query_db pool ~item:"Snapp state id" ~f:(fun db ->
-                          Processor.Zkapp_states.load db
-                            zkapp_account_data.state_id)
-                    in
-                    let%map state_data =
-                      Snapp_helpers.state_data_of_ids ~pool snapp_state_ids
-                    in
-                    Array.map state_data ~f:Zkapp_basic.Or_ignore.of_option
-                    |> Array.to_list
-                    |> Pickles_types.Vector.Vector_8.of_list_exn
-                  in
-                  let%bind sequence_state =
-                    Option.value_map zkapp_account_data.sequence_state_id
-                      ~default:(return Zkapp_basic.Or_ignore.Ignore)
-                      ~f:(fun state_id ->
-                        let%map state_data_str =
-                          query_db pool ~item:"Snapp state data" ~f:(fun db ->
-                              Processor.Zkapp_state_data.load db state_id)
-                        in
-                        let state_data =
-                          Pickles.Backend.Tick.Field.of_string state_data_str
-                        in
-                        Zkapp_basic.Or_ignore.Check state_data)
-                  in
-                  let proved_state =
-                    Option.value_map zkapp_account_data.proved_state
-                      ~default:Zkapp_basic.Or_ignore.Ignore ~f:(fun b ->
-                        Zkapp_basic.Or_ignore.Check b)
-                  in
-                  return
-                    ( { balance
-                      ; nonce
-                      ; receipt_chain_hash
-                      ; public_key
-                      ; delegate
-                      ; state
-                      ; sequence_state
-                      ; proved_state
-                      }
-                      : Zkapp_precondition.Account.t )
-                in
-                Party.Account_precondition.Full zkapp_account
-            | Nonce -> (
-                match account_precondition_data.nonce with
-                | None ->
-                    failwith
-                      "Expected nonce for account precondition of kind Nonce"
-                | Some nonce ->
-                    return
-                      (Party.Account_precondition.Nonce
-                         (Mina_numbers.Account_nonce.of_uint32
-                            (Unsigned.UInt32.of_int64 nonce))) )
-            | Accept ->
-                return Party.Account_precondition.Accept
-          in
-          return ({ body; account_precondition } : Party.Preconditioned.t)
-        in
-        let authorization =
-          (* dummy proof, signature, don't affect replay *)
-          match snapp_party_data.authorization_kind with
-          | Control.Tag.Proof ->
-              let n2 = Pickles_types.Nat.N2.n in
-              let proof = Pickles.Proof.dummy n2 n2 n2 in
-              Control.Proof proof
-          | Control.Tag.Signature ->
-              Control.Signature Signature.dummy
-          | Control.Tag.None_given ->
-              Control.None_given
-        in
-        return ({ body; authorization } : Party.t))
+        let%map body = Archive_lib.Load_data.get_party_body ~pool id in
+        let authorization = Control.None_given in
+        ({ body; authorization } : Party.t))
   in
-  (* memo contents don't affect ability to replay snapp *)
   let memo = Mina_base.Signed_command_memo.dummy in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
-let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
-    (cmd : Sql.Snapp_command.t) =
+let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
   [%log info]
-    "Applying Snapp command at global slot since genesis %Ld, and sequence \
+    "Applying zkApp command at global slot since genesis %Ld, and sequence \
      number %d"
     cmd.global_slot_since_genesis cmd.sequence_no ;
   let%bind state_view =
-    Snapp_helpers.get_parent_state_view ~pool cmd.block_id
+    Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
-  let%bind parties = parties_of_snapp_command ~pool cmd in
+  let%bind parties = parties_of_zkapp_command ~pool cmd in
   match
     Ledger.apply_parties_unchecked ~constraint_constants ~state_view ledger
       parties
@@ -1688,7 +652,7 @@ let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_
   | Ok _ ->
       Deferred.unit
   | Error err ->
-      Error.tag_arg err "Snapp command failed on replay"
+      Error.tag_arg err "zkApp command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
         , ("sequence number", cmd.sequence_no) )
         [%sexp_of: (string * int64) * (string * int)]
@@ -1699,12 +663,9 @@ let find_canonical_chain ~logger pool slot =
      a slot may represent several blocks, only one of which can be on canonical chain
      starting with max slot, look for chain, decrementing slot until chain found
   *)
+  let query_db = Mina_caqti.query pool in
   let find_state_hash_chain state_hash =
-    match%map
-      query_db pool
-        ~f:(fun db -> Sql.Block.get_chain db state_hash)
-        ~item:"chain from state hash"
-    with
+    match%map query_db ~f:(fun db -> Sql.Block.get_chain db state_hash) with
     | [] ->
         [%log info] "Block with state hash %s is not along canonical chain"
           state_hash ;
@@ -1713,9 +674,7 @@ let find_canonical_chain ~logger pool slot =
         Some state_hash
   in
   let%bind state_hashes =
-    query_db pool
-      ~f:(fun db -> Sql.Block.get_state_hashes_by_slot db slot)
-      ~item:"ids by slot"
+    query_db ~f:(fun db -> Sql.Block.get_state_hashes_by_slot db slot)
   in
   Deferred.List.find_map state_hashes ~f:find_state_hash_chain
 
@@ -1744,8 +703,7 @@ let unquoted_string_of_yojson json =
   let s = Yojson.Safe.to_string json in
   String.sub s ~pos:1 ~len:(String.length s - 2)
 
-let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
-    ~continue_on_error () =
+let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1769,6 +727,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       (* load from runtime config in same way as daemon
          except that we don't consider loading from a tar file
       *)
+      let query_db = Mina_caqti.query pool in
       let%bind padded_accounts =
         match
           Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
@@ -1795,18 +754,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         match epoch_ledgers_state_hash_opt with
         | Some epoch_ledgers_state_hash ->
             [%log info] "Retrieving fork block state_hash" ;
-            query_db pool
-              ~f:(fun db ->
+            query_db ~f:(fun db ->
                 Sql.Parent_block.get_parent_state_hash db
                   epoch_ledgers_state_hash)
-              ~item:"parent state hash of state hash"
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
-              query_db pool
-                ~f:(fun db -> Sql.Block.get_max_slot db ())
-                ~item:"max slot"
+              query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
             [%log info] "Maximum global slot since genesis in blocks is %d"
               max_slot ;
@@ -1864,16 +819,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       let%bind user_cmd_ids =
         get_command_ids (module Sql.User_command_ids) "user"
       in
-      [%log info] "Loading Snapp command ids" ;
-      let%bind snapp_cmd_ids =
-        get_command_ids (module Sql.Snapp_command_ids) "Snapp"
+      [%log info] "Loading zkApp command ids" ;
+      let%bind zkapp_cmd_ids =
+        get_command_ids (module Sql.Zkapp_command_ids) "zkApp"
       in
       [%log info]
-        "Obtained %d user command ids, %d internal command ids, and %d Snapp \
+        "Obtained %d user command ids, %d internal command ids, and %d zkApp \
          command ids"
         (List.length user_cmd_ids)
         (List.length internal_cmd_ids)
-        (List.length snapp_cmd_ids) ;
+        (List.length zkapp_cmd_ids) ;
       [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
@@ -1959,32 +914,32 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2))
       in
-      [%log info] "Loading Snapp commands" ;
-      let%bind unsorted_snapp_cmds_list =
-        Deferred.List.map snapp_cmd_ids ~f:(fun id ->
+      [%log info] "Loading zkApp commands" ;
+      let%bind unsorted_zkapp_cmds_list =
+        Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.Snapp_command.run db id) pool
+              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
             with
             | Ok [] ->
-                failwithf "Expected at least one Snapp command with id %d" id ()
-            | Ok snapp_cmds ->
-                snapp_cmds
+                failwithf "Expected at least one zkApp command with id %d" id ()
+            | Ok zkapp_cmds ->
+                zkapp_cmds
             | Error msg ->
                 failwithf
-                  "Error querying for Snapp commands with id %d, error %s" id
+                  "Error querying for zkApp commands with id %d, error %s" id
                   (Caqti_error.show msg) ())
       in
-      let unsorted_snapp_cmds = List.concat unsorted_snapp_cmds_list in
-      let filtered_snapp_cmds =
-        List.filter unsorted_snapp_cmds ~f:(fun (cmd : Sql.Snapp_command.t) ->
+      let unsorted_zkapp_cmds = List.concat unsorted_zkapp_cmds_list in
+      let filtered_zkapp_cmds =
+        List.filter unsorted_zkapp_cmds ~f:(fun (cmd : Sql.Zkapp_command.t) ->
             Int64.( >= ) cmd.global_slot_since_genesis
               input.start_slot_since_genesis
             && Int.Set.mem block_ids cmd.block_id)
       in
-      let sorted_snapp_cmds =
-        List.sort filtered_snapp_cmds ~compare:(fun sc1 sc2 ->
-            let tuple (sc : Sql.Snapp_command.t) =
+      let sorted_zkapp_cmds =
+        List.sort filtered_zkapp_cmds ~compare:(fun sc1 sc2 ->
+            let tuple (sc : Sql.Zkapp_command.t) =
               (sc.global_slot_since_genesis, sc.sequence_no)
             in
             [%compare: int64 * int] (tuple sc1) (tuple sc2))
@@ -1992,7 +947,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list)
-          (snapp_cmds : Sql.Snapp_command.t list)
+          (zkapp_cmds : Sql.Zkapp_command.t list)
           ~last_global_slot_since_genesis ~last_block_id ~staking_epoch_ledger
           ~next_epoch_ledger =
         let%bind staking_epoch_ledger, staking_seed =
@@ -2003,7 +958,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
           update_next_epoch_data ~logger pool ~last_block_id ~ledger
             ~next_epoch_ledger
         in
-        let log_ledger_hash_after_last_slot () =
+        let check_ledger_hash_after_last_slot () =
           let _state_hash, expected_ledger_hash =
             get_slot_hashes ~logger last_global_slot_since_genesis
           in
@@ -2026,6 +981,99 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               last_global_slot_since_genesis ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
+        let check_account_accessed () =
+          [%log info] "Checking accounts accessed in block just processed"
+            ~metadata:[ ("block_id", `Int last_block_id) ] ;
+          let%bind accounts_accessed_db =
+            query_db ~f:(fun db ->
+                Processor.Accounts_accessed.all_from_block db last_block_id)
+          in
+          let%bind accounts_created_db =
+            query_db ~f:(fun db ->
+                Processor.Accounts_created.all_from_block db last_block_id)
+          in
+          (* every account created in preceding block is an accessed account in preceding block *)
+          List.iter accounts_created_db
+            ~f:(fun { account_identifier_id = acct_id_created; _ } ->
+              if
+                Option.is_none
+                  (List.find accounts_accessed_db
+                     ~f:(fun { account_identifier_id = acct_id_accessed; _ } ->
+                       acct_id_accessed = acct_id_created))
+              then (
+                [%log error] "Created account not present in accessed accounts"
+                  ~metadata:
+                    [ ("created_account_identifier_id", `Int acct_id_created)
+                    ; ("block_id", `Int last_block_id)
+                    ] ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 )) ;
+          let%map accounts_accessed =
+            Deferred.List.map accounts_accessed_db
+              ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
+          in
+          List.iter accounts_accessed
+            ~f:(fun (index, { public_key; token_id; balance; nonce; _ }) ->
+              let account_id = Account_id.create public_key token_id in
+              let index_in_ledger =
+                Ledger.index_of_account_exn ledger account_id
+              in
+              if index <> index_in_ledger then (
+                [%log error]
+                  "Index in ledger does not match index in account accessed"
+                  ~metadata:
+                    [ ("index_in_ledger", `Int index_in_ledger)
+                    ; ("index_in_account_accessed", `Int index)
+                    ] ;
+                if continue_on_error then incr error_count
+                else Core_kernel.exit 1 ) ;
+              match Ledger.location_of_account ledger account_id with
+              | None ->
+                  [%log error] "Accessed account not in ledger"
+                    ~metadata:
+                      [ ("account_id", Account_id.to_yojson account_id) ] ;
+                  if continue_on_error then incr error_count
+                  else Core_kernel.exit 1
+              | Some loc ->
+                  let account_in_ledger =
+                    match Ledger.get ledger loc with
+                    | Some acct ->
+                        acct
+                    | None ->
+                        (* should be unreachable *)
+                        failwith
+                          "Account not in ledger, even though there's a \
+                           location for it"
+                  in
+                  let balance_in_ledger = account_in_ledger.balance in
+                  if not (Currency.Balance.equal balance balance_in_ledger) then (
+                    [%log error]
+                      "Balance in ledger does not match balance in account \
+                       accessed"
+                      ~metadata:
+                        [ ( "balance_in_ledger"
+                          , Currency.Balance.to_yojson balance_in_ledger )
+                        ; ( "balance_in_account_accessed"
+                          , Currency.Balance.to_yojson balance )
+                        ] ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1 ) ;
+                  let nonce_in_ledger = account_in_ledger.nonce in
+                  if
+                    not (Mina_numbers.Account_nonce.equal nonce nonce_in_ledger)
+                  then (
+                    [%log error]
+                      "Nonce in ledger does not match nonce in account accessed"
+                      ~metadata:
+                        [ ( "balance_in_ledger"
+                          , Mina_numbers.Account_nonce.to_yojson nonce_in_ledger
+                          )
+                        ; ( "balance_in_account_accessed"
+                          , Mina_numbers.Account_nonce.to_yojson nonce )
+                        ] ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1 ))
+        in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
             get_slot_hashes ~logger curr_global_slot_since_genesis
@@ -2038,13 +1086,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
              $state_hash at global slot since genesis %Ld"
             curr_global_slot_since_genesis
         in
-        let log_on_slot_change curr_global_slot_since_genesis =
+        let run_checks_on_slot_change curr_global_slot_since_genesis =
           if
             Int64.( > ) curr_global_slot_since_genesis
               last_global_slot_since_genesis
           then (
-            log_ledger_hash_after_last_slot () ;
+            check_ledger_hash_after_last_slot () ;
+            let%map () = check_account_accessed () in
             log_state_hash_on_next_slot curr_global_slot_since_genesis )
+          else Deferred.unit
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -2058,22 +1108,22 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
-              log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
-                  ~repair_nonces ~continue_on_error ic ic2
+                run_checks_on_slot_change ic.global_slot_since_genesis
               in
-              apply_commands ics2 user_cmds snapp_cmds
+              let%bind () =
+                apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
+              in
+              apply_commands ics2 user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              log_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
-                run_internal_command ~logger ~pool ~ledger ~set_nonces
-                  ~repair_nonces ~continue_on_error ic
+                run_checks_on_slot_change ic.global_slot_since_genesis
               in
-              apply_commands ics user_cmds snapp_cmds
+              let%bind () = run_internal_command ~logger ~pool ~ledger ic in
+              apply_commands ics user_cmds zkapp_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
@@ -2085,8 +1135,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         let get_user_cmd_sequence (uc : Sql.User_command.t) =
           (`User_command, uc.global_slot_since_genesis, uc.sequence_no)
         in
-        let get_snapp_cmd_sequence (sc : Sql.Snapp_command.t) =
-          (`Snapp_command, sc.global_slot_since_genesis, sc.sequence_no)
+        let get_zkapp_cmd_sequence (sc : Sql.Zkapp_command.t) =
+          (`Zkapp_command, sc.global_slot_since_genesis, sc.sequence_no)
         in
         let command_type_of_sequences seqs =
           let compare (_cmd_ty1, slot1, seq_no1) (_cmd_ty2, slot2, seq_no2) =
@@ -2097,28 +1147,28 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
           cmd_ty
         in
         let run_user_commands (uc : Sql.User_command.t) ucs =
-          log_on_slot_change uc.global_slot_since_genesis ;
           let%bind () =
-            run_user_command ~logger ~pool ~ledger ~continue_on_error
-              ~repair_nonces ~set_nonces uc
+            run_checks_on_slot_change uc.global_slot_since_genesis
           in
-          apply_commands internal_cmds ucs snapp_cmds
+          let%bind () = run_user_command ~logger ~pool ~ledger uc in
+          apply_commands internal_cmds ucs zkapp_cmds
             ~last_global_slot_since_genesis:uc.global_slot_since_genesis
             ~last_block_id:uc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
-        let run_snapp_commands (sc : Sql.Snapp_command.t) scs =
-          log_on_slot_change sc.global_slot_since_genesis ;
+        let run_zkapp_commands (zkc : Sql.Zkapp_command.t) zkcs =
           let%bind () =
-            run_snapp_command ~logger ~pool ~ledger ~continue_on_error sc
+            run_checks_on_slot_change zkc.global_slot_since_genesis
           in
-          apply_commands internal_cmds user_cmds scs
-            ~last_global_slot_since_genesis:sc.global_slot_since_genesis
-            ~last_block_id:sc.block_id ~staking_epoch_ledger ~next_epoch_ledger
+          let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
+          apply_commands internal_cmds user_cmds zkcs
+            ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
+            ~last_block_id:zkc.block_id ~staking_epoch_ledger ~next_epoch_ledger
         in
-        match (internal_cmds, user_cmds, snapp_cmds) with
+        match (internal_cmds, user_cmds, zkapp_cmds) with
         | [], [], [] ->
             (* all done *)
-            log_ledger_hash_after_last_slot () ;
+            check_ledger_hash_after_last_slot () ;
+            let%bind () = check_account_accessed () in
             Deferred.return
               ( last_global_slot_since_genesis
               , staking_epoch_ledger
@@ -2132,30 +1182,30 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             (* only user commands *)
             run_user_commands uc ucs
         | [], [], sc :: scs ->
-            (* only Snapp commands *)
-            run_snapp_commands sc scs
+            (* only zkApp commands *)
+            run_zkapp_commands sc scs
         | [], uc :: ucs, sc :: scs -> (
             (* no internal commands *)
             let seqs =
-              [ get_user_cmd_sequence uc; get_snapp_cmd_sequence sc ]
+              [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence sc ]
             in
             match command_type_of_sequences seqs with
             | `User_command ->
                 run_user_commands uc ucs
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                run_zkapp_commands sc scs )
         | ic :: ics, [], sc :: scs -> (
             (* no user commands *)
             let seqs =
-              [ get_internal_cmd_sequence ic; get_snapp_cmd_sequence sc ]
+              [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence sc ]
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
                 combine_or_run_internal_cmds ic ics
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                run_zkapp_commands sc scs )
         | ic :: ics, uc :: ucs, [] -> (
-            (* no Snapp commands *)
+            (* no zkApp commands *)
             let seqs =
               [ get_internal_cmd_sequence ic; get_user_cmd_sequence uc ]
             in
@@ -2164,34 +1214,35 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 combine_or_run_internal_cmds ic ics
             | `User_command ->
                 run_user_commands uc ucs )
-        | ic :: ics, uc :: ucs, sc :: scs -> (
-            (* internal, user, and Snapp commands *)
+        | ic :: ics, uc :: ucs, zkc :: zkcs -> (
+            (* internal, user, and zkApp commands *)
             let seqs =
               [ get_internal_cmd_sequence ic
               ; get_user_cmd_sequence uc
-              ; get_snapp_cmd_sequence sc
+              ; get_zkapp_cmd_sequence zkc
               ]
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
                 combine_or_run_internal_cmds ic ics
             | `User_command ->
-                log_on_slot_change uc.global_slot_since_genesis ;
                 let%bind () =
-                  run_user_command ~logger ~pool ~ledger ~continue_on_error
-                    ~set_nonces ~repair_nonces uc
+                  run_checks_on_slot_change uc.global_slot_since_genesis
                 in
-                apply_commands internal_cmds ucs scs
+                let%bind () = run_user_command ~logger ~pool ~ledger uc in
+                apply_commands internal_cmds ucs zkcs
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger
-            | `Snapp_command ->
-                run_snapp_commands sc scs )
+            | `Zkapp_command ->
+                let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
+                apply_commands internal_cmds ucs zkcs
+                  ~last_global_slot_since_genesis:uc.global_slot_since_genesis
+                  ~last_block_id:uc.block_id ~staking_epoch_ledger
+                  ~next_epoch_ledger )
       in
       let%bind unparented_ids =
-        query_db pool
-          ~f:(fun db -> Sql.Block.get_unparented db ())
-          ~item:"unparented ids"
+        query_db ~f:(fun db -> Sql.Block.get_unparented db ())
       in
       let genesis_block_id =
         match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
@@ -2202,10 +1253,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
-          query_db pool
-            ~f:(fun db ->
+          query_db ~f:(fun db ->
               Sql.Block.get_next_slot db input.start_slot_since_genesis)
-            ~item:"Next slot"
         in
         match slot_opt with
         | Some slot ->
@@ -2236,7 +1285,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                , staking_seed
                , next_epoch_ledger
                , next_seed ) =
-        apply_commands sorted_internal_cmds sorted_user_cmds sorted_snapp_cmds
+        apply_commands sorted_internal_cmds sorted_user_cmds sorted_zkapp_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
@@ -2288,7 +1337,7 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async ~summary:"Replay transactions from Mina archive"
+      Command.async ~summary:"Replay transactions from Mina archive database"
         (let%map input_file =
            Param.flag "--input-file"
              ~doc:"file File containing the genesis ledger"
@@ -2303,15 +1352,8 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
-         and set_nonces =
-           Param.flag "--set-nonces"
-             ~doc:"Set missing nonces in archive database" Param.no_arg
-         and repair_nonces =
-           Param.flag "--repair-nonces"
-             ~doc:"Repair incorrect nonces in archive database" Param.no_arg
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
          in
-         main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~continue_on_error)))
+         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error)))

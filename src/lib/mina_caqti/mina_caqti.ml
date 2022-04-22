@@ -260,3 +260,31 @@ let query ~f pool =
       return v
   | Error msg ->
       failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+
+(** functions to retrieve an item from the db, where the input has
+    option type; the resulting option is converted to a suitable type
+*)
+let make_get_opt ~of_option ~f item_opt =
+  let%map res_opt =
+    Option.value_map item_opt ~default:(return None) ~f:(fun item ->
+        match%map f item with
+        | Ok v ->
+            Some v
+        | Error msg ->
+            failwithf "Error querying db, error: %s" (Caqti_error.show msg) ())
+  in
+  of_option res_opt
+
+let get_zkapp_set_or_keep (item_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
+    'res Zkapp_basic.Set_or_keep.t Deferred.t =
+  make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
+
+let get_zkapp_or_ignore (item_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
+    'res Zkapp_basic.Or_ignore.t Deferred.t =
+  make_get_opt item_opt ~of_option:Zkapp_basic.Or_ignore.of_option ~f
+
+let get_opt_item (arg_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
+  make_get_opt ~of_option:Fn.id ~f arg_opt

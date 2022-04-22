@@ -116,8 +116,8 @@ CREATE TABLE zkapp_fee_payers
 );
 
 /* zkapp_other_parties_ids refers to a list of ids in zkapp_party.
-   The values in zkapp_other_parties_ids are unenforced foreign keys, and
-   not NULL. */
+   The values in zkapp_other_parties_ids are unenforced foreign keys
+   that reference zkapp_party_body(id), and not NULL. */
 CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
 , zkapp_fee_payer_id                    int            NOT NULL REFERENCES zkapp_fee_payers(id)

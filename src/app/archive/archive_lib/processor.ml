@@ -51,7 +51,7 @@ module Public_key = struct
           public_key
 end
 
-module Tokens = struct
+module Token = struct
   type t =
     { value : string
     ; owner_public_key_id : int option
@@ -166,7 +166,7 @@ module Account_identifiers = struct
     let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
     (* this token_id is a Postgresql table id *)
     let%bind token_id =
-      Tokens.add_if_doesn't_exist (module Conn) ~owner:token_owner token_id
+      Token.add_if_doesn't_exist (module Conn) ~owner:token_owner token_id
     in
     let t = { public_key_id; token_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -179,7 +179,7 @@ module Account_identifiers = struct
     let pk = Account_id.public_key account_id in
     let%bind public_key_id = Public_key.find (module Conn) pk in
     let token = Account_id.token_id account_id in
-    let%bind token_id = Tokens.find (module Conn) token in
+    let%bind token_id = Token.find (module Conn) token in
     Conn.find
       (Caqti_request.find
          Caqti_type.(tup2 int int)
@@ -961,11 +961,13 @@ module Timing_info = struct
     ; vesting_period : int64
     ; vesting_increment : int64
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; int64; int64; int64; int64; int64; int64 ]
+
+  let table_name = "timing_info"
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -1052,6 +1054,18 @@ module Timing_info = struct
                    RETURNING id
              |sql})
           values
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+      id
+
+  let load_opt (module Conn : CONNECTION) id =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+      id
 end
 
 module Snarked_ledger_hash = struct
@@ -2121,95 +2135,6 @@ WITH RECURSIVE pending_chain_nonce AS (
             map)
 end
 
-module Balance = struct
-  type t =
-    { id : int
-    ; public_key_id : int
-    ; balance : int64
-    ; block_id : int
-    ; block_height : int64
-    ; block_sequence_no : int
-    ; block_secondary_sequence_no : int
-    ; nonce : int64 option
-    }
-  [@@deriving hlist]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int64; int; int64; int; int; option int64 ]
-
-  let balance_to_int64 (balance : Currency.Balance.t) : int64 =
-    balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64
-    |> Unsigned.UInt64.to_int64
-
-  let find (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no =
-    (* TODO: Do we need to query with the nonce here? *)
-    Conn.find_opt
-      (Caqti_request.find_opt
-         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
-         Caqti_type.int
-         {sql| SELECT id FROM balances
-               WHERE public_key_id = $1
-               AND balance = $2
-               AND block_id = $3
-               AND block_height = $4
-               AND block_sequence_no = $5
-               AND block_secondary_sequence_no = $6
-         |sql})
-      ( (public_key_id, balance_to_int64 balance)
-      , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
-      )
-
-  let load (module Conn : CONNECTION) ~(id : int) =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT id, public_key_id, balance,
-                      block_id, block_height,
-                      block_sequence_no, block_secondary_sequence_no, nonce
-               FROM balances
-               WHERE id = $1
-         |sql})
-      id
-
-  let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no ~nonce =
-    Conn.find
-      (Caqti_request.find
-         Caqti_type.(
-           tup2 (tup2 int int64) (tup4 int int64 (tup2 int int) (option int64)))
-         Caqti_type.int
-         {sql| INSERT INTO balances (public_key_id, balance,
-                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no, nonce)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
-               RETURNING id |sql})
-      ( (public_key_id, balance_to_int64 balance)
-      , ( block_id
-        , block_height
-        , (block_sequence_no, block_secondary_sequence_no)
-        , nonce ) )
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no ~nonce =
-    let open Deferred.Result.Let_syntax in
-    match%bind
-      find
-        (module Conn)
-        ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
-        ~block_secondary_sequence_no
-    with
-    | Some balance_id ->
-        return balance_id
-    | None ->
-        add
-          (module Conn)
-          ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
-          ~block_secondary_sequence_no ~nonce
-end
-
 module Block_and_internal_command = struct
   type t =
     { block_id : int
@@ -2631,14 +2556,11 @@ module Accounts_accessed = struct
     Result.all results
 
   let all_from_block (module Conn : CONNECTION) block_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.collect_list
       (Caqti_request.collect Caqti_type.int typ
-         {sql| SELECT ledger_index, block_id, account_id_id, token_symbol_id, balance, nonce,
-                      receipt_chain_hash, delegate, voting_for, timing_id, permissions_id,
-                      zkapp_id
-               FROM accounts_accessed
-               WHERE block_id = ?
-         |sql})
+         (Mina_caqti.select_cols ~select:comma_cols ~table_name
+            ~cols:[ "block_id" ] ()))
       block_id
 end
 
