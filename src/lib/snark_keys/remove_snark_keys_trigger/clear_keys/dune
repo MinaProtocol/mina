@@ -1,6 +1,16 @@
 (executable
  (name clear_keys)
- (libraries core file_system async cache_dir snarky.backendless)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   core_kernel
+   async_kernel
+   stdio
+   ;; local libraries
+   file_system
+   cache_dir
+   snarky.backendless)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))

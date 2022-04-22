@@ -1,18 +1,37 @@
 (executable
  (name gen_values)
  (libraries
-   ;; opam deps
+   ;; opam libraries
+   stdio
+   async_kernel
+   compiler-libs
+   core_kernel
+   ppxlib
+   ppxlib.ast
    async
    core
-   ;; libraries
+   ocaml-migrate-parsetree
+   base
+   ocaml-compiler-libs.common
+   async_unix
+   base.caml
+   ;; local libraries
+   coda_runtime_config
+   consensus
+   transaction_snark
+   mina_state
+   snark_params
+   coda_genesis_proof
    blockchain_snark
    mina_base
-   genesis_proof
    global_signer_private_key
-   ppxlib
    ppx_util
-   snark_params
-   snarky.backendless)
+   snarky.backendless
+   genesis_constants
+   pickles
+   test_genesis_ledger
+   coda_genesis_ledger
+ )
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot ppx_here))

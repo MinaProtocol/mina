@@ -2,7 +2,6 @@
  (name graph_algorithms)
  (public_name graph_algorithms)
  (inline_tests)
- (libraries core_kernel)
+ (libraries core_kernel ppx_inline_test.config)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_deriving.std ppx_jane)))
- 

@@ -431,6 +431,20 @@ let setup_daemon logger =
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
   in
+  let to_pubsub_topic_mode_option =
+    let open Gossip_net.Libp2p in
+    function
+    | `String "ro" ->
+        Some RO
+    | `String "rw" ->
+        Some RW
+    | `String "none" ->
+        Some N
+    | `Null ->
+        None
+    | _ ->
+        raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
+  in
   fun () ->
     let open Deferred.Let_syntax in
     O1trace.thread "mina" (fun () ->
@@ -1088,6 +1102,16 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "max-connections"
               ~default:Cli_lib.Default.max_connections max_connections
           in
+          let pubsub_v1 = Gossip_net.Libp2p.N in
+          (* TODO uncomment after introducing Bitswap-based block retrieval *)
+          (* let pubsub_v1 =
+               or_from_config to_pubsub_topic_mode_option "pubsub-v1"
+                 ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
+             in *)
+          let pubsub_v0 =
+            or_from_config to_pubsub_topic_mode_option "pubsub-v0"
+              ~default:Cli_lib.Default.pubsub_v0 None
+          in
           let validation_queue_size =
             or_from_config YJ.Util.to_int_option "validation-queue-size"
               ~default:Cli_lib.Default.validation_queue_size
@@ -1146,6 +1170,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; known_private_ip_nets =
                   Option.value ~default:[] client_trustlist
               ; time_controller
+              ; pubsub_v1
+              ; pubsub_v0
               }
           in
           let net_config =

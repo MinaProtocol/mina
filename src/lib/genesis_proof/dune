@@ -2,11 +2,28 @@
  (name genesis_proof)
  (public_name coda_genesis_proof)
  (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   base.md5
+   core
+   async
+   ;; local libraries
+   snarky.backendless
+   pickles_types
+   currency
+   pickles
+   consensus
+   coda_runtime_config
+   blockchain_snark
    mina_base
    mina_state
-   blockchain_snark
    genesis_constants
-   runtime_config
-   with_hash)
+   with_hash
+   coda_genesis_ledger
+   transaction_snark
+   sgn
+   snark_params
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

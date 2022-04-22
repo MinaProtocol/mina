@@ -5,8 +5,12 @@
  (preprocess (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   snarky.backendless
-   blake2
-   digestif
+   ;; opam libraries
    core_kernel
-   integers))
+   digestif
+   integers
+   bignum.bigint
+   ;; local libraries
+   blake2
+   snarky.backendless
+))

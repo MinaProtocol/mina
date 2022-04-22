@@ -2,6 +2,20 @@
  (name logproc)
  (public_name logproc)
  (modules logproc)
- (libraries logproc_lib bash_colors core yojson angstrom cmdliner logger)
+ (libraries
+   ;;opam libraries
+   result
+   stdio
+   core
+   yojson
+   cmdliner
+   core_kernel
+   ppx_deriving_yojson.runtime
+   ;;local libraries
+   logger
+   logproc_lib
+   bash_colors
+   interpolator_lib
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std)))
