@@ -31,15 +31,15 @@ let%test_module "Zkapp fuzzy tests" =
                 (Public_key.compress public_key, private_key))
             |> Public_key.Compressed.Map.of_alist_exn
           in
-          Quickcheck.test ~trials:20
-            (Mina_generators.Parties_generators.gen_parties_from
-               ~protocol_state_view:U.genesis_state_view ~fee_payer_keypair
-               ~keymap ~ledger ()) ~f:(fun parties ->
-              U.apply_parties ledger [ parties ] |> fun _ -> ()
-              (*
-              Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants:U.constraint_constants
-              ~state_view:U.genesis_state_view
-                    ledger parties
-                 |> Or_error.ok_exn |> (fun _ -> ())
-              *)))
+          let test () =
+            Quickcheck.test ~trials:1
+              (Mina_generators.Parties_generators.gen_parties_from
+                 ~protocol_state_view:U.genesis_state_view ~fee_payer_keypair
+                 ~keymap ~ledger ()) ~f:(fun parties ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    U.check_parties_with_merges_exn ledger [ parties ]))
+          in
+          for _i = 1 to 2 do
+            test ()
+          done)
   end )
