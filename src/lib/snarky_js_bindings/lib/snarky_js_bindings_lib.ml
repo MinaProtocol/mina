@@ -3153,22 +3153,16 @@ module Ledger = struct
     method_ "applyJsonTransaction" apply_json_transaction ;
 
     static_method "partiesToJson" parties_to_json ;
-    let rec yojson_to_gql (y : Yojson.Safe.t) : string =
-      match y with
-      | `Assoc kv ->
-          let kv_to_string (k, v) =
-            sprintf "%s:%s" (Fields_derivers.under_to_camel k) (yojson_to_gql v)
-          in
-          sprintf "{%s}" (List.map kv ~f:kv_to_string |> String.concat ~sep:",")
-      | `List xs ->
-          sprintf "[%s]" (List.map xs ~f:yojson_to_gql |> String.concat ~sep:",")
-      | x ->
-          Yojson.Safe.to_string x
-    in
     let parties_to_graphql ps =
-      parties ps |> !((deriver ())#to_json) |> yojson_to_gql |> Js.string
+      parties ps |> Parties.arg_query_string |> Js.string
     in
-    static_method "partiesToGraphQL" parties_to_graphql
+    static_method "partiesToGraphQL" parties_to_graphql ;
+    let json_to_graphql json =
+      json |> Js.to_string |> Yojson.Safe.from_string |> Parties.of_json
+      |> Parties.arg_query_string |> Js.string
+    in
+    static_method "jsonToGraphQL" json_to_graphql ;
+    ()
 end
 
 let export () =
