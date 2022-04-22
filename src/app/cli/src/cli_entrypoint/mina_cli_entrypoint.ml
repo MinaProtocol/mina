@@ -1109,6 +1109,7 @@ let setup_daemon logger =
                      peer_list_url))
           in
           if is_seed then [%log info] "Starting node as a seed node"
+          else if demo_mode then [%log info] "Starting node in demo mode"
           else if
             List.is_empty initial_peers && Option.is_none seed_peer_list_url
           then
