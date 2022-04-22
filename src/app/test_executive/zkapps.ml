@@ -87,9 +87,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer_nodes = Network.block_producers network in
+    (*TODO: capture snark worker processes' failures*)
     let%bind () =
-      Malleable_error.List.iter block_producer_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              ( Network.seeds network @ block_producer_nodes
+              @ Network.snark_coordinators network )))
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
@@ -121,6 +125,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = snapp_keypairs
@@ -161,6 +166,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair2, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount = Currency.Amount.zero
         ; zkapp_account_keypairs = snapp_keypairs
@@ -229,6 +235,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair2, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = snapp_keypairs

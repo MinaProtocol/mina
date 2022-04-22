@@ -930,6 +930,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -997,6 +998,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1074,6 +1076,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1158,6 +1161,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1241,6 +1245,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1313,6 +1318,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1386,6 +1392,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1463,6 +1470,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []
@@ -1534,6 +1542,7 @@ let%test_module "account timing check" =
           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
             { sender = (sender_keypair, nonce)
             ; fee
+            ; fee_payer = None
             ; receivers = [ (receiver_key, amount) ]
             ; amount
             ; zkapp_account_keypairs = []

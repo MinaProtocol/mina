@@ -8,7 +8,7 @@ type invalid =
   | `Invalid_proof
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
-[@@deriving bin_io_unversioned]
+[@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_string (invalid : invalid) =
   let keys_to_string keys =

@@ -419,7 +419,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
             let block_bin_prot =
-              Mina_transition.External_transition.Stable.Latest.bin_t
+              Mina_transition.External_transition.Raw.Stable.Latest.bin_t
             in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
@@ -445,25 +445,42 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition env
+                    ( `Transition
+                        (Envelope.Incoming.map
+                           ~f:Mina_transition.External_transition.decompose env)
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ))
                 block_bin_prot v1_topic_block
+              >>| Fn.flip Fn.compose Mina_transition.External_transition.compose
+            in
+            let map_v0_msg msg =
+              match msg with
+              | Message.New_state state ->
+                  Message.Latest.T.New_state
+                    (Mina_transition.External_transition.compose state)
+              | Message.Transaction_pool_diff diff ->
+                  Message.Latest.T.Transaction_pool_diff diff
+              | Message.Snark_pool_diff diff ->
+                  Message.Latest.T.Snark_pool_diff diff
             in
             let subscribe_v0_impl =
               subscribe
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
-                  | Message.New_state state ->
+                  | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
                         ( `Transition
-                            (Envelope.Incoming.map ~f:(fun _ -> state) env)
+                            (Envelope.Incoming.map
+                               ~f:(fun _ ->
+                                 Mina_transition.External_transition.decompose
+                                   state)
+                               env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
-                  | Message.Transaction_pool_diff diff ->
+                  | Message.Latest.T.Transaction_pool_diff diff ->
                       Sinks.Tx_sink.push sink_tx
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
-                  | Message.Snark_pool_diff diff ->
+                  | Message.Latest.T.Snark_pool_diff diff ->
                       Sinks.Snark_sink.push sink_snark_work
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc))
                 v0_topic Message.Latest.T.bin_msg
@@ -472,6 +489,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               match config.pubsub_v0 with
               | RW ->
                   subscribe_v0_impl >>| Pubsub.publish net2
+                  >>| Fn.flip Fn.compose map_v0_msg
               | RO ->
                   subscribe_v0_impl >>| fun _ -> unit_f
               | _ ->
