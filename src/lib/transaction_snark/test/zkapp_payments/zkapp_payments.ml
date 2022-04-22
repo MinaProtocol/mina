@@ -229,6 +229,7 @@ let%test_module "Zkapp payments tests" =
               let test_spec : Spec.t =
                 { sender = spec.sender
                 ; fee
+                ; fee_payer = None
                 ; receivers =
                     (new_receiver, amount)
                     :: ( List.take specs (receiver_count - 1)
