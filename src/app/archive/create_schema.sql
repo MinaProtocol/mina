@@ -28,19 +28,31 @@ CREATE TABLE public_keys
 CREATE INDEX idx_public_keys_id ON public_keys(id);
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
+/* for the default token only, owner_public_key_id and owner_token_id are NULL
+   for other tokens, those columns are non-NULL
+*/
 CREATE TABLE tokens
-( id    serial PRIMARY KEY
-, value text   NOT NULL UNIQUE
+( id                   serial  PRIMARY KEY
+, value                text    NOT NULL  UNIQUE
+, owner_public_key_id  int               REFERENCES public_keys(id) ON DELETE CASCADE
+, owner_token_id       int               REFERENCES tokens(id)
 );
 
 CREATE INDEX idx_tokens_id ON tokens(id);
 CREATE INDEX idx_tokens_value ON tokens(value);
 
+CREATE TABLE token_symbols
+( id          serial PRIMARY KEY
+, value text  NOT NULL
+);
+
+CREATE INDEX idx_token_symbols_id ON token_symbols(id);
+CREATE INDEX idx_token_symbols_value ON token_symbols(value);
+
 CREATE TABLE account_identifiers
 ( id                 serial  PRIMARY KEY
 , public_key_id      int     NOT NULL UNIQUE  REFERENCES public_keys(id) ON DELETE CASCADE
-, token_id           int     NOT NULL         REFERENCES tokens(id)
-, token_owner        int                      REFERENCES account_identifiers(id)
+, token_id           int     NOT NULL         REFERENCES tokens(id) ON DELETE CASCADE
 );
 
 /* the initial balance is the balance at genesis, whether the account is timed or not
@@ -73,11 +85,9 @@ CREATE TYPE user_command_status AS ENUM ('applied', 'failed');
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
 , type           user_command_type   NOT NULL
-, fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
-, source_id      int                 NOT NULL REFERENCES public_keys(id)
-, receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token_id   int                 NOT NULL REFERENCES tokens(id)
-, token_id       int                 NOT NULL REFERENCES tokens(id)
+, fee_payer_id   int                 NOT NULL REFERENCES account_identifiers(id)
+, source_id      int                 NOT NULL REFERENCES account_identifiers(id)
+, receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -91,9 +101,8 @@ CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_tra
 CREATE TABLE internal_commands
 ( id          serial                PRIMARY KEY
 , type        internal_command_type NOT NULL
-, receiver_id int                   NOT NULL REFERENCES public_keys(id)
+, receiver_id int                   NOT NULL REFERENCES account_identifiers(id)
 , fee         bigint                NOT NULL
-, token_id    int                   NOT NULL REFERENCES tokens(id)
 , hash        text                  NOT NULL
 , UNIQUE (hash,type)
 );
@@ -149,22 +158,30 @@ CREATE TABLE blocks
 , chain_status                 chain_status_type NOT NULL
 );
 
-CREATE INDEX idx_blocks_id ON blocks(id);
-CREATE INDEX idx_blocks_parent_id ON blocks(parent_id);
+CREATE INDEX idx_blocks_id         ON blocks(id);
+CREATE INDEX idx_blocks_parent_id  ON blocks(parent_id);
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
+/* block state hashes mentioned in voting_for fields */
+CREATE TABLE voting_for
+( id          serial PRIMARY KEY
+, value text  NOT NULL
+);
+
+CREATE INDEX idx_voting_for_id ON voting_for(id);
+CREATE INDEX idx_voting_for_value ON voting_for(value);
+
 /* accounts accessed in a block, representing the account
    state after all transactions in the block have been executed
 */
-
 CREATE TABLE accounts_accessed
 ( ledger_index            int     NOT NULL
 , block_id                int     NOT NULL  REFERENCES blocks(id)
 , account_identifier_id   int     NOT NULL  REFERENCES account_identifiers(id)
-, token_symbol            text    NOT NULL
+, token_symbol_id         int     NOT NULL  REFERENCES token_symbols(id)
 , balance                 bigint  NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
@@ -177,7 +194,18 @@ CREATE TABLE accounts_accessed
 );
 
 CREATE INDEX idx_accounts_accessed_block_id ON accounts_accessed(block_id);
-CREATE INDEX idx_accounts_accessed_block_account_id ON accounts_accessed(account_identifier_id);
+CREATE INDEX idx_accounts_accessed_block_account_identifier_id ON accounts_accessed(account_identifier_id);
+
+/* accounts created in a block */
+CREATE TABLE accounts_created
+( block_id                int     NOT NULL  REFERENCES blocks(id)
+, account_identifier_id   int     NOT NULL  REFERENCES account_identifiers(id)
+, creation_fee            bigint  NOT NULL
+, PRIMARY KEY (block_id,account_identifier_id)
+);
+
+CREATE INDEX idx_accounts_created_block_id ON accounts_created(block_id);
+CREATE INDEX idx_accounts_created_block_account_identifier_id ON accounts_created(account_identifier_id);
 
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE

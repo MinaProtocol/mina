@@ -104,7 +104,7 @@ CREATE TABLE zkapp_updates
 , verification_key_id      int              REFERENCES zkapp_verification_keys(id)
 , permissions_id           int              REFERENCES zkapp_permissions(id)
 , zkapp_uri                text
-, token_symbol             text
+, token_symbol_id          int              REFERENCES token_symbols(id)
 , timing_id                int              REFERENCES zkapp_timing_info(id)
 , voting_for               text
 );
@@ -233,8 +233,7 @@ CREATE TABLE zkapp_precondition_protocol_state
 */
 CREATE TABLE zkapp_party_body
 ( id                                    serial     PRIMARY KEY
-, public_key_id                         int        NOT NULL REFERENCES public_keys(id)
-, token_id                              int        NOT NULL REFERENCES tokens(id)
+, account_identifier_id                 int        NOT NULL REFERENCES account_identifiers(id)
 , update_id                             int        NOT NULL REFERENCES zkapp_updates(id)
 , balance_change                        bigint     NOT NULL
 , increment_nonce                       boolean    NOT NULL

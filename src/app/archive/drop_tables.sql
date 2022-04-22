@@ -14,6 +14,8 @@ DROP TABLE zkapp_party_failures;
 
 DROP TABLE accounts_accessed;
 
+DROP TABLE accounts_created;
+
 DROP TABLE blocks;
 
 DROP TYPE chain_status_type;
@@ -94,8 +96,12 @@ DROP TABLE zkapp_sequence_states;
 
 DROP TABLE zkapp_uris;
 
-DROP TABLE public_keys;
-
 DROP TABLE tokens;
 
+DROP TABLE public_keys;
+
 DROP TABLE zkapp_events;
+
+DROP TABLE token_symbols;
+
+DROP TABLE voting_for;
