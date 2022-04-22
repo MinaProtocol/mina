@@ -5,6 +5,7 @@
     (libraries ctypes ctypes.foreign)
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
     (c_library_flags (:standard (:include flags.sexp)))
+    (self_build_stubs_archive (rocksdb))
     )
 
 (executable
@@ -15,7 +16,6 @@
 
 (rule
  (targets flags.sexp)
- (deps librocksdb_stubs.a)
  (action (run ./rocks_linker_flags_gen.exe)))
 
 (rule
