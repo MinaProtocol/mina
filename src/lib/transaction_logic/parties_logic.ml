@@ -250,6 +250,8 @@ module type Party_intf = sig
 
   val increment_nonce : t -> bool
 
+  val no_authorization_given : t -> bool
+
   val check_authorization :
        commitment:transaction_commitment
     -> at_party:parties
@@ -882,12 +884,12 @@ module Make (Inputs : Inputs_intf) = struct
         (Check_protocol_state_precondition
            (Party.protocol_state_precondition party, global_state))
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "protocol state preconsition loc %s\n%!" __LOC__ ;
     let local_state =
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "check authorization loc %s\n%!" __LOC__ ;
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_
@@ -897,13 +899,21 @@ module Make (Inputs : Inputs_intf) = struct
       in
       Inputs.Party.check_authorization ~commitment ~at_party party
     in
-    printf "loc %s\n%!" __LOC__ ;
+    (*This is to debug failures inside snark. We don't check
+      proofs or signatures outside snark*)
+    let local_state =
+      Local_state.add_check local_state Invalid_party_authorization
+        Inputs.Bool.(
+          proof_verifies ||| signature_verifies
+          ||| Inputs.Party.no_authorization_given party)
+    in
+    printf "fee payer nonce incr loc %s\n%!" __LOC__ ;
     (* The fee-payer must increment their nonce. *)
     let local_state =
       Local_state.add_check local_state Fee_payer_nonce_must_increase
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "replay attack loc %s\n%!" __LOC__ ;
     let local_state =
       Local_state.add_check local_state Parties_replay_check_failed
         Inputs.Bool.(
@@ -911,12 +921,12 @@ module Make (Inputs : Inputs_intf) = struct
           ||| Inputs.Party.use_full_commitment party
           ||| not signature_verifies)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "account is new loc %s\n%!" __LOC__ ;
     let (`Is_new account_is_new) =
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "account timingloc %s\n%!" __LOC__ ;
     let party_token = Party.token_id party in
     let party_token_is_default = Token_id.(equal default) party_token in
     (* Set account timing for new accounts, if specified. *)
@@ -936,7 +946,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_timing timing a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "balance change; calls check loc %s\n%!" __LOC__ ;
     (* Apply balance change. *)
     let a, local_state =
       let balance_change = Party.balance_change party in
@@ -970,6 +980,10 @@ module Make (Inputs : Inputs_intf) = struct
         let has_permission =
           Controller.check ~proof_verifies ~signature_verifies controller
         in
+        let _l =
+          Local_state.add_check local_state Update_not_permitted_balance
+            has_permission
+        in
         Local_state.add_check local_state Update_not_permitted_balance
           Bool.(
             has_permission
@@ -978,7 +992,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_balance balance a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "check timing, calls check; loc %s\n%!" __LOC__ ;
     let txn_global_slot = Global_state.global_slot_since_genesis global_state in
     (* Check timing with current balance *)
     let a, local_state =
@@ -999,7 +1013,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_timing timing a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "app state; calls check, loc %s\n%!" __LOC__ ;
     (* Transform into a snapp account.
        This must be done before updating snapp fields!
     *)
@@ -1058,7 +1072,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_app_state app_state a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "verification key; calls check; loc %s\n%!" __LOC__ ;
     (* Set verification key. *)
     let a, local_state =
       let verification_key = Party.Update.verification_key party in
@@ -1067,7 +1081,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_verification_key a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
+        Local_state.add_check local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
       let verification_key =
@@ -1077,7 +1091,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_verification_key verification_key a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "sequence states; calls check; loc %s\n%!" __LOC__ ;
     (* Update sequence state. *)
     let a, local_state =
       let sequence_events = Party.Update.sequence_events party in
@@ -1116,7 +1130,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "reset and update snapp uri; calls check; loc %s\n%!" __LOC__ ;
     (* Reset snapp state to [None] if it is unmodified. *)
     let a = Account.unmake_zkapp a in
     (* Update snapp URI. *)
@@ -1137,7 +1151,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_zkapp_uri zkapp_uri a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "update token symbol; calls check; loc %s\n%!" __LOC__ ;
     (* Update token symbol. *)
     let a, local_state =
       let token_symbol = Party.Update.token_symbol party in
@@ -1156,7 +1170,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_token_symbol token_symbol a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "update delegate; calls check; loc %s\n%!" __LOC__ ;
     (* Update delegate. *)
     let a, local_state =
       let delegate = Party.Update.delegate party in
@@ -1188,7 +1202,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_delegate delegate a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "update nonce; calls check; loc %s\n%!" __LOC__ ;
     (* Update nonce. *)
     let a, local_state =
       let nonce = Account.nonce a in
@@ -1207,7 +1221,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_nonce nonce a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "update voting for; calls check; loc %s\n%!" __LOC__ ;
     (* Update voting-for. *)
     let a, local_state =
       let voting_for = Party.Update.voting_for party in
@@ -1226,7 +1240,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_voting_for voting_for a in
       (a, local_state)
     in
-    printf "loc %s\n%!" __LOC__ ;
+    printf "update permissions; calls check; loc %s\n%!" __LOC__ ;
     (* Finally, update permissions.
        This should be the last update applied, to ensure that any earlier
        updates use the account's existing permissions, and not permissions that

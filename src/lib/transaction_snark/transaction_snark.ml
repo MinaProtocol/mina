@@ -1093,14 +1093,35 @@ module Base = struct
           let if_ = Permissions.Auth_required.Checked.if_
 
           let check =
+            printf !"check in transaction snark\n%!" ;
             match auth_type with
             | Proof ->
                 fun ~proof_verifies:_ ~signature_verifies:_ perm ->
-                  Permissions.Auth_required.Checked.eval_proof perm
+                  let b = Permissions.Auth_required.Checked.eval_proof perm in
+                  let _x =
+                    as_prover
+                      As_prover.(
+                        fun () ->
+                          let res = read Boolean.typ b in
+                          Core.printf "Proof auth: eval result: %b\n%!" res)
+                  in
+                  b
             | Signature | None_given ->
+                Core.printf "auth_type= Signature/None_give\n%!" ;
                 fun ~proof_verifies:_ ~signature_verifies perm ->
-                  Permissions.Auth_required.Checked.eval_no_proof
-                    ~signature_verifies perm
+                  let b =
+                    Permissions.Auth_required.Checked.eval_no_proof
+                      ~signature_verifies perm
+                  in
+                  let _x =
+                    as_prover
+                      As_prover.(
+                        fun () ->
+                          let res = read Boolean.typ b in
+                          Core.printf
+                            "Signature/None_given auth: eval result: %b\n%!" res)
+                  in
+                  b
         end
 
         module Global_slot = struct
@@ -1638,6 +1659,13 @@ module Base = struct
           let use_full_commitment (t : t) = t.party.data.use_full_commitment
 
           let increment_nonce (t : t) = t.party.data.increment_nonce
+
+          let no_authorization_given _t =
+            match (auth_type, snapp_statement) with
+            | None_given, None ->
+                Boolean.true_
+            | _ ->
+                Boolean.false_
 
           let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)
@@ -4332,13 +4360,12 @@ module For_tests = struct
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
       @ snapp_parties @ other_receivers
     in
     let protocol_state_predicate_hash =
-      Zkapp_precondition.Protocol_state.digest protocol_state
+      Zkapp_precondition.Protocol_state.digest protocol_state_precondition
     in
     let ps =
       Parties.Call_forest.of_parties_list

@@ -56,15 +56,19 @@ let%test_module "Protocol state precondition tests" =
 
     let%test_unit "exact protocol state predicate" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
-        ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          printf "Starting test\n%!" ;
           let state_body = U.genesis_state_body in
           let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let _amount = Amount.of_int 10_000_000_000 in
+          let spec = List.hd_exn specs in
           let test_spec : Spec.t =
-            { sender = (new_kp, Mina_base.Account.Nonce.zero)
+            { sender =
+                spec.sender
+                (* TODO: Transaction application passes when we do this and protocol preconditon is accept (new_kp, Mina_base.Account.Nonce.zero)*)
             ; fee
             ; receivers = []
-            ; amount
+            ; amount = Amount.zero
             ; zkapp_account_keypairs = [ new_kp ]
             ; memo
             ; new_zkapp_account = false

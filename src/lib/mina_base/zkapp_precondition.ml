@@ -1239,26 +1239,37 @@ module Protocol_state = struct
       in
       printf !"2.\n%!" ;
       ignore last_vrf_output ;
-      Boolean.all
-        ( [ Hash.(check_checked ~label:"snarked ledger hash" Tc.ledger_hash)
-              snarked_ledger_hash s.snarked_ledger_hash
-          ; Numeric.(Checked.check ~label:"timestamp" Tc.time)
-              timestamp s.timestamp
-          ; Numeric.(Checked.check ~label:"blockchian length" Tc.length)
-              blockchain_length s.blockchain_length
-          ; Numeric.(Checked.check ~label:"min window density" Tc.length)
-              min_window_density s.min_window_density
-          ; Numeric.(Checked.check ~label:"total_currency" Tc.amount)
-              total_currency s.total_currency
-          ; Numeric.(
-              Checked.check ~label:"global_slot_since_hard_fork" Tc.global_slot)
-              global_slot_since_hard_fork s.global_slot_since_hard_fork
-          ; Numeric.(
-              Checked.check ~label:"global_slot_since_genesis" Tc.global_slot)
-              global_slot_since_genesis s.global_slot_since_genesis
-          ]
-        @ epoch_data staking_epoch_data s.staking_epoch_data
-        @ epoch_data next_epoch_data s.next_epoch_data )
+      let b =
+        Boolean.all
+          ( [ Hash.(check_checked ~label:"snarked ledger hash" Tc.ledger_hash)
+                snarked_ledger_hash s.snarked_ledger_hash
+            ; Numeric.(Checked.check ~label:"timestamp" Tc.time)
+                timestamp s.timestamp
+            ; Numeric.(Checked.check ~label:"blockchian length" Tc.length)
+                blockchain_length s.blockchain_length
+            ; Numeric.(Checked.check ~label:"min window density" Tc.length)
+                min_window_density s.min_window_density
+            ; Numeric.(Checked.check ~label:"total_currency" Tc.amount)
+                total_currency s.total_currency
+            ; Numeric.(
+                Checked.check ~label:"global_slot_since_hard_fork"
+                  Tc.global_slot)
+                global_slot_since_hard_fork s.global_slot_since_hard_fork
+            ; Numeric.(
+                Checked.check ~label:"global_slot_since_genesis" Tc.global_slot)
+                global_slot_since_genesis s.global_slot_since_genesis
+            ]
+          @ epoch_data staking_epoch_data s.staking_epoch_data
+          @ epoch_data next_epoch_data s.next_epoch_data )
+      in
+      let _r =
+        as_prover
+          Pickles.Impls.Step.As_prover.(
+            fun () ->
+              let res = read Boolean.typ b in
+              printf "protocol precondition check %b\n%!" res)
+      in
+      b
   end
 
   let typ : (Checked.t, Stable.Latest.t) Typ.t =

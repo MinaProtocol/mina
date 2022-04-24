@@ -131,9 +131,17 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
           |> Or_error.ok_exn
         in
         let _a = Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger in
-        Core.printf "Ledger.apply_parties_unchecked successful\n%!" ;
-        () )
+        match (fst _applied).command.status with
+        | Transaction_status.Applied _ ->
+            Core.printf "Ledger.apply_parties_unchecked successful\n%!" ;
+            ()
+        | Failed (tbl, _) ->
+            Core.printf "Ledger.apply_parties_unchecked failed with %s\n%!"
+              ( Transaction_status.Failure.Collection.to_yojson tbl
+              |> Yojson.Safe.to_string ) ;
+            () )
       else () ;
+      Core.printf !"starting sparse ledger application\n%!" ;
       let witnesses =
         match
           Or_error.try_with (fun () ->
@@ -152,6 +160,16 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
               (sprintf "parties_witnesses_exn failed with %s"
                  (Error.to_string_hum e))
       in
+      let print_statement spec stmt witness =
+        Core.printf
+          !"spec: %s statement: %s witness: %s\n%!"
+          ( Transaction_snark.Parties_segment.Basic.to_yojson spec
+          |> Yojson.Safe.to_string )
+          ( Transaction_snark.Statement.With_sok.to_yojson stmt
+          |> Yojson.Safe.to_string )
+          ( Transaction_snark.Parties_segment.Witness.to_yojson witness
+          |> Yojson.Safe.to_string )
+      in
       let _deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
       let%map p =
@@ -160,6 +178,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
             failwith "no witnesses generated"
         | (witness, spec, stmt, snapp_statement) :: rest ->
             let open Async.Deferred.Or_error.Let_syntax in
+            print_statement spec stmt witness ;
             let%bind p1 =
               Async.Deferred.Or_error.try_with (fun () ->
                   T.of_parties_segment_exn ~statement:stmt ~witness ~spec
@@ -167,6 +186,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
             in
             Async.Deferred.List.fold ~init:(Ok p1) rest
               ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
+                print_statement spec stmt witness ;
                 let%bind prev = Async.Deferred.return acc in
                 let%bind curr =
                   Async.Deferred.Or_error.try_with (fun () ->
