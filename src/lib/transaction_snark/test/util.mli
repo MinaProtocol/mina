@@ -47,7 +47,8 @@ val dummy_rule :
     Raises if either the snark generation or application fails
 *)
 val check_parties_with_merges_exn :
-     ?state_body:Transaction_protocol_state.Block_data.t
+     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+  -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?state_view:Zkapp_precondition.Protocol_state.View.t
   -> Ledger.t
   -> Parties.t list
@@ -71,7 +72,8 @@ val gen_snapp_ledger :
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
-     ?snapp_permissions:Permissions.t
+     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+  -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:
        ( unit
