@@ -3156,12 +3156,13 @@ module Ledger = struct
     let parties_to_graphql ps =
       parties ps |> Parties.arg_query_string |> Js.string
     in
+    (* TODO *)
     static_method "partiesToGraphQL" parties_to_graphql ;
-    let json_to_graphql json =
+    let json_to_graphql_query json =
       json |> Js.to_string |> Yojson.Safe.from_string |> Parties.of_json
       |> Parties.arg_query_string |> Js.string
     in
-    static_method "jsonToGraphQL" json_to_graphql ;
+    static_method "jsonToGraphQLQuery" json_to_graphql_query ;
     ()
 end
 
