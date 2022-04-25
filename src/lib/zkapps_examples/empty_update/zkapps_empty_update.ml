@@ -82,7 +82,7 @@ module Party_under_construction = struct
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
-        let Typ typ = typ in
+        let (Typ typ) = typ in
         let fields, aux = typ.value_to_fields x in
         let fields = Array.map Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
