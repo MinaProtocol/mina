@@ -901,6 +901,10 @@ module Make (Inputs : Inputs_intf) = struct
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
     let local_state =
+      Local_state.add_check local_state Fee_payer_must_be_signed
+        Inputs.Bool.(signature_verifies ||| not is_start')
+    in
+    let local_state =
       Local_state.add_check local_state Parties_replay_check_failed
         Inputs.Bool.(
           Inputs.Party.increment_nonce party
