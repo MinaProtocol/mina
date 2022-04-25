@@ -277,7 +277,7 @@ let gen_balance_change ?balances_tbl ?permissions_auth (account : Account.t) =
       *)
       let%map (magnitude : Currency.Amount.t) =
         Currency.Amount.gen_incl Currency.Amount.zero
-          (Currency.Amount.of_int 100_000_000_000)
+          (Currency.Amount.of_int 10_000_000_000)
       in
       ({ magnitude; sgn = Sgn.Pos } : Currency.Amount.Signed.t)
   | Neg ->
@@ -503,7 +503,7 @@ module Party_body_components = struct
     ; call_data = t.call_data
     ; call_depth = t.call_depth
     ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account.Nonce.zero
+    ; account_precondition = t.account_precondition
     ; use_full_commitment = t.use_full_commitment
     }
 
