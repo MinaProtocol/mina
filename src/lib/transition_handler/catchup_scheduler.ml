@@ -25,7 +25,7 @@ type t =
   ; time_controller : Block_time.Controller.t
   ; catchup_job_writer :
       ( State_hash.t
-        * ( External_transition.Initial_validated.t Envelope.Incoming.t
+        * ( Mina_block.initial_valid_block Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
@@ -40,7 +40,7 @@ type t =
             its corresponding value in the hash table would just be an empty
             list. *)
   ; collected_transitions :
-      ( External_transition.Initial_validated.t Envelope.Incoming.t
+      ( Mina_block.initial_valid_block Envelope.Incoming.t
       , State_hash.t )
       Cached.t
       list
@@ -51,7 +51,7 @@ type t =
   ; parent_root_timeouts : unit Block_time.Timeout.t State_hash.Table.t
   ; breadcrumb_builder_supervisor :
       ( State_hash.t
-      * ( External_transition.Initial_validated.t Envelope.Incoming.t
+      * ( Mina_block.initial_valid_block Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         Rose_tree.t
@@ -63,7 +63,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller
     ~(catchup_job_writer :
        ( State_hash.t
-         * ( External_transition.Initial_validated.t Envelope.Incoming.t
+         * ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t
            Rose_tree.t
@@ -110,8 +110,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
                     ignore
                       ( Cached.invalidate_with_failure cached_transition
-                        : External_transition.Initial_validated.t
-                          Envelope.Incoming.t ))))
+                        : Mina_block.initial_valid_block Envelope.Incoming.t ))))
   in
   { logger
   ; collected_transitions
@@ -308,8 +307,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let downcast_breadcrumb breadcrumb =
       let transition =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
-        |> External_transition.Validation.reset_frontier_dependencies_validation
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        |> Mina_block.Validated.remember
+        |> Validation.reset_frontier_dependencies_validation
+        |> Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 

@@ -91,8 +91,10 @@ let find_protocol_state (t : t) hash =
       With_hash.data s
   | Some breadcrumb ->
       Some
-        ( Breadcrumb.validated_transition breadcrumb
-        |> External_transition.Validated.protocol_state )
+      ( breadcrumb
+      |> Breadcrumb.block
+      |> Mina_block.header
+      |> Mina_block.Header.protocol_state )
 
 let root t = find_exn t t.root
 
@@ -112,14 +114,19 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values ~persistent_root_instance ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
-  let root_hash = (External_transition.Validated.state_hashes root_data.transition).state_hash in
+  let validated_transition = External_transition.Validated.lower root_data.transition in
+  let root_hash = Mina_block.Validated.state_hash validated_transition in
   let protocol_states_for_root_scan_state =
     root_data.protocol_states
     |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
     |> State_hash.Map.of_alist_exn
   in
   let root_protocol_state =
-    External_transition.Validated.protocol_state root_data.transition
+    validated_transition
+    |> Mina_block.Validated.forget
+    |> With_hash.data
+    |> Mina_block.header
+    |> Mina_block.Header.protocol_state
   in
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
@@ -133,7 +140,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
          (Ledger.Any_ledger.M.merkle_root root_ledger))
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
-    Breadcrumb.create ~validated_transition:root_data.transition
+    Breadcrumb.create ~validated_transition
       ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
       ~transition_receipt_time
   in
@@ -157,7 +164,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
 let root_data t =
   let open Root_data in
   let root = root t in
-  { transition= Breadcrumb.validated_transition root
+  { transition= External_transition.Validated.lift @@ Breadcrumb.validated_transition root
   ; staged_ledger= Breadcrumb.staged_ledger root
   ; protocol_states=
       State_hash.Map.data t.protocol_states_for_root_scan_state }
@@ -281,7 +288,7 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition = Breadcrumb.validated_transition heir in
+  let heir_transition = External_transition.Validated.lift @@ Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -367,7 +374,9 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
   let genesis_ledger_hash =
-    Breadcrumb.blockchain_state old_root_node.breadcrumb
+    old_root_node.breadcrumb
+    |> Breadcrumb.protocol_state
+    |> Protocol_state.blockchain_state
     |> Blockchain_state.genesis_ledger_hash
   in
   (* STEP 0 *)
@@ -391,7 +400,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 1 *)
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
-        let hash = (External_transition.Validated.state_hashes node.transition).state_hash in
+        let hash = Mina_block.Validated.state_hash node.transition in
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
@@ -596,7 +605,7 @@ module Metrics = struct
 
   let empty_blocks_at_best_tip t =
     let rec go acc b =
-      if not (List.is_empty (Breadcrumb.commands b)) then acc
+      if not (List.is_empty ( Breadcrumb.validated_transition b |> Mina_block.Validated.valid_commands)) then acc
       else match parent t b with None -> acc | Some b -> go (acc + 1) b
     in
     go 0 (best_tip t)
@@ -618,8 +627,9 @@ module Metrics = struct
 
   let has_coinbase b =
     let d1, d2 =
-      ( Breadcrumb.validated_transition b
-      |> External_transition.Validated.staged_ledger_diff )
+    ( Breadcrumb.block b
+    |> Mina_block.body
+    |> Mina_block.Body.staged_ledger_diff )
         .diff
     in
     match (d1.coinbase, d2) with
@@ -680,7 +690,7 @@ let update_metrics_with_diff (type mutant) t
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.validated_transition new_root_breadcrumb |> Mina_block.Validated.valid_commands ))
         in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;
@@ -726,7 +736,7 @@ let update_metrics_with_diff (type mutant) t
       in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float (List.length (Breadcrumb.commands best_tip))) ;
+          (Int.to_float (List.length (Breadcrumb.validated_transition best_tip |> Mina_block.Validated.valid_commands ))) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;

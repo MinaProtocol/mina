@@ -109,33 +109,46 @@ let participant_pks
 
 let commands { transactions = { Transactions.commands; _ }; _ } = commands
 
-let validate_transactions ((transition_with_hash, _validity) as transition) =
-  let staged_ledger_diff =
-    External_transition.Validated.staged_ledger_diff transition
+let validate_transactions block =
+  let consensus_state =
+    block |> Mina_block.header |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.consensus_state
   in
-  let external_transition = With_hash.data transition_with_hash in
-  let coinbase_receiver =
-    External_transition.coinbase_receiver external_transition
-  in
+  let open Consensus.Data in
+  let coinbase_receiver = Consensus_state.coinbase_receiver consensus_state in
   let supercharge_coinbase =
-    External_transition.supercharge_coinbase external_transition
+    Consensus_state.supercharge_coinbase consensus_state
+  in
+  let staged_ledger_diff =
+    block |> Mina_block.body |> Mina_block.Body.staged_ledger_diff
   in
   Staged_ledger.Pre_diff_info.get_transactions ~coinbase_receiver
     ~supercharge_coinbase staged_ledger_diff
 
-let of_transition external_transition tracked_participants
-    (calculated_transactions : Transaction.t With_status.t list) =
-  let open External_transition.Validated in
-  let creator = block_producer external_transition in
-  let winner = block_winner external_transition in
-  let protocol_state =
-    { Protocol_state.previous_state_hash = parent_hash external_transition
-    ; blockchain_state =
-        External_transition.Validated.blockchain_state external_transition
-    ; consensus_state =
-        External_transition.Validated.consensus_state external_transition
+let filter_protocol_state protocol_state : Protocol_state.t =
+  Mina_state.Protocol_state.
+    { previous_state_hash = previous_state_hash protocol_state
+    ; blockchain_state = blockchain_state protocol_state
+    ; consensus_state = consensus_state protocol_state
     }
+
+let of_transition block tracked_participants
+    (calculated_transactions : Transaction.t With_status.t list) =
+  let header = Mina_block.header block in
+  let staged_ledger_diff =
+    block |> Mina_block.body |> Mina_block.Body.staged_ledger_diff
   in
+  let consensus_state =
+    header |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.consensus_state
+  in
+  let protocol_state =
+    header |> Mina_block.Header.protocol_state |> filter_protocol_state
+  in
+  let open Consensus.Data in
+  let creator = Consensus_state.block_creator consensus_state in
+  let winner = Consensus_state.block_stake_winner consensus_state in
+  let proof = Mina_block.Header.protocol_state_proof header in
   let next_available_token =
     protocol_state.blockchain_state.snarked_next_available_token
   in
@@ -222,12 +235,7 @@ let of_transition external_transition tracked_participants
             , next_available_token ))
   in
   let snark_jobs =
-    List.map
-      ( Staged_ledger_diff.completed_works
-      @@ External_transition.Validated.staged_ledger_diff external_transition )
-      ~f:Transaction_snark_work.info
-  in
-  let proof =
-    External_transition.Validated.protocol_state_proof external_transition
+    staged_ledger_diff |> Staged_ledger_diff.completed_works
+    |> List.map ~f:Transaction_snark_work.info
   in
   { creator; winner; protocol_state; transactions; snark_jobs; proof }

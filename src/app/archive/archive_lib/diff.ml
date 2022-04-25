@@ -56,8 +56,11 @@ module Builder = struct
     let validated_block =
       Breadcrumb.validated_transition breadcrumb
     in
-    let block, _ = External_transition.Validated.Stable.V1.of_v2 validated_block in
-    let commands = External_transition.Validated.commands validated_block in
+    let block = 
+      With_hash.data @@ Mina_block.Validated.forget validated_block
+    in
+    let hash = Mina_block.Validated.state_hash validated_block in
+    let commands = Mina_block.Validated.valid_commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
         commands
@@ -81,7 +84,7 @@ module Builder = struct
                (sender, receipt_chain_hash)) )
     in
     Transition_frontier.Breadcrumb_added
-      {block = With_hash.map ~f:External_transition.compose block; sender_receipt_chains_from_parent_ledger}
+      {block = {With_hash.hash; data = External_transition.compose block}; sender_receipt_chains_from_parent_ledger}
 
   let user_commands user_commands =
     Transaction_pool {Transaction_pool.added= user_commands; removed= []}

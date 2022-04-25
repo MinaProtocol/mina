@@ -55,11 +55,11 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     let open Result.Let_syntax in
     let%bind initially_validated_transition =
       transition_with_hash
-      |> External_transition.skip_time_received_validation
-           `This_transition_was_not_received_via_gossip
-      |> External_transition.validate_genesis_protocol_state ~genesis_state_hash
-      >>= External_transition.validate_protocol_versions
-      >>= External_transition.validate_delta_transition_chain
+      |> Validation.skip_time_received_validation
+           `This_block_was_not_received_via_gossip
+      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
+      >>= Validation.validate_protocol_versions
+      >>= Validation.validate_delta_block_chain
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -107,7 +107,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           , Some ("invalid genesis protocol state", []) )
       in
       Error (Error.of_string "invalid genesis protocol state")
-  | Error `Invalid_delta_transition_chain_proof ->
+  | Error `Invalid_delta_block_chain_proof ->
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Gossiped_invalid_transition
@@ -115,9 +115,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "invalid delta transition chain witness")
   | Error `Invalid_protocol_version ->
-      let transition =
-        External_transition.Validation.forget_validation transition_with_hash
-      in
+      let transition = Validation.block transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_invalid_protocol_version
@@ -137,9 +135,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
-      let transition =
-        External_transition.Validation.forget_validation transition_with_hash
-      in
+      let transition = Validation.block transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_mismatched_protocol_version
@@ -228,7 +224,8 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
     "Doing a catchup job with target $target_hash" ;
   let blockchain_length_of_root =
     Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.blockchain_length
+    |> Transition_frontier.Breadcrumb.consensus_state
+    |> Consensus.Data.Consensus_state.blockchain_length
   in
   let open Deferred.Result.Let_syntax in
   find_map_ok peers ~f:(fun peer ->
@@ -474,9 +471,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
         |> State_hash.With_state_hashes.state_hash
       in
       match%bind
-        External_transition.validate_proofs ~verifier ~genesis_state_hash
+        Validation.validate_proofs ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
-               External_transition.Validation.wrap (Envelope.Incoming.data t)))
+               Validation.wrap (Envelope.Incoming.data t)))
       with
       | Ok tvs ->
           return
@@ -520,8 +517,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         | Error e ->
             ignore
               ( List.map acc ~f:Cached.invalidate_with_failure
-                : External_transition.Initial_validated.t Envelope.Incoming.t
-                  list ) ;
+                : Mina_block.initial_valid_block Envelope.Incoming.t list ) ;
             Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
             Deferred.Or_error.return @@ Continue_or_stop.Stop (acc, initial_hash)
@@ -588,8 +584,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
           ignore
             ( List.map transitions_with_initial_validation
                 ~f:Cached.invalidate_with_failure
-              : External_transition.Initial_validated.t Envelope.Incoming.t list
-              )
+              : Mina_block.initial_valid_block Envelope.Incoming.t list )
         with e ->
           [%log error]
             ~metadata:[ ("exn", `String (Exn.to_string e)) ]
@@ -638,8 +633,8 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
              let blockchain_length_of_target_hash =
                let blockchain_length_of_dangling_block =
                  List.hd_exn subtrees |> Rose_tree.root |> Cached.peek
-                 |> Envelope.Incoming.data
-                 |> External_transition.Initial_validated.blockchain_length
+                 |> Envelope.Incoming.data |> Validation.block
+                 |> Mina_block.blockchain_length
                in
                Unsigned.UInt32.pred blockchain_length_of_dangling_block
              in
@@ -713,11 +708,10 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                let children_state_hashes =
                                  List.map children_transitions
                                    ~f:(fun cached_transition ->
-                                     ( Cached.peek cached_transition
+                                     Cached.peek cached_transition
                                      |> Envelope.Incoming.data
-                                     |> External_transition.Initial_validated
-                                        .state_hashes )
-                                       .state_hash)
+                                     |> Validation.block_with_hash
+                                     |> State_hash.With_state_hashes.state_hash)
                                in
                                [%log error]
                                  ~metadata:
@@ -727,16 +721,17 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                             ~f:State_hash.to_yojson) )
                                    ; ( "state_hash"
                                      , State_hash.to_yojson
-                                         (External_transition.Initial_validated
-                                          .state_hashes transition)
-                                           .state_hash )
+                                         ( transition
+                                         |> Validation.block_with_hash
+                                         |> State_hash.With_state_hashes
+                                            .state_hash ) )
                                    ; ( "reason"
                                      , `String
                                          "no common ancestor with our \
                                           transition frontier" )
                                    ; ( "protocol_state"
-                                     , External_transition.Initial_validated
-                                       .protocol_state transition
+                                     , Validation.block transition
+                                       |> Block.header |> Header.protocol_state
                                        |> Mina_state.Protocol_state
                                           .value_to_yojson )
                                    ]
@@ -857,21 +852,21 @@ let%test_module "Ledger_catchup tests" =
 
     let downcast_transition transition =
       let transition =
-        transition
-        |> External_transition.Validation.reset_frontier_dependencies_validation
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        transition |> Validation.reset_frontier_dependencies_validation
+        |> Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
     let downcast_breadcrumb breadcrumb =
       downcast_transition
-        (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
+        ( Transition_frontier.Breadcrumb.validated_transition breadcrumb
+        |> Mina_block.Validated.remember )
 
     type catchup_test =
       { cache : Transition_handler.Unprocessed_transition_cache.t
       ; job_writer :
           ( State_hash.t
-            * ( External_transition.Initial_validated.t Envelope.Incoming.t
+            * ( Mina_block.initial_valid_block Envelope.Incoming.t
               , State_hash.t )
               Cached.t
               Rose_tree.t
@@ -951,7 +946,7 @@ let%test_module "Ledger_catchup tests" =
       let catchup_breadcrumbs_are_best_tip_path =
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-            External_transition.Validated.equal
+            Mina_block.Validated.equal
               (Transition_frontier.Breadcrumb.validated_transition
                  breadcrumb_tree1)
               (Transition_frontier.Breadcrumb.validated_transition
@@ -1027,7 +1022,9 @@ let%test_module "Ledger_catchup tests" =
               List.nth_exn (Root_history.to_list history) 1
             in
             downcast_transition
-              (Frontier_base.Root_data.Historical.transition failing_root_data)
+              ( Frontier_base.Root_data.Historical.transition failing_root_data
+              |> External_transition.Validated.lower
+              |> Mina_block.Validated.remember )
           in
           Thread_safe.block_on_async_exn (fun () ->
               let `Test { cache; _ }, `Cached_transition cached_transition =
@@ -1042,8 +1039,7 @@ let%test_module "Ledger_catchup tests" =
               ignore
                 ( Cache_lib.Cached.invalidate_with_failure
                     cached_failing_transition
-                  : External_transition.Initial_validated.t Envelope.Incoming.t
-                  ) ;
+                  : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
               let%map result =
                 Block_time.Timeout.await_exn time_controller
                   ~timeout_duration:(Block_time.Span.of_ms 10000L)
