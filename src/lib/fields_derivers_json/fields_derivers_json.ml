@@ -6,6 +6,7 @@ module To_yojson = struct
     type ('input_type, 'a, 'c) t =
       < to_json : ('input_type -> Yojson.Safe.t) ref
       ; contramap : ('c -> 'input_type) ref
+      ; skip : bool ref
       ; .. >
       as
       'a
@@ -28,7 +29,7 @@ module To_yojson = struct
     in
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
-      ( if annotations.skip then None
+      ( if annotations.skip || !(t_field#skip) then None
       else
         ( Option.value annotations.name
             ~default:(Fields_derivers.name_under_to_camel field)
@@ -50,6 +51,7 @@ module To_yojson = struct
     obj
 
   let skip obj =
+    obj#skip := true ;
     obj#contramap := Fn.id ;
     (obj#to_json :=
        fun _ -> failwith "Unexpected: This obj#to_json should be skipped") ;
@@ -92,6 +94,7 @@ module Of_yojson = struct
     type ('input_type, 'a, 'c) t =
       < of_json : (Yojson.Safe.t -> 'input_type) ref
       ; map : ('input_type -> 'c) ref
+      ; skip : bool ref
       ; .. >
       as
       'a
@@ -115,7 +118,7 @@ module Of_yojson = struct
     let creator finished_obj =
       let map = !(finished_obj#of_json_creator) in
       !(t_field#map)
-        ( if annotations.skip then
+        ( if annotations.skip || !(t_field#skip) then
           match skip_data with
           | Some x ->
               x
@@ -225,7 +228,10 @@ let%test_module "Test" =
       let of_json_creator = ref String.Map.empty in
       let map = ref Fn.id in
       let contramap = ref Fn.id in
+      let skip = ref false in
       object
+        method skip = skip
+
         method to_json = to_json
 
         method map = map

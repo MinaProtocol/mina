@@ -952,8 +952,6 @@ func TestBitswapDownloadPrepoluated(t *testing.T) {
 						prepopulatedIxs[ix]++
 					} else {
 						prepopulated.Add(k)
-						ks := k.String()
-						fmt.Printf("Prepopulating %s\n", ks[len(ks)-6:])
 						ix++
 						if ix == len(prepopulatedIxs) {
 							break

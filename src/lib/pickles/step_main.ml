@@ -12,7 +12,7 @@ module B = Inductive_rule.B
 let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
     (pass_through : Digest.t) (unfinalized : Unfinalized.t)
     (should_verify : B.t) : _ Vector.t * B.t =
-  let open Pairing_main in
+  let open Step_verifier in
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
   let ( app_state
       , state
@@ -67,7 +67,7 @@ let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
             ; old_bulletproof_challenges
             })
     in
-    { Types.Dlog_based.Statement.pass_through = prev_me_only
+    { Types.Wrap.Statement.pass_through = prev_me_only
     ; proof_state = { state with me_only = pass_through }
     }
   in
@@ -89,6 +89,8 @@ let verify_one (p : _ Per_proof_witness.t) (d : _ Types_map.For_step.t)
           printf "verified: %b\n%!" verified ;
           printf "should_verify: %b\n\n%!" should_verify) ;
   (chals, Boolean.(verified &&& finalized ||| not should_verify))
+
+let finalize_previous_and_verify = ()
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
@@ -122,7 +124,7 @@ let step_main :
     -> (   ( (Unfinalized.t, max_branching) Vector.t
            , Field.t
            , (Field.t, max_branching) Vector.t )
-           Types.Pairing_based.Statement.t
+           Types.Step.Statement.t
         -> unit)
        Staged.t =
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
@@ -186,25 +188,20 @@ let step_main :
         let f = Fn.id
       end)
   in
-  let main (stmt : _ Types.Pairing_based.Statement.t) =
+  let main (stmt : _ Types.Step.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
         let dlog_plonk_index =
-          with_label "dlog_plonk_index" (fun () ->
-              exists
-                ~request:(fun () -> Req.Wrap_index)
-                (Plonk_verification_key_evals.typ Inner_curve.typ))
+          exists
+            ~request:(fun () -> Req.Wrap_index)
+            (Plonk_verification_key_evals.typ Inner_curve.typ)
         in
-        let app_state =
-          with_label "app_state" (fun () ->
-              exists basic.typ ~request:(fun () -> Req.App_state))
-        in
+        let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
-          with_label "prevs" (fun () ->
-              exists (Prev_typ.f prev_typs) ~request:(fun () ->
-                  Req.Proof_with_datas))
+          exists (Prev_typ.f prev_typs) ~request:(fun () ->
+              Req.Proof_with_datas)
         in
         let prev_statements =
           let module M =
@@ -216,78 +213,7 @@ let step_main :
           in
           M.f prevs
         in
-        let proofs_should_verify =
-          with_label "rule_main" (fun () -> rule.main prev_statements app_state)
-        in
-        let datas =
-          let self_data :
-              ( a_var
-              , a_value
-              , max_branching
-              , self_branches )
-              Types_map.For_step.t =
-            { branches = self_branches
-            ; branchings = Vector.map basic.branchings ~f:Field.of_int
-            ; max_branching = (module Max_branching)
-            ; max_width = None
-            ; typ = basic.typ
-            ; var_to_field_elements = basic.var_to_field_elements
-            ; value_to_field_elements = basic.value_to_field_elements
-            ; wrap_domains = basic.wrap_domains
-            ; step_domains = `Known basic.step_domains
-            ; wrap_key = dlog_plonk_index
-            }
-          in
-          let module M =
-            H4.Map (Tag) (Types_map.For_step)
-              (struct
-                let f :
-                    type a b n m.
-                    (a, b, n, m) Tag.t -> (a, b, n, m) Types_map.For_step.t =
-                 fun tag ->
-                  match Type_equal.Id.same_witness self.id tag.id with
-                  | Some T ->
-                      self_data
-                  | None -> (
-                      match tag.kind with
-                      | Compiled ->
-                          Types_map.For_step.of_compiled
-                            (Types_map.lookup_compiled tag.id)
-                      | Side_loaded ->
-                          Types_map.For_step.of_side_loaded
-                            (Types_map.lookup_side_loaded tag.id) )
-              end)
-          in
-          M.f rule.prevs
-        in
-        let unfinalized_proofs =
-          let module H = H1.Of_vector (Unfinalized) in
-          H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
-        in
-        let module Packed_digest = Field in
-        let module Proof = struct
-          type t = Wrap_proof.var
-        end in
-        let open Pairing_main in
-        let pass_throughs =
-          with_label "pass_throughs" (fun () ->
-              let module V = H1.Of_vector (Digest) in
-              V.f branching (Vector.trim stmt.pass_through lte))
-        in
-        let sgs =
-          let module M =
-            H3.Map
-              (Per_proof_witness)
-              (E03 (Inner_curve))
-              (struct
-                let f :
-                    type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t =
-                 fun (_, _, _, _, _, (opening, _)) -> opening.sg
-              end)
-          in
-          let module V = H3.To_vector (Inner_curve) in
-          V.f branching (M.f prevs)
-        in
+        let open Step_verifier in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
@@ -326,12 +252,81 @@ let step_main :
                     (chals :: chalss, v :: vs)
               in
               let chalss, vs =
+                let pass_throughs =
+                  with_label "pass_throughs" (fun () ->
+                      let module V = H1.Of_vector (Digest) in
+                      V.f branching (Vector.trim stmt.pass_through lte))
+                and proofs_should_verify =
+                  (* Run the application logic of the rule on the predecessor statements *)
+                  with_label "rule_main" (fun () ->
+                      rule.main prev_statements app_state)
+                and unfinalized_proofs =
+                  let module H = H1.Of_vector (Unfinalized) in
+                  H.f branching
+                    (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+                and datas =
+                  let self_data :
+                      ( a_var
+                      , a_value
+                      , max_branching
+                      , self_branches )
+                      Types_map.For_step.t =
+                    { branches = self_branches
+                    ; branchings = Vector.map basic.branchings ~f:Field.of_int
+                    ; max_branching = (module Max_branching)
+                    ; max_width = None
+                    ; typ = basic.typ
+                    ; var_to_field_elements = basic.var_to_field_elements
+                    ; value_to_field_elements = basic.value_to_field_elements
+                    ; wrap_domains = basic.wrap_domains
+                    ; step_domains = `Known basic.step_domains
+                    ; wrap_key = dlog_plonk_index
+                    }
+                  in
+                  let module M =
+                    H4.Map (Tag) (Types_map.For_step)
+                      (struct
+                        let f :
+                            type a b n m.
+                               (a, b, n, m) Tag.t
+                            -> (a, b, n, m) Types_map.For_step.t =
+                         fun tag ->
+                          match Type_equal.Id.same_witness self.id tag.id with
+                          | Some T ->
+                              self_data
+                          | None -> (
+                              match tag.kind with
+                              | Compiled ->
+                                  Types_map.For_step.of_compiled
+                                    (Types_map.lookup_compiled tag.id)
+                              | Side_loaded ->
+                                  Types_map.For_step.of_side_loaded
+                                    (Types_map.lookup_side_loaded tag.id) )
+                      end)
+                  in
+                  M.f rule.prevs
+                in
                 go prevs datas pass_throughs unfinalized_proofs
                   proofs_should_verify branching
               in
               Boolean.Assert.all vs ; chalss)
         in
         let () =
+          let sgs =
+            let module M =
+              H3.Map
+                (Per_proof_witness)
+                (E03 (Inner_curve))
+                (struct
+                  let f :
+                      type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t
+                      =
+                   fun (_, _, _, _, _, (opening, _)) -> opening.sg
+                end)
+            in
+            let module V = H3.To_vector (Inner_curve) in
+            V.f branching (M.f prevs)
+          in
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
                 unstage

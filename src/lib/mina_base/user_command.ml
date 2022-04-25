@@ -146,7 +146,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.snapp).verification_key).data)
+        !(!(account.zkapp).verification_key).data)
   in
   match t with
   | Signed_command c ->

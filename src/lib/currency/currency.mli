@@ -65,7 +65,7 @@ module Fee : sig
          and type signed_var := Signed.var
          and type value := t
 
-    val add_signed : var -> Signed.var -> (var, _) Checked.t
+    val add_signed : var -> Signed.var -> var Checked.t
   end
 
   [%%endif]
@@ -122,7 +122,7 @@ module Amount : sig
          and type signed_var := Signed.var
          and type value := t
 
-    val add_signed : var -> Signed.var -> (var, _) Checked.t
+    val add_signed : var -> Signed.var -> var Checked.t
 
     val of_fee : Fee.var -> var
 
@@ -174,42 +174,40 @@ module Balance : sig
 
     val to_amount : t -> Amount.var
 
-    val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
+    val add_signed_amount : var -> Amount.Signed.var -> var Checked.t
 
-    val add_amount : var -> Amount.var -> (var, _) Checked.t
+    val add_amount : var -> Amount.var -> var Checked.t
 
-    val sub_amount : var -> Amount.var -> (var, _) Checked.t
+    val sub_amount : var -> Amount.var -> var Checked.t
 
     val sub_amount_flagged :
-      var -> Amount.var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
+      var -> Amount.var -> (var * [ `Underflow of Boolean.var ]) Checked.t
 
     val add_amount_flagged :
-      var -> Amount.var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
+      var -> Amount.var -> (var * [ `Overflow of Boolean.var ]) Checked.t
 
     val add_signed_amount_flagged :
-         var
-      -> Amount.Signed.var
-      -> (var * [ `Overflow of Boolean.var ], _) Checked.t
+      var -> Amount.Signed.var -> (var * [ `Overflow of Boolean.var ]) Checked.t
 
-    val sub_or_zero : var -> var -> (var, _) Checked.t
+    val sub_or_zero : var -> var -> var Checked.t
 
-    val ( + ) : var -> Amount.var -> (var, _) Checked.t
+    val ( + ) : var -> Amount.var -> var Checked.t
 
-    val ( - ) : var -> Amount.var -> (var, _) Checked.t
+    val ( - ) : var -> Amount.var -> var Checked.t
 
-    val equal : var -> var -> (Boolean.var, _) Checked.t
+    val equal : var -> var -> Boolean.var Checked.t
 
-    val ( = ) : var -> var -> (Boolean.var, _) Checked.t
+    val ( = ) : var -> var -> Boolean.var Checked.t
 
-    val ( < ) : var -> var -> (Boolean.var, _) Checked.t
+    val ( < ) : var -> var -> Boolean.var Checked.t
 
-    val ( > ) : var -> var -> (Boolean.var, _) Checked.t
+    val ( > ) : var -> var -> Boolean.var Checked.t
 
-    val ( <= ) : var -> var -> (Boolean.var, _) Checked.t
+    val ( <= ) : var -> var -> Boolean.var Checked.t
 
-    val ( >= ) : var -> var -> (Boolean.var, _) Checked.t
+    val ( >= ) : var -> var -> Boolean.var Checked.t
 
-    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+    val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
     module Unsafe : sig
       val of_field : Field.Var.t -> var

@@ -22,7 +22,7 @@ module Constraints (Snarky_backendless : Snark_intf.Basic) = struct
   open Snarky_backendless
 
   (** Generate a flamechart for the labels of a checked computation. *)
-  let log ?weight (t : (_, _) Checked.t) : events =
+  let log ?weight (t : _ Checked.t) : events =
     let rev_events = ref [] in
     let _total =
       constraint_count ?weight t ~log:(fun ?(start = false) label count ->
@@ -47,7 +47,7 @@ let () = Snarky_log.to_file "output.json" @@
     ~apply_args:(fun mul -> mul Field.one Field.one)
     }] *)
   let log_func ~(input : ('r_value, 'r_value, 'k_var, 'k_value) Data_spec.t)
-      ~(apply_args : 'k_value -> (_, _) Checked.t) (f : 'k_var) : events =
+      ~(apply_args : 'k_value -> _ Checked.t) (f : 'k_var) : events =
     let f' = conv (fun c -> c) input f in
     log (apply_args f')
 end

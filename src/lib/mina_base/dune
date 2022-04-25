@@ -48,7 +48,7 @@
    crypto_params
    debug_assert
    fold_lib
-   fields_derivers.snapps
+   fields_derivers.zkapps
    fields_derivers.json
    fields_derivers.graphql
    one_or_two

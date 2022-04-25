@@ -184,7 +184,7 @@ let block_base64_of_breadcrumb breadcrumb =
   let external_transition = external_transition_of_breadcrumb breadcrumb in
   let block_string =
     Binable.to_string
-      (module External_transition.Stable.Latest)
+      (module External_transition.Raw.Stable.Latest)
       external_transition
   in
   (* raises only on errors from invalid optional arguments *)
@@ -321,7 +321,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   match transition with
                   | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
                     ->
-                      Kimchi.Foundations.Fp.equal target.ledger
+                      Pasta_bindings.Fp.equal target.ledger
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)

@@ -47,47 +47,93 @@ let genesis_state_body =
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
+let genesis_state_view = Mina_state.Protocol_state.Body.view genesis_state_body
+
+let genesis_state_body_hash =
+  Mina_state.Protocol_state.Body.hash genesis_state_body
+
 let init_stack = Pending_coinbase.Stack.empty
 
+let pending_coinbase_state_stack ~state_body_hash =
+  { Transaction_snark.Pending_coinbase_stack_state.source = init_stack
+  ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
+  }
+
 let apply_parties ledger parties =
+  let parties =
+    match parties with
+    | [] ->
+        []
+    | [ ps ] ->
+        [ ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement
+              (pending_coinbase_state_stack
+                 ~state_body_hash:genesis_state_body_hash)
+          , ps )
+        ]
+    | ps1 :: ps2 :: rest ->
+        let ps1 =
+          ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement
+              (pending_coinbase_state_stack
+                 ~state_body_hash:genesis_state_body_hash)
+          , ps1 )
+        in
+        let pending_coinbase_state_stack =
+          pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
+        in
+        let unchanged_stack_state ps =
+          ( `Pending_coinbase_init_stack init_stack
+          , `Pending_coinbase_of_statement
+              { pending_coinbase_state_stack with
+                source = pending_coinbase_state_stack.target
+              }
+          , ps )
+        in
+        let ps2 = unchanged_stack_state ps2 in
+        ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-      ~pending_coinbase_init_stack:init_stack (`Ledger ledger) parties
+      (`Ledger ledger) parties
   in
   let open Impl in
-  List.fold ~init:((), ()) witnesses
-    ~f:(fun _ (witness, spec, statement, snapp_stmt) ->
-      run_and_check
-        (fun () ->
+  List.iter witnesses ~f:(fun (witness, spec, statement, snapp_stmt) ->
+      run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
           let snapp_stmt =
             Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Snapp_statement.typ ~compute:(fun () -> stmt)) ])
+                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ])
           in
           Transaction_snark.Base.Parties_snark.main ~constraint_constants
             (Parties_segment.Basic.to_single_list spec)
             snapp_stmt s ~witness ;
           fun () -> ())
-        ()
       |> Or_error.ok_exn)
 
 let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let apply_parties_with_merges ledger partiess =
+let check_parties_with_merges_exn ?(state_body = genesis_state_body)
+    ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
+    ?(apply = true) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
       let witnesses =
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
-                ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
-                ~pending_coinbase_init_stack:init_stack (`Ledger ledger)
-                [ parties ])
+                ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+                [ ( `Pending_coinbase_init_stack init_stack
+                  , `Pending_coinbase_of_statement
+                      (pending_coinbase_state_stack ~state_body_hash)
+                  , parties )
+                ])
         with
         | Ok a ->
             a
@@ -125,13 +171,14 @@ let apply_parties_with_merges ledger partiess =
                 T.merge ~sok_digest prev curr)
       in
       let _p = Or_error.ok_exn p in
-      let _s =
-        Ledger.apply_parties_unchecked ~constraint_constants
-          ~state_view:(Mina_state.Protocol_state.Body.view genesis_state_body)
-          ledger parties
-        |> Or_error.ok_exn
-      in
-      ())
+      if apply then
+        let _applied =
+          Ledger.apply_parties_unchecked ~constraint_constants ~state_view
+            ledger parties
+          |> Or_error.ok_exn
+        in
+        ()
+      else ())
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
@@ -147,7 +194,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         |> fun s ->
         Run.Field.(Assert.equal s (s + one))
         |> fun () :
-               (Snapp_statement.Checked.t * (Snapp_statement.Checked.t * unit))
+               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
                Pickles_types.Hlist0.H1
                  (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                .t ->
@@ -178,46 +225,46 @@ let test_snapp_update ?snapp_permissions ~vk ~snapp_prover test_spec
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           (*create a snapp account*)
-          Transaction_snark.For_tests.create_trivial_snapp_account
+          Transaction_snark.For_tests.create_trivial_zkapp_account
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =
             Transaction_snark.For_tests.update_states ~snapp_prover
               ~constraint_constants test_spec
           in
-          apply_parties_with_merges ledger [ parties ]))
+          check_parties_with_merges_exn ledger [ parties ]))
 
 let permissions_from_update (update : Party.Update.t) ~auth =
   let default = Permissions.user_default in
   { default with
     edit_state =
       ( if
-        Snapp_state.V.to_list update.app_state
-        |> List.exists ~f:Snapp_basic.Set_or_keep.is_set
+        Zkapp_state.V.to_list update.app_state
+        |> List.exists ~f:Zkapp_basic.Set_or_keep.is_set
       then auth
       else default.edit_state )
   ; set_delegate =
-      ( if Snapp_basic.Set_or_keep.is_keep update.delegate then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.delegate then
         default.set_delegate
       else auth )
   ; set_verification_key =
-      ( if Snapp_basic.Set_or_keep.is_keep update.verification_key then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
       else auth )
   ; set_permissions =
-      ( if Snapp_basic.Set_or_keep.is_keep update.permissions then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions
       else auth )
-  ; set_snapp_uri =
-      ( if Snapp_basic.Set_or_keep.is_keep update.snapp_uri then
-        default.set_snapp_uri
+  ; set_zkapp_uri =
+      ( if Zkapp_basic.Set_or_keep.is_keep update.zkapp_uri then
+        default.set_zkapp_uri
       else auth )
   ; set_token_symbol =
-      ( if Snapp_basic.Set_or_keep.is_keep update.token_symbol then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.token_symbol then
         default.set_token_symbol
       else auth )
   ; set_voting_for =
-      ( if Snapp_basic.Set_or_keep.is_keep update.voting_for then
+      ( if Zkapp_basic.Set_or_keep.is_keep update.voting_for then
         default.set_voting_for
       else auth )
   }
@@ -265,9 +312,6 @@ module Wallet = struct
       ~receiver_pk:(Account.public_key receiver.account)
       amt fee nonce memo
 end
-
-let genesis_state_body_hash =
-  Mina_state.Protocol_state.Body.hash genesis_state_body
 
 (** Each transaction pushes the previous protocol state (used to validate
     the transaction) to the pending coinbase stack of protocol states*)

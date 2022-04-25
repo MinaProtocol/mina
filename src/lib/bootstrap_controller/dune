@@ -50,4 +50,5 @@
    block_time
    mina_base.util
    o1trace
+   mina_net2
    ))

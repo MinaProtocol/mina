@@ -12,7 +12,7 @@ module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
-module Pairing_main = Pairing_main
+module Step_verifier = Step_verifier
 module Common = Common
 
 module type Statement_intf = sig
@@ -33,7 +33,7 @@ module Verification_key : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t
+      type t [@@deriving to_yojson]
     end
   end]
 
@@ -85,8 +85,12 @@ module Proof : sig
       module V2 : sig
         type t = Make(Nat.N2)(Nat.N2).t
         [@@deriving sexp, compare, equal, yojson, hash]
+
+        val to_yojson_full : t -> Yojson.Safe.t
       end
     end]
+
+    val to_yojson_full : t -> Yojson.Safe.t
   end
 end
 

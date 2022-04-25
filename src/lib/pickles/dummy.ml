@@ -7,7 +7,7 @@ open Common
 let wrap_domains = Common.wrap_domains
 
 let evals =
-  let open Dlog_plonk_types in
+  let open Plonk_types in
   let e () =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
         Array.create n (Ro.tock ()))
@@ -18,7 +18,7 @@ let evals =
   { All_evals.ft_eval1 = Ro.tock (); evals = (ex (), ex ()) }
 
 let evals_combined =
-  Dlog_plonk_types.All_evals.map evals ~f1:Fn.id
+  Plonk_types.All_evals.map evals ~f1:Fn.id
     ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
 
 module Ipa = struct

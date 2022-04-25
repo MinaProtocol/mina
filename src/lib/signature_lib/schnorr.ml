@@ -38,10 +38,10 @@ module type Message_intf = sig
 
   type curve_scalar_var
 
-  type (_, _) checked
+  type _ checked
 
   val hash_checked :
-    var -> public_key:curve_var -> r:field_var -> (curve_scalar_var, _) checked
+    var -> public_key:curve_var -> r:field_var -> curve_scalar_var checked
 
   [%%endif]
 end
@@ -66,7 +66,7 @@ module type S = sig
       Snarky_curves.Shifted_intf
         with type curve_var := curve_var
          and type boolean_var := Boolean.var
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type 'a checked := 'a Checked.t
   end
 
   module Message :
@@ -74,7 +74,7 @@ module type S = sig
       with type boolean_var := Boolean.var
        and type curve_scalar := curve_scalar
        and type curve_scalar_var := curve_scalar_var
-       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type 'a checked := 'a Checked.t
        and type curve := curve
        and type curve_var := curve_var
        and type field := Field.t
@@ -99,21 +99,21 @@ module type S = sig
   end
 
   module Checked : sig
-    val compress : curve_var -> (Boolean.var list, _) Checked.t
+    val compress : curve_var -> Boolean.var list Checked.t
 
     val verifies :
          (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
-      -> (Boolean.var, _) Checked.t
+      -> Boolean.var Checked.t
 
     val assert_verifies :
          (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
-      -> (unit, _) Checked.t
+      -> unit Checked.t
   end
 
   val compress : curve -> bool list
@@ -184,7 +184,7 @@ module Make
                   and type curve_var := Curve.var
                   and type field := Impl.Field.t
                   and type field_var := Impl.Field.Var.t
-                  and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+                  and type 'a checked := 'a Impl.Checked.t) :
   S
     with module Impl := Impl
      and type curve := Curve.t
@@ -541,13 +541,13 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash = make_hash ~init:Hash_prefix_states.signature
+    let hash = make_hash ~init:Hash_prefix_states.signature_legacy
 
     let hash_for_mainnet =
-      make_hash ~init:Hash_prefix_states.signature_for_mainnet
+      make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
 
     let hash_for_testnet =
-      make_hash ~init:Hash_prefix_states.signature_for_testnet
+      make_hash ~init:Hash_prefix_states.signature_for_testnet_legacy
 
     [%%ifdef consensus_mechanism]
 
@@ -561,7 +561,7 @@ module Message = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
-          hash ~init:Hash_prefix_states.signature (pack_input input)
+          hash ~init:Hash_prefix_states.signature_legacy (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list)
 

@@ -6,6 +6,7 @@ module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr
 module Validation_callback = Validation_callback
+module Sink = Sink
 
 exception
   Libp2p_helper_died_unexpectedly = Libp2p_helper
@@ -192,7 +193,8 @@ let bandwidth_info t =
 let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
     ~mina_peer_exchange ~seed_peers ~initial_gating_config ~min_connections
-    ~max_connections ~validation_queue_size ~known_private_ip_nets =
+    ~max_connections ~validation_queue_size ~known_private_ip_nets ~topic_config
+    =
   let open Deferred.Or_error.Let_syntax in
   let libp2p_config =
     Libp2p_ipc.create_libp2p_config ~private_key:(Keypair.secret me)
@@ -208,6 +210,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~peer_exchange ~mina_peer_exchange ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
+      ~topic_config
   in
   let%map _ =
     Libp2p_helper.do_rpc t.helper

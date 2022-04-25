@@ -221,7 +221,7 @@ query user_commands($public_key: PublicKey) {
 }
 |}]
 
-module Pooled_snapp_commands = Generated_graphql_queries.Pooled_snapp_commands
+module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Time_offset = [%graphql {|
 query time_offset {

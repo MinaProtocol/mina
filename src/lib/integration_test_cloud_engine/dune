@@ -34,6 +34,7 @@
    mina_version
    timeout_lib
    mina_numbers
+   mina_transaction
    file_system
    pickles
    pickles_types
@@ -42,5 +43,7 @@
    with_hash
    data_hash_lib
    generated_graphql_queries
+   integers
+
    )
 )

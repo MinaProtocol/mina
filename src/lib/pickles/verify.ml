@@ -4,7 +4,6 @@ open Async_kernel
 open Pickles_types
 open Common
 open Import
-open Types
 open Backend
 open Tuple_lib
 
@@ -29,7 +28,7 @@ module Plonk_checks = struct
 end
 
 let verify_heterogenous (ts : Instance.t list) =
-  let module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk in
+  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
@@ -67,7 +66,7 @@ let verify_heterogenous (ts : Instance.t list) =
             pass_through = { statement.pass_through with app_state }
           }
         in
-        let open Types.Dlog_based.Proof_state in
+        let open Types.Wrap.Proof_state in
         let sc =
           SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
         in
@@ -90,10 +89,8 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let zetaw = Tick.Field.mul zeta w in
         let tick_plonk_minimal :
-            _
-            Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
-            .Minimal
-            .t =
+            _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+            =
           let chal = Challenge.Constant.to_tick_field in
           { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
         in
@@ -153,10 +150,10 @@ let verify_heterogenous (ts : Instance.t list) =
           (absorb sponge, squeeze)
         in
         let absorb_evals
-            { Dlog_plonk_types.All_evals.With_public_input.public_input = x_hat
+            { Plonk_types.All_evals.With_public_input.public_input = x_hat
             ; evals = e
             } =
-          let xs, ys = Dlog_plonk_types.Evals.to_vectors e in
+          let xs, ys = Plonk_types.Evals.to_vectors e in
           List.iter
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:absorb)
@@ -225,11 +222,10 @@ let verify_heterogenous (ts : Instance.t list) =
                 ((module Max_branching), (module A_value), key, app_state, T t))
               plonk
             ->
-           let prepared_statement : _ Types.Dlog_based.Statement.In_circuit.t =
+           let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
              { pass_through =
-                 Common.hash_pairing_me_only
-                   ~app_state:A_value.to_field_elements
-                   (Reduced_me_only.Pairing_based.prepare
+                 Common.hash_step_me_only ~app_state:A_value.to_field_elements
+                   (Reduced_me_only.Step.prepare
                       ~dlog_plonk_index:key.commitments
                       { t.statement.pass_through with app_state })
              ; proof_state =
@@ -238,7 +234,7 @@ let verify_heterogenous (ts : Instance.t list) =
                      { t.statement.proof_state.deferred_values with plonk }
                  ; me_only =
                      Common.hash_dlog_me_only Max_branching.n
-                       (Reduced_me_only.Dlog_based.prepare
+                       (Reduced_me_only.Wrap.prepare
                           t.statement.proof_state.me_only)
                  }
              }

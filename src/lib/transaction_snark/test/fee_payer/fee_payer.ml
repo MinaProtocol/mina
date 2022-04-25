@@ -16,8 +16,8 @@ let%test_module "Fee payer tests" =
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =
-          Pickles_types.Vector.init Snapp_state.Max_state_size.n ~f:(fun i ->
-              Snapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
       }
 
     let%test_unit "update a snapp account with signature and fee paid by the \
@@ -29,11 +29,12 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -54,11 +55,12 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
@@ -78,11 +80,12 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
@@ -106,11 +109,12 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
-            ; snapp_account_keypairs = [ new_kp ]
+            ; zkapp_account_keypairs = [ new_kp ]
             ; memo
-            ; new_snapp_account = false
+            ; new_zkapp_account = false
             ; snapp_update
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
@@ -136,11 +140,12 @@ let%test_module "Fee payer tests" =
               let test_spec : Spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
+                ; fee_payer = None
                 ; receivers = []
                 ; amount
-                ; snapp_account_keypairs = [ fst spec.sender ]
+                ; zkapp_account_keypairs = [ fst spec.sender ]
                 ; memo
-                ; new_snapp_account = true
+                ; new_zkapp_account = true
                 ; snapp_update
                 ; current_auth = Permissions.Auth_required.Signature
                 ; call_data = Snark_params.Tick.Field.zero
@@ -170,9 +175,13 @@ let%test_module "Fee payer tests" =
                 Or_error.try_with (fun () ->
                     Transaction_snark.parties_witnesses_exn
                       ~constraint_constants ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero
-                      ~pending_coinbase_init_stack:U.init_stack (`Ledger ledger)
-                      [ parties ])
+                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+                      [ ( `Pending_coinbase_init_stack U.init_stack
+                        , `Pending_coinbase_of_statement
+                            (U.pending_coinbase_state_stack
+                               ~state_body_hash:U.genesis_state_body_hash)
+                        , parties )
+                      ])
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"

@@ -15,7 +15,9 @@
    pickles_types
    kimchi_backend
    kimchi_pasta
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
  )
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))

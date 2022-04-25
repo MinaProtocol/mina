@@ -173,7 +173,7 @@ end = struct
 
   let var_of_t (t : t) : var = Field.Var.constant (Field.project (to_bits t))
 
-  let if_ cond ~then_ ~else_ : (var, _) Checked.t =
+  let if_ cond ~then_ ~else_ : var Checked.t =
     Field.Checked.if_ cond ~then_ ~else_
 
   let () = assert (Int.(length_in_bits mod 16 = 0))
@@ -561,7 +561,7 @@ end = struct
         in
         { sgn; magnitude }
 
-      let if_ cond ~(then_ : var) ~(else_ : var) : (var, _) Checked.t =
+      let if_ cond ~(then_ : var) ~(else_ : var) : var Checked.t =
         let%bind repr = if_repr cond ~then_:then_.repr ~else_:else_.repr in
         let%map value =
           match (then_.value, else_.value) with
@@ -745,11 +745,10 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
-        let expect_failure err c =
-          if Or_error.is_ok (check c ()) then failwith err
+        let expect_failure err c = if Or_error.is_ok (check c) then failwith err
 
         let expect_success err c =
-          match check c () with
+          match check c with
           | Ok () ->
               ()
           | Error e ->
@@ -1134,7 +1133,7 @@ let%test_module "sub_flagged module" =
 
       module Checked : sig
         val sub_flagged :
-          var -> var -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
+          var -> var -> (var * [ `Underflow of Boolean.var ]) Tick.Checked.t
       end
     end
 

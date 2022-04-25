@@ -82,7 +82,7 @@ let get ~depth t addr =
      account [f account] at path [addr].
 *)
 let%snarkydef modify_account ~depth t aid
-    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
+    ~(filter : Account.var -> 'a Checked.t) ~f =
   let%bind addr =
     request_witness
       (Account.Index.Unpacked.typ ~ledger_depth:depth)

@@ -9,6 +9,7 @@
    core
    base
    core_kernel
+   sexplib0
    yojson
    ;; local libraries
    mina_base.import
@@ -18,13 +19,19 @@
    transaction_snark
    snark_params
    data_hash_lib
+   genesis_proof
    mina_ledger
    mina_base
+   mina_transaction
+   mina_compile_config
+   precomputed_values
    currency
    mina_state
    signature_lib
+   random_oracle
    genesis_constants
    transaction_protocol_state
+   with_hash
    pickles_types
    mina_numbers
    sgn

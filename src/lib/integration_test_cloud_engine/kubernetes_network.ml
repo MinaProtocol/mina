@@ -1,6 +1,7 @@
-open Core
+open Core_kernel
 open Async
 open Integration_test_lib
+open Mina_transaction
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -39,7 +40,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
   let run_in_container ?container_id ~cmd { pod_id; config; info; _ } =
@@ -47,7 +48,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
@@ -141,6 +142,38 @@ module Node = struct
       }
     |}]
 
+    module Send_payment_with_raw_sig =
+    [%graphql
+    {|
+      mutation (
+        $sender: PublicKey!,
+        $receiver: PublicKey!,
+        $amount: UInt64!,
+        $token: UInt64!,
+        $fee: UInt64!,
+        $nonce: UInt32!,
+        $memo: String!,
+        $validUntil: UInt32!,
+        $rawSignature: String!
+      )
+      {
+        sendPayment(
+          input:
+          {
+            from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo, validUntil: $validUntil
+          },
+          signature: {rawSignature: $rawSignature}
+        )
+        {
+          payment {
+            id
+            nonce
+            hash
+          }
+        }
+      }
+    |}]
+
     module Send_delegation =
     [%graphql
     {|
@@ -163,21 +196,7 @@ module Node = struct
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
-
-    module Get_balance =
-    [%graphql
-    {|
-      query ($public_key: PublicKey, $token: UInt64) {
-        account(publicKey: $public_key, token: $token) {
-          balance {
-            total @bsDecoder(fn: "Decoders.balance")
-            liquid @bsDecoder(fn: "Decoders.optional_balance")
-            locked @bsDecoder(fn: "Decoders.optional_balance")
-          }
-        }
-      }
-    |}]
+    module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
 
     module Query_peer_id =
     [%graphql
@@ -230,9 +249,9 @@ module Node = struct
     {|
       query ($public_key: PublicKey, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid
-                    locked
-                    total
+          balance { liquid @bsDecoder(fn: "Decoders.optional_balance")
+                    locked @bsDecoder(fn: "Decoders.optional_balance")
+                    total @bsDecoder(fn: "Decoders.balance")
                   }
           delegate
           nonce
@@ -243,14 +262,14 @@ module Node = struct
                         send
                         setDelegate
                         setPermissions
-                        setSnappUri
+                        setZkappUri
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
                       }
           sequenceEvents
-          snappState
-          snappUri
+          zkappState
+          zkappUri
           timing { cliffTime
                    cliffAmount
                    vestingPeriod
@@ -270,7 +289,7 @@ module Node = struct
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-      ?(initial_delay_sec = 30.0) ~logger ~node ~query_name query_obj =
+      ?(initial_delay_sec = 0.) ~logger ~node ~query_name query_obj =
     let open Deferred.Let_syntax in
     if not node.config.graphql_enabled then
       Deferred.Or_error.error_string
@@ -379,57 +398,13 @@ module Node = struct
     get_best_chain ?max_length ~logger t
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let make_get_balance ~f ~logger t ~account_id =
-    let open Deferred.Or_error.Let_syntax in
-    [%log info] "Getting account balance"
-      ~metadata:
-        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
-        :: logger_metadata t ) ;
+  let get_account ~logger t ~account_id =
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
-    let get_balance_obj =
-      Graphql.Get_balance.make
-        ~public_key:(Graphql_lib.Encoders.public_key pk)
-        ~token:(Graphql_lib.Encoders.token token)
-        ()
-    in
-    let%bind balance_obj =
-      exec_graphql_request ~logger ~node:t ~query_name:"get_balance_graphql"
-        get_balance_obj
-    in
-    match balance_obj#account with
-    | None ->
-        Deferred.Or_error.errorf
-          !"Account with %{sexp:Mina_base.Account_id.t} not found"
-          account_id
-    | Some acc ->
-        return (f acc#balance)
-
-  let get_balance_total = make_get_balance ~f:(fun balance -> balance#total)
-
-  let must_get_balance_total ~logger t ~account_id =
-    get_balance_total ~logger t ~account_id
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let get_balance_liquid = make_get_balance ~f:(fun balance -> balance#liquid)
-
-  let must_get_balance_liquid ~logger t ~account_id =
-    get_balance_liquid ~logger t ~account_id
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let get_balance_locked = make_get_balance ~f:(fun balance -> balance#locked)
-
-  let must_get_balance_locked ~logger t ~account_id =
-    get_balance_locked ~logger t ~account_id
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let get_account ~logger t ~account_id =
     [%log info] "Getting account"
       ~metadata:
-        ( ("account_id", Mina_base.Account_id.to_yojson account_id)
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk)
         :: logger_metadata t ) ;
-    let pk = Mina_base.Account_id.public_key account_id in
-    let token = Mina_base.Account_id.token_id account_id in
     let get_account_obj =
       Graphql.Account.make
         ~public_key:(Graphql_lib.Encoders.public_key pk)
@@ -438,6 +413,48 @@ module Node = struct
     in
     exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
       get_account_obj
+
+  type account_data =
+    { nonce : Mina_numbers.Account_nonce.t
+    ; total_balance : Currency.Balance.t
+    ; liquid_balance_opt : Currency.Balance.t option
+    ; locked_balance_opt : Currency.Balance.t option
+    }
+
+  let get_account_data ~logger t ~account_id =
+    let open Deferred.Or_error.Let_syntax in
+    let public_key = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
+    [%log info] "Getting account data, which is its balances and nonce"
+      ~metadata:
+        ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
+        :: logger_metadata t ) ;
+    let%bind account_obj = get_account ~logger t ~account_id in
+    match account_obj#account with
+    | None ->
+        Deferred.Or_error.errorf
+          !"Account with Account id %{sexp:Mina_base.Account_id.t}, public_key \
+            %s, and token %s not found"
+          account_id
+          (Signature_lib.Public_key.Compressed.to_string public_key)
+          (Mina_base.Token_id.to_string token)
+    | Some acc ->
+        return
+          { nonce =
+              acc#nonce
+              |> Option.value_exn
+                   ~message:
+                     "the nonce from get_balance is None, which should be \
+                      impossible"
+              |> Mina_numbers.Account_nonce.of_string
+          ; total_balance = acc#balance#total
+          ; liquid_balance_opt = acc#balance#liquid
+          ; locked_balance_opt = acc#balance#locked
+          }
+
+  let must_get_account_data ~logger t ~account_id =
+    get_account_data ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let permissions_of_account_permissions account_permissions :
       Mina_base.Permissions.t =
@@ -462,7 +479,7 @@ module Node = struct
     ; send = to_auth_required account_permissions#send
     ; set_delegate = to_auth_required account_permissions#setDelegate
     ; set_permissions = to_auth_required account_permissions#setPermissions
-    ; set_snapp_uri = to_auth_required account_permissions#setSnappUri
+    ; set_zkapp_uri = to_auth_required account_permissions#setZkappUri
     ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
     ; set_verification_key =
         to_auth_required account_permissions#setVerificationKey
@@ -495,21 +512,21 @@ module Node = struct
     let%bind account_obj = get_account ~logger t ~account_id in
     match account_obj#account with
     | Some account ->
-        let open Mina_base.Snapp_basic.Set_or_keep in
+        let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
-          match account#snappState with
+          match account#zkappState with
           | Some strs ->
               let fields =
                 Array.to_list strs
                 |> Base.List.map ~f:(fun s ->
                        Set (Pickles.Backend.Tick.Field.of_string s))
               in
-              return (Mina_base.Snapp_state.V.of_list_exn fields)
+              return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with an app state for public key \
+                      "Expected zkApp account with an app state for public key \
                        %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -540,7 +557,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with a verification key for \
+                      "Expected zkApp account with a verification key for \
                        public_key %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -552,12 +569,12 @@ module Node = struct
           | None ->
               fail (Error.of_string "Expected permissions in account")
         in
-        let%bind snapp_uri =
-          match account#snappUri with
+        let%bind zkapp_uri =
+          match account#zkappUri with
           | Some s ->
               return @@ Set s
           | None ->
-              fail (Error.of_string "Expected snapp URI in account")
+              fail (Error.of_string "Expected zkApp URI in account")
         in
         let%bind token_symbol =
           match account#tokenSymbol with
@@ -654,7 +671,7 @@ module Node = struct
             ; delegate
             ; verification_key
             ; permissions
-            ; snapp_uri
+            ; zkapp_uri
             ; token_symbol
             ; timing
             ; voting_for
@@ -664,7 +681,10 @@ module Node = struct
         fail (Error.of_string "Could not get account from ledger")
 
   type signed_command_result =
-    { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
+    { id : string
+    ; hash : Transaction_hash.t
+    ; nonce : Mina_numbers.Account_nonce.t
+    }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -701,14 +721,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -718,8 +738,8 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
-    [%log info] "Sending a snapp"
+  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+    [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
@@ -728,24 +748,39 @@ module Node = struct
     let parties_json =
       Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
-    let send_snapp_graphql () =
-      let send_snapp_obj =
-        Graphql.Send_test_snapp.make ~parties:parties_json ()
+    let send_zkapp_graphql () =
+      let send_zkapp_obj =
+        Graphql.Send_test_zkapp.make ~parties:parties_json ()
       in
-      exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
-        send_snapp_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
+        send_zkapp_obj
     in
-    let%bind sent_snapp_obj = send_snapp_graphql () in
+    let%bind sent_zkapp_obj = send_zkapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
+      match sent_zkapp_obj#internalSendZkapp#zkapp#failureReason with
       | None ->
           return ()
       | Some s ->
-          Deferred.Or_error.errorf "Snapp failed, reason: %s" s
+          Deferred.Or_error.errorf "Zkapp failed, reason: %s"
+            ( Array.fold ~init:[] s ~f:(fun acc f ->
+                  match f with
+                  | None ->
+                      acc
+                  | Some f ->
+                      ( Int.of_string (Option.value_exn f#index)
+                      , Array.map
+                          ~f:(fun s ->
+                            Mina_base.Transaction_status.Failure.of_string s
+                            |> Result.ok_or_failwith)
+                          f#failures
+                        |> Array.to_list |> List.rev )
+                      :: acc)
+            |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
+            |> Yojson.Safe.to_string )
     in
-    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
-    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
-    return snapp_id
+    let zkapp_id = sent_zkapp_obj#internalSendZkapp#zkapp#id in
+    [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
+    return zkapp_id
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
@@ -781,17 +816,63 @@ module Node = struct
     let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
+
+  let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token
+      ~(valid_until : Mina_numbers.Global_slot.t) ~raw_signature =
+    [%log info] "Sending a payment with raw signature"
+      ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let send_payment_graphql () =
+      let send_payment_obj =
+        Graphql.Send_payment_with_raw_sig.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~token:(Graphql_lib.Encoders.token token)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ~nonce:(Graphql_lib.Encoders.nonce nonce)
+          ~memo
+          ~validUntil:(Graphql_lib.Encoders.nonce valid_until)
+          ~rawSignature:raw_signature ()
+      in
+      [%log info] "send_payment_obj with $variables "
+        ~metadata:[ ("variables", send_payment_obj#variables) ] ;
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
+    in
+    let%map sent_payment_obj = send_payment_graphql () in
+    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let res =
+      { id = return_obj#id
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
+      ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
+      }
+    in
+    [%log info] "Sent payment"
+      ~metadata:
+        [ ("user_command_id", `String res.id)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
+        ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
+        ] ;
+    res
+
+  let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
+    send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
       ~fee =
@@ -985,7 +1066,7 @@ module Workload = struct
   let get_nodes t ~config =
     let%bind cwd = Unix.getcwd () in
     let%bind app_id =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"
           ; "deployment"
@@ -995,7 +1076,7 @@ module Workload = struct
           ] )
     in
     let%map pod_ids_str =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
@@ -1070,7 +1151,7 @@ let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
 let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
-let initialize ~logger network =
+let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 60 (* 15 mins *) in
@@ -1080,7 +1161,8 @@ let initialize ~logger network =
     |> String.Set.of_list
   in
   let kube_get_pods () =
-    Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/" "kubectl"
+    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
+      "kubectl"
       [ "-n"
       ; network.namespace
       ; "get"
@@ -1154,24 +1236,8 @@ let initialize ~logger network =
   let res = poll 0 in
   match%bind.Deferred res with
   | Error _ ->
-      [%log error]
-        "Since not all pods were assigned nodes, daemons will not be started" ;
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
       res
   | Ok _ ->
-      [%log info] "Starting the daemons within the pods" ;
-      let start_print (node : Node.t) =
-        let open Malleable_error.Let_syntax in
-        [%log info] "starting %s ..." node.pod_id ;
-        let%bind res = Node.start ~fresh_state:false node in
-        [%log info] "%s started" node.pod_id ;
-        Malleable_error.return res
-      in
-      let seed_nodes = network |> seeds in
-      let non_seed_pods = network |> all_non_seed_pods in
-      (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-      let%bind () =
-        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
-      in
-      Malleable_error.List.iter non_seed_pods ~f:start_print
+      [%log info] "Pods assigned to nodes" ;
+      res

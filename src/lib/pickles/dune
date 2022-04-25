@@ -29,7 +29,9 @@
    async_kernel
    bin_prot.shape
    ;; local libraries
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    kimchi_backend.pasta
    bitstring_lib
    snarky.intf

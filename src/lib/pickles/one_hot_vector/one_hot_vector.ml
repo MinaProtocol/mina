@@ -11,9 +11,7 @@ module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
   type 'n t = (Impl.Boolean.var, 'n) Vector.t
 end
 
-module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit) =
-struct
+module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Constant = Constant
   open Impl
   include T (Impl)

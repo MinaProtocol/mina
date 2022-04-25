@@ -34,3 +34,5 @@ type push_message = Builder.Libp2pHelperInterface.PushMessage.t
 type incoming_message = Reader.DaemonInterface.Message.t
 
 type outgoing_message = Builder.Libp2pHelperInterface.Message.t
+
+type topic_level = Builder.TopicLevel.t

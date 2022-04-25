@@ -12,10 +12,9 @@ use wasm_bindgen::prelude::*;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use kimchi::circuits::{
-    scalars::ProofEvaluations,
+use kimchi::{
     // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
-    wires::COLUMNS,
+    circuits::wires::COLUMNS,
 };
 // use std::path::Path;
 use commitment_dlog::{
@@ -23,7 +22,7 @@ use commitment_dlog::{
     evaluation_proof::OpeningProof,
 };
 use groupmap::GroupMap;
-use kimchi::prover::{ProverCommitments, ProverProof};
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
 use oracle::{

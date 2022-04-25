@@ -22,15 +22,15 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
-        | Signed_command_on_snapp_account
-        | Snapp_account_not_present
+        | Signed_command_on_zkapp_account
+        | Zkapp_account_not_present
         | Update_not_permitted_balance
         | Update_not_permitted_timing_existing_account
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
         | Update_not_permitted_sequence_state
-        | Update_not_permitted_snapp_uri
+        | Update_not_permitted_zkapp_uri
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
@@ -67,6 +67,12 @@ module Failure = struct
             else (index + 1, (index, bucket) :: acc))
       in
       display
+
+    let empty = []
+
+    let of_single_failure f : t = [ [ f ] ]
+
+    let is_empty : t -> bool = Fn.compose List.is_empty List.concat
   end
 
   type failure = t
@@ -108,10 +114,10 @@ module Failure = struct
         "Mismatched_token_permissions"
     | Overflow ->
         "Overflow"
-    | Signed_command_on_snapp_account ->
-        "Signed_command_on_snapp_account"
-    | Snapp_account_not_present ->
-        "Snapp_account_not_present"
+    | Signed_command_on_zkapp_account ->
+        "Signed_command_on_zkapp_account"
+    | Zkapp_account_not_present ->
+        "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
     | Update_not_permitted_timing_existing_account ->
@@ -124,8 +130,8 @@ module Failure = struct
         "Update_not_permitted_verification_key"
     | Update_not_permitted_sequence_state ->
         "Update_not_permitted_sequence_state"
-    | Update_not_permitted_snapp_uri ->
-        "Update_not_permitted_snapp_uri"
+    | Update_not_permitted_zkapp_uri ->
+        "Update_not_permitted_zkapp_uri"
     | Update_not_permitted_token_symbol ->
         "Update_not_permitted_token_symbol"
     | Update_not_permitted_permissions ->
@@ -170,10 +176,10 @@ module Failure = struct
         Ok Mismatched_token_permissions
     | "Overflow" ->
         Ok Overflow
-    | "Signed_command_on_snapp_account" ->
-        Ok Signed_command_on_snapp_account
-    | "Snapp_account_not_present" ->
-        Ok Snapp_account_not_present
+    | "Signed_command_on_zkapp_account" ->
+        Ok Signed_command_on_zkapp_account
+    | "Zkapp_account_not_present" ->
+        Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
     | "Update_not_permitted_timing_existing_account" ->
@@ -186,8 +192,8 @@ module Failure = struct
         Ok Update_not_permitted_verification_key
     | "Update_not_permitted_sequence_state" ->
         Ok Update_not_permitted_sequence_state
-    | "Update_not_permitted_snapp_uri" ->
-        Ok Update_not_permitted_snapp_uri
+    | "Update_not_permitted_zkapp_uri" ->
+        Ok Update_not_permitted_zkapp_uri
     | "Update_not_permitted_token_symbol" ->
         Ok Update_not_permitted_token_symbol
     | "Update_not_permitted_permissions" ->
@@ -244,9 +250,9 @@ module Failure = struct
         "The permissions for this token do not match those in the command"
     | Overflow ->
         "The resulting balance is too large to store"
-    | Signed_command_on_snapp_account ->
+    | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
-    | Snapp_account_not_present ->
+    | Zkapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
@@ -265,7 +271,7 @@ module Failure = struct
     | Update_not_permitted_sequence_state ->
         "The authentication for an account didn't allow the requested update \
          to its sequence state"
-    | Update_not_permitted_snapp_uri ->
+    | Update_not_permitted_zkapp_uri ->
         "The authentication for an account didn't allow the requested update \
          to its snapp URI"
     | Update_not_permitted_token_symbol ->
@@ -439,7 +445,7 @@ module Stable = struct
   module V2 = struct
     type t =
       | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Stable.V2.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V1.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
