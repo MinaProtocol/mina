@@ -571,11 +571,21 @@ module Account_precondition = struct
             (pack_input x))
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
+
+    let nonce (t : t) = t.nonce
   end
 
   let typ () : (Zkapp_precondition.Account.Checked.t, t) Typ.t =
     Typ.transport (Zkapp_precondition.Account.typ ()) ~there:to_full
       ~back:(fun s -> Full s)
+
+  let nonce = function
+    | Full { nonce; _ } ->
+        nonce
+    | Nonce nonce ->
+        Check { lower = nonce; upper = nonce }
+    | Accept ->
+        Ignore
 end
 
 module Body = struct
