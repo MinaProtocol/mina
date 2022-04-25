@@ -14,11 +14,9 @@ let () =
         ; "-lc++abi"
         ; "-lc++" ]
     | "Linux" ->
-        [ sprintf "-L%s" cwd
-        ; "-fuse-ld=lld"
-        ; "-Wl,--whole-archive"
+        [ "-Wl,--push-state,-whole-archive"
         ; "-lrocksdb_stubs"
-        ; "-Wl,--no-whole-archive"
+        ; "-Wl,--pop-state"
         ; "-lz"
         ; "-lbz2"
         ; "-lstdc++" ]
