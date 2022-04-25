@@ -9,6 +9,8 @@ let%test_module "account timing check" =
   ( module struct
     open Transaction_snark.Transaction_validator.For_tests
 
+    let constraint_constants = U.constraint_constants
+
     (* test that unchecked and checked calculations for timing agree *)
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
