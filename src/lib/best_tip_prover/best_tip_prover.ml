@@ -14,17 +14,17 @@ module Make (Inputs : Inputs_intf) :
   open Inputs
 
   module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
-    type value = External_transition.Validated.t
+    type value = Mina_block.Validated.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem = External_transition.Validated.state_body_hash
+    let to_proof_elem = Mina_block.Validated.state_body_hash
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> External_transition.Validated.protocol_state
+        transition |> Mina_block.Validated.header |> Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
@@ -63,10 +63,7 @@ module Make (Inputs : Inputs_intf) :
     let best_verified_tip =
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
-    let best_tip =
-      External_transition.Validation.forget_validation_with_hash
-        best_verified_tip
-    in
+    let best_tip = Mina_block.Validated.forget best_verified_tip in
     let root =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
@@ -82,27 +79,38 @@ module Make (Inputs : Inputs_intf) :
       "Best tip prover produced a merkle list of $merkle_list" ;
     Proof_carrying_data.
       { data = best_tip
-      ; proof =
-          (merkle_list, root |> External_transition.Validation.forget_validation)
+      ; proof = (merkle_list, With_hash.data @@ Mina_block.Validated.forget root)
       }
 
-  let validate_proof ~genesis_state_hash ~verifier transition_with_hash =
-    let open Deferred.Result.Monad_infix in
-    External_transition.(
+  let validate_proof ~verifier ~genesis_state_hash
+      (transition_with_hash : Mina_block.with_hash) :
+      Mina_block.initial_valid_block Deferred.Or_error.t =
+    let%map validation =
+      let open Deferred.Result.Let_syntax in
       Validation.wrap transition_with_hash
-      |> skip_time_received_validation
-           `This_transition_was_not_received_via_gossip
-      |> skip_genesis_protocol_state_validation
-           `This_transition_was_generated_internally
-      |> skip_protocol_versions_validation
-           `This_transition_has_valid_protocol_versions
-      |> (fun x ->
-           validate_proofs ~genesis_state_hash ~verifier [ x ] >>| List.hd_exn)
-      >>= Fn.compose Deferred.Result.return
-            (skip_delta_transition_chain_validation
-               `This_transition_was_not_received_via_gossip)
-      |> Deferred.map
-           ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))
+      |> Validation.skip_time_received_validation
+           `This_block_was_not_received_via_gossip
+      |> Validation.skip_delta_block_chain_validation
+           `This_block_was_not_received_via_gossip
+      |> Fn.compose Deferred.return Validation.validate_protocol_versions
+      >>= Fn.compose Deferred.return
+            (Validation.validate_genesis_protocol_state ~genesis_state_hash)
+      >>= Validation.validate_single_proof ~verifier ~genesis_state_hash
+    in
+    match validation with
+    | Ok block ->
+        Ok block
+    | Error err ->
+        Or_error.error_string
+          ( match err with
+          | `Invalid_genesis_protocol_state ->
+              "invalid genesis state"
+          | `Invalid_protocol_version | `Mismatched_protocol_version ->
+              "invalid protocol version"
+          | `Invalid_proof ->
+              "invalid proof"
+          | `Verifier_error e ->
+              Printf.sprintf "verifier error: %s" (Error.to_string_hum e) )
 
   let verify ~verifier ~genesis_constants ~precomputed_values
       { Proof_carrying_data.data = best_tip; proof = merkle_list, root } =

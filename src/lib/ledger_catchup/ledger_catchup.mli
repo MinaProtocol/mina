@@ -19,7 +19,7 @@ val run :
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:
        ( State_hash.t
-       * ( External_transition.Initial_validated.t Envelope.Incoming.t
+       * ( Mina_block.initial_valid_block Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Rose_tree.t
