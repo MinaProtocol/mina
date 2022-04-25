@@ -32,6 +32,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = (new_kp, Mina_base.Account.Nonce.zero)
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -55,6 +56,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = (new_kp, Mina_base.Account.Nonce.zero)
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -82,6 +84,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -109,6 +112,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -135,6 +139,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -162,6 +167,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -189,6 +195,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -216,6 +223,7 @@ module Make (Input : Input_intf) = struct
         let test_spec : Spec.t =
           { sender = spec.sender
           ; fee
+          ; fee_payer = None
           ; receivers = []
           ; amount
           ; zkapp_account_keypairs = [ new_kp ]
@@ -245,6 +253,7 @@ module Make (Input : Input_intf) = struct
             let test_spec : Spec.t =
               { sender = spec.sender
               ; fee
+              ; fee_payer = None
               ; receivers = []
               ; amount
               ; zkapp_account_keypairs = [ new_kp ]

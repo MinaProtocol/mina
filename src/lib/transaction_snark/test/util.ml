@@ -47,6 +47,8 @@ let genesis_state_body =
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
+let genesis_state_view = Mina_state.Protocol_state.Body.view genesis_state_body
+
 let genesis_state_body_hash =
   Mina_state.Protocol_state.Body.hash genesis_state_body
 

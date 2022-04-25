@@ -22,6 +22,7 @@ let%test_module "Snapp deploy tests" =
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
+                    ; fee_payer = None
                     ; receivers = []
                     ; amount
                     ; zkapp_account_keypairs = [ new_kp ]
@@ -96,6 +97,7 @@ let%test_module "Snapp deploy tests" =
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
+                    ; fee_payer = None
                     ; receivers = []
                     ; amount
                     ; zkapp_account_keypairs = [ fst spec.sender ]
@@ -131,6 +133,7 @@ let%test_module "Snapp deploy tests" =
                   let test_spec : Spec.t =
                     { sender = spec0.sender
                     ; fee
+                    ; fee_payer = None
                     ; receivers = []
                     ; amount
                     ; zkapp_account_keypairs = [ fst spec1.sender ]

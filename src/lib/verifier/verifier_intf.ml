@@ -13,7 +13,7 @@ module Base = struct
       | `Invalid_proof
       | `Missing_verification_key of Signature_lib.Public_key.Compressed.t list
       ]
-    [@@deriving bin_io]
+    [@@deriving bin_io, to_yojson]
 
     val invalid_to_string : invalid -> string
 
