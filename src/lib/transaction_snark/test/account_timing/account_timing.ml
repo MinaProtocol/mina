@@ -9,8 +9,6 @@ let%test_module "account timing check" =
   ( module struct
     open Transaction_snark.Transaction_validator.For_tests
 
-    let constraint_constants = U.constraint_constants
-
     (* test that unchecked and checked calculations for timing agree *)
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
@@ -817,37 +815,6 @@ let%test_module "account timing check" =
                   then failwithf "Unexpected transaction error: %s" err_str ()))
 
     (* zkApps with timings *)
-
-    (* Mina_ledger.Ledger.copy does not actually copy *)
-    let copy_ledger (ledger : Mina_ledger.Ledger.t) =
-      let ledger_copy =
-        Mina_ledger.Ledger.create ~depth:(Mina_ledger.Ledger.depth ledger) ()
-      in
-      let accounts = Mina_ledger.Ledger.to_list ledger in
-      List.iter accounts ~f:(fun account ->
-          let pk = Account.public_key account in
-          let token = Account.token account in
-          let account_id = Account_id.create pk token in
-          match
-            Mina_ledger.Ledger.get_or_create_account ledger_copy account_id
-              account
-          with
-          | Ok (`Added, _loc) ->
-              ()
-          | Ok (`Existed, _loc) ->
-              failwithf
-                "When creating ledger, account with public key %s and token %s \
-                 already existed"
-                (Signature_lib.Public_key.Compressed.to_string pk)
-                (Token_id.to_string token) ()
-          | Error err ->
-              failwithf
-                "When creating ledger, error adding account with public key %s \
-                 and token %s: %s"
-                (Signature_lib.Public_key.Compressed.to_string pk)
-                (Token_id.to_string token) (Error.to_string_hum err) ()) ;
-      ledger_copy
-
     let apply_zkapp_commands_at_slot ledger slot (partiess : Parties.t list) =
       let state_body, _state_view = state_body_and_view_at_slot slot in
       Async.Deferred.List.iter partiess ~f:(fun parties ->
