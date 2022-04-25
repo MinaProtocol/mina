@@ -125,7 +125,11 @@ let create
       Impls.Step.input ~branching:max_branching
         ~wrap_rounds:Backend.Tock.Rounds.n
     in
-    Fix_domains.domains (module Impls.Step) etyp main
+    Fix_domains.domains
+      (module Impls.Step)
+      etyp
+      (Snarky_backendless.Typ.unit ())
+      main
   in
   Timer.clock __LOC__ ;
   T

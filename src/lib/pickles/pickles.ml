@@ -566,7 +566,11 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               let open Impls.Step in
               let k_p =
                 lazy
-                  (let cs = constraint_system ~exposing:[ typ ] main in
+                  (let cs =
+                     constraint_system ~exposing:[ typ ]
+                       ~return_typ:(Snarky_backendless.Typ.unit ())
+                       main
+                   in
                    let cs_hash =
                      Md5.to_hex (R1CS_constraint_system.digest cs)
                    in
@@ -598,7 +602,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate cache k_p k_v typ main)
+                    Cache.Step.read_or_generate cache k_p k_v typ
+                      (Snarky_backendless.Typ.unit ())
+                      main)
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
               accum_dirty (Lazy.map vk ~f:snd) ;
@@ -662,7 +668,11 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
-          (let cs = constraint_system ~exposing:[ typ ] main in
+          (let cs =
+             constraint_system ~exposing:[ typ ]
+               ~return_typ:(Snarky_backendless.Typ.unit ())
+               main
+           in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
            ( self_id
            , snark_keys_header
@@ -688,7 +698,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate
               (Vector.to_array step_domains)
-              cache disk_key_prover disk_key_verifier typ main)
+              cache disk_key_prover disk_key_verifier typ
+              (Snarky_backendless.Typ.unit ())
+              main)
       in
       (r, disk_key_verifier)
     in

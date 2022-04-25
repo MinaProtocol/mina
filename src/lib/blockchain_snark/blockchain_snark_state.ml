@@ -399,7 +399,10 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~exposing:[ Mina_base.State_hash.typ ] main) )
+         Tick.constraint_system
+           ~exposing:[ Mina_base.State_hash.typ ]
+           ~return_typ:(Snarky_backendless.Typ.unit ())
+           main) )
   ]
 
 module Make (T : sig
