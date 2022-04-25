@@ -5,7 +5,7 @@ module U = Transaction_snark_tests.Util
 
 let%test_module "Zkapp fuzzy tests" =
   ( module struct
-    let mk_ledgers_and_fee_payers ~num_of_fee_payers ~trials =
+    let mk_ledgers_and_fee_payers ~num_of_fee_payers =
       let fee_payer_keypairs =
         Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
       in
@@ -45,7 +45,7 @@ let%test_module "Zkapp fuzzy tests" =
       let num_of_fee_payers = 5 in
       let trials = 10 in
       let ledger, fee_payer_keypairs, keymap =
-        mk_ledgers_and_fee_payers ~num_of_fee_payers ~trials
+        mk_ledgers_and_fee_payers ~num_of_fee_payers
       in
       Test_util.with_randomness 123456789 (fun () ->
           let test i =
@@ -69,7 +69,7 @@ let%test_module "Zkapp fuzzy tests" =
       Test_util.with_randomness 123456789 (fun () ->
           let test i =
             let ledger, fee_payer_keypairs, keymap =
-              mk_ledgers_and_fee_payers ~num_of_fee_payers ~trials
+              mk_ledgers_and_fee_payers ~num_of_fee_payers
             in
             Quickcheck.test ~trials:1
               (Mina_generators.Parties_generators.gen_parties_from
