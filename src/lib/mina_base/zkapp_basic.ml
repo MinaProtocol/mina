@@ -273,6 +273,12 @@ module Or_ignore = struct
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
 
+    val map :
+         f_implicit:('a -> 'b)
+      -> f_explicit:((Boolean.var, 'a) Flagged_option.t -> 'b)
+      -> 'a t
+      -> 'b
+
     val make_unsafe_implicit : 'a -> 'a t
 
     val make_unsafe_explicit : Boolean.var -> 'a -> 'a t
@@ -295,6 +301,12 @@ module Or_ignore = struct
           f x
       | Explicit { is_some; data } ->
           Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
+
+    let map ~f_implicit ~f_explicit = function
+      | Implicit x ->
+          f_implicit x
+      | Explicit t ->
+          f_explicit t
 
     let typ_implicit (type a a_var) ~equal ~(ignore : a) (t : (a_var, a) Typ.t)
         : (a_var t, a Stable.Latest.t) Typ.t =
