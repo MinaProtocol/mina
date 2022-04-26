@@ -204,6 +204,8 @@ module Failure = struct
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Fee_payer_must_be_signed" ->
+        Ok Fee_payer_must_be_signed
     | "Account_precondition_unsatisfied" ->
         Ok Account_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
