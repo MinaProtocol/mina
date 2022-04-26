@@ -36,6 +36,7 @@ module Failure = struct
         | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
+        | Fee_payer_must_be_signed
         | Account_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
@@ -141,6 +142,8 @@ module Failure = struct
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
+    | Fee_payer_must_be_signed ->
+        "Fee_payer_must_be_signed"
     | Account_precondition_unsatisfied ->
         "Account_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
@@ -201,6 +204,8 @@ module Failure = struct
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Fee_payer_must_be_signed" ->
+        Ok Fee_payer_must_be_signed
     | "Account_precondition_unsatisfied" ->
         Ok Account_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
@@ -285,6 +290,8 @@ module Failure = struct
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
+    | Fee_payer_must_be_signed ->
+        "Fee payer party must have a valid signature"
     | Account_precondition_unsatisfied ->
         "The party's account precondition unsatisfied"
     | Protocol_state_precondition_unsatisfied ->

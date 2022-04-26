@@ -997,50 +997,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (Signed_command.forget_check user_command)
 
-  let apply_body ~is_start
-      ({ public_key = _
-       ; token_id = _
-       ; update =
-           { app_state = _
-           ; delegate = _
-           ; verification_key = _
-           ; permissions = _
-           ; zkapp_uri = _
-           ; token_symbol = _
-           ; timing = _
-           ; voting_for = _
-           }
-       ; caller = _
-       ; balance_change = _
-       ; increment_nonce
-       ; events = _ (* This is for the snapp to use, we don't need it. *)
-       ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-       ; sequence_events = _
-       ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-       ; protocol_state_precondition = _
-       ; account_precondition
-       ; use_full_commitment
-       } :
-        Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
-    let open Result.Let_syntax in
-    (* enforce that either the account_precondition is `Accept`,
-         the nonce is incremented,
-         or the full commitment is used to avoid replays. *)
-    let%map () =
-      let account_precondition_is_accept =
-        Zkapp_precondition.Account.is_accept
-        @@ Party.Account_precondition.to_full account_precondition
-      in
-      List.exists ~f:Fn.id
-        [ account_precondition_is_accept
-        ; increment_nonce
-        ; use_full_commitment && not is_start
-        ]
-      |> Result.ok_if_true
-           ~error:Transaction_status.Failure.Parties_replay_check_failed
-    in
-    a
-
   module Global_state = struct
     type t =
       { ledger : L.t
@@ -1453,6 +1409,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Party = struct
       include Party
 
+      module Account_precondition = struct
+        include Party.Account_precondition
+
+        let nonce (t : Party.t) = nonce t.body.account_precondition
+      end
+
+      type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
+
       type parties =
         ( Party.t
         , Parties.Digest.Party.t
@@ -1609,6 +1573,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let add_new_failure_status_bucket (t : t) =
         { t with failure_status_tbl = [] :: t.failure_status_tbl }
     end
+
+    module Nonce_precondition = struct
+      let is_constant =
+        Zkapp_precondition.Numeric.is_constant
+          Zkapp_precondition.Numeric.Tc.nonce
+    end
   end
 
   module Env = struct
@@ -1657,14 +1627,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               Account.Nonce.equal account.nonce n
           | Full p ->
               Or_error.is_ok (Zkapp_precondition.Account.check p account) )
-      | Check_auth { is_start; party = p; account = a } -> (
-          if (is_start : bool) then
-            [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
-          match apply_body ~is_start p.body a with
-          | Error failure ->
-              (a, false, Some failure)
-          | Ok a ->
-              (a, true, None) )
+      | Init_account { party = _; account = a } ->
+          a
   end
 
   module M = Parties_logic.Make (Inputs)
