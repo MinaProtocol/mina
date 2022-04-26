@@ -1026,7 +1026,13 @@ module Base = struct
 
           let assert_ = Assert.is_true
 
-          let display _b ~label:_ = ""
+          let display b ~label =
+            let str =
+              ref (sprintf "%s: <not available when not proving>" label)
+            in
+            as_prover (fun () ->
+                str := sprintf "%s: %b" label (As_prover.read Boolean.typ b)) ;
+            !str
 
           type failure_status = unit
 
