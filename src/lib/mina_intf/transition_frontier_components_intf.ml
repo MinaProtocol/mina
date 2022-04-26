@@ -304,21 +304,20 @@ module type Transition_frontier_controller_intf = sig
 end
 
 module type Initial_validator_intf = sig
-  type external_transition
+  type block
 
-  type external_transition_with_initial_validation
+  type block_with_initial_validation
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> transition_reader:
-         ( [ `Transition of external_transition Envelope.Incoming.t ]
+         ( [ `Transition of block Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
          Strict_pipe.Reader.t
     -> valid_transition_writer:
-         ( [ `Transition of
-             external_transition_with_initial_validation Envelope.Incoming.t ]
+         ( [ `Transition of block_with_initial_validation Envelope.Incoming.t ]
            * [ `Time_received of Block_time.t ]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )

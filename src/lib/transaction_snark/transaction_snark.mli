@@ -352,8 +352,8 @@ module type S = sig
 end
 
 type local_state =
-  ( (Party.t, unit) Parties.Call_forest.t
-  , (Party.t, unit) Parties.Call_forest.t list
+  ( Stack_frame.value
+  , Stack_frame.value list
   , Token_id.t
   , Currency.Amount.t
   , Mina_ledger.Sparse_ledger.t
@@ -429,10 +429,12 @@ val parties_witnesses_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_body:Transaction_protocol_state.Block_data.t
   -> fee_excess:Currency.Amount.Signed.t
-  -> pending_coinbase_init_stack:Pending_coinbase.Stack.t
   -> [ `Ledger of Mina_ledger.Ledger.t
      | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
-  -> Parties.t list
+  -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
+     * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+     * Parties.t )
+     list
   -> ( Parties_segment.Witness.t
      * Parties_segment.Basic.t
      * Statement.With_sok.t
@@ -504,6 +506,7 @@ module For_tests : sig
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
@@ -563,5 +566,8 @@ module For_tests : sig
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers : Spec.t -> Parties.t
+  val multiple_transfers :
+       ?protocol_state_precondition:Zkapp_precondition.Protocol_state.t
+    -> Spec.t
+    -> Parties.t
 end

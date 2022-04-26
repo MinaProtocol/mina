@@ -71,11 +71,23 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
@@ -151,11 +163,23 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
@@ -284,6 +308,7 @@ let create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -317,6 +342,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -355,6 +381,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers
     ; amount
     ; zkapp_account_keypairs = []
@@ -381,6 +408,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -415,6 +443,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -451,6 +480,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -485,6 +515,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -520,6 +551,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -556,6 +588,81 @@ let%test_module "ZkApps test transaction" =
       | Error e ->
           Deferred.return (Error e)
 
+    let print_diff_yojson ?(path = []) expected got =
+      let success = ref true in
+      let rec go path expected got =
+        let print_unexpected () =
+          success := false ;
+          printf "At path %s:\nExpected:\n%s\nGot:\n%s\n"
+            (String.concat ~sep:"." (List.rev path))
+            (Yojson.Safe.to_string expected)
+            (Yojson.Safe.to_string got)
+        in
+        match (expected, got) with
+        | `Null, `Null ->
+            ()
+        | `Bool b1, `Bool b2 when Bool.equal b1 b2 ->
+            ()
+        | `Int i1, `Int i2 when Int.equal i1 i2 ->
+            ()
+        | `Intlit s1, `Intlit s2 when String.equal s1 s2 ->
+            ()
+        | `Float f1, `Float f2 when Float.equal f1 f2 ->
+            ()
+        | `String s1, `String s2 when String.equal s1 s2 ->
+            ()
+        | `Assoc l1, `Assoc l2 ->
+            let rec go_assoc l1 l2 =
+              match (l1, l2) with
+              | [], [] ->
+                  ()
+              | (s1, x1) :: l1, (s2, x2) :: l2 when String.equal s1 s2 ->
+                  go (s1 :: path) x1 x2 ;
+                  go_assoc l1 l2
+              | (s1, x1) :: l1, (s2, x2) :: l2 ->
+                  (* NB: Assumes that fields appear in the same order. *)
+                  go (s1 :: path) x1 `Null ;
+                  go (s2 :: path) `Null x2 ;
+                  go_assoc l1 l2
+              | (s1, x1) :: l1, [] ->
+                  go (s1 :: path) x1 `Null ;
+                  go_assoc l1 []
+              | [], (s2, x2) :: l2 ->
+                  go (s2 :: path) `Null x2 ;
+                  go_assoc [] l2
+            in
+            go_assoc l1 l2
+        | `List l1, `List l2 | `Tuple l1, `Tuple l2 ->
+            let rec go_list i l1 l2 =
+              match (l1, l2) with
+              | [], [] ->
+                  ()
+              | x1 :: l1, x2 :: l2 ->
+                  go (string_of_int i :: path) x1 x2 ;
+                  go_list (i + 1) l1 l2
+              | x1 :: l1, [] ->
+                  go (string_of_int i :: path) x1 `Null ;
+                  go_list (i + 1) l1 []
+              | [], x2 :: l2 ->
+                  go (string_of_int i :: path) `Null x2 ;
+                  go_list (i + 1) [] l2
+            in
+            go_list 0 l1 l2
+        | `Variant (s1, x1), `Variant (s2, x2) when String.equal s1 s2 -> (
+            match (x1, x2) with
+            | None, None ->
+                ()
+            | Some x1, None ->
+                go ("0" :: path) x1 `Null
+            | None, Some x2 ->
+                go ("0" :: path) `Null x2
+            | Some x1, Some x2 ->
+                go ("0" :: path) x1 x2 )
+        | _ ->
+            print_unexpected ()
+      in
+      go path expected got ; !success
+
     let hit_server (parties : Parties.t) query =
       let typ = Mina_graphql.Types.Input.send_zkapp in
       let query_top_level =
@@ -564,26 +671,23 @@ let%test_module "ZkApps test transaction" =
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
             ~resolve:(fun _ () (parties' : Parties.t) ->
-              let failed = ref false in
-              let printf_diff ~label expected got =
-                if String.equal expected got then ()
-                else (
-                  failed := true ;
-                  printf "Expected %s: %s \nGot: %s\n%!" label expected got )
+              let ok_fee_payer =
+                print_diff_yojson ~path:[ "fee_payer" ]
+                  (Party.Fee_payer.to_yojson parties.fee_payer)
+                  (Party.Fee_payer.to_yojson parties'.fee_payer)
               in
-              printf_diff ~label:"fee payer"
-                ( Party.Fee_payer.to_yojson parties.fee_payer
-                |> Yojson.Safe.to_string )
-                ( Party.Fee_payer.to_yojson parties'.fee_payer
-                |> Yojson.Safe.to_string ) ;
-              List.iter2_exn parties.other_parties parties'.other_parties
-                ~f:(fun expected got ->
-                  printf_diff ~label:"party"
-                    (Party.to_yojson expected |> Yojson.Safe.to_string)
-                    (Party.to_yojson got |> Yojson.Safe.to_string)) ;
-              if !failed then
-                return (Error "invalid zkApp transaction generated")
-              else return (Ok "Passed")))
+              let _, ok_other_parties =
+                Parties.Call_forest.Tree.fold_forest2_exn ~init:(0, true)
+                  parties.other_parties parties.other_parties
+                  ~f:(fun (i, ok) expected got ->
+                    ( i + 1
+                    , print_diff_yojson
+                        ~path:[ string_of_int i; "other_parties" ]
+                        (Party.to_yojson expected) (Party.to_yojson got)
+                      && ok ))
+              in
+              if ok_fee_payer && ok_other_parties then return (Ok "Passed")
+              else return (Error "invalid snapp transaction generated")))
       in
       let schema =
         Graphql_async.Schema.(

@@ -63,6 +63,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -115,6 +116,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (sender_keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = [ (receiver_key, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
@@ -145,6 +147,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (sender_keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = [ (receiver_key, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
@@ -183,6 +186,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
         ; zkapp_account_keypairs = [ timed_account_keypair ]
@@ -283,7 +287,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Unexpected underflow when taking balance difference")
         | Some diff ->
             let sender_party =
-              List.hd_exn parties_transfer_from_timed_account.other_parties
+              (List.hd_exn parties_transfer_from_timed_account.other_parties)
+                .elt
+                .party
             in
             let amount_to_send =
               Currency.Amount.Signed.magnitude
@@ -314,7 +320,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Send a snapp with transfer from timed account that fails due to min \
          balance"
         (let sender_party =
-           List.hd_exn parties_invalid_transfer_from_timed_account.other_parties
+           (List.hd_exn
+              parties_invalid_transfer_from_timed_account.other_parties)
+             .elt
+             .party
          in
          let amount_to_send =
            Currency.Amount.Signed.magnitude

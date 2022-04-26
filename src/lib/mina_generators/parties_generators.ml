@@ -411,7 +411,8 @@ module Party_body_components = struct
        , 'int
        , 'bool
        , 'protocol_state_precondition
-       , 'account_precondition )
+       , 'account_precondition
+       , 'caller )
        t =
     { public_key : 'pk
     ; update : 'update
@@ -425,6 +426,7 @@ module Party_body_components = struct
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
     ; use_full_commitment : 'bool
+    ; caller : 'caller
     }
 
   let to_fee_payer t : Party.Body.Fee_payer.t =
@@ -440,9 +442,10 @@ module Party_body_components = struct
     ; protocol_state_precondition = t.protocol_state_precondition
     ; account_precondition = Account.Nonce.zero
     ; use_full_commitment = t.use_full_commitment
+    ; caller = ()
     }
 
-  let to_typical_party t : Party.Body.t =
+  let to_typical_party t : Party.Body.Wire.t =
     { public_key = t.public_key
     ; update = t.update
     ; token_id = t.token_id
@@ -455,6 +458,7 @@ module Party_body_components = struct
     ; protocol_state_precondition = t.protocol_state_precondition
     ; account_precondition = t.account_precondition
     ; use_full_commitment = t.use_full_commitment
+    ; caller = t.caller
     }
 end
 
@@ -474,7 +478,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
     ~(f_balance_change : a -> Currency.Amount.Signed.t) ~(increment_nonce : b)
     ~(f_token_id : Token_id.t -> c) ~f_account_predcondition ~ledger () :
-    (_, _, _, a, _, _, _, b, _, d) Party_body_components.t
+    (_, _, _, a, _, _, _, b, _, d, _) Party_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
@@ -675,7 +679,8 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
     Option.value_map protocol_state_view ~f:gen_protocol_state_precondition
       ~default:(return Zkapp_precondition.Protocol_state.accept)
   in
-  let%map use_full_commitment = gen_use_full_commitment in
+  let%map use_full_commitment = gen_use_full_commitment
+  and caller = Party.Call_type.quickcheck_generator in
   let token_id = f_token_id token_id in
   { Party_body_components.public_key
   ; update
@@ -689,6 +694,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
   ; protocol_state_precondition
   ; account_precondition
   ; use_full_commitment
+  ; caller
   }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
@@ -721,7 +727,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
   let body = Party_body_components.to_typical_party body_components in
-  return { Party.body; authorization }
+  return { Party.Wire.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
 let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
@@ -766,7 +772,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  { Party.Fee_payer.body; authorization }
+  ({ body; authorization } : Party.Fee_payer.t)
 
 (* keep max_other_parties small, so snapp integration tests don't need lots
    of block producers
@@ -936,11 +942,12 @@ let gen_parties_from ?(succeed = true)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    { fee_payer; other_parties; memo }
+    Parties.of_wire { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
-    Party.of_fee_payer parties_dummy_signatures.fee_payer |> Party.digest
+    Party.of_fee_payer parties_dummy_signatures.fee_payer
+    |> Parties.Digest.Party.create
   in
   let fee_payer_signature =
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -955,8 +962,7 @@ let gen_parties_from ?(succeed = true)
     }
   in
   let other_parties_hash =
-    Parties.Call_forest.With_hashes.other_parties_hash
-      parties_dummy_signatures.other_parties
+    Parties.other_parties_hash parties_dummy_signatures
   in
   let tx_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash
@@ -974,8 +980,8 @@ let gen_parties_from ?(succeed = true)
   in
   (* replace dummy signatures in other parties *)
   let other_parties_with_valid_signatures =
-    List.map parties_dummy_signatures.other_parties
-      ~f:(fun { body; authorization } ->
+    Parties.Call_forest.map parties_dummy_signatures.other_parties
+      ~f:(fun ({ body; authorization } : Party.t) ->
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->

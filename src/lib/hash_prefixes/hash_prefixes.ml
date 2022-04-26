@@ -91,6 +91,10 @@ let party_cons = create "MinaPartyCons"
 
 let party_node = create "MinaPartyNode"
 
+let party_stack_frame = create "MinaPartyStckFrm"
+
+let party_stack_frame_cons = create "MinaPartyStckFrmCons"
+
 let zkapp_uri = create "MinaZkappUri"
 
 let zkapp_event = create "MinaZkappEvent"

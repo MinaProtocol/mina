@@ -108,6 +108,10 @@ let party_cons = salt party_cons
 
 let party_node = salt party_node
 
+let party_stack_frame = salt party_stack_frame
+
+let party_stack_frame_cons = salt party_stack_frame_cons
+
 let zkapp_uri = salt zkapp_uri
 
 let zkapp_event = salt zkapp_event
