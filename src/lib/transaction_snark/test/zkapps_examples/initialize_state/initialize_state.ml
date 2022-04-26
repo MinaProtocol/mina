@@ -60,6 +60,20 @@ let%test_module "Initialize state test" =
                       *)
                       Zkapp_account.digest_vk vk
                   }
+            ; permissions =
+                Set
+                  { edit_state = Proof
+                  ; send = Proof
+                  ; receive = Proof
+                  ; set_delegate = Proof
+                  ; set_permissions = Proof
+                  ; set_verification_key = Proof
+                  ; set_zkapp_uri = Proof
+                  ; edit_sequence_state = Proof
+                  ; set_token_symbol = Proof
+                  ; increment_nonce = Proof
+                  ; set_voting_for = Proof
+                  }
             }
         ; use_full_commitment = true
         ; account_precondition = Accept
