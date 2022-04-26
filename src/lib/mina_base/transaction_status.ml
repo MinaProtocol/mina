@@ -47,7 +47,7 @@ module Failure = struct
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson]
+    type display = (int * t list) list [@@deriving to_yojson, sexp]
 
     [%%versioned
     module Stable = struct

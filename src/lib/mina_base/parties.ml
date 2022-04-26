@@ -748,7 +748,7 @@ let fee_excess (t : t) =
 let accounts_accessed (t : t) =
   Call_forest.fold t.other_parties ~init:[ fee_payer t ] ~f:(fun acc p ->
       Party.account_id p :: acc)
-  |> List.stable_dedup
+  |> List.rev |> List.stable_dedup
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 

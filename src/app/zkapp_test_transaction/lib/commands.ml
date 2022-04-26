@@ -71,11 +71,23 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
@@ -152,11 +164,23 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
+  let pending_coinbase_state_stack =
+    { Transaction_snark.Pending_coinbase_stack_state.source =
+        pending_coinbase_init_stack
+    ; target =
+        Pending_coinbase.Stack.push_state state_body_hash
+          pending_coinbase_init_stack
+    }
+  in
   let witnesses =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
-      ~fee_excess:Currency.Amount.Signed.zero
-      ~pending_coinbase_init_stack:Pending_coinbase.Stack.empty (`Ledger ledger)
-      [ parties ]
+      ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
+        , `Pending_coinbase_of_statement pending_coinbase_state_stack
+        , parties )
+      ]
   in
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
@@ -285,6 +309,7 @@ let create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -318,6 +343,7 @@ let upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -356,6 +382,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers
     ; amount
     ; zkapp_account_keypairs = []
@@ -382,6 +409,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state =
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -416,6 +444,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -452,6 +481,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]
@@ -486,6 +516,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ zkapp_account_keypair ]
@@ -521,6 +552,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee
+    ; fee_payer = None
     ; receivers = []
     ; amount = Currency.Amount.zero
     ; zkapp_account_keypairs = [ snapp_keypair ]

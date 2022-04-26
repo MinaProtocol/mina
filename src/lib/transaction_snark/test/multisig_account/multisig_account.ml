@@ -11,6 +11,8 @@ module Impl = Pickles.Impls.Step
 
 let%test_module "multisig_account" =
   ( module struct
+    let constraint_constants = U.constraint_constants
+
     module M_of_n_predicate = struct
       type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 

@@ -1202,7 +1202,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_verification_key a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
+        Local_state.add_check local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
       let verification_key =

@@ -2054,8 +2054,20 @@ module Base = struct
                 pending_coinbase_stack_after
             in
             let%bind valid_init_state =
-              Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
-                pending_coinbase_stack_before
+              (* Stack update is performed once per scan state tree and the
+                 following is true only for the first transaction per block per
+                 tree*)
+              let%bind equal_source =
+                Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                  pending_coinbase_stack_before
+              in
+              (*for the rest, both source and target are the same*)
+              let%bind equal_source_with_state =
+                Pending_coinbase.Stack.equal_var
+                  computed_pending_coinbase_stack_after
+                  pending_coinbase_stack_before
+              in
+              Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all
               [ correct_coinbase_target_stack; valid_init_state ]))
@@ -3740,21 +3752,26 @@ let rec accumulate_call_stack_hashes
       in
       { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
-    ~pending_coinbase_init_stack ledger (partiess : Parties.t list) =
+let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
+    (partiess :
+      ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
+      * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+      * Parties.t )
+      list) =
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
         Sparse_ledger.of_ledger_subset_exn ledger
-          (List.concat_map ~f:Parties.accounts_accessed partiess)
+          (List.concat_map
+             ~f:(fun (_, _, parties) -> Parties.accounts_accessed parties)
+             partiess)
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
   in
-  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let _, _, states_rev =
     List.fold_left ~init:(fee_excess, sparse_ledger, []) partiess
-      ~f:(fun (fee_excess, sparse_ledger, statess_rev) parties ->
+      ~f:(fun (fee_excess, sparse_ledger, statess_rev) (_, _, parties) ->
         let _, states =
           Sparse_ledger.apply_parties_unchecked_with_states sparse_ledger
             ~constraint_constants ~state_view ~fee_excess parties
@@ -3766,7 +3783,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let states = List.rev states_rev in
   let states_rev =
     group_by_parties_rev
-      ([] :: List.map ~f:Parties.parties_list partiess)
+      ( []
+      :: List.map
+           ~f:(fun (_, _, parties) -> Parties.parties_list parties)
+           partiess )
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
   let tx_statement commitment full_commitment use_full_commitment
@@ -3791,10 +3811,23 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
   let remaining_parties =
     let partiess =
       List.map partiess
-        ~f:(fun parties : _ Mina_transaction_logic.Parties_logic.Start_data.t ->
-          { parties; memo_hash = Signed_command_memo.hash parties.memo })
+        ~f:(fun
+             (pending_coinbase_init_stack, pending_coinbase_stack_state, parties)
+           ->
+          ( pending_coinbase_init_stack
+          , pending_coinbase_stack_state
+          , { Mina_transaction_logic.Parties_logic.Start_data.parties
+            ; memo_hash = Signed_command_memo.hash parties.memo
+            } ))
     in
     ref partiess
+  in
+  let pending_coinbase_init_stack = ref Pending_coinbase.Stack.empty in
+  let pending_coinbase_stack_state =
+    ref
+      { Pending_coinbase_stack_state.source = Pending_coinbase.Stack.empty
+      ; target = Pending_coinbase.Stack.empty
+      }
   in
   List.fold_right states_rev ~init:[]
     ~f:(fun
@@ -3824,7 +3857,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         | _ ->
             None
       in
-      let start_parties, next_commitment, next_full_commitment =
+      let ( start_parties
+          , next_commitment
+          , next_full_commitment
+          , pending_coinbase_init_stack
+          , pending_coinbase_stack_state ) =
         let empty_if_last (mk : unit -> field * field) : field * field =
           match (target_local.stack_frame.calls, target_local.call_stack) with
           | [], [] ->
@@ -3854,29 +3891,60 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
               empty_if_last (fun () ->
                   (current_commitment, current_full_commitment))
             in
-            ([], next_commitment, next_full_commitment)
+            ( []
+            , next_commitment
+            , next_full_commitment
+            , !pending_coinbase_init_stack
+            , !pending_coinbase_stack_state )
         | `New -> (
             match !remaining_parties with
-            | parties :: rest ->
+            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+              , parties )
+              :: rest ->
                 let commitment', full_commitment' =
                   mk_next_commitments parties.parties
                 in
                 remaining_parties := rest ;
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
-                ([ parties ], commitment', full_commitment')
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
+                ( [ parties ]
+                , commitment'
+                , full_commitment'
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
         | `Two_new -> (
             match !remaining_parties with
-            | parties1 :: parties2 :: rest ->
+            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+              , parties1 )
+              :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
+                 , `Pending_coinbase_of_statement pending_coinbase_stack_state2
+                 , parties2 )
+                 :: rest ->
                 let commitment', full_commitment' =
                   mk_next_commitments parties2.parties
                 in
                 remaining_parties := rest ;
                 commitment := commitment' ;
                 full_commitment := full_commitment' ;
-                ([ parties1; parties2 ], commitment', full_commitment')
+                (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
+                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                pending_coinbase_stack_state :=
+                  { pending_coinbase_stack_state1 with
+                    Pending_coinbase_stack_state.target =
+                      pending_coinbase_stack_state2
+                        .Pending_coinbase_stack_state.target
+                  } ;
+                ( [ parties1; parties2 ]
+                , commitment'
+                , full_commitment'
+                , !pending_coinbase_init_stack
+                , !pending_coinbase_stack_state )
             | _ ->
                 failwith "Not enough remaining parties" )
       in
@@ -3965,7 +4033,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
         in
         { source =
             { ledger = Sparse_ledger.merkle_root source_global.ledger
-            ; pending_coinbase_stack = pending_coinbase_init_stack
+            ; pending_coinbase_stack = pending_coinbase_stack_state.source
             ; local_state =
                 { source_local with
                   stack_frame =
@@ -3976,9 +4044,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess
             }
         ; target =
             { ledger = Sparse_ledger.merkle_root target_global.ledger
-            ; pending_coinbase_stack =
-                Pending_coinbase.Stack.push_state state_body_hash
-                  pending_coinbase_init_stack
+            ; pending_coinbase_stack = pending_coinbase_stack_state.target
             ; local_state =
                 { target_local with
                   stack_frame =
@@ -4173,6 +4239,7 @@ module For_tests = struct
     type t =
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+      ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
       ; receivers :
           (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
@@ -4251,9 +4318,14 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties spec ~update ~account_precondition =
+  let create_parties
+      ?(protocol_state_precondition = Zkapp_precondition.Protocol_state.accept)
+      ?(account_precondition = Party.Account_precondition.Accept)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
+      ~update =
     let { Spec.fee
         ; sender = sender, sender_nonce
+        ; fee_payer = fee_payer_opt
         ; receivers
         ; amount
         ; new_zkapp_account
@@ -4268,8 +4340,16 @@ module For_tests = struct
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
+      let public_key, account_precondition =
+        match fee_payer_opt with
+        | None ->
+            (sender_pk, sender_nonce)
+        | Some (fee_payer_kp, fee_payer_nonce) ->
+            (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
+      in
+
       { body =
-          { public_key = sender_pk
+          { public_key
           ; update = Party.Update.noop
           ; token_id = ()
           ; balance_change = fee
@@ -4278,13 +4358,11 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
+          ; protocol_state_precondition
+          ; account_precondition
           ; use_full_commitment = ()
-          ; account_precondition = sender_nonce
           ; caller = ()
           }
-          (*To be updated later*)
       ; authorization = Signature.dummy
       }
     in
@@ -4299,9 +4377,12 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; protocol_state_precondition
+        ; account_precondition =
+            ( if Option.is_none fee_payer_opt then
+              Nonce (Account.Nonce.succ sender_nonce)
+            else Nonce sender_nonce )
         ; use_full_commitment = false
-        ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
         ; caller = Call
         }
       in
@@ -4316,8 +4397,7 @@ module For_tests = struct
     let snapp_parties : Party.Wire.t list =
       let num_keypairs = List.length zkapp_account_keypairs in
       let account_creation_fee =
-        Amount.of_fee
-          Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        Amount.of_fee constraint_constants.account_creation_fee
       in
       (* if creating new snapp accounts, amount must be enough for account creation fees for each *)
       assert (
@@ -4361,10 +4441,9 @@ module For_tests = struct
                 ; sequence_events
                 ; call_data
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; use_full_commitment = true
+                ; protocol_state_precondition
                 ; account_precondition
+                ; use_full_commitment = true
                 ; caller = Call
                 }
             ; authorization =
@@ -4384,22 +4463,20 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
-              ; use_full_commitment = false
+              ; protocol_state_precondition
               ; account_precondition = Accept
+              ; use_full_commitment = false
               ; caller = Call
               }
           ; authorization = Control.None_given
           })
     in
-    let protocol_state = Zkapp_precondition.Protocol_state.accept in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
       @ snapp_parties @ other_receivers
     in
     let protocol_state_predicate_hash =
-      Zkapp_precondition.Protocol_state.digest protocol_state
+      Zkapp_precondition.Protocol_state.digest protocol_state_precondition
     in
     let ps =
       Parties.Call_forest.With_hashes.of_parties_list
@@ -4418,8 +4495,13 @@ module For_tests = struct
     in
     let fee_payer =
       let fee_payer_signature_auth =
-        Signature_lib.Schnorr.Chunked.sign sender.private_key
-          (Random_oracle.Input.Chunked.field full_commitment)
+        match fee_payer_opt with
+        | None ->
+            Signature_lib.Schnorr.Chunked.sign sender.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
+        | Some (fee_payer_kp, _) ->
+            Signature_lib.Schnorr.Chunked.sign fee_payer_kp.private_key
+              (Random_oracle.Input.Chunked.field full_commitment)
       in
       { fee_payer with authorization = fee_payer_signature_auth }
     in
@@ -4469,8 +4551,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~update:update_vk
-        ~account_precondition:Party.Account_precondition.Accept
+      create_parties ~constraint_constants spec ~update:update_vk
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4502,8 +4583,7 @@ module For_tests = struct
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
-      create_parties spec ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
+      create_parties ~constraint_constants spec ~update:spec.snapp_update
     in
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
@@ -4581,14 +4661,15 @@ module For_tests = struct
     in
     parties
 
-  let multiple_transfers (spec : Spec.t) =
+  let multiple_transfers ?protocol_state_precondition (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment _commitment
         , `Full_txn_commitment _full_commitment ) =
-      create_parties spec ~update:spec.snapp_update
-        ~account_precondition:Party.Account_precondition.Accept
+      create_parties
+        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+        spec ~update:spec.snapp_update ?protocol_state_precondition
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
