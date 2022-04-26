@@ -1356,9 +1356,10 @@ module Base = struct
                       Sparse_ledger.set_exn ledger idx a) )
 
           let check_inclusion (root, _) (account, incl) =
-            with_label __LOC__
-              (fun () -> Field.Assert.equal (implied_root account incl))
-              (Ledger_hash.var_to_hash_packed root)
+            with_label __LOC__ (fun () ->
+                Field.Assert.equal
+                  (implied_root account incl)
+                  (Ledger_hash.var_to_hash_packed root))
 
           let check_account public_key token_id
               (({ data = account; _ }, _) : Account.t * _) =
