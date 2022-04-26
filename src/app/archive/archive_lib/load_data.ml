@@ -578,6 +578,12 @@ let get_party_body ~pool body_id =
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
   let query_db = Mina_caqti.query pool in
+  let with_pool ~f arg =
+    let open Caqti_async in
+    Pool.use
+      (fun (module Conn : CONNECTION) -> f (module Conn : CONNECTION) arg)
+      pool
+  in
   let pk_of_id = pk_of_id pool in
   let token_of_id = token_of_id pool in
   let ({ ledger_index
@@ -587,12 +593,11 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
        ; balance
        ; nonce
        ; receipt_chain_hash
-       ; delegate
+       ; delegate_id
        ; voting_for_id
        ; timing_id
        ; permissions_id
        ; zkapp_id
-       ; zkapp_uri_id
        }
         : Processor.Accounts_accessed.t) =
     account
@@ -613,8 +618,12 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let receipt_chain_hash =
     receipt_chain_hash |> Receipt.Chain_hash.of_base58_check_exn
   in
-  let delegate =
-    Option.map delegate
+  let%bind delegate =
+    let%map pk_str_opt =
+      Mina_caqti.get_opt_item delegate_id
+        ~f:(with_pool ~f:Processor.Public_key.find_by_id)
+    in
+    Option.map pk_str_opt
       ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
   let%bind voting_for =
@@ -697,11 +706,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       : Permissions.t )
   in
   let%bind zkapp_db =
-    Option.value_map zkapp_id ~default:(return None) ~f:(fun id ->
-        let%map zkapp =
-          query_db ~f:(fun db -> Processor.Zkapp_account.load db id)
-        in
-        Some zkapp)
+    Mina_caqti.get_opt_item zkapp_id
+      ~f:(with_pool ~f:Processor.Zkapp_account.load)
   in
   let%bind zkapp =
     Option.value_map ~default:(return None) zkapp_db
@@ -774,9 +780,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             }
             : Mina_base.Zkapp_account.t ))
   in
-  let%bind zkapp_uri =
-    query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp_uri_id)
-  in
+  (* TODO: the URI will be moved to the zkApp, no longer in the account *)
+  let zkapp_uri = "https://dummy_uri.com" in
   (* TODO: token permissions is going away *)
   let account =
     ( { public_key

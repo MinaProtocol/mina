@@ -25,7 +25,6 @@ CREATE TABLE public_keys
 , value text   NOT NULL UNIQUE
 );
 
-CREATE INDEX idx_public_keys_id ON public_keys(id);
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
 /* for the default token only, owner_public_key_id and owner_token_id are NULL
@@ -110,6 +109,14 @@ CREATE TABLE internal_commands
 , UNIQUE (hash,type)
 );
 
+/* block state hashes mentioned in voting_for fields */
+CREATE TABLE voting_for
+( id          serial PRIMARY KEY
+, value text  NOT NULL
+);
+
+CREATE INDEX idx_voting_for_value ON voting_for(value);
+
 /* import supporting Zkapp-related tables */
 \ir zkapp_tables.sql
 
@@ -168,14 +175,6 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);
 
-/* block state hashes mentioned in voting_for fields */
-CREATE TABLE voting_for
-( id          serial PRIMARY KEY
-, value text  NOT NULL
-);
-
-CREATE INDEX idx_voting_for_value ON voting_for(value);
-
 /* accounts accessed in a block, representing the account
    state after all transactions in the block have been executed
 */
@@ -187,8 +186,8 @@ CREATE TABLE accounts_accessed
 , balance                 bigint  NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
-, delegate                int               REFERENCES public_keys(id)
-, voting_for              text    NOT NULL
+, delegate_id             int               REFERENCES public_keys(id)
+, voting_for_id           int     NOT NULL  REFERENCES voting_for(id)
 , timing_id               int               REFERENCES timing_info(id)
 , permissions_id          int     NOT NULL  REFERENCES zkapp_permissions(id)
 , zkapp_id                int               REFERENCES zkapp_accounts(id)

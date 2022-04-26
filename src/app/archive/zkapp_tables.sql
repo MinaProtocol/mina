@@ -96,6 +96,13 @@ CREATE TABLE zkapp_timing_info
 , vesting_increment        bigint  NOT NULL
 );
 
+CREATE TABLE zkapp_uris
+( id                 serial  PRIMARY KEY
+, value              text    NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_zkapp_uris_value ON zkapp_uris(value);
+
 /* NULL convention */
 CREATE TABLE zkapp_updates
 ( id                       serial           PRIMARY KEY
@@ -103,10 +110,10 @@ CREATE TABLE zkapp_updates
 , delegate_id              int              REFERENCES public_keys(id)
 , verification_key_id      int              REFERENCES zkapp_verification_keys(id)
 , permissions_id           int              REFERENCES zkapp_permissions(id)
-, zkapp_uri                text
+, zkapp_uri_id             int              REFERENCES zkapp_uris(id)
 , token_symbol_id          int              REFERENCES token_symbols(id)
 , timing_id                int              REFERENCES zkapp_timing_info(id)
-, voting_for               text
+, voting_for_id            int              REFERENCES voting_for(id)
 );
 
 CREATE TABLE zkapp_balance_bounds
@@ -144,11 +151,6 @@ CREATE TABLE zkapp_account_precondition
 , kind                     zkapp_precondition_type           NOT NULL
 , precondition_account_id  int                               REFERENCES zkapp_precondition_accounts(id)
 , nonce                    bigint
-);
-
-CREATE TABLE zkapp_uris
-( id                 serial  PRIMARY KEY
-, uri                text    NOT NULL UNIQUE
 );
 
 CREATE TABLE zkapp_accounts

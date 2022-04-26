@@ -483,14 +483,14 @@ module Zkapp_uri = struct
   let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
-      ~cols:([ "uri" ], typ)
+      ~cols:([ "value" ], typ)
       (module Conn)
       zkapp_uri
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Caqti_type.string
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "uri" ]))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]))
       id
 end
 
@@ -1684,9 +1684,9 @@ module User_command = struct
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, fee_token_id, token_id, nonce, amount, fee,
+                      receiver_id, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id |sql})
             { typ =
                 ( match via with
@@ -1927,20 +1927,14 @@ module Fee_transfer = struct
           "fee_transfer_via_coinbase"
   end
 
-  type t =
-    { kind : Kind.t
-    ; receiver_id : int
-    ; fee : int64
-    ; token : string
-    ; hash : string
-    }
+  type t = { kind : Kind.t; receiver_id : int; fee : int64; hash : string }
 
   let typ =
     let encode t =
       let kind = Kind.to_string t.kind in
-      Ok ((kind, t.receiver_id, t.fee, t.token), t.hash)
+      Ok (kind, t.receiver_id, t.fee, t.hash)
     in
-    let decode ((kind, receiver_id, fee, token), hash) =
+    let decode (kind, receiver_id, fee, hash) =
       let open Result.Let_syntax in
       let%bind kind =
         match kind with
@@ -1951,9 +1945,9 @@ module Fee_transfer = struct
         | s ->
             Result.fail (sprintf "Bad kind %s in decode attempt" s)
       in
-      Ok { kind; receiver_id; fee; token; hash }
+      Ok { kind; receiver_id; fee; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
+    let rep = Caqti_type.(tup4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -1969,15 +1963,20 @@ module Fee_transfer = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist
+          let account_id =
+            Account_id.create
+              (Fee_transfer.Single.receiver_pk t)
+              Token_id.default
+          in
+          Account_identifiers.add_if_doesn't_exist
             (module Conn)
-            (Fee_transfer.Single.receiver_pk t)
+            ~token_owner:None account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
+                    (type, receiver_id, fee, hash)
+                   VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql})
           { kind
@@ -1985,7 +1984,6 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token = Token_id.to_string t.fee_token
           ; hash = transaction_hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1996,15 +1994,11 @@ module Coinbase = struct
   let coinbase_typ = "coinbase"
 
   let typ =
-    let encode t =
-      Ok
-        ( (coinbase_typ, t.receiver_id, t.amount, Token_id.(to_string default))
-        , t.hash )
-    in
-    let decode ((_, receiver_id, amount, _), hash) =
+    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
+    let rep = Caqti_type.(tup4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -2017,13 +2011,18 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver_pk t)
+          let account_id =
+            Account_id.create (Coinbase.receiver_pk t) Token_id.default
+          in
+          Account_identifiers.add_if_doesn't_exist
+            (module Conn)
+            ~token_owner:None account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
+                    (type, receiver_id, fee, hash)
+                   VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql})
           { receiver_id
@@ -2138,7 +2137,7 @@ module Block_and_internal_command = struct
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
                 VALUES (?, ?, ?, ?)
          |sql})
       { block_id; internal_command_id; sequence_no; secondary_sequence_no }
@@ -2437,12 +2436,11 @@ module Accounts_accessed = struct
     ; balance : int64
     ; nonce : int64
     ; receipt_chain_hash : string
-    ; delegate : string option
+    ; delegate_id : int option
     ; voting_for_id : int
     ; timing_id : int
     ; permissions_id : int
     ; zkapp_id : int option
-    ; zkapp_uri_id : int
     }
   [@@deriving hlist, fields]
 
@@ -2456,15 +2454,29 @@ module Accounts_accessed = struct
         ; int64
         ; int64
         ; string
-        ; option string
+        ; option int
         ; int
         ; int
         ; int
         ; option int
-        ; int
         ]
 
   let table_name = "accounts_accessed"
+
+  let find_opt (module Conn : CONNECTION) ~block_id ~account_identifier_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.find_opt
+      (Caqti_request.find_opt
+         Caqti_type.(tup2 int int)
+         typ
+         (sprintf
+            {sql| SELECT %s
+                  FROM %s
+                  WHERE block_id = $1
+                  AND   account_identifier_id = $2
+            |sql}
+            comma_cols table_name))
+      (block_id, account_identifier_id)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) block_id
       (ledger_index, (account : Account.t)) =
@@ -2476,61 +2488,65 @@ module Accounts_accessed = struct
         (module Conn)
         ~token_owner:None account_id
     in
-    let%bind token_symbol_id =
-      Token_symbols.add_if_doesn't_exist (module Conn) account.token_symbol
-    in
-    let balance =
-      account.balance |> Currency.Balance.to_uint64 |> Unsigned.UInt64.to_int64
-    in
-    let nonce =
-      account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
-    in
-    let receipt_chain_hash =
-      account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
-    in
-    let delegate =
-      Option.map account.delegate
-        ~f:Signature_lib.Public_key.Compressed.to_base58_check
-    in
-    let%bind voting_for_id =
-      Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
-    in
-    let%bind timing_id =
-      Timing_info.add_if_doesn't_exist (module Conn) account
-    in
-    let%bind permissions_id =
-      Zkapp_permissions.add_if_doesn't_exist (module Conn) account.permissions
-    in
-    let%bind zkapp_id =
-      (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
-      Mina_caqti.add_if_some
-        (Zkapp_account.add_if_doesn't_exist (module Conn) account.zkapp_uri)
-        account.zkapp
-    in
-    let%bind zkapp_uri_id =
-      Zkapp_uri.add_if_doesn't_exist (module Conn) account.zkapp_uri
-    in
-    let account_accessed : t =
-      { ledger_index
-      ; block_id
-      ; account_identifier_id
-      ; token_symbol_id
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for_id
-      ; timing_id
-      ; permissions_id
-      ; zkapp_id
-      ; zkapp_uri_id
-      }
-    in
-    Mina_caqti.select_insert_into_cols
-      ~select:("block_id,account_id", Caqti_type.(tup2 int int))
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      account_accessed
+    match%bind find_opt (module Conn) ~block_id ~account_identifier_id with
+    | Some result ->
+        return (result.block_id, result.account_identifier_id)
+    | None ->
+        let%bind token_symbol_id =
+          Token_symbols.add_if_doesn't_exist (module Conn) account.token_symbol
+        in
+        let balance =
+          account.balance |> Currency.Balance.to_uint64
+          |> Unsigned.UInt64.to_int64
+        in
+        let nonce =
+          account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
+        in
+        let receipt_chain_hash =
+          account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
+        in
+        let%bind delegate_id =
+          Mina_caqti.add_if_some
+            (Public_key.add_if_doesn't_exist (module Conn))
+            account.delegate
+        in
+        let%bind voting_for_id =
+          Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
+        in
+        let%bind timing_id =
+          Timing_info.add_if_doesn't_exist (module Conn) account
+        in
+        let%bind permissions_id =
+          Zkapp_permissions.add_if_doesn't_exist
+            (module Conn)
+            account.permissions
+        in
+        let%bind zkapp_id =
+          (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
+          Mina_caqti.add_if_some
+            (Zkapp_account.add_if_doesn't_exist (module Conn) account.zkapp_uri)
+            account.zkapp
+        in
+        let account_accessed : t =
+          { ledger_index
+          ; block_id
+          ; account_identifier_id
+          ; token_symbol_id
+          ; balance
+          ; nonce
+          ; receipt_chain_hash
+          ; delegate_id
+          ; voting_for_id
+          ; timing_id
+          ; permissions_id
+          ; zkapp_id
+          }
+        in
+        Mina_caqti.select_insert_into_cols
+          ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+          ~table_name ~cols:(Fields.names, typ)
+          (module Conn)
+          account_accessed
 
   let add_accounts_if_don't_exist (module Conn : CONNECTION) block_id
       (accounts : (int * Account.t) list) =
@@ -2571,12 +2587,11 @@ module Accounts_created = struct
     let creation_fee =
       Currency.Fee.to_uint64 creation_fee |> Unsigned.UInt64.to_int64
     in
-    let t = { block_id; account_identifier_id; creation_fee } in
     Mina_caqti.select_insert_into_cols
-      ~select:("block_id,public_key_id", Caqti_type.(tup2 int int))
+      ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      t
+      { block_id; account_identifier_id; creation_fee }
 
   let add_accounts_created_if_don't_exist (module Conn : CONNECTION) block_id
       accounts_created =
@@ -3336,7 +3351,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
             | Error err ->
                 [%log warn]
                   "Could not commit data for block with state hash \
-                   $state_hash, rolling back transaction"
+                   $state_hash, rolling back transaction: $error"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson state_hash)
                     ; ("error", `String (Caqti_error.show err))
@@ -3354,7 +3369,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                     [%log warn]
                       "Could not get block id for block with state hash \
                        $state_hash just archived; can't store accounts \
-                       accessed, rolling back transaction"
+                       accessed, rolling back transaction: $error"
                       ~metadata:
                         [ ("state_hash", State_hash.to_yojson state_hash)
                         ; ("error", `String (Caqti_error.show err))
@@ -3362,8 +3377,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                     Conn.rollback ()
                 | Ok block_id -> (
                     [%log info]
-                      "Adding accounts accessed in block with state hash \
-                       $state_hash to archive database"
+                      "Added block with state hash $state_hash to archive \
+                       database"
                       ~metadata:
                         [ ("state_hash", State_hash.to_yojson state_hash)
                         ; ( "num_accounts_accessed"
@@ -3381,7 +3396,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                     | Error err ->
                         [%log error]
                           "Could not add accounts accessed in block with state \
-                           hash $state_hash to archive database"
+                           hash $state_hash to archive database: $error"
                           ~metadata:
                             [ ("state_hash", State_hash.to_yojson state_hash)
                             ; ("error", `String (Caqti_error.show err))
@@ -3389,7 +3404,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                         Conn.rollback ()
                     | Ok _block_and_account_ids -> (
                         [%log info]
-                          "Adding accounts created for block with state hash \
+                          "Added accounts accessed for block with state hash \
                            $state_hash to archive database"
                           ~metadata:
                             [ ("state_hash", State_hash.to_yojson state_hash)
@@ -3418,7 +3433,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                         | Error err ->
                             [%log warn]
                               "Could not add account creation fees in block \
-                               with state hash $state_hash to archive database"
+                               with state hash $state_hash to archive \
+                               database: $error"
                               ~metadata:
                                 [ ("state_hash", State_hash.to_yojson state_hash)
                                 ; ("error", `String (Caqti_error.show err))
