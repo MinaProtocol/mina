@@ -3288,8 +3288,7 @@ let retry ~f ~logger ~error_str retries =
 let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
     ~delete_older_than ~accounts_accessed ~accounts_created block =
   let state_hash = hash block in
-  Format.eprintf "NUM ACCTS ACCESSED: %d@." (List.length accounts_accessed) ;
-  Format.eprintf "NUM ACCTS CREATED: %d@." (List.length accounts_created) ;
+
   (* the block itself is added in a single transaction with a transaction block
 
      once that transaction is committed, we can get a block id
