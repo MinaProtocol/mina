@@ -155,7 +155,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
               attempt max_attempts ~metadata ) ;
           succeeded || unretriable
       | Error exn ->
-          [%log error]
+          [%log warn]
             "Error when sending block with state hash $state_hash to uptime \
              service at URL $url"
             ~metadata:
