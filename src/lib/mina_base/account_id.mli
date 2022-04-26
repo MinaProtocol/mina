@@ -67,6 +67,8 @@ val derive_token_id : owner:t -> Digest.t
 
 val empty : t
 
+val invalid : t
+
 val public_key : t -> Public_key.Compressed.t
 
 val token_id : t -> Digest.t
@@ -103,6 +105,8 @@ module Checked : sig
   val equal : var -> var -> Boolean.var Checked.t
 
   val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
+
+  val derive_token_id : owner:var -> Digest.Checked.t
 end
 
 [%%endif]

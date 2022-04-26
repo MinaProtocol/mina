@@ -64,6 +64,7 @@ let deploy_party_body : Party.Body.t =
             }
       }
   ; account_precondition = Accept
+  ; caller = Token_id.default
   ; use_full_commitment = true
   }
 
@@ -106,7 +107,7 @@ let fee_payer =
 let full_commitment =
   (* TODO: This is a pain. *)
   Parties.Transaction_commitment.with_fee_payer transaction_commitment
-    ~fee_payer_hash:(Party.digest (Party.of_fee_payer fee_payer))
+    ~fee_payer_hash:(Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
 
 (* TODO: Make this better. *)
 let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
@@ -123,10 +124,11 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
         fee_payer
   in
   let other_parties =
-    List.map other_parties ~f:(function
-      | { body = { public_key; use_full_commitment; _ }
-        ; authorization = Signature _
-        } as party
+    Parties.Call_forest.map other_parties ~f:(function
+      | ({ body = { public_key; use_full_commitment; _ }
+         ; authorization = Signature _
+         } as party :
+          Party.t)
         when Public_key.Compressed.equal public_key pk_compressed ->
           let commitment =
             if use_full_commitment then full_commitment
@@ -134,7 +136,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
           in
           { party with
             authorization =
-              Signature
+              Control.Signature
                 (Schnorr.Chunked.sign sk
                    (Random_oracle.Input.Chunked.field commitment))
           }
@@ -144,7 +146,14 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
   { fee_payer; other_parties; memo }
 
 let parties : Parties.t =
-  sign_all { fee_payer; other_parties = [ deploy_party; party ]; memo }
+  sign_all
+    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
+    ; other_parties =
+        Parties.Call_forest.of_parties_list [ deploy_party; party ]
+          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+        |> Parties.Call_forest.accumulate_hashes'
+    ; memo
+    }
 
 let () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->

@@ -145,6 +145,7 @@ module Party_under_construction = struct
     ; use_full_commitment = false
     ; account_precondition =
         Full (Account_condition.to_predicate t.account_condition)
+    ; caller = t.token_id
     }
 
   let assert_state_unproved (t : t) =
@@ -341,6 +342,7 @@ module Party_under_construction = struct
       ; use_full_commitment = Boolean.false_
       ; account_precondition =
           Account_condition.to_predicate t.account_condition
+      ; caller = t.token_id
       }
 
     let assert_state_unproved (t : t) =

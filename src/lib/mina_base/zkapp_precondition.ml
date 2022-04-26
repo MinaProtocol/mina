@@ -397,7 +397,7 @@ module Eq_data = struct
 
     let public_key () =
       Public_key.Compressed.
-        { default = Lazy.force invalid_public_key
+        { default = invalid_public_key
         ; to_input
         ; to_input_checked = Checked.to_input
         ; equal_checked = run Checked.equal
@@ -449,7 +449,7 @@ end
 module Leaf_typs = struct
   let public_key () =
     Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:(Lazy.force invalid_public_key) typ)
+      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 

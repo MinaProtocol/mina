@@ -352,8 +352,8 @@ module type S = sig
 end
 
 type local_state =
-  ( (Party.t, unit) Parties.Call_forest.t
-  , (Party.t, unit) Parties.Call_forest.t list
+  ( Stack_frame.value
+  , Stack_frame.value list
   , Token_id.t
   , Currency.Amount.t
   , Mina_ledger.Sparse_ledger.t

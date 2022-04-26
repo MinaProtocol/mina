@@ -140,17 +140,21 @@ let%test_module "Initialize state test" =
         Parties.Transaction_commitment.create ~other_parties_hash
           ~protocol_state_predicate_hash ~memo_hash
       in
-      let fee_payer_body =
-        { Party.Body.Fee_payer.dummy with
-          public_key = pk_compressed
-        ; balance_change = Currency.Fee.(of_int 100)
-        ; protocol_state_precondition
+      let fee_payer : Party.Fee_payer.t =
+        { body =
+            { Party.Body.Fee_payer.dummy with
+              public_key = pk_compressed
+            ; balance_change = Currency.Fee.(of_int 100)
+            ; protocol_state_precondition
+            }
+        ; authorization = Signature.dummy
         }
       in
       let full_commitment =
         Parties.Transaction_commitment.with_fee_payer transaction_commitment
           ~fee_payer_hash:
-            (Party.Body.digest (Party.Body.of_fee_payer fee_payer_body))
+            (Parties.Call_forest.Digest.Party.create
+               (Party.of_fee_payer fee_payer))
       in
       let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
           =
@@ -167,10 +171,11 @@ let%test_module "Initialize state test" =
               fee_payer
         in
         let other_parties =
-          List.map other_parties ~f:(function
-            | { body = { public_key; use_full_commitment; _ }
-              ; authorization = Signature _
-              } as party
+          Parties.Call_forest.map other_parties ~f:(function
+            | ({ body = { public_key; use_full_commitment; _ }
+               ; authorization = Signature _
+               } as party :
+                Party.t)
               when Public_key.Compressed.equal public_key pk_compressed ->
                 let commitment =
                   if use_full_commitment then full_commitment
@@ -188,12 +193,7 @@ let%test_module "Initialize state test" =
         { fee_payer; other_parties; memo }
       in
       let parties : Parties.t =
-        sign_all
-          { fee_payer =
-              { body = fee_payer_body; authorization = Signature.dummy }
-          ; other_parties = parties
-          ; memo
-          }
+        sign_all { fee_payer; other_parties = ps; memo }
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
