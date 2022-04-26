@@ -49,10 +49,6 @@ let _ =
                 ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
-         let protocol_state_predicate_hash =
-           Zkapp_precondition.Protocol_state.digest
-             Zkapp_precondition.Protocol_state.accept
-         in
          let memo =
            fee_payer_party_js##.memo |> Js.to_string
            |> Memo.create_from_string_exn
