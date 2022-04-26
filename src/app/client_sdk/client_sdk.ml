@@ -58,12 +58,11 @@ let _ =
          in
          let commitment : Parties.Transaction_commitment.t =
            Parties.Transaction_commitment.create ~other_parties_hash
-             ~protocol_state_predicate_hash
-             ~memo_hash:(Signed_command_memo.hash memo)
          in
          let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
          let full_commitment =
-           Parties.Transaction_commitment.with_fee_payer commitment
+           Parties.Transaction_commitment.create_complete commitment
+             ~memo_hash:(Signed_command_memo.hash memo)
              ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
          in
          let sk =
