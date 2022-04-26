@@ -2,16 +2,7 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Mina_state
-
-(* TODO: this may be re-done with the new body header split *)
-
-(* By redefining a type alias in this module, and then rewriting that type alias in
-   the signature of the type module before it is included, we effectively obscure the
-   underlying type definition from external code (since the type module is not directly
-   exported from this library). It is important to hide this specific type externally,
-   as otherwise external code using the library could just freely manipulate the
-   validation state without using this library as intended. *)
-include module type of Validation_types
+open Validation_types
 
 val validation :
   ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) t

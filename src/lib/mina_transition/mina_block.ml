@@ -8,15 +8,15 @@ module Validation = Validation
 
 (* module Precomputed = Precomputed *)
 
-type fully_invalid_block = Validation.fully_invalid_with_block
+type fully_invalid_block = Validation_types.fully_invalid_with_block
 
-type initial_valid_block = Validation.initial_valid_with_block
+type initial_valid_block = Validation_types.initial_valid_with_block
 
-type almost_valid_block = Validation.almost_valid_with_block
+type almost_valid_block = Validation_types.almost_valid_with_block
 
-type fully_valid_block = Validation.fully_valid_with_block
+type fully_valid_block = Validation_types.fully_valid_with_block
 
-let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
+let genesis ~precomputed_values : fully_valid_block =
   let genesis_state =
     Precomputed_values.genesis_state_with_hashes precomputed_values
   in
@@ -52,7 +52,7 @@ module Validated : sig
   type t = Block.with_hash * State_hash.t Non_empty_list.t
   [@@deriving sexp, to_yojson, equal]
 
-  val lift : Block.with_hash * Validation.fully_valid -> t
+  val lift : fully_valid_block -> t
 
   val forget : t -> Block.with_hash
 

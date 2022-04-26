@@ -10,7 +10,7 @@ open Core_kernel
 open Mina_base
 open Mina_state
 open Consensus.Data
-include Validation_types
+open Validation_types
 
 let validation (_, v) = v
 

@@ -227,7 +227,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                    (Drop_head
                       (fun ( `Block
                                (block :
-                                 Validation.initial_valid_with_block
+                                 Validation_types.initial_valid_with_block
                                  Envelope.Incoming.t)
                            , `Valid_cb valid_cb ) ->
                         Mina_metrics.(

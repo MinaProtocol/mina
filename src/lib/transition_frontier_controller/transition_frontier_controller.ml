@@ -9,7 +9,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
   let f_drop_head name head valid_cb =
-    let block : Mina_block.initial_valid_block =
+    let block : Validation_types.initial_valid_with_block =
       Network_peer.Envelope.Incoming.data @@ Cache_lib.Cached.peek head
     in
     Mina_block.handle_dropped_transition

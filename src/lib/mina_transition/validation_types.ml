@@ -15,26 +15,25 @@ type ( 'time_received
   * 'frontier_dependencies
   * 'staged_ledger_diff
   * 'protocol_versions
-
-(* TODO commented out because of weird type errors *)
-(* Types are constrained though in practice (e.g. all functions requiring fully validated
-   block prescribe this requirement well) *)
-(* constraint 'time_received = [ `Time_received ] * (unit, _) Truth.t
-   constraint 'genesis_state = [ `Genesis_state ] * (unit, _) Truth.t
-   constraint 'proof = [ `Proof ] * (unit, _) Truth.t
-   (* TODO: This type seems wrong... we sometimes have a proof if it was received
-      via gossip, but sometimes we do not and just stick a dummy proof here.
-      It seems that the better thing to do would be to mark this accordingly instead
-      of having a dummy (though I wonder why we need to cache this in the first
-      place). *)
-   constraint
-     'delta_block_chain =
-     [ `Delta_block_chain ] * (State_hash.t Non_empty_list.t, _) Truth.t
-   constraint
-     'frontier_dependencies =
-     [ `Frontier_dependencies ] * (unit, _) Truth.t
-   constraint 'staged_ledger_diff = [ `Staged_ledger_diff ] * (unit, _) Truth.t
-   constraint 'protocol_versions = [ `Protocol_versions ] * (unit, _) Truth.t *)
+  (* TODO commented out because of weird type errors *)
+  (* Types are constrained though in practice (e.g. all functions requiring fully validated
+     block prescribe this requirement well) *)
+  constraint 'time_received = [ `Time_received ] * (unit, _) Truth.t
+  constraint 'genesis_state = [ `Genesis_state ] * (unit, _) Truth.t
+  constraint 'proof = [ `Proof ] * (unit, _) Truth.t
+  (* TODO: This type seems wrong... we sometimes have a proof if it was received
+     via gossip, but sometimes we do not and just stick a dummy proof here.
+     It seems that the better thing to do would be to mark this accordingly instead
+     of having a dummy (though I wonder why we need to cache this in the first
+     place). *)
+  constraint
+    'delta_block_chain =
+    [ `Delta_block_chain ] * (State_hash.t Non_empty_list.t, _) Truth.t
+  constraint
+    'frontier_dependencies =
+    [ `Frontier_dependencies ] * (unit, _) Truth.t
+  constraint 'staged_ledger_diff = [ `Staged_ledger_diff ] * (unit, _) Truth.t
+  constraint 'protocol_versions = [ `Protocol_versions ] * (unit, _) Truth.t
 
 type fully_invalid =
   ( [ `Time_received ] * unit Truth.false_t
