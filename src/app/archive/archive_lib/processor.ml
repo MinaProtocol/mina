@@ -87,25 +87,31 @@ module Token = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~owner token_id =
     let open Deferred.Result.Let_syntax in
-    let value = Token_id.to_string token_id in
-    let%bind owner_public_key_id, owner_token_id =
-      match owner with
-      | None ->
-          assert (Token_id.(equal default) token_id) ;
-          return (None, None)
-      | Some owner_tid ->
-          assert (not @@ Token_id.(equal default) token_id) ;
+    match owner with
+    | None ->
+        assert (Token_id.(equal default) token_id) ;
+        (* the db creation SQL adds the default token
+
+           we wouldn't want to try to insert it here,
+           because `select_insert_into_cols` would break
+           on the NULL columns for the owner
+        *)
+        find (module Conn) token_id
+    | Some owner_tid ->
+        assert (not @@ Token_id.(equal default) token_id) ;
+        let value = Token_id.to_string token_id in
+        let%bind owner_public_key_id, owner_token_id =
           (* we can only add this token if its owner exists *)
           let%map owner_pk_id, owner_token_id =
             find_owner (module Conn) owner_tid
           in
           (Some owner_pk_id, Some owner_token_id)
-    in
-    let t = { value; owner_public_key_id; owner_token_id } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      t
+        in
+        let t = { value; owner_public_key_id; owner_token_id } in
+        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+          ~table_name ~cols:(Fields.names, typ)
+          (module Conn)
+          t
 end
 
 module Voting_for = struct
@@ -2112,27 +2118,6 @@ WITH RECURSIVE pending_chain_nonce AS (
            typ
            (sql_template public_keys_sql_list))
         (parent_id, List.length public_keys)
-
-  (* INVARIANT: The map is populated with all the public_keys present *)
-  let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
-    let open Deferred.Result.Let_syntax in
-    let%map ts = collect (module Conn) ~public_keys ~parent_id in
-    let alist =
-      List.map ts ~f:(fun t ->
-          ( Signature_lib.Public_key.Compressed.of_base58_check_exn t.public_key
-          , Account.Nonce.of_uint32 Unsigned.UInt32.(of_int64 t.nonce |> succ)
-          ))
-    in
-    let map = Signature_lib.Public_key.Compressed.Map.of_alist_exn alist in
-    List.fold public_keys ~init:map ~f:(fun map key ->
-        match
-          Signature_lib.Public_key.Compressed.Map.add map ~key
-            ~data:Account.Nonce.zero
-        with
-        | `Ok map' ->
-            map'
-        | `Duplicate ->
-            map)
 end
 
 module Block_and_internal_command = struct
@@ -2731,27 +2716,6 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        (* grab all the nonces associated with every public key in all of these
-         * transactions for blocks earlier than this one. *)
-        let%bind initial_nonce_map :
-            ( Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t
-            , _ )
-            Deferred.Result.t =
-          let public_keys =
-            transactions
-            |> List.map ~f:(fun x -> Transaction.public_keys x.data)
-            |> List.concat
-          in
-          (* if this block is disconnected and doesn't have a parent, the nonce map will need to start empty *)
-          match parent_id with
-          | None ->
-              Deferred.Result.return
-                Signature_lib.Public_key.Compressed.Map.empty
-          | Some parent_id ->
-              Find_nonce.initialize_nonce_map
-                (module Conn)
-                ~public_keys ~parent_id
-        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -2800,122 +2764,102 @@ module Block = struct
             ; chain_status = Chain_status.(to_string Pending)
             }
         in
-        let%bind (_
-                   : int
-                     * Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t)
-            =
-          Mina_caqti.deferred_result_list_fold transactions
-            ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
-            function
-            | { Mina_base.With_status.status
-              ; data = Transaction.Command command
-              } ->
-                let user_command =
-                  { Mina_base.With_status.status; data = command }
-                in
-                (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
-                   Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
-                let nonce_map =
-                  Signature_lib.Public_key.Compressed.Map.change
-                    initial_nonce_map
-                    ( Mina_base.User_command.fee_payer command
-                    |> Account_id.public_key )
-                    ~f:(fun _ ->
-                      Some
-                        ( Mina_base.User_command.nonce_exn command
-                        |> Unsigned.UInt32.succ ))
-                in
-                let%bind id =
-                  User_command.add_if_doesn't_exist
-                    (module Conn)
-                    user_command.data
-                in
-                let%map () =
-                  match command with
-                  | Signed_command _ ->
-                      Block_and_signed_command.add_with_status
+        Mina_caqti.deferred_result_list_fold transactions ~init:0
+          ~f:(fun sequence_no -> function
+          | { Mina_base.With_status.status; data = Transaction.Command command }
+            ->
+              let user_command =
+                { Mina_base.With_status.status; data = command }
+              in
+              let%bind id =
+                User_command.add_if_doesn't_exist
+                  (module Conn)
+                  user_command.data
+              in
+              let%map () =
+                match command with
+                | Signed_command _ ->
+                    Block_and_signed_command.add_with_status
+                      (module Conn)
+                      ~block_id ~user_command_id:id ~sequence_no
+                      ~status:user_command.status
+                    >>| ignore
+                | Parties _ ->
+                    let status, failure_reasons =
+                      match user_command.status with
+                      | Applied ->
+                          (applied_str, None)
+                      | Failed failures ->
+                          let display =
+                            Transaction_status.Failure.Collection.to_display
+                              failures
+                          in
+                          (failed_str, Some display)
+                    in
+                    Block_and_zkapp_command.add_if_doesn't_exist
+                      (module Conn)
+                      ~block_id ~zkapp_command_id:id ~sequence_no ~status
+                      ~failure_reasons
+                    >>| ignore
+              in
+              sequence_no + 1
+          | { data = Fee_transfer fee_transfer_bundled; _ } ->
+              let fee_transfers =
+                Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
+              in
+              (* balances.receiver1_balance is for receiver of head of fee_transfers
+                 balances.receiver2_balance, if it exists, is for receiver of
+                   next element of fee_transfers
+              *)
+              let%bind fee_transfer_infos =
+                Mina_caqti.deferred_result_list_fold fee_transfers ~init:[]
+                  ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
+                    let%map id =
+                      Fee_transfer.add_if_doesn't_exist
                         (module Conn)
-                        ~block_id ~user_command_id:id ~sequence_no
-                        ~status:user_command.status
-                      >>| ignore
-                  | Parties _ ->
-                      let status, failure_reasons =
-                        match user_command.status with
-                        | Applied ->
-                            (applied_str, None)
-                        | Failed failures ->
-                            let display =
-                              Transaction_status.Failure.Collection.to_display
-                                failures
-                            in
-                            (failed_str, Some display)
-                      in
-                      Block_and_zkapp_command.add_if_doesn't_exist
-                        (module Conn)
-                        ~block_id ~zkapp_command_id:id ~sequence_no ~status
-                        ~failure_reasons
-                      >>| ignore
-                in
-                (sequence_no + 1, nonce_map)
-            | { data = Fee_transfer fee_transfer_bundled; _ } ->
-                let fee_transfers =
-                  Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
-                in
-                (* balances.receiver1_balance is for receiver of head of fee_transfers
-                   balances.receiver2_balance, if it exists, is for receiver of
-                     next element of fee_transfers
-                *)
-                let%bind fee_transfer_infos =
-                  Mina_caqti.deferred_result_list_fold fee_transfers ~init:[]
-                    ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
-                      let%map id =
-                        Fee_transfer.add_if_doesn't_exist
-                          (module Conn)
-                          fee_transfer `Normal
-                      in
-                      ( id
-                      , secondary_sequence_no
-                      , fee_transfer.fee
-                      , fee_transfer.receiver_pk )
-                      :: acc)
-                in
-                let fee_transfer_infos_with_balances =
-                  match fee_transfer_infos with
-                  | [ id ] ->
-                      [ id ]
-                  | [ id2; id1 ] ->
-                      (* the fold reverses the order of the infos from the fee transfers *)
-                      [ id1; id2 ]
-                  | _ ->
-                      failwith
-                        "Unexpected number of single fee transfers in a fee \
-                         transfer transaction"
-                in
-                let%map () =
-                  Mina_caqti.deferred_result_list_fold
-                    fee_transfer_infos_with_balances ~init:()
-                    ~f:(fun () (fee_transfer_id, secondary_sequence_no, _, _) ->
-                      Block_and_internal_command.add
-                        (module Conn)
-                        ~block_id ~internal_command_id:fee_transfer_id
-                        ~sequence_no ~secondary_sequence_no
-                      >>| ignore)
-                in
-                (sequence_no + 1, nonce_map)
-            | { data = Coinbase coinbase; _ } ->
-                let%bind id =
-                  Coinbase.add_if_doesn't_exist (module Conn) coinbase
-                in
-                let%map () =
-                  Block_and_internal_command.add
-                    (module Conn)
-                    ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0
-                  >>| ignore
-                in
-                (sequence_no + 1, nonce_map))
-        in
-        return block_id
+                        fee_transfer `Normal
+                    in
+                    ( id
+                    , secondary_sequence_no
+                    , fee_transfer.fee
+                    , fee_transfer.receiver_pk )
+                    :: acc)
+              in
+              let fee_transfer_infos_with_balances =
+                match fee_transfer_infos with
+                | [ id ] ->
+                    [ id ]
+                | [ id2; id1 ] ->
+                    (* the fold reverses the order of the infos from the fee transfers *)
+                    [ id1; id2 ]
+                | _ ->
+                    failwith
+                      "Unexpected number of single fee transfers in a fee \
+                       transfer transaction"
+              in
+              let%map () =
+                Mina_caqti.deferred_result_list_fold
+                  fee_transfer_infos_with_balances ~init:()
+                  ~f:(fun () (fee_transfer_id, secondary_sequence_no, _, _) ->
+                    Block_and_internal_command.add
+                      (module Conn)
+                      ~block_id ~internal_command_id:fee_transfer_id
+                      ~sequence_no ~secondary_sequence_no
+                    >>| ignore)
+              in
+              sequence_no + 1
+          | { data = Coinbase coinbase; _ } ->
+              let%bind id =
+                Coinbase.add_if_doesn't_exist (module Conn) coinbase
+              in
+              let%map () =
+                Block_and_internal_command.add
+                  (module Conn)
+                  ~block_id ~internal_command_id:id ~sequence_no
+                  ~secondary_sequence_no:0
+                >>| ignore
+              in
+              sequence_no + 1)
 
   let add_if_doesn't_exist conn ~constraint_constants
       ({ data = t; hash = { state_hash = hash; _ } } :
@@ -3344,13 +3288,21 @@ let retry ~f ~logger ~error_str retries =
 let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
     ~delete_older_than ~accounts_accessed ~accounts_created block =
   let state_hash = hash block in
+  Format.eprintf "NUM ACCTS ACCESSED: %d@." (List.length accounts_accessed) ;
+  Format.eprintf "NUM ACCTS CREATED: %d@." (List.length accounts_created) ;
+  (* the block itself is added in a single transaction with a transaction block
+
+     once that transaction is committed, we can get a block id
+
+     so we add accounts accessed, accounts created, contained in another
+     transaction block
+  *)
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
               [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
@@ -3380,82 +3332,99 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
               ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
             let%map _ = Conn.rollback () in
             err
-        | Ok _ -> (
-            (* added block data, now add accounts accessed *)
-            match%bind
-              Caqti_async.Pool.use
-                (fun (module Conn : CONNECTION) ->
-                  Block.find (module Conn) ~state_hash)
-                pool
-            with
+        | Ok () -> (
+            match%bind Conn.commit () with
             | Error err ->
                 [%log warn]
-                  "Could not get block id for block just archived; can't store \
-                   accounts accessed, rolling back transaction"
+                  "Could not commit data for block with state hash \
+                   $state_hash, rolling back transaction"
                   ~metadata:
-                    [ ("block", State_hash.to_yojson state_hash)
+                    [ ("state_hash", State_hash.to_yojson state_hash)
                     ; ("error", `String (Caqti_error.show err))
                     ] ;
                 Conn.rollback ()
-            | Ok block_id -> (
-                [%log info]
-                  "Adding accounts accessed in block to archive database"
-                  ~metadata:
-                    [ ("block", State_hash.to_yojson state_hash)
-                    ; ( "num_accounts_accessed"
-                      , `Int (List.length accounts_accessed) )
-                    ] ;
+            | Ok () -> (
+                (* added block data, now add accounts accessed *)
                 match%bind
                   Caqti_async.Pool.use
                     (fun (module Conn : CONNECTION) ->
-                      Accounts_accessed.add_accounts_if_don't_exist
-                        (module Conn)
-                        block_id accounts_accessed)
+                      Block.find (module Conn) ~state_hash)
                     pool
                 with
                 | Error err ->
-                    [%log error]
-                      "Could not add accounts accessed in block to archive \
-                       database, rolling back transaction"
+                    [%log warn]
+                      "Could not get block id for block with state hash \
+                       $state_hash just archived; can't store accounts \
+                       accessed, rolling back transaction"
                       ~metadata:
                         [ ("state_hash", State_hash.to_yojson state_hash)
                         ; ("error", `String (Caqti_error.show err))
                         ] ;
                     Conn.rollback ()
-                | Ok _block_and_account_ids -> (
+                | Ok block_id -> (
                     [%log info]
-                      "Adding account creation fees to archive database"
+                      "Adding accounts accessed in block with state hash \
+                       $state_hash to archive database"
                       ~metadata:
-                        [ ("block", State_hash.to_yojson state_hash)
-                        ; ( "num_accounts_created"
-                          , `Int (List.length accounts_created) )
+                        [ ("state_hash", State_hash.to_yojson state_hash)
+                        ; ( "num_accounts_accessed"
+                          , `Int (List.length accounts_accessed) )
                         ] ;
+                    let%bind.Deferred.Result () = Conn.start () in
                     match%bind
                       Caqti_async.Pool.use
                         (fun (module Conn : CONNECTION) ->
-                          Accounts_created.add_accounts_created_if_don't_exist
+                          Accounts_accessed.add_accounts_if_don't_exist
                             (module Conn)
-                            block_id accounts_created)
+                            block_id accounts_accessed)
                         pool
                     with
-                    | Ok _block_and_public_key_ids ->
-                        [%log info]
-                          "Added block data, accounts accessed, and accounts \
-                           created for $state_hash, committing transaction"
-                          ~metadata:
-                            [ ( "state_hash"
-                              , Mina_base.State_hash.to_yojson (hash block) )
-                            ] ;
-                        Conn.commit ()
                     | Error err ->
-                        [%log warn]
-                          "Could not add account creation fees in block to \
-                           archive database, rolling back transaction"
+                        [%log error]
+                          "Could not add accounts accessed in block with state \
+                           hash $state_hash to archive database"
                           ~metadata:
                             [ ("state_hash", State_hash.to_yojson state_hash)
                             ; ("error", `String (Caqti_error.show err))
                             ] ;
-                        Conn.rollback () ) ) ))
+                        Conn.rollback ()
+                    | Ok _block_and_account_ids -> (
+                        [%log info]
+                          "Adding accounts created for block with state hash \
+                           $state_hash to archive database"
+                          ~metadata:
+                            [ ("state_hash", State_hash.to_yojson state_hash)
+                            ; ( "num_accounts_created"
+                              , `Int (List.length accounts_created) )
+                            ] ;
+                        match%bind
+                          Caqti_async.Pool.use
+                            (fun (module Conn : CONNECTION) ->
+                              Accounts_created
+                              .add_accounts_created_if_don't_exist
+                                (module Conn)
+                                block_id accounts_created)
+                            pool
+                        with
+                        | Ok _block_and_public_key_ids ->
+                            [%log info]
+                              "Added accounts created for block with state \
+                               hash $state_hash to archive database"
+                              ~metadata:
+                                [ ( "state_hash"
+                                  , Mina_base.State_hash.to_yojson (hash block)
+                                  )
+                                ] ;
+                            Conn.commit ()
+                        | Error err ->
+                            [%log warn]
+                              "Could not add account creation fees in block \
+                               with state hash $state_hash to archive database"
+                              ~metadata:
+                                [ ("state_hash", State_hash.to_yojson state_hash)
+                                ; ("error", `String (Caqti_error.show err))
+                                ] ;
+                            Conn.rollback () ) ) ) ))
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
@@ -3496,10 +3465,10 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ("block", State_hash.to_yojson state_hash)
+                [ ("state_hash", State_hash.to_yojson state_hash)
                 ; ("error", `String (Caqti_error.show e))
                 ]
-              "Failed to archive block: $block, see $error" ;
+              "Failed to archive block with state hash $state_hash, see $error" ;
             Deferred.unit
         | Ok () ->
             Deferred.unit )
@@ -3524,7 +3493,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
                               , Mina_base.User_command.to_yojson command )
                             ]
                           "Failed to archive user command $command from \
-                           transaction pool: $block, see $error")
+                           transaction pool: see $error")
               in
               Ok ())
             pool

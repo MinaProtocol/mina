@@ -198,7 +198,11 @@ let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
 (* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...] ()`
    creates the string
    `"SELECT s0 FROM t0 WHERE col0 = ? AND col1 = ? AND..."`.
-   The optional `tannot` function maps column names to type annotations. *)
+   The optional `tannot` function maps column names to type annotations.
+
+   N.B. The equalities will not hold if either the column value or the compared
+        value is NULL
+ *)
 let select_cols ~(select : string) ~(table_name : string)
     ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
     : string =
@@ -235,6 +239,9 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+(* N.B.: Do not use if any of the values to be inserted are NULLs
+   See note in `select_cols`
+*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =

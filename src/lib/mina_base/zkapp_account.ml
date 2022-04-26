@@ -6,7 +6,7 @@ open Zkapp_basic
 
 module Events = struct
   module Event = struct
-    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+    (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
     type t = Field.t array
 
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x

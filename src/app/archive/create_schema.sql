@@ -38,15 +38,18 @@ CREATE TABLE tokens
 , owner_token_id       int               REFERENCES tokens(id)
 );
 
-CREATE INDEX idx_tokens_id ON tokens(id);
 CREATE INDEX idx_tokens_value ON tokens(value);
+
+/* insert default token, whose value is obtained via
+   the OCaml code `Token_id.(to_string default)`
+*/
+INSERT INTO tokens (value) VALUES ('wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf');
 
 CREATE TABLE token_symbols
 ( id          serial PRIMARY KEY
 , value text  NOT NULL
 );
 
-CREATE INDEX idx_token_symbols_id ON token_symbols(id);
 CREATE INDEX idx_token_symbols_value ON token_symbols(value);
 
 CREATE TABLE account_identifiers
@@ -171,7 +174,6 @@ CREATE TABLE voting_for
 , value text  NOT NULL
 );
 
-CREATE INDEX idx_voting_for_id ON voting_for(id);
 CREATE INDEX idx_voting_for_value ON voting_for(value);
 
 /* accounts accessed in a block, representing the account
