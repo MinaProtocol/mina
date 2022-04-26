@@ -444,5 +444,5 @@ let%test_module "multisig_account" =
                 }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ]))
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t)))
   end )

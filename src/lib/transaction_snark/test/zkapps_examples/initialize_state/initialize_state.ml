@@ -201,12 +201,13 @@ let%test_module "Initialize state test" =
               Currency.Balance.(
                 Option.value_exn (add_amount zero (Currency.Amount.of_int 500)))
           in
-          let _, loc =
+          let _, _ =
             Ledger.get_or_create_account ledger account_id account
             |> Or_error.ok_exn
           in
-          let () = apply_parties ledger [ parties ] in
-          Ledger.get ledger loc |> Option.value_exn)
+          let target_ledger = apply_parties ledger [ parties ] in
+          Sparse_ledger.find_index_exn target_ledger account_id
+          |> Sparse_ledger.get_exn target_ledger)
 
     let%test_unit "Initialize" =
       let account =

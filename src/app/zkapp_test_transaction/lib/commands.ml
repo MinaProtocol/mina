@@ -81,7 +81,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
           pending_coinbase_init_stack
     }
   in
-  let witnesses =
+  let witnesses, _final_ledger =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
       ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
@@ -173,7 +173,7 @@ let generate_snapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
           pending_coinbase_init_stack
     }
   in
-  let witnesses =
+  let witnesses, _final_ledger =
     Transaction_snark.parties_witnesses_exn ~constraint_constants ~state_body
       ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack

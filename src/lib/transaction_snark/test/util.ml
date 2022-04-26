@@ -93,7 +93,7 @@ let apply_parties ledger parties =
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
-  let witnesses =
+  let witnesses, final_ledger =
     Transaction_snark.parties_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) parties
@@ -113,7 +113,8 @@ let apply_parties ledger parties =
             (Parties_segment.Basic.to_single_list spec)
             snapp_stmt s ~witness ;
           fun () -> ())
-      |> Or_error.ok_exn)
+      |> Or_error.ok_exn) ;
+  final_ledger
 
 let trivial_snapp =
   lazy
@@ -125,7 +126,7 @@ let check_parties_with_merges_exn ?(state_body = genesis_state_body)
   (*TODO: merge multiple snapp transactions*)
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
-      let witnesses =
+      let witnesses, _final_ledger =
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
