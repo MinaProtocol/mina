@@ -977,58 +977,6 @@ module Base = struct
           let acc' = Ledger_hash.merge_var ~height l r in
           acc')
 
-    let apply_body ~is_start
-        ({ public_key
-         ; token_id = _
-         ; update =
-             { app_state = _
-             ; delegate = _
-             ; verification_key = _
-             ; permissions = _
-             ; zkapp_uri = _
-             ; token_symbol = _
-             ; timing = _
-             ; voting_for = _
-             }
-         ; balance_change = _
-         ; increment_nonce
-         ; events = _ (* This is for the snapp to use, we don't need it. *)
-         ; call_data = _ (* This is for the snapp to use, we don't need it. *)
-         ; sequence_events = _
-         ; call_depth = _ (* This is used to build the 'stack of stacks'. *)
-         ; protocol_state_precondition = _
-         ; account_precondition
-         ; use_full_commitment
-         ; caller = _
-         } :
-          Party.Body.Checked.t) (a : Account.Checked.Unhashed.t) :
-        Account.Checked.Unhashed.t * _ =
-      let open Impl in
-      let r = ref [] in
-      let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
-
-      (* enforce that either the account_precondition is `Accept`,
-         the nonce is incremented,
-         or the full commitment is used to avoid replays. *)
-      let account_precondition_is_accept =
-        let accept_digest =
-          Zkapp_precondition.Account.digest Zkapp_precondition.Account.accept
-          |> Field.constant
-        in
-        let account_precondition_digest =
-          Zkapp_precondition.Account.Checked.digest account_precondition
-        in
-        Field.equal accept_digest account_precondition_digest
-      in
-      with_label __LOC__ (fun () ->
-          Boolean.Assert.any
-            [ account_precondition_is_accept
-            ; increment_nonce
-            ; Boolean.(use_full_commitment &&& not is_start)
-            ]) ;
-      let a : Account.Checked.Unhashed.t = { a with public_key } in
-      (a, `proof_must_verify proof_must_verify)
-
     module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
 
@@ -1854,6 +1802,8 @@ module Base = struct
 
           type parties = Parties.t
 
+          type 'a or_ignore = 'a Zkapp_basic.Or_ignore.Checked.t
+
           type transaction_commitment = Transaction_commitment.t
 
           let balance_change (t : t) = t.party.data.balance_change
@@ -1946,6 +1896,10 @@ module Base = struct
 
             let permissions ({ party; _ } : t) = party.data.update.permissions
           end
+
+          module Account_precondition = struct
+            let nonce ({ party; _ } : t) = party.data.account_precondition.nonce
+          end
         end
 
         module Set_or_keep = struct
@@ -1968,6 +1922,12 @@ module Base = struct
 
           let global_slot_since_genesis { protocol_state; _ } =
             protocol_state.global_slot_since_genesis
+        end
+
+        module Nonce_precondition = struct
+          let is_constant =
+            Zkapp_precondition.Numeric.Checked.is_constant
+              Zkapp_precondition.Numeric.Tc.nonce
         end
 
         let with_label ~label f = with_label label f
@@ -2018,22 +1978,14 @@ module Base = struct
           ->
             Zkapp_precondition.Account.Checked.check
               party.data.account_precondition account.data
-        | Check_auth { is_start; party = { party; _ }; account } ->
-            (* If there's a valid signature, it must increment the nonce or use full commitment *)
-            let account', `proof_must_verify proof_must_verify =
-              apply_body ~is_start party.data account.data
+        | Init_account { party = { party; _ }; account } ->
+            let account' : Account.Checked.Unhashed.t =
+              { account.data with
+                public_key = party.data.public_key
+              ; token_id = party.data.token_id
+              }
             in
-            let proof_must_verify = proof_must_verify () in
-            let success =
-              match auth_type with
-              | None_given | Signature ->
-                  Boolean.(not proof_must_verify)
-              | Proof ->
-                  (* We always assert that the proof verifies. *)
-                  Boolean.true_
-            in
-            (* omit failure status here, unlike `Mina_transaction_logic` *)
-            (Inputs.Account.account_with_hash account', success, ())
+            Inputs.Account.account_with_hash account'
     end
 
     let check_protocol_state ~pending_coinbase_stack_init

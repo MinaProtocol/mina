@@ -260,6 +260,10 @@ module type Party_intf = sig
 
   type account
 
+  type nonce
+
+  type _ or_ignore
+
   val balance_change : t -> signed_amount
 
   val protocol_state_precondition : t -> protocol_state_precondition
@@ -318,6 +322,10 @@ module type Party_intf = sig
     type permissions
 
     val permissions : t -> permissions set_or_keep
+  end
+
+  module Account_precondition : sig
+    val nonce : t -> nonce Zkapp_precondition.Closed_interval.t or_ignore
   end
 end
 
@@ -569,16 +577,9 @@ module Eff = struct
              ; protocol_state_precondition : 'protocol_state_pred
              ; .. > )
            t
-    | Check_auth :
-        { is_start : 'bool; party : 'party; account : 'account }
-        -> ( 'account * 'bool * 'failure
-           , < bool : 'bool
-             ; party : 'party
-             ; parties : 'parties
-             ; account : 'account
-             ; failure : 'failure
-             ; .. > )
-           t
+    | Init_account :
+        { party : 'party; account : 'account }
+        -> ('account, < party : 'party ; account : 'account ; .. >) t
 end
 
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
@@ -659,6 +660,7 @@ module type Inputs_intf = sig
        and type bool := Bool.t
        and type account := Account.t
        and type public_key := Public_key.t
+       and type nonce := Nonce.t
        and type account_id := Account_id.t
        and type Update.timing := Timing.t
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
@@ -669,6 +671,11 @@ module type Inputs_intf = sig
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
        and type Update.permissions := Account.Permissions.t
+
+  module Nonce_precondition : sig
+    val is_constant :
+      Nonce.t Zkapp_precondition.Closed_interval.t Party.or_ignore -> Bool.t
+  end
 
   module Ledger :
     Ledger_intf
@@ -1038,11 +1045,27 @@ module Make (Inputs : Inputs_intf) = struct
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
     let local_state =
+      Local_state.add_check local_state Fee_payer_must_be_signed
+        Inputs.Bool.(signature_verifies ||| not is_start')
+    in
+    let local_state =
+      let precondition_has_constant_nonce =
+        Inputs.Party.Account_precondition.nonce party
+        |> Inputs.Nonce_precondition.is_constant
+      in
+      let increments_nonce_and_constrains_its_old_value =
+        Inputs.Bool.(
+          Inputs.Party.increment_nonce party &&& precondition_has_constant_nonce)
+      in
+      let depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer =
+        Inputs.Bool.(Inputs.Party.use_full_commitment party &&& not is_start')
+      in
+      let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
       Local_state.add_check local_state Parties_replay_check_failed
         Inputs.Bool.(
-          Inputs.Party.increment_nonce party
-          ||| Inputs.Party.use_full_commitment party
-          ||| not signature_verifies)
+          increments_nonce_and_constrains_its_old_value
+          ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
+          ||| does_not_use_a_signature)
     in
     let (`Is_new account_is_new) =
       Inputs.Ledger.check_account (Party.public_key party)
@@ -1377,16 +1400,11 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_permissions permissions a in
       (a, local_state)
     in
+    (* Initialize account's pk, in case it is new. *)
+    let a = h.perform (Init_account { party; account = a }) in
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
-    let a', update_permitted, failure_status =
-      h.perform (Check_auth { is_start = is_start'; party; account = a })
-    in
-    let local_state =
-      Local_state.update_failure_status_tbl local_state failure_status
-        update_permitted
-    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status_tbl
@@ -1439,7 +1457,7 @@ module Make (Inputs : Inputs_intf) = struct
        The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      Inputs.Ledger.set_account local_state.ledger (a', inclusion_proof)
+      Inputs.Ledger.set_account local_state.ledger (a, inclusion_proof)
     in
     let is_last_party = Ps.is_empty (Stack_frame.calls remaining) in
     let local_state =
