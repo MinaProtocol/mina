@@ -99,7 +99,8 @@ let apply_parties ledger parties =
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter witnesses ~f:(fun (witness, spec, statement, snapp_stmt) ->
+  List.iter (List.rev witnesses)
+    ~f:(fun (witness, spec, statement, snapp_stmt) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
