@@ -221,8 +221,8 @@ val apply_parties_unchecked :
   -> t
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
-     * ( ( (Party.t, unit) Parties.Call_forest.t
-         , (Party.t, unit) Parties.Call_forest.t list
+     * ( ( Stack_frame.value
+         , Stack_frame.value list
          , Token_id.t
          , Currency.Amount.t
          , t

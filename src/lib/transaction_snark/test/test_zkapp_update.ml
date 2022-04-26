@@ -5,13 +5,14 @@ open Signature_lib
 module U = Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
-open Mina_transaction
 
 module type Input_intf = sig
   (*Spec for all the updates to generate a parties transaction*)
   val snapp_update : Party.Update.t
 
   val test_description : string
+
+  val failure_expected : Mina_base.Transaction_status.Failure.t
 end
 
 module T = U.T
@@ -235,7 +236,7 @@ module Make (Input : Input_intf) = struct
           ; sequence_events = []
           }
         in
-        U.test_snapp_update
+        U.test_snapp_update ~expected_failure:(Some failure_expected)
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
@@ -266,30 +267,14 @@ module Make (Input : Input_intf) = struct
               }
             in
             let snapp_pk = Public_key.compress new_kp.public_key in
-            (*Ledger.apply_transaction should be successful if fee payer update
-              is successful*)
-            let parties =
-              Async.Thread_safe.block_on_async_exn (fun () ->
-                  Transaction_snark.For_tests.update_states test_spec
-                    ~snapp_prover ~constraint_constants)
-            in
             Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
             (*Create snapp transaction*)
             Transaction_snark.For_tests.create_trivial_zkapp_account
               ~permissions:(U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~ledger snapp_pk ;
-            ( match
-                Ledger.apply_transaction ledger ~constraint_constants
-                  ~txn_state_view:
-                    (Mina_state.Protocol_state.Body.view U.genesis_state_body)
-                  (Transaction.Command (Parties parties))
-              with
-            | Error e ->
-                Error.raise e
-            | Ok _ ->
-                (*TODO: match the transaction status*) () ) ;
-            (*generate snark*)
-            U.test_snapp_update
+            (*Ledger.apply_transaction should be successful if fee payer update
+              is successful*)
+            U.test_snapp_update ~expected_failure:(Some failure_expected)
               ~snapp_permissions:
                 (U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~snapp_prover test_spec ~init_ledger ~snapp_pk))

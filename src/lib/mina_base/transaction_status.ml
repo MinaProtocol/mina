@@ -19,8 +19,7 @@ module Failure = struct
         | Source_insufficient_balance
         | Source_minimum_balance_violation
         | Receiver_already_exists
-        | Not_token_owner
-        | Mismatched_token_permissions
+        | Token_owner_not_caller
         | Overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
@@ -48,7 +47,7 @@ module Failure = struct
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson]
+    type display = (int * t list) list [@@deriving to_yojson, sexp]
 
     [%%versioned
     module Stable = struct
@@ -108,10 +107,8 @@ module Failure = struct
         "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
-    | Not_token_owner ->
-        "Not_token_owner"
-    | Mismatched_token_permissions ->
-        "Mismatched_token_permissions"
+    | Token_owner_not_caller ->
+        "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
     | Signed_command_on_zkapp_account ->
@@ -170,10 +167,8 @@ module Failure = struct
         Ok Source_minimum_balance_violation
     | "Receiver_already_exists" ->
         Ok Receiver_already_exists
-    | "Not_token_owner" ->
-        Ok Not_token_owner
-    | "Mismatched_token_permissions" ->
-        Ok Mismatched_token_permissions
+    | "Token_owner_not_caller" ->
+        Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
     | "Signed_command_on_zkapp_account" ->
@@ -244,10 +239,9 @@ module Failure = struct
         "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
-    | Not_token_owner ->
-        "The source account does not own the token"
-    | Mismatched_token_permissions ->
-        "The permissions for this token do not match those in the command"
+    | Token_owner_not_caller ->
+        "A party used a non-default token but its caller was not the token \
+         owner"
     | Overflow ->
         "The resulting balance is too large to store"
     | Signed_command_on_zkapp_account ->

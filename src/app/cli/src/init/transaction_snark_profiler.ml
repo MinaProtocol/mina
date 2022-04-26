@@ -164,12 +164,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                       ; source =
                           { ledger = Sparse_ledger.merkle_root sparse_ledger
                           ; pending_coinbase_stack = coinbase_stack_source
-                          ; local_state = Mina_state.Local_state.empty
+                          ; local_state = Mina_state.Local_state.empty ()
                           }
                       ; target =
                           { ledger = Sparse_ledger.merkle_root sparse_ledger'
                           ; pending_coinbase_stack = coinbase_stack_target
-                          ; local_state = Mina_state.Local_state.empty
+                          ; local_state = Mina_state.Local_state.empty ()
                           }
                       ; supply_increase =
                           Transaction.supply_increase t |> Or_error.ok_exn
