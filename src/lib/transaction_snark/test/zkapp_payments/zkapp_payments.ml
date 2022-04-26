@@ -228,7 +228,6 @@ let%test_module "Zkapp payments tests" =
               in
               let test_spec : Spec.t =
                 { sender = spec.sender
-                ; fee_payer = None
                 ; fee
                 ; fee_payer = None
                 ; receivers =
