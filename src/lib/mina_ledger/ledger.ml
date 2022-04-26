@@ -421,6 +421,9 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+  in
   let keypairs = Quickcheck.random_value (Init_ledger.gen ()) in
   let get ledger pk token =
     match
