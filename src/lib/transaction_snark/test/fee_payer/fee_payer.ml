@@ -13,6 +13,8 @@ let%test_module "Fee payer tests" =
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 
+    let constraint_constants = U.constraint_constants
+
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =

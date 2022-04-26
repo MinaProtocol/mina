@@ -303,8 +303,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Mina_base.Parties.
         { p with
           other_parties =
-            List.map p.other_parties ~f:(fun other_p ->
-                match other_p.authorization with
+            Call_forest.map p.other_parties ~f:(fun other_p ->
+                match other_p.Mina_base.Party.authorization with
                 | Proof _ ->
                     { other_p with
                       authorization =
