@@ -872,7 +872,6 @@ module Make (Inputs : Inputs_intf) = struct
     let a, inclusion_proof =
       Inputs.Ledger.get_account party local_state.ledger
     in
-    let a = h.perform (Init_account { party; account = a }) in
     Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a snapp proof.
@@ -1256,6 +1255,8 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_permissions permissions a in
       (a, local_state)
     in
+    (* Initialize account's pk, in case it is new. *)
+    let a = h.perform (Init_account { party; account = a }) in
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
