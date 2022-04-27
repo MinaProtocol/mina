@@ -25,11 +25,6 @@ module Flags = struct
            (Currency.Fee.to_formatted_string min_fee))
       (Param.optional txn_fee)
 
-  let zkapp_account_key =
-    Param.flag "--zkapp-account-key"
-      ~doc:"PUBLIC KEY Base58 encoded public key of the new zkApp account"
-      Param.(required public_key_compressed)
-
   let amount =
     Param.flag "--receiver-amount" ~doc:"NN Receiver amount in Mina"
       (Param.required txn_amount)
@@ -58,11 +53,11 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo ()
+  let create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo ()
       =
     let open Deferred.Let_syntax in
     let%map parties =
-      create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
+      create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
         ~memo
     in
     Util.print_snapp_transaction parties ;
@@ -73,7 +68,7 @@ let create_zkapp_account =
     Command.async
       ~summary:"Generate a zkApp transaction that creates a zkApp account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
@@ -83,14 +78,14 @@ let create_zkapp_account =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo))
+       create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo))
 
-let upgrade_snapp =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+let upgrade_zkapp =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~verification_key ~zkapp_uri ~auth () =
     let open Deferred.Let_syntax in
     let%map parties =
-      upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~verification_key ~zkapp_uri ~auth
     in
     Util.print_snapp_transaction parties ;
@@ -101,9 +96,9 @@ let upgrade_snapp =
     Command.async
       ~summary:"Generate a zkApp transaction that updates the verification key"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file for the account to be upgraded"
            Param.(required string)
        and verification_key =
          Param.flag "--verification-key"
@@ -126,7 +121,7 @@ let upgrade_snapp =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~verification_key ~zkapp_uri ~auth))
 
 let transfer_funds =
@@ -195,11 +190,11 @@ let transfer_funds =
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers))
 
 let update_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       () =
     let open Deferred.Let_syntax in
     let%map parties =
-      update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state
+      update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     in
     Util.print_snapp_transaction parties ;
     ()
@@ -209,9 +204,9 @@ let update_state =
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file for account to get the updated state"
            Param.(required string)
        and app_state =
          Param.flag "--zkapp-state"
@@ -225,7 +220,7 @@ let update_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state))
 
 let update_zkapp_uri =
@@ -242,21 +237,21 @@ let update_zkapp_uri =
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a zkApp transaction that updates the zkApp uri"
+      ~summary:"Generate a zkApp transaction that updates the zkApp URI"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file to get the updated zkApp URI"
            Param.(required string)
        and zkapp_uri =
          Param.flag "--zkapp-uri"
-           ~doc:"SNAPP_URI The string to be used as the updated zkApp uri"
+           ~doc:"SNAPP_URI The string to be used as the updated zkApp URI"
            Param.(required string)
        and auth =
          Param.flag "--auth"
            ~doc:
              "Proof|Signature|Either|None Current authorization in the account \
-              to change the zkApp uri"
+              to change the zkApp URI"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -286,7 +281,9 @@ let update_sequence_state =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:
+             "KEYFILE Private key file for the account to get the updated \
+              sequence state"
            Param.(required string)
        and sequence_state0 =
          Param.flag "--sequence-state0"
@@ -353,7 +350,9 @@ let update_token_symbol =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:
+             "KEYFILE Private key file for the account to get the updated \
+              token symbol"
            Param.(required string)
        and token_symbol =
          Param.flag "--token-symbol"
@@ -395,7 +394,9 @@ let update_permissions =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:
+             "KEYFILE Private key file for the account to get the updated \
+              permissions"
            Param.(required string)
        and edit_state =
          Param.flag "--edit-state" ~doc:"Proof|Signature|Either|None"
@@ -461,7 +462,7 @@ let update_permissions =
          ~permissions
          ~current_auth:(Util.auth_of_string current_auth)))
 
-let test_snapp_with_genesis_ledger =
+let test_zkapp_with_genesis_ledger =
   Command.(
     let open Let_syntax in
     Command.async
@@ -474,7 +475,7 @@ let test_snapp_with_genesis_ledger =
              "KEYFILE Private key file for the fee payer of the transaction \
               (should be in the genesis ledger)"
            Param.(required string)
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
@@ -484,18 +485,18 @@ let test_snapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file))
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)
-  ; ("upgrade-zkapp", upgrade_snapp)
+  ; ("upgrade-zkapp", upgrade_zkapp)
   ; ("transfer-funds", transfer_funds)
   ; ("update-state", update_state)
   ; ("update-zkapp-uri", update_zkapp_uri)
   ; ("update-sequence-state", update_sequence_state)
   ; ("update-token-symbol", update_token_symbol)
   ; ("update-permissions", update_permissions)
-  ; ("test-zkapp-with-genesis-ledger", test_snapp_with_genesis_ledger)
+  ; ("test-zkapp-with-genesis-ledger", test_zkapp_with_genesis_ledger)
   ]
 
 let () =
