@@ -670,8 +670,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SendTestSnappInput",
-          "description": "Parties for a test snapp",
+          "name": "SendTestZkappInput",
+          "description": "Parties for a test zkApp",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -820,7 +820,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -828,7 +828,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountPrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -960,79 +976,21 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyPredicatedFeePayerInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "predicate",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "body",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
+                  "name": "ProtocolStatePreconditionInput",
                   "ofType": null
                 }
               },
               "defaultValue": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1056,7 +1014,7 @@
           "description": null,
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -1064,7 +1022,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "FeePayerPartyBodyInput",
                   "ofType": null
                 }
               },
@@ -1090,14 +1048,14 @@
           ],
           "inputFields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayerInput",
+                  "name": "FeePayerPartyBodyInput",
                   "ofType": null
                 }
               },
@@ -1296,7 +1254,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -1462,7 +1420,7 @@
               "defaultValue": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1756,7 +1714,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -1842,7 +1800,7 @@
               "defaultValue": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "defaultValue": null
@@ -2168,7 +2126,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochLedgerPredicateInput",
+          "name": "EpochLedgerPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2288,7 +2246,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "EpochDataPredicateInput",
+          "name": "EpochDataPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2300,7 +2258,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2353,7 +2311,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochLedgerPredicateInput",
+                  "name": "EpochLedgerPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2394,7 +2352,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ProtocolStatePredicateInput",
+          "name": "ProtocolStatePreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2486,7 +2444,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2502,7 +2460,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2585,7 +2543,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2599,10 +2557,318 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "EpochDataPredicateInput",
+                  "name": "EpochDataPreconditionInput",
                   "ofType": null
                 }
               },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "BalanceIntervalInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "NonceIntervalInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "AccountPreconditionInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "balance",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BalanceIntervalInput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "NonceIntervalInput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "receiptChainHash",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "publicKey",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "delegate",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "state",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sequenceState",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "provedState",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "balance",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "BalanceIntervalInput",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "nonce",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "NonceIntervalInput",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "receiptChainHash",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "publicKey",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "delegate",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "state",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "Field",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "sequenceState",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "provedState",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "defaultValue": null
             }
           ],
@@ -2788,7 +3054,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -2796,7 +3062,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountPrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2813,6 +3095,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -2976,14 +3274,28 @@
               "defaultValue": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePredicateInput",
+                  "name": "ProtocolStatePreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "accountPrecondition",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AccountPreconditionInput",
                   "ofType": null
                 }
               },
@@ -3002,382 +3314,16 @@
                 }
               },
               "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "BalanceIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Balance",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             },
             {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Balance",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
+              "name": "caller",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Balance",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Balance",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "NonceIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "AccountPredicateInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "balance",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BalanceIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nonce",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "NonceIntervalInput",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "receiptChainHash",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "delegate",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "state",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "Field",
-                    "ofType": null
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "sequenceState",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "provedState",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "balance",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "BalanceIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "nonce",
-              "description": null,
-              "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "NonceIntervalInput",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "receiptChainHash",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "publicKey",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "delegate",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "state",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "Field",
-                    "ofType": null
-                  }
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "sequenceState",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "provedState",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "SnappPartyPredicatedInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "predicate",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "body",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "predicate",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountPredicateInput",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -3450,7 +3396,7 @@
           "description": "A party to a zkApp transaction",
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -3458,7 +3404,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -3484,14 +3430,14 @@
           ],
           "inputFields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "SnappPartyPredicatedInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -3636,7 +3582,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SendSnappInput",
+          "name": "SendZkappInput",
           "description": null,
           "fields": [
             {
@@ -3678,19 +3624,19 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SendSnappPayload",
+          "name": "SendZkappPayload",
           "description": null,
           "fields": [
             {
-              "name": "snapp",
-              "description": "snapp transaction that was sent",
+              "name": "zkapp",
+              "description": "zkApp transaction that was sent",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappCommand",
+                  "name": "ZkappCommand",
                   "ofType": null
                 }
               },
@@ -4961,8 +4907,8 @@
               "deprecationReason": null
             },
             {
-              "name": "sendSnapp",
-              "description": "Send a snapp transaction",
+              "name": "sendZkapp",
+              "description": "Send a zkApp transaction",
               "args": [
                 {
                   "name": "input",
@@ -4972,7 +4918,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SendSnappInput",
+                      "name": "SendZkappInput",
                       "ofType": null
                     }
                   },
@@ -4984,7 +4930,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -4992,9 +4938,9 @@
               "deprecationReason": null
             },
             {
-              "name": "mockSnapp",
+              "name": "mockZkapp",
               "description":
-                "Mock a snapp transaction, no effect on blockchain",
+                "Mock a zkApp transaction, no effect on blockchain",
               "args": [
                 {
                   "name": "input",
@@ -5004,7 +4950,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "SendSnappInput",
+                      "name": "SendZkappInput",
                       "ofType": null
                     }
                   },
@@ -5016,7 +4962,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -5024,8 +4970,8 @@
               "deprecationReason": null
             },
             {
-              "name": "internalSendSnapp",
-              "description": "Send a snapp (for internal testing purposes)",
+              "name": "internalSendZkapp",
+              "description": "Send a zkApp (for internal testing purposes)",
               "args": [
                 {
                   "name": "parties",
@@ -5035,7 +4981,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "SendTestSnappInput",
+                      "name": "SendTestZkappInput",
                       "ofType": null
                     }
                   },
@@ -5047,7 +4993,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SendSnappPayload",
+                  "name": "SendZkappPayload",
                   "ofType": null
                 }
               },
@@ -5361,16 +5307,6 @@
           ],
           "inputFields": null,
           "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "JSON",
-          "description": "Arbitrary JSON",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -6711,6 +6647,50 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "PartiesFailureReason",
+          "description": null,
+          "fields": [
+            {
+              "name": "index",
+              "description": "List index of the party that failed",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "failures",
+              "description":
+                "Failure reason for the party or any nested parties",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Memo",
           "description": null,
@@ -6853,7 +6833,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AccountPredicate",
+          "name": "AccountPrecondition",
           "description": null,
           "fields": [
             {
@@ -7177,7 +7157,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -7185,7 +7165,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
+                  "name": "ProtocolStatePrecondition",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountPrecondition",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountPrecondition",
                   "ofType": null
                 }
               },
@@ -7207,44 +7203,17 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "SnappPartyPredicated",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "PartyBody",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "caller",
               "description": null,
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "AccountPredicate",
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -7263,7 +7232,7 @@
           "description": "A party to a zkApp transaction",
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -7271,7 +7240,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "SnappPartyPredicated",
+                  "name": "PartyBody",
                   "ofType": null
                 }
               },
@@ -7312,7 +7281,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochLedgerPredicate",
+          "name": "EpochLedgerPrecondition",
           "description": null,
           "fields": [
             {
@@ -7343,7 +7312,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EpochDataPredicate",
+          "name": "EpochDataPrecondition",
           "description": null,
           "fields": [
             {
@@ -7355,7 +7324,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochLedgerPredicate",
+                  "name": "EpochLedgerPrecondition",
                   "ofType": null
                 }
               },
@@ -7588,7 +7557,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ProtocolStatePredicate",
+          "name": "ProtocolStatePrecondition",
           "description": null,
           "fields": [
             {
@@ -7680,7 +7649,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -7696,7 +7665,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EpochDataPredicate",
+                  "name": "EpochDataPrecondition",
                   "ofType": null
                 }
               },
@@ -7962,7 +7931,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description": null,
               "args": [],
               "type": {
@@ -8158,7 +8127,7 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
@@ -8351,7 +8320,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolState",
+              "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8359,34 +8328,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePredicate",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ZkappPartyPredicatedFeePayer",
-          "description": null,
-          "fields": [
-            {
-              "name": "body",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "FeePayerPartyBody",
+                  "name": "ProtocolStatePrecondition",
                   "ofType": null
                 }
               },
@@ -8394,7 +8336,7 @@
               "deprecationReason": null
             },
             {
-              "name": "predicate",
+              "name": "accountPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8421,7 +8363,7 @@
           "description": null,
           "fields": [
             {
-              "name": "data",
+              "name": "body",
               "description": null,
               "args": [],
               "type": {
@@ -8429,7 +8371,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappPartyPredicatedFeePayer",
+                  "name": "FeePayerPartyBody",
                   "ofType": null
                 }
               },
@@ -8527,7 +8469,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "SnappCommand",
+          "name": "ZkappCommand",
           "description": null,
           "fields": [
             {
@@ -8544,7 +8486,7 @@
             },
             {
               "name": "hash",
-              "description": "A cryptographic hash of the snapp command",
+              "description": "A cryptographic hash of the zkApp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8577,9 +8519,17 @@
             {
               "name": "failureReason",
               "description":
-                "The reason for the snapp transaction failure; null means success or the status is unknown",
+                "The reason for the zkApp transaction failure; null means success or the status is unknown",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "PartiesFailureReason",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -9604,8 +9554,8 @@
               "deprecationReason": null
             },
             {
-              "name": "snappCommands",
-              "description": "List of snapp commands included in this block",
+              "name": "zkappCommands",
+              "description": "List of zkApp commands included in this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9618,7 +9568,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappCommand",
+                      "name": "ZkappCommand",
                       "ofType": null
                     }
                   }
@@ -9684,6 +9634,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "JSON",
+          "description": "Arbitrary JSON",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
@@ -9693,6 +9653,14 @@
               "description": "Base-64 encoded proof",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "json",
+              "description": "JSON-encoded proof",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "JSON", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -10560,6 +10528,49 @@
         },
         {
           "kind": "OBJECT",
+          "name": "MerklePathElement",
+          "description": null,
+          "fields": [
+            {
+              "name": "isRightBranch",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "otherHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "NetworkPeerPayload",
           "description": null,
           "fields": [
@@ -10781,7 +10792,7 @@
           "fields": [
             {
               "name": "editState",
-              "description": "Authorization required to edit snapp state",
+              "description": "Authorization required to edit zkApp state",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10862,7 +10873,7 @@
             {
               "name": "setVerificationKey",
               "description":
-                "Authorization required to set the verification key of the snapp associated with the account",
+                "Authorization required to set the verification key of the zkApp associated with the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10877,9 +10888,9 @@
               "deprecationReason": null
             },
             {
-              "name": "setSnappUri",
+              "name": "setZkappUri",
               "description":
-                "Authorization required to change the URI of the snapp associated with the account ",
+                "Authorization required to change the URI of the zkApp associated with the account ",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11393,18 +11404,18 @@
               "deprecationReason": null
             },
             {
-              "name": "snappUri",
+              "name": "zkappUri",
               "description":
-                "The URI associated with this account, usually pointing to the snapp source code",
+                "The URI associated with this account, usually pointing to the zkApp source code",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "snappState",
+              "name": "zkappState",
               "description":
-                "The 8 field elements comprising the snapp state associated with this account encoded as bignum strings",
+                "The 8 field elements comprising the zkApp state associated with this account encoded as bignum strings",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -13006,6 +13017,52 @@
               "deprecationReason": null
             },
             {
+              "name": "accountMerklePath",
+              "description": "Get the merkle path for an account",
+              "args": [
+                {
+                  "name": "token",
+                  "description":
+                    "Token of account being retrieved (defaults to MINA)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "TokenId",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "MerklePathElement",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "tokenOwner",
               "description": "Find the account ID that owns a given token",
               "args": [
@@ -13248,13 +13305,13 @@
               "deprecationReason": null
             },
             {
-              "name": "pooledSnappCommands",
+              "name": "pooledZkappCommands",
               "description":
-                "Retrieve all the scheduled snapp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
+                "Retrieve all the scheduled zkApp commands for a specified sender that the current daemon sees in its transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "ids",
-                  "description": "Ids of snapp commands",
+                  "description": "Ids of zkApp commands",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13273,7 +13330,7 @@
                 {
                   "name": "hashes",
                   "description":
-                    "Hashes of the snapp commands to find in the pool",
+                    "Hashes of the zkApp commands to find in the pool",
                   "type": {
                     "kind": "LIST",
                     "name": null,
@@ -13292,7 +13349,7 @@
                 {
                   "name": "publicKey",
                   "description":
-                    "Public key of sender of pooled snapp commands",
+                    "Public key of sender of pooled zkApp commands",
                   "type": {
                     "kind": "SCALAR",
                     "name": "PublicKey",
@@ -13312,7 +13369,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "SnappCommand",
+                      "name": "ZkappCommand",
                       "ofType": null
                     }
                   }
@@ -13326,8 +13383,8 @@
               "description": "Get the status of a transaction",
               "args": [
                 {
-                  "name": "snappTransaction",
-                  "description": "Id of a snapp transaction",
+                  "name": "zkappTransaction",
+                  "description": "Id of a zkApp transaction",
                   "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
                   "defaultValue": null
                 },
@@ -13646,6 +13703,23 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockchainVerificationKey",
+              "description":
+                "The pickles verification key for the protocol state proof",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
                   "ofType": null
                 }
               },

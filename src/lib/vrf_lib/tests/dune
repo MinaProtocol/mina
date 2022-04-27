@@ -26,7 +26,9 @@
    crypto_params
    backend
    kimchi_backend
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    kimchi_pasta
    snarky_field_extensions
    tuple_lib

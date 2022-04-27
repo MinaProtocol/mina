@@ -8,9 +8,7 @@ open Mina_transition
 open Network_peer
 
 let validate_transition ~consensus_constants ~logger ~frontier
-    ~unprocessed_transition_cache
-    (enveloped_transition :
-      External_transition.Initial_validated.t Envelope.Incoming.t) =
+    ~unprocessed_transition_cache enveloped_transition =
   let open Result.Let_syntax in
   let transition =
     Envelope.Incoming.data enveloped_transition
@@ -53,15 +51,18 @@ let validate_transition ~consensus_constants ~logger ~frontier
 let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
     ~transition_reader
     ~(valid_transition_writer :
-       ( ( External_transition.Initial_validated.t Envelope.Incoming.t
-         , State_hash.t )
-         Cached.t
+       ( [ `Block of
+           ( External_transition.Initial_validated.t Envelope.Incoming.t
+           , State_hash.t )
+           Cached.t ]
+         * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
        , drop_head buffered
        , unit )
        Writer.t) ~unprocessed_transition_cache =
   let module Lru = Core_extended_cache.Lru in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Reader.iter transition_reader ~f:(fun transition_env ->
+      Reader.iter transition_reader
+        ~f:(fun (`Block transition_env, `Valid_cb vc) ->
           let transition_with_hash, _ = Envelope.Incoming.data transition_env in
           let transition_hash =
             State_hash.With_state_hashes.state_hash transition_with_hash
@@ -93,7 +94,8 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                 (Core_kernel.Time.diff
                    Block_time.(now time_controller |> to_time)
                    transition_time) ;
-              Writer.write valid_transition_writer cached_transition
+              Writer.write valid_transition_writer
+                (`Block cached_transition, `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Sent_old_gossip

@@ -1,7 +1,7 @@
 (library
- (public_name kimchi.pasta_fq_poseidon)
+ (public_name kimchi_bindings.pasta_fq_poseidon)
  (name kimchi_pasta_fq_poseidon)
- (libraries kimchi)
+ (libraries kimchi_bindings)
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess (pps ppx_version ppx_inline_test)))

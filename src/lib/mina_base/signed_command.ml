@@ -145,11 +145,13 @@ module Gen = struct
 
   module Payment = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?nonce ~max_amount ~fee_range () =
+        ?nonce ?(min_amount = 1) ~max_amount ~fee_range () =
       gen_inner sign' ~key_gen ?nonce ~fee_range
       @@ fun { public_key = signer; _ } { public_key = receiver; _ } ->
       let open Quickcheck.Generator.Let_syntax in
-      let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
+      let%map amount =
+        Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+      in
       Signed_command_payload.Body.Payment
         { receiver_pk = Public_key.compress receiver
         ; source_pk = Public_key.compress signer
@@ -163,10 +165,10 @@ module Gen = struct
       | `Real ->
           gen_inner sign
 
-    let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-        ~fee_range =
+    let gen_with_random_participants ?sign_type ~keys ?nonce ?min_amount
+        ~max_amount ~fee_range =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
-          gen ?sign_type ~key_gen ?nonce ~max_amount ~fee_range)
+          gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ~fee_range)
   end
 
   module Stake_delegation = struct

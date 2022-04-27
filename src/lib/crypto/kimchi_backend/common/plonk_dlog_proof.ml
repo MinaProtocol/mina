@@ -48,7 +48,7 @@ module type Inputs_intf = sig
       include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = Base_field.t Kimchi.Foundations.or_infinity
+        type t = Base_field.t Kimchi_types.or_infinity
       end
 
       val of_backend :
@@ -63,7 +63,7 @@ module type Inputs_intf = sig
     type t = Base_field.t Poly_comm.t
 
     module Backend : sig
-      type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
+      type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
     end
 
     val of_backend_with_degree_bound : Backend.t -> t
@@ -74,12 +74,11 @@ module type Inputs_intf = sig
   end
 
   module Opening_proof_backend : sig
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
   end
 
   module Evaluations_backend : sig
-    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
+    type t = Scalar_field.t Kimchi_types.proof_evaluations
   end
 
   module Index : sig
@@ -91,8 +90,7 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.prover_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.prover_proof
 
     val create :
          Index.t
@@ -313,8 +311,8 @@ module Make (Inputs : Inputs_intf) = struct
         Array.of_list_map chal_polys
           ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
             ( challenges
-            , { Kimchi.Protocol.shifted = None
-              ; unshifted = [| Kimchi.Foundations.Finite (x, y) |]
+            , { Kimchi_types.shifted = None
+              ; unshifted = [| Kimchi_types.Finite (x, y) |]
               } ))
     }
 

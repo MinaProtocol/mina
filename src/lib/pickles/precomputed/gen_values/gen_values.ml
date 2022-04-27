@@ -34,7 +34,7 @@ let vesta =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "vesta %d" i (fun () ->
-              Kimchi.Protocol.SRS.Fp.lagrange_commitment
+              Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
                 domain_size i)
           |> Kimchi_pasta.Pasta.Fp_poly_comm.of_backend_without_degree_bound
@@ -49,7 +49,7 @@ let pallas =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "pallas %d" i (fun () ->
-              Kimchi.Protocol.SRS.Fq.lagrange_commitment
+              Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
                 domain_size i)
           |> Kimchi_pasta.Pasta.Fq_poly_comm.of_backend_without_degree_bound

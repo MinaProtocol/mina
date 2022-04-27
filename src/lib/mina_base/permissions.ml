@@ -314,7 +314,7 @@ module Poly = struct
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
-        ; set_snapp_uri : 'controller
+        ; set_zkapp_uri : 'controller
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
@@ -329,7 +329,7 @@ module Poly = struct
     Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
       ~send:(f controller) ~set_delegate:(f controller)
       ~set_permissions:(f controller) ~set_verification_key:(f controller)
-      ~receive:(f controller) ~set_snapp_uri:(f controller)
+      ~receive:(f controller) ~set_zkapp_uri:(f controller)
       ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
@@ -363,7 +363,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_delegate = auth_required_gen in
   let%bind set_permissions = auth_required_gen in
   let%bind set_verification_key = auth_required_gen in
-  let%bind set_snapp_uri = auth_required_gen in
+  let%bind set_zkapp_uri = auth_required_gen in
   let%bind edit_sequence_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
@@ -375,7 +375,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; set_delegate
     ; set_permissions
     ; set_verification_key
-    ; set_snapp_uri
+    ; set_zkapp_uri
     ; edit_sequence_state
     ; set_token_symbol
     ; increment_nonce
@@ -397,7 +397,7 @@ module Checked = struct
     in
     let c = g Auth_required.Checked.if_ in
     Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
-      ~set_permissions:c ~set_verification_key:c ~set_snapp_uri:c
+      ~set_permissions:c ~set_verification_key:c ~set_zkapp_uri:c
       ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
       ~set_voting_for:c
 
@@ -405,7 +405,7 @@ module Checked = struct
     let open Core_kernel.Field in
     let a f = Auth_required.Checked.constant (get f t) in
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
-      ~set_permissions:a ~set_verification_key:a ~set_snapp_uri:a
+      ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
       ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
       ~set_voting_for:a
 end
@@ -439,7 +439,7 @@ let user_default : t =
   ; set_delegate = Signature
   ; set_permissions = Signature
   ; set_verification_key = Signature
-  ; set_snapp_uri = Signature
+  ; set_zkapp_uri = Signature
   ; edit_sequence_state = Signature
   ; set_token_symbol = Signature
   ; increment_nonce = Signature
@@ -453,7 +453,7 @@ let empty : t =
   ; set_delegate = None
   ; set_permissions = None
   ; set_verification_key = None
-  ; set_snapp_uri = None
+  ; set_zkapp_uri = None
   ; edit_sequence_state = None
   ; set_token_symbol = None
   ; increment_nonce = None
@@ -488,29 +488,29 @@ let auth_required_of_string = function
       failwith "auth_required_of_string: unknown variant"
 
 let auth_required =
-  Fields_derivers_snapps.Derivers.iso_string ~name:"AuthRequired"
+  Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
     ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
     ~of_string:auth_required_of_string
 
 let deriver obj =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
-    ~set_snapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
+    ~set_zkapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
     ~set_voting_for:!.auth_required
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 let%test_unit "json roundtrip" =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let full = o () in
   let _a = deriver full in
   [%test_eq: t] user_default (user_default |> to_json full |> of_json full)
 
 let%test_unit "json value" =
-  let open Fields_derivers_snapps.Derivers in
+  let open Fields_derivers_zkapps.Derivers in
   let full = o () in
   let _a = deriver full in
   [%test_eq: string]
@@ -522,7 +522,7 @@ let%test_unit "json value" =
         setDelegate: "Signature",
         setPermissions: "Signature",
         setVerificationKey: "Signature",
-        setSnappUri: "Signature",
+        setZkappUri: "Signature",
         editSequenceState: "Signature",
         setTokenSymbol: "Signature",
         incrementNonce: "Signature",

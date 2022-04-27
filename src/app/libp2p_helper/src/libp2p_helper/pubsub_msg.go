@@ -130,6 +130,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	}
 	subId := subId_.Id()
 
+	// Join is a misleading name, it actually only creates a new topic handle
 	topic, err := app.P2p.Pubsub.Join(topicName)
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
@@ -138,6 +139,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.Topics[topicName] = topic
 
 	err = app.P2p.Pubsub.RegisterTopicValidator(topicName, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
+		app.P2p.Logger.Debugf("Received gossip message on topic %s from %s", topicName, id.Pretty())
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")

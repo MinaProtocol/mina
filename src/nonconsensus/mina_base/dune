@@ -17,7 +17,7 @@
    integers
    base_quickcheck
    ;;local libraries
-   fields_derivers_snapps_nonconsensus
+   fields_derivers_zkapps_nonconsensus
    sgn_nonconsensus
    mina_base_nonconsensus.import
    random_oracle_nonconsensus

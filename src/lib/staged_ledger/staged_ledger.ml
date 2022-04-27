@@ -244,7 +244,7 @@ module T = struct
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
-      ; local_state = Mina_state.Local_state.empty
+      ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
     in
@@ -281,7 +281,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -307,7 +307,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -516,7 +516,7 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let empty_local_state = Mina_state.Local_state.empty in
+    let empty_local_state = Mina_state.Local_state.empty () in
     let%map applied_txn =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
@@ -1001,7 +1001,7 @@ module T = struct
       =
     ((a :> Transaction.t With_status.t list), b, c, d)
 
-  [%%if feature_snapps]
+  [%%if feature_zkapps]
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let cs =
@@ -1987,7 +1987,7 @@ let%test_module "staged ledger tests" =
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk)
-        ~(current_state_view : Snapp_predicate.Protocol_state.View.t)
+        ~(current_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~state_and_body_hash sl txns stmt_to_work =
       let open Deferred.Let_syntax in
       let supercharge_coinbase =
@@ -2392,20 +2392,20 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps ~iters ~num_snapps :
+    let gen_zkapps ~iters ~num_zkapps :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_snapps ()
+          ~length:num_zkapps ()
       in
-      let snapps =
+      let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
-                Party.Predicated.of_fee_payer parties.fee_payer.data
-                |> Party.Predicated.digest
+                Party.of_fee_payer parties.fee_payer
+                |> Parties.Digest.Party.create
               in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -2419,13 +2419,10 @@ let%test_module "staged ledger tests" =
                 { parties.fee_payer with authorization = fee_payer_signature }
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
-              let other_parties_hash =
-                Parties.Call_forest.With_hashes.other_parties_hash
-                  parties.other_parties
-              in
+              let other_parties_hash = Parties.other_parties_hash parties in
               let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
-                  Snapp_predicate.Protocol_state.digest protocol_state
+                  Zkapp_precondition.Protocol_state.digest protocol_state
                 in
                 let tx_commitment =
                   Parties.Transaction_commitment.create ~other_parties_hash
@@ -2444,12 +2441,12 @@ let%test_module "staged ledger tests" =
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
-                List.map parties.other_parties
-                  ~f:(fun { data; authorization } ->
+                Parties.Call_forest.map parties.other_parties
+                  ~f:(fun ({ body; authorization } : Party.t) ->
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
-                          let pk = data.body.public_key in
+                          let pk = body.public_key in
                           let sk =
                             match
                               Signature_lib.Public_key.Compressed.Map.find
@@ -2465,20 +2462,19 @@ let%test_module "staged ledger tests" =
                                    .to_base58_check pk)
                                   ()
                           in
-                          let use_full_commitment =
-                            data.body.use_full_commitment
-                          in
+                          let use_full_commitment = body.use_full_commitment in
                           let signature =
                             sign_for_other_party ~use_full_commitment sk
-                              data.body.protocol_state
+                              body.protocol_state_precondition
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->
                           authorization
                     in
-                    { Party.data
-                    ; authorization = authorization_with_valid_signature
-                    })
+                    ( { body
+                      ; authorization = authorization_with_valid_signature
+                      }
+                      : Party.t ))
               in
               let parties' =
                 { parties with
@@ -2490,18 +2486,18 @@ let%test_module "staged ledger tests" =
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command")
       in
-      assert (List.length snapps = num_snapps) ;
-      return (ledger, snapps, List.init iters ~f:(Fn.const None))
+      assert (List.length zkapps = num_zkapps) ;
+      return (ledger, zkapps, List.init iters ~f:(Fn.const None))
 
-    let gen_snapps_at_capacity :
+    let gen_zkapps_at_capacity :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
-      let num_snapps = transaction_capacity * iters in
-      gen_snapps ~num_snapps ~iters
+      let num_zkapps = transaction_capacity * iters in
+      gen_zkapps ~num_zkapps ~iters
 
-    let gen_snapps_below_capacity ?(extra_blocks = false) () :
+    let gen_zkapps_below_capacity ?(extra_blocks = false) () :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -2510,12 +2506,12 @@ let%test_module "staged ledger tests" =
       in
       let%bind iters = Int.gen_incl 1 iters_max in
       (* see comment in gen_below_capacity for rationale *)
-      let%bind snapps_per_iter =
+      let%bind zkapps_per_iter =
         Quickcheck.Generator.list_with_length iters
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
-      let num_snapps = List.fold snapps_per_iter ~init:0 ~f:( + ) in
-      gen_snapps ~num_snapps ~iters
+      let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
+      gen_zkapps ~num_zkapps ~iters
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2586,15 +2582,15 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
-    let%test_unit "Max_throughput (snapps)" =
+    let%test_unit "Max_throughput (zkapps)" =
       (* limit trials to prevent too-many-open-files failure *)
-      Quickcheck.test ~trials:3 gen_snapps_at_capacity
-        ~f:(fun (ledger, snapps, iters) ->
+      Quickcheck.test ~trials:3 gen_zkapps_at_capacity
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `Many_provers
+              test_simple account_ids zkapps iters sl test_mask `Many_provers
                 stmt_to_work_random_prover))
 
     let%test_unit "Be able to include random number of commands" =
@@ -2605,14 +2601,14 @@ let%test_module "staged ledger tests" =
                 (init_pks ledger_init_state)
                 cmds iters sl test_mask `Many_provers stmt_to_work_random_prover))
 
-    let%test_unit "Be able to include random number of commands (snapps)" =
-      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
-        ~f:(fun (ledger, snapps, iters) ->
+    let%test_unit "Be able to include random number of commands (zkapps)" =
+      Quickcheck.test (gen_zkapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `Many_provers
+              test_simple account_ids zkapps iters sl test_mask `Many_provers
                 stmt_to_work_random_prover))
 
     let%test_unit "Be able to include random number of commands (One prover)" =
@@ -2624,14 +2620,14 @@ let%test_module "staged ledger tests" =
                 cmds iters sl test_mask `One_prover stmt_to_work_one_prover))
 
     let%test_unit "Be able to include random number of commands (One prover, \
-                   snapps)" =
-      Quickcheck.test (gen_snapps_below_capacity ()) ~trials:4
-        ~f:(fun (ledger, snapps, iters) ->
+                   zkapps)" =
+      Quickcheck.test (gen_zkapps_below_capacity ()) ~trials:4
+        ~f:(fun (ledger, zkapps, iters) ->
           async_with_given_ledger ledger (fun sl test_mask ->
               let account_ids =
                 Ledger.accounts ledger |> Account_id.Set.to_list
               in
-              test_simple account_ids snapps iters sl test_mask `One_prover
+              test_simple account_ids zkapps iters sl test_mask `One_prover
                 stmt_to_work_one_prover))
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
@@ -3218,7 +3214,7 @@ let%test_module "staged ledger tests" =
         -> int option list
         -> int list
         -> (State_hash.t * State_body_hash.t) list
-        -> Mina_base.Snapp_predicate.Protocol_state.View.t
+        -> Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Sl.t ref
         -> Ledger.Mask.Attached.t
         -> [ `One_prover | `Many_provers ]
@@ -3668,8 +3664,9 @@ let%test_module "staged ledger tests" =
                       { data = invalid_command
                       ; status =
                           Transaction_status.Failed
-                            ( Transaction_status.Failure
-                              .Amount_insufficient_to_create_account
+                            ( Transaction_status.Failure.(
+                                Collection.of_single_failure
+                                  Amount_insufficient_to_create_account)
                             , Transaction_status.Balance_data.
                                 { fee_payer_balance = None
                                 ; source_balance = None

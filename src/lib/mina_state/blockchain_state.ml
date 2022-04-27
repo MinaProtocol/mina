@@ -125,7 +125,7 @@ let negative_one
   ; registers =
       { ledger = genesis_ledger_hash
       ; pending_coinbase_stack = ()
-      ; local_state = Local_state.dummy
+      ; local_state = Local_state.dummy ()
       }
   ; timestamp = consensus_constants.genesis_state_timestamp
   }

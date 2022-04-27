@@ -464,7 +464,7 @@ struct
     let next_statement : _ Types.Step.Statement.t =
       let unfinalized_proofs_extended =
         Vector.extend unfinalized_proofs lte Max_branching.n
-          Unfinalized.Constant.dummy
+          (Unfinalized.Constant.dummy ())
       in
       let pass_through =
         let module M =

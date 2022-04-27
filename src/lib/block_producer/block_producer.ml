@@ -733,7 +733,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     let previous_state_hash =
                       (Protocol_state.hashes previous_protocol_state).state_hash
                     in
-                    let delta_transition_chain_proof =
+                    let delta_block_chain_proof =
                       Transition_chain_prover.prove
                         ~length:
                           (Mina_numbers.Length.to_int consensus_constants.delta)
@@ -745,12 +745,14 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                       External_transition.Validation.wrap
                         { With_hash.hash = protocol_state_hashes
                         ; data =
-                            External_transition.create ~protocol_state
-                              ~protocol_state_proof ~staged_ledger_diff
-                              ~validation_callback:
-                                (Mina_net2.Validation_callback
-                                 .create_without_expiration ())
-                              ~delta_transition_chain_proof ()
+                            (let body = Body.create staged_ledger_diff in
+                             Block.create ~body
+                               ~header:
+                                 (Header.create
+                                    ~body_reference:
+                                      (Body_reference.of_body body)
+                                    ~protocol_state ~protocol_state_proof
+                                    ~delta_block_chain_proof ()))
                         }
                       |> External_transition.skip_time_received_validation
                            `This_transition_was_not_received_via_gossip
@@ -1161,7 +1163,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
-      ; delta_transition_chain_proof
+      ; delta_transition_chain_proof = delta_block_chain_proof
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1224,12 +1226,13 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             External_transition.Validation.wrap
               { With_hash.hash = protocol_state_hashes
               ; data =
-                  External_transition.create ~protocol_state
-                    ~protocol_state_proof ~staged_ledger_diff
-                    ~validation_callback:
-                      (Mina_net2.Validation_callback.create_without_expiration
-                         ())
-                    ~delta_transition_chain_proof ()
+                  (let body = Body.create staged_ledger_diff in
+                   Block.create ~body
+                     ~header:
+                       (Header.create
+                          ~body_reference:(Body_reference.of_body body)
+                          ~protocol_state ~protocol_state_proof
+                          ~delta_block_chain_proof ()))
               }
             |> External_transition.skip_time_received_validation
                  `This_transition_was_not_received_via_gossip

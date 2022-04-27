@@ -19,6 +19,8 @@
    pickles_types
    kimchi_backend.common
    promise
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    snarkette
 ))

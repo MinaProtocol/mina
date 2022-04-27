@@ -56,6 +56,10 @@ struct GatingConfig {
   isolate @4 :Bool;
 }
 
+struct TopicLevel {
+  topics @0 :List(Text);
+}
+
 struct Libp2pConfig {
   statedir @0 :Text;
   privateKey @1 :Data;
@@ -74,6 +78,7 @@ struct Libp2pConfig {
   minaPeerExchange @14 :Bool;
   minConnections @15 :UInt32;
   knownPrivateIpNets @16 :List(Text);
+  topicConfig @17 :List(TopicLevel);
 }
 
 # Resource status updated

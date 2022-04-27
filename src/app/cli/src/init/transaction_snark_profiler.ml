@@ -164,12 +164,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                       ; source =
                           { ledger = Sparse_ledger.merkle_root sparse_ledger
                           ; pending_coinbase_stack = coinbase_stack_source
-                          ; local_state = Mina_state.Local_state.empty
+                          ; local_state = Mina_state.Local_state.empty ()
                           }
                       ; target =
                           { ledger = Sparse_ledger.merkle_root sparse_ledger'
                           ; pending_coinbase_stack = coinbase_stack_target
-                          ; local_state = Mina_state.Local_state.empty
+                          ; local_state = Mina_state.Local_state.empty ()
                           }
                       ; supply_increase =
                           Transaction.supply_increase t |> Or_error.ok_exn
@@ -237,7 +237,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                 { source = Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~snapp_account1:None ~snapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
@@ -279,7 +279,7 @@ let generate_base_snarks_witness sparse_ledger0
                     Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~snapp_account1:None ~snapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
               }

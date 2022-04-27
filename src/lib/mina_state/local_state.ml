@@ -18,7 +18,7 @@ type display =
 [@@deriving yojson]
 
 let display
-    ({ parties
+    ({ stack_frame
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
@@ -29,12 +29,14 @@ let display
      ; failure_status_tbl
      } :
       t) : display =
+  let open Kimchi_backend.Pasta.Basic in
   let f x =
     Visualization.display_prefix_of_string
-      Kimchi_backend.Pasta.Basic.(Bigint256.to_hex_string (Fp.to_bigint x))
+      (Bigint256.to_hex_string (Fp.to_bigint x))
   in
-  { Mina_transaction_logic.Parties_logic.Local_state.parties = f parties
-  ; call_stack = f call_stack
+  { Mina_transaction_logic.Parties_logic.Local_state.stack_frame =
+      f (stack_frame :> Fp.t)
+  ; call_stack = f (call_stack :> Fp.t)
   ; transaction_commitment = f transaction_commitment
   ; full_transaction_commitment = f full_transaction_commitment
   ; token_id = Token_id.to_string token_id
@@ -49,17 +51,18 @@ let display
       |> Yojson.Safe.to_string
   }
 
-let dummy : t =
-  { parties = Parties.Call_forest.With_hashes.empty
-  ; call_stack = Parties.Call_forest.With_hashes.empty
-  ; transaction_commitment = Parties.Transaction_commitment.empty
-  ; full_transaction_commitment = Parties.Transaction_commitment.empty
-  ; token_id = Token_id.default
-  ; excess = Amount.zero
-  ; ledger = Frozen_ledger_hash.empty_hash
-  ; success = true
-  ; failure_status_tbl = []
-  }
+let dummy : unit -> t =
+  Memo.unit (fun () : t ->
+      { stack_frame = Stack_frame.Digest.create Stack_frame.empty
+      ; call_stack = Call_stack_digest.empty
+      ; transaction_commitment = Parties.Transaction_commitment.empty
+      ; full_transaction_commitment = Parties.Transaction_commitment.empty
+      ; token_id = Token_id.default
+      ; excess = Amount.zero
+      ; ledger = Frozen_ledger_hash.empty_hash
+      ; success = true
+      ; failure_status_tbl = []
+      })
 
 let empty = dummy
 
@@ -68,8 +71,8 @@ let gen : t Quickcheck.Generator.t =
   let%map ledger = Frozen_ledger_hash.gen
   and excess = Amount.gen
   and transaction_commitment = Impl.Field.Constant.gen
-  and parties = Impl.Field.Constant.gen
-  and call_stack = Impl.Field.Constant.gen
+  and stack_frame = Stack_frame.Digest.gen
+  and call_stack = Call_stack_digest.gen
   and token_id = Token_id.gen
   and success =
     Bool.quickcheck_generator
@@ -79,7 +82,7 @@ let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Some failure ]
   *)
   in
-  { Mina_transaction_logic.Parties_logic.Local_state.parties
+  { Mina_transaction_logic.Parties_logic.Local_state.stack_frame
   ; call_stack
   ; transaction_commitment
   ; full_transaction_commitment = transaction_commitment
@@ -91,7 +94,7 @@ let gen : t Quickcheck.Generator.t =
   }
 
 let to_input
-    ({ parties
+    ({ stack_frame
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
@@ -103,9 +106,10 @@ let to_input
      } :
       t) =
   let open Random_oracle.Input.Chunked in
+  let open Pickles.Impls.Step in
   Array.reduce_exn ~f:append
-    [| field parties
-     ; field call_stack
+    [| field (stack_frame :> Field.Constant.t)
+     ; field (call_stack :> Field.Constant.t)
      ; field transaction_commitment
      ; field full_transaction_commitment
      ; Token_id.to_input token_id
@@ -126,7 +130,8 @@ module Checked = struct
           Core_kernel.Field.(eq (get f t1) (get f t2)))
     in
     Mina_transaction_logic.Parties_logic.Local_state.Fields.iter
-      ~parties:(f Field.Assert.equal) ~call_stack:(f Field.Assert.equal)
+      ~stack_frame:(f Stack_frame.Digest.Checked.Assert.equal)
+      ~call_stack:(f Call_stack_digest.Checked.Assert.equal)
       ~transaction_commitment:(f Field.Assert.equal)
       ~full_transaction_commitment:(f Field.Assert.equal)
       ~token_id:(f Token_id.Checked.Assert.equal)
@@ -139,7 +144,8 @@ module Checked = struct
     let ( ! ) f x y = Impl.run_checked (f x y) in
     let f eq acc f = Core_kernel.Field.(eq (get f t1) (get f t2)) :: acc in
     Mina_transaction_logic.Parties_logic.Local_state.Fields.fold ~init:[]
-      ~parties:(f Field.equal) ~call_stack:(f Field.equal)
+      ~stack_frame:(f Stack_frame.Digest.Checked.equal)
+      ~call_stack:(f Call_stack_digest.Checked.equal)
       ~transaction_commitment:(f Field.equal)
       ~full_transaction_commitment:(f Field.equal)
       ~token_id:(f Token_id.Checked.equal)
@@ -148,7 +154,7 @@ module Checked = struct
       ~failure_status_tbl:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
-      ({ parties
+      ({ stack_frame
        ; call_stack
        ; transaction_commitment
        ; full_transaction_commitment
@@ -161,15 +167,16 @@ module Checked = struct
         t) =
     (* failure_status is the unit value, no need to represent it *)
     let open Random_oracle.Input.Chunked in
+    let open Snark_params.Tick.Field.Var in
     Array.reduce_exn ~f:append
-      [| field parties
-       ; field call_stack
+      [| field (stack_frame :> t)
+       ; field (call_stack :> t)
        ; field transaction_commitment
        ; field full_transaction_commitment
        ; Token_id.Checked.to_input token_id
        ; Amount.var_to_input excess
        ; Ledger_hash.var_to_input ledger
-       ; packed ((success :> Snark_params.Tick.Field.Var.t), 1)
+       ; packed ((success :> t), 1)
       |]
 end
 
@@ -188,8 +195,8 @@ let typ : (Checked.t, t) Impl.Typ.t =
   let open Mina_transaction_logic.Parties_logic.Local_state in
   let open Impl in
   Typ.of_hlistable
-    [ Field.typ
-    ; Field.typ
+    [ Stack_frame.Digest.typ
+    ; Call_stack_digest.typ
     ; Field.typ
     ; Field.typ
     ; Token_id.typ

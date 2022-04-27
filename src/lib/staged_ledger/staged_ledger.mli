@@ -125,7 +125,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -143,7 +143,7 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -166,7 +166,7 @@ val create_diff :
   -> t
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

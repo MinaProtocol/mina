@@ -21,8 +21,8 @@ let tick_shifts, tock_shifts =
     in
     fun ~log2_size -> f log2_size
   in
-  ( mk Kimchi.Protocol.VerifierIndex.Fp.shifts
-  , mk Kimchi.Protocol.VerifierIndex.Fq.shifts )
+  ( mk Kimchi_bindings.Protocol.VerifierIndex.Fp.shifts
+  , mk Kimchi_bindings.Protocol.VerifierIndex.Fq.shifts )
 
 let wrap_domains =
   { Domains.h = Pow_2_roots_of_unity 15
@@ -105,14 +105,14 @@ module Shifts = struct
     Shifted_value.Type2.Shift.create (module Tick.Field)
 end
 
-let finite_exn : 'a Kimchi.Foundations.or_infinity -> 'a * 'a = function
+let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Finite (x, y) ->
       (x, y)
   | Infinity ->
       failwith "finite_exn"
 
-let or_infinite_conv :
-    ('a * 'a) Or_infinity.t -> 'a Kimchi.Foundations.or_infinity = function
+let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
+  function
   | Finite (x, y) ->
       Finite (x, y)
   | Infinity ->
@@ -143,7 +143,7 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Kimchi.Protocol.SRS.Fq.b_poly_commitment
+        Kimchi_bindings.Protocol.SRS.Fq.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
@@ -162,7 +162,7 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Kimchi.Protocol.SRS.Fp.b_poly_commitment
+        Kimchi_bindings.Protocol.SRS.Fp.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
@@ -179,7 +179,7 @@ module Ipa = struct
       in
       let urs = Backend.Tick.Keypair.load_urs () in
       Promise.run_in_thread (fun () ->
-          Kimchi.Protocol.SRS.Fp.batch_accumulator_check urs
+          Kimchi_bindings.Protocol.SRS.Fp.batch_accumulator_check urs
             (Array.map comms ~f:or_infinite_conv)
             chals)
   end

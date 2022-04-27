@@ -11,7 +11,7 @@ module type Inputs_intf = sig
       type t = Base_field.t * Base_field.t
 
       module Backend : sig
-        type t = Base_field.t Kimchi.Foundations.or_infinity
+        type t = Base_field.t Kimchi_types.or_infinity
 
         val zero : unit -> t
 
@@ -55,16 +55,16 @@ module Make (Inputs : Inputs_intf) = struct
   let g_vec arr = Array.map ~f:g arr
 
   let or_infinity_to_backend :
-      ('a * 'a) Pickles_types.Or_infinity.t -> 'a Kimchi.Foundations.or_infinity
-      = function
+      ('a * 'a) Pickles_types.Or_infinity.t -> 'a Kimchi_types.or_infinity =
+    function
     | Infinity ->
         Infinity
     | Finite (x, y) ->
         Finite (x, y)
 
   let or_infinity_of_backend :
-      'a Kimchi.Foundations.or_infinity -> ('a * 'a) Pickles_types.Or_infinity.t
-      = function
+      'a Kimchi_types.or_infinity -> ('a * 'a) Pickles_types.Or_infinity.t =
+    function
     | Infinity ->
         Infinity
     | Finite (x, y) ->
@@ -84,9 +84,7 @@ module Make (Inputs : Inputs_intf) = struct
         Pickles_types.Plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t
       =
     Backend.make
-      (Array.map
-         ~f:(fun x -> Kimchi.Foundations.Finite (fst x, snd x))
-         commitment)
+      (Array.map ~f:(fun x -> Kimchi_types.Finite (fst x, snd x)) commitment)
       None
 
   let to_backend (t : t) : Backend.t =

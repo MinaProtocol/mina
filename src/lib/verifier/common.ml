@@ -8,7 +8,7 @@ type invalid =
   | `Invalid_proof
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
-[@@deriving bin_io_unversioned]
+[@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_string (invalid : invalid) =
   let keys_to_string keys =
@@ -46,15 +46,14 @@ let check :
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
               ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest
-                   fee_payer.data.body.protocol_state)
+                (Zkapp_precondition.Protocol_state.digest
+                   fee_payer.body.protocol_state_precondition)
               ~memo_hash:(Signed_command_memo.hash memo)
           in
           let full_tx_commitment =
             Parties.Transaction_commitment.with_fee_payer tx_commitment
               ~fee_payer_hash:
-                (Party.Predicated.digest
-                   (Party.Predicated.of_fee_payer fee_payer.data))
+                (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -72,7 +71,7 @@ let check :
                       [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization fee_payer.data.body.public_key
+          check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
           let parties_with_hashes_list =
             Parties.Call_forest.With_hashes.to_parties_with_hashes_list
@@ -82,12 +81,12 @@ let check :
             List.filter_map parties_with_hashes_list
               ~f:(fun ((p, vk_opt), at_party) ->
                 let commitment =
-                  if p.data.body.use_full_commitment then full_tx_commitment
+                  if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
                 in
                 match p.authorization with
                 | Signature s ->
-                    check_signature s p.data.body.public_key commitment ;
+                    check_signature s p.body.public_key commitment ;
                     None
                 | None_given ->
                     None
@@ -99,8 +98,8 @@ let check :
                             [ Account_id.public_key @@ Party.account_id p ])
                     | Some vk ->
                         let stmt =
-                          { Snapp_statement.Poly.transaction = commitment
-                          ; at_party
+                          { Zkapp_statement.Poly.transaction = commitment
+                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
                         Some (vk, stmt, pi) ))
@@ -109,7 +108,7 @@ let check :
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =
-                  List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
+                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
               ; memo
               }
           in

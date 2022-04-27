@@ -14,9 +14,9 @@ module type Gate_vector_intf = sig
 
   val create : unit -> t
 
-  val add : t -> field Kimchi.Protocol.circuit_gate -> unit
+  val add : t -> field Kimchi_types.circuit_gate -> unit
 
-  val get : t -> int -> field Kimchi.Protocol.circuit_gate
+  val get : t -> int -> field Kimchi_types.circuit_gate
 
   val digest : t -> bytes
 end
@@ -71,9 +71,9 @@ module Position = struct
     *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
-  (** Converts a [Position.t] into the Rust-compatible type [Kimchi.Protocol.wire]. 
+  (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire]. 
     *)
-  let to_rust_wire { row; col } : Kimchi.Protocol.wire = { row; col }
+  let to_rust_wire { row; col } : Kimchi_types.wire = { row; col }
 end
 
 (** A gate. *)
@@ -84,7 +84,7 @@ module Gate_spec = struct
 
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
   type ('row, 'f) t =
-    { kind : (Kimchi.Protocol.gate_type[@sexp.opaque])
+    { kind : (Kimchi_types.gate_type[@sexp.opaque])
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
     }
@@ -101,7 +101,7 @@ module Gate_spec = struct
     { t with wired_to }
 
   (* TODO: just send the array to Rust directly *)
-  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi.Protocol.circuit_gate =
+  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi_types.circuit_gate =
     let typ = kind in
     let wired_to = Array.map ~f:Position.to_rust_wire wired_to in
     let wires =
@@ -1116,7 +1116,7 @@ struct
              ; Some round.b4
             |]
           in
-          add_row sys row Kimchi.Protocol.EndoMul [||]
+          add_row sys row Kimchi_types.EndoMul [||]
         in
         Array.iter state ~f:add_endoscale_round ;
         (* Last row. *)
@@ -1160,7 +1160,7 @@ struct
              ; None
             |]
           in
-          add_row sys row Kimchi.Protocol.EndoMulScalar [||]
+          add_row sys row Kimchi_types.EndoMulScalar [||]
         in
         Array.iter state
           ~f:

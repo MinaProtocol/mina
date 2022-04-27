@@ -69,7 +69,7 @@ end
 (* why use a functor here? *)
 module Bigint256 =
   Kimchi_backend_common.Bigint.Make
-    (Kimchi.Foundations.BigInt256)
+    (Pasta_bindings.BigInt256)
     (struct
       let length_in_bytes = 32
     end)
@@ -78,14 +78,14 @@ module Bigint256 =
 
 module Fp = Field.Make (struct
   module Bigint = Bigint256
-  include Kimchi.Foundations.Fp
-  module Vector = Kimchi.FieldVectors.Fp
+  include Pasta_bindings.Fp
+  module Vector = Kimchi_bindings.FieldVectors.Fp
 end)
 
 module Fq = Field.Make (struct
   module Bigint = Bigint256
-  include Kimchi.Foundations.Fq
-  module Vector = Kimchi.FieldVectors.Fq
+  include Pasta_bindings.Fq
+  module Vector = Kimchi_bindings.FieldVectors.Fq
 end)
 
 module Vesta = struct
@@ -97,7 +97,7 @@ module Vesta = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fq) (Fp) (Params) (Kimchi.Vesta)
+  include Curve.Make (Fq) (Fp) (Params) (Pasta_bindings.Vesta)
 end
 
 module Pallas = struct
@@ -109,7 +109,7 @@ module Pallas = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fp) (Fq) (Params) (Kimchi.Pallas)
+  include Curve.Make (Fp) (Fq) (Params) (Pasta_bindings.Pallas)
 end
 
 (* the polynomial commitment types *)
@@ -119,7 +119,7 @@ module Fq_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Base_field = Fp
 
   module Backend = struct
-    type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
+    type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
 
     let shifted ({ shifted; _ } : t) = shifted
 
@@ -136,7 +136,7 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
   module Base_field = Fq
 
   module Backend = struct
-    type t = Curve.Affine.Backend.t Kimchi.Protocol.poly_comm
+    type t = Curve.Affine.Backend.t Kimchi_types.poly_comm
 
     let shifted ({ shifted; _ } : t) = shifted
 
