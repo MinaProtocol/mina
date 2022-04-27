@@ -2263,6 +2263,8 @@ module Ledger = struct
     ; use_full_commitment = bool b##.useFullCommitment
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition = predicate b##.accountPrecondition
+    ; caller = (* TODO *)
+               Token_id.default
     }
 
   let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
@@ -2287,6 +2289,7 @@ module Ledger = struct
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition =
         uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
+    ; caller = ()
     }
 
   let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
@@ -2328,6 +2331,9 @@ module Ledger = struct
   let fee_payer_party_body (party : fee_payer_party) : Party.Body.Fee_payer.t =
     fee_payer_body party##.body
 
+  let token_id (str : Js.js_string Js.t) : Token_id.t =
+    Token_id.of_string (Js.to_string str)
+
   let authorization (a : Party_authorization.t) : Mina_base.Control.t =
     match Js.to_string a##.kind with
     | "none" ->
@@ -2359,6 +2365,10 @@ module Ledger = struct
                ; authorization = authorization p##.authorization
                })
         |> Array.to_list
+        |> Parties.Call_forest.of_parties_list
+             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+        |> Parties.Call_forest.accumulate_hashes
+             ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
     ; memo = Mina_base.Signed_command_memo.empty
     }
 
@@ -2610,6 +2620,7 @@ module Ledger = struct
       ; use_full_commitment = bool b##.useFullCommitment
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition = predicate b##.accountPrecondition
+      ; caller = (*TODO*) Token_id.Checked.constant Token_id.default
       }
 
     let fee_payer_body (b : fee_payer_party_body) : Party.Body.Checked.t =
@@ -2658,12 +2669,12 @@ module Ledger = struct
       ; use_full_commitment = bool b##.useFullCommitment
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition
+      ; caller = (*TODO*) Token_id.Checked.constant Token_id.default
       }
 
     let fee_payer_party (party : fee_payer_party) : Party.Checked.t =
       (* TODO: is it OK that body is the same for fee_payer as for party?
-           what about fee vs. delta and other differences in the unchecked version?
-      *)
+           what about fee vs. delta and other differences in the unchecked version?*)
       fee_payer_body party##.body
 
     let party (party : party) : Party.Checked.t = body party##.body
@@ -2743,10 +2754,18 @@ module Ledger = struct
     p |> Checked.protocol_state
     |> Zkapp_precondition.Protocol_state.Checked.digest |> to_js_field
 
+  let forest_digest_of_field : Field.Constant.t -> Parties.Digest.Forest.t =
+    Obj.magic
+
+  let forest_digest_of_field_checked :
+      Field.t -> Parties.Digest.Forest.Checked.t =
+    Obj.magic
+
   (* TODO memo hash *)
   let hash_transaction other_parties_hash protocol_state_predicate_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> to_unchecked
+      |> forest_digest_of_field
     in
     let protocol_state_predicate_hash =
       protocol_state_predicate_hash |> of_js_field |> to_unchecked
@@ -2757,7 +2776,9 @@ module Ledger = struct
 
   let hash_transaction_checked other_parties_hash protocol_state_predicate_hash
       =
-    let other_parties_hash = other_parties_hash |> of_js_field in
+    let other_parties_hash =
+      other_parties_hash |> of_js_field |> forest_digest_of_field_checked
+    in
     let protocol_state_predicate_hash =
       protocol_state_predicate_hash |> of_js_field
     in
@@ -2772,14 +2793,17 @@ module Ledger = struct
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
     let use_full_commitment =
       match party_index with
       | Fee_payer ->
           true
       | Other_party i ->
-          (List.nth_exn other_parties i).body.use_full_commitment
+          (List.nth_exn (Parties.Call_forest.to_parties_list other_parties) i)
+            .body
+            .use_full_commitment
     in
     if use_full_commitment then full_commitment else commitment
 
@@ -2798,7 +2822,8 @@ module Ledger = struct
     | Other_party i ->
         { tx with
           other_parties =
-            List.mapi tx.other_parties ~f:(fun i' p ->
+            Parties.Call_forest.mapi tx.other_parties
+              ~f:(fun i' (p : Party.t) ->
                 if i' = i then { p with authorization = Signature signature }
                 else p)
         } )

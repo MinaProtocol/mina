@@ -13,6 +13,8 @@ let%test_module "Fee payer tests" =
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 
+    let constraint_constants = U.constraint_constants
+
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =
@@ -29,6 +31,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -56,6 +59,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -82,6 +86,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -112,6 +117,7 @@ let%test_module "Fee payer tests" =
           let test_spec : Spec.t =
             { sender = spec.sender
             ; fee
+            ; fee_payer = None
             ; receivers = []
             ; amount
             ; zkapp_account_keypairs = [ new_kp ]
@@ -144,6 +150,7 @@ let%test_module "Fee payer tests" =
               let test_spec : Spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
                 ; fee
+                ; fee_payer = None
                 ; receivers = []
                 ; amount
                 ; zkapp_account_keypairs = [ fst spec.sender ]

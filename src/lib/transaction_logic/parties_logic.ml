@@ -28,9 +28,13 @@ module type Bool_intf = sig
 
   val ( &&& ) : t -> t -> t
 
-  val display : t -> label:string -> string
+  module Assert : sig
+    val is_true : t -> unit
 
-  val assert_ : t -> unit
+    val any : t list -> unit
+  end
+
+  val display : t -> label:string -> string
 
   val all : t list -> t
 
@@ -83,6 +87,22 @@ module type Amount_intf = sig
   val of_constant_fee : Currency.Fee.t -> t
 end
 
+module type Account_id_intf = sig
+  include Iffable
+
+  type public_key
+
+  type token_id
+
+  val invalid : t
+
+  val equal : t -> t -> bool
+
+  val create : public_key -> token_id -> t
+
+  val derive_token_id : owner:t -> token_id
+end
+
 module type Global_slot_intf = sig
   include Iffable
 
@@ -131,7 +151,7 @@ module Local_state = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ( 'parties
+      type ( 'stack_frame
            , 'call_stack
            , 'token_id
            , 'excess
@@ -140,7 +160,7 @@ module Local_state = struct
            , 'comm
            , 'failure_status_tbl )
            t =
-        { parties : 'parties
+        { stack_frame : 'stack_frame
         ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
@@ -154,10 +174,10 @@ module Local_state = struct
     end
   end]
 
-  let typ parties call_stack token_id excess ledger bool comm failure_status_tbl
-      =
+  let typ stack_frame call_stack token_id excess ledger bool comm
+      failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
-      [ parties
+      [ stack_frame
       ; call_stack
       ; comm
       ; comm
@@ -175,8 +195,8 @@ module Local_state = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Parties.Digest.Stable.V1.t
-          , Parties.Digest.Stable.V1.t
+          ( Mina_base.Stack_frame.Digest.Stable.V1.t
+          , Mina_base.Call_stack_digest.Stable.V1.t
           , Token_id.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Ledger_hash.Stable.V1.t
@@ -195,8 +215,8 @@ module Local_state = struct
     open Pickles.Impls.Step
 
     type t =
-      ( Field.t
-      , Field.t
+      ( Stack_frame.Digest.Checked.t
+      , Call_stack_digest.Checked.t
       , Token_id.Checked.t
       , Currency.Amount.Checked.t
       , Ledger_hash.var
@@ -236,7 +256,13 @@ module type Party_intf = sig
 
   type token_id
 
+  type account_id
+
   type account
+
+  type nonce
+
+  type _ or_ignore
 
   val balance_change : t -> signed_amount
 
@@ -245,6 +271,10 @@ module type Party_intf = sig
   val public_key : t -> public_key
 
   val token_id : t -> token_id
+
+  val account_id : t -> account_id
+
+  val caller : t -> token_id
 
   val use_full_commitment : t -> bool
 
@@ -295,6 +325,10 @@ module type Party_intf = sig
 
     val permissions : t -> permissions set_or_keep
   end
+
+  module Account_precondition : sig
+    val nonce : t -> nonce Zkapp_precondition.Closed_interval.t or_ignore
+  end
 end
 
 module type Opt_intf = sig
@@ -319,7 +353,7 @@ module type Stack_intf = sig
 
   type elt
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
@@ -337,17 +371,33 @@ module type Parties_intf = sig
 
   module Opt : Opt_intf with type bool := bool
 
-  val empty : t
+  val empty : unit -> t
 
   val is_empty : t -> bool
 
   val pop_exn : t -> (party * t) * t
 end
 
-module type Call_stack_intf = sig
+module type Stack_frame_intf = sig
+  type caller
+
   type parties
 
-  include Stack_intf with type elt := parties
+  include Iffable
+
+  val caller : t -> caller
+
+  val caller_caller : t -> caller
+
+  val calls : t -> parties
+
+  val make : caller:caller -> caller_caller:caller -> calls:parties -> t
+end
+
+module type Call_stack_intf = sig
+  type stack_frame
+
+  include Stack_intf with type elt := stack_frame
 end
 
 module type Ledger_intf = sig
@@ -382,11 +432,11 @@ module type Controller_intf = sig
 end
 
 module type Account_intf = sig
+  type bool
+
   type t
 
   type public_key
-
-  type bool
 
   module Permissions : sig
     type controller
@@ -525,21 +575,16 @@ module Eff = struct
              ; protocol_state_precondition : 'protocol_state_pred
              ; .. > )
            t
-    | Check_auth :
-        { is_start : 'bool; party : 'party; account : 'account }
-        -> ( 'account * 'bool * 'failure
-           , < bool : 'bool
-             ; party : 'party
-             ; parties : 'parties
-             ; account : 'account
-             ; failure : 'failure
-             ; .. > )
-           t
+    | Init_account :
+        { party : 'party; account : 'account }
+        -> ('account, < party : 'party ; account : 'account ; .. >) t
 end
 
 type 'e handler = { perform : 'r. ('r, 'e) Eff.t -> 'r }
 
 module type Inputs_intf = sig
+  val with_label : label:string -> (unit -> 'a) -> 'a
+
   module Bool : Bool_intf
 
   module Field : Iffable with type bool := Bool.t
@@ -555,6 +600,12 @@ module type Inputs_intf = sig
   module Public_key : Iffable with type bool := Bool.t
 
   module Token_id : Token_id_intf with type bool := Bool.t
+
+  module Account_id :
+    Account_id_intf
+      with type bool := Bool.t
+       and type public_key := Public_key.t
+       and type token_id := Token_id.t
 
   module Set_or_keep : Set_or_keep_intf with type bool := Bool.t
 
@@ -606,6 +657,8 @@ module type Inputs_intf = sig
        and type bool := Bool.t
        and type account := Account.t
        and type public_key := Public_key.t
+       and type nonce := Nonce.t
+       and type account_id := Account_id.t
        and type Update.timing := Timing.t
        and type 'a Update.set_or_keep := 'a Set_or_keep.t
        and type Update.field := Field.t
@@ -615,6 +668,11 @@ module type Inputs_intf = sig
        and type Update.token_symbol := Token_symbol.t
        and type Update.state_hash := State_hash.t
        and type Update.permissions := Account.Permissions.t
+
+  module Nonce_precondition : sig
+    val is_constant :
+      Nonce.t Zkapp_precondition.Closed_interval.t Party.or_ignore -> Bool.t
+  end
 
   module Ledger :
     Ledger_intf
@@ -633,9 +691,15 @@ module type Inputs_intf = sig
        and type party := Party.t
        and module Opt := Opt
 
+  module Stack_frame :
+    Stack_frame_intf
+      with type bool := Bool.t
+       and type parties := Parties.t
+       and type caller := Token_id.t
+
   module Call_stack :
     Call_stack_intf
-      with type parties := Parties.t
+      with type stack_frame := Stack_frame.t
        and type bool := Bool.t
        and module Opt := Opt
 
@@ -653,7 +717,7 @@ module type Inputs_intf = sig
 
   module Local_state : sig
     type t =
-      ( Parties.t
+      ( Stack_frame.t
       , Call_stack.t
       , Token_id.t
       , Amount.t
@@ -701,21 +765,31 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Ps = Inputs.Parties
 
+  let default_caller = Token_id.default
+
+  let stack_frame_default () =
+    Stack_frame.make ~caller:default_caller ~caller_caller:default_caller
+      ~calls:(Ps.empty ())
+
+  let assert_ = Bool.Assert.is_true
+
   (* Pop from the call stack, returning dummy values if the stack is empty. *)
-  let pop_call_stack (s : Call_stack.t) : Ps.t * Call_stack.t =
+  let pop_call_stack (s : Call_stack.t) : Stack_frame.t * Call_stack.t =
     let res = Call_stack.pop s in
     (* Split out the option returned by Call_stack.pop into two options *)
-    let next_forest, next_call_stack =
+    let next_frame, next_call_stack =
       (Opt.map ~f:fst res, Opt.map ~f:snd res)
     in
     (* Handle the None cases *)
-    ( Opt.or_default ~if_:Ps.if_ ~default:Ps.empty next_forest
-    , Opt.or_default ~if_:Call_stack.if_ ~default:Call_stack.empty
+    ( Opt.or_default ~if_:Stack_frame.if_ ~default:(stack_frame_default ())
+        next_frame
+    , Opt.or_default ~if_:Call_stack.if_ ~default:(Call_stack.empty ())
         next_call_stack )
 
-  let get_next_party
-      (current_forest : Ps.t) (* The stack for the most recent snapp *)
-      (call_stack : Call_stack.t) (* The partially-completed parent stacks *) =
+  let get_next_party (current_forest : Stack_frame.t)
+      (* The stack for the most recent snapp *)
+        (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
+      =
     (* If the current stack is complete, 'return' to the previous
        partially-completed one.
     *)
@@ -726,13 +800,26 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (* TODO: I believe current should only be empty for the first party in
          a transaction. *)
-      let current_is_empty = Ps.is_empty current_forest in
-      ( Ps.if_ current_is_empty ~then_:next_forest ~else_:current_forest
+      let current_is_empty = Ps.is_empty (Stack_frame.calls current_forest) in
+      ( Stack_frame.if_ current_is_empty ~then_:next_forest ~else_:current_forest
       , Call_stack.if_ current_is_empty ~then_:next_call_stack ~else_:call_stack
       )
     in
     let (party, party_forest), remainder_of_current_forest =
-      Ps.pop_exn current_forest
+      Ps.pop_exn (Stack_frame.calls current_forest)
+    in
+    let party_caller = Party.caller party in
+    let is_normal_call =
+      Token_id.equal party_caller (Stack_frame.caller current_forest)
+    in
+    let () =
+      with_label ~label:"check valid caller" (fun () ->
+          let is_delegate_call =
+            Token_id.equal party_caller
+              (Stack_frame.caller_caller current_forest)
+          in
+          (* Check that party has a valid caller. *)
+          assert_ Bool.(is_normal_call ||| is_delegate_call))
     in
     (* Cases:
        - [party_forest] is empty, [remainder_of_current_forest] is empty.
@@ -749,7 +836,13 @@ module Make (Inputs : Inputs_intf) = struct
     let remainder_of_current_forest_empty =
       Ps.is_empty remainder_of_current_forest
     in
-    let newly_popped_forest, popped_call_stack = pop_call_stack call_stack in
+    let newly_popped_frame, popped_call_stack = pop_call_stack call_stack in
+    let remainder_of_current_forest_frame : Stack_frame.t =
+      Stack_frame.make
+        ~caller:(Stack_frame.caller current_forest)
+        ~caller_caller:(Stack_frame.caller_caller current_forest)
+        ~calls:remainder_of_current_forest
+    in
     let new_call_stack =
       Call_stack.if_ party_forest_empty
         ~then_:
@@ -760,14 +853,22 @@ module Make (Inputs : Inputs_intf) = struct
         ~else_:
           (Call_stack.if_ remainder_of_current_forest_empty ~then_:call_stack
              ~else_:
-               (Call_stack.push remainder_of_current_forest ~onto:call_stack))
+               (Call_stack.push remainder_of_current_forest_frame
+                  ~onto:call_stack))
     in
     let new_current_forest =
-      Ps.if_ party_forest_empty
+      Stack_frame.if_ party_forest_empty
         ~then_:
-          (Ps.if_ remainder_of_current_forest_empty ~then_:newly_popped_forest
-             ~else_:remainder_of_current_forest)
-        ~else_:party_forest
+          (Stack_frame.if_ remainder_of_current_forest_empty
+             ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame)
+        ~else_:
+          (let caller =
+             Token_id.if_ is_normal_call
+               ~then_:
+                 (Account_id.derive_token_id ~owner:(Party.account_id party))
+               ~else_:(Stack_frame.caller current_forest)
+           and caller_caller = party_caller in
+           Stack_frame.make ~calls:party_forest ~caller ~caller_caller)
     in
     (party, new_current_forest, new_call_stack)
 
@@ -788,14 +889,14 @@ module Make (Inputs : Inputs_intf) = struct
       =
     let open Inputs in
     let is_start' =
-      let is_start' = Ps.is_empty local_state.parties in
+      let is_start' = Ps.is_empty (Stack_frame.calls local_state.stack_frame) in
       ( match is_start with
       | `Compute _ ->
           ()
       | `Yes _ ->
-          Bool.assert_ is_start'
+          assert_ is_start'
       | `No ->
-          Bool.assert_ (Bool.not is_start') ) ;
+          assert_ (Bool.not is_start') ) ;
       match is_start with
       | `Yes _ ->
           Bool.true_
@@ -812,20 +913,50 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.ledger
       }
     in
-    let (party, remaining, call_stack), at_party, local_state =
+    let ( (party, remaining, call_stack)
+        , at_party
+        , local_state
+        , (a, inclusion_proof) ) =
       let to_pop, call_stack =
         match is_start with
         | `Compute start_data ->
-            ( Ps.if_ is_start' ~then_:start_data.parties
-                ~else_:local_state.parties
-            , Call_stack.if_ is_start' ~then_:Call_stack.empty
+            ( Stack_frame.if_ is_start'
+                ~then_:
+                  (Stack_frame.make ~calls:start_data.parties
+                     ~caller:default_caller ~caller_caller:default_caller)
+                ~else_:local_state.stack_frame
+            , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
         | `Yes start_data ->
-            (start_data.parties, Call_stack.empty)
+            ( Stack_frame.make ~calls:start_data.parties ~caller:default_caller
+                ~caller_caller:default_caller
+            , Call_stack.empty () )
         | `No ->
-            (local_state.parties, local_state.call_stack)
+            (local_state.stack_frame, local_state.call_stack)
       in
-      let party, remaining, call_stack = get_next_party to_pop call_stack in
+      let party, remaining, call_stack =
+        with_label ~label:"get next party" (fun () ->
+            (* TODO: Make the stack frame hashed inside of the local state *)
+            get_next_party to_pop call_stack)
+      in
+      let local_state =
+        with_label ~label:"token owner not caller" (fun () ->
+            let default_token_or_token_owner_was_caller =
+              (* Check that the token owner was consulted if using a non-default
+                 token *)
+              let party_token_id = Party.token_id party in
+              Bool.( ||| )
+                (Token_id.equal party_token_id Token_id.default)
+                (Token_id.equal party_token_id (Party.caller party))
+            in
+            Local_state.add_check local_state Token_owner_not_caller
+              default_token_or_token_owner_was_caller)
+      in
+      let ((a, inclusion_proof) as acct) =
+        with_label ~label:"get account" (fun () ->
+            Inputs.Ledger.get_account party local_state.ledger)
+      in
+      Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
       let transaction_commitment, full_transaction_commitment =
         match is_start with
         | `No ->
@@ -833,7 +964,8 @@ module Make (Inputs : Inputs_intf) = struct
             , local_state.full_transaction_commitment )
         | `Yes start_data | `Compute start_data ->
             let tx_commitment_on_start =
-              Transaction_commitment.commitment ~party ~other_parties:remaining
+              Transaction_commitment.commitment ~party
+                ~other_parties:(Stack_frame.calls remaining)
                 ~memo_hash:start_data.memo_hash
             in
             let full_tx_commitment_on_start =
@@ -860,13 +992,12 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.token_id
         }
       in
-      ((party, remaining, call_stack), to_pop, local_state)
+      ((party, remaining, call_stack), to_pop, local_state, acct)
     in
-    let local_state = { local_state with parties = remaining; call_stack } in
+    let local_state =
+      { local_state with stack_frame = remaining; call_stack }
+    in
     let local_state = Local_state.add_new_failure_status_bucket local_state in
-    let a, inclusion_proof =
-      Inputs.Ledger.get_account party local_state.ledger
-    in
     Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a snapp proof.
@@ -895,7 +1026,9 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Party.check_authorization ~commitment ~at_party party
+      Inputs.Party.check_authorization ~commitment
+        ~at_party:(Stack_frame.calls at_party)
+        party
     in
     (*This is to debug failures inside snark. We don't check
       proofs or signatures outside snark*)
@@ -911,11 +1044,27 @@ module Make (Inputs : Inputs_intf) = struct
         Inputs.Bool.(Inputs.Party.increment_nonce party ||| not is_start')
     in
     let local_state =
+      Local_state.add_check local_state Fee_payer_must_be_signed
+        Inputs.Bool.(signature_verifies ||| not is_start')
+    in
+    let local_state =
+      let precondition_has_constant_nonce =
+        Inputs.Party.Account_precondition.nonce party
+        |> Inputs.Nonce_precondition.is_constant
+      in
+      let increments_nonce_and_constrains_its_old_value =
+        Inputs.Bool.(
+          Inputs.Party.increment_nonce party &&& precondition_has_constant_nonce)
+      in
+      let depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer =
+        Inputs.Bool.(Inputs.Party.use_full_commitment party &&& not is_start')
+      in
+      let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
       Local_state.add_check local_state Parties_replay_check_failed
         Inputs.Bool.(
-          Inputs.Party.increment_nonce party
-          ||| Inputs.Party.use_full_commitment party
-          ||| not signature_verifies)
+          increments_nonce_and_constrains_its_old_value
+          ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
+          ||| does_not_use_a_signature)
     in
     let (`Is_new account_is_new) =
       Inputs.Ledger.check_account (Party.public_key party)
@@ -936,7 +1085,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
-      Bool.assert_ Global_slot.(vesting_period > zero) ;
+      assert_ Global_slot.(vesting_period > zero) ;
       let a = Account.set_timing timing a in
       (a, local_state)
     in
@@ -1246,16 +1395,11 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_permissions permissions a in
       (a, local_state)
     in
+    (* Initialize account's pk, in case it is new. *)
+    let a = h.perform (Init_account { party; account = a }) in
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
-    let a', update_permitted, failure_status =
-      h.perform (Check_auth { is_start = is_start'; party; account = a })
-    in
-    let local_state =
-      Local_state.update_failure_status_tbl local_state failure_status
-        update_permitted
-    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status_tbl
@@ -1279,9 +1423,14 @@ module Make (Inputs : Inputs_intf) = struct
         assert_
           ( (not is_start')
           ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
-      (* FIXME: Allow non-default tokens again. *)
-      Bool.(assert_ (party_token_is_default &&& curr_is_default)) ;
-      Amount.add_signed_flagged local_state.excess local_delta
+      assert_ curr_is_default ;
+      let new_local_fee_excess, `Overflow overflow =
+        Amount.add_signed_flagged local_state.excess local_delta
+      in
+      ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
+          ~else_:Amount.zero
+      , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
+        `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
     (* The first party must succeed. *)
     Bool.(assert_ (not (is_start' &&& overflowed))) ;
@@ -1302,9 +1451,9 @@ module Make (Inputs : Inputs_intf) = struct
        The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      Inputs.Ledger.set_account local_state.ledger (a', inclusion_proof)
+      Inputs.Ledger.set_account local_state.ledger (a, inclusion_proof)
     in
-    let is_last_party = Ps.is_empty remaining in
+    let is_last_party = Ps.is_empty (Stack_frame.calls remaining) in
     let local_state =
       { local_state with
         ledger = new_ledger
