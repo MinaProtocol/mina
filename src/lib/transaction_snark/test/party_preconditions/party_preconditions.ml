@@ -1,5 +1,6 @@
 open Core_kernel
 open Currency
+open Signature_lib
 module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
@@ -283,12 +284,7 @@ let%test_module "Protocol state precondition tests" =
                         { public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
-                        ; balance_change =
-                            Option.value_exn
-                              (Currency.Amount.sub amount
-                                 (Amount.of_fee
-                                    constraint_constants.account_creation_fee))
-                            |> Amount.Signed.of_unsigned
+                        ; balance_change = Amount.Signed.of_unsigned amount
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []

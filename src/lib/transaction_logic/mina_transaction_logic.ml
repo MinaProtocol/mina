@@ -1161,7 +1161,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
 
       let check ~proof_verifies ~signature_verifies perm =
-        printf !"calling transaction logic check\n%!" ;
         (* Invariant: We either have a proof, a signature, or neither. *)
         assert (not (proof_verifies && signature_verifies)) ;
         let tag =
