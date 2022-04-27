@@ -17,14 +17,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
-    let keypair () =
-      let private_key = Signature_lib.Private_key.create () in
-      let public_key =
-        Signature_lib.Public_key.of_private_key_exn private_key
-      in
-      { Signature_lib.Keypair.private_key; public_key }
-    in
     { default with
       requires_graphql = true
     ; block_producers =
@@ -32,8 +24,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "1000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts =
-        [ { keypair = keypair (); balance = "1000" }
-        ; { keypair = keypair (); balance = "1000" }
+        [ { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"; timing = Untimed }
         ]
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
@@ -99,10 +91,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
     in
-    let (keypair : Signature_lib.Keypair.t) =
-      (List.nth_exn config.extra_genesis_accounts 0).keypair
+    let[@warning "-8"] [ fish1_kp; fish2_kp ] =
+      Network.extra_genesis_keypairs network
     in
-    let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
     let num_zkapp_accounts = 3 in
     let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -123,7 +114,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let fee = Currency.Fee.of_int 20_000_000 in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair, nonce)
+        { sender = (fish1_kp, nonce)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -166,7 +157,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair2, nonce)
+        { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -240,7 +231,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair2, nonce)
+        { sender = (fish2_kp, nonce)
         ; fee
         ; fee_payer = None
         ; receivers = []
