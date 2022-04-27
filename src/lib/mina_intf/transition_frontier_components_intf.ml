@@ -212,10 +212,10 @@ module type Sync_handler_intf = sig
   val answer_query :
        frontier:transition_frontier
     -> Ledger_hash.t
-    -> Sync_ledger.Query.t Envelope.Incoming.t
+    -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
     -> logger:Logger.t
     -> trust_system:Trust_system.t
-    -> Sync_ledger.Answer.t option Deferred.t
+    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
@@ -272,7 +272,7 @@ module type Bootstrap_controller_intf = sig
     -> persistent_frontier:persistent_frontier
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
+    -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
     -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
@@ -304,21 +304,20 @@ module type Transition_frontier_controller_intf = sig
 end
 
 module type Initial_validator_intf = sig
-  type external_transition
+  type block
 
-  type external_transition_with_initial_validation
+  type block_with_initial_validation
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> transition_reader:
-         ( [ `Transition of external_transition Envelope.Incoming.t ]
+         ( [ `Transition of block Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
          Strict_pipe.Reader.t
     -> valid_transition_writer:
-         ( [ `Transition of
-             external_transition_with_initial_validation Envelope.Incoming.t ]
+         ( [ `Transition of block_with_initial_validation Envelope.Incoming.t ]
            * [ `Time_received of Block_time.t ]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )

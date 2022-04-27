@@ -2,15 +2,10 @@
 
 [%%import "/src/config.mlh"]
 
-[%%ifdef consensus_mechanism]
-
-[%%error "Client SDK cannot be built if \"consensus_mechanism\" is defined"]
-
-[%%endif]
-
 open Js_of_ocaml
 open Signature_lib
 open Mina_base
+open Mina_transaction
 open Rosetta_lib
 open Rosetta_coding
 open Js_util
@@ -37,6 +32,54 @@ let _ =
 
            val publicKey = pk_str_js
          end
+
+       (** generate a parties fee payer and sign other parties with the fee payer account *)
+       method signParty (parties_js : string_js)
+           (fee_payer_party_js : payload_fee_payer_party_js)
+           (sk_base58_check_js : string_js) =
+         let other_parties_json =
+           parties_js |> Js.to_string |> Yojson.Safe.from_string
+         in
+         let other_parties = Parties.other_parties_of_json other_parties_json in
+         let other_parties =
+           Parties.Call_forest.of_parties_list
+             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+             other_parties
+           |> Parties.Call_forest.accumulate_hashes
+                ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
+         in
+         let other_parties_hash = Parties.Call_forest.hash other_parties in
+         let protocol_state_predicate_hash =
+           Zkapp_precondition.Protocol_state.digest
+             Zkapp_precondition.Protocol_state.accept
+         in
+         let memo =
+           fee_payer_party_js##.memo |> Js.to_string
+           |> Memo.create_from_string_exn
+         in
+         let commitment : Parties.Transaction_commitment.t =
+           Parties.Transaction_commitment.create ~other_parties_hash
+             ~protocol_state_predicate_hash
+             ~memo_hash:(Signed_command_memo.hash memo)
+         in
+         let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
+         let full_commitment =
+           Parties.Transaction_commitment.with_fee_payer commitment
+             ~fee_payer_hash:
+               (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+         in
+         let sk =
+           Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
+         in
+         let fee_payer =
+           let fee_payer_signature_auth =
+             Signature_lib.Schnorr.Chunked.sign sk
+               (Random_oracle.Input.Chunked.field full_commitment)
+           in
+           { fee_payer with authorization = fee_payer_signature_auth }
+         in
+         { Parties.fee_payer; other_parties; memo }
+         |> Parties.parties_to_json |> Yojson.Safe.to_string |> Js.string
 
        (** return public key associated with private key in raw hex format for Rosetta *)
        method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =
@@ -80,9 +123,11 @@ let _ =
            let signature =
              Mina_base.Signed_command.sign_payload sk dummy_payload
            in
-           let message = Mina_base.Signed_command.to_input dummy_payload in
+           let message =
+             Mina_base.Signed_command.to_input_legacy dummy_payload
+           in
            let verified =
-             Schnorr.verify signature
+             Schnorr.Legacy.verify signature
                (Snark_params.Tick.Inner_curve.of_affine pk)
                message
            in
@@ -286,9 +331,6 @@ let _ =
              ; signer_input = _
              ; payment = Some payment
              ; stake_delegation = None
-             ; create_token = None
-             ; create_token_account = None
-             ; mint_tokens = None
              } ->
              let command = Transaction.Unsigned.of_rendered_payment payment in
              make_signed_transaction command payment.nonce
@@ -297,9 +339,6 @@ let _ =
              ; signer_input = _
              ; payment = None
              ; stake_delegation = Some delegation
-             ; create_token = None
-             ; create_token_account = None
-             ; mint_tokens = None
              } ->
              let command =
                Transaction.Unsigned.of_rendered_delegation delegation
@@ -332,6 +371,33 @@ let _ =
                `Assoc [ ("error", `String err_msg) ]
          in
          Js.string (Yojson.Safe.to_string result_json)
+
+       method hashBytearray = Poseidon_hash.hash_bytearray
+
+       method hashFieldElems = Poseidon_hash.hash_field_elems
+
+       val hashOrder =
+         let open Core_kernel in
+         let field_order_bytes =
+           let bits_to_bytes bits =
+             let byte_of_bits bs =
+               List.foldi bs ~init:0 ~f:(fun i acc b ->
+                   if b then acc lor (1 lsl i) else acc)
+               |> Char.of_int_exn
+             in
+             List.map
+               (List.groupi bits ~break:(fun i _ _ -> i mod 8 = 0))
+               ~f:byte_of_bits
+             |> String.of_char_list
+           in
+           bits_to_bytes
+             (List.init Snark_params.Tick.Field.size_in_bits ~f:(fun i ->
+                  Bigint.(
+                    equal
+                      (shift_right Snark_params.Tick.Field.size i land one)
+                      one)))
+         in
+         Hex.encode @@ field_order_bytes
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

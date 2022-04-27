@@ -327,78 +327,76 @@ module Make (Inputs : Inputs_intf) :
           Some parsed_location
   end
 
+  let get_at_index_exn mdb index =
+    let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
+    get mdb (Location.Account addr) |> Option.value_exn
+
+  let all_accounts (t : t) =
+    match Account_location.last_location_address t with
+    | None ->
+        Sequence.empty
+    | Some last_addr ->
+        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
+        |> Sequence.map ~f:(fun i -> get_at_index_exn t i)
+
+  let iteri (t : t) ~(f : int -> Account.t -> unit) =
+    Sequence.iteri (all_accounts t) ~f
+
   (** The tokens associated with each public key.
 
       These are represented as a [Token_id.Set.t], which is represented by an
       ordered list.
   *)
   module Tokens = struct
-    let next_available_key =
-      Memo.unit (fun () ->
-          Location.build_generic (Bigstring.of_string "next_available_token"))
-
-    let next_available mdb =
-      Option.value
-        ~default:Token_id.(next default)
-        (get_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_read_t)
-
-    let next_available_kv ~ledger_depth tid =
-      let token_buf =
-        Bin_prot.Common.create_buf (Token_id.Stable.Latest.bin_size_t tid)
-      in
-      ignore (Token_id.Stable.Latest.bin_write_t token_buf ~pos:0 tid : int) ;
-      (Location.serialize ~ledger_depth (next_available_key ()), token_buf)
-
-    let set_next_available mdb tid =
-      set_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_size_t
-        Token_id.Stable.Latest.bin_write_t tid
-
-    let update_next_available_token mdb tid =
-      if Token_id.(next_available mdb <= tid) then
-        set_next_available mdb Token_id.(next tid)
-
     module Owner = struct
+      (* Map token IDs to the owning account *)
+
       let build_location token_id =
         Location.build_generic
           (Bigstring.of_string
              (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id))
 
-      let serialize_kv ~ledger_depth (tid, pk) =
-        let pk_buf =
-          Bin_prot.Common.create_buf (Key.Stable.Latest.bin_size_t pk)
+      let serialize_kv ~ledger_depth ((tid : Token_id.t), (aid : Account_id.t))
+          =
+        let aid_buf =
+          Bin_prot.Common.create_buf (Account_id.Stable.Latest.bin_size_t aid)
         in
-        ignore (Key.Stable.Latest.bin_write_t pk_buf ~pos:0 pk : int) ;
-        (Location.serialize ~ledger_depth (build_location tid), pk_buf)
+        ignore (Account_id.Stable.Latest.bin_write_t aid_buf ~pos:0 aid : int) ;
+        (Location.serialize ~ledger_depth (build_location tid), aid_buf)
 
-      let get mdb token_id =
-        get_bin mdb (build_location token_id) Key.Stable.Latest.bin_read_t
+      let get (mdb : t) (token_id : Token_id.t) : Account_id.t option =
+        get_bin mdb (build_location token_id)
+          Account_id.Stable.Latest.bin_read_t
 
-      let set mdb token_id public_key =
-        set_bin mdb (build_location token_id) Key.Stable.Latest.bin_size_t
-          Key.Stable.Latest.bin_write_t public_key
+      let set (mdb : t) (token_id : Token_id.t) (account_id : Account_id.t) :
+          unit =
+        set_bin mdb (build_location token_id)
+          Account_id.Stable.Latest.bin_size_t
+          Account_id.Stable.Latest.bin_write_t account_id
 
-      let remove mdb token_id = delete_raw mdb (build_location token_id)
+      let remove (mdb : t) (token_id : Token_id.t) : unit =
+        delete_raw mdb (build_location token_id)
 
-      let foldi t ~init ~f =
-        let next_available_token = next_available t in
-        let rec go acc tid =
-          let tid = Token_id.next tid in
-          if Token_id.(tid < next_available_token) then
-            let acc =
-              Option.fold ~init:acc
-                ~f:(fun acc pk -> f ~key:tid ~data:pk acc)
-                (get t tid)
-            in
-            go acc tid
-          else acc
+      let all_owners (t : t) : (Token_id.t * Account_id.t) Sequence.t =
+        let deduped_tokens =
+          (* First get the sequence of unique tokens *)
+          Sequence.folding_map (all_accounts t) ~init:Token_id.Set.empty
+            ~f:(fun (seen : Token_id.Set.t) (a : Account.t) ->
+              let token = Account.token a in
+              let already_seen = Token_id.Set.mem seen token in
+              (Set.add seen token, (already_seen, token)))
+          |> Sequence.filter_map ~f:(fun (already_seen, token) ->
+                 if already_seen then None else Some token)
         in
-        go init Token_id.default
+        Sequence.filter_map deduped_tokens ~f:(fun token ->
+            Option.map (get t token) ~f:(fun owner -> (token, owner)))
+
+      let foldi (type a) (t : t) ~(init : a)
+          ~(f : key:Token_id.t -> data:Account_id.t -> a -> a) : a =
+        Sequence.fold (all_owners t) ~init ~f:(fun acc (key, data) ->
+            f ~key ~data acc)
 
       let _iteri t ~f = foldi t ~init:() ~f:(fun ~key ~data () -> f ~key ~data)
-
-      (* Newest tokens come first, but this should be fine. *)
-      let get_all t =
-        foldi t ~init:[] ~f:(fun ~key ~data acc -> (key, data) :: acc)
     end
 
     let build_location pk =
@@ -446,12 +444,13 @@ module Make (Inputs : Inputs_intf) :
       update mdb pk ~f:(fun tids ->
           Set.union tids (Token_id.Set.of_list new_tids))
 
-    let add_account mdb aid account =
+    let add_account (mdb : t) (aid : Account_id.t) : unit =
       let token = Account_id.token_id aid in
       let key = Account_id.public_key aid in
       add mdb key token ;
-      update_next_available_token mdb token ;
-      if Account.token_owner account then Owner.set mdb token key
+      (* TODO: The owner DB will store a lot of these unnecessarily since
+         most accounts are not going to be managers. *)
+      Owner.set mdb (Account_id.derive_token_id ~owner:aid) aid
 
     let remove mdb pk tid = update mdb pk ~f:(fun tids -> Set.remove tids tid)
 
@@ -459,12 +458,11 @@ module Make (Inputs : Inputs_intf) :
       update mdb pk ~f:(fun tids ->
           Set.diff tids (Token_id.Set.of_list rem_tids))
 
-    let remove_account mdb aid =
+    let remove_account (mdb : t) (aid : Account_id.t) : unit =
       let token = Account_id.token_id aid in
       let key = Account_id.public_key aid in
       remove mdb key token ;
-      if Option.equal Key.equal (Owner.get mdb token) (Some key) then
-        Owner.remove mdb token
+      Owner.remove mdb (Account_id.derive_token_id ~owner:aid)
 
     (** Generate a batch of database changes to add the given tokens. *)
     let add_batch_create mdb pks_to_tokens =
@@ -492,18 +490,14 @@ module Make (Inputs : Inputs_intf) :
 
   let last_filled t = Account_location.last_location t
 
-  let token_owners t =
-    Tokens.Owner.get_all t
-    |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
-    |> Account_id.Set.of_list
+  let token_owners (t : t) : Account_id.Set.t =
+    Tokens.Owner.all_owners t
+    |> Sequence.fold ~init:Account_id.Set.empty ~f:(fun acc (_, owner) ->
+           Set.add acc owner)
 
   let token_owner = Tokens.Owner.get
 
   let tokens = Tokens.get
-
-  let next_available_token = Tokens.next_available
-
-  let set_next_available_token = Tokens.set_next_available
 
   include Util.Make (struct
     module Key = Key
@@ -538,36 +532,22 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
-      let next_available_token = Tokens.next_available mdb in
       let key_to_location_list = Non_empty_list.to_list key_to_location_list in
-      let account_tokens, new_next_available_token =
-        List.fold ~init:(Key.Map.empty, next_available_token)
-          key_to_location_list ~f:(fun (map, next_available_token) (aid, _) ->
-            ( Map.update map (Account_id.public_key aid) ~f:(function
-                | Some set ->
-                    Set.add set (Account_id.token_id aid)
-                | None ->
-                    Token_id.Set.singleton (Account_id.token_id aid))
-            , (* If the token is present in an account, it is no longer
-                 available.
-              *)
-              Token_id.max next_available_token
-                (Token_id.next (Account_id.token_id aid)) ))
-      in
-      let next_available_token_change =
-        if Token_id.(new_next_available_token > next_available_token) then
-          [ Tokens.next_available_kv ~ledger_depth:mdb.depth
-              new_next_available_token
-          ]
-        else []
+      let account_tokens =
+        List.fold ~init:Key.Map.empty key_to_location_list
+          ~f:(fun map (aid, _) ->
+            Map.update map (Account_id.public_key aid) ~f:(function
+              | Some set ->
+                  Set.add set (Account_id.token_id aid)
+              | None ->
+                  Token_id.Set.singleton (Account_id.token_id aid)))
       in
       let batched_changes =
-        next_available_token_change
-        @ Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
-            last_location_key_value
-          :: ( Tokens.add_batch_create mdb account_tokens
-             @ Account_location.set_batch_create ~ledger_depth:mdb.depth
-                 key_to_location_list )
+        Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
+          last_location_key_value
+        :: ( Tokens.add_batch_create mdb account_tokens
+           @ Account_location.set_batch_create ~ledger_depth:mdb.depth
+               key_to_location_list )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
 
@@ -581,7 +561,7 @@ module Make (Inputs : Inputs_intf) :
               let aid = Account.identifier account in
               Some
                 (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, Account_id.public_key aid))
+                   (Account_id.token_id aid, aid))
             else None)
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
@@ -615,10 +595,6 @@ module Make (Inputs : Inputs_intf) :
     let addr = Location.to_path_exn location in
     Addr.to_int addr
 
-  let get_at_index_exn mdb index =
-    let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
-
   let set_at_index_exn mdb index account =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
@@ -629,7 +605,7 @@ module Make (Inputs : Inputs_intf) :
         match Account_location.allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
-            Tokens.add_account mdb account_id account ;
+            Tokens.add_account mdb account_id ;
             Ok (`Added, location)
         | Error err ->
             Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
@@ -645,14 +621,6 @@ module Make (Inputs : Inputs_intf) :
         0
     | Some addr ->
         Addr.to_int addr + 1
-
-  let iteri t ~f =
-    match Account_location.last_location_address t with
-    | None ->
-        ()
-    | Some last_addr ->
-        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue

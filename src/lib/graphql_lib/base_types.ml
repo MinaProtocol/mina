@@ -25,7 +25,7 @@ let uint64 () =
   unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
 
 let token_id () =
-  scalar "TokenId" ~doc:"String representation of a token's UInt64 identifier"
+  scalar "TokenId" ~doc:"String representation of a token's base58 identifier"
     ~coerce:(fun tid -> `String (Mina_base.Token_id.to_string tid))
 
 let epoch_seed () =

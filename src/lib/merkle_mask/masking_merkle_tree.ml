@@ -40,8 +40,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid : Uuid.Stable.V1.t
     ; account_tbl : Account.t Location_binable.Table.t
-    ; token_owners : Key.Stable.Latest.t Token_id.Table.t
-    ; mutable next_available_token : Token_id.t option
+    ; token_owners : Account_id.Stable.Latest.t Token_id.Table.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
     ; hash_tbl : Hash.t Addr.Table.t
@@ -59,7 +58,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; detached_parent_signal = Async.Ivar.create ()
     ; account_tbl = Location_binable.Table.create ()
     ; token_owners = Token_id.Table.create ()
-    ; next_available_token = None
     ; hash_tbl = Addr.Table.create ()
     ; location_tbl = Account_id.Table.create ()
     ; current_location = None
@@ -270,31 +268,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root (get_parent t)
 
-    let next_available_token t =
-      assert_is_attached t ;
-      let base_token = Base.next_available_token (get_parent t) in
-      match t.next_available_token with
-      | Some tid ->
-          Token_id.max tid base_token
-      | None ->
-          base_token
-
-    let set_next_available_token t tid =
-      assert_is_attached t ;
-      t.next_available_token <- Some tid
-
     let remove_account_and_update_hashes t location =
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
       Location_binable.Table.remove t.account_tbl location ;
       (* Update token info. *)
-      let account_token = Account.token account in
-      if Account.token_owner account then
-        Token_id.Table.remove t.token_owners account_token ;
+      let account_id = Account.identifier account in
+      Token_id.Table.remove t.token_owners
+        (Account_id.derive_token_id ~owner:account_id) ;
       (* TODO : use stack database to save unused location, which can be used
          when allocating a location *)
-      Account_id.Table.remove t.location_tbl (Account.identifier account) ;
+      Account_id.Table.remove t.location_tbl account_id ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -320,12 +305,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       self_set_account t location account ;
       (* Update token info. *)
-      let account_token = Account.token account in
-      if Token_id.(next_available_token t <= account_token) then
-        set_next_available_token t (Token_id.next account_token) ;
-      if Account.token_owner account then
-        Token_id.Table.set t.token_owners ~key:account_token
-          ~data:(Account_id.public_key (Account.identifier account)) ;
+      let account_id = Account.identifier account in
+      Token_id.Table.set t.token_owners
+        ~key:(Account_id.derive_token_id ~owner:account_id)
+        ~data:account_id ;
       (* Update merkle path. *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
@@ -389,10 +372,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       let old_root_hash = merkle_root t in
       let account_data = Location_binable.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
-      Option.iter t.next_available_token ~f:(fun tid ->
-          if Token_id.(tid > Base.next_available_token (get_parent t)) then
-            Base.set_next_available_token (get_parent t) tid ;
-          t.next_available_token <- None) ;
       Location_binable.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Debug_assert.debug_assert (fun () ->
@@ -414,7 +393,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; detached_parent_signal = Async.Ivar.create ()
       ; account_tbl = Location_binable.Table.copy t.account_tbl
       ; token_owners = Token_id.Table.copy t.token_owners
-      ; next_available_token = t.next_available_token
       ; location_tbl = Account_id.Table.copy t.location_tbl
       ; hash_tbl = Addr.Table.copy t.hash_tbl
       ; current_location = t.current_location
@@ -481,19 +459,12 @@ module Make (Inputs : Inputs_intf.S) = struct
             Account_id.Table.set t.location_tbl ~key ~data)
 
       let set_raw_account_batch t locations_and_accounts =
-        let next_available_token = next_available_token t in
-        let new_next_available_token =
-          List.fold ~init:next_available_token locations_and_accounts
-            ~f:(fun next_available_token (location, account) ->
-              let account_token = Account.token account in
-              if Account.token_owner account then
-                Token_id.Table.set t.token_owners ~key:account_token
-                  ~data:(Account_id.public_key (Account.identifier account)) ;
-              self_set_account t location account ;
-              Token_id.max next_available_token (Token_id.next account_token))
-        in
-        if Token_id.(next_available_token < new_next_available_token) then
-          set_next_available_token t new_next_available_token
+        List.iter locations_and_accounts ~f:(fun (location, account) ->
+            let account_id = Account.identifier account in
+            Token_id.Table.set t.token_owners
+              ~key:(Account_id.derive_token_id ~owner:account_id)
+              ~data:account_id ;
+            self_set_account t location account)
     end)
 
     let set_batch_accounts t addresses_and_accounts =
@@ -516,20 +487,19 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent_keys = Base.accounts (get_parent t) in
       Account_id.Set.union parent_keys mask_keys
 
-    let token_owner t tid =
+    let token_owner (t : t) (tid : Token_id.t) : Account_id.t option =
       assert_is_attached t ;
       match Token_id.Table.find t.token_owners tid with
-      | Some pk ->
-          Some pk
+      | Some id ->
+          Some id
       | None ->
           Base.token_owner (get_parent t) tid
 
-    let token_owners t =
+    let token_owners (t : t) : Account_id.Set.t =
       assert_is_attached t ;
       let mask_owners =
-        Token_id.Table.to_alist t.token_owners
-        |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
-        |> Account_id.Set.of_list
+        Hashtbl.fold t.token_owners ~init:Account_id.Set.empty
+          ~f:(fun ~key:_tid ~data:owner acc -> Set.add acc owner)
       in
       Set.union mask_owners (Base.token_owners (get_parent t))
 
@@ -627,7 +597,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     let close t =
       assert_is_attached t ;
       Location_binable.Table.clear t.account_tbl ;
-      t.next_available_token <- None ;
       Addr.Table.clear t.hash_tbl ;
       Account_id.Table.clear t.location_tbl ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()

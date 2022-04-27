@@ -1,6 +1,6 @@
 open Core
 open Integration_test_lib
-open Mina_base
+open Mina_transaction
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -17,15 +17,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 2 in
+    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
     ; block_producers =
         List.init n ~f:(fun _ ->
-            { Block_producer.balance = block_producer_balance
-            ; timing = Untimed
-            })
+            { Wallet.balance = block_producer_balance; timing = Untimed })
     }
 
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node

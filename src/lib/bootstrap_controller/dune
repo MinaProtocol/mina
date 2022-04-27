@@ -33,6 +33,8 @@
    pipe_lib
    mina_transition
    mina_base
+   mina_ledger
+   mina_transaction_logic
    syncable_ledger
    consensus
    mina_networking
@@ -46,6 +48,7 @@
    genesis_constants
    coda_genesis_ledger
    block_time
+   mina_base.util
    o1trace
    mina_net2
    ))

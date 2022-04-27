@@ -25,7 +25,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       (x :> Field.Var.t)
       (Field.Var.constant Field.zero)
 
-  let assert_decreasing : Boolean.var list -> (unit, _) Checked.t =
+  let assert_decreasing : Boolean.var list -> unit Checked.t =
     let rec go prev (bs0 : Boolean.var list) =
       match bs0 with
       | [] ->
@@ -109,8 +109,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     num_bits
 
   (* Someday: this could definitely be made more efficient *)
-  let num_bits_upper_bound_unpacked :
-      Boolean.var list -> (Field.Var.t, _) Checked.t =
+  let num_bits_upper_bound_unpacked : Boolean.var list -> Field.Var.t Checked.t
+      =
    fun x_unpacked ->
     let%bind res =
       exists Typ.field
@@ -124,8 +124,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     let%map () = assert_num_bits_upper_bound x_unpacked res in
     res
 
-  let num_bits_upper_bound ~max_length (x : Field.Var.t) :
-      (Field.Var.t, _) Checked.t =
+  let num_bits_upper_bound ~max_length (x : Field.Var.t) : Field.Var.t Checked.t
+      =
     Field.Checked.unpack x ~length:max_length >>= num_bits_upper_bound_unpacked
 
   let%test_module "Snark_util" =
@@ -143,7 +143,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         let test () =
           let x = random () in
           let y = random () in
-          let (), (less, less_or_equal) =
+          let less, less_or_equal =
             run_and_check
               (let%map { less; less_or_equal } =
                  Field.Checked.compare ~bit_length (Field.Var.constant x)
@@ -153,7 +153,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                  map2 (read Boolean.typ less)
                    (read Boolean.typ less_or_equal)
                    ~f:Tuple2.create))
-              ()
             |> Or_error.ok_exn
           in
           let r = Bigint.(compare (of_field x) (of_field y)) in
@@ -171,15 +170,14 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                 [ boolean_assert_lte Boolean.false_ Boolean.false_
                 ; boolean_assert_lte Boolean.false_ Boolean.true_
                 ; boolean_assert_lte Boolean.true_ Boolean.true_
-                ])
-             ()) ;
+                ])) ;
         assert (
           Or_error.is_error
-            (check (boolean_assert_lte Boolean.true_ Boolean.false_) ()) )
+            (check (boolean_assert_lte Boolean.true_ Boolean.false_)) )
 
       let%test_unit "assert_decreasing" =
         let decreasing bs =
-          check (assert_decreasing (List.map ~f:Boolean.var_of_value bs)) ()
+          check (assert_decreasing (List.map ~f:Boolean.var_of_value bs))
         in
         Or_error.ok_exn (decreasing [ true; true; true; false ]) ;
         Or_error.ok_exn (decreasing [ true; true; false; false ]) ;
@@ -203,8 +201,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
           in
           for i = 0 to Int.pow 2 total_length - 1 do
             if i = correct then
-              Or_error.ok_exn (check (handle_with (to_bits i)) ())
-            else assert (Or_error.is_error (check (handle_with (to_bits i)) ()))
+              Or_error.ok_exn (check (handle_with (to_bits i)))
+            else assert (Or_error.is_error (check (handle_with (to_bits i))))
           done
         in
         for n = 0 to total_length do

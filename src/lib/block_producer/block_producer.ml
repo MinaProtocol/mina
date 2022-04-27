@@ -2,6 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 
@@ -189,7 +190,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
-          @@ Ledger.unregister_mask_exn ~loc:__LOC__
+          @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( (match diff with Ok diff -> diff | Error _ -> assert false)
@@ -236,19 +237,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target)
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
+            let next_registers =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
+                  { ( Ledger_proof.statement proof
+                    |> Ledger_proof.statement_target )
+                    with
+                    pending_coinbase_stack = ()
+                  }
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
+                  |> Blockchain_state.registers
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -270,8 +269,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
+                ~registers:next_registers ~genesis_ledger_hash
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =
@@ -471,10 +469,11 @@ module Vrf_evaluation_state = struct
     }
 
   let poll_vrf_evaluator ~logger vrf_evaluator =
-    O1trace.thread "query_vrf_evaluator" (fun () ->
-        retry ~logger
-          ~error_message:"Error fetching slots from the VRF evaluator"
-          (fun () -> Vrf_evaluator.slots_won_so_far vrf_evaluator))
+    let f () =
+      O1trace.thread "query_vrf_evaluator" (fun () ->
+          Vrf_evaluator.slots_won_so_far vrf_evaluator)
+    in
+    retry ~logger ~error_message:"Error fetching slots from the VRF evaluator" f
 
   let create () = { queue = Core.Queue.create (); vrf_evaluator_status = Start }
 
@@ -519,14 +518,13 @@ module Vrf_evaluation_state = struct
 
   let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
     let set_epoch_data () =
-      O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
-          retry ~logger
-            ~error_message:"Error setting epoch state of the VRF evaluator"
-            (fun () ->
-              Vrf_evaluator.set_new_epoch_state vrf_evaluator
-                ~epoch_data_for_vrf))
+      let f () =
+        O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
+            Vrf_evaluator.set_new_epoch_state vrf_evaluator ~epoch_data_for_vrf)
+      in
+      retry ~logger
+        ~error_message:"Error setting epoch state of the VRF evaluator" f
     in
-
     [%log info] "Sending data for VRF evaluations for epoch $epoch"
       ~metadata:
         [ ("epoch", Mina_numbers.Length.to_yojson epoch_data_for_vrf.epoch) ] ;
@@ -735,7 +733,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     let previous_state_hash =
                       (Protocol_state.hashes previous_protocol_state).state_hash
                     in
-                    let delta_transition_chain_proof =
+                    let delta_block_chain_proof =
                       Transition_chain_prover.prove
                         ~length:
                           (Mina_numbers.Length.to_int consensus_constants.delta)
@@ -747,9 +745,14 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                       External_transition.Validation.wrap
                         { With_hash.hash = protocol_state_hashes
                         ; data =
-                            External_transition.create ~protocol_state
-                              ~protocol_state_proof ~staged_ledger_diff
-                              ~delta_transition_chain_proof ()
+                            (let body = Body.create staged_ledger_diff in
+                             Block.create ~body
+                               ~header:
+                                 (Header.create
+                                    ~body_reference:
+                                      (Body_reference.of_body body)
+                                    ~protocol_state ~protocol_state_proof
+                                    ~delta_block_chain_proof ()))
                         }
                       |> External_transition.skip_time_received_validation
                            `This_transition_was_not_received_via_gossip
@@ -1160,7 +1163,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
-      ; delta_transition_chain_proof
+      ; delta_transition_chain_proof = delta_block_chain_proof
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1223,9 +1226,13 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             External_transition.Validation.wrap
               { With_hash.hash = protocol_state_hashes
               ; data =
-                  External_transition.create ~protocol_state
-                    ~protocol_state_proof ~staged_ledger_diff
-                    ~delta_transition_chain_proof ()
+                  (let body = Body.create staged_ledger_diff in
+                   Block.create ~body
+                     ~header:
+                       (Header.create
+                          ~body_reference:(Body_reference.of_body body)
+                          ~protocol_state ~protocol_state_proof
+                          ~delta_block_chain_proof ()))
               }
             |> External_transition.skip_time_received_validation
                  `This_transition_was_not_received_via_gossip
