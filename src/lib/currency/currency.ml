@@ -23,8 +23,7 @@ module Signed_var = struct
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
   (* Invariant: At least one of these is Some *)
-  type nonrec 'mag t =
-    { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
+  type nonrec 'mag t = { repr : 'mag repr; mutable value : Field.Var.t option }
 end
 
 [%%endif]
@@ -323,8 +322,9 @@ end = struct
   let to_field (x : t) : Field.t = Field.project (to_bits x)
 
   let typ : (var, t) Typ.t =
+    let (Typ typ) = Field.typ in
     Typ.transport
-      { Field.typ with check = range_check }
+      (Typ { typ with check = range_check })
       ~there:to_field ~back:of_field
 
   [%%endif]
@@ -489,18 +489,6 @@ end = struct
     let to_field (t : t) : Field.t =
       Field.mul (Sgn.to_field t.sgn) (magnitude_to_field t.magnitude)
 
-    let magnitude_upper_bound =
-      Bigint.of_bignum_bigint Bignum_bigint.(one lsl M.length)
-
-    let of_field (x : Field.t) : t =
-      let n = Bigint.of_field x in
-      let sgn, magnitude =
-        if Int.( <= ) (Bigint.compare n magnitude_upper_bound) 0 then
-          (Sgn.Pos, x)
-        else (Sgn.Neg, Field.negate x)
-      in
-      { sgn; magnitude = of_field magnitude }
-
     type repr = var Signed_var.repr
 
     type nonrec var = var Signed_var.t
@@ -511,63 +499,26 @@ end = struct
         ~value_of_hlist:typ_of_hlist
 
     let typ : (var, t) Typ.t =
-      { alloc =
-          Snarky_backendless.Typ_monads.Alloc.map repr_typ.alloc ~f:(fun r ->
-              { Signed_var.value = None; repr = Some r })
-      ; check =
-          (fun x ->
-            match x.repr with None -> return () | Some r -> repr_typ.check r)
-      ; read =
-          (fun (x : var) ->
-            match (x.repr, x.value) with
-            | None, None ->
-                assert false
-            | Some r, None | Some r, Some _ ->
-                repr_typ.read r
-            | None, Some v ->
-                Snarky_backendless.Typ_monads.Read.map (Field.typ.read v)
-                  ~f:of_field)
-      ; store =
-          (fun (x : t) ->
-            Snarky_backendless.Typ_monads.Store.map (repr_typ.store x)
-              ~f:(fun r -> { Signed_var.value = None; repr = Some r }))
-      }
+      Typ.transport_var repr_typ
+        ~back:(fun repr -> { Signed_var.value = None; repr })
+        ~there:(fun { Signed_var.repr; _ } -> repr)
 
     let create_var ~magnitude ~sgn : var =
-      { repr = Some { magnitude; sgn }; value = None }
+      { repr = { magnitude; sgn }; value = None }
 
     module Checked = struct
       type t = var
 
       type signed_fee_var = t
 
-      let repr_value ({ magnitude; sgn } : repr) =
-        Field.Checked.mul magnitude (sgn :> Field.Var.t)
-
-      let repr (x : Field.Var.t) =
-        let%bind repr =
-          exists repr_typ
-            ~compute:As_prover.(map (read Field.typ x) ~f:of_field)
-        in
-        let%bind x' = repr_value repr in
-        let%map () = Field.Checked.Assert.equal x x' in
-        repr
-
-      let repr (t : var) =
-        match t.repr with
-        | Some r ->
-            Checked.return r
-        | None ->
-            let%map r = repr (Option.value_exn t.value) in
-            t.repr <- Some r ;
-            r
+      let repr (t : var) = Checked.return t.repr
 
       let value (t : var) =
         match t.value with
         | Some x ->
             Checked.return x
         | None ->
-            let r = Option.value_exn t.repr in
+            let r = t.repr in
             let%map x = Field.Checked.mul (r.sgn :> Field.Var.t) r.magnitude in
             t.value <- Some x ;
             x
@@ -589,21 +540,18 @@ end = struct
 
       let constant ({ magnitude; sgn } as t) =
         { Signed_var.repr =
-            Some
-              { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
+            { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
         ; value = Some (Field.Var.constant (to_field t))
         }
 
       let of_unsigned magnitude : var =
-        { repr = Some { magnitude; sgn = Sgn.Checked.pos }
-        ; value = Some magnitude
-        }
+        { repr = { magnitude; sgn = Sgn.Checked.pos }; value = Some magnitude }
 
       let negate (t : var) : var =
         { value = Option.map t.value ~f:Field.Var.negate
         ; repr =
-            Option.map t.repr ~f:(fun { magnitude; sgn } ->
-                { magnitude; sgn = Sgn.Checked.negate sgn })
+            (let { magnitude; sgn } = t.repr in
+             { magnitude; sgn = Sgn.Checked.negate sgn })
         }
 
       let if_repr cond ~then_ ~else_ =
@@ -614,13 +562,7 @@ end = struct
         { sgn; magnitude }
 
       let if_ cond ~(then_ : var) ~(else_ : var) : var Checked.t =
-        let%bind repr =
-          match (then_.repr, else_.repr) with
-          | Some r1, Some r2 ->
-              if_repr cond ~then_:r1 ~else_:r2 >>| Option.return
-          | _ ->
-              return None
-        in
+        let%bind repr = if_repr cond ~then_:then_.repr ~else_:else_.repr in
         let%map value =
           match (then_.value, else_.value) with
           | Some v1, Some v2 ->
@@ -628,7 +570,6 @@ end = struct
           | _ ->
               return None
         in
-        assert (Option.is_some repr || Option.is_some value) ;
         { Signed_var.value; repr }
 
       let sgn (t : var) =
@@ -671,7 +612,7 @@ end = struct
            adjusted.
         *)
         let%map res_value = Field.Checked.mul (sgn :> Field.Var.t) magnitude in
-        ( { Signed_var.repr = Some { magnitude = res_magnitude; sgn }
+        ( { Signed_var.repr = { magnitude = res_magnitude; sgn }
           ; value = Some res_value
           }
         , `Overflow overflow )
@@ -690,7 +631,7 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) res_value
         in
         let%map () = range_check magnitude in
-        { Signed_var.repr = Some { magnitude; sgn }; value = Some res_value }
+        { Signed_var.repr = { magnitude; sgn }; value = Some res_value }
 
       let ( + ) = add
 

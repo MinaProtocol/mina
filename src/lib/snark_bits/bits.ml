@@ -202,25 +202,21 @@ module Snarkable = struct
       type value = V.t
 
       let typ : (var, value) Typ.t =
-        let open Typ in
-        let read v =
-          let open Read.Let_syntax in
-          let%map x = Read.read v in
-          let n = Bigint.of_field x in
-          init ~f:(fun i -> Bigint.test_bit n i)
-        in
-        let store t =
-          let rec go two_to_the_i i acc =
-            if i = V.length then acc
-            else
-              let acc = if V.get t i then Field.add two_to_the_i acc else acc in
-              go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
-          in
-          Store.store (go Field.one 0 Field.zero)
-        in
-        let alloc = Alloc.alloc in
-        let check _ = Checked.return () in
-        { read; store; alloc; check }
+        Field.typ
+        |> Typ.transport
+             ~there:(fun t ->
+               let rec go two_to_the_i i acc =
+                 if i = V.length then acc
+                 else
+                   let acc =
+                     if V.get t i then Field.add two_to_the_i acc else acc
+                   in
+                   go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
+               in
+               go Field.one 0 Field.zero)
+             ~back:(fun t ->
+               let n = Bigint.of_field t in
+               init ~f:(fun i -> Bigint.test_bit n i))
 
       let size_in_bits = size_in_bits
     end
