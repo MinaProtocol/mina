@@ -17,7 +17,11 @@ module Transmuter = struct
     type t = Mina_block.initial_valid_block Envelope.Incoming.t
   end
 
-  module Target = State_hash
+  module Target = struct
+    include State_hash
+
+    let to_string = to_base58_check
+  end
 
   let transmute enveloped_transition =
     let transition, _ = Envelope.Incoming.data enveloped_transition in
