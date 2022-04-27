@@ -20,7 +20,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test snark work *)
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -45,6 +45,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
           (* 30_000_000_000_000 mina is the total. initially, the balance will be 10k mina. after 8 global slots, the cliff is hit, although the cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
         ]
+    ; extra_genesis_accounts =
+        [ { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"; timing = Untimed }
+        ]
     ; num_snark_workers =
         3
         (* this test doesn't need snark workers, however turning it on in this test just to make sure the snark workers function within integration tests *)
@@ -59,17 +63,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
       Network.block_producers network
     in
-    (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_int 30_000_000_000_000 in
-    let fee = Currency.Fee.of_int 1_000_000_000 in
-    let test_constants = Engine.Network.constraint_constants network in
-    let%bind receiver_pub_key = Util.pub_key_of_node untimed_node_a in
-    let sender_kp =
-      (Node.network_keypair untimed_node_b |> Option.value_exn).keypair
+    [%log info] "extra genesis keypairs: %s"
+      (List.to_string (Network.extra_genesis_keypairs network)
+         ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
+           public_key |> Signature_lib.Public_key.to_bigstring
+           |> Bigstring.to_string)) ;
+    let[@warning "-8"] [ fish1; fish2 ] =
+      Network.extra_genesis_keypairs network
     in
+    (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
+    let amount = Currency.Amount.of_formatted_string "10" in
+    let fee = Currency.Fee.of_formatted_string "1" in
+    let test_constants = Engine.Network.constraint_constants network in
+    let receiver_pub_key =
+      fish1.public_key |> Signature_lib.Public_key.compress
+    in
+    let sender_kp = fish2 in
     let sender_pub_key =
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
+    (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
+    let receiver_original_balance =
+      Currency.Amount.of_formatted_string "1000"
+    in
+    let sender_original_balance = Currency.Amount.of_formatted_string "1000" in
     let txn_body =
       Signed_command_payload.Body.Payment
         { source_pk = sender_pub_key
@@ -138,106 +155,80 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot.  timeouts are hardcoded because the intg test configurations aren't registering.  hardcoding should be removed when that's fixed *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)))
     in
     let%bind () =
       section
         "check that the account balances are what we expect after the previous \
          txn"
-        (let%bind { total_balance = node_a_balance; _ } =
+        (let%bind { total_balance = receiver_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
              ~public_key:receiver_pub_key
          in
-         let%bind { total_balance = node_b_balance; _ } =
+         let%bind { total_balance = sender_balance; _ } =
            Network.Node.must_get_account_data ~logger untimed_node_b
              ~public_key:sender_pub_key
          in
-         let node_a_num_produced_blocks =
-           Map.find (network_state t).blocks_produced_by_node
-             (Network.Node.id untimed_node_a)
-           |> Option.value ~default:[] |> List.length
-         in
-         let node_b_num_produced_blocks =
-           Map.find (network_state t).blocks_produced_by_node
-             (Network.Node.id untimed_node_b)
-           |> Option.value ~default:[] |> List.length
-         in
-         let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in
+         (* let node_a_num_produced_blocks =
+              Map.find (network_state t).blocks_produced_by_node
+                (Network.Node.id untimed_node_a)
+              |> Option.value ~default:[] |> List.length
+            in
+            let node_b_num_produced_blocks =
+              Map.find (network_state t).blocks_produced_by_node
+                (Network.Node.id untimed_node_b)
+              |> Option.value ~default:[] |> List.length
+            in
+            let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in *)
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
-         let node_a_expected =
-           (* 400_000_000_000_000 is hardcoded as the original amount, change this if original amount changes *)
-           Currency.Amount.add
-             (Currency.Amount.of_int 400_000_000_000_000)
-             amount
+         let receiver_expected =
+           Currency.Amount.add receiver_original_balance amount
            |> Option.value_exn
          in
-         let node_b_expected =
-           Currency.Amount.sub
-             ( Currency.Amount.add
-                 (* 300_000_000_000_000 is hardcoded the original amount, change this if original amount changes *)
-                 (Currency.Amount.of_int 300_000_000_000_000)
-                 ( if Int.equal node_b_num_produced_blocks 0 then
-                   Currency.Amount.zero
-                 else
-                   Currency.Amount.scale coinbase_reward
-                     (node_b_num_produced_blocks * 2)
-                   |> Option.value_exn )
-             |> Option.value_exn )
-             amount
+         let sender_expected =
+           Currency.Amount.sub sender_original_balance amount
            (* ( Currency.Amount.add amount (Currency.Amount.of_fee fee)
               |> Option.value_exn ) *)
            (* TODO: put the fee back in *)
            |> Option.value_exn
          in
-         [%log info] "coinbase_amount: %s"
-           (Currency.Amount.to_formatted_string coinbase_reward) ;
+         (* [%log info] "coinbase_amount: %s"
+            (Currency.Amount.to_formatted_string coinbase_reward) ; *)
          [%log info] "txn_amount: %s"
            (Currency.Amount.to_formatted_string amount) ;
-         [%log info] "node_a_expected: %s"
-           (Currency.Amount.to_formatted_string node_a_expected) ;
-         [%log info] "node_a_balance: %s"
-           (Currency.Balance.to_formatted_string node_a_balance) ;
-         [%log info] "node_a_num_produced_blocks: %d" node_a_num_produced_blocks ;
-         [%log info] "node_b_expected: %s"
-           (Currency.Amount.to_formatted_string node_b_expected) ;
-         [%log info] "node_b_balance: %s"
-           (Currency.Balance.to_formatted_string node_b_balance) ;
-         [%log info] "node_b_num_produced_blocks: %d" node_b_num_produced_blocks ;
+         [%log info] "receiver_expected: %s"
+           (Currency.Amount.to_formatted_string receiver_expected) ;
+         [%log info] "receiver_balance: %s"
+           (Currency.Balance.to_formatted_string receiver_balance) ;
+         [%log info] "sender_expected: %s"
+           (Currency.Amount.to_formatted_string sender_expected) ;
+         [%log info] "sender_balance: %s"
+           (Currency.Balance.to_formatted_string sender_balance) ;
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
            (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
-             (Currency.Balance.to_amount node_a_balance)
-             node_a_expected
+             (Currency.Balance.to_amount receiver_balance)
+             receiver_expected
            (* node_b is the sender *)
            (* node_b_balance <= (300_000_000_000_000 + node_b_num_produced_blocks*possible_coinbase_reward*2) - (txn_amount + txn_fee) *)
            (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `node_b_num_produced_blocks*possible_coinbase_reward*2` bit.  the *2 is because untimed accounts get supercharged rewards *)
            (* TODO, the fee is not calculated in at the moment *)
            && Currency.Amount.( <= )
-                (Currency.Balance.to_amount node_b_balance)
-                node_b_expected
+                (Currency.Balance.to_amount sender_balance)
+                sender_expected
          then Malleable_error.return ()
          else
            Malleable_error.soft_error_format ~value:()
-             "Error with account balances.  receiving node_a balance is %d and \
-              should be at least %d, node_b balance is %d and should be at \
-              most %d.  possible coinbase_amount is %d, and txn_amount is %d"
-             (Currency.Balance.to_int node_a_balance)
-             (Currency.Amount.to_int node_a_expected)
-             (Currency.Balance.to_int node_b_balance)
-             (Currency.Amount.to_int node_b_expected)
-             (Currency.Amount.to_int coinbase_reward)
+             "Error with account balances.  receiver balance is %d and should \
+              be %d, sender balance is %d and should be %d.  and txn_amount is \
+              %d"
+             (Currency.Balance.to_int receiver_balance)
+             (Currency.Amount.to_int receiver_expected)
+             (Currency.Balance.to_int sender_balance)
+             (Currency.Amount.to_int sender_expected)
              (Currency.Amount.to_int amount))
     in
     let%bind () =
@@ -294,7 +285,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Invalid_signature"
         (let open Deferred.Let_syntax in
         match%bind
-          Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
+          Network.Node.send_payment_with_raw_sig untimed_node_a ~logger
             ~sender_pub_key:
               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
             ~receiver_pub_key:
@@ -343,21 +334,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender = timed_node_c in
          let%bind sender_pub_key = Util.pub_key_of_node sender in
          let%bind { hash; _ } =
-           Network.Node.must_send_payment ~logger sender ~sender_pub_key
+           Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
              ~receiver_pub_key ~amount ~fee
          in
          wait_for t
-           ( Wait_condition.signed_command_to_be_included_in_frontier
-               ~txn_hash:hash ~node_included_in:(`Node timed_node_c)
-           |> Wait_condition.with_timeouts
-                ~soft_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (8. *. 3. *. 60.)))
-                  (* 8 slots, 3 minutes per slot *)
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_sec (16. *. 3. *. 60.)))
-              (* 16 slots, 3 minutes per slot *) ))
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
     in
     section "unable to send payment from timed account using illiquid tokens"
       (let amount = Currency.Amount.of_int 25_000_000_000_000 in
