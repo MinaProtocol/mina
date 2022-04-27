@@ -11,6 +11,11 @@ struct PeerId {
   id @0 :Text;
 }
 
+struct BlockWithId {
+  blake2bHash @0 :Data;
+  block @1 :Data;
+}
+
 struct RootBlockId {
   blake2bHash @0 :Data;
 }
@@ -294,6 +299,30 @@ struct Libp2pHelperInterface {
     }
   }
 
+  # Rpcs only used for testing (TODO: move these somewhere else)
+  struct TestDecodeBitswapBlocks {
+    struct Request {
+      blocks @0 :List(BlockWithId);
+      rootBlockId @1 :RootBlockId;
+    }
+
+    struct Response {
+      decodedData @0 :Data;
+    }
+  }
+
+  struct TestEncodeBitswapBlocks {
+    struct Request {
+      data @0 :Data;
+      maxBlockSize @1 :Int64;
+    }
+
+    struct Response {
+      blocks @0 :List(BlockWithId);
+      rootBlockId @1 :RootBlockId;
+    }
+  }
+
   # validation is a special push message where the sequence number
   # corresponds to the the push message sent to the daemon in the
   # GossipReceived message
@@ -340,6 +369,8 @@ struct Libp2pHelperInterface {
       setNodeStatus @18 :Libp2pHelperInterface.SetNodeStatus.Request;
       getPeerNodeStatus @19 :Libp2pHelperInterface.GetPeerNodeStatus.Request;
       bandwidthInfo @20 :Libp2pHelperInterface.BandwidthInfo.Request;
+      testDecodeBitswapBlocks @21 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Request;
+      testEncodeBitswapBlocks @22 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Request;
     }
   }
 
@@ -365,6 +396,8 @@ struct Libp2pHelperInterface {
       setNodeStatus @17 :Libp2pHelperInterface.SetNodeStatus.Response;
       getPeerNodeStatus @18 :Libp2pHelperInterface.GetPeerNodeStatus.Response;
       bandwidthInfo @19 :Libp2pHelperInterface.BandwidthInfo.Response;
+      testDecodeBitswapBlocks @20 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Response;
+      testEncodeBitswapBlocks @21 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Response;
     }
   }
 
