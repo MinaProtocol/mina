@@ -338,6 +338,8 @@ module Dsl = struct
          txn_hash:Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
+
+    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
   end
 
   module type Util_intf = sig
