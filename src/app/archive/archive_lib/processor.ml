@@ -180,18 +180,26 @@ module Account_identifiers = struct
       (module Conn)
       t
 
-  let find (module Conn : CONNECTION) account_id =
+  let find_opt (module Conn : CONNECTION) account_id =
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
     let%bind public_key_id = Public_key.find (module Conn) pk in
     let token = Account_id.token_id account_id in
     let%bind token_id = Token.find (module Conn) token in
-    Conn.find
-      (Caqti_request.find
+    Conn.find_opt
+      (Caqti_request.find_opt
          Caqti_type.(tup2 int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()))
       (public_key_id, token_id)
+
+  let find (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    match%map find_opt (module Conn) account_id with
+    | Some id ->
+        id
+    | None ->
+        failwith "Could not find account identifier in database"
 
   let load (module Conn : CONNECTION) id =
     Conn.find

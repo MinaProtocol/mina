@@ -498,10 +498,6 @@ WITH RECURSIVE chain AS (
       end
     end in
     let open M.Let_syntax in
-    let get_token_by_id id =
-      Archive_lib.Processor.Token.find_by_id (module Conn) id
-      |> Errors.Lift.sql ~context:"Finding token by id"
-    in
     let%bind block_id, raw_block, block_extras =
       match%bind
         Block.run (module Conn) input
@@ -537,7 +533,7 @@ WITH RECURSIVE chain AS (
     in
     let%bind internal_commands =
       M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
-          let%bind kind =
+          let%map kind =
             match ic.Archive_lib.Processor.Internal_command.typ with
             | "fee_transfer" ->
                 M.return `Fee_transfer
@@ -556,7 +552,8 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
-          let%map token_id = get_token_by_id ic.token_id in
+          (* internal commands always use the default token *)
+          let token_id = Mina_base.Token_id.(to_string default) in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
@@ -585,8 +582,9 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
-          let%bind fee_token = get_token_by_id uc.fee_token_id in
-          let%bind token = get_token_by_id uc.token_id in
+          (* TODO: do we want to mention tokens at all here? *)
+          let fee_token = Mina_base.Token_id.(to_string default) in
+          let token = Mina_base.Token_id.(to_string default) in
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
