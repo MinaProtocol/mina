@@ -245,14 +245,10 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               [ (sender_party_data, ()); (snapp_party_data, ()) ]
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
-          let protocol_state_predicate_hash =
-            Zkapp_precondition.Protocol_state.digest protocol_state
-          in
           let memo = Signed_command_memo.empty in
           let memo_hash = Signed_command_memo.hash memo in
           let transaction : Parties.Transaction_commitment.t =
             Parties.Transaction_commitment.create ~other_parties_hash
-              ~protocol_state_predicate_hash ~memo_hash
           in
           let at_party = Parties.Call_forest.hash ps in
           let tx_statement : Zkapp_statement.t =
@@ -277,7 +273,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           in
           let fee_payer =
             let txn_comm =
-              Parties.Transaction_commitment.with_fee_payer transaction
+              Parties.Transaction_commitment.create_complete transaction
+                ~memo_hash
                 ~fee_payer_hash:
                   (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
             in

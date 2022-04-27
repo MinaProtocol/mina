@@ -1113,9 +1113,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let if_ = Parties.value_if
 
-      let commitment ~party:_ ~other_parties:_ ~memo_hash:_ = ()
+      let commitment ~other_parties:_ = ()
 
-      let full_commitment ~party:_ ~commitment:_ = ()
+      let full_commitment ~party:_ ~memo_hash:_ ~commitment:_ = ()
     end
 
     module Public_key = struct
@@ -2454,7 +2454,8 @@ module For_tests = struct
     let parties = Parties.of_wire parties in
     let commitment = Parties.commitment parties in
     let full_commitment =
-      Parties.Transaction_commitment.with_fee_payer commitment
+      Parties.Transaction_commitment.create_complete commitment
+        ~memo_hash:(Signed_command_memo.hash parties.memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer parties.fee_payer))
     in

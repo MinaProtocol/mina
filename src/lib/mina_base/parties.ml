@@ -782,33 +782,23 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~(other_parties_hash : Digest.Forest.t)
-      ~protocol_state_predicate_hash ~memo_hash : t =
-    Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| protocol_state_predicate_hash
-       ; (other_parties_hash :> Pickles.Impls.Step.Field.Constant.t)
-       ; memo_hash
-      |]
+  let create ~(other_parties_hash : Digest.Forest.t) : t =
+    (other_parties_hash :> t)
 
-  let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.t) =
+  let create_complete (t : t) ~memo_hash ~(fee_payer_hash : Digest.Party.t) =
     Random_oracle.hash ~init:Hash_prefix.party_cons
-      [| (fee_payer_hash :> t); t |]
+      [| memo_hash; (fee_payer_hash :> t); t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~(other_parties_hash : Digest.Forest.Checked.t)
-        ~protocol_state_predicate_hash ~memo_hash =
-      Random_oracle.Checked.hash
-        ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| protocol_state_predicate_hash
-         ; (other_parties_hash :> t)
-         ; memo_hash
-        |]
+    let create ~(other_parties_hash : Digest.Forest.Checked.t) =
+      (other_parties_hash :> t)
 
-    let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.Checked.t) =
+    let create_complete (t : t) ~memo_hash
+        ~(fee_payer_hash : Digest.Party.Checked.t) =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
-        [| (fee_payer_hash :> t); t |]
+        [| memo_hash; (fee_payer_hash :> t); t |]
   end
 end
 
@@ -816,10 +806,6 @@ let other_parties_hash (t : t) = Call_forest.hash t.other_parties
 
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~other_parties_hash:(other_parties_hash t)
-    ~protocol_state_predicate_hash:
-      (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.body.protocol_state_precondition)
-    ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
 module Weight = struct
