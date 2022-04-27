@@ -208,7 +208,7 @@ module Ledger = struct
           ( module Genesis_ledger.Of_ledger (struct
             let t =
               lazy
-                (Ledger.create ~directory_name:dirname
+                (Mina_ledger.Ledger.create ~directory_name:dirname
                    ~depth:constraint_constants.ledger_depth ())
 
             let depth = constraint_constants.ledger_depth
@@ -217,9 +217,11 @@ module Ledger = struct
     packed
 
   let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
-    Ledger.commit ledger ;
-    let dirname = Option.value_exn (Ledger.get_directory ledger) in
-    let root_hash = State_hash.to_base58_check @@ Ledger.merkle_root ledger in
+    Mina_ledger.Ledger.commit ledger ;
+    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
+    let root_hash =
+      State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+    in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
@@ -386,7 +388,8 @@ module Ledger = struct
                   { config with
                     hash =
                       Some
-                        (State_hash.to_base58_check @@ Ledger.merkle_root ledger)
+                        ( State_hash.to_base58_check
+                        @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
                 in
                 let name, other_data =
@@ -428,7 +431,8 @@ module Ledger = struct
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_base58_check @@ Ledger.merkle_root ledger
+                      State_hash.to_base58_check
+                      @@ Mina_ledger.Ledger.merkle_root ledger
                     in
                     let tar_path =
                       genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
@@ -601,14 +605,14 @@ module Genesis_proof = struct
     (* TODO: Use [Writer.write_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         let%bind wr = Writer.open_file filename in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
+        Writer.write wr (Proof.Stable.V2.sexp_of_t proof |> Sexp.to_string) ;
         Writer.close wr)
 
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         Reader.file_contents filename
-        >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp)
+        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp)
 
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))

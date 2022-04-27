@@ -8,111 +8,183 @@ open Snark_bits
 
 [%%ifdef consensus_mechanism]
 
-let zero_checked =
-  Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
-
 module Make_checked
     (N : Unsigned_extended.S)
     (Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
-  open Bitstring_lib
   open Snark_params.Tick
-  open Snarky_integer
 
-  type var = field Integer.t
+  type var = Field.Var.t
 
   let () = assert (Int.(N.length_in_bits < Field.size_in_bits))
 
-  let to_field = Integer.to_field
+  let to_input (t : var) =
+    Random_oracle.Input.Chunked.packed (t, N.length_in_bits)
 
-  let of_bits bs = Integer.of_bits ~m bs
-
-  let to_bits t =
-    with_label
-      (sprintf "to_bits: %s" __LOC__)
-      (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
-
-  let to_input t =
+  let to_input_legacy (t : var) =
+    let to_bits (t : var) =
+      with_label
+        (sprintf "to_bits: %s" __LOC__)
+        (Field.Checked.choose_preimage_var t ~length:N.length_in_bits)
+    in
     Checked.map (to_bits t) ~f:(fun bits ->
-        Random_oracle.Input.bitstring
-          (Bitstring_lib.Bitstring.Lsb_first.to_list bits))
+        Random_oracle.Input.Legacy.bitstring bits)
 
-  let constant n = Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
+  let constant n =
+    Field.Var.constant
+      (Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n)))
 
-  (* warning: this typ does not work correctly with the generic if_ *)
-  let typ : (field Integer.t, N.t) Typ.t =
-    let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
-    let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
-    let alloc = Typ.Alloc.map typ.alloc ~f:of_bits in
-    let store t =
-      Typ.Store.map (typ.store (Fold.to_list (Bits.fold t))) ~f:of_bits
+  let () = assert (Int.(N.length_in_bits mod 16 = 0))
+
+  let range_check' (t : var) =
+    let _, _, actual_packed =
+      Pickles.Scalar_challenge.to_field_checked' ~num_bits:N.length_in_bits m
+        (Kimchi_backend_common.Scalar_challenge.create t)
     in
-    let check v =
-      typ.check (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v))
+    actual_packed
+
+  let range_check t =
+    let%bind actual = make_checked (fun () -> range_check' t) in
+    Field.Checked.Assert.equal actual t
+
+  let range_check_flag t =
+    let open Pickles.Impls.Step in
+    let actual = range_check' t in
+    Field.equal actual t
+
+  let of_field (x : Field.t) : N.t =
+    let of_bits bs =
+      (* TODO: Make this efficient *)
+      List.foldi bs ~init:N.zero ~f:(fun i acc b ->
+          if b then N.(logor (shift_left one i) acc) else acc)
     in
-    let read v =
-      let of_field_elt x =
-        let bs = List.take (Field.unpack x) N.length_in_bits in
-        (* TODO: Make this efficient *)
-        List.foldi bs ~init:N.zero ~f:(fun i acc b ->
-            if b then N.(logor (shift_left one i) acc) else acc)
-      in
-      Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
+    of_bits (List.take (Field.unpack x) N.length_in_bits)
+
+  let to_field (x : N.t) : Field.t = Field.project (Fold.to_list (Bits.fold x))
+
+  let typ : (var, N.t) Typ.t =
+    let (Typ field_typ) = Field.typ in
+    Typ.transport
+      (Typ { field_typ with check = range_check })
+      ~there:to_field ~back:of_field
+
+  let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
+
+  let div_mod (x : var) (y : var) =
+    let%bind q, r =
+      exists (Typ.tuple2 typ typ)
+        ~compute:
+          As_prover.(
+            let%map x = read typ x and y = read typ y in
+            (N.div x y, N.rem x y))
     in
-    { alloc; store; check; read }
+
+    (* q * y + r = x
+
+       q * y = x - r
+    *)
+    let%map () = assert_r1cs q y (Field.Var.sub x r) in
+    (q, r)
 
   type t = var
 
   let is_succ ~pred ~succ =
     let open Snark_params.Tick in
     let open Field in
-    Checked.(equal (to_field pred + Var.constant one) (to_field succ))
+    Checked.(equal (pred + Var.constant one) succ)
 
-  let min a b = make_checked (fun () -> Integer.min ~m a b)
+  let gte x y =
+    let open Pickles.Impls.Step in
+    let xy = Pickles.Util.seal m Field.(x - y) in
+    let yx = Pickles.Util.seal m (Field.negate xy) in
+    let x_gte_y = range_check_flag xy in
+    let y_gte_x = range_check_flag yx in
+    Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
+    x_gte_y
 
-  let if_ c ~then_ ~else_ =
-    make_checked (fun () -> Integer.if_ ~m c ~then_ ~else_)
+  let op op a b = make_checked (fun () -> op a b)
 
-  let succ_if t c =
+  let ( >= ) a b = op gte a b
+
+  let ( <= ) a b = b >= a
+
+  let ( < ) a b =
     make_checked (fun () ->
-        let t = Integer.succ_if ~m t c in
-        t)
+        let open Pickles.Impls.Step in
+        Boolean.( &&& ) (gte b a) (Boolean.not (Field.equal b a)))
 
-  let succ t =
-    make_checked (fun () ->
-        let t = Integer.succ ~m t in
-        t)
+  let ( > ) a b = b < a
 
-  let op op a b = make_checked (fun () -> op ~m a b)
+  module Assert = struct
+    let equal = Field.Checked.Assert.equal
+  end
 
-  let add a b = op Integer.add a b
+  let to_field = Fn.id
 
-  let sub_or_zero a b = op Integer.subtract_unpacking_or_zero a b
+  module Unsafe = struct
+    let of_field = Fn.id
+  end
 
-  let sub a b = op Integer.subtract_unpacking a b
+  let min a b =
+    let%bind a_lte_b = a <= b in
+    Field.Checked.if_ a_lte_b ~then_:a ~else_:b
 
-  let equal a b = op Integer.equal a b
+  let if_ = Field.Checked.if_
 
-  let ( < ) a b = op Integer.lt a b
+  let succ_if (t : var) (c : Boolean.var) =
+    Checked.return (Field.Var.add t (c :> Field.Var.t))
 
-  let ( <= ) a b = op Integer.lte a b
+  let succ (t : var) =
+    Checked.return (Field.Var.add t (Field.Var.constant Field.one))
 
-  let ( > ) a b = op Integer.gt a b
+  let seal x = make_checked (fun () -> Pickles.Util.seal m x)
 
-  let ( >= ) a b = op Integer.gte a b
+  let add (x : var) (y : var) =
+    let%bind res = seal (Field.Var.add x y) in
+    let%map () = range_check res in
+    res
+
+  let mul (x : var) (y : var) =
+    let%bind res = Field.Checked.mul x y in
+    let%map () = range_check res in
+    res
+
+  let subtract_unpacking_or_zero x y =
+    let open Pickles.Impls.Step in
+    let res = Pickles.Util.seal m Field.(x - y) in
+    let neg_res = Pickles.Util.seal m (Field.negate res) in
+    let x_gte_y = range_check_flag res in
+    let y_gte_x = range_check_flag neg_res in
+    Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
+    (* If y_gte_x is false, then x_gte_y is true, so x >= y and
+       thus there was no underflow.
+
+       If y_gte_x is true, then y >= x, which means there was underflow
+       iff y != x.
+
+       Thus, underflow = (neg_res_good && y != x)
+    *)
+    let underflow = Boolean.( &&& ) y_gte_x (Boolean.not (Field.equal x y)) in
+    (`Underflow underflow, Field.if_ underflow ~then_:Field.zero ~else_:res)
+
+  let sub_or_zero a b = make_checked (fun () -> subtract_unpacking_or_zero a b)
+
+  (* Unpacking protects against underflow *)
+  let sub (x : var) (y : var) =
+    let%bind res = seal (Field.Var.sub x y) in
+    let%map () = range_check res in
+    res
+
+  let equal a b = Field.Checked.equal a b
 
   let ( = ) = equal
 
-  let to_integer = Fn.id
-
-  module Unsafe = struct
-    let of_integer = Fn.id
-  end
-
-  let zero = zero_checked
+  let zero = Field.Var.constant Field.zero
 end
 
 [%%endif]
+
+open Snark_params.Tick
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]
@@ -143,10 +215,6 @@ struct
   (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
 
-  let var_to_bits var =
-    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
-      ~m:Snark_params.Tick.m var
-
   [%%endif]
 
   module Bits = Bits
@@ -155,7 +223,11 @@ struct
 
   let of_bits = Bits.of_bits
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input (t : t) =
+    Random_oracle.Input.Chunked.packed
+      (Field.project (to_bits t), N.length_in_bits)
+
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
