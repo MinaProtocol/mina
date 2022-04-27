@@ -31,13 +31,6 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let external_transition_of_breadcrumb breadcrumb =
-  let { With_hash.data = external_transition; _ }, _ =
-    Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    |> External_transition.Validated.erase
-  in
-  external_transition
-
 let sign_blake2_hash ~private_key s =
   let module Field = Snark_params.Tick.Field in
   let blake2 = Blake2.digest_string s in
@@ -181,7 +174,10 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
           ]
 
 let block_base64_of_breadcrumb breadcrumb =
-  let external_transition = external_transition_of_breadcrumb breadcrumb in
+  let external_transition =
+    breadcrumb |> Transition_frontier.Breadcrumb.block
+    |> External_transition.compose
+  in
   let block_string =
     Binable.to_string
       (module External_transition.Raw.Stable.Latest)
@@ -240,16 +236,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ~prover:(Public_key.compress submitter_keypair.public_key)
       in
       let best_tip = Transition_frontier.best_tip tf in
-      let external_transition =
-        Transition_frontier.Breadcrumb.validated_transition best_tip
-        |> External_transition.Validation.forget_validation
-      in
+      let block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
           (External_transition.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled
-             external_transition)
+               Genesis_constants.Constraint_constants.compiled block)
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -313,7 +305,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                        false)
             in
             let staged_ledger_hash =
-              Transition_frontier.Breadcrumb.blockchain_state best_tip
+              Mina_block.header block |> Mina_block.Header.protocol_state
+              |> Mina_state.Protocol_state.blockchain_state
               |> Mina_state.Blockchain_state.staged_ledger_hash
             in
             match

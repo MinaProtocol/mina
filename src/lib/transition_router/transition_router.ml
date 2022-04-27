@@ -22,7 +22,7 @@ let is_transition_for_bootstrap ~logger
     |> Transition_frontier.Breadcrumb.consensus_state_with_hashes
   in
   let new_consensus_state =
-    External_transition.Validation.forget_validation_with_hash new_transition
+    Validation.block_with_hash new_transition
     |> With_hash.map ~f:External_transition.consensus_state
   in
   let constants = precomputed_values.consensus_constants in
@@ -37,7 +37,8 @@ let is_transition_for_bootstrap ~logger
       if
         Length.to_int
           ( Transition_frontier.best_tip frontier
-          |> Transition_frontier.Breadcrumb.blockchain_length )
+          |> Transition_frontier.Breadcrumb.consensus_state
+          |> Consensus.Data.Consensus_state.blockchain_length )
         + 290 + slack
         < Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
@@ -67,9 +68,9 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Mina_metrics.(
           Counter.inc_one
             Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data block)
+        Mina_block.handle_dropped_transition
+          ( With_hash.hash @@ Validation.block_with_hash
+          @@ Network_peer.Envelope.Incoming.data block )
           ?valid_cb ~pipe_name:name ~logger)
       ()
   in
@@ -108,9 +109,9 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ~f:(fun (`Block head, `Valid_cb valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data head)
+        Mina_transition.Mina_block.handle_dropped_transition
+          ( With_hash.hash @@ Validation.block_with_hash
+          @@ Network_peer.Envelope.Incoming.data head )
           ~pipe_name:name ~logger ?valid_cb)
       ()
   in
@@ -211,7 +212,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
         Option.merge acc (Option.return enveloped_candidate_best_tip)
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
             let f x =
-              External_transition.Validation.forget_validation_with_hash x
+              Validation.block_with_hash x
               |> With_hash.map ~f:External_transition.consensus_state
             in
             match
@@ -228,8 +229,8 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
   in
   Option.iter res ~f:(fun best ->
       let best_tip_length =
-        External_transition.Initial_validated.blockchain_length best.data.data
-        |> Length.to_int
+        Validation.block best.data.data
+        |> Mina_block.blockchain_length |> Length.to_int
       in
       Mina_metrics.Transition_frontier.update_max_blocklength_observed
         best_tip_length ;
@@ -347,8 +348,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
               [ ( "length"
                 , `Int
                     (Unsigned.UInt32.to_int
-                       (External_transition.Initial_validated.blockchain_length
-                          best_tip.data)) )
+                       ( Mina_block.blockchain_length
+                       @@ Validation.block best_tip.data )) )
               ]
             "Network best tip is too new to catchup to (best_tip with \
              $length); starting bootstrap" ;
@@ -371,8 +372,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                 [ ( "length"
                   , `Int
                       (Unsigned.UInt32.to_int
-                         (External_transition.Initial_validated
-                          .blockchain_length (Option.value_exn best_tip).data))
+                         ( Mina_block.blockchain_length
+                         @@ Validation.block (Option.value_exn best_tip).data ))
                   )
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
@@ -476,11 +477,14 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_bufferred_pipe ~name
-      ~f:(fun (`Transition head, _, `Valid_cb valid_cb) ->
+      ~f:
+        (fun (`Transition (head : Mina_block.Validated.t), _, `Valid_cb valid_cb)
+             ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
-        Mina_transition.External_transition.Validated.handle_dropped_transition
-          head ~pipe_name:name ~logger ?valid_cb)
+        Mina_transition.Mina_block.handle_dropped_transition
+          (Mina_block.Validated.forget head |> With_hash.hash)
+          ~pipe_name:name ~logger ?valid_cb)
       ()
   in
   let transition_reader, transition_writer =
@@ -488,9 +492,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     create_bufferred_pipe ~name
       ~f:(fun (`Block block, `Valid_cb valid_cb) ->
         Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
-        Mina_transition.External_transition.Initial_validated
-        .handle_dropped_transition
-          (Network_peer.Envelope.Incoming.data block)
+        Mina_transition.Mina_block.handle_dropped_transition
+          ( Network_peer.Envelope.Incoming.data block
+          |> Validation.block_with_hash |> With_hash.hash )
           ?valid_cb ~pipe_name:name ~logger)
       ()
   in
@@ -516,9 +520,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
             let `Block block, `Valid_cb valid_cb = head in
             Mina_metrics.(
               Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
-            Mina_transition.External_transition.Initial_validated
-            .handle_dropped_transition
-              (Network_peer.Envelope.Incoming.data block)
+            Mina_transition.Mina_block.handle_dropped_transition
+              ( Network_peer.Envelope.Incoming.data block
+              |> Validation.block_with_hash |> With_hash.hash )
               ~valid_cb ~pipe_name:name ~logger)
           ()
       in
@@ -561,12 +565,10 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                  (Consensus.Hooks.select
                     ~constants:precomputed_values.consensus_constants
                     ~existing:
-                      ( External_transition.Validation
-                        .forget_validation_with_hash current_transition
+                      ( Validation.block_with_hash current_transition
                       |> With_hash.map ~f:External_transition.consensus_state )
                     ~candidate:
-                      ( External_transition.Validation
-                        .forget_validation_with_hash incoming_transition
+                      ( Validation.block_with_hash incoming_transition
                       |> With_hash.map ~f:External_transition.consensus_state )
                     ~logger)
              then

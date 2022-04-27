@@ -257,7 +257,7 @@ let%test_module "Archive node unit tests" =
                         in
                         if
                           Unsigned.UInt32.compare
-                            (Transition_frontier.Breadcrumb.blockchain_length
+                            (Consensus.Data.Consensus_state.blockchain_length @@ Transition_frontier.Breadcrumb.consensus_state 
                                breadcrumb)
                             (Unsigned.UInt32.of_int 1)
                           > 0

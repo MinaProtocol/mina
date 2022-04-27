@@ -50,9 +50,6 @@ end = struct
     interruptible
 end
 
-module Transition_frontier_validation =
-  External_transition.Transition_frontier_validation (Transition_frontier)
-
 let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
 let time_of_ms = Fn.compose Block_time.of_span_since_epoch Block_time.Span.of_ms
@@ -620,10 +617,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
             [%log info]
               ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
               "Producing new block with parent $breadcrumb%!" ;
-            let previous_transition =
-              Breadcrumb.validated_transition crumb
-              |> External_transition.Validation.forget_validation_with_hash
-            in
+            let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
               External_transition.protocol_state
                 (With_hash.data previous_transition)
@@ -742,7 +736,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     in
                     let%bind transition =
                       let open Result.Let_syntax in
-                      External_transition.Validation.wrap
+                      Validation.wrap
                         { With_hash.hash = protocol_state_hashes
                         ; data =
                             (let body = Body.create staged_ledger_diff in
@@ -754,23 +748,28 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                                     ~protocol_state ~protocol_state_proof
                                     ~delta_block_chain_proof ()))
                         }
-                      |> External_transition.skip_time_received_validation
-                           `This_transition_was_not_received_via_gossip
-                      |> External_transition.skip_protocol_versions_validation
-                           `This_transition_has_valid_protocol_versions
-                      |> External_transition.validate_genesis_protocol_state
+                      |> Validation.skip_time_received_validation
+                           `This_block_was_not_received_via_gossip
+                      |> Validation.skip_protocol_versions_validation
+                           `This_block_has_valid_protocol_versions
+                      |> Validation.validate_genesis_protocol_state
                            ~genesis_state_hash:
                              (Protocol_state.genesis_state_hash
                                 ~state_hash:(Some previous_state_hash)
                                 previous_protocol_state)
-                      >>| External_transition.skip_proof_validation
-                            `This_transition_was_generated_internally
-                      >>| External_transition
-                          .skip_delta_transition_chain_validation
-                            `This_transition_was_not_received_via_gossip
-                      >>= Transition_frontier_validation
-                          .validate_frontier_dependencies ~logger ~frontier
+                      >>| Validation.skip_proof_validation
+                            `This_block_was_generated_internally
+                      >>| Validation.skip_delta_block_chain_validation
+                            `This_block_was_not_received_via_gossip
+                      >>= Validation.validate_frontier_dependencies ~logger
                             ~consensus_constants
+                            ~root_block:
+                              ( Transition_frontier.root frontier
+                              |> Breadcrumb.block_with_hash )
+                            ~get_block_by_hash:
+                              (Fn.compose
+                                 (Option.map ~f:Breadcrumb.block_with_hash)
+                                 (Transition_frontier.find frontier))
                       |> Deferred.return
                     in
                     let transition_receipt_time = Some (Time.now ()) in
@@ -1185,10 +1184,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         [%log trace]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
           "Emitting precomputed block with parent $breadcrumb%!" ;
-        let previous_transition =
-          Breadcrumb.validated_transition crumb
-          |> External_transition.Validation.forget_validation_with_hash
-        in
+        let previous_transition = Breadcrumb.block_with_hash crumb in
         let previous_protocol_state =
           External_transition.protocol_state
             (With_hash.data previous_transition)
@@ -1223,7 +1219,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           in
           let%bind transition =
             let open Result.Let_syntax in
-            External_transition.Validation.wrap
+            Validation.wrap
               { With_hash.hash = protocol_state_hashes
               ; data =
                   (let body = Body.create staged_ledger_diff in
@@ -1234,21 +1230,28 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                           ~protocol_state ~protocol_state_proof
                           ~delta_block_chain_proof ()))
               }
-            |> External_transition.skip_time_received_validation
-                 `This_transition_was_not_received_via_gossip
-            |> External_transition.skip_protocol_versions_validation
-                 `This_transition_has_valid_protocol_versions
-            |> External_transition.validate_genesis_protocol_state
+            |> Validation.skip_time_received_validation
+                 `This_block_was_not_received_via_gossip
+            |> Validation.skip_protocol_versions_validation
+                 `This_block_has_valid_protocol_versions
+            |> Validation.skip_proof_validation
+                 `This_block_was_generated_internally
+            |> Validation.skip_delta_block_chain_validation
+                 `This_block_was_not_received_via_gossip
+            |> Validation.validate_genesis_protocol_state
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state)
-            >>| External_transition.skip_proof_validation
-                  `This_transition_was_generated_internally
-            >>| External_transition.skip_delta_transition_chain_validation
-                  `This_transition_was_not_received_via_gossip
-            >>= Transition_frontier_validation.validate_frontier_dependencies
-                  ~logger ~frontier ~consensus_constants
+            >>= Validation.validate_frontier_dependencies ~logger
+                  ~consensus_constants
+                  ~root_block:
+                    ( Transition_frontier.root frontier
+                    |> Breadcrumb.block_with_hash )
+                  ~get_block_by_hash:
+                    (Fn.compose
+                       (Option.map ~f:Breadcrumb.block_with_hash)
+                       (Transition_frontier.find frontier))
             |> Deferred.return
           in
           let transition_receipt_time = None in
