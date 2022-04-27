@@ -472,11 +472,11 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   in
   parties
 
-let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ~sequence_state =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind zkapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
+  let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let sequence_events = Util.sequence_state_of_list sequence_state in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
@@ -544,11 +544,11 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   parties
 
-let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ~permissions ~current_auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
-  let%bind zkapp_keypair = Util.snapp_keypair_of_file snapp_keyfile in
+  let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
     { Transaction_snark.For_tests.Spec.sender = (keypair, nonce)
     ; fee

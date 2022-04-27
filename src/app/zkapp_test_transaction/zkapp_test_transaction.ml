@@ -70,7 +70,7 @@ let create_zkapp_account =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file for the zkApp account to be created"
            Param.(required string)
        and amount = Flags.amount in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -98,7 +98,7 @@ let upgrade_zkapp =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file for the account to be upgraded"
+           ~doc:"KEYFILE Private key file for the zkApp account to be upgraded"
            Param.(required string)
        and verification_key =
          Param.flag "--verification-key"
@@ -206,7 +206,7 @@ let update_state =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file for account to get the updated state"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and app_state =
          Param.flag "--zkapp-state"
@@ -241,7 +241,7 @@ let update_zkapp_uri =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to get the updated zkApp URI"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and zkapp_uri =
          Param.flag "--zkapp-uri"
@@ -264,11 +264,11 @@ let update_zkapp_uri =
          ~zkapp_uri ~auth))
 
 let update_sequence_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~sequence_state () =
     let open Deferred.Let_syntax in
     let%map parties =
-      update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~sequence_state
     in
     Util.print_snapp_transaction parties ;
@@ -279,11 +279,9 @@ let update_sequence_state =
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:
-             "KEYFILE Private key file for the account to get the updated \
-              sequence state"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and sequence_state0 =
          Param.flag "--sequence-state0"
@@ -329,7 +327,7 @@ let update_sequence_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~sequence_state))
 
 let update_token_symbol =
@@ -350,9 +348,7 @@ let update_token_symbol =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:
-             "KEYFILE Private key file for the account to get the updated \
-              token symbol"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and token_symbol =
          Param.flag "--token-symbol"
@@ -375,11 +371,11 @@ let update_token_symbol =
          ~token_symbol ~auth))
 
 let update_permissions =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~permissions ~current_auth () =
     let open Deferred.Let_syntax in
     let%map parties =
-      update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~permissions ~current_auth
     in
     Util.print_snapp_transaction parties ;
@@ -392,11 +388,9 @@ let update_permissions =
         "Generate a zkApp transaction that updates the permissions of a zkApp \
          account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:
-             "KEYFILE Private key file for the account to get the updated \
-              permissions"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and edit_state =
          Param.flag "--edit-state" ~doc:"Proof|Signature|Either|None"
@@ -458,7 +452,7 @@ let update_permissions =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~permissions
          ~current_auth:(Util.auth_of_string current_auth)))
 
