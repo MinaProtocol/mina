@@ -22,15 +22,16 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     v
 
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
-    let typ = Vector.typ Boolean.typ n in
-    let typ =
-      { typ with
-        check =
-          (fun x ->
-            Snarky_backendless.Checked.bind (typ.check x) ~f:(fun () ->
-                make_checked (fun () ->
-                    Boolean.Assert.exactly_one (Vector.to_list x))))
-      }
+    let (Typ typ) = Vector.typ Boolean.typ n in
+    let typ : _ Typ.t =
+      Typ
+        { typ with
+          check =
+            (fun x ->
+              Snarky_backendless.Checked.bind (typ.check x) ~f:(fun () ->
+                  make_checked (fun () ->
+                      Boolean.Assert.exactly_one (Vector.to_list x))))
+        }
     in
     Typ.transport typ
       ~there:(fun i -> Vector.init n ~f:(( = ) i))

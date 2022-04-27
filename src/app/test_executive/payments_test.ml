@@ -270,7 +270,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section
         "attempt to send again the same signed transaction command as before, \
-         but changing the nonce, to conduct a replay attack.  expecting an \
+         but changing the nonce, to conduct a replay attack.  expecting a \
          Invalid_signature"
         (let open Deferred.Let_syntax in
         match%bind

@@ -422,6 +422,11 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 let%test_unit "parties payment test" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_int 1
+    }
+  in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
       let ts2 : Parties.t list =

@@ -244,7 +244,7 @@ module T = struct
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
-      ; local_state = Mina_state.Local_state.empty
+      ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
     in
@@ -281,7 +281,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -307,7 +307,7 @@ module T = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
-          { local_state = Mina_state.Local_state.empty
+          { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
           ; pending_coinbase_stack
@@ -516,7 +516,7 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let empty_local_state = Mina_state.Local_state.empty in
+    let empty_local_state = Mina_state.Local_state.empty () in
     let%map applied_txn =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
@@ -2404,7 +2404,8 @@ let%test_module "staged ledger tests" =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
               let fee_payer_hash =
-                Party.of_fee_payer parties.fee_payer |> Party.digest
+                Party.of_fee_payer parties.fee_payer
+                |> Parties.Digest.Party.create
               in
               let fee_payer_signature =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
@@ -2418,10 +2419,7 @@ let%test_module "staged ledger tests" =
                 { parties.fee_payer with authorization = fee_payer_signature }
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
-              let other_parties_hash =
-                Parties.Call_forest.With_hashes.other_parties_hash
-                  parties.other_parties
-              in
+              let other_parties_hash = Parties.other_parties_hash parties in
               let sign_for_other_party ~use_full_commitment sk protocol_state =
                 let protocol_state_predicate_hash =
                   Zkapp_precondition.Protocol_state.digest protocol_state
@@ -2443,8 +2441,8 @@ let%test_module "staged ledger tests" =
               in
               (* replace other party's signatures, because of new protocol state *)
               let other_parties_with_valid_signatures =
-                List.map parties.other_parties
-                  ~f:(fun { body; authorization } ->
+                Parties.Call_forest.map parties.other_parties
+                  ~f:(fun ({ body; authorization } : Party.t) ->
                     let authorization_with_valid_signature =
                       match authorization with
                       | Control.Signature _dummy ->
@@ -2473,9 +2471,10 @@ let%test_module "staged ledger tests" =
                       | Proof _ | None_given ->
                           authorization
                     in
-                    { Party.body
-                    ; authorization = authorization_with_valid_signature
-                    })
+                    ( { body
+                      ; authorization = authorization_with_valid_signature
+                      }
+                      : Party.t ))
               in
               let parties' =
                 { parties with

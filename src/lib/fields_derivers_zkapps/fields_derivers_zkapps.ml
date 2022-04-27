@@ -112,6 +112,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     Invalid_rich_scalar of
       [ `Uint
       | `Field
+      | `Token_id
       | `Public_key
       | `Amount
       | `Balance

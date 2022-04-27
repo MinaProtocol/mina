@@ -96,10 +96,11 @@ module Command_error = struct
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
+        [ `Valid_until of Mina_numbers.Global_slot.t
+        | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
-    | Invalid_transaction
+    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   let grounds_for_diff_rejection : t -> bool = function
@@ -108,7 +109,7 @@ module Command_error = struct
     | Insufficient_funds _
     | Insufficient_replace_fee _ ->
         false
-    | Overflow | Bad_token | Unwanted_fee_token _ | Invalid_transaction ->
+    | Overflow | Bad_token | Unwanted_fee_token _ | Verification_failed ->
         true
 end
 
@@ -745,8 +746,8 @@ let expired_by_predicate (t : t) :
              None)
   |> Sequence.filter ~f:(fun (_, ps) ->
          ps.other_parties
-         |> List.map ~f:Party.protocol_state_precondition
-         |> List.exists ~f:(fun predicate ->
+         |> Parties.Call_forest.exists ~f:(fun party ->
+                let predicate = Party.protocol_state_precondition party in
                 match predicate.timestamp with
                 | Check { upper; _ } ->
                     let upper =
@@ -938,8 +939,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         true
     | User_command.Parties ps ->
         ps.other_parties
-        |> List.map ~f:Party.protocol_state_precondition
-        |> List.exists ~f:(fun predicate ->
+        |> Parties.Call_forest.exists ~f:(fun party ->
+               let predicate = Party.protocol_state_precondition party in
                match predicate.timestamp with
                | Check { lower; upper } ->
                    let lower =
@@ -1005,7 +1006,12 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           (* C5 *)
           let%bind () =
             if check_timestamp_predicate expiry_ns unchecked then Ok ()
-            else Error Invalid_transaction
+            else
+              Error
+                (Expired
+                   ( `Timestamp_predicate (Time_ns.Span.to_string_hum expiry_ns)
+                   , `Global_slot_since_genesis
+                       (global_slot_since_genesis config) ))
           in
           let%bind () = check_expiry config unchecked in
           let%bind consumed =
@@ -1232,7 +1238,7 @@ let add_from_gossip_exn t ~verify cmd0 nonce balance :
   let x =
     Add_from_gossip_exn0.add_from_gossip_exn ~config:t.config
       ~verify:(fun c ->
-        Result.of_option (verify c) ~error:Command_error.Invalid_transaction
+        Result.of_option (verify c) ~error:Command_error.Verification_failed
         |> Writer_result.of_result)
       cmd0 nonce balance
   in
@@ -1258,7 +1264,7 @@ let add_from_gossip_exn_async ~config
       ~verify:(fun c ->
         Writer_result.Deferred.Deferred
           (Deferred.map (verify c) ~f:(fun r ->
-               Result.of_option r ~error:Command_error.Invalid_transaction
+               Result.of_option r ~error:Command_error.Verification_failed
                |> Writer_result.of_result)))
       cmd0 nonce balance r
   in
@@ -1535,9 +1541,9 @@ let%test_module _ =
                     failwith "Overflow."
                 | Error Bad_token ->
                     failwith "Token is incompatible with the command."
-                | Error Invalid_transaction ->
+                | Error Verification_failed ->
                     failwith
-                      "Transaction had invalid signature or was malformed"
+                      "Transaction had invalid proof/signature or was malformed"
                 | Error (Unwanted_fee_token fee_token) ->
                     failwithf
                       !"Bad fee token. The fees are paid in token %{sexp: \
@@ -1552,7 +1558,18 @@ let%test_module _ =
                       !"Expired user command. Current global slot is \
                         %{sexp:Mina_numbers.Global_slot.t} but user command is \
                         only valid until %{sexp:Mina_numbers.Global_slot.t}"
-                      global_slot_since_genesis valid_until () )
+                      global_slot_since_genesis valid_until ()
+                | Error
+                    (Expired
+                      ( `Timestamp_predicate expiry_ns
+                      , `Global_slot_since_genesis global_slot_since_genesis ))
+                  ->
+                    failwithf
+                      !"Expired zkapp. Current global slot is \
+                        %{sexp:Mina_numbers.Global_slot.t}. Transaction \
+                        expired or will expire in the pool based on the \
+                        current expiry duration of %s"
+                      global_slot_since_genesis expiry_ns () )
           in
           go cmds)
 

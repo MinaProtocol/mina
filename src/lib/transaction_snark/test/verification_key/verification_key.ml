@@ -5,6 +5,9 @@ module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "verification_key"
 
+  let failure_expected =
+    Mina_base.Transaction_status.Failure.Update_not_permitted_verification_key
+
   let snapp_update : Party.Update.t =
     let new_verification_key :
         (Side_loaded.Verification_key.t, Zkapp_basic.F.t) With_hash.t =

@@ -286,7 +286,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Unexpected underflow when taking balance difference")
         | Some diff ->
             let sender_party =
-              List.hd_exn parties_transfer_from_timed_account.other_parties
+              (List.hd_exn parties_transfer_from_timed_account.other_parties)
+                .elt
+                .party
             in
             let amount_to_send =
               Currency.Amount.Signed.magnitude
@@ -317,7 +319,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Send a snapp with transfer from timed account that fails due to min \
          balance"
         (let sender_party =
-           List.hd_exn parties_invalid_transfer_from_timed_account.other_parties
+           (List.hd_exn
+              parties_invalid_transfer_from_timed_account.other_parties)
+             .elt
+             .party
          in
          let amount_to_send =
            Currency.Amount.Signed.magnitude
