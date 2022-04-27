@@ -8,12 +8,8 @@ module Container_images = struct
     }
 end
 
-module Block_producer = struct
+module Wallet = struct
   type t = { balance : string; timing : Mina_base.Account_timing.t }
-end
-
-module Extra_accounts = struct
-  type t = { keypair : Signature_lib.Keypair.t; balance : string }
 end
 
 type constants =
@@ -31,8 +27,8 @@ type t =
   ; slots_per_sub_window : int
   ; proof_level : Runtime_config.Proof_keys.Level.t
   ; txpool_max_size : int
-  ; block_producers : Block_producer.t list
-  ; extra_genesis_accounts : Extra_accounts.t list
+  ; block_producers : Wallet.t list
+  ; extra_genesis_accounts : Wallet.t list
   ; num_snark_workers : int
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
@@ -41,7 +37,6 @@ type t =
   ; work_delay : int option
   ; transaction_capacity :
       Runtime_config.Proof_keys.Transaction_capacity.t option
-  ; aux_account_balance : string option
   }
 
 let default =
@@ -63,5 +58,4 @@ let default =
        Signature_lib.Public_key.Compressed.to_string pk)
   ; work_delay = None
   ; transaction_capacity = None
-  ; aux_account_balance = None
   }

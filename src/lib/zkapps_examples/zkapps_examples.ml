@@ -174,7 +174,11 @@ module Party_under_construction = struct
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
-          Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.constant
+          let open Snark_params.Tick in
+          let (Typ typ) = typ in
+          let fields, aux = typ.value_to_fields x in
+          let fields = Array.map Field.Var.constant fields in
+          typ.var_of_fields (fields, aux)
         in
         let default =
           var_of_t
@@ -237,7 +241,11 @@ module Party_under_construction = struct
         (* TODO: Don't do this. *)
         let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) :
             var =
-          Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.constant
+          let open Snark_params.Tick in
+          let (Typ typ) = typ in
+          let fields, aux = typ.value_to_fields x in
+          let fields = Array.map Field.Var.constant fields in
+          typ.var_of_fields (fields, aux)
         in
         let default =
           var_of_t (Party.Update.typ ())
@@ -300,7 +308,11 @@ module Party_under_construction = struct
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
-        Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.constant
+        let open Snark_params.Tick in
+        let (Typ typ) = typ in
+        let fields, aux = typ.value_to_fields x in
+        let fields = Array.map Field.Var.constant fields in
+        typ.var_of_fields (fields, aux)
       in
       { public_key = t.public_key
       ; token_id = t.token_id
