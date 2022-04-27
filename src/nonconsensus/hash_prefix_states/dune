@@ -3,7 +3,16 @@
  (public_name hash_prefix_states_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries hash_prefixes mina_compile_config_nonconsensus random_oracle_nonconsensus mina_signature_kind)
+ (libraries
+   ;;opam libraries
+   core_kernel
+   base
+   ;;local libraries
+   hash_prefixes
+   random_oracle_nonconsensus
+   snark_params_nonconsensus
+   mina_signature_kind
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_compare ppx_deriving_yojson ppx_inline_test))

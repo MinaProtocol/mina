@@ -2,13 +2,19 @@
  (public_name cache_dir.native)
  (name cache_dir_native)
  (libraries
-   ; opam deps
-   async
+   ;; opam libraries
+   base.caml
+   async_unix
+   base
    core
-   ; libs
+   async
+   core_kernel
+   stdio
+   async_kernel
+   ;; local libraries
    key_cache
-   blake2
-   logger)
+   logger
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_here ppx_let ppx_custom_printf))
  (implements cache_dir))

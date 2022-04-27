@@ -4,10 +4,47 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare))
  (libraries
+   ;; opam libraries
+   integers
+   base.caml
+   async_kernel
+   core_kernel
    core
    async
+   sexplib0
+   ;; local libraries
+   best_tip_prover
+   transition_handler
+   o1trace
+   truth
+   mina_net2
+   consensus
+   logger
+   error_json
+   trust_system
+   mina_transition
+   mina_state
+   transition_frontier_persistent_frontier
+   mina_networking
+   transition_frontier_controller
    pipe_lib
    transition_frontier
-   transition_frontier_controller
    bootstrap_controller
-   mina_networking))
+   mina_intf
+   transition_frontier_persistent_root
+   transition_frontier_base
+   mina_base
+   signature_lib
+   network_peer
+   with_hash
+   block_time
+   mina_metrics
+   precomputed_values
+   mina_numbers
+   interruptible
+   genesis_constants
+   unsigned_extended
+   proof_carrying_data
+   ledger_catchup
+   data_hash_lib
+))

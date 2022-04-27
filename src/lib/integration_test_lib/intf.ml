@@ -1,9 +1,7 @@
 open Async_kernel
 open Core_kernel
-open Currency
 open Mina_base
 open Pipe_lib
-open Signature_lib
 
 type metrics_t =
   { block_production_delay : int list
@@ -51,7 +49,7 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       type signed_command_result =
-        { id : string; hash : string; nonce : Unsigned.uint32 }
+        { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
 
       val send_payment :
            logger:Logger.t
@@ -186,6 +184,8 @@ module Engine = struct
 
     val seeds : t -> Node.t list
 
+    val all_non_seed_pods : t -> Node.t list
+
     val block_producers : t -> Node.t list
 
     val snark_coordinators : t -> Node.t list
@@ -194,9 +194,13 @@ module Engine = struct
 
     val all_nodes : t -> Node.t list
 
-    val keypairs : t -> Signature_lib.Keypair.t list
+    val all_keypairs : t -> Signature_lib.Keypair.t list
 
-    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
+    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
+
+    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
+
+    val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig
@@ -294,6 +298,8 @@ module Dsl = struct
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
       ; blocks_produced_by_node : State_hash.t list String.Map.t
+      ; blocks_seen_by_node : State_hash.Set.t String.Map.t
+      ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
       }
 
     val listen :
@@ -328,14 +334,8 @@ module Dsl = struct
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    type command_type = Send_payment | Send_delegation
-
     val signed_command_to_be_included_in_frontier :
-         sender_pub_key:Public_key.Compressed.t
-      -> receiver_pub_key:Public_key.Compressed.t
-      -> amount:Amount.t
-      -> nonce:Unsigned.uint32
-      -> command_type:command_type
+         txn_hash:Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
   end

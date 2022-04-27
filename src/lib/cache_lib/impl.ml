@@ -20,6 +20,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       { name : string
       ; on_add : 'a -> unit
       ; on_remove : [ `Consumed | `Unconsumed | `Failure ] -> 'a -> unit
+      ; element_to_string : 'a -> string
       ; set : ('a, 'a Intf.final_state) Hashtbl.t
       ; logger : Logger.t
       }
@@ -28,11 +29,11 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let logger { logger; _ } = logger
 
-    let create (type elt) ~name ~logger ~on_add ~on_remove
+    let create (type elt) ~name ~logger ~on_add ~on_remove ~element_to_string
         (module Elt : Hashtbl.Key_plain with type t = elt) : elt t =
       let set = Hashtbl.create ~growth_allowed:true ?size:None (module Elt) in
       let logger = Logger.extend logger [ ("cache", `String name) ] in
-      { name; on_add; on_remove; set; logger }
+      { name; on_add; on_remove; element_to_string; set; logger }
 
     let final_state t x = Hashtbl.find t.set x
 
@@ -41,6 +42,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       Hashtbl.add_exn t.set ~key:x ~data:final_state ;
       t.on_add x ;
       Cached.create t x final_state
+
+    let element_to_string t = t.element_to_string
 
     let mem t x = Hashtbl.mem t.set x
 
@@ -169,11 +172,17 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let assert_not_consumed t msg =
       let open Error in
-      if was_consumed t then raise (of_string msg)
+      if was_consumed t then
+        raise
+          (createf "%s: %s" msg
+             (Cache.element_to_string (cache t) (original t)))
 
     let assert_not_finalized t msg =
       let open Error in
-      if was_finalized t then raise (of_string msg)
+      if was_finalized t then
+        raise
+          (createf "%s: %s" msg
+             (Cache.element_to_string (cache t) (original t)))
 
     let peek (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "cannot peek at finalized Cached.t" ;
@@ -251,6 +260,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       let create ~logger =
         Cache.create ~logger ~name:Name.t ~on_add:Registry.element_added
           ~on_remove:Registry.element_removed
+          ~element_to_string:Transmuter.Target.to_string
           (module Transmuter.Target)
 
       let register_exn t x =
@@ -283,6 +293,7 @@ let%test_module "cache_lib test instance" =
     let with_cache ~logger ~f =
       Cache.create ~name:"test" ~logger ~on_add:ignore
         ~on_remove:(fun _ _ -> ())
+        ~element_to_string:Fn.id
         (module String)
       |> f
 

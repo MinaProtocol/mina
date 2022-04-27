@@ -3,7 +3,24 @@
  (public_name unsigned_extended)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel integers snark_params ppx_dhall_type ppx_version.runtime)
+ (libraries
+   ;; opam libraries
+   base.caml
+   result
+   base
+   ppx_version.runtime
+   core_kernel
+   integers
+   sexplib0
+   bignum.bigint
+   base.base_internalhash_types
+   bin_prot.shape
+   ppx_inline_test.config
+   ;; local libraries
+   bignum_bigint
+   snark_params
+   ppx_dhall_type
+)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_inline_test ppx_deriving.std ppx_deriving_yojson))

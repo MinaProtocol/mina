@@ -1,6 +1,6 @@
 (library
  (name mina_version_dummy)
- (libraries core_kernel)
+ (libraries core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (public_name mina_version.dummy)

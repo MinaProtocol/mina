@@ -1,7 +1,15 @@
 (library
  (name quickcheck_lib)
  (public_name quickcheck_lib_nonconsensus)
- (libraries core_kernel currency_nonconsensus rose_tree)
+ (libraries
+   ;;opam libraries
+   core_kernel
+   base
+   ppx_inline_test.config
+   ;;local libraries
+   rose_tree
+   currency_nonconsensus
+ )
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
