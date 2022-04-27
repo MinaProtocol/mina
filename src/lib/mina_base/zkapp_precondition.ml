@@ -253,7 +253,7 @@ module Numeric = struct
 
     open Impl
 
-    let check ~label { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
+    let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
           Boolean.all [ lower <= x; x <= upper ])
   end
@@ -403,8 +403,7 @@ module Eq_data = struct
   let to_input_checked { Tc.to_input_checked; _ } (t : _ Checked.t) =
     Checked.to_input t ~f:to_input_checked
 
-  let check_checked ?(label = "") { Tc.equal_checked; _ } (t : 'a Checked.t)
-      (x : 'a) =
+  let check_checked { Tc.equal_checked; _ } (t : 'a Checked.t) (x : 'a) =
     Checked.check t ~f:(equal_checked x)
 
   let check ?(label = "") { Tc.equal; _ } (t : 'a t) (x : 'a) =
@@ -686,8 +685,8 @@ module Account = struct
          ; proved_state = _
          } :
           t) (a : Account.Checked.Unhashed.t) =
-      [ Numeric.(Checked.check ~label:"" Tc.balance balance a.balance)
-      ; Numeric.(Checked.check ~label:"" Tc.nonce nonce a.nonce)
+      [ Numeric.(Checked.check Tc.balance balance a.balance)
+      ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
       ; Eq_data.(
           check_checked Tc.receipt_chain_hash receipt_chain_hash
             a.receipt_chain_hash)
@@ -714,15 +713,11 @@ module Account = struct
             (map snapp.sequence_state
                ~f:
                  Eq_data.(
-                   check_checked ~label:""
-                     (Lazy.force Tc.sequence_state)
-                     sequence_state)))
-      :: Eq_data.(
-           check_checked ~label:"" Tc.boolean proved_state snapp.proved_state)
+                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
+      :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
       :: Vector.(
            to_list
-             (map2 state snapp.app_state
-                ~f:Eq_data.(check_checked ~label:"" Tc.field)))
+             (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
 
     let check_snapp t a = Boolean.all (snapp t a)
 
@@ -1211,10 +1206,8 @@ module Protocol_state = struct
       let open Impl in
       let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
           (t : Epoch_ledger.var) =
-        [ Hash.(check_checked ~label:"epoch ledger hash" Tc.frozen_ledger_hash)
-            hash t.hash
-        ; Numeric.(Checked.check ~label:"epoch total currency" Tc.amount)
-            total_currency t.total_currency
+        [ Hash.(check_checked Tc.frozen_ledger_hash) hash t.hash
+        ; Numeric.(Checked.check Tc.amount) total_currency t.total_currency
         ]
       in
       let epoch_data
@@ -1222,31 +1215,25 @@ module Protocol_state = struct
             _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
         ignore seed ;
         epoch_ledger ledger t.ledger
-        @ [ Hash.(check_checked ~label:"start checkpoint" Tc.state_hash)
+        @ [ Hash.(check_checked Tc.state_hash)
               start_checkpoint t.start_checkpoint
-          ; Hash.(check_checked ~label:"lock_checkpoint" Tc.state_hash)
-              lock_checkpoint t.lock_checkpoint
-          ; Numeric.(Checked.check ~label:"epoch_length" Tc.length)
-              epoch_length t.epoch_length
+          ; Hash.(check_checked Tc.state_hash) lock_checkpoint t.lock_checkpoint
+          ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length
           ]
       in
       ignore last_vrf_output ;
       Boolean.all
-        ( [ Hash.(check_checked ~label:"snarked ledger hash" Tc.ledger_hash)
+        ( [ Hash.(check_checked Tc.ledger_hash)
               snarked_ledger_hash s.snarked_ledger_hash
-          ; Numeric.(Checked.check ~label:"timestamp" Tc.time)
-              timestamp s.timestamp
-          ; Numeric.(Checked.check ~label:"blockchian length" Tc.length)
+          ; Numeric.(Checked.check Tc.time) timestamp s.timestamp
+          ; Numeric.(Checked.check Tc.length)
               blockchain_length s.blockchain_length
-          ; Numeric.(Checked.check ~label:"min window density" Tc.length)
+          ; Numeric.(Checked.check Tc.length)
               min_window_density s.min_window_density
-          ; Numeric.(Checked.check ~label:"total_currency" Tc.amount)
-              total_currency s.total_currency
-          ; Numeric.(
-              Checked.check ~label:"global_slot_since_hard_fork" Tc.global_slot)
+          ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
+          ; Numeric.(Checked.check Tc.global_slot)
               global_slot_since_hard_fork s.global_slot_since_hard_fork
-          ; Numeric.(
-              Checked.check ~label:"global_slot_since_genesis" Tc.global_slot)
+          ; Numeric.(Checked.check Tc.global_slot)
               global_slot_since_genesis s.global_slot_since_genesis
           ]
         @ epoch_data staking_epoch_data s.staking_epoch_data

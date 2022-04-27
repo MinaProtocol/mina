@@ -1,7 +1,5 @@
 open Core_kernel
 open Currency
-
-(*open Signature_lib*)
 module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Spec
 open Mina_base
