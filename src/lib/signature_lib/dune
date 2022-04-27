@@ -17,6 +17,7 @@
    result
    ;; local libraries
    crypto_params
+   kimchi_backend.pasta
    random_oracle_input
    bitstring_lib
    codable
@@ -33,8 +34,8 @@
    pickles
    fold_lib
    pickles.backend
-   pasta
-   zexe_backend
+   kimchi_backend
+   h_list
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

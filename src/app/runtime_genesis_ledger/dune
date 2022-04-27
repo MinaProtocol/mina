@@ -13,10 +13,10 @@
    ;;local libraries
    genesis_constants
    coda_runtime_config
+   mina_ledger
    genesis_ledger_helper
    logger
    cache_dir
-   mina_base
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

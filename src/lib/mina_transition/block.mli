@@ -1,4 +1,5 @@
 open Mina_base
+open Mina_transaction
 
 [%%versioned:
 module Stable : sig
