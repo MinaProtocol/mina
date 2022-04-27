@@ -209,19 +209,16 @@ struct
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits)
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
-      ~combined_inner_product
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Openings.Bulletproof.Advice.t)
+      (advice : _ Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~opening:
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
-          ( Inner_curve.t
-          , Other_field.t Shifted_value.Type2.t )
-          Openings.Bulletproof.t) =
+          (Inner_curve.t, Other_field.t Shifted_value.Type2.t) Bulletproof.t) =
     with_label "check_bulletproof" (fun () ->
         absorb sponge Scalar
-          ( match combined_inner_product with
+          ( match advice.combined_inner_product with
           | Shifted_value.Type2.Shifted_value x ->
               x ) ;
         (* a_hat should be equal to
@@ -279,7 +276,7 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          let uc = scale_fast2 u combined_inner_product in
+          let uc = scale_fast2 u advice.combined_inner_product in
           combined_polynomial + uc
         in
         let q = p_prime + lr_prod in
@@ -336,11 +333,11 @@ struct
         assert false
 
   let incrementally_verify_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ~domain
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain
       ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array)
-      ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
+      ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
       ~proof:({ messages; opening } : Wrap_proof.Checked.t)
       ~(plonk :
          ( _
@@ -409,7 +406,7 @@ struct
           *)
           let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
-            let T = Branching.eq in
+            let T = Proofs_verified.eq in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
@@ -417,15 +414,15 @@ struct
               :: Vector.append w_comm
                    (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                    (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-              (snd (Branching.add num_commitments_without_degree_bound))
+              (snd (Proofs_verified.add num_commitments_without_degree_bound))
           in
           with_label "check_bulletproof" (fun () ->
               check_bulletproof
                 ~pcs_batch:
                   (Common.dlog_pcs_batch
-                     (Branching.add num_commitments_without_degree_bound))
-                ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-                ~advice ~opening ~polynomials:(without_degree_bound, []))
+                     (Proofs_verified.add num_commitments_without_degree_bound))
+                ~sponge:sponge_before_evaluations ~xi ~advice ~opening
+                ~polynomials:(without_degree_bound, []))
         in
         assert_eq_deferred_values
           { alpha = plonk.alpha
@@ -441,7 +438,8 @@ struct
         Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
             scalar prechallenge))
 
-  let b_poly = Field.(Wrap_verifier.b_poly ~add ~mul ~one)
+  let challenge_polynomial =
+    Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
 
   module Pseudo = Pseudo.Make (Impl)
 
@@ -760,7 +758,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
-      (module Branching : Nat.Add.Intf with type n = b) ~max_width
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~max_width
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t
          | `Side_loaded of
@@ -768,7 +766,7 @@ struct
              Side_loaded_verification_key.Domains.t
            , branches )
            Vector.t ]) ~step_widths
-      ~(* TODO: Add "actual branching" so that proofs don't
+      ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
       sponge ~(prev_challenges : (_, b) Vector.t)
       ({ xi
@@ -807,7 +805,7 @@ struct
                        (Option.value_exn max_width)) ))
     in
     let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
-    let T = Branching.eq in
+    let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let absorb_evals x_hat e =
       with_label "absorb_evals" (fun () ->
@@ -879,14 +877,16 @@ struct
         let sg_olds =
           with_label "sg_olds" (fun () ->
               Vector.map prev_challenges ~f:(fun chals ->
-                  unstage (b_poly (Vector.to_array chals))))
+                  unstage (challenge_polynomial (Vector.to_array chals))))
         in
         let combine ~ft pt x_hat e =
-          let pi = Branching.add Nat.N26.n in
+          let pi = Proofs_verified.add Nat.N26.n in
           let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
           let sg_evals =
             Vector.map2
-              (ones_vector (module Impl) ~first_zero:actual_width Branching.n)
+              (ones_vector
+                 (module Impl)
+                 ~first_zero:actual_width Proofs_verified.n)
               sg_olds
               ~f:(fun keep f -> [| (keep, f pt) |])
           in
@@ -923,10 +923,13 @@ struct
     in
     let b_correct =
       with_label "b_correct" (fun () ->
-          let b_poly =
-            unstage (b_poly (Vector.to_array bulletproof_challenges))
+          let challenge_poly =
+            unstage
+              (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
-          let b_actual = b_poly plonk.zeta + (r * b_poly zetaw) in
+          let b_actual =
+            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+          in
           let b_used =
             Shifted_value.Type1.to_field (module Field) ~shift:shift1 b
           in
@@ -1037,8 +1040,9 @@ struct
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
-  let verify ~branching ~is_base_case ~sg_old ~(proof : Wrap_proof.Checked.t)
-      ~wrap_domain ~wrap_verification_key statement
+  let verify ~proofs_verified ~is_base_case ~sg_old
+      ~(proof : Wrap_proof.Checked.t) ~wrap_domain ~wrap_verification_key
+      statement
       (unfinalized :
         ( _
         , _
@@ -1067,10 +1071,10 @@ struct
     in
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
-      incrementally_verify_proof branching ~domain:wrap_domain ~xi
+      incrementally_verify_proof proofs_verified ~domain:wrap_domain ~xi
         ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
-        ~combined_inner_product ~advice:{ b } ~proof
-        ~plonk:unfinalized.deferred_values.plonk
+        ~advice:{ b; combined_inner_product }
+        ~proof ~plonk:unfinalized.deferred_values.plonk
     in
     with_label __LOC__ (fun () ->
         with_label __LOC__ (fun () ->

@@ -191,7 +191,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
-  module Max_branching_at_most = At_most.With_length (W)
+  module Max_proofs_verified_at_most = At_most.With_length (W)
   module MLMB_vec = Nvector (MLMB)
 
   module Repr = struct
@@ -200,10 +200,10 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
         Types.Wrap.Proof_state.Me_only.t
       , ( unit
-        , Tock.Curve.Affine.t Max_branching_at_most.t
+        , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-          Max_branching_at_most.t )
+          Max_proofs_verified_at_most.t )
         Base.Me_only.Step.t )
       Base.Wrap.t
     [@@deriving compare, sexp, yojson, hash, equal]
@@ -301,7 +301,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Error "Invalid json for proof. Expecting base64 encoded string"
 end
 
-module Branching_2 = struct
+module Proofs_verified_2 = struct
   module T = Make (Nat.N2) (Nat.N2)
 
   module Repr = struct
@@ -366,7 +366,7 @@ module Branching_2 = struct
   include (T : module type of T with module Repr := T.Repr)
 end
 
-module Branching_max = struct
+module Proofs_verified_max = struct
   module T =
     Make
       (Side_loaded_verification_key.Width.Max)

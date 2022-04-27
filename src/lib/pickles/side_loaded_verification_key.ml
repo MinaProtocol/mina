@@ -42,7 +42,7 @@ let input_size ~of_int ~add ~mul w =
   (* This should be an affine function in [a]. *)
   let size a =
     let (T (typ, conv)) =
-      Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Impls.Step.Data_spec.size [ typ ]
   in
@@ -355,7 +355,8 @@ let%test_unit "input_size" =
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
          let (T (typ, conv)) =
-           Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+           Impls.Step.input ~proofs_verified:a
+             ~wrap_rounds:Backend.Tock.Rounds.n
          in
          Impls.Step.Data_spec.size [ typ ]))
 

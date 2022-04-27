@@ -69,15 +69,16 @@ module Wrap = struct
     end
   end
 
-  type 'max_local_max_branching t =
+  type 'max_local_max_proofs_verified t =
     ( Tock.Inner_curve.Affine.t
-    , (Challenges_vector.t, 'max_local_max_branching) Vector.t )
+    , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
     Types.Wrap.Proof_state.Me_only.t
 
   module Prepared = struct
-    type 'max_local_max_branching t =
+    type 'max_local_max_proofs_verified t =
       ( Tock.Inner_curve.Affine.t
-      , (Challenges_vector.Prepared.t, 'max_local_max_branching) Vector.t )
+      , (Challenges_vector.Prepared.t, 'max_local_max_proofs_verified) Vector.t
+      )
       Types.Wrap.Proof_state.Me_only.t
   end
 

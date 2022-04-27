@@ -2,8 +2,7 @@ open Pickles_types
 open Import
 open Backend
 
-type dlog_opening =
-  (Tock.Curve.Affine.t, Tock.Field.t) Types.Step.Openings.Bulletproof.t
+type dlog_opening = (Tock.Curve.Affine.t, Tock.Field.t) Types.Step.Bulletproof.t
 
 module Constant = struct
   (* Out-of-circuit type for wrap proofs *)
@@ -23,7 +22,7 @@ module Checked = struct
     ; opening :
         ( Inner_curve.t
         , Impls.Step.Other_field.t Shifted_value.Type2.t )
-        Types.Step.Openings.Bulletproof.t
+        Types.Step.Bulletproof.t
     }
   [@@deriving hlist]
 end
@@ -37,7 +36,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
     [ Plonk_types.Messages.typ ~bool:Boolean.typ ~dummy:Inner_curve.Params.one
         ~commitment_lengths:(Commitment_lengths.create ~of_int:(fun x -> x))
         Inner_curve.typ
-    ; Types.Step.Openings.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
+    ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->
               (* When storing, make it a shifted value *)

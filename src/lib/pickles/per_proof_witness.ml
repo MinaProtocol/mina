@@ -39,14 +39,13 @@ module One_hot_vector = One_hot_vector.Make (Impl)
    - a set of IPA challenges (thought of as F-elements) corresponding to P's own inner-product argument
 *)
 
-
 (** Represents a proof (along with its accumulation state) which wraps a
     "step" proof S on the other curve.
 
     To have some notation, the proof S itself comes from a circuit that verified
-    up to 'max_branching many wrap proofs W_0, ..., W_max_branching.
+    up to 'max_proofs_verified many wrap proofs W_0, ..., W_max_proofs_verified.
 *)
-type ('app_state, 'max_branching, 'num_branches) t =
+type ('app_state, 'max_proofs_verified, 'num_branches) t =
   { app_state : 'app_state
         (** The user-level statement corresponding to this proof. *)
   ; wrap_proof : Wrap_proof.Checked.t
@@ -76,10 +75,10 @@ type ('app_state, 'max_branching, 'num_branches) t =
       (Impl.Field.t, Impl.Field.t array) Plonk_types.All_evals.t
         (** The evaluations from the step proof that this proof wraps *)
   ; prev_challenges :
-      ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'max_branching) Vector.t
+      ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
         (** The challenges c_0, ... c_{k - 1} corresponding to each W_i. *)
   ; prev_challenge_polynomial_commitments :
-      (Step_main_inputs.Inner_curve.t, 'max_branching) Vector.t
+      (Step_main_inputs.Inner_curve.t, 'max_proofs_verified) Vector.t
         (** The commitments to the "challenge polynomials" \prod_{i = 0}^k (1 + c_{k - 1 - i} x^{2^i})
       corresponding to each of the "prev_challenges".
   *)
@@ -89,8 +88,8 @@ type ('app_state, 'max_branching, 'num_branches) t =
 module Constant = struct
   open Kimchi_backend
 
-  type ('local_statement, 'local_max_branching, _) t =
-    { app_state : 'local_statement
+  type ('statement, 'max_proofs_verified, _) t =
+    { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
         ( Challenge.Constant.t
@@ -106,9 +105,9 @@ module Constant = struct
     ; prev_proof_evals :
         (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
     ; prev_challenges :
-        ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
+        ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
     ; prev_challenge_polynomial_commitments :
-        (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
+        (Tick.Inner_curve.Affine.t, 'max_proofs_verified) Vector.t
     }
   [@@deriving hlist]
 end
@@ -116,13 +115,13 @@ end
 open Core_kernel
 
 let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
-    (local_max_branching : n Nat.t) (local_branches : m Nat.t) :
+    (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
   let index =
-    Typ.transport (One_hot_vector.typ local_branches) ~there:Types.Index.to_int
+    Typ.transport (One_hot_vector.typ branches) ~there:Types.Index.to_int
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
   Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
@@ -138,6 +137,6 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
         Digest.typ index
     ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
        Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero)
-    ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) local_max_branching
-    ; Vector.typ Inner_curve.typ local_max_branching
+    ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
+    ; Vector.typ Inner_curve.typ max_proofs_verified
     ]
