@@ -741,7 +741,7 @@ end
 module Zkapp_account_precondition = struct
   type t =
     { kind : Party.Account_precondition.Tag.t
-    ; account_id : int option
+    ; precondition_account_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
@@ -750,9 +750,9 @@ module Zkapp_account_precondition = struct
     let encode = function
       | Party.Account_precondition.Tag.Full ->
           "full"
-      | Party.Account_precondition.Tag.Nonce ->
+      | Nonce ->
           "nonce"
-      | Party.Account_precondition.Tag.Accept ->
+      | Accept ->
           "accept"
     in
     let decode = function
@@ -765,7 +765,7 @@ module Zkapp_account_precondition = struct
       | _ ->
           Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
     in
-    Caqti_type.enum "zkapp_account_precondition_type" ~encode ~decode
+    Caqti_type.enum "zkapp_precondition_type" ~encode ~decode
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -777,7 +777,7 @@ module Zkapp_account_precondition = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (account_precondition : Party.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind account_id =
+    let%bind precondition_account_id =
       match account_precondition with
       | Party.Account_precondition.Full acct ->
           Zkapp_precondition_account.add_if_doesn't_exist (module Conn) acct
@@ -793,11 +793,29 @@ module Zkapp_account_precondition = struct
       | _ ->
           None
     in
-    let value = { kind; account_id; nonce } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      value
+    (* can't use Mina_caqti.select_insert_into_cols because of NULLs
+       TODO: either handle NULLs there, or add new combinators that do so
+    *)
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt typ Caqti_type.int
+           (sprintf
+              {sql| SELECT id FROM %s
+                 WHERE kind = $1
+                 AND (precondition_account_id = $2 OR (precondition_account_id IS NULL AND $2 IS NULL))
+                 AND (nonce = $3 OR (nonce IS NULL AND $3 IS NULL))
+           |sql}
+              table_name))
+        { kind; precondition_account_id; nonce }
+    with
+    | Some id ->
+        return id
+    | None ->
+        Conn.find
+          (Caqti_request.find typ Caqti_type.int
+             (Mina_caqti.insert_into_cols ~table_name ~returning:"id"
+                Fields.names))
+          { kind; precondition_account_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1340,7 +1358,7 @@ module Zkapp_party_body = struct
     ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_precondition_protocol_state_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     }
@@ -1374,7 +1392,7 @@ module Zkapp_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_protocol_state_precondition_id =
+    let%bind zkapp_precondition_protocol_state_id =
       Zkapp_precondition_protocol_state.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
@@ -1406,7 +1424,7 @@ module Zkapp_party_body = struct
       ; sequence_events_id
       ; call_data_id
       ; call_depth
-      ; zkapp_protocol_state_precondition_id
+      ; zkapp_precondition_protocol_state_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
       }

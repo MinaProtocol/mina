@@ -44,7 +44,7 @@ let get_party_body ~pool body_id =
            ; sequence_events_id
            ; call_data_id
            ; call_depth
-           ; zkapp_protocol_state_precondition_id
+           ; zkapp_precondition_protocol_state_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
            } =
@@ -274,7 +274,7 @@ let get_party_body ~pool body_id =
                : Processor.Zkapp_precondition_protocol_state.t) =
       query_db ~f:(fun db ->
           Processor.Zkapp_precondition_protocol_state.load db
-            zkapp_protocol_state_precondition_id)
+            zkapp_precondition_protocol_state_id)
     in
     let%bind snarked_ledger_hash =
       let%map hash_opt =
@@ -440,7 +440,7 @@ let get_party_body ~pool body_id =
         : Zkapp_precondition.Protocol_state.t )
   in
   let%bind account_precondition =
-    let%bind ({ kind; account_id; nonce }
+    let%bind ({ kind; precondition_account_id; nonce }
                : Processor.Zkapp_account_precondition.t) =
       query_db ~f:(fun db ->
           Processor.Zkapp_account_precondition.load db
@@ -457,7 +457,7 @@ let get_party_body ~pool body_id =
     | Accept ->
         return Party.Account_precondition.Accept
     | Full ->
-        assert (Option.is_some account_id) ;
+        assert (Option.is_some precondition_account_id) ;
         let%bind { balance_id
                  ; nonce_id
                  ; receipt_chain_hash
@@ -469,7 +469,7 @@ let get_party_body ~pool body_id =
                  } =
           query_db ~f:(fun db ->
               Processor.Zkapp_precondition_account.load db
-                (Option.value_exn account_id))
+                (Option.value_exn precondition_account_id))
         in
         let%bind balance =
           let%map balance_opt =
