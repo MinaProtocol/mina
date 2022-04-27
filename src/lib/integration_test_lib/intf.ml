@@ -224,7 +224,11 @@ module Engine = struct
 
     val all_nodes : t -> Node.t list
 
-    val keypairs : t -> Signature_lib.Keypair.t list
+    val all_keypairs : t -> Signature_lib.Keypair.t list
+
+    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
+
+    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
