@@ -3,8 +3,28 @@
  (public_name mina_numbers_nonconsensus)
  (inline_tests)
  (library_flags -linkall)
- (libraries fold_lib tuple_lib bignum_bigint snark_bits_nonconsensus unsigned_extended_nonconsensus random_oracle_nonconsensus
-            core_kernel codable ppx_dhall_type)
+ (libraries
+   ;;opam libraries
+   base.base_internalhash_types
+   bin_prot.shape
+   base
+   integers
+   core_kernel
+   sexplib0
+   base.caml
+   result
+   ;;local libraries
+   ppx_dhall_type
+   bignum_bigint
+   fold_lib
+   tuple_lib
+   codable
+   random_oracle_input
+   unsigned_extended_nonconsensus
+   snark_bits_nonconsensus
+   random_oracle_nonconsensus
+   snark_params_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_compare ppx_deriving_yojson

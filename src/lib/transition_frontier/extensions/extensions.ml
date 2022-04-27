@@ -10,13 +10,14 @@ module New_breadcrumbs = New_breadcrumbs
 module Ledger_table = Ledger_table
 
 type t =
-  { root_history: Root_history.Broadcasted.t
-  ; snark_pool_refcount: Snark_pool_refcount.Broadcasted.t
-  ; best_tip_diff: Best_tip_diff.Broadcasted.t
-  ; transition_registry: Transition_registry.Broadcasted.t
-  ; ledger_table: Ledger_table.Broadcasted.t
-  ; identity: Identity.Broadcasted.t
-  ; new_breadcrumbs: New_breadcrumbs.Broadcasted.t }
+  { root_history : Root_history.Broadcasted.t
+  ; snark_pool_refcount : Snark_pool_refcount.Broadcasted.t
+  ; best_tip_diff : Best_tip_diff.Broadcasted.t
+  ; transition_registry : Transition_registry.Broadcasted.t
+  ; ledger_table : Ledger_table.Broadcasted.t
+  ; identity : Identity.Broadcasted.t
+  ; new_breadcrumbs : New_breadcrumbs.Broadcasted.t
+  }
 [@@deriving fields]
 
 let create ~logger frontier : t Deferred.t =
@@ -33,9 +34,7 @@ let create ~logger frontier : t Deferred.t =
   let%bind transition_registry =
     Transition_registry.(Broadcasted.create (create ~logger frontier))
   in
-  let%bind identity =
-    Identity.(Broadcasted.create (create ~logger frontier))
-  in
+  let%bind identity = Identity.(Broadcasted.create (create ~logger frontier)) in
   let%bind new_breadcrumbs =
     New_breadcrumbs.(Broadcasted.create (create ~logger frontier))
   in
@@ -49,7 +48,8 @@ let create ~logger frontier : t Deferred.t =
     ; transition_registry
     ; identity
     ; ledger_table
-    ; new_breadcrumbs }
+    ; new_breadcrumbs
+    }
 
 (* HACK: A way to ensure that all the pipes are closed in a type-safe manner *)
 let close t : unit =
@@ -103,15 +103,17 @@ type ('ext, 'view) broadcasted_extension =
       * 't
       -> ('ext, 'view) broadcasted_extension
 
-let get : type ext view.
-    t -> (ext, view) access -> (ext, view) broadcasted_extension =
+let get :
+    type ext view. t -> (ext, view) access -> (ext, view) broadcasted_extension
+    =
  fun { root_history
      ; snark_pool_refcount
      ; best_tip_diff
      ; transition_registry
      ; ledger_table
      ; new_breadcrumbs
-     ; identity } -> function
+     ; identity
+     } -> function
   | Root_history ->
       Broadcasted_extension ((module Root_history.Broadcasted), root_history)
   | Snark_pool_refcount ->
@@ -135,8 +137,8 @@ let get_extension : type ext view. t -> (ext, view) access -> ext =
   let (Broadcasted_extension ((module B), ext)) = get t access in
   B.extension ext
 
-let get_view_pipe : type ext view.
-    t -> (ext, view) access -> view Broadcast_pipe.Reader.t =
+let get_view_pipe :
+    type ext view. t -> (ext, view) access -> view Broadcast_pipe.Reader.t =
  fun t access ->
   let (Broadcasted_extension ((module B), ext)) = get t access in
   B.reader ext

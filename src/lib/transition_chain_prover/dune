@@ -3,4 +3,18 @@
  (public_name transition_chain_prover)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
- (libraries core_kernel mina_intf mina_base transition_frontier merkle_list_prover))
+ (libraries
+   ;; opam libraries
+   core
+   core_kernel
+   ;; local libraries
+   transition_frontier_extensions
+   mina_transition
+   mina_state
+   mina_intf
+   mina_base
+   transition_frontier
+   merkle_list_prover
+   transition_frontier_base
+   data_hash_lib
+))

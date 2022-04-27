@@ -4,7 +4,24 @@
  (public_name test_signatures)
  (modes native)
  (modules test_signatures)
- (libraries core_kernel mina_base mina_numbers currency signature_lib snark_params string_sign)
+ (libraries
+   ;; opam libraries
+   sexplib0
+   base
+   core_kernel
+   ;; local libraries
+   pickles.backend
+   string_sign
+   snark_params
+   signature_lib
+   currency
+   mina_numbers
+   mina_base
+   mina_base.import
+   mina_signature_kind
+   kimchi_backend.pasta
+   pickles
+ )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
@@ -16,8 +33,21 @@
  (public_name test_signatures_nonconsensus)
  (modes native)
  (modules test_signatures_nonconsensus)
- (libraries core_kernel mina_base_nonconsensus mina_numbers_nonconsensus currency_nonconsensus
-            signature_lib_nonconsensus snark_params_nonconsensus string_sign_nonconsensus)
+ (libraries
+   ;; opam libraries 
+   core_kernel
+   base
+   sexplib0
+   ;; local libraries
+   mina_base_nonconsensus.import
+   mina_signature_kind
+   mina_base_nonconsensus
+   mina_numbers_nonconsensus
+   string_sign_nonconsensus
+   snark_params_nonconsensus
+   signature_lib_nonconsensus
+   currency_nonconsensus
+ )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))

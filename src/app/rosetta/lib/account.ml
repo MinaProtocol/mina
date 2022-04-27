@@ -535,7 +535,7 @@ module Balance = struct
           | None ->
               Amount_of.mina
           | Some token_id ->
-              Amount_of.token token_id )
+              Amount_of.token (`Token_id token_id) )
             total_balance
         in
         let locked_balance =

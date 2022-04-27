@@ -3,9 +3,32 @@
  (public_name snark_params)
  (library_flags -linkall)
  (inline_tests)
- (libraries sponge group_map fold_lib o1trace digestif tuple_lib bitstring_lib
-            snarky_group_map core_kernel snarky.backendless snarky_curves
-            snark_bits pickles crypto_params)
+ (libraries
+   ;; opam libraries
+   base.base_internalhash_types
+   ppx_inline_test.config
+   core_kernel
+   digestif
+   base
+   sexplib0
+   ;; local libraries
+   kimchi_backend.pasta
+   bignum_bigint
+   pickles.backend
+   snarky_curves
+   snarky.backendless
+   snarky_group_map
+   sponge
+   group_map
+   fold_lib
+   bitstring_lib
+   snark_bits
+   pickles
+   crypto_params
+   snarky_field_extensions
+   snarky.intf
+   kimchi_backend
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_assert ppx_base ppx_bench ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot

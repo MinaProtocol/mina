@@ -12,7 +12,7 @@ module Master = struct
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
     [@@deriving sexp, to_yojson]
 
-    type state_msg = External_transition.t
+    type state_msg = Block.t
 
     type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
 
@@ -28,23 +28,37 @@ end
 include Master.T
 include Versioned_rpc.Both_convert.One_way.Make (Master)
 
-module V1 = struct
+module V2 = struct
   module T = struct
-    type msg = Master.T.msg =
-      | New_state of External_transition.Stable.V1.t
-      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V1.t
-      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V1.t
+    type msg =
+      | New_state of External_transition.Raw.Stable.V2.t
+      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V2.t
+      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V2.t
     [@@deriving bin_io, sexp, version { rpc }]
 
-    type state_msg = External_transition.Stable.V1.t
+    type state_msg = External_transition.Raw.Stable.V2.t
 
-    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V1.t
+    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V2.t
 
-    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V1.t
+    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V2.t
 
-    let callee_model_of_msg = Fn.id
+    let callee_model_of_msg msg =
+      match msg with
+      | New_state state ->
+          Master.T.New_state (External_transition.decompose state)
+      | Snark_pool_diff diff ->
+          Master.T.Snark_pool_diff diff
+      | Transaction_pool_diff diff ->
+          Master.T.Transaction_pool_diff diff
 
-    let msg_of_caller_model = Fn.id
+    let msg_of_caller_model msg =
+      match msg with
+      | Master.T.New_state state ->
+          New_state (External_transition.compose state)
+      | Master.T.Snark_pool_diff diff ->
+          Snark_pool_diff diff
+      | Master.T.Transaction_pool_diff diff ->
+          Transaction_pool_diff diff
   end
 
   include Register (T)
@@ -58,7 +72,7 @@ module V1 = struct
         "transaction pool diff"
 end
 
-module Latest = V1
+module Latest = V2
 
 [%%define_locally Latest.(summary)]
 

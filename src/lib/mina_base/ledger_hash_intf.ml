@@ -14,7 +14,7 @@ module type S = sig
     | Find_index : Account_id.t -> Account.Index.t Request.t
 
   val get :
-    depth:int -> var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
+    depth:int -> var -> Account.Index.Unpacked.var -> Account.var Checked.t
 
   val merge : height:int -> t -> t -> t
 
@@ -31,9 +31,9 @@ module type S = sig
        depth:int
     -> var
     -> Account_id.var
-    -> filter:(Account.var -> ('a, 's) Checked.t)
-    -> f:('a -> Account.var -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+    -> filter:(Account.var -> 'a Checked.t)
+    -> f:('a -> Account.var -> Account.var Checked.t)
+    -> var Checked.t
 
   val modify_account_send :
        depth:int
@@ -43,8 +43,8 @@ module type S = sig
     -> f:
          (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+          -> Account.var Checked.t)
+    -> var Checked.t
 
   val modify_account_recv :
        depth:int
@@ -53,6 +53,6 @@ module type S = sig
     -> f:
          (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+          -> Account.var Checked.t)
+    -> var Checked.t
 end

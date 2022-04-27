@@ -18,11 +18,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        { Block_producer.balance = "9999999"; timing = Untimed }
-        :: List.init 4
-             ~f:(const { Block_producer.balance = "0"; timing = Untimed })
+        { Wallet.balance = "9999999"; timing = Untimed }
+        :: List.init 4 ~f:(const { Wallet.balance = "0"; timing = Untimed })
     ; num_snark_workers = 25
-    ; aux_account_balance = Some "1000"
+    ; extra_genesis_accounts =
+        [ { balance = "1000"; timing = Untimed } ]
+        (* ; aux_account_balance = Some "1000" *)
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     }
@@ -83,8 +84,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender_keys =
            List.map ~f:snd
            @@ List.drop
-                ( Array.to_list @@ Lazy.force
-                @@ Mina_base.Sample_keypairs.keypairs )
+                (Array.to_list @@ Lazy.force @@ Key_gen.Sample_keypairs.keypairs)
                 (num_senders + 2)
          in
          let num_sender_keys = List.length sender_keys in

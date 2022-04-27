@@ -1,6 +1,11 @@
 (library
  (name signature_lib_tests)
  (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   ;; local libraries
+   pickles
+   random_oracle
    random_oracle_input
    signature_lib
    snark_params)

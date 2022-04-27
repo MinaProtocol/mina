@@ -58,6 +58,7 @@ all: clean build
 clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
+	@rm -rf Cargo.lock target
 	@rm -rf src/$(COVERAGE_DIR)
 	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
@@ -111,12 +112,12 @@ build_rosetta_all_sigs: ocaml_checks
 
 build_intgtest: ocaml_checks
 	$(info Starting Build)
-	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
 client_sdk: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune b src/lib/crypto/kimchi_bindings/js/node_js && dune b src/app/client_sdk/client_sdk.bc.js
 	$(info Build complete)
 
 client_sdk_test_sigs: ocaml_checks
@@ -127,6 +128,22 @@ client_sdk_test_sigs: ocaml_checks
 client_sdk_test_sigs_nonconsensus: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
+	$(info Build complete)
+
+mina_signer: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) \
+	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
+	&& dune b src/app/client_sdk/client_sdk.bc.js \
+	&& (cd frontend/mina-signer; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	cd ../..)
+	$(info Build complete)
+
+snarkyjs: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) \
+	&& bash ./scripts/build-snarkyjs-node.sh
 	$(info Build complete)
 
 rosetta_lib_encodings: ocaml_checks
@@ -261,8 +278,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon

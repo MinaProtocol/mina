@@ -3,7 +3,18 @@
  (public_name merkle_address)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel bitstring direction ppx_version.runtime)
+(libraries
+  ;; opam libraries
+  base.base_internalhash_types
+  bin_prot.shape
+  ppx_version.runtime
+  bitstring
+  core_kernel
+  sexplib0
+  base.caml
+  ppx_inline_test.config
+  ;; local libraries
+  direction)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson bitstring.ppx))
  (instrumentation (backend bisect_ppx))

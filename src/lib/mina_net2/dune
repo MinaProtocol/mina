@@ -1,7 +1,35 @@
 (library
  (name mina_net2)
  (public_name mina_net2)
- (libraries async base58 base64 capnp error_json child_processes digestif core file_system libp2p_ipc logger network_peer pipe_lib yojson timeout_lib mina_metrics)
+ (libraries
+   ;; opam libraries
+   async
+   base58
+   base64
+   capnp
+   digestif
+   core
+   libp2p_ipc
+   yojson
+   async_kernel
+   core_kernel
+   bin_prot.shape
+   ppx_inline_test.config
+   async_unix
+   sexplib0
+   base.caml
+   base.base_internalhash_types
+   ;; local libraries
+   error_json
+   child_processes
+   file_system
+   logger
+   network_peer
+   pipe_lib
+   timeout_lib
+   mina_metrics
+   o1trace
+   )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))

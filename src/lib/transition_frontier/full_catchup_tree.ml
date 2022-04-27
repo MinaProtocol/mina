@@ -8,10 +8,10 @@ open Mina_numbers
 
 module Attempt_history = struct
   module Attempt = struct
-    type reason = [`Download | `Initial_validate | `Verify | `Build_breadcrumb]
+    type reason = [ `Download | `Initial_validate | `Verify | `Build_breadcrumb ]
     [@@deriving yojson]
 
-    type t = {failure_reason: reason} [@@deriving yojson]
+    type t = { failure_reason : reason } [@@deriving yojson]
   end
 
   type t = Attempt.t Peer.Map.t
@@ -19,7 +19,7 @@ module Attempt_history = struct
   let to_yojson (t : t) =
     `Assoc
       (List.map (Map.to_alist t) ~f:(fun (peer, a) ->
-           (Peer.to_multiaddr_string peer, Attempt.to_yojson a) ))
+           (Peer.to_multiaddr_string peer, Attempt.to_yojson a)))
 
   let empty : t = Peer.Map.empty
 end
@@ -38,7 +38,8 @@ module Downloader_job = struct
     `Assoc
       [ ("hash", State_hash.to_yojson h)
       ; ("length", Length.to_yojson l)
-      ; ("attempts", Attempt_history.to_yojson t.attempts) ]
+      ; ("attempts", Attempt_history.to_yojson t.attempts)
+      ]
 
   let result (t : t) = Ivar.read t.res
 end
@@ -59,7 +60,7 @@ module Node = struct
           , State_hash.t )
           Cached.t
       | To_build_breadcrumb of
-          ( [`Parent of State_hash.t]
+          ( [ `Parent of State_hash.t ]
           * ( External_transition.Almost_validated.t Envelope.Incoming.t
             , State_hash.t )
             Cached.t )
@@ -104,12 +105,13 @@ module Node = struct
   end
 
   type t =
-    { mutable state: State.t
-    ; mutable attempts: Attempt_history.t
-    ; state_hash: State_hash.t
-    ; blockchain_length: Length.t
-    ; parent: State_hash.t
-    ; result: ([`Added_to_frontier], Attempt_history.t) Result.t Ivar.t }
+    { mutable state : State.t
+    ; mutable attempts : Attempt_history.t
+    ; state_hash : State_hash.t
+    ; blockchain_length : Length.t
+    ; parent : State_hash.t
+    ; result : ([ `Added_to_frontier ], Attempt_history.t) Result.t Ivar.t
+    }
 end
 
 let add_state states (node : Node.t) =
@@ -117,26 +119,27 @@ let add_state states (node : Node.t) =
     | None ->
         State_hash.Set.singleton node.state_hash
     | Some hashes ->
-        State_hash.Set.add hashes node.state_hash )
+        State_hash.Set.add hashes node.state_hash)
 
 let remove_state states (node : Node.t) =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
         State_hash.Set.empty
     | Some hashes ->
-        State_hash.Set.remove hashes node.state_hash )
+        State_hash.Set.remove hashes node.state_hash)
 
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
 type t =
-  { nodes: Node.t State_hash.Table.t
-  ; states: State_hash.Set.t Node.State.Enum.Table.t
-  ; logger: Logger.t }
+  { nodes : Node.t State_hash.Table.t
+  ; states : State_hash.Set.t Node.State.Enum.Table.t
+  ; logger : Logger.t
+  }
 
 (* mutable root: Node.t ; *)
 (*     ; mutable target: State_hash.t Envelope.Incoming.t (* So that we know who to punish if the process fails *) *)
 
-let tear_down {nodes; states; _} =
+let tear_down { nodes; states; _ } =
   Hashtbl.iter nodes ~f:(fun x ->
       match x.state with
       | Root _ | Failed | Finished ->
@@ -146,7 +149,7 @@ let tear_down {nodes; states; _} =
       | To_initial_validate _
       | To_verify _
       | To_build_breadcrumb _ ->
-          Ivar.fill_if_empty x.result (Error x.attempts) ) ;
+          Ivar.fill_if_empty x.result (Error x.attempts)) ;
   Hashtbl.clear nodes ;
   Hashtbl.clear states
 
@@ -171,8 +174,7 @@ let to_yojson =
   fun (t : t) ->
     T.to_yojson
     @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
-           ( state
-           , (State_hash.Set.length hashes, State_hash.Set.to_list hashes) ) )
+           (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)))
 
 type job_states =
   { finished : int
@@ -185,38 +187,36 @@ type job_states =
   }
 [@@deriving to_yojson]
 
-let to_node_status_report =
-  fun (t : t) ->
-    let init =
-      { finished = 0
-      ; failed = 0
-      ; to_download = 0
-      ; to_initial_validate = 0
-      ; to_verify = 0
-      ; wait_for_parent = 0
-      ; to_build_breadcrumb = 0
-      }
-    in
-    Hashtbl.fold t.states ~init ~f:(fun ~key ~data acc -> 
+let to_node_status_report (t : t) =
+  let init =
+    { finished = 0
+    ; failed = 0
+    ; to_download = 0
+    ; to_initial_validate = 0
+    ; to_verify = 0
+    ; wait_for_parent = 0
+    ; to_build_breadcrumb = 0
+    }
+  in
+  Hashtbl.fold t.states ~init ~f:(fun ~key ~data acc ->
       let n = Set.length data in
-      match key with 
-      | Finished -> 
-        { acc with finished = n }
-      | Failed -> 
-        { acc with failed = n }
-      | To_download -> 
-        { acc with to_download = n }
-      | To_initial_validate -> 
-        { acc with to_initial_validate = n }
-      | To_verify -> 
-        { acc with to_verify = n }
-      | Wait_for_parent -> 
-        { acc with wait_for_parent = n }
-      | To_build_breadcrumb -> 
-        { acc with to_build_breadcrumb = n }
-      | Root -> 
-        acc ) 
-
+      match key with
+      | Finished ->
+          { acc with finished = n }
+      | Failed ->
+          { acc with failed = n }
+      | To_download ->
+          { acc with to_download = n }
+      | To_initial_validate ->
+          { acc with to_initial_validate = n }
+      | To_verify ->
+          { acc with to_verify = n }
+      | Wait_for_parent ->
+          { acc with wait_for_parent = n }
+      | To_build_breadcrumb ->
+          { acc with to_build_breadcrumb = n }
+      | Root ->
+          acc)
 
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
@@ -236,27 +236,28 @@ let max_catchup_chain_length (t : t) =
           | To_initial_validate _
           | To_verify _
           | To_build_breadcrumb _ -> (
-            match Hashtbl.find t.nodes node.parent with
-            | None ->
-                1
-            | Some parent ->
-                1 + longest_starting_at parent )
+              match Hashtbl.find t.nodes node.parent with
+              | None ->
+                  1
+              | Some parent ->
+                  1 + longest_starting_at parent )
         in
         Hashtbl.set lengths ~key:node.state_hash ~data:n ;
         n
   in
   Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
-      Int.max acc (longest_starting_at data) )
+      Int.max acc (longest_starting_at data))
 
 let create_node_full t b : unit =
   let h = Breadcrumb.state_hash b in
   let node : Node.t =
-    { state= Finished
-    ; state_hash= h
-    ; blockchain_length= Breadcrumb.blockchain_length b
-    ; attempts= Attempt_history.empty
-    ; parent= Breadcrumb.parent_hash b
-    ; result= Ivar.create_full (Ok `Added_to_frontier) }
+    { state = Finished
+    ; state_hash = h
+    ; blockchain_length = Breadcrumb.blockchain_length b
+    ; attempts = Attempt_history.empty
+    ; parent = Breadcrumb.parent_hash b
+    ; result = Ivar.create_full (Ok `Added_to_frontier)
+    }
   in
   add_state t.states node ;
   Hashtbl.add_exn t.nodes ~key:h ~data:node
@@ -286,10 +287,9 @@ let remove_node' t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
-  | Wait_for_parent c ->
-      ignore
-        ( Cached.invalidate_with_failure c
-          : External_transition.Almost_validated.t Envelope.Incoming.t )
+  | Wait_for_parent _ ->
+      (* cache invalidation for this case is handled explicitly in the super catchup fstm *)
+      ()
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()
@@ -321,11 +321,11 @@ let prune t ~root_hash =
           | None ->
               false
           | Some parent ->
-              reachable_from_root parent )
+              reachable_from_root parent)
   in
   let to_remove =
     Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key:_ ~data acc ->
-        if reachable_from_root data then acc else data :: acc )
+        if reachable_from_root data then acc else data :: acc)
   in
   List.iter to_remove ~f:(remove_node' t)
 
@@ -333,24 +333,26 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
   List.iter ds ~f:(function
     | E (New_node (Full b)) ->
         breadcrumb_added t b
-    | E (Root_transitioned {new_root; garbage= Full hs; _}) ->
+    | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
         let h = (Root_data.Limited.hashes new_root).state_hash in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]
-            ~metadata:[("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
-            "catchup $tree invariant broken: new root $hash not present. \
-             Diffs may have been applied out of order. This may lead to a \
-             memory leak" ;
+            ~metadata:
+              [ ("hash", State_hash.to_yojson h); ("tree", to_yojson t) ]
+            "catchup $tree invariant broken: new root $hash not present. Diffs \
+             may have been applied out of order. This may lead to a memory \
+             leak" ;
           () )
     | E (Best_tip_changed _) ->
-        () )
+        ())
 
 let create ~root =
   let t =
-    { states= Node.State.Enum.Table.create ()
-    ; nodes= State_hash.Table.create ()
-    ; logger= Logger.create () }
+    { states = Node.State.Enum.Table.create ()
+    ; nodes = State_hash.Table.create ()
+    ; logger = Logger.create ()
+    }
   in
   create_node_full t root ; t

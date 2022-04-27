@@ -2,7 +2,14 @@
  (name ppx_representatives)
  (public_name ppx_representatives)
  (kind ppx_deriver)
- (libraries compiler-libs.common ppxlib)
+ (libraries
+   ;; opam libraries
+   ppxlib.ast
+   ocaml-compiler-libs.common
+   compiler-libs.common
+   ppxlib
+   base
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppxlib.metaquot))
  (ppx_runtime_libraries ppx_representatives.runtime))

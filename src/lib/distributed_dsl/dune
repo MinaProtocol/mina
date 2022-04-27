@@ -3,7 +3,22 @@
  (public_name distributed_dsl)
  (library_flags -linkall)
  (inline_tests)
- (libraries logger core pipe_lib async inline_test_quiet_logs)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   core_kernel
+   ppx_inline_test.config
+   async_kernel
+   sexplib0
+   core_kernel.pairing_heap
+   async_unix
+   base.base_internalhash_types
+   ;; local libraries
+   logger
+   pipe_lib
+   inline_test_quiet_logs
+ )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.enum ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

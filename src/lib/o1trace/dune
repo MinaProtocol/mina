@@ -1,7 +1,19 @@
 (library
  (name o1trace)
  (public_name o1trace)
- (libraries core async ocamlgraph logger)
+ (libraries
+   ;;opam libraries
+   async
+   async_kernel
+   async_unix
+   base.base_internalhash_types
+   core
+   core_kernel
+   ocamlgraph
+   ppx_inline_test.config
+   sexplib0
+   ;;local libraries
+   logger)
  (inline_tests)
  (synopsis "Basic event tracing")
  (instrumentation (backend bisect_ppx))
