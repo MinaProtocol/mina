@@ -45,6 +45,7 @@ Pipeline.build
         name = "DaemonUnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib" Size.XLarge
+      buildTestCmd "dev" "src/lib" Size.XLarge,
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy" Size.XLarge,
     ]
   }
