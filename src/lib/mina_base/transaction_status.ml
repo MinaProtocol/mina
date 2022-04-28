@@ -41,7 +41,6 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
-        | Invalid_party_authorization
       [@@deriving sexp, yojson, equal, compare, enum, hash]
 
       let to_latest = Fn.id
@@ -153,8 +152,6 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
-    | Invalid_party_authorization ->
-        "Invalid_party_authorization"
 
   let of_string = function
     | "Predicate" ->
@@ -217,8 +214,6 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
-    | "Invalid_party_authorization" ->
-        Ok Invalid_party_authorization
     | _ ->
         Error "Signed_command_status.Failure.of_string: Unknown value"
 
@@ -305,8 +300,6 @@ module Failure = struct
         "Incorrect nonce"
     | Invalid_fee_excess ->
         "Fee excess from parties transaction more than the transaction fees"
-    | Invalid_party_authorization ->
-        "Invalid authorization for a party update"
 end
 
 module Balance_data = struct
