@@ -120,7 +120,7 @@ let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_parties_with_merges_exn ?(expected_failure = None)
+let check_parties_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body)
     ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
     ledger partiess =
