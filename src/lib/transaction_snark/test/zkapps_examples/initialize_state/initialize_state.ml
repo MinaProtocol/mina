@@ -198,13 +198,13 @@ let%test_module "Initialize state test" =
               Currency.Balance.(
                 Option.value_exn (add_amount zero (Currency.Amount.of_int 500)))
           in
-          let _, _ =
+          let _, loc =
             Ledger.get_or_create_account ledger account_id account
             |> Or_error.ok_exn
           in
-          let target_ledger = apply_parties ledger [ parties ] in
-          Sparse_ledger.find_index_exn target_ledger account_id
-          |> Sparse_ledger.get_exn target_ledger)
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              check_parties_with_merges_exn ledger [ parties ]) ;
+          Option.value_exn (Ledger.get ledger loc))
 
     let%test_unit "Initialize" =
       let account =
