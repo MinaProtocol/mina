@@ -425,11 +425,7 @@ module Parties_segment = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
-          | Opt_signed_unsigned
-          | Opt_signed_opt_signed
-          | Opt_signed
-          | Proved
+        type t = Opt_signed_opt_signed | Opt_signed | Proved
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -441,24 +437,20 @@ module Parties_segment = struct
           Proved
       | [ (Control.Signature _ | Control.None_given) ] ->
           Opt_signed
-      | [ Control.(Signature _ | None_given); Control.None_given ] ->
-          Opt_signed_unsigned
-      | [ Control.(Signature _ | None_given); Control.Signature _ ] ->
+      | [ Control.(Signature _ | None_given)
+        ; Control.(Signature _ | None_given)
+        ] ->
           Opt_signed_opt_signed
       | _ ->
           failwith "Parties_segment.Basic.of_controls: Unsupported combination"
 
     let opt_signed ~is_start : Spec.single = { auth_type = Signature; is_start }
 
-    let unsigned : Spec.single = { auth_type = None_given; is_start = `No }
-
     let opt_signed = opt_signed ~is_start:`Compute_in_circuit
 
     let to_single_list : t -> Spec.single list =
      fun t ->
       match t with
-      | Opt_signed_unsigned ->
-          [ opt_signed; unsigned ]
       | Opt_signed_opt_signed ->
           [ opt_signed; opt_signed ]
       | Opt_signed ->
@@ -467,8 +459,6 @@ module Parties_segment = struct
           [ { auth_type = Proof; is_start = `No } ]
 
     type (_, _, _, _) t_typed =
-      (* Corresponds to payment *)
-      | Opt_signed_unsigned : (unit, unit, unit, unit) t_typed
       | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
       | Opt_signed : (unit, unit, unit, unit) t_typed
       | Proved
@@ -481,8 +471,6 @@ module Parties_segment = struct
     let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =
      fun t ->
       match t with
-      | Opt_signed_unsigned ->
-          [ opt_signed; unsigned ]
       | Opt_signed_opt_signed ->
           [ opt_signed; opt_signed ]
       | Opt_signed ->
@@ -2251,15 +2239,6 @@ module Base = struct
                   stmt ;
                 [ b ])
           }
-      | Opt_signed_unsigned ->
-          { identifier = "opt_signed-unsigned"
-          ; prevs = M.[]
-          ; main_value = (fun [] _ -> [])
-          ; main =
-              (fun [] stmt ->
-                main ?witness:!witness s ~constraint_constants [] stmt ;
-                [])
-          }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
@@ -3184,7 +3163,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N6.n )
+  , Nat.N5.n )
   Pickles.Tag.t
 
 let time lab f =
@@ -3200,7 +3179,7 @@ let system ~proof_level ~constraint_constants =
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
         ~typ:Statement.With_sok.typ
-        ~branches:(module Nat.N6)
+        ~branches:(module Nat.N5)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
         ~constraint_constants:
@@ -3212,7 +3191,6 @@ let system ~proof_level ~constraint_constants =
           in
           [ Base.rule ~constraint_constants
           ; Merge.rule ~proof_level self
-          ; parties Opt_signed_unsigned
           ; parties Opt_signed_opt_signed
           ; parties Opt_signed
           ; parties Proved
@@ -4012,13 +3990,7 @@ struct
       , cache_handle
       , p
       , Pickles.Provers.
-          [ base
-          ; merge
-          ; opt_signed_unsigned
-          ; opt_signed_opt_signed
-          ; opt_signed
-          ; proved
-          ] ) =
+          [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
     system ~proof_level ~constraint_constants
 
   module Proof = (val p)
@@ -4089,8 +4061,6 @@ struct
       match spec with
       | Opt_signed ->
           opt_signed [] statement
-      | Opt_signed_unsigned ->
-          opt_signed_unsigned [] statement
       | Opt_signed_opt_signed ->
           opt_signed_opt_signed [] statement
       | Proved -> (

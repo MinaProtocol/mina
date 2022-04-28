@@ -219,7 +219,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N6.n )
+  , Nat.N5.n )
   Pickles.Tag.t
 
 val verify :
@@ -298,12 +298,7 @@ module Parties_segment : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t =
-          (* Corresponds to payment *)
-          | Opt_signed_unsigned
-          | Opt_signed_opt_signed
-          | Opt_signed
-          | Proved
+        type t = Opt_signed_opt_signed | Opt_signed | Proved
         [@@deriving sexp, yojson]
       end
     end]
