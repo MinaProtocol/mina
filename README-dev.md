@@ -82,10 +82,9 @@ let g:syntastic_ocaml_checkers=['merlin']
 - Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 - Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 - Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-- If you use vscode, you might like these extensions
+- If you use vscode, you might like this extension
 
   - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
-  - [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
 
 - If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
 
