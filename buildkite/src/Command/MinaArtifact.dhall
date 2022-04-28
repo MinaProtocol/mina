@@ -89,7 +89,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           service="mina-daemon",
           network="zkapp_archive_db",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-zkapp_archive_db-${DebianVersions.lowerName debVersion}-docker-image"
         }
 
         in
