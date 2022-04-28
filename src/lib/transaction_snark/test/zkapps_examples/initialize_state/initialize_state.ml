@@ -121,7 +121,7 @@ let%test_module "Initialize state test" =
 
     let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 
-    let test_parties parties =
+    let test_parties ?expected_failure parties =
       let ps =
         (* TODO: This is a pain. *)
         Parties.Call_forest.of_parties_list
@@ -203,14 +203,16 @@ let%test_module "Initialize state test" =
             |> Or_error.ok_exn
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_parties_with_merges_exn ledger [ parties ]) ;
-          Option.value_exn (Ledger.get ledger loc))
+              check_parties_with_merges_exn ?expected_failure ledger [ parties ]) ;
+          Ledger.get ledger loc)
 
     let%test_unit "Initialize" =
       let account =
         test_parties [ Deploy_party.party; Initialize_party.party ]
       in
-      let zkapp_state = (Option.value_exn account.zkapp).app_state in
+      let zkapp_state =
+        (Option.value_exn (Option.value_exn account).zkapp).app_state
+      in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
@@ -223,7 +225,9 @@ let%test_module "Initialize state test" =
           ; Update_state_party.party
           ]
       in
-      let zkapp_state = (Option.value_exn account.zkapp).app_state in
+      let zkapp_state =
+        (Option.value_exn (Option.value_exn account).zkapp).app_state
+      in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
         zkapp_state
@@ -237,32 +241,35 @@ let%test_module "Initialize state test" =
           ; Update_state_party.party
           ]
       in
-      let zkapp_state = (Option.value_exn account.zkapp).app_state in
+      let zkapp_state =
+        (Option.value_exn (Option.value_exn account).zkapp).app_state
+      in
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
         zkapp_state
 
     let%test_unit "Update without initialize fails" =
       let account =
-        test_parties [ Deploy_party.party; Update_state_party.party ]
+        test_parties ~expected_failure:Account_precondition_unsatisfied
+          [ Deploy_party.party; Update_state_party.party ]
       in
-      assert (Option.is_none account.zkapp)
+      assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Double initialize fails" =
       let account =
-        test_parties
+        test_parties ~expected_failure:Account_precondition_unsatisfied
           [ Deploy_party.party; Initialize_party.party; Initialize_party.party ]
       in
-      assert (Option.is_none account.zkapp)
+      assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Initialize after update fails" =
       let account =
-        test_parties
+        test_parties ~expected_failure:Account_precondition_unsatisfied
           [ Deploy_party.party
           ; Initialize_party.party
           ; Update_state_party.party
           ; Initialize_party.party
           ]
       in
-      assert (Option.is_none account.zkapp)
+      assert (Option.is_none (Option.value_exn account).zkapp)
   end )
