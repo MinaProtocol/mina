@@ -71,11 +71,16 @@ module Token = struct
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
       id
 
-  let find (module Conn : CONNECTION) token_id =
-    Conn.find
-      (Caqti_request.find Caqti_type.string Caqti_type.int
+  let make_finder conn_finder req_finder token_id =
+    conn_finder
+      (req_finder Caqti_type.string Caqti_type.int
          (Mina_caqti.select_cols ~table_name ~select:"id" ~cols:[ "value" ] ()))
       (Token_id.to_string token_id)
+
+  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+
+  let find_opt (module Conn : CONNECTION) =
+    make_finder Conn.find_opt Caqti_request.find_opt
 
   let find_owner (module Conn : CONNECTION) token_id =
     Conn.find
@@ -183,23 +188,35 @@ module Account_identifiers = struct
   let find_opt (module Conn : CONNECTION) account_id =
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
+    match%bind Public_key.find_opt (module Conn) pk with
+    | None ->
+        return None
+    | Some pk_id -> (
+        let token = Account_id.token_id account_id in
+        match%bind Token.find_opt (module Conn) token with
+        | None ->
+            return None
+        | Some tok_id ->
+            Conn.find_opt
+              (Caqti_request.find_opt
+                 Caqti_type.(tup2 int int)
+                 Caqti_type.int
+                 (Mina_caqti.select_cols ~select:"id" ~table_name
+                    ~cols:Fields.names ()))
+              (pk_id, tok_id) )
+
+  let find (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
     let%bind public_key_id = Public_key.find (module Conn) pk in
     let token = Account_id.token_id account_id in
     let%bind token_id = Token.find (module Conn) token in
-    Conn.find_opt
-      (Caqti_request.find_opt
+    Conn.find
+      (Caqti_request.find
          Caqti_type.(tup2 int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()))
       (public_key_id, token_id)
-
-  let find (module Conn : CONNECTION) account_id =
-    let open Deferred.Result.Let_syntax in
-    match%map find_opt (module Conn) account_id with
-    | Some id ->
-        id
-    | None ->
-        failwith "Could not find account identifier in database"
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -2679,17 +2696,16 @@ module Block = struct
         ; string
         ]
 
-  let find (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
-    Conn.find
-      (Caqti_request.find Caqti_type.string Caqti_type.int
+  let make_finder conn_finder req_finder ~state_hash =
+    conn_finder
+      (req_finder Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
       (State_hash.to_base58_check state_hash)
 
-  let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_base58_check state_hash)
+  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+
+  let find_opt (module Conn : CONNECTION) =
+    make_finder Conn.find_opt Caqti_request.find_opt
 
   let load (module Conn : CONNECTION) ~id =
     Conn.find

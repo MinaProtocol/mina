@@ -25,8 +25,6 @@ CREATE TABLE public_keys
 , value text   NOT NULL UNIQUE
 );
 
-CREATE INDEX idx_public_keys_value ON public_keys(value);
-
 /* for the default token only, owner_public_key_id and owner_token_id are NULL
    for other tokens, those columns are non-NULL
 */
@@ -36,8 +34,6 @@ CREATE TABLE tokens
 , owner_public_key_id  int               REFERENCES public_keys(id) ON DELETE CASCADE
 , owner_token_id       int               REFERENCES tokens(id)
 );
-
-CREATE INDEX idx_tokens_value ON tokens(value);
 
 /* insert default token, whose value is obtained via
    the OCaml code `Token_id.(to_string default)`
@@ -53,8 +49,9 @@ CREATE INDEX idx_token_symbols_value ON token_symbols(value);
 
 CREATE TABLE account_identifiers
 ( id                 serial  PRIMARY KEY
-, public_key_id      int     NOT NULL UNIQUE  REFERENCES public_keys(id) ON DELETE CASCADE
-, token_id           int     NOT NULL         REFERENCES tokens(id) ON DELETE CASCADE
+, public_key_id      int     NOT NULL     REFERENCES public_keys(id) ON DELETE CASCADE
+, token_id           int     NOT NULL     REFERENCES tokens(id) ON DELETE CASCADE
+, UNIQUE (public_key_id,token_id)
 );
 
 /* the initial balance is the balance at genesis, whether the account is timed or not
@@ -71,14 +68,10 @@ CREATE TABLE timing_info
 , vesting_increment       bigint    NOT NULL
 );
 
-CREATE INDEX idx_account_identifier_id ON timing_info(account_identifier_id);
-
 CREATE TABLE snarked_ledger_hashes
 ( id    serial PRIMARY KEY
 , value text   NOT NULL UNIQUE
 );
-
-CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 
 CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
 
@@ -170,7 +163,6 @@ CREATE TABLE blocks
 
 CREATE INDEX idx_blocks_id         ON blocks(id);
 CREATE INDEX idx_blocks_parent_id  ON blocks(parent_id);
-CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE INDEX idx_chain_status      ON blocks(chain_status);

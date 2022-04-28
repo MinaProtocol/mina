@@ -101,8 +101,6 @@ CREATE TABLE zkapp_uris
 , value              text    NOT NULL UNIQUE
 );
 
-CREATE INDEX idx_zkapp_uris_value ON zkapp_uris(value);
-
 /* NULL convention */
 CREATE TABLE zkapp_updates
 ( id                       serial           PRIMARY KEY
