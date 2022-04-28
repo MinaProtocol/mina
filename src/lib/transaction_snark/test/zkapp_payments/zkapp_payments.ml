@@ -275,5 +275,5 @@ let%test_module "Zkapp payments tests" =
                   ] ;
               assert (
                 List.equal Transaction_status.Failure.equal failure_status
-                  [ Transaction_status.Failure.Overflow ] )))
+                  [ Transaction_status.Failure.Invalid_fee_excess; Overflow ] )))
   end )
