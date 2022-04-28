@@ -20,10 +20,7 @@ module Basic = struct
     ; typ : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
-    ; wrap_key :
-        Tick.Inner_curve.Affine.t
-        Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Plonk_verification_key_evals.t
+    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     }
 end
@@ -82,7 +79,7 @@ module Side_loaded = struct
     ; typ
     ; branches
     ; wrap_domains = Common.wrap_domains
-    ; wrap_key = Plonk_verification_key_evals.map ~f:Array.of_list wrap_key
+    ; wrap_key
     }
 end
 
@@ -110,11 +107,7 @@ module Compiled = struct
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
-    ; wrap_key :
-        Tick.Inner_curve.Affine.t
-        Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Plonk_verification_key_evals.t
-        Lazy.t
+    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
@@ -156,9 +149,7 @@ module For_step = struct
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
-    ; wrap_key :
-        inner_curve_var Dlog_plonk_types.Poly_comm.Without_degree_bound.t
-        Plonk_verification_key_evals.t
+    ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
     ; wrap_domains : Domains.t
     ; step_domains :
         [ `Known of (Domains.t, 'branches) Vector.t
@@ -224,7 +215,7 @@ module For_step = struct
     ; var_to_field_elements
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
-          ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
+          ~f:Step_main_inputs.Inner_curve.constant
     ; wrap_domains
     ; step_domains = `Known step_domains
     }

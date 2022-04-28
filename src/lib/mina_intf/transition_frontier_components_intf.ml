@@ -212,10 +212,10 @@ module type Sync_handler_intf = sig
   val answer_query :
        frontier:transition_frontier
     -> Ledger_hash.t
-    -> Sync_ledger.Query.t Envelope.Incoming.t
+    -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
     -> logger:Logger.t
     -> trust_system:Trust_system.t
-    -> Sync_ledger.Answer.t option Deferred.t
+    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
@@ -272,7 +272,7 @@ module type Bootstrap_controller_intf = sig
     -> persistent_frontier:persistent_frontier
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
+    -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
     -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )

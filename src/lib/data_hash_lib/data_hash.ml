@@ -28,7 +28,7 @@ struct
 
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
-  let to_input t = Random_oracle.Input.field t
+  let to_input t = Random_oracle.Input.Chunked.field t
 
   [%%ifdef consensus_mechanism]
 
@@ -80,7 +80,7 @@ struct
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
         bits
 
-  let var_to_input (t : var) = Random_oracle.Input.field t.digest
+  let var_to_input (t : var) = Random_oracle.Input.Chunked.field t.digest
 
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard

@@ -14,9 +14,15 @@
    pickles_types
    pickles_base
    pickles.composition_types
+   kimchi_backend
    snarky.backendless
    tuple_lib
-   zexe_backend
-   marlin_plonk_bindings
-   marlin_plonk_bindings_types
  ))
+
+(rule
+ (targets scalars.ml)
+ (mode promote)
+ (action
+  (progn
+   (run gen_scalars/gen_scalars.exe scalars.ml)
+   (run ocamlformat -i scalars.ml))))
