@@ -371,17 +371,17 @@ let add_breadcrumb_exn t breadcrumb =
       ]
     "POST: ($state_hash, $n)" ;
   let user_cmds = Breadcrumb.commands breadcrumb in
-  if not (List.is_empty user_cmds) then
-    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
-       command or snapp command
-    *)
-    [%str_log' trace t.logger] Added_breadcrumb_user_commands
-      ~metadata:
-        [ ( "user_commands"
-          , `List
-              (List.map user_cmds
-                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
-        ] ;
+  (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+     command or snapp command
+  *)
+  [%str_log' trace t.logger] Added_breadcrumb_user_commands
+    ~metadata:
+      [ ( "user_commands"
+        , `List
+            (List.map user_cmds
+               ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
+      ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
+      ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
@@ -534,7 +534,7 @@ module For_tests = struct
                           ~depth:constraint_constants.pending_coinbase_depth ()
                      )
                    ~snarked_ledger:genesis_ledger
-                   ~snarked_local_state:Mina_state.Local_state.empty
+                   ~snarked_local_state:(Mina_state.Local_state.empty ())
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)))
         in
         Breadcrumb.create ~validated_transition:genesis_transition

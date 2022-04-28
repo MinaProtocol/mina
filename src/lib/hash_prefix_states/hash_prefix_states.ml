@@ -7,7 +7,7 @@ let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
 
 let receipt_chain_user_command = salt_legacy receipt_chain_user_command
 
-let receipt_chain_snapp = salt receipt_chain_snapp
+let receipt_chain_zkapp = salt receipt_chain_zkapp
 
 let coinbase = salt coinbase
 
@@ -90,9 +90,9 @@ let side_loaded_vk = salt side_loaded_vk
 
 let zkapp_account = salt zkapp_account
 
-let snapp_payload = salt snapp_payload
+let zkapp_payload = salt zkapp_payload
 
-let snapp_body = salt snapp_body
+let zkapp_body = salt zkapp_body
 
 let zkapp_precondition = salt zkapp_precondition
 
@@ -102,25 +102,26 @@ let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
 
 let party = salt party
 
-let party_predicate = salt party_predicate
+let party_account_precondition = salt party_account_precondition
 
 let party_cons = salt party_cons
 
 let party_node = salt party_node
 
-let party_with_protocol_state_predicate =
-  salt party_with_protocol_state_predicate
+let party_stack_frame = salt party_stack_frame
+
+let party_stack_frame_cons = salt party_stack_frame_cons
 
 let zkapp_uri = salt zkapp_uri
 
-let snapp_event = salt snapp_event
+let zkapp_event = salt zkapp_event
 
-let snapp_events = salt snapp_events
+let zkapp_events = salt zkapp_events
 
-let snapp_sequence_events = salt snapp_sequence_events
+let zkapp_sequence_events = salt zkapp_sequence_events
 
-let snapp_memo = salt snapp_memo
+let zkapp_memo = salt zkapp_memo
 
-let snapp_test = salt snapp_test
+let zkapp_test = salt zkapp_test
 
 let derive_token_id = salt derive_token_id

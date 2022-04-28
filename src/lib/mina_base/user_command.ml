@@ -146,7 +146,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.snapp).verification_key).data)
+        !(!(account.zkapp).verification_key).data)
   in
   match t with
   | Signed_command c ->
@@ -156,8 +156,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         { fee_payer
         ; other_parties =
             other_parties
-            |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Call_forest.With_hashes.of_parties_list
+            |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))
         ; memo
         }
 
@@ -212,7 +211,7 @@ let check (t : t) : Valid.t option =
   | Signed_command x ->
       Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
   | Parties p ->
-      if Parties.check p then Some (Parties (p :> Parties.Valid.t)) else None
+      Some (Parties (p :> Parties.Valid.t))
 
 let fee_token (t : t) =
   match t with

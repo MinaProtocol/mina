@@ -57,25 +57,23 @@ module type External_transition_common_intf = sig
   val current_protocol_version : t -> Protocol_version.t
 
   val proposed_protocol_version_opt : t -> Protocol_version.t option
-
-  val accept : t -> unit
-
-  val reject : t -> unit
-
-  val poke_validation_callback : t -> Mina_net2.Validation_callback.t -> unit
 end
 
 module type External_transition_base_intf = sig
-  type t [@@deriving sexp, to_yojson, equal]
+  type t = Block.t [@@deriving sexp, to_yojson]
 
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module Raw : sig
+    type t [@@deriving sexp]
 
-    module V2 : sig
-      type nonrec t = t [@@deriving sexp]
-    end
-  end]
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V2 : sig
+        type nonrec t = t [@@deriving sexp]
+      end
+    end]
+  end
 
   include External_transition_common_intf with type t := t
 end
@@ -83,7 +81,7 @@ end
 module type S = sig
   include External_transition_base_intf
 
-  type external_transition = t
+  type external_transition = Raw.t
 
   module Precomputed_block : sig
     module Proof : sig
@@ -205,7 +203,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          with_transition =
-      external_transition State_hash.With_state_hashes.t
+      Block.with_hash
       * ( 'time_received
         , 'genesis_state
         , 'proof
@@ -217,9 +215,7 @@ module type S = sig
 
     val fully_invalid : fully_invalid
 
-    val wrap :
-         external_transition State_hash.With_state_hashes.t
-      -> external_transition State_hash.With_state_hashes.t * fully_invalid
+    val wrap : Block.with_hash -> Block.with_hash * fully_invalid
 
     val extract_delta_transition_chain_witness :
          ( 'time_received
@@ -278,7 +274,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          with_transition
-      -> external_transition
+      -> Block.t
 
     val forget_validation_with_hash :
          ( 'time_received
@@ -289,34 +285,30 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          with_transition
-      -> external_transition State_hash.With_state_hashes.t
+      -> Block.with_hash
   end
 
   module Initial_validated : sig
-    type t =
-      external_transition State_hash.With_state_hashes.t
-      * Validation.initial_valid
-    [@@deriving compare]
+    type t = Block.with_hash * Validation.initial_valid [@@deriving compare]
 
     val handle_dropped_transition :
-      ?pipe_name:string -> logger:Logger.t -> t -> unit
+         ?pipe_name:string
+      -> ?valid_cb:Mina_net2.Validation_callback.t
+      -> logger:Logger.t
+      -> t
+      -> unit
 
     include External_transition_common_intf with type t := t
   end
 
   module Almost_validated : sig
-    type t =
-      external_transition State_hash.With_state_hashes.t
-      * Validation.almost_valid
-    [@@deriving compare]
+    type t = Block.with_hash * Validation.almost_valid [@@deriving compare]
 
     include External_transition_common_intf with type t := t
   end
 
   module Validated : sig
-    type t =
-      external_transition State_hash.With_state_hashes.t
-      * Validation.fully_valid
+    type t = Block.with_hash * Validation.fully_valid
     [@@deriving compare, equal, sexp, to_yojson]
 
     [%%versioned:
@@ -335,11 +327,14 @@ module type S = sig
       -> external_transition State_hash.With_state_hashes.t
          * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
 
-    val create_unsafe :
-      external_transition -> [ `I_swear_this_is_safe_see_my_comment of t ]
+    val create_unsafe : Block.t -> [ `I_swear_this_is_safe_see_my_comment of t ]
 
     val handle_dropped_transition :
-      ?pipe_name:string -> logger:Logger.t -> t -> unit
+         ?pipe_name:string
+      -> ?valid_cb:Mina_net2.Validation_callback.t
+      -> logger:Logger.t
+      -> t
+      -> unit
 
     val commands : t -> User_command.Valid.t With_status.t list
 
@@ -348,16 +343,6 @@ module type S = sig
     val state_body_hash : t -> State_body_hash.t
   end
 
-  val create :
-       protocol_state:Protocol_state.Value.t
-    -> protocol_state_proof:Proof.t
-    -> staged_ledger_diff:Staged_ledger_diff.t
-    -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-    -> validation_callback:Mina_net2.Validation_callback.t
-    -> ?proposed_protocol_version_opt:Protocol_version.t
-    -> unit
-    -> t
-
   val genesis : precomputed_values:Precomputed_values.t -> Validated.t
 
   module For_tests : sig
@@ -365,8 +350,7 @@ module type S = sig
          protocol_state:Protocol_state.Value.t
       -> protocol_state_proof:Proof.t
       -> staged_ledger_diff:Staged_ledger_diff.t
-      -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-      -> validation_callback:Mina_net2.Validation_callback.t
+      -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
       -> ?proposed_protocol_version_opt:Protocol_version.t
       -> unit
       -> t
@@ -374,7 +358,7 @@ module type S = sig
     val genesis : precomputed_values:Precomputed_values.t -> Validated.t
   end
 
-  val timestamp : t -> Block_time.t
+  val timestamp : external_transition -> Block_time.t
 
   val skip_time_received_validation :
        [ `This_transition_was_not_received_via_gossip ]
@@ -717,4 +701,8 @@ module type S = sig
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t
   end
+
+  val compose : t -> external_transition
+
+  val decompose : external_transition -> t
 end

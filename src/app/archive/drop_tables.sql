@@ -38,9 +38,9 @@ DROP TABLE zkapp_party_body;
 
 DROP TABLE zkapp_updates;
 
-DROP TABLE zkapp_precondition_protocol_states;
+DROP TABLE zkapp_protocol_state_precondition;
 
-DROP TABLE zkapp_predicate;
+DROP TABLE zkapp_account_precondition;
 
 DROP TABLE zkapp_account;
 
@@ -78,7 +78,7 @@ DROP TYPE zkapp_auth_required_type;
 
 DROP TYPE zkapp_authorization_kind_type;
 
-DROP TYPE zkapp_predicate_type;
+DROP TYPE zkapp_account_precondition_type;
 
 DROP TABLE snarked_ledger_hashes;
 

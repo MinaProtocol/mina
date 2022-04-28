@@ -107,7 +107,7 @@ CREATE TABLE zkapp_nonce_bounds
 , nonce_upper_bound        bigint           NOT NULL
 );
 
-CREATE TYPE zkapp_predicate_type AS ENUM ('full', 'nonce', 'accept');
+CREATE TYPE zkapp_account_precondition_type AS ENUM ('full', 'nonce', 'accept');
 
 /* NULL convention */
 CREATE TABLE zkapp_account
@@ -125,9 +125,9 @@ CREATE TABLE zkapp_account
 /* invariants: account id is not NULL iff kind is 'full'
                nonce is not NULL iff kind is 'nonce'
 */
-CREATE TABLE zkapp_predicate
+CREATE TABLE zkapp_account_precondition
 ( id               serial                 PRIMARY KEY
-, kind             zkapp_predicate_type   NOT NULL
+, kind             zkapp_account_precondition_type   NOT NULL
 , account_id       int                    REFERENCES zkapp_account(id)
 , nonce            bigint
 );
@@ -182,7 +182,7 @@ CREATE TABLE zkapp_epoch_data
 );
 
 /* NULL convention */
-CREATE TABLE zkapp_precondition_protocol_states
+CREATE TABLE zkapp_protocol_state_precondition
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
 , timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
@@ -199,23 +199,24 @@ CREATE TABLE zkapp_precondition_protocol_states
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array. */
 CREATE TABLE zkapp_party_body
-( id                                    serial     PRIMARY KEY
-, public_key_id                         int        NOT NULL REFERENCES public_keys(id)
-, update_id                             int        NOT NULL REFERENCES zkapp_updates(id)
-, token_id                              text       NOT NULL
-, balance_change                        bigint     NOT NULL
-, increment_nonce                       boolean    NOT NULL
-, events_ids                            int[]      NOT NULL
-, sequence_events_ids                   int[]      NOT NULL
-, call_data_id                          int        NOT NULL REFERENCES zkapp_state_data(id)
-, call_depth                            int        NOT NULL
-, zkapp_precondition_protocol_state_id     int        NOT NULL REFERENCES zkapp_precondition_protocol_states(id)
-, use_full_commitment                   boolean    NOT NULL
+( id                                       serial     PRIMARY KEY
+, public_key_id                            int        NOT NULL REFERENCES public_keys(id)
+, update_id                                int        NOT NULL REFERENCES zkapp_updates(id)
+, token_id                                 text       NOT NULL
+, balance_change                           bigint     NOT NULL
+, increment_nonce                          boolean    NOT NULL
+, events_ids                               int[]      NOT NULL
+, sequence_events_ids                      int[]      NOT NULL
+, call_data_id                             int        NOT NULL REFERENCES zkapp_state_data(id)
+, call_depth                               int        NOT NULL
+, zkapp_protocol_state_precondition_id     int        NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
+, zkapp_account_precondition_id            int        NOT NULL REFERENCES zkapp_account_precondition(id)
+, use_full_commitment                      boolean    NOT NULL
+, caller                                   text       NOT NULL
 );
 
 CREATE TABLE zkapp_party
 ( id                       serial                          NOT NULL PRIMARY KEY
 , body_id                  int                             NOT NULL REFERENCES zkapp_party_body(id)
-, predicate_id             int                             NOT NULL REFERENCES zkapp_predicate(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );

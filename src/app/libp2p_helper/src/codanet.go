@@ -113,6 +113,22 @@ type CodaConnectionManager struct {
 	protectedMirrorLock sync.Mutex
 }
 
+func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
+	prevOnConnect := cm.OnConnect
+	cm.OnConnect = func(net network.Network, c network.Conn) {
+		prevOnConnect(net, c)
+		f(net, c)
+	}
+}
+
+func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
+	prevOnDisconnect := cm.OnDisconnect
+	cm.OnDisconnect = func(net network.Network, c network.Conn) {
+		prevOnDisconnect(net, c)
+		f(net, c)
+	}
+}
+
 func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 

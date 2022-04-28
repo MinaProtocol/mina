@@ -185,7 +185,7 @@ let gen =
     ~f:create_by_digesting_string_exn
 
 let hash memo =
-  Random_oracle.hash ~init:Hash_prefix.snapp_memo
+  Random_oracle.hash ~init:Hash_prefix.zkapp_memo
     (Random_oracle.Legacy.pack_input
        (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 
@@ -284,12 +284,19 @@ let%test_module "user_command_memo" =
         | _ ->
             assert false
       in
+      let (Typ typ) = typ in
       let memo_var =
-        Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x)
+        memo |> typ.value_to_fields
+        |> (fun (arr, aux) ->
+             ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+             , aux ))
+        |> typ.var_of_fields
       in
       let memo_read =
-        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
+        memo_var |> typ.var_to_fields
+        |> (fun (arr, aux) ->
+             (Array.map arr ~f:(fun x -> read_constant x), aux))
+        |> typ.value_of_fields
       in
       [%test_eq: string] memo memo_read
 

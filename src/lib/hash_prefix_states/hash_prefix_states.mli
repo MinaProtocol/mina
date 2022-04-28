@@ -43,9 +43,9 @@ val side_loaded_vk : Field.t State.t
 
 val zkapp_account : Field.t State.t
 
-val snapp_payload : Field.t State.t
+val zkapp_payload : Field.t State.t
 
-val snapp_body : Field.t State.t
+val zkapp_body : Field.t State.t
 
 val zkapp_precondition : Field.t State.t
 
@@ -53,7 +53,7 @@ val zkapp_precondition_account : Field.t State.t
 
 val zkapp_precondition_protocol_state : Field.t State.t
 
-val party_predicate : Field.t State.t
+val party_account_precondition : Field.t State.t
 
 val party : Field.t State.t
 
@@ -61,11 +61,13 @@ val party_cons : Field.t State.t
 
 val party_node : Field.t State.t
 
-val party_with_protocol_state_predicate : Field.t State.t
+val party_stack_frame : Field.t State.t
+
+val party_stack_frame_cons : Field.t State.t
 
 val receipt_chain_user_command : Field.t Legacy.State.t
 
-val receipt_chain_snapp : Field.t State.t
+val receipt_chain_zkapp : Field.t State.t
 
 val pending_coinbases : Field.t State.t
 
@@ -85,14 +87,14 @@ val base_snark : Field.t State.t
 
 val zkapp_uri : Field.t State.t
 
-val snapp_event : Field.t State.t
+val zkapp_event : Field.t State.t
 
-val snapp_events : Field.t State.t
+val zkapp_events : Field.t State.t
 
-val snapp_sequence_events : Field.t State.t
+val zkapp_sequence_events : Field.t State.t
 
-val snapp_memo : Field.t State.t
+val zkapp_memo : Field.t State.t
 
-val snapp_test : Field.t State.t
+val zkapp_test : Field.t State.t
 
 val derive_token_id : Field.t State.t

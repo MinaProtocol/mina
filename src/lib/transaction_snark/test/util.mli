@@ -9,7 +9,7 @@ val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
 
-(* For tests, monkey patch ledger and sparse ledger to freeze their 
+(* For tests, monkey patch ledger and sparse ledger to freeze their
    ledger_hashes.
    The nominal type prevents using this in non-test code. *)
 module Ledger : module type of Mina_ledger.Ledger
@@ -22,9 +22,15 @@ module T : Transaction_snark.S
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
+val genesis_state_view : Zkapp_precondition.Protocol_state.View.t
+
 val genesis_state_body_hash : State_hash.t
 
 val init_stack : Pending_coinbase.Stack_versioned.t
+
+val pending_coinbase_state_stack :
+     state_body_hash:State_hash.t
+  -> Transaction_snark.Pending_coinbase_stack_state.t
 
 val apply_parties : Ledger.t -> Parties.t list -> unit
 
@@ -38,9 +44,16 @@ val dummy_rule :
      , 'e )
      Pickles.Inductive_rule.t
 
-(** Generates base and merge snarks of all the party segments*)
-val apply_parties_with_merges :
-  Ledger.t -> Parties.t list -> unit Async.Deferred.t
+(** Generates base and merge snarks of all the party segments
+
+    Raises if either the snark generation or application fails
+*)
+val check_parties_with_merges_exn :
+     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+  -> ?state_body:Transaction_protocol_state.Block_data.t
+  -> Ledger.t
+  -> Parties.t list
+  -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
 val trivial_snapp :
@@ -60,7 +73,9 @@ val gen_snapp_ledger :
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
-     ?snapp_permissions:Permissions.t
+     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+  -> ?state_body:Transaction_protocol_state.Block_data.t
+  -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:
        ( unit

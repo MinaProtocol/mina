@@ -108,14 +108,14 @@ module Accounts = struct
             (String.length (Option.value_exn t.token_symbol))
             Mina_base.Account.Token_symbol.max_length
       in
-      let%map snapp =
-        match t.snapp with
+      let%map zkapp =
+        match t.zkapp with
         | None ->
             Ok None
         | Some
             { state
             ; verification_key
-            ; snapp_version
+            ; zkapp_version
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
@@ -153,7 +153,7 @@ module Accounts = struct
             Some
               { Zkapp_account.verification_key
               ; app_state
-              ; snapp_version
+              ; zkapp_version
               ; sequence_state
               ; last_sequence_slot
               ; proved_state
@@ -175,7 +175,7 @@ module Accounts = struct
         ; voting_for =
             Option.value_map ~default:account.voting_for
               ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
-        ; snapp
+        ; zkapp
         ; permissions
         ; zkapp_uri = Option.value ~default:"" t.zkapp_uri
         }
@@ -259,12 +259,12 @@ module Accounts = struct
           ; set_voting_for = auth_required set_voting_for
           }
       in
-      let snapp =
-        Option.map account.snapp
+      let zkapp =
+        Option.map account.zkapp
           ~f:(fun
                { app_state
                ; verification_key
-               ; snapp_version
+               ; zkapp_version
                ; sequence_state
                ; last_sequence_slot
                ; proved_state
@@ -280,7 +280,7 @@ module Accounts = struct
             in
             { Runtime_config.Accounts.Single.Zkapp_account.state
             ; verification_key
-            ; snapp_version
+            ; zkapp_version
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
@@ -305,7 +305,7 @@ module Accounts = struct
                account.receipt_chain_hash)
       ; voting_for =
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
-      ; snapp
+      ; zkapp
       ; permissions
       ; token_symbol = Some account.token_symbol
       ; zkapp_uri = Some account.zkapp_uri

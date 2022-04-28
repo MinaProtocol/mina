@@ -1,6 +1,7 @@
-open Core
+open Core_kernel
 open Async
 open Integration_test_lib
+open Mina_transaction
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -195,7 +196,7 @@ module Node = struct
     |}]
 
     (* TODO: temporary version *)
-    module Send_test_snapp = Generated_graphql_queries.Send_test_snapp
+    module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
 
     module Query_peer_id =
     [%graphql
@@ -267,7 +268,7 @@ module Node = struct
                         setVotingFor
                       }
           sequenceEvents
-          snappState
+          zkappState
           zkappUri
           timing { cliffTime
                    cliffAmount
@@ -513,7 +514,7 @@ module Node = struct
     | Some account ->
         let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
-          match account#snappState with
+          match account#zkappState with
           | Some strs ->
               let fields =
                 Array.to_list strs
@@ -525,7 +526,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with an app state for public key \
+                      "Expected zkApp account with an app state for public key \
                        %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -556,7 +557,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf
-                      "Expected snapp account with a verification key for \
+                      "Expected zkApp account with a verification key for \
                        public_key %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
                          (Mina_base.Account_id.public_key account_id))))
@@ -573,7 +574,7 @@ module Node = struct
           | Some s ->
               return @@ Set s
           | None ->
-              fail (Error.of_string "Expected snapp URI in account")
+              fail (Error.of_string "Expected zkApp URI in account")
         in
         let%bind token_symbol =
           match account#tokenSymbol with
@@ -680,7 +681,10 @@ module Node = struct
         fail (Error.of_string "Could not get account from ledger")
 
   type signed_command_result =
-    { id : string; hash : string; nonce : Mina_numbers.Account_nonce.t }
+    { id : string
+    ; hash : Transaction_hash.t
+    ; nonce : Mina_numbers.Account_nonce.t
+    }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -717,14 +721,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -734,8 +738,8 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_snapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
-    [%log info] "Sending a snapp"
+  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+    [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
@@ -744,20 +748,20 @@ module Node = struct
     let parties_json =
       Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
     in
-    let send_snapp_graphql () =
-      let send_snapp_obj =
-        Graphql.Send_test_snapp.make ~parties:parties_json ()
+    let send_zkapp_graphql () =
+      let send_zkapp_obj =
+        Graphql.Send_test_zkapp.make ~parties:parties_json ()
       in
-      exec_graphql_request ~logger ~node:t ~query_name:"send_snapp_graphql"
-        send_snapp_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
+        send_zkapp_obj
     in
-    let%bind sent_snapp_obj = send_snapp_graphql () in
+    let%bind sent_zkapp_obj = send_zkapp_graphql () in
     let%bind () =
-      match sent_snapp_obj#internalSendSnapp#snapp#failureReason with
+      match sent_zkapp_obj#internalSendZkapp#zkapp#failureReason with
       | None ->
           return ()
       | Some s ->
-          Deferred.Or_error.errorf "Snapp failed, reason: %s"
+          Deferred.Or_error.errorf "Zkapp failed, reason: %s"
             ( Array.fold ~init:[] s ~f:(fun acc f ->
                   match f with
                   | None ->
@@ -774,9 +778,9 @@ module Node = struct
             |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
             |> Yojson.Safe.to_string )
     in
-    let snapp_id = sent_snapp_obj#internalSendSnapp#snapp#id in
-    [%log info] "Sent snapp" ~metadata:[ ("snapp_id", `String snapp_id) ] ;
-    return snapp_id
+    let zkapp_id = sent_zkapp_obj#internalSendZkapp#zkapp#id in
+    [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
+    return zkapp_id
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
@@ -812,14 +816,14 @@ module Node = struct
     let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -852,14 +856,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -1098,8 +1102,9 @@ type t =
   ; snark_coordinators : Node.t list
   ; snark_workers : Node.t list
   ; archive_nodes : Node.t list
-  ; testnet_log_filter : string
-  ; keypairs : Signature_lib.Keypair.t list
+  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
+  ; block_producer_keypairs : Signature_lib.Keypair.t list
+  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
   ; nodes_by_pod_id : Node.t String.Map.t
   }
 
@@ -1141,13 +1146,20 @@ let all_non_seed_pods
   List.concat
     [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
 
-let keypairs { keypairs; _ } = keypairs
+let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
+  block_producer_keypairs @ extra_genesis_keypairs
+
+let block_producer_keypairs { block_producer_keypairs; _ } =
+  block_producer_keypairs
+
+let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
+  extra_genesis_keypairs
 
 let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
 let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
-let initialize ~logger network =
+let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 60 (* 15 mins *) in
@@ -1232,24 +1244,8 @@ let initialize ~logger network =
   let res = poll 0 in
   match%bind.Deferred res with
   | Error _ ->
-      [%log error]
-        "Since not all pods were assigned nodes, daemons will not be started" ;
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
       res
   | Ok _ ->
-      [%log info] "Starting the daemons within the pods" ;
-      let start_print (node : Node.t) =
-        let open Malleable_error.Let_syntax in
-        [%log info] "starting %s ..." node.pod_id ;
-        let%bind res = Node.start ~fresh_state:false node in
-        [%log info] "%s started" node.pod_id ;
-        Malleable_error.return res
-      in
-      let seed_nodes = network |> seeds in
-      let non_seed_pods = network |> all_non_seed_pods in
-      (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-      let%bind () =
-        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
-      in
-      Malleable_error.List.iter non_seed_pods ~f:start_print
+      [%log info] "Pods assigned to nodes" ;
+      res
