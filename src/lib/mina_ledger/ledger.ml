@@ -493,13 +493,13 @@ let%test_unit "tokens test" =
           Currency.Amount.Signed.create
             ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
             ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-      ; increment_nonce = true
+      ; increment_nonce = false
       ; events = []
       ; sequence_events = []
       ; call_data = Pickles.Impls.Step.Field.Constant.zero
       ; call_depth = 0
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; use_full_commitment = false
+      ; use_full_commitment = true
       ; account_precondition = Accept
       ; caller
       }
