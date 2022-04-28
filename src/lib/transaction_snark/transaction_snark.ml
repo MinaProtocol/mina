@@ -4511,7 +4511,7 @@ module For_tests = struct
           ( { body = snapp_party.body; authorization = Signature signature }
             : Party.Wire.t ))
     in
-    let other_parties = [ Option.value_exn sender_party ] @ snapp_parties in
+    let other_parties = Option.to_list sender_party @ snapp_parties in
     let parties : Parties.t =
       Parties.of_wire { fee_payer; other_parties; memo }
     in
