@@ -248,21 +248,23 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                  Mina_metrics.(
                    Counter.inc_one Mina_metrics.Network.ipc_logs_received_total) ;
                  let record_result =
-                   try
-                     Some
-                       (Go_log.record_of_yojson @@ Yojson.Safe.from_string line)
-                   with Yojson.Json_error _error -> None
+                   let open Result.Let_syntax in
+                   let%bind json =
+                     try Ok (Yojson.Safe.from_string line)
+                     with Yojson.Json_error error ->
+                       Error
+                         (Printf.sprintf "Failed to parse json line: %s" error)
+                   in
+                   Go_log.record_of_yojson json
                  in
                  ( match record_result with
-                 | Some (Ok record) ->
+                 | Ok record ->
                      record |> Go_log.record_to_message |> Logger.raw logger
-                 | Some (Error error) ->
+                 | Error error ->
                      [%log error]
                        "failed to parse record over libp2p_helper stderr: \
                         $error"
-                       ~metadata:[ ("error", `String error) ]
-                 | None ->
-                     Core.print_endline line ) ;
+                       ~metadata:[ ("error", `String error) ] ) ;
                  Deferred.unit)) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process

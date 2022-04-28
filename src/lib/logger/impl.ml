@@ -1,7 +1,5 @@
 open Core_kernel
 
-let max_log_line_length = 1 lsl 20
-
 module Level = struct
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
@@ -225,9 +223,6 @@ end
 module Consumer_registry = struct
   type consumer = { processor : Processor.t; transport : Transport.t }
 
-  let default_consumer =
-    lazy { processor = Processor.raw (); transport = Transport.stdout () }
-
   module Consumer_tbl = Hashtbl.Make (String)
 
   type t = consumer list Consumer_tbl.t
@@ -240,36 +235,27 @@ module Consumer_registry = struct
     Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
 
   let broadcast_log_message ~id msg =
-    let consumers =
-      match Hashtbl.find t id with
-      | Some consumers ->
-          consumers
-      | None ->
-          [ Lazy.force default_consumer ]
-    in
-    List.iter consumers ~f:(fun consumer ->
-        let { processor = Processor.T ((module Processor), processor)
-            ; transport = Transport.T ((module Transport), transport)
-            } =
-          consumer
+    Hashtbl.find_and_call t id
+      ~if_found:(fun consumers ->
+        List.iter consumers
+          ~f:(fun
+               { processor = Processor.T ((module Processor), processor)
+               ; transport = Transport.T ((module Transport), transport)
+               }
+             ->
+            match Processor.process processor msg with
+            | Some str ->
+                Transport.transport transport str
+            | None ->
+                ()))
+      ~if_not_found:(fun _ ->
+        let (Processor.T ((module Processor), processor)) = Processor.raw () in
+        let (Transport.T ((module Transport), transport)) =
+          Transport.stdout ()
         in
         match Processor.process processor msg with
         | Some str ->
-            if String.length str < max_log_line_length then
-              Transport.transport transport str
-            else
-              let max_log_line_error =
-                { msg with
-                  message =
-                    "<log message elided as it was exceeded the max log line \
-                     length>"
-                ; metadata = Metadata.empty
-                }
-              in
-              Processor.process processor max_log_line_error
-              |> Option.value
-                   ~default:"failed to process max log line error message"
-              |> Transport.transport transport
+            Transport.transport transport str
         | None ->
             ())
 end
