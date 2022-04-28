@@ -59,7 +59,7 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name = "berkeley"
+  testnet_name = "zkarchive"
   mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
   mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
   seed_region = "us-central1"
@@ -75,7 +75,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "berkeley" {
+module "zkarchive" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -154,7 +154,7 @@ module "berkeley" {
       duplicates = 1
     }
   ]
-  
+
   fishes= [
     for i in range(var.fish_count):{
       duplicates = 1
@@ -162,7 +162,7 @@ module "berkeley" {
   ]
 
   # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
-  
+
   seed_count            = var.seed_count
 
   plain_node_count = 0
@@ -174,6 +174,4 @@ module "berkeley" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley.txt"
 }
-

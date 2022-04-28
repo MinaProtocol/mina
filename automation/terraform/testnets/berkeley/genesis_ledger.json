@@ -1,9 +1,9 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-03-02T20:13:09Z"
+    "genesis_state_timestamp": "2022-04-27T20:13:09Z"
   },
   "ledger": {
-    "name": "berkeley",
+    "name": "zkarchive",
     "accounts": [
       {
         "pk": "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e",

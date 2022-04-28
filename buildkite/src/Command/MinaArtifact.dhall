@@ -74,7 +74,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-daemon",
-          network="berkeley",
+          network="zkarchive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
         }
@@ -82,19 +82,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         in
 
         DockerImage.generateStep daemonBerkeleySpec,
-
-        -- daemon zkapp_archive_db image
-        let daemonZkAppArchiveDbSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="zkapp_archive_db",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-zkapp_archive_db-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-
-        in
-
-        DockerImage.generateStep daemonZkAppArchiveDbSpec,
 
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
