@@ -1001,22 +1001,13 @@ module Base = struct
 
         let empty = Field.constant Parties.Transaction_commitment.empty
 
-        let commitment ~party:({ party; _ } : party)
-            ~other_parties:
-              { With_hash.hash =
-                  (other_parties : Parties.Digest.Forest.Checked.t)
-              ; _
-              } ~memo_hash =
+        let commitment ~other_parties:{ With_hash.hash = other_parties; _ } =
           Parties.Transaction_commitment.Checked.create
             ~other_parties_hash:other_parties
-            ~protocol_state_predicate_hash:
-              (Zkapp_precondition.Protocol_state.Checked.digest
-                 party.data.protocol_state_precondition)
-            ~memo_hash
 
-        let full_commitment ~party:{ party; _ } ~commitment =
-          Parties.Transaction_commitment.Checked.with_fee_payer commitment
-            ~fee_payer_hash:party.hash
+        let full_commitment ~party:{ party; _ } ~memo_hash ~commitment =
+          Parties.Transaction_commitment.Checked.create_complete commitment
+            ~memo_hash ~fee_payer_hash:party.hash
       end
 
       module Bool = struct
@@ -3831,13 +3822,14 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           let mk_next_commitments (parties : Parties.t) =
             empty_if_last (fun () ->
                 let next_commitment = Parties.commitment parties in
+                let memo_hash = Signed_command_memo.hash parties.memo in
                 let fee_payer_hash =
                   Parties.Digest.Party.create
                     (Party.of_fee_payer parties.fee_payer)
                 in
                 let next_full_commitment =
-                  Parties.Transaction_commitment.with_fee_payer next_commitment
-                    ~fee_payer_hash
+                  Parties.Transaction_commitment.create_complete next_commitment
+                    ~memo_hash ~fee_payer_hash
                 in
                 (next_commitment, next_full_commitment))
           in
@@ -4433,9 +4425,6 @@ module For_tests = struct
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
       @ snapp_parties @ other_receivers
     in
-    let protocol_state_predicate_hash =
-      Zkapp_precondition.Protocol_state.digest protocol_state_precondition
-    in
     let ps =
       Parties.Call_forest.With_hashes.of_parties_list
         (List.map ~f:(fun p -> (p, ())) other_parties_data)
@@ -4443,11 +4432,10 @@ module For_tests = struct
     let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
       Parties.Transaction_commitment.create ~other_parties_hash
-        ~protocol_state_predicate_hash
-        ~memo_hash:(Signed_command_memo.hash memo)
     in
     let full_commitment =
-      Parties.Transaction_commitment.with_fee_payer commitment
+      Parties.Transaction_commitment.create_complete commitment
+        ~memo_hash:(Signed_command_memo.hash memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
@@ -4761,15 +4749,9 @@ module For_tests = struct
         [ (sender_party_data, ()); (snapp_party_data, ()) ]
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
-    let protocol_state_predicate_hash =
-      (*FIXME: is this ok? *)
-      Zkapp_precondition.Protocol_state.digest protocol_state_predicate
-    in
     let transaction : Parties.Transaction_commitment.t =
       (*FIXME: is this correct? *)
       Parties.Transaction_commitment.create ~other_parties_hash
-        ~protocol_state_predicate_hash
-        ~memo_hash:(Signed_command_memo.hash memo)
     in
     let proof_party =
       let ps =
@@ -4789,7 +4771,8 @@ module For_tests = struct
     in
     let fee_payer_signature_auth =
       let txn_comm =
-        Parties.Transaction_commitment.with_fee_payer transaction
+        Parties.Transaction_commitment.create_complete transaction
+          ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
             (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
       in

@@ -2403,6 +2403,7 @@ let%test_module "staged ledger tests" =
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
+              let memo_hash = Signed_command_memo.hash parties.memo in
               let fee_payer_hash =
                 Party.of_fee_payer parties.fee_payer
                 |> Parties.Digest.Party.create
@@ -2411,8 +2412,8 @@ let%test_module "staged ledger tests" =
                 Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
                   (Random_oracle.Input.Chunked.field
                      ( Parties.commitment parties
-                     |> Parties.Transaction_commitment.with_fee_payer
-                          ~fee_payer_hash ))
+                     |> Parties.Transaction_commitment.create_complete
+                          ~memo_hash ~fee_payer_hash ))
               in
               (* replace fee payer signature, because new protocol state invalidates the old *)
               let fee_payer_with_valid_signature =
@@ -2420,17 +2421,13 @@ let%test_module "staged ledger tests" =
               in
               let memo_hash = Signed_command_memo.hash parties.memo in
               let other_parties_hash = Parties.other_parties_hash parties in
-              let sign_for_other_party ~use_full_commitment sk protocol_state =
-                let protocol_state_predicate_hash =
-                  Zkapp_precondition.Protocol_state.digest protocol_state
-                in
+              let sign_for_other_party ~use_full_commitment sk =
                 let tx_commitment =
                   Parties.Transaction_commitment.create ~other_parties_hash
-                    ~protocol_state_predicate_hash ~memo_hash
                 in
                 let full_tx_commitment =
-                  Parties.Transaction_commitment.with_fee_payer tx_commitment
-                    ~fee_payer_hash
+                  Parties.Transaction_commitment.create_complete tx_commitment
+                    ~memo_hash ~fee_payer_hash
                 in
                 let commitment =
                   if use_full_commitment then full_tx_commitment
@@ -2465,7 +2462,6 @@ let%test_module "staged ledger tests" =
                           let use_full_commitment = body.use_full_commitment in
                           let signature =
                             sign_for_other_party ~use_full_commitment sk
-                              body.protocol_state_precondition
                           in
                           Control.Signature signature
                       | Proof _ | None_given ->

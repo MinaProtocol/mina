@@ -2762,28 +2762,19 @@ module Ledger = struct
     Obj.magic
 
   (* TODO memo hash *)
-  let hash_transaction other_parties_hash protocol_state_predicate_hash =
+  let hash_transaction other_parties_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> to_unchecked
       |> forest_digest_of_field
     in
-    let protocol_state_predicate_hash =
-      protocol_state_predicate_hash |> of_js_field |> to_unchecked
-    in
     Parties.Transaction_commitment.create ~other_parties_hash
-      ~protocol_state_predicate_hash ~memo_hash:Field.Constant.zero
     |> Field.constant |> to_js_field
 
-  let hash_transaction_checked other_parties_hash protocol_state_predicate_hash
-      =
+  let hash_transaction_checked other_parties_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> forest_digest_of_field_checked
     in
-    let protocol_state_predicate_hash =
-      protocol_state_predicate_hash |> of_js_field
-    in
     Parties.Transaction_commitment.Checked.create ~other_parties_hash
-      ~protocol_state_predicate_hash ~memo_hash:Field.zero
     |> to_js_field
 
   type party_index = Fee_payer | Other_party of int
@@ -2792,7 +2783,8 @@ module Ledger = struct
       (party_index : party_index) =
     let commitment = Parties.commitment tx in
     let full_commitment =
-      Parties.Transaction_commitment.with_fee_payer commitment
+      Parties.Transaction_commitment.create_complete commitment
+        ~memo_hash:Field.Constant.zero
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
