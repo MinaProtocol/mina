@@ -85,7 +85,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - If you use vscode, you might like these extensions
 
   - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
-  - [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
+  - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
 
 - If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
 
