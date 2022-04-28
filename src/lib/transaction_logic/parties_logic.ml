@@ -280,8 +280,6 @@ module type Party_intf = sig
 
   val increment_nonce : t -> bool
 
-  val no_authorization_given : t -> bool
-
   val check_authorization :
        commitment:transaction_commitment
     -> at_party:parties
@@ -1030,14 +1028,6 @@ module Make (Inputs : Inputs_intf) = struct
         ~at_party:(Stack_frame.calls at_party)
         party
     in
-    (*This is to debug failures inside snark. We don't check
-      proofs or signatures outside snark*)
-    let local_state =
-      Local_state.add_check local_state Invalid_party_authorization
-        Inputs.Bool.(
-          proof_verifies ||| signature_verifies
-          ||| Inputs.Party.no_authorization_given party)
-    in
     (* The fee-payer must increment their nonce. *)
     let local_state =
       Local_state.add_check local_state Fee_payer_nonce_must_increase
@@ -1121,10 +1111,6 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let has_permission =
           Controller.check ~proof_verifies ~signature_verifies controller
-        in
-        let _l =
-          Local_state.add_check local_state Update_not_permitted_balance
-            has_permission
         in
         Local_state.add_check local_state Update_not_permitted_balance
           Bool.(

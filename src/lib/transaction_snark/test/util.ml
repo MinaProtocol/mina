@@ -142,7 +142,6 @@ let check_parties_with_merges_exn ?(expected_failure = None)
               (sprintf "parties_witnesses_exn failed with %s"
                  (Error.to_string_hum e))
       in
-      let _deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
       let%map p =
         match List.rev witnesses with

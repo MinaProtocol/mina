@@ -1817,13 +1817,6 @@ module Base = struct
 
           let increment_nonce (t : t) = t.party.data.increment_nonce
 
-          let no_authorization_given _t =
-            match (auth_type, snapp_statement) with
-            | None_given, None ->
-                Boolean.true_
-            | _ ->
-                Boolean.false_
-
           let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)
               ({ party; control; _ } : t) =
