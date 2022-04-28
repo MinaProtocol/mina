@@ -4160,6 +4160,8 @@ module For_tests = struct
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
+      ; account_precondition : Party.Account_precondition.t option
       }
     [@@deriving sexp]
   end
@@ -4227,8 +4229,6 @@ module For_tests = struct
     , `Prover trivial_prover )
 
   let create_parties
-      ?(protocol_state_precondition = Zkapp_precondition.Protocol_state.accept)
-      ?(account_precondition = Party.Account_precondition.Accept)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
       ~update =
     let { Spec.fee
@@ -4242,9 +4242,15 @@ module For_tests = struct
         ; sequence_events
         ; events
         ; call_data
+        ; protocol_state_precondition
+        ; account_precondition
         ; _
         } =
       spec
+    in
+    let protocol_state_precondition =
+      Option.value protocol_state_precondition
+        ~default:Zkapp_precondition.Protocol_state.accept
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
@@ -4350,7 +4356,8 @@ module For_tests = struct
                 ; call_data
                 ; call_depth = 0
                 ; protocol_state_precondition
-                ; account_precondition
+                ; account_precondition =
+                    Option.value ~default:Accept account_precondition
                 ; use_full_commitment = true
                 ; caller = Call
                 }
@@ -4565,7 +4572,7 @@ module For_tests = struct
     in
     parties
 
-  let multiple_transfers ?protocol_state_precondition (spec : Spec.t) =
+  let multiple_transfers (spec : Spec.t) =
     let ( `Parties parties
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
@@ -4573,7 +4580,7 @@ module For_tests = struct
         , `Full_txn_commitment _full_commitment ) =
       create_parties
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-        spec ~update:spec.snapp_update ?protocol_state_precondition
+        spec ~update:spec.snapp_update
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;
@@ -4584,6 +4591,13 @@ module For_tests = struct
         parties.other_parties
     in
     { parties with other_parties }
+
+  let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
+    let id = Account_id.create pk Token_id.default in
+    { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
+      permissions
+    ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+    }
 
   let create_trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk
       ~ledger pk =
@@ -4598,12 +4612,7 @@ module For_tests = struct
           ()
     in
     let id = Account_id.create pk Token_id.default in
-    let account : Account.t =
-      { (Account.create id Balance.(of_int 1_000_000_000_000_000)) with
-        permissions
-      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
-      }
-    in
+    let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
     create ledger id account
 
   let create_trivial_predicate_snapp ~constraint_constants
