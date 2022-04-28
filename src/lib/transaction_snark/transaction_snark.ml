@@ -4356,11 +4356,11 @@ module For_tests = struct
       let zeroing_allotment =
         if new_zkapp_account then
           (* value doesn't matter when num_keypairs = 0 *)
-          if num_keypairs <= 1 then amount
+          if num_keypairs = 0 then amount
           else
             let otherwise_allotted =
               Option.value_exn
-                (Currency.Amount.scale account_creation_fee (num_keypairs - 1))
+                (Currency.Amount.scale account_creation_fee num_keypairs)
             in
             Option.value_exn (Currency.Amount.sub amount otherwise_allotted)
         else Currency.Amount.zero
@@ -4370,9 +4370,8 @@ module For_tests = struct
             Signature_lib.Public_key.compress zkapp_account_keypair.public_key
           in
           let delta =
-            if new_zkapp_account then
-              if ndx = 0 then Amount.Signed.(of_unsigned zeroing_allotment)
-              else Amount.Signed.(of_unsigned account_creation_fee)
+            if new_zkapp_account && ndx = 0 then
+              Amount.Signed.(of_unsigned zeroing_allotment)
             else Amount.Signed.zero
           in
           ( { body =
