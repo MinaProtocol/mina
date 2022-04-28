@@ -217,3 +217,26 @@ module GetPeerNodeStatus : sig
 
   val create_request : peer_multiaddr:multiaddr -> Request.t
 end
+
+module TestDecodeBitswapBlocks : sig
+  include
+    Rpc_intf
+      with type Request.t =
+            Builder.Libp2pHelperInterface.TestDecodeBitswapBlocks.Request.t
+       and type Response.t =
+            Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks.Response.t
+
+  val create_request :
+    blocks:(Blake2.t * string) list -> root_block_hash:Blake2.t -> Request.t
+end
+
+module TestEncodeBitswapBlocks : sig
+  include
+    Rpc_intf
+      with type Request.t =
+            Builder.Libp2pHelperInterface.TestEncodeBitswapBlocks.Request.t
+       and type Response.t =
+            Reader.Libp2pHelperInterface.TestEncodeBitswapBlocks.Response.t
+
+  val create_request : max_block_size:int -> data:string -> Request.t
+end

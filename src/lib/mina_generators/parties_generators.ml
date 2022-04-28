@@ -953,7 +953,8 @@ let gen_parties_from ?(succeed = true)
     Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
       (Random_oracle.Input.Chunked.field
          ( Parties.commitment parties_dummy_signatures
-         |> Parties.Transaction_commitment.with_fee_payer ~fee_payer_hash ))
+         |> Parties.Transaction_commitment.create_complete ~memo_hash
+              ~fee_payer_hash ))
   in
   let fee_payer_with_valid_signature =
     { parties_dummy_signatures.fee_payer with
@@ -963,16 +964,12 @@ let gen_parties_from ?(succeed = true)
   let other_parties_hash =
     Parties.other_parties_hash parties_dummy_signatures
   in
-  let protocol_state_predicate_hash =
-    Zkapp_precondition.Protocol_state.digest
-      parties_dummy_signatures.fee_payer.body.protocol_state_precondition
-  in
   let tx_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash
-      ~protocol_state_predicate_hash ~memo_hash
   in
   let full_tx_commitment =
-    Parties.Transaction_commitment.with_fee_payer tx_commitment ~fee_payer_hash
+    Parties.Transaction_commitment.create_complete tx_commitment ~memo_hash
+      ~fee_payer_hash
   in
   let sign_for_other_party ~use_full_commitment sk =
     let commitment =

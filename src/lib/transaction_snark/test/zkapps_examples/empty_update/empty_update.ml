@@ -86,12 +86,7 @@ let memo = Signed_command_memo.empty
 let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
   let other_parties_hash = Parties.Call_forest.hash ps in
-  let protocol_state_predicate_hash =
-    Zkapp_precondition.Protocol_state.digest protocol_state_precondition
-  in
-  let memo_hash = Signed_command_memo.hash memo in
   Parties.Transaction_commitment.create ~other_parties_hash
-    ~protocol_state_predicate_hash ~memo_hash
 
 let fee_payer =
   (* TODO: This is a pain. *)
@@ -106,7 +101,8 @@ let fee_payer =
 
 let full_commitment =
   (* TODO: This is a pain. *)
-  Parties.Transaction_commitment.with_fee_payer transaction_commitment
+  Parties.Transaction_commitment.create_complete transaction_commitment
+    ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:(Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
 
 (* TODO: Make this better. *)

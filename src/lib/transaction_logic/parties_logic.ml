@@ -712,10 +712,10 @@ module type Inputs_intf = sig
 
     val empty : t
 
-    val commitment :
-      party:Party.t -> other_parties:Parties.t -> memo_hash:Field.t -> t
+    val commitment : other_parties:Parties.t -> t
 
-    val full_commitment : party:Party.t -> commitment:t -> t
+    val full_commitment :
+      party:Party.t -> memo_hash:Field.t -> commitment:t -> t
   end
 
   module Local_state : sig
@@ -973,12 +973,12 @@ module Make (Inputs : Inputs_intf) = struct
             , local_state.full_transaction_commitment )
         | `Yes start_data | `Compute start_data ->
             let tx_commitment_on_start =
-              Transaction_commitment.commitment ~party
+              Transaction_commitment.commitment
                 ~other_parties:(Stack_frame.calls remaining)
-                ~memo_hash:start_data.memo_hash
             in
             let full_tx_commitment_on_start =
               Transaction_commitment.full_commitment ~party
+                ~memo_hash:start_data.memo_hash
                 ~commitment:tx_commitment_on_start
             in
             let tx_commitment =
