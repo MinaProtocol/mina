@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-berkeley.tfstate"
+    key     = "terraform-zkarchive.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -60,8 +60,10 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "zkarchive"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
+#  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
+  mina_image = "minaprotocol/mina-daemon:1.3.0-feature-zkapp-archive-db-testnet-ee9546e-focal-zkarchive"
+#  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.0-feature-zkapp-archive-db-testnet-ee9546e-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
