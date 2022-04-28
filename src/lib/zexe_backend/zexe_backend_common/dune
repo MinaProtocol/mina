@@ -6,19 +6,35 @@
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
   (libraries
-    run_in_thread
-    hex
-    digestif
-    pickles_types
-    marlin_plonk_bindings
-    key_cache
-    sgn_type
-    snarky.backendless
-    sponge
-    snarkette
-    core_kernel
-    integers
-    allocation_functor ))
+   ;;opam libraries
+   result
+   async_kernel
+   bin_prot.shape
+   base.caml
+   integers
+   digestif
+   core_kernel
+   sexplib0
+   ppx_inline_test.config
+   bignum.bigint
+   base.base_internalhash_types
+   ;;local libraries
+   tuple_lib
+   snarkette
+   snarky.backendless
+   key_cache
+   run_in_thread
+   hex
+   pickles_types
+   sgn_type
+   sponge
+   allocation_functor
+   snarky.intf
+   marlin_plonk_bindings
+   marlin_plonk_bindings_types
+
+    
+))
 
 (rule
  (targets version.ml)

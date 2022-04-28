@@ -4,7 +4,22 @@
  (library_flags -linkall)
  (modules perf_histograms0 perf_histograms histogram rpc intf)
  (inline_tests)
- (libraries mina_metrics core async core_kernel yojson ppx_deriving_yojson.runtime)
+(libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   bin_prot.shape
+   async_rpc_kernel
+   yojson
+   async
+   core
+   core_kernel
+   ppx_deriving_yojson.runtime
+   async.async_rpc
+   base.caml
+   async_kernel
+   ;; local libraries
+   mina_metrics
+)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

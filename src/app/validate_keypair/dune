@@ -3,7 +3,15 @@
  (name validate_keypair)
  (public_name validate_keypair)
  (modes native)
- (libraries cli_lib async core_kernel mina_version)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async
+   async_unix
+   ;; local libraries
+   mina_version
+   cli_lib
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_sexp_conv ppx_optcomp))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))

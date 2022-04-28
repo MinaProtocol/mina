@@ -98,6 +98,17 @@ func textListForeach(l capnp.TextList, f func(string) error) error {
 	return nil
 }
 
+func blockWithIdListForeach(l ipc.BlockWithId_List, f func(ipc.BlockWithId) error) error {
+	for i := 0; i < l.Len(); i++ {
+		el := l.At(i)
+		err := f(el)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingConfig, error) {
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
 	if err != nil {

@@ -4,4 +4,4 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_inline_test))
- (libraries core_kernel))
+ (libraries core_kernel ppx_inline_test.config))

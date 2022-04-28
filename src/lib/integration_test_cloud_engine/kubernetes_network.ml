@@ -1,6 +1,7 @@
-open Core
+open Core_kernel
 open Async
 open Integration_test_lib
+open Mina_base
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
@@ -37,7 +38,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
   let run_in_container ?container_id ~cmd { pod_id; config; info; _ } =
@@ -45,7 +46,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
@@ -403,7 +404,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   type signed_command_result =
-    { id : string; hash : string; nonce : Unsigned.uint32 }
+    { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -440,14 +441,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -491,14 +492,14 @@ module Node = struct
     let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -530,14 +531,14 @@ module Node = struct
     let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
     let res =
       { id = return_obj#id
-      ; hash = return_obj#hash
+      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
       ; nonce = Unsigned.UInt32.of_int return_obj#nonce
       }
     in
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String res.hash)
+        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
         ; ("nonce", `Int (Unsigned.UInt32.to_int res.nonce))
         ] ;
     res
@@ -740,7 +741,7 @@ module Workload = struct
   let get_nodes t ~config =
     let%bind cwd = Unix.getcwd () in
     let%bind app_id =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"
           ; "deployment"
@@ -750,7 +751,7 @@ module Workload = struct
           ] )
     in
     let%map pod_ids_str =
-      Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
@@ -776,8 +777,9 @@ type t =
   ; snark_coordinators : Node.t list
   ; snark_workers : Node.t list
   ; archive_nodes : Node.t list
-  ; testnet_log_filter : string
-  ; keypairs : Signature_lib.Keypair.t list
+  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
+  ; block_producer_keypairs : Signature_lib.Keypair.t list
+  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
   ; nodes_by_pod_id : Node.t String.Map.t
   }
 
@@ -819,13 +821,20 @@ let all_non_seed_pods
   List.concat
     [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
 
-let keypairs { keypairs; _ } = keypairs
+let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
+  block_producer_keypairs @ extra_genesis_keypairs
+
+let block_producer_keypairs { block_producer_keypairs; _ } =
+  block_producer_keypairs
+
+let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
+  extra_genesis_keypairs
 
 let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
 let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
-let initialize ~logger network =
+let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 60 (* 15 mins *) in
@@ -835,7 +844,8 @@ let initialize ~logger network =
     |> String.Set.of_list
   in
   let kube_get_pods () =
-    Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/" "kubectl"
+    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
+      "kubectl"
       [ "-n"
       ; network.namespace
       ; "get"
@@ -909,24 +919,8 @@ let initialize ~logger network =
   let res = poll 0 in
   match%bind.Deferred res with
   | Error _ ->
-      [%log error]
-        "Since not all pods were assigned nodes, daemons will not be started" ;
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
       res
   | Ok _ ->
-      [%log info] "Starting the daemons within the pods" ;
-      let start_print (node : Node.t) =
-        let open Malleable_error.Let_syntax in
-        [%log info] "starting %s ..." node.pod_id ;
-        let%bind res = Node.start ~fresh_state:false node in
-        [%log info] "%s started" node.pod_id ;
-        Malleable_error.return res
-      in
-      let seed_nodes = network |> seeds in
-      let non_seed_pods = network |> all_non_seed_pods in
-      (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
-      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-      let%bind () =
-        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
-      in
-      Malleable_error.List.iter non_seed_pods ~f:start_print
+      [%log info] "Pods assigned to nodes" ;
+      res

@@ -143,6 +143,8 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; min_connections = 20
           ; max_connections = 50
+          ; pubsub_v1 = N
+          ; pubsub_v0 = RW
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false

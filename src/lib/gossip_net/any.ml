@@ -62,13 +62,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
-  let broadcast_state (Any ((module M), t)) = M.broadcast_state t
+  let broadcast_state ?origin_topic (Any ((module M), t)) =
+    M.broadcast_state ?origin_topic t
 
-  let broadcast_transaction_pool_diff (Any ((module M), t)) =
-    M.broadcast_transaction_pool_diff t
+  let broadcast_transaction_pool_diff ?origin_topic (Any ((module M), t)) =
+    M.broadcast_transaction_pool_diff ?origin_topic t
 
-  let broadcast_snark_pool_diff (Any ((module M), t)) =
-    M.broadcast_snark_pool_diff t
+  let broadcast_snark_pool_diff ?origin_topic (Any ((module M), t)) =
+    M.broadcast_snark_pool_diff ?origin_topic t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
 

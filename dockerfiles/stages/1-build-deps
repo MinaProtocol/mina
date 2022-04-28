@@ -49,12 +49,17 @@ RUN apt-get update \
     curl \
     file \
     git \
+    '(^lld-10$|^lld-11$)' \
     m4 \
     pkg-config \
     rsync \
     sudo \
     unzip \
     zlib1g-dev
+
+# Symlink image-specific lld version to a single lld executable
+RUN if command -v ld.lld-10 &> /dev/null; then ln -sf $(which ld.lld-10) /usr/bin/ld.lld; fi
+RUN if command -v ld.lld-11 &> /dev/null; then ln -sf $(which ld.lld-11) /usr/bin/ld.lld; fi
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \

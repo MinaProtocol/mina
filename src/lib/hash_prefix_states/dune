@@ -3,7 +3,17 @@
  (public_name hash_prefix_states)
  (library_flags -linkall)
  (inline_tests)
- (libraries snark_params mina_compile_config random_oracle mina_signature_kind)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   base
+   ;; local libraries
+   snark_params
+   random_oracle
+   mina_signature_kind
+   hash_prefixes
+   pickles
+   )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_custom_printf ppx_snarky ppx_version ppx_inline_test ppx_compare ppx_deriving_yojson))

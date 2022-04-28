@@ -3,26 +3,48 @@
  (public_name lib)
  (inline_tests)
  (libraries
-   async
-   async_ssl
-   caqti
-   caqti-async
-   caqti-driver-postgresql
-   cohttp
-   ctypes
-   cohttp-async
+   ;;opam libraries
+   ppx_inline_test.config
+   integers
+   async_unix
+   result
+   base
    core_kernel
+   cohttp
+   caqti
+   async
+   caqti-async
+   cohttp-async
+   archive_lib
+   base.caml
+   async_kernel
+   uri
+   core
+   ;;local libraries
+   mina_signature_kind
+   graphql_lib
+   interpolator_lib
+   pickles
+   random_oracle_input
+   unsigned_extended
+   signature_lib
+   rosetta_coding
+   rosetta_lib
    logger
    mina_compile_config
-   ppx_deriving_yojson.runtime
-   rosetta_lib
    rosetta_models
-   rosetta_coding
-   yojson
-   archive_lib
-   signature_lib
    secrets
-   unsigned_extended
+   mina_base
+   snark_params
+   random_oracle
+   pickles.backend
+   currency
+   genesis_constants
+   hex
+   mina_numbers
+   zexe_backend.pasta
+   logproc_lib
+
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))

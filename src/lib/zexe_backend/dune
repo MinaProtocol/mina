@@ -6,15 +6,18 @@
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
-    ;;zexe_backend.common
-    zexe_backend.pasta
-    hex
-    pickles_types
-    marlin_plonk_bindings
-    key_cache
-    sgn_type
-    snarky.backendless
-    sponge
-    snarkette
-    core_kernel
-    integers ))
+   ;;opam libraries
+   core_kernel
+   integers
+   ;;local libraries
+   sponge
+   sgn_type
+   pickles_types
+   hex
+   key_cache
+   snarky.backendless
+   snarkette
+   zexe_backend.common
+   zexe_backend.pasta
+   marlin_plonk_bindings
+))

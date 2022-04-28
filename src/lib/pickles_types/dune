@@ -5,6 +5,14 @@
   (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.std h_list.ppx))
   (instrumentation (backend bisect_ppx))
   (libraries
-    snarky.backendless
-    core_kernel
-    marlin_plonk_bindings_types))
+   ;;opam libraries
+   bin_prot.shape
+   base.caml
+   core_kernel
+   result
+   sexplib0
+   ppx_inline_test.config
+   ;;local libraries
+   snarky.backendless
+   marlin_plonk_bindings_types
+))

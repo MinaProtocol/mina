@@ -127,13 +127,19 @@ let create_multiaddr representation =
     (module Builder.Multiaddr)
     (op Builder.Multiaddr.representation_set representation)
 
+let create_topic_level topics =
+  build'
+    (module Builder.TopicLevel)
+    (list_op Builder.TopicLevel.topics_set_list topics)
+
 let create_peer_id peer_id =
   build' (module Builder.PeerId) (op Builder.PeerId.id_set peer_id)
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
     ~seed_peers ~known_private_ip_nets ~peer_exchange ~mina_peer_exchange
-    ~min_connections ~max_connections ~validation_queue_size ~gating_config =
+    ~min_connections ~max_connections ~validation_queue_size ~gating_config
+    ~topic_config =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -153,7 +159,9 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> op min_connections_set_int_exn min_connections
       *> op max_connections_set_int_exn max_connections
       *> op validation_queue_size_set_int_exn validation_queue_size
-      *> reader_op gating_config_set_reader gating_config)
+      *> reader_op gating_config_set_reader gating_config
+      *> list_op topic_config_set_list
+           (List.map ~f:create_topic_level topic_config))
 
 let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
     ~isolate =
@@ -216,6 +224,10 @@ let rpc_request_body_set req body =
       ignore @@ set_node_status_set_builder req b
   | GetPeerNodeStatus b ->
       ignore @@ get_peer_node_status_set_builder req b
+  | TestDecodeBitswapBlocks b ->
+      ignore @@ test_decode_bitswap_blocks_set_builder req b
+  | TestEncodeBitswapBlocks b ->
+      ignore @@ test_encode_bitswap_blocks_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 
