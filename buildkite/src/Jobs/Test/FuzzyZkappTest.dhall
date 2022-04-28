@@ -16,8 +16,8 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
-      label = "${profile} unit-tests",
-      key = "unit-test-${profile}",
+      label = "Fuzzy zkapp unit tests",
+      key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
@@ -29,11 +29,8 @@ Pipeline.build
   Pipeline.Config::{
     spec = 
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/nonconsensus"),
-        S.strictly (S.contains "Makefile"),
-        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
-        S.exactly "scripts/link-coredumps" "sh",
+        S.strictlyStart (S.contains "src/lib/transaction_snark/test/zkapp_fuzzy"),
+        S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
 
@@ -42,9 +39,9 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "DaemonUnitTest"
+        name = "FuzzyZkappTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib" Size.XLarge
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy" Size.Small
     ]
   }
