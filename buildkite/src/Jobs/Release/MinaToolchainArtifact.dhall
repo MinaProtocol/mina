@@ -30,30 +30,6 @@ Pipeline.build
       },
     steps = [
 
-      -- mina-toolchain Debian 12 "Bookworm" Toolchain
-      let toolchainBookwormSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="bookworm",
-        extra_args="--no-cache",
-        step_key="toolchain-bookworm-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainBookwormSpec,
-
-      -- mina-toolchain Ubuntu 22.04 "Jammy" Toolchain
-      let toolchainJammySpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="jammy",
-        extra_args="--no-cache",
-        step_key="toolchain-jammy-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainJammySpec,
-
       -- mina-toolchain Debian 11 "Bullseye" Toolchain
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
