@@ -172,12 +172,18 @@ let%test_module "Zkapp payments tests" =
                   let new_receiver =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
+                  let new_receiver_amount =
+                    Option.value_exn
+                      (Amount.sub amount
+                         (Amount.of_fee
+                            constraint_constants.account_creation_fee))
+                  in
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
                     ; fee_payer = None
                     ; receivers =
-                        (new_receiver, amount)
+                        (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
                     ; amount = total_amount
