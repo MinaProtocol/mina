@@ -187,7 +187,7 @@ module Network_config = struct
       ; sub_windows_per_window = None
       ; ledger_depth = None
       ; work_delay
-      ; block_window_duration_ms = Some 150000
+      ; block_window_duration_ms = Some 120000
       ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None

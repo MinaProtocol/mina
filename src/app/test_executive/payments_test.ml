@@ -49,7 +49,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
-    ; num_snark_workers = 2
+    ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
     ; work_delay = Some 1
     ; transaction_capacity =
@@ -406,6 +406,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        let sender = untimed_node_b in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
        let%bind () =
+         (* deepthi says that to fill up a `small` transaction capacity with work delay of 1, there needs to be 12 total txns sent.  2 successfull txn are sent in the prior course of this test, so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
          repeat_seq ~n:10 ~f:(fun () ->
              Network.Node.must_send_payment ~logger sender ~sender_pub_key
                ~receiver_pub_key ~amount:Currency.Amount.one ~fee
