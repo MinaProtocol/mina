@@ -11,7 +11,7 @@ import {
   call,
   isReady,
   shutdown,
-  Mina,
+  addCachedAccount,
 } from "snarkyjs";
 
 await isReady;
@@ -55,11 +55,10 @@ let zkappAddress = zkappKey.toPublicKey();
 if (command === "deploy") {
   // snarkyjs part
   let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
-  // FIXME: this is a hack; it ensures deploy "magically" finds the nonce (= 0) of the feePayer, for the account precondition
-  // we need something explicit like "add cached account" for testing
-  let Local = Mina.LocalBlockchain();
-  Mina.setActiveInstance(Local);
-  Local.addAccount(feePayerKey.toPublicKey(), "30000000000");
+  addCachedAccount({
+    publicKey: feePayerKey.toPublicKey(),
+    nonce: feePayerNonce,
+  });
 
   let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
   let partiesJson = await deploy(SimpleZkapp, {
