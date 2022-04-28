@@ -267,10 +267,10 @@ ls -lh mina*.deb
 ##################################### BERKELEY PACKAGE #######################################
 
 echo "------------------------------------------------------------"
-echo "Building Mina Berkeley testnet signatures deb without keys:"
+echo "Building Mina Zkarchive testnet signatures deb without keys:"
 
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: mina-berkeley
+Package: mina-zkarchive
 Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
@@ -311,7 +311,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-berkeley_${MINA_DEB_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-zkarchive_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END BERKELEY PACKAGE #######################################
