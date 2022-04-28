@@ -51,7 +51,6 @@ val dummy_rule :
 val check_parties_with_merges_exn :
      ?expected_failure:Mina_base.Transaction_status.Failure.t option
   -> ?state_body:Transaction_protocol_state.Block_data.t
-  -> ?state_view:Zkapp_precondition.Protocol_state.View.t
   -> Ledger.t
   -> Parties.t list
   -> unit Async.Deferred.t
@@ -75,6 +74,7 @@ val gen_snapp_ledger :
 
 val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t option
+  -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:

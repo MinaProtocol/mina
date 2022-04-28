@@ -43,6 +43,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -67,6 +69,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -95,6 +99,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -123,6 +129,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -150,6 +158,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -178,6 +188,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -206,6 +218,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -234,6 +248,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update ~expected_failure:(Some failure_expected)
@@ -264,6 +280,8 @@ module Make (Input : Input_intf) = struct
               ; call_data = Snark_params.Tick.Field.zero
               ; events = []
               ; sequence_events = []
+              ; protocol_state_precondition = None
+              ; account_precondition = None
               }
             in
             let snapp_pk = Public_key.compress new_kp.public_key in

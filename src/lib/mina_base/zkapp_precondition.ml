@@ -424,7 +424,7 @@ module Eq_data = struct
   let check_checked { Tc.equal_checked; _ } (t : 'a Checked.t) (x : 'a) =
     Checked.check t ~f:(equal_checked x)
 
-  let check ~label { Tc.equal; _ } (t : 'a t) (x : 'a) =
+  let check ?(label = "") { Tc.equal; _ } (t : 'a t) (x : 'a) =
     match t with
     | Ignore ->
         Ok ()
@@ -1691,7 +1691,7 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
   let%bind () =
-    Eq_data.(check (Tc.public_key ())) ~label:"fee_payer" fee_payer fee_payer_pk
+    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
   in
   let%bind () =
     let check (s : Account_state.t) (a : _ option) =
