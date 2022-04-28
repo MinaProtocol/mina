@@ -272,4 +272,11 @@ let%test_module "Initialize state test" =
           ]
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
+
+    let%test_unit "Initialize without deploy fails" =
+      let account =
+        Option.try_with (fun () ->
+            test_parties [ Initialize_party.party; Update_state_party.party ])
+      in
+      assert (Option.is_none account)
   end )
