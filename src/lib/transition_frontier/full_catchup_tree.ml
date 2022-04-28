@@ -286,10 +286,9 @@ let remove_node' t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
-  | Wait_for_parent c ->
-      ignore
-        ( Cached.invalidate_with_failure c
-          : External_transition.Almost_validated.t Envelope.Incoming.t )
+  | Wait_for_parent _ ->
+      (* cache invalidation for this case is handled explicitly in the super catchup fstm *)
+      ()
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()

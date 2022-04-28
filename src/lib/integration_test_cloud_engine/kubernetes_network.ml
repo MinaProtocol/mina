@@ -777,8 +777,9 @@ type t =
   ; snark_coordinators : Node.t list
   ; snark_workers : Node.t list
   ; archive_nodes : Node.t list
-  ; testnet_log_filter : string
-  ; keypairs : Signature_lib.Keypair.t list
+  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
+  ; block_producer_keypairs : Signature_lib.Keypair.t list
+  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
   ; nodes_by_pod_id : Node.t String.Map.t
   }
 
@@ -820,7 +821,14 @@ let all_non_seed_pods
   List.concat
     [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
 
-let keypairs { keypairs; _ } = keypairs
+let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
+  block_producer_keypairs @ extra_genesis_keypairs
+
+let block_producer_keypairs { block_producer_keypairs; _ } =
+  block_producer_keypairs
+
+let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
+  extra_genesis_keypairs
 
 let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
