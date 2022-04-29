@@ -649,32 +649,44 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
               : Processor.Timing_info.t) =
           timing
         in
-        let initial_minimum_balance =
-          initial_minimum_balance |> Unsigned.UInt64.of_int64
-          |> Currency.Balance.of_uint64
-        in
-        let cliff_time =
-          cliff_time |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Global_slot.of_uint32
-        in
-        let cliff_amount =
-          cliff_amount |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64
-        in
-        let vesting_period =
-          vesting_period |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Global_slot.of_uint32
-        in
-        let vesting_increment =
-          vesting_increment |> Unsigned.UInt64.of_int64
-          |> Currency.Amount.of_uint64
-        in
-        Timed
-          { initial_minimum_balance
-          ; cliff_time
-          ; cliff_amount
-          ; vesting_period
-          ; vesting_increment
-          }
+        if
+          List.for_all
+            [ initial_minimum_balance
+            ; cliff_time
+            ; cliff_amount
+            ; vesting_period
+            ; vesting_increment
+            ]
+            ~f:Int64.(equal zero)
+        then Untimed
+        else
+          let initial_minimum_balance =
+            initial_minimum_balance |> Unsigned.UInt64.of_int64
+            |> Currency.Balance.of_uint64
+          in
+          let cliff_time =
+            cliff_time |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Global_slot.of_uint32
+          in
+          let cliff_amount =
+            cliff_amount |> Unsigned.UInt64.of_int64
+            |> Currency.Amount.of_uint64
+          in
+          let vesting_period =
+            vesting_period |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Global_slot.of_uint32
+          in
+          let vesting_increment =
+            vesting_increment |> Unsigned.UInt64.of_int64
+            |> Currency.Amount.of_uint64
+          in
+          Timed
+            { initial_minimum_balance
+            ; cliff_time
+            ; cliff_amount
+            ; vesting_period
+            ; vesting_increment
+            }
   in
   let%bind permissions =
     let%map { edit_state
@@ -743,8 +755,14 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                     Processor.Zkapp_verification_keys.load db id)
               in
               let data =
-                Side_loaded_verification_key.of_base58_check_exn
-                  verification_key
+                match Base64.decode verification_key with
+                | Ok s ->
+                    Binable.of_string
+                      (module Pickles.Side_loaded.Verification_key.Stable.Latest)
+                      s
+                | Error (`Msg err) ->
+                    failwithf "Could not Base64-decode verification key: %s" err
+                      ()
               in
               let hash = Zkapp_basic.F.of_string hash in
               Some ({ data; hash } : _ With_hash.t))

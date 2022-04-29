@@ -58,7 +58,8 @@ end
    as caqti does this when using a string representation.
    type annotations are necessary for array values in postgresql, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = '{foo,bar,baz,...}'::string[]`
- *)
+*)
+
 let make_coding (type a) ~(elem_to_string : a -> string)
     ~(elem_of_string : string -> a) =
   let encode xs =
@@ -83,8 +84,9 @@ let make_coding (type a) ~(elem_to_string : a -> string)
     |> Result.of_option ~error
     >>= fun s ->
     String.filter ~f:(Char.( <> ) ' ') s
-    |> String.split ~on:',' |> List.map ~f:decode_elem |> Result.all
-    >>| List.to_array
+    |> String.split ~on:','
+    |> List.filter ~f:(fun s -> not @@ String.is_empty s)
+    |> List.map ~f:decode_elem |> Result.all >>| List.to_array
   in
   (encode, decode)
 

@@ -1125,6 +1125,12 @@ module Snarked_ledger_hash = struct
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
       hash
 
+  let find_by_id (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         "SELECT value FROM snarked_ledger_hashes WHERE id = ?")
+      id
+
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Frozen_ledger_hash.t)
       =
     let open Deferred.Result.Let_syntax in
@@ -1836,9 +1842,7 @@ module User_command = struct
     let load (module Conn : CONNECTION) id =
       Conn.find
         ( Caqti_request.find Caqti_type.int typ
-        @@ Mina_caqti.select_cols_from_id ~table_name
-             ~cols:[ "zkapp_fee_payer_id"; "zkapp_other_parties_ids"; "hash" ]
-        )
+        @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
@@ -1947,7 +1951,7 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql})
           { typ = internal_cmd.typ
@@ -2223,7 +2227,7 @@ module Block_and_signed_command = struct
     ; status : string
     ; failure_reason : string option
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -2283,24 +2287,18 @@ module Block_and_signed_command = struct
           ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
 
   let load (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
+    let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (Caqti_request.find
          Caqti_type.(tup3 int int int)
          typ
-         {sql| SELECT block_id, user_command_id,
-               sequence_no,
-               status,failure_reason,
-               fee_payer_account_creation_fee_paid,
-               receiver_account_creation_fee_paid,
-               created_token,
-               fee_payer_balance,
-               source_balance,
-               receiver_balance
-               FROM blocks_user_commands
+         (sprintf
+            {sql| SELECT %s FROM blocks_user_commands
                WHERE block_id = $1
                AND user_command_id = $2
                AND sequence_no = $3
-           |sql})
+           |sql}
+            comma_cols))
       (block_id, user_command_id, sequence_no)
 end
 
@@ -2339,7 +2337,7 @@ module Block_and_zkapp_command = struct
     ; status : string
     ; failure_reasons_ids : int array option
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let table_name = "blocks_zkapp_commands"
 
@@ -2383,18 +2381,14 @@ module Block_and_zkapp_command = struct
       { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
 
   let load (module Conn : CONNECTION) ~block_id ~zkapp_command_id ~sequence_no =
+    let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (Caqti_request.find
          Caqti_type.(tup3 int int int)
          typ
-         (Mina_caqti.select_cols_from_id ~table_name
-            ~cols:
-              [ "block_id"
-              ; "zkapp_command_id"
-              ; "sequence_no"
-              ; "status"
-              ; "failure_reasons_ids"
-              ]))
+         (Mina_caqti.select_cols ~table_name ~select:comma_cols
+            ~cols:[ "block_id"; "zkapp_command_id"; "sequence_no" ]
+            ()))
       (block_id, zkapp_command_id, sequence_no)
 end
 
@@ -2696,6 +2690,8 @@ module Block = struct
         ; string
         ]
 
+  let table_name = "blocks"
+
   let make_finder conn_finder req_finder ~state_hash =
     conn_finder
       (req_finder Caqti_type.string Caqti_type.int
@@ -2776,14 +2772,10 @@ module Block = struct
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,
-                      snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id,
-                      min_window_density, total_currency,
-                      ledger_hash, height, global_slot_since_hard_fork,
-                      global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
-               |sql})
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "chain_status" -> Some "chain_status_type" | _ -> None)
+                  Fields.names))
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash =

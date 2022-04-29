@@ -12,7 +12,8 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
   let query_db = Mina_caqti.query pool in
   let%bind hash_str =
     query_db ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
+        Processor.Snarked_ledger_hash.find_by_id db
+          raw_epoch_data.ledger_hash_id)
   in
   let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
   let total_currency =
@@ -46,18 +47,19 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let parent_hash = State_hash.of_base58_check_exn block.parent_hash in
   let open Deferred.Let_syntax in
   let%bind creator_str =
-    query_db ~f:(fun db -> Sql.Public_key.run db block.creator_id)
+    query_db ~f:(fun db -> Processor.Public_key.find_by_id db block.creator_id)
   in
   let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
-    query_db ~f:(fun db -> Sql.Public_key.run db block.block_winner_id)
+    query_db ~f:(fun db ->
+        Processor.Public_key.find_by_id db block.block_winner_id)
   in
   let block_winner =
     Public_key.Compressed.of_base58_check_exn block_winner_str
   in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db block.snarked_ledger_hash_id)
+        Processor.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
@@ -151,7 +153,8 @@ let fill_in_accounts_created pool block_state_hash =
       in
       let%bind pk =
         let%map pk_str =
-          query_db ~f:(fun db -> Sql.Public_key.run db public_key_id)
+          query_db ~f:(fun db ->
+              Processor.Public_key.find_by_id db public_key_id)
         in
         Public_key.Compressed.of_base58_check_exn pk_str
       in
@@ -303,6 +306,7 @@ let fill_in_zkapp_commands pool block_state_hash =
             Processor.Block_and_zkapp_command.load db ~block_id
               ~zkapp_command_id ~sequence_no)
       in
+
       let status = block_zkapp_cmd.status in
       let%bind failure_reasons =
         Option.value_map block_zkapp_cmd.failure_reasons_ids
@@ -325,6 +329,7 @@ let fill_in_zkapp_commands pool block_state_hash =
             in
             Some display)
       in
+
       return
         { Extensional.Zkapp_command.sequence_no
         ; fee_payer
@@ -463,6 +468,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             in
             { block with internal_cmds })
       in
+      [%log info] "Querying for zkapp commands in blocks" ;
       let%bind blocks_with_zkapp_cmds =
         Deferred.List.map blocks_with_internal_cmds ~f:(fun block ->
             let%map unsorted_zkapp_cmds =
@@ -476,7 +482,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             in
             { block with zkapp_cmds })
       in
-      [%log info] "Querying for zkapp commands in blocks" ;
+      [%log info] "Querying for accounts accessed in blocks" ;
       let%bind blocks_with_accounts_accessed =
         Deferred.List.map blocks_with_zkapp_cmds ~f:(fun block ->
             let%map accounts_accessed =
@@ -484,6 +490,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             in
             { block with accounts_accessed })
       in
+      [%log info] "Querying for accounts created in blocks" ;
       let%bind blocks_with_accounts_created =
         Deferred.List.map blocks_with_accounts_accessed ~f:(fun block ->
             let%map accounts_created =
