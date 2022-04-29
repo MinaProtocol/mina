@@ -2979,6 +2979,9 @@ module Ledger = struct
       parties ps |> !((deriver ())#to_json) |> yojson_to_gql |> Js.string
     in
     static_method "partiesToGraphQL" parties_to_graphql ;
+    static_method "accountCreationFee" (fun () ->
+        Currency.Fee.to_int
+          Genesis_constants.Constraint_constants.compiled.account_creation_fee) ;
     ()
 end
 
