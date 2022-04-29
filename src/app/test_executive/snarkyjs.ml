@@ -116,22 +116,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind () = Deferred.return unit_with_error in
       (* TODO: switch to external sending script once the rest is working *)
       let%bind () = send_zkapp ~logger node parties_contract in
-      (* Note: Sending the zkapp "outside OCaml" so we can _properly_ ensure that the GraphQL API is working *)
-      (*
-      let uri = Network.Node.graphql_uri node in
-      let parties_query = Lazy.force Mina_base.Parties.inner_query in
-      let%bind.Deferred () =
-        let open Deferred.Let_syntax in
-        let%bind process =
-          Async_unix.Process.create_exn
-            ~prog:"./scripts/send-parties-transaction.sh"
-            ~args:[ parties_query; parties_contract_str; uri ]
-            ()
-        in
-        let%map _stdout = wait_and_stdout ~logger process in
-        ()
-      in
-      *)
       return parties_contract
     in
     let%bind parties_deploy_contract = make_sign_and_send `Deploy in
@@ -170,10 +154,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             let module Set_or_keep = Mina_base.Zkapp_basic.Set_or_keep in
             let module Field = Snark_params.Tick0.Field in
             let expected = Set_or_keep.Set (Field.of_int 3) in
-            if
-              Set_or_keep.equal Field.equal zkapp_first_state
-                (Set_or_keep.Set (Field.of_int 3))
-            then (
+            if Set_or_keep.equal Field.equal zkapp_first_state expected then (
               [%log info] "Ledger sees state update in zkapp execution" ;
               return () )
             else
