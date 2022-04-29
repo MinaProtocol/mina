@@ -2907,8 +2907,10 @@ module Ledger = struct
     in
     let commitment = Parties.commitment tx in
     let full_commitment =
-      Parties.Transaction_commitment.with_fee_payer commitment
-        ~fee_payer_hash:Party.(digest (of_fee_payer tx.fee_payer))
+      Parties.Transaction_commitment.create_complete commitment
+        ~memo_hash:Field.Constant.zero
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer tx.fee_payer))
     in
     object%js
       val commitment = to_js_field_unchecked commitment
@@ -2921,13 +2923,8 @@ module Ledger = struct
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let at_party =
-      let ps =
-        Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
-          (List.drop tx.other_parties party_index)
-        |> Parties.Call_forest.accumulate_hashes_predicated
-      in
-      Parties.Call_forest.hash ps
+      let ps = List.drop tx.other_parties party_index in
+      (Parties.Call_forest.hash ps :> Impl.field)
     in
     let transaction = transaction_commitment tx (Other_party party_index) in
     Zkapp_statement.Constant.to_js { transaction; at_party }
@@ -2968,8 +2965,10 @@ module Ledger = struct
     let ({ fee_payer; other_parties; _ } : Parties.t) = parties in
     let tx_commitment = Parties.commitment parties in
     let full_tx_commitment =
-      Parties.Transaction_commitment.with_fee_payer tx_commitment
-        ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
+      Parties.Transaction_commitment.create_complete tx_commitment
+        ~memo_hash:Field.Constant.zero
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
     let key_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     let check_signature who s pk msg =
@@ -2993,7 +2992,8 @@ module Ledger = struct
 
     check_signature "fee payer" fee_payer.authorization
       fee_payer.body.public_key full_tx_commitment ;
-    List.iteri other_parties ~f:(fun i p ->
+    List.iteri (Parties.Call_forest.to_parties_list other_parties)
+      ~f:(fun i p ->
         let commitment =
           if p.body.use_full_commitment then full_tx_commitment
           else tx_commitment
