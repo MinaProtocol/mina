@@ -159,4 +159,4 @@ let () =
              Currency.Balance.(
                Option.value_exn (add_amount zero (Currency.Amount.of_int 500))))
       in
-      apply_parties ledger [ parties ])
+      ignore (apply_parties ledger [ parties ] : Sparse_ledger.t))
