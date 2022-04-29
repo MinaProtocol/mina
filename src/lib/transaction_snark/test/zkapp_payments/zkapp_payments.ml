@@ -266,7 +266,7 @@ let%test_module "Zkapp payments tests" =
               let parties =
                 Transaction_snark.For_tests.multiple_transfers test_spec
               in
-              U.apply_parties ledger [ parties ] ;
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ;
               let _, (local_state, _) =
                 Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view:U.genesis_state_view ledger parties

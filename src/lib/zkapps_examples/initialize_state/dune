@@ -1,7 +1,8 @@
 (library
- (name zkapps_empty_update)
+ (name zkapps_initialize_state)
  (libraries
    ;; opam libraries
+   base
    core_kernel
    ;; local libraries
    crypto_params

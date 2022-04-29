@@ -3750,237 +3750,249 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
       ; target = Pending_coinbase.Stack.empty
       }
   in
-  List.fold_right states_rev ~init:[]
-    ~f:(fun
-         { Parties_intermediate_state.kind
-         ; spec
-         ; state_before = { global = source_global; local = source_local }
-         ; state_after = { global = target_global; local = target_local }
-         ; use_full_commitment
-         }
-         witnesses
-       ->
-      (*Transaction snark says nothing about failure status*)
-      let source_local = { source_local with failure_status_tbl = [] } in
-      let target_local = { target_local with failure_status_tbl = [] } in
-      let current_commitment = !commitment in
-      let current_full_commitment = !full_commitment in
-      let snapp_stmt =
-        match spec with
-        | Proved ->
-            (* NB: This is only correct if we assume that a proved party will
-               never appear first in a transaction.
-            *)
-            Some
-              ( 0
-              , tx_statement current_commitment current_full_commitment
-                  use_full_commitment source_local.stack_frame.calls )
-        | _ ->
-            None
-      in
-      let ( start_parties
-          , next_commitment
-          , next_full_commitment
-          , pending_coinbase_init_stack
-          , pending_coinbase_stack_state ) =
-        let empty_if_last (mk : unit -> field * field) : field * field =
-          match (target_local.stack_frame.calls, target_local.call_stack) with
-          | [], [] ->
-              (* The commitment will be cleared, because this is the last
-                 party.
+  let final_ledger =
+    match states_rev with
+    | [] ->
+        sparse_ledger
+    | { Parties_intermediate_state.state_after = { global = { ledger; _ }; _ }
+      ; _
+      }
+      :: _ ->
+        ledger
+  in
+  ( List.fold_right states_rev ~init:[]
+      ~f:(fun
+           { Parties_intermediate_state.kind
+           ; spec
+           ; state_before = { global = source_global; local = source_local }
+           ; state_after = { global = target_global; local = target_local }
+           ; use_full_commitment
+           }
+           witnesses
+         ->
+        (*Transaction snark says nothing about failure status*)
+        let source_local = { source_local with failure_status_tbl = [] } in
+        let target_local = { target_local with failure_status_tbl = [] } in
+        let current_commitment = !commitment in
+        let current_full_commitment = !full_commitment in
+        let snapp_stmt =
+          match spec with
+          | Proved ->
+              (* NB: This is only correct if we assume that a proved party will
+                 never appear first in a transaction.
               *)
-              Parties.Transaction_commitment.(empty, empty)
+              Some
+                ( 0
+                , tx_statement current_commitment current_full_commitment
+                    use_full_commitment source_local.stack_frame.calls )
           | _ ->
-              mk ()
+              None
         in
-        let mk_next_commitments (parties : Parties.t) =
-          empty_if_last (fun () ->
-              let next_commitment = Parties.commitment parties in
-              let memo_hash = Signed_command_memo.hash parties.memo in
-              let fee_payer_hash =
-                Parties.Digest.Party.create
-                  (Party.of_fee_payer parties.fee_payer)
-              in
-              let next_full_commitment =
-                Parties.Transaction_commitment.create_complete next_commitment
-                  ~memo_hash ~fee_payer_hash
-              in
-              (next_commitment, next_full_commitment))
-        in
-        match kind with
-        | `Same ->
-            let next_commitment, next_full_commitment =
-              empty_if_last (fun () ->
-                  (current_commitment, current_full_commitment))
-            in
-            ( []
+        let ( start_parties
             , next_commitment
             , next_full_commitment
-            , !pending_coinbase_init_stack
-            , !pending_coinbase_stack_state )
-        | `New -> (
-            match !remaining_parties with
-            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
-              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-              , parties )
-              :: rest ->
-                let commitment', full_commitment' =
-                  mk_next_commitments parties.parties
-                in
-                remaining_parties := rest ;
-                commitment := commitment' ;
-                full_commitment := full_commitment' ;
-                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
-                pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
-                ( [ parties ]
-                , commitment'
-                , full_commitment'
-                , !pending_coinbase_init_stack
-                , !pending_coinbase_stack_state )
+            , pending_coinbase_init_stack
+            , pending_coinbase_stack_state ) =
+          let empty_if_last (mk : unit -> field * field) : field * field =
+            match (target_local.stack_frame.calls, target_local.call_stack) with
+            | [], [] ->
+                (* The commitment will be cleared, because this is the last
+                   party.
+                *)
+                Parties.Transaction_commitment.(empty, empty)
             | _ ->
-                failwith "Not enough remaining parties" )
-        | `Two_new -> (
-            match !remaining_parties with
-            | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
-              , `Pending_coinbase_of_statement pending_coinbase_stack_state1
-              , parties1 )
-              :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
-                 , `Pending_coinbase_of_statement pending_coinbase_stack_state2
-                 , parties2 )
-                 :: rest ->
-                let commitment', full_commitment' =
-                  mk_next_commitments parties2.parties
+                mk ()
+          in
+          let mk_next_commitments (parties : Parties.t) =
+            empty_if_last (fun () ->
+                let next_commitment = Parties.commitment parties in
+                let memo_hash = Signed_command_memo.hash parties.memo in
+                let fee_payer_hash =
+                  Parties.Digest.Party.create
+                    (Party.of_fee_payer parties.fee_payer)
                 in
-                remaining_parties := rest ;
-                commitment := commitment' ;
-                full_commitment := full_commitment' ;
-                (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
-                pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
-                pending_coinbase_stack_state :=
-                  { pending_coinbase_stack_state1 with
-                    Pending_coinbase_stack_state.target =
-                      pending_coinbase_stack_state2
-                        .Pending_coinbase_stack_state.target
-                  } ;
-                ( [ parties1; parties2 ]
-                , commitment'
-                , full_commitment'
-                , !pending_coinbase_init_stack
-                , !pending_coinbase_stack_state )
-            | _ ->
-                failwith "Not enough remaining parties" )
-      in
-      let hash_local_state
-          (local :
-            ( Stack_frame.value
-            , Stack_frame.value list
-            , _
-            , _
-            , _
-            , _
-            , _
-            , _ )
-            Mina_transaction_logic.Parties_logic.Local_state.t) =
-        let stack_frame (stack_frame : Stack_frame.value) =
-          { stack_frame with
-            calls =
-              Parties.Call_forest.map stack_frame.calls ~f:(fun p -> (p, ()))
+                let next_full_commitment =
+                  Parties.Transaction_commitment.create_complete next_commitment
+                    ~memo_hash ~fee_payer_hash
+                in
+                (next_commitment, next_full_commitment))
+          in
+          match kind with
+          | `Same ->
+              let next_commitment, next_full_commitment =
+                empty_if_last (fun () ->
+                    (current_commitment, current_full_commitment))
+              in
+              ( []
+              , next_commitment
+              , next_full_commitment
+              , !pending_coinbase_init_stack
+              , !pending_coinbase_stack_state )
+          | `New -> (
+              match !remaining_parties with
+              | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+                , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+                , parties )
+                :: rest ->
+                  let commitment', full_commitment' =
+                    mk_next_commitments parties.parties
+                  in
+                  remaining_parties := rest ;
+                  commitment := commitment' ;
+                  full_commitment := full_commitment' ;
+                  pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                  pending_coinbase_stack_state := pending_coinbase_stack_state1 ;
+                  ( [ parties ]
+                  , commitment'
+                  , full_commitment'
+                  , !pending_coinbase_init_stack
+                  , !pending_coinbase_stack_state )
+              | _ ->
+                  failwith "Not enough remaining parties" )
+          | `Two_new -> (
+              match !remaining_parties with
+              | ( `Pending_coinbase_init_stack pending_coinbase_init_stack1
+                , `Pending_coinbase_of_statement pending_coinbase_stack_state1
+                , parties1 )
+                :: ( `Pending_coinbase_init_stack _pending_coinbase_init_stack2
+                   , `Pending_coinbase_of_statement
+                       pending_coinbase_stack_state2
+                   , parties2 )
+                   :: rest ->
+                  let commitment', full_commitment' =
+                    mk_next_commitments parties2.parties
+                  in
+                  remaining_parties := rest ;
+                  commitment := commitment' ;
+                  full_commitment := full_commitment' ;
+                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for parties2 if it is in a different scan state tree*)
+                  pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
+                  pending_coinbase_stack_state :=
+                    { pending_coinbase_stack_state1 with
+                      Pending_coinbase_stack_state.target =
+                        pending_coinbase_stack_state2
+                          .Pending_coinbase_stack_state.target
+                    } ;
+                  ( [ parties1; parties2 ]
+                  , commitment'
+                  , full_commitment'
+                  , !pending_coinbase_init_stack
+                  , !pending_coinbase_stack_state )
+              | _ ->
+                  failwith "Not enough remaining parties" )
+        in
+        let hash_local_state
+            (local :
+              ( Stack_frame.value
+              , Stack_frame.value list
+              , _
+              , _
+              , _
+              , _
+              , _
+              , _ )
+              Mina_transaction_logic.Parties_logic.Local_state.t) =
+          let stack_frame (stack_frame : Stack_frame.value) =
+            { stack_frame with
+              calls =
+                Parties.Call_forest.map stack_frame.calls ~f:(fun p -> (p, ()))
+            }
+          in
+          { local with
+            stack_frame = stack_frame local.stack_frame
+          ; call_stack =
+              List.map local.call_stack ~f:(fun f ->
+                  With_hash.of_data (stack_frame f)
+                    ~hash_data:Stack_frame.Digest.create)
+              |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
+                     x.With_hash.hash)
           }
         in
-        { local with
-          stack_frame = stack_frame local.stack_frame
-        ; call_stack =
-            List.map local.call_stack ~f:(fun f ->
-                With_hash.of_data (stack_frame f)
-                  ~hash_data:Stack_frame.Digest.create)
-            |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
-                   x.With_hash.hash)
-        }
-      in
-      let source_local =
-        { (hash_local_state source_local) with
-          transaction_commitment = current_commitment
-        ; full_transaction_commitment = current_full_commitment
-        }
-      in
-      let target_local =
-        { (hash_local_state target_local) with
-          transaction_commitment = next_commitment
-        ; full_transaction_commitment = next_full_commitment
-        }
-      in
-      let w : Parties_segment.Witness.t =
-        { global_ledger = source_global.ledger
-        ; local_state_init = source_local
-        ; start_parties
-        ; state_body
-        ; init_stack = pending_coinbase_init_stack
-        }
-      in
-      let fee_excess =
-        (*capture only the difference in the fee excess*)
+        let source_local =
+          { (hash_local_state source_local) with
+            transaction_commitment = current_commitment
+          ; full_transaction_commitment = current_full_commitment
+          }
+        in
+        let target_local =
+          { (hash_local_state target_local) with
+            transaction_commitment = next_commitment
+          ; full_transaction_commitment = next_full_commitment
+          }
+        in
+        let w : Parties_segment.Witness.t =
+          { global_ledger = source_global.ledger
+          ; local_state_init = source_local
+          ; start_parties
+          ; state_body
+          ; init_stack = pending_coinbase_init_stack
+          }
+        in
         let fee_excess =
-          match
-            Amount.Signed.(
-              add target_global.fee_excess (negate source_global.fee_excess))
-          with
-          | None ->
-              failwith
-                (sprintf
-                   !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
-                     target %{sexp: Amount.Signed.t}"
-                   target_global.fee_excess source_global.fee_excess)
-          | Some balance_change ->
-              balance_change
+          (*capture only the difference in the fee excess*)
+          let fee_excess =
+            match
+              Amount.Signed.(
+                add target_global.fee_excess (negate source_global.fee_excess))
+            with
+            | None ->
+                failwith
+                  (sprintf
+                     !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
+                       target %{sexp: Amount.Signed.t}"
+                     target_global.fee_excess source_global.fee_excess)
+            | Some balance_change ->
+                balance_change
+          in
+          { fee_token_l = Token_id.default
+          ; fee_excess_l = Amount.Signed.to_fee fee_excess
+          ; Mina_base.Fee_excess.fee_token_r = Token_id.default
+          ; fee_excess_r = Fee.Signed.zero
+          }
         in
-        { fee_token_l = Token_id.default
-        ; fee_excess_l = Amount.Signed.to_fee fee_excess
-        ; Mina_base.Fee_excess.fee_token_r = Token_id.default
-        ; fee_excess_r = Fee.Signed.zero
-        }
-      in
-      let call_stack_hash s =
-        List.hd s
-        |> Option.value_map ~default:Call_stack_digest.empty
-             ~f:With_stack_hash.stack_hash
-      in
-      let statement : Statement.With_sok.t =
-        (* empty ledger hash in the local state at the beginning of each
-           transaction
-           `parties` in local state is empty for the first segment*)
-        let source_local_ledger =
-          if Parties.Call_forest.is_empty source_local.stack_frame.calls then
-            Frozen_ledger_hash.empty_hash
-          else Sparse_ledger.merkle_root source_local.ledger
+        let call_stack_hash s =
+          List.hd s
+          |> Option.value_map ~default:Call_stack_digest.empty
+               ~f:With_stack_hash.stack_hash
         in
-        { source =
-            { ledger = Sparse_ledger.merkle_root source_global.ledger
-            ; pending_coinbase_stack = pending_coinbase_stack_state.source
-            ; local_state =
-                { source_local with
-                  stack_frame =
-                    Stack_frame.Digest.create source_local.stack_frame
-                ; call_stack = call_stack_hash source_local.call_stack
-                ; ledger = source_local_ledger
-                }
-            }
-        ; target =
-            { ledger = Sparse_ledger.merkle_root target_global.ledger
-            ; pending_coinbase_stack = pending_coinbase_stack_state.target
-            ; local_state =
-                { target_local with
-                  stack_frame =
-                    Stack_frame.Digest.create target_local.stack_frame
-                ; call_stack = call_stack_hash target_local.call_stack
-                ; ledger = Sparse_ledger.merkle_root target_local.ledger
-                }
-            }
-        ; supply_increase = Amount.zero
-        ; fee_excess
-        ; sok_digest = Sok_message.Digest.default
-        }
-      in
-      (w, spec, statement, snapp_stmt) :: witnesses)
+        let statement : Statement.With_sok.t =
+          (* empty ledger hash in the local state at the beginning of each
+             transaction
+             `parties` in local state is empty for the first segment*)
+          let source_local_ledger =
+            if Parties.Call_forest.is_empty source_local.stack_frame.calls then
+              Frozen_ledger_hash.empty_hash
+            else Sparse_ledger.merkle_root source_local.ledger
+          in
+          { source =
+              { ledger = Sparse_ledger.merkle_root source_global.ledger
+              ; pending_coinbase_stack = pending_coinbase_stack_state.source
+              ; local_state =
+                  { source_local with
+                    stack_frame =
+                      Stack_frame.Digest.create source_local.stack_frame
+                  ; call_stack = call_stack_hash source_local.call_stack
+                  ; ledger = source_local_ledger
+                  }
+              }
+          ; target =
+              { ledger = Sparse_ledger.merkle_root target_global.ledger
+              ; pending_coinbase_stack = pending_coinbase_stack_state.target
+              ; local_state =
+                  { target_local with
+                    stack_frame =
+                      Stack_frame.Digest.create target_local.stack_frame
+                  ; call_stack = call_stack_hash target_local.call_stack
+                  ; ledger = Sparse_ledger.merkle_root target_local.ledger
+                  }
+              }
+          ; supply_increase = Amount.zero
+          ; fee_excess
+          ; sok_digest = Sok_message.Digest.default
+          }
+        in
+        (w, spec, statement, snapp_stmt) :: witnesses)
+  , final_ledger )
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
