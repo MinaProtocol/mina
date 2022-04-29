@@ -1436,6 +1436,7 @@ module Snapp_helpers = struct
           return Party.Account_precondition.Accept
     in
     let use_full_commitment = body_data.use_full_commitment in
+    let caller = Token_id.of_string body_data.caller in
     return
       ( { public_key
         ; update
@@ -1449,6 +1450,7 @@ module Snapp_helpers = struct
         ; protocol_state_precondition
         ; account_precondition
         ; use_full_commitment
+        ; caller
         }
         : Party.Body.t )
 
@@ -1489,6 +1491,7 @@ module Snapp_helpers = struct
       ; protocol_state_precondition = body.protocol_state_precondition
       ; account_precondition = fee_payer_account_precondition
       ; use_full_commitment = ()
+      ; caller = ()
       }
       : Party.Body.Fee_payer.t )
 end
@@ -1669,6 +1672,12 @@ let parties_of_snapp_command ~pool (cmd : Sql.Snapp_command.t) :
   in
   (* memo contents don't affect ability to replay snapp *)
   let memo = Mina_base.Signed_command_memo.dummy in
+  let other_parties =
+    Parties.Call_forest.of_parties_list other_parties
+      ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+    |> Parties.Call_forest.accumulate_hashes
+         ~hash_party:Parties.Digest.Party.create
+  in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
 let run_snapp_command ~logger ~pool ~ledger ~continue_on_error:_

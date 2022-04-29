@@ -233,6 +233,7 @@ CREATE TABLE zkapp_party_body
 , zkapp_protocol_state_precondition_id     int        NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
 , zkapp_account_precondition_id            int        NOT NULL REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                      boolean    NOT NULL
+, caller                                   text       NOT NULL
 );
 
 CREATE TABLE zkapp_party

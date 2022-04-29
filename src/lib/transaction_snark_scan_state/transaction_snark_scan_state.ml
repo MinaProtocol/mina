@@ -191,7 +191,7 @@ let create_expected_statement ~constraint_constants
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
-  let empty_local_state = Mina_state.Local_state.empty in
+  let empty_local_state = Mina_state.Local_state.empty () in
   let%bind after, _ =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants

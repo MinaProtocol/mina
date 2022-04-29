@@ -43,7 +43,8 @@ module Make () = struct
     end
   end]
 
-  [%%define_locally T1.(to_raw_string, digest_string, to_hex)]
+  [%%define_locally
+  T1.(of_raw_string, to_raw_string, digest_string, digest_bigstring, to_hex)]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)

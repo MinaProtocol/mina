@@ -66,10 +66,10 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
+      module V2 = struct
         type t =
           | Insufficient_replace_fee
-          | Invalid_signature
+          | Verification_failed
           | Duplicate
           | Sender_account_does_not_exist
           | Invalid_nonce
@@ -91,7 +91,7 @@ module Diff_versioned = struct
      * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
-      | Invalid_signature
+      | Verification_failed
       | Duplicate
       | Sender_account_does_not_exist
       | Invalid_nonce
@@ -107,8 +107,8 @@ module Diff_versioned = struct
     let to_string_name = function
       | Insufficient_replace_fee ->
           "insufficient_replace_fee"
-      | Invalid_signature ->
-          "invalid_signature"
+      | Verification_failed ->
+          "verification_failed"
       | Duplicate ->
           "duplicate"
       | Sender_account_does_not_exist ->
@@ -134,8 +134,8 @@ module Diff_versioned = struct
       | Insufficient_replace_fee ->
           "This transaction would have replaced an existing transaction in the \
            pool, but the fee was too low"
-      | Invalid_signature ->
-          "This transaction had an invalid signature"
+      | Verification_failed ->
+          "This transaction had an invalid proof/signature"
       | Duplicate ->
           "This transaction is a duplicate of one already in the pool"
       | Sender_account_does_not_exist ->
@@ -167,8 +167,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V1.t) list
+      module V3 = struct
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -434,8 +434,8 @@ struct
           Overflow
       | Bad_token ->
           Bad_token
-      | Invalid_transaction ->
-          Invalid_signature
+      | Verification_failed ->
+          Verification_failed
       | Unwanted_fee_token _ ->
           Unwanted_fee_token
       | Expired _ ->
@@ -461,7 +461,7 @@ struct
           []
       | Bad_token ->
           []
-      | Invalid_transaction ->
+      | Verification_failed ->
           []
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
@@ -469,6 +469,13 @@ struct
           ( `Valid_until valid_until
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
+          ; ( "current_global_slot"
+            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
+          ]
+      | Expired
+          ( `Timestamp_predicate expiry_ns
+          , `Global_slot_since_genesis global_slot_since_genesis ) ->
+          [ ("expiry_ns", `String expiry_ns)
           ; ( "current_global_slot"
             , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
           ]
@@ -915,7 +922,7 @@ struct
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
           | Insufficient_replace_fee
-          | Invalid_signature
+          | Verification_failed
           | Duplicate
           | Sender_account_does_not_exist
           | Invalid_nonce
@@ -1014,8 +1021,8 @@ struct
                   "invalid nonce"
               | Insufficient_funds _ ->
                   "insufficient funds"
-              | Invalid_transaction ->
-                  "transaction had bad signature or was malformed"
+              | Verification_failed ->
+                  "transaction had bad proof/signature or was malformed"
               | Insufficient_replace_fee _ ->
                   "insufficient replace fee"
               | Overflow ->
@@ -1063,7 +1070,7 @@ struct
                   ; ("token", Token_id.to_yojson fee_token)
                   ] ;
               Deferred.unit
-          | Invalid_transaction ->
+          | Verification_failed ->
               trust_record
                 ( Trust_system.Actions.Sent_useless_gossip
                 , Some
@@ -2130,12 +2137,11 @@ let%test_module _ =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = Some protocol_state_precondition
+        ; account_precondition = None
         }
       in
-      let parties =
-        Transaction_snark.For_tests.multiple_transfers
-          ~protocol_state_precondition test_spec
-      in
+      let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
       User_command.Parties parties
 
     let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
