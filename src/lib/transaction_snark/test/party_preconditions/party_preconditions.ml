@@ -317,12 +317,13 @@ let%test_module "Protocol state precondition tests" =
                   let commitment =
                     Parties.Transaction_commitment.create ~other_parties_hash
                   in
+                  let memo_hash = Signed_command_memo.hash memo in
+                  let fee_payer_hash =
+                    Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
+                  in
                   let full_commitment =
                     Parties.Transaction_commitment.create_complete commitment
-                      ~fee_payer_hash:
-                        (Parties.Digest.Party.create
-                           (Party.of_fee_payer fee_payer))
-                      ~memo_hash:(Signed_command_memo.hash memo)
+                      ~memo_hash ~fee_payer_hash
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
@@ -708,11 +709,13 @@ let%test_module "Account precondition tests" =
               let commitment =
                 Parties.Transaction_commitment.create ~other_parties_hash
               in
+              let memo_hash = Signed_command_memo.hash memo in
+              let fee_payer_hash =
+                Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
+              in
               let full_commitment =
                 Parties.Transaction_commitment.create_complete commitment
-                  ~memo_hash:(Signed_command_memo.hash memo)
-                  ~fee_payer_hash:
-                    (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+                  ~memo_hash ~fee_payer_hash
               in
               let fee_payer =
                 let fee_payer_signature_auth =
