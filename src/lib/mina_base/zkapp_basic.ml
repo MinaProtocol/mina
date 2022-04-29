@@ -159,6 +159,10 @@ module Set_or_keep = struct
       -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
       -> Field.Var.t Random_oracle_input.Chunked.t
 
+    val set : 'a -> 'a t
+
+    val keep : dummy:'a -> 'a t
+
     val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
@@ -203,6 +207,10 @@ module Set_or_keep = struct
           (b :> Field.Var.t))
 
     let make_unsafe is_keep data = { Flagged_option.is_some = is_keep; data }
+
+    let set data = { Flagged_option.is_some = Boolean.true_; data }
+
+    let keep ~dummy = { Flagged_option.is_some = Boolean.false_; data = dummy }
   end
 
   let typ = Checked.typ

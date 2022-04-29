@@ -435,6 +435,7 @@ val parties_witnesses_exn :
      * Statement.With_sok.t
      * (int * Zkapp_statement.t) option )
      list
+     * Mina_ledger.Sparse_ledger.t
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t

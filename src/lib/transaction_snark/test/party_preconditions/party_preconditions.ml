@@ -362,9 +362,8 @@ let%test_module "Protocol state precondition tests" =
                     init_ledger ledger ;
                   U.check_parties_with_merges_exn
                     ~expected_failure:
-                      (Some
-                         Transaction_status.Failure
-                         .Protocol_state_precondition_unsatisfied) ~state_body
+                      Transaction_status.Failure
+                      .Protocol_state_precondition_unsatisfied ~state_body
                     ledger
                     [ parties_with_valid_fee_payer ])))
   end )
@@ -611,9 +610,8 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   U.check_parties_with_merges_exn
                     ~expected_failure:
-                      (Some
-                         Transaction_status.Failure
-                         .Account_precondition_unsatisfied) ~state_body ledger
+                      Transaction_status.Failure
+                      .Account_precondition_unsatisfied ~state_body ledger
                     [ parties ])))
 
     let%test_unit "invalid account predicate in fee payer" =

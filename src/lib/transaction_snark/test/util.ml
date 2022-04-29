@@ -93,13 +93,14 @@ let apply_parties ledger parties =
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
-  let witnesses =
+  let witnesses, final_ledger =
     Transaction_snark.parties_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter witnesses ~f:(fun (witness, spec, statement, snapp_stmt) ->
+  List.iter (List.rev witnesses)
+    ~f:(fun (witness, spec, statement, snapp_stmt) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
@@ -112,19 +113,20 @@ let apply_parties ledger parties =
             (Parties_segment.Basic.to_single_list spec)
             snapp_stmt s ~witness ;
           fun () -> ())
-      |> Or_error.ok_exn)
+      |> Or_error.ok_exn) ;
+  final_ledger
 
 let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_parties_with_merges_exn ?(expected_failure = None)
+let check_parties_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
-      let witnesses =
+      let witnesses, _final_ledger =
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
