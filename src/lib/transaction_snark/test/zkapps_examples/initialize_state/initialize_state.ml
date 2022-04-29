@@ -275,8 +275,11 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Initialize without deploy fails" =
       let account =
-        Option.try_with (fun () ->
+        Or_error.try_with (fun () ->
+            (* Raises an exception due to verifying a proof without a valid vk
+               in the account.
+            *)
             test_parties [ Initialize_party.party; Update_state_party.party ])
       in
-      assert (Option.is_none account)
+      assert (Or_error.is_error account)
   end )
