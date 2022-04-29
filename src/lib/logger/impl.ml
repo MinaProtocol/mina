@@ -286,7 +286,7 @@ module Consumer_registry = struct
   let register ~(id : id) ~processor ~transport =
     Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
 
-  let broadcast_log_message ~id msg =
+  let rec broadcast_log_message ~id msg =
     let consumers =
       match Hashtbl.find t id with
       | Some consumers ->
@@ -302,21 +302,24 @@ module Consumer_registry = struct
         in
         match Processor.process processor msg with
         | Some str ->
-            if String.length str < max_log_line_length then
-              Transport.transport transport str
+            if
+              String.equal id "oversized_logs"
+              || String.length str < max_log_line_length
+            then Transport.transport transport str
             else
               let max_log_line_error =
                 { msg with
                   message =
-                    "<log message elided as it was exceeded the max log line \
-                     length>"
+                    "<log message elided as it exceeded the max log line \
+                     length; see oversized logs for full log>"
                 ; metadata = Metadata.empty
                 }
               in
               Processor.process processor max_log_line_error
               |> Option.value
                    ~default:"failed to process max log line error message"
-              |> Transport.transport transport
+              |> Transport.transport transport ;
+              broadcast_log_message ~id:"oversized_logs" msg
         | None ->
             ())
 end
