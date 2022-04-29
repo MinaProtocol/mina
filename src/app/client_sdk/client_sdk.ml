@@ -41,30 +41,27 @@ let _ =
            parties_js |> Js.to_string |> Yojson.Safe.from_string
          in
          let other_parties = Parties.other_parties_of_json other_parties_json in
-         let ps =
+         let other_parties =
            Parties.Call_forest.of_parties_list
              ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
              other_parties
-           |> Parties.Call_forest.accumulate_hashes_predicated
+           |> Parties.Call_forest.accumulate_hashes
+                ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
-         let other_parties_hash = Parties.Call_forest.hash ps in
-         let protocol_state_predicate_hash =
-           Zkapp_precondition.Protocol_state.digest
-             Zkapp_precondition.Protocol_state.accept
-         in
+         let other_parties_hash = Parties.Call_forest.hash other_parties in
          let memo =
            fee_payer_party_js##.memo |> Js.to_string
            |> Memo.create_from_string_exn
          in
          let commitment : Parties.Transaction_commitment.t =
            Parties.Transaction_commitment.create ~other_parties_hash
-             ~protocol_state_predicate_hash
-             ~memo_hash:(Signed_command_memo.hash memo)
          in
          let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
          let full_commitment =
-           Parties.Transaction_commitment.with_fee_payer commitment
-             ~fee_payer_hash:Party.(digest (of_fee_payer fee_payer))
+           Parties.Transaction_commitment.create_complete commitment
+             ~memo_hash:(Signed_command_memo.hash memo)
+             ~fee_payer_hash:
+               (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
          in
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn

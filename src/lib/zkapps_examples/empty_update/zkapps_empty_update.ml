@@ -68,6 +68,7 @@ module Party_under_construction = struct
           ; proved_state = Ignore
           }
     ; use_full_commitment = false
+    ; caller = Token_id.default
     }
 
   module In_circuit = struct
@@ -82,7 +83,10 @@ module Party_under_construction = struct
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
-        Snarky_backendless.Typ_monads.Store.run (typ.store x) Field.Var.constant
+        let (Typ typ) = typ in
+        let fields, aux = typ.value_to_fields x in
+        let fields = Array.map Field.Var.constant fields in
+        typ.var_of_fields (fields, aux)
       in
       { Party.Body.Checked.public_key = t.public_key
       ; token_id = t.token_id
@@ -154,6 +158,7 @@ module Party_under_construction = struct
                ; proved_state = Ignore
                })
       ; use_full_commitment = Boolean.false_
+      ; caller = Token_id.(Checked.constant default)
       }
   end
 end

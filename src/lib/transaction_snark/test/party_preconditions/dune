@@ -1,25 +1,30 @@
 (library
-  (name zkapp_payments_tests)
+  (name party_precondition_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
+   async_unix
    async
    async_kernel
-   async_unix
    core
    base
    core_kernel
    yojson
    ;; local libraries
-   logger
    mina_base.import
+   data_hash_lib
    pickles
    pickles.backend
+   kimchi_backend
+   kimchi_backend.common
    kimchi_backend.pasta
    transaction_snark
    snark_params
    mina_ledger
    mina_base
+   mina_generators
+   mina_transaction
+   mina_transaction_logic
    currency
    mina_state
    signature_lib
@@ -29,11 +34,11 @@
    mina_numbers
    sgn
    transaction_snark_tests
-   test_util
-   mina_transaction_logic
+   random_oracle
+   random_oracle_input
    )
   (library_flags -linkall)
   (inline_tests)
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_coda))
+    (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

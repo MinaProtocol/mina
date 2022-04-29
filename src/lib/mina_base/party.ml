@@ -20,6 +20,31 @@ module type Type = sig
   type t
 end
 
+let token_id_deriver obj =
+  let open Fields_derivers_zkapps in
+  iso_string obj ~name:"TokenId" ~doc:"String representing a token ID"
+    ~to_string:Token_id.to_string
+    ~of_string:(except ~f:Token_id.of_string `Token_id)
+
+module Call_type = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Call | Delegate_call
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let quickcheck_generator =
+    Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
+      | false ->
+          Call
+      | true ->
+          Delegate_call)
+end
+
 module Update = struct
   module Timing_info = struct
     [%%versioned
@@ -571,11 +596,21 @@ module Account_precondition = struct
             (pack_input x))
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
+
+    let nonce (t : t) = t.nonce
   end
 
   let typ () : (Zkapp_precondition.Account.Checked.t, t) Typ.t =
     Typ.transport (Zkapp_precondition.Account.typ ()) ~there:to_full
       ~back:(fun s -> Full s)
+
+  let nonce = function
+    | Full { nonce; _ } ->
+        nonce
+    | Nonce nonce ->
+        Check { lower = nonce; upper = nonce }
+    | Accept ->
+        Ignore
 end
 
 module Body = struct
@@ -589,7 +624,8 @@ module Body = struct
       (Int : Type)
       (Bool : Type)
       (Protocol_state : Type)
-      (Account_precondition : Type) =
+      (Account_precondition : Type)
+      (Caller : Type) =
   struct
     (** Body component of a party *)
     type t =
@@ -605,6 +641,7 @@ module Body = struct
       ; protocol_state_precondition : Protocol_state.t
       ; account_precondition : Account_precondition.t
       ; use_full_commitment : Bool.t
+      ; caller : Caller.t
       }
   end
 
@@ -653,6 +690,44 @@ module Body = struct
     end]
   end
 
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+              Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
+                (Update.Stable.V1)
+                (Amount_sgn_signed_poly.Stable.V1)
+                (Events'.Stable.V1)
+                (Pickles.Backend.Tick.Field.Stable.V1)
+                (Int)
+                (Bool)
+                (Zkapp_precondition.Protocol_state.Stable.V1)
+                (Account_precondition.Stable.V1)
+                (Call_type.Stable.V1)
+              .t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V1.t
+          ; update : Update.Stable.V1.t
+          ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; sequence_events : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; protocol_state_precondition :
+              Zkapp_precondition.Protocol_state.Stable.V1.t
+          ; account_precondition : Account_precondition.Stable.V1.t
+          ; use_full_commitment : bool
+          ; caller : Call_type.Stable.V1.t
+          }
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -666,6 +741,7 @@ module Body = struct
               (Bool)
               (Zkapp_precondition.Protocol_state.Stable.V1)
               (Account_precondition.Stable.V1)
+              (Token_id.Stable.V1)
             .t
             (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -681,12 +757,29 @@ module Body = struct
             Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account_precondition : Account_precondition.Stable.V1.t
         ; use_full_commitment : bool
+        ; caller : Token_id.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
       let to_latest = Fn.id
     end
   end]
+
+  let to_wire (p : t) caller : Wire.t =
+    { public_key = p.public_key
+    ; token_id = p.token_id
+    ; update = p.update
+    ; balance_change = p.balance_change
+    ; increment_nonce = p.increment_nonce
+    ; events = p.events
+    ; sequence_events = p.sequence_events
+    ; call_data = p.call_data
+    ; call_depth = p.call_depth
+    ; protocol_state_precondition = p.protocol_state_precondition
+    ; account_precondition = p.account_precondition
+    ; use_full_commitment = p.use_full_commitment
+    ; caller
+    }
 
   (* * Balance change for the fee payer is always going to be Neg, so represent it using
        an unsigned fee,
@@ -709,6 +802,7 @@ module Body = struct
                 (Unit)
                 (Zkapp_precondition.Protocol_state.Stable.V1)
                 (Account_nonce.Stable.V1)
+                (Unit)
               .t
               (* Opaque to txn logic *) =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -724,6 +818,7 @@ module Body = struct
               Zkapp_precondition.Protocol_state.Stable.V1.t
           ; account_precondition : Account_nonce.Stable.V1.t
           ; use_full_commitment : unit [@skip]
+          ; caller : unit [@skip]
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
@@ -744,6 +839,7 @@ module Body = struct
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
       ; account_precondition = Account_nonce.zero
       ; use_full_commitment = ()
+      ; caller = ()
       }
 
     let deriver obj =
@@ -760,7 +856,7 @@ module Body = struct
         ~sequence_events:!.(list @@ array field @@ o ())
         ~call_data:!.field ~call_depth:!.int
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
-        ~account_precondition:!.uint32 ~use_full_commitment:unit
+        ~account_precondition:!.uint32 ~use_full_commitment:unit ~caller:unit
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
@@ -786,6 +882,7 @@ module Body = struct
     ; protocol_state_precondition = t.protocol_state_precondition
     ; account_precondition = Account_precondition.Nonce t.account_precondition
     ; use_full_commitment = true
+    ; caller = Token_id.default
     }
 
   module Checked = struct
@@ -810,6 +907,7 @@ module Body = struct
             (Type_of_var(Boolean))
             (Zkapp_precondition.Protocol_state.Checked)
             (Account_precondition.Checked)
+            (Token_id.Checked)
           .t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
@@ -824,6 +922,7 @@ module Body = struct
           Zkapp_precondition.Protocol_state.Checked.t
       ; account_precondition : Account_precondition.Checked.t
       ; use_full_commitment : Boolean.var
+      ; caller : Token_id.Checked.t
       }
     [@@deriving annot, hlist, fields]
 
@@ -840,6 +939,7 @@ module Body = struct
          ; protocol_state_precondition
          ; account_precondition
          ; use_full_commitment
+         ; caller
          } :
           t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -859,6 +959,7 @@ module Body = struct
             (Account_precondition.Checked.digest account_precondition)
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
+        ; Token_id.Checked.to_input caller
         ]
 
     let digest (t : t) =
@@ -880,6 +981,7 @@ module Body = struct
       ; Zkapp_precondition.Protocol_state.typ
       ; Account_precondition.typ ()
       ; Impl.Boolean.typ
+      ; Token_id.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -897,6 +999,7 @@ module Body = struct
     ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
     ; account_precondition = Account_precondition.Accept
     ; use_full_commitment = false
+    ; caller = Token_id.default
     }
 
   let deriver obj =
@@ -941,7 +1044,7 @@ module Body = struct
       ~call_data:!.field ~call_depth:!.int
       ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool
+      ~use_full_commitment:!.bool ~caller:!.token_id_deriver
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -963,6 +1066,7 @@ module Body = struct
        ; protocol_state_precondition
        ; account_precondition
        ; use_full_commitment
+       ; caller
        } :
         t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -978,6 +1082,7 @@ module Body = struct
       ; Random_oracle_input.Chunked.field
           (Account_precondition.digest account_precondition)
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
+      ; Token_id.to_input caller
       ]
 
   let digest (t : t) =
@@ -997,6 +1102,19 @@ module Poly (Body : Type) (Auth : Type) = struct
 end
 
 module T = struct
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Poly(Body.Wire.Stable.V1)(Control.Stable.V2).t =
+          { body : Body.Wire.Stable.V1.t; authorization : Control.Stable.V2.t }
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1008,6 +1126,9 @@ module T = struct
       let to_latest = Fn.id
     end
   end]
+
+  let to_wire (p : t) caller : Wire.t =
+    { body = Body.to_wire p.body caller; authorization = p.authorization }
 
   let digest (t : t) = Body.digest t.body
 

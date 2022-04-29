@@ -17,7 +17,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
     { default with
       requires_graphql = true
     ; block_producers =
@@ -86,6 +85,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       let timing_account_id =
@@ -127,6 +128,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -158,6 +161,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -197,6 +202,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
         }
       in
       Transaction_snark.For_tests.update_states ~constraint_constants
@@ -287,7 +294,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Unexpected underflow when taking balance difference")
         | Some diff ->
             let sender_party =
-              List.hd_exn parties_transfer_from_timed_account.other_parties
+              (List.hd_exn parties_transfer_from_timed_account.other_parties)
+                .elt
+                .party
             in
             let amount_to_send =
               Currency.Amount.Signed.magnitude
@@ -318,7 +327,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Send a snapp with transfer from timed account that fails due to min \
          balance"
         (let sender_party =
-           List.hd_exn parties_invalid_transfer_from_timed_account.other_parties
+           (List.hd_exn
+              parties_invalid_transfer_from_timed_account.other_parties)
+             .elt
+             .party
          in
          let amount_to_send =
            Currency.Amount.Signed.magnitude
