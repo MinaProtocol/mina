@@ -316,16 +316,14 @@ let%test_module "Protocol state precondition tests" =
                   let other_parties_hash = Parties.Call_forest.hash ps in
                   let commitment =
                     Parties.Transaction_commitment.create ~other_parties_hash
-                      ~protocol_state_predicate_hash:
-                        (Zkapp_precondition.Protocol_state.digest
-                           protocol_state_precondition)
-                      ~memo_hash:(Signed_command_memo.hash memo)
+                  in
+                  let memo_hash = Signed_command_memo.hash memo in
+                  let fee_payer_hash =
+                    Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
                   in
                   let full_commitment =
-                    Parties.Transaction_commitment.with_fee_payer commitment
-                      ~fee_payer_hash:
-                        (Parties.Digest.Party.create
-                           (Party.of_fee_payer fee_payer))
+                    Parties.Transaction_commitment.create_complete commitment
+                      ~memo_hash ~fee_payer_hash
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
@@ -712,14 +710,14 @@ let%test_module "Account precondition tests" =
               let other_parties_hash = Parties.Call_forest.hash ps in
               let commitment =
                 Parties.Transaction_commitment.create ~other_parties_hash
-                  ~protocol_state_predicate_hash:
-                    Zkapp_precondition.Protocol_state.(digest accept)
-                  ~memo_hash:(Signed_command_memo.hash memo)
+              in
+              let memo_hash = Signed_command_memo.hash memo in
+              let fee_payer_hash =
+                Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
               in
               let full_commitment =
-                Parties.Transaction_commitment.with_fee_payer commitment
-                  ~fee_payer_hash:
-                    (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+                Parties.Transaction_commitment.create_complete commitment
+                  ~memo_hash ~fee_payer_hash
               in
               let fee_payer =
                 let fee_payer_signature_auth =
