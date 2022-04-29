@@ -2863,7 +2863,6 @@ module Ledger = struct
       Field.t -> Parties.Digest.Forest.Checked.t =
     Obj.magic
 
-  (* TODO memo hash *)
   let hash_transaction other_parties_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> to_unchecked
@@ -2881,12 +2880,13 @@ module Ledger = struct
 
   type party_index = Fee_payer | Other_party of int
 
-  let transaction_commitment ({ fee_payer; other_parties; _ } as tx : Parties.t)
+  let transaction_commitment
+      ({ fee_payer; other_parties; memo } as tx : Parties.t)
       (party_index : party_index) =
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment
-        ~memo_hash:Field.Constant.zero
+        ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
@@ -2908,7 +2908,7 @@ module Ledger = struct
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment
-        ~memo_hash:Field.Constant.zero
+        ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer tx.fee_payer))
     in
@@ -2962,11 +2962,11 @@ module Ledger = struct
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
   let check_party_signatures parties =
-    let ({ fee_payer; other_parties; _ } : Parties.t) = parties in
+    let ({ fee_payer; other_parties; memo } : Parties.t) = parties in
     let tx_commitment = Parties.commitment parties in
     let full_tx_commitment =
       Parties.Transaction_commitment.create_complete tx_commitment
-        ~memo_hash:Field.Constant.zero
+        ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in

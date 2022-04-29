@@ -59,7 +59,7 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  () => compile(SimpleZkapp, zkappAddress).verificationKey
+  async () => (await compile(SimpleZkapp, zkappAddress)).verificationKey
 );
 toc();
 
