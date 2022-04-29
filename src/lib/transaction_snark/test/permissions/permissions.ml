@@ -4,6 +4,9 @@ module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "permissions"
 
+  let failure_expected =
+    Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
+
   let snapp_update =
     { Party.Update.dummy with
       permissions =

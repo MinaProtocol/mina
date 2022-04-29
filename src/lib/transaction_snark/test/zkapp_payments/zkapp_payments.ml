@@ -11,6 +11,8 @@ let%test_module "Zkapp payments tests" =
   ( module struct
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
+    let constraint_constants = U.constraint_constants
+
     let merkle_root_after_parties_exn t ~txn_state_view txn =
       let hash =
         Ledger.merkle_root_after_parties_exn
@@ -30,74 +32,78 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      { fee_payer =
-          { Party.Fee_payer.body =
-              { public_key = acct1.account.public_key
-              ; update =
-                  { app_state =
-                      Pickles_types.Vector.map new_state ~f:(fun x ->
-                          Zkapp_basic.Set_or_keep.Set x)
-                  ; delegate = Keep
-                  ; verification_key = Keep
-                  ; permissions = Keep
-                  ; zkapp_uri = Keep
-                  ; token_symbol = Keep
-                  ; timing = Keep
-                  ; voting_for = Keep
-                  }
-              ; token_id = ()
-              ; balance_change = Fee.of_int full_amount
-              ; increment_nonce = ()
-              ; events = []
-              ; sequence_events = []
-              ; call_data = Field.zero
-              ; call_depth = 0
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
-              ; account_precondition = acct1.account.nonce
-              ; use_full_commitment = ()
-              }
-          ; authorization = Signature.dummy
-          }
-      ; other_parties =
-          [ { body =
+      Parties.of_wire
+        { fee_payer =
+            { body =
                 { public_key = acct1.account.public_key
-                ; update = Party.Update.noop
-                ; token_id = Token_id.default
-                ; balance_change =
-                    Amount.Signed.(of_unsigned receiver_amount |> negate)
-                ; increment_nonce = true
+                ; update =
+                    { app_state =
+                        Pickles_types.Vector.map new_state ~f:(fun x ->
+                            Zkapp_basic.Set_or_keep.Set x)
+                    ; delegate = Keep
+                    ; verification_key = Keep
+                    ; permissions = Keep
+                    ; zkapp_uri = Keep
+                    ; token_symbol = Keep
+                    ; timing = Keep
+                    ; voting_for = Keep
+                    }
+                ; token_id = ()
+                ; balance_change = Fee.of_int full_amount
+                ; increment_nonce = ()
                 ; events = []
                 ; sequence_events = []
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Accept
-                ; use_full_commitment = false
+                ; use_full_commitment = ()
+                ; account_precondition = acct1.account.nonce
+                ; caller = ()
                 }
-            ; authorization = Signature Signature.dummy
+            ; authorization = Signature.dummy
             }
-          ; { body =
-                { public_key = acct2.account.public_key
-                ; update = Party.Update.noop
-                ; token_id = Token_id.default
-                ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
-                ; increment_nonce = false
-                ; events = []
-                ; sequence_events = []
-                ; call_data = Field.zero
-                ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Accept
-                ; use_full_commitment = false
-                }
-            ; authorization = None_given
-            }
-          ]
-      ; memo
-      }
+        ; other_parties =
+            [ { body =
+                  { public_key = acct1.account.public_key
+                  ; update = Party.Update.noop
+                  ; token_id = Token_id.default
+                  ; balance_change =
+                      Amount.Signed.(of_unsigned receiver_amount |> negate)
+                  ; increment_nonce = true
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
+                  ; use_full_commitment = false
+                  ; account_precondition = Accept
+                  ; caller = Call
+                  }
+              ; authorization = Signature Signature.dummy
+              }
+            ; { body =
+                  { public_key = acct2.account.public_key
+                  ; update = Party.Update.noop
+                  ; token_id = Token_id.default
+                  ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
+                  ; increment_nonce = false
+                  ; events = []
+                  ; sequence_events = []
+                  ; call_data = Field.zero
+                  ; call_depth = 0
+                  ; protocol_state_precondition =
+                      Zkapp_precondition.Protocol_state.accept
+                  ; use_full_commitment = false
+                  ; account_precondition = Accept
+                  ; caller = Call
+                  }
+              ; authorization = None_given
+              }
+            ]
+        ; memo
+        }
 
     let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -181,6 +187,8 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
@@ -229,6 +237,7 @@ let%test_module "Zkapp payments tests" =
               let test_spec : Spec.t =
                 { sender = spec.sender
                 ; fee
+                ; fee_payer = None
                 ; receivers =
                     (new_receiver, amount)
                     :: ( List.take specs (receiver_count - 1)
@@ -242,6 +251,8 @@ let%test_module "Zkapp payments tests" =
                 ; call_data = Snark_params.Tick.Field.zero
                 ; events = []
                 ; sequence_events = []
+                ; protocol_state_precondition = None
+                ; account_precondition = None
                 }
               in
               let parties =

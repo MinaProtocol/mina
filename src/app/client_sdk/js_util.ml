@@ -31,7 +31,7 @@ type payload_fee_payer_party_js =
   Js.t
 
 let payload_of_fee_payer_party_js
-    (fee_payer_party_js : payload_fee_payer_party_js) =
+    (fee_payer_party_js : payload_fee_payer_party_js) : Party.Fee_payer.t =
   let fee_payer_pk =
     fee_payer_party_js##.feePayer
     |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
@@ -56,6 +56,7 @@ let payload_of_fee_payer_party_js
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
       ; account_precondition = nonce
       ; use_full_commitment = ()
+      ; caller = ()
       }
   ; authorization = Signature.dummy
   }

@@ -13,6 +13,8 @@ let%test_module "Fee payer tests" =
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 
+    let constraint_constants = U.constraint_constants
+
     let snapp_update : Party.Update.t =
       { Party.Update.dummy with
         app_state =
@@ -40,6 +42,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -66,6 +70,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -91,6 +97,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update
@@ -120,6 +128,8 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           U.test_snapp_update
@@ -151,6 +161,8 @@ let%test_module "Fee payer tests" =
                 ; call_data = Snark_params.Tick.Field.zero
                 ; events = []
                 ; sequence_events = []
+                ; protocol_state_precondition = None
+                ; account_precondition = None
                 }
               in
               let parties =

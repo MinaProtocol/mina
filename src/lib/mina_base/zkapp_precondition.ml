@@ -82,6 +82,7 @@ module Numeric = struct
       ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
       ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
+      ; eq_checked : 'var -> 'var -> Boolean.var
       }
 
     let run f x y = Impl.run_checked (f x y)
@@ -94,6 +95,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -106,6 +108,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -118,6 +121,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -130,6 +134,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -142,6 +147,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -153,6 +159,7 @@ module Numeric = struct
         { equal
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; zero
         ; max_value
         ; typ = Checked.typ
@@ -256,6 +263,14 @@ module Numeric = struct
     let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
           Boolean.all [ lower <= x; x <= upper ])
+
+    let is_constant { eq_checked = ( = ); _ } (t : 'a t) =
+      let is_constant ({ lower; upper } : _ Closed_interval.t) =
+        lower = upper
+      in
+      Or_ignore.Checked.map t ~f_implicit:is_constant
+        ~f_explicit:(fun { is_some; data } ->
+          Boolean.( &&& ) is_some (is_constant data))
   end
 
   let typ { equal = eq; zero; max_value; typ; _ } =
@@ -270,6 +285,9 @@ module Numeric = struct
     | Check { lower; upper } ->
         if compare lower x <= 0 && compare x upper <= 0 then Ok ()
         else Or_error.errorf "Bounds check failed: %s" label
+
+  let is_constant { equal = ( = ); _ } (t : 'a t) =
+    match t with Ignore -> false | Check { lower; upper } -> lower = upper
 end
 
 module Eq_data = struct
@@ -379,7 +397,7 @@ module Eq_data = struct
 
     let public_key () =
       Public_key.Compressed.
-        { default = Lazy.force invalid_public_key
+        { default = invalid_public_key
         ; to_input
         ; to_input_checked = Checked.to_input
         ; equal_checked = run Checked.equal
@@ -406,7 +424,7 @@ module Eq_data = struct
   let check_checked { Tc.equal_checked; _ } (t : 'a Checked.t) (x : 'a) =
     Checked.check t ~f:(equal_checked x)
 
-  let check ~label { Tc.equal; _ } (t : 'a t) (x : 'a) =
+  let check ?(label = "") { Tc.equal; _ } (t : 'a t) (x : 'a) =
     match t with
     | Ignore ->
         Ok ()
@@ -431,7 +449,7 @@ end
 module Leaf_typs = struct
   let public_key () =
     Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:(Lazy.force invalid_public_key) typ)
+      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 
@@ -1673,7 +1691,7 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
   let%bind () =
-    Eq_data.(check (Tc.public_key ())) ~label:"fee_payer" fee_payer fee_payer_pk
+    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
   in
   let%bind () =
     let check (s : Account_state.t) (a : _ option) =

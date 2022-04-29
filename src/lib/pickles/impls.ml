@@ -113,11 +113,14 @@ module Step = struct
         let b_eq = match b2 with true -> b1 | false -> Boolean.not b1 in
         Boolean.( && ) x_eq b_eq
       in
+      let (Typ typ_unchecked) = typ_unchecked in
       let%bind () = typ_unchecked.check t in
       Checked.List.map forbidden_shifted_values ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
-    let typ = { typ_unchecked with check }
+    let typ : _ Snarky_backendless.Typ.t =
+      let (Typ typ_unchecked) = typ_unchecked in
+      Typ { typ_unchecked with check }
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
@@ -199,7 +202,7 @@ module Wrap = struct
 
     let typ_unchecked, check =
       (* Tick -> Tock *)
-      let t0 =
+      let (Typ t0 as typ_unchecked) =
         Typ.transport Field.typ
           ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
           ~back:(Fn.compose Tick.Field.of_bits Tock.Field.to_bits)
@@ -212,9 +215,11 @@ module Wrap = struct
         Checked.List.map forbidden_shifted_values ~f:(equal t)
         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
-      (t0, check)
+      (typ_unchecked, check)
 
-    let typ = { typ_unchecked with check }
+    let typ : _ Snarky_backendless.Typ.t =
+      let (Typ typ_unchecked) = typ_unchecked in
+      Typ { typ_unchecked with check }
 
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end

@@ -219,7 +219,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N6.n )
+  , Nat.N5.n )
   Pickles.Tag.t
 
 val verify :
@@ -298,12 +298,7 @@ module Parties_segment : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t =
-          (* Corresponds to payment *)
-          | Opt_signed_unsigned
-          | Opt_signed_opt_signed
-          | Opt_signed
-          | Proved
+        type t = Opt_signed_opt_signed | Opt_signed | Proved
         [@@deriving sexp, yojson]
       end
     end]
@@ -352,8 +347,8 @@ module type S = sig
 end
 
 type local_state =
-  ( (Party.t, unit) Parties.Call_forest.t
-  , (Party.t, unit) Parties.Call_forest.t list
+  ( Stack_frame.value
+  , Stack_frame.value list
   , Token_id.t
   , Currency.Amount.t
   , Mina_ledger.Sparse_ledger.t
@@ -518,6 +513,8 @@ module For_tests : sig
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
+      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
+      ; account_precondition : Party.Account_precondition.t option
       }
     [@@deriving sexp]
   end
@@ -547,6 +544,12 @@ module For_tests : sig
     -> Mina_ledger.Ledger.t
     -> Parties.t Async.Deferred.t
 
+  val trivial_zkapp_account :
+       ?permissions:Permissions.t
+    -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+    -> Account.key
+    -> Account.t
+
   val create_trivial_zkapp_account :
        ?permissions:Permissions.t
     -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
@@ -566,8 +569,5 @@ module For_tests : sig
             , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
             Pickles.Prover.t ]
 
-  val multiple_transfers :
-       ?protocol_state_precondition:Zkapp_precondition.Protocol_state.t
-    -> Spec.t
-    -> Parties.t
+  val multiple_transfers : Spec.t -> Parties.t
 end
