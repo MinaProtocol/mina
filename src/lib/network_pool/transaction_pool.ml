@@ -80,6 +80,7 @@ module Diff_versioned = struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | Fee_payer_account_not_found
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -102,6 +103,7 @@ module Diff_versioned = struct
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -129,6 +131,8 @@ module Diff_versioned = struct
           "expired"
       | Overloaded ->
           "overloaded"
+      | Fee_payer_account_not_found ->
+          "fee_payer_account_not_found"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -160,6 +164,8 @@ module Diff_versioned = struct
           "This transaction has expired"
       | Overloaded ->
           "The diff containing this transaction was too large"
+      | Fee_payer_account_not_found ->
+          "Fee payer account was not found in the best tip ledger"
   end
 
   module Rejected = struct
@@ -933,6 +939,7 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | Fee_payer_account_not_found
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -1185,7 +1192,13 @@ struct
                                 , [ ("account_id", Account_id.to_yojson signer)
                                   ] ) )
                         in
-                        Error `Account_not_found
+                        Ok
+                          ( []
+                          , List.map cs ~f:(fun c ->
+                                let uc = User_command.of_verifiable c in
+                                (uc, Diff_error.Fee_payer_account_not_found))
+                          , Indexed_pool.get_sender_local_state t.pool signer
+                          , Indexed_pool.Update.empty )
                     | Some account ->
                         let%bind () = Mutex.acquire signer_lock in
                         let rec go sender_local_state u_acc acc
@@ -1355,6 +1368,9 @@ struct
                   let data =
                     List.filter_map diffs' ~f:(function
                       | Error (`Invalid_command | `Other_command_failed) ->
+                          (* `Invalid_command should be handled in the Error
+                             case above and `Other_command_failed should be
+                             triggered only if there's an `Invalid_command*)
                           assert false
                       | Error `Account_not_found ->
                           (* We can just skip this set of commands *)
