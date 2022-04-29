@@ -2142,12 +2142,11 @@ let%test_module _ =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
+        ; protocol_state_precondition = Some protocol_state_precondition
+        ; account_precondition = None
         }
       in
-      let parties =
-        Transaction_snark.For_tests.multiple_transfers
-          ~protocol_state_precondition test_spec
-      in
+      let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
       User_command.Parties parties
 
     let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
