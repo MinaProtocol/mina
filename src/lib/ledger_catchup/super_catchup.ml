@@ -1472,15 +1472,19 @@ let%test_module "Ledger_catchup tests" =
         (Broadcast_pipe.Reader.peek Catchup_jobs.reader) ;
       [%log info] "target_best_tip_path length: %d"
         (List.length target_best_tip_path) ;
+      let target_best_tip_tree = Rose_tree.of_list_exn target_best_tip_path in
       [%log info] "breadcrumb_list length: %d" (List.length breadcrumb_list) ;
       let catchup_breadcrumbs_are_best_tip_path =
-        Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
-          breadcrumbs_tree ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-            Mina_block.Validated.equal
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree1)
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree2))
+        Rose_tree.equal target_best_tip_tree
+          breadcrumbs_tree ~f:(fun br1 br2 ->
+            let b1 = Transition_frontier.Breadcrumb.validated_transition
+                 br1 in
+            let b2 = Transition_frontier.Breadcrumb.validated_transition
+                 br2 in
+            (* We force evaluation of state body hash for both blocks for further equality check *)
+            let _hash1 = Mina_block.Validated.state_body_hash b1 in
+            let _hash2 = Mina_block.Validated.state_body_hash b2 in
+            Mina_block.Validated.equal b1 b2)
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith

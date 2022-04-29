@@ -432,13 +432,13 @@ module For_tests = struct
           let header =
             Mina_block.Header.create
               ~protocol_state ~protocol_state_proof:Proof.blockchain_dummy
-              ~delta_block_chain_proof:(previous_ledger_hash, [])
+              ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
               ~body_reference ()
           in
           (* We manually created a validated an block *)
           let block = {With_hash.hash= Protocol_state.hashes protocol_state; data= Mina_block.create ~header ~body} in
           Mina_block.Validated.unsafe_of_trusted_block
-            ~delta_block_chain_proof:(Non_empty_list.singleton @@ State_hash.State_hashes.state_hash previous_state_hashes)
+            ~delta_block_chain_proof:(Non_empty_list.singleton previous_state_hashes.state_hash)
             (`This_block_is_trusted_to_be_safe block)
       in
       let transition_receipt_time = Some (Time.now ()) in

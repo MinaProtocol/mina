@@ -32,6 +32,7 @@
    full_frontier
    frontier_base
    transition_frontier
+   protocol_version
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
