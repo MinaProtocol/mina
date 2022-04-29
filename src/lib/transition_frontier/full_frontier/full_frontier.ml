@@ -553,13 +553,17 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
-      Hashtbl.add_exn t.table ~key:breadcrumb_hash
-        ~data:{breadcrumb; successor_hashes= []; length= parent_node.length + 1} ;
-      Hashtbl.set t.table ~key:parent_hash
-        ~data:
-          { parent_node with
-            successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
-          } ;
+      let node = {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1} in
+      ( match Hashtbl.add t.table ~key:breadcrumb_hash ~data:node with
+        | `Duplicate ->
+          [%log' error t.logger] "Same block ($state_hash) was applied to transition frontier more than once; this could indicate that you are running multiple block producers with the same keypair"
+            ~metadata:[("state_hash", State_hash.to_yojson breadcrumb_hash)]
+        | `Ok ->
+          Hashtbl.set t.table ~key:parent_hash
+            ~data:
+              { parent_node with
+                successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
+              } ) ;
       ((), None)
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in

@@ -19,6 +19,7 @@
    async_kernel
    ppx_inline_test.config
    ;; local libraries
+   blake2
    pipe_lib
    network_peer
    o1trace
