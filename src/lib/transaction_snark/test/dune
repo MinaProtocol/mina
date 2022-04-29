@@ -49,4 +49,4 @@
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))
-(ignored_subdirs (zkapp_fuzzy))
+(data_only_dirs zkapp_fuzzy)
