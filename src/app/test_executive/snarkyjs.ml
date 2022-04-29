@@ -21,14 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
-    let keypair =
-      let private_key = Signature_lib.Private_key.create () in
-      let public_key =
-        Signature_lib.Public_key.of_private_key_exn private_key
-      in
-      { Signature_lib.Keypair.private_key; public_key }
-    in
+    let open Test_config.Wallet in
     { default with
       requires_graphql = true
     ; block_producers =
@@ -37,7 +30,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; timing = Untimed
           }
         ]
-    ; extra_genesis_accounts = [ { keypair; balance = "10" } ]
+    ; extra_genesis_accounts = [ { balance = "10"; timing = Untimed } ]
     ; num_snark_workers = 0
     }
 
