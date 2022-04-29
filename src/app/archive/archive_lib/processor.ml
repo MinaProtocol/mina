@@ -1392,6 +1392,7 @@ module Zkapp_party_body = struct
     ; zkapp_precondition_protocol_state_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
+    ; caller : string
     }
   [@@deriving fields, hlist]
 
@@ -1446,6 +1447,7 @@ module Zkapp_party_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
+    let caller = Token_id.to_string body.caller in
     let value =
       { account_identifier_id
       ; update_id
@@ -1458,6 +1460,7 @@ module Zkapp_party_body = struct
       ; zkapp_precondition_protocol_state_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
+      ; caller
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1846,7 +1849,8 @@ module User_command = struct
         Zkapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer
       in
       let%bind zkapp_other_parties_ids =
-        Mina_caqti.deferred_result_list_map ps.other_parties
+        Mina_caqti.deferred_result_list_map
+          (Parties.Call_forest.to_parties_list ps.other_parties)
           ~f:(Zkapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
@@ -3414,12 +3418,13 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
       -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
-        let state_hash = hash block in
         match%bind
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block
-            ~accounts_accessed ~accounts_created ~pool block
+          add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
+            ~accounts_accessed ~accounts_created
+            (With_hash.map ~f:External_transition.decompose block)
         with
         | Error e ->
+            let state_hash = hash block in
             [%log warn]
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson state_hash)

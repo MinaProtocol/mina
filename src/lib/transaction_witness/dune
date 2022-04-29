@@ -19,6 +19,7 @@
    mina_transaction_logic
    kimchi_backend
    kimchi_backend.pasta
+   with_hash
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))

@@ -1,14 +1,13 @@
 open Core_kernel
 
 let padded_array_typ ~length ~dummy elt =
-  let typ = Snarky_backendless.Typ.array ~length elt in
-  { typ with
-    store =
-      (fun a ->
-        let n = Array.length a in
-        if n > length then failwithf "Expected %d <= %d" n length () ;
-        typ.store (Array.append a (Array.create ~len:(length - n) dummy)))
-  }
+  Snarky_backendless.Typ.array ~length elt
+  |> Snarky_backendless.Typ.transport
+       ~there:(fun a ->
+         let n = Array.length a in
+         if n > length then failwithf "Expected %d <= %d" n length () ;
+         Array.append a (Array.create ~len:(length - n) dummy))
+       ~back:Fn.id
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
@@ -80,14 +79,12 @@ module Evals = struct
       : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
     let v ls =
       Vector.map ls ~f:(fun length ->
-          let t = Snarky_backendless.Typ.array ~length g in
-          { t with
-            store =
-              (fun arr ->
-                t.store
-                  (Array.append arr
-                     (Array.create ~len:(length - Array.length arr) default)))
-          })
+          Snarky_backendless.Typ.array ~length g
+          |> Snarky_backendless.Typ.transport
+               ~there:(fun arr ->
+                 Array.append arr
+                   (Array.create ~len:(length - Array.length arr) default))
+               ~back:Fn.id)
     in
     let t =
       let l1, l2 = to_vectors lengths in
@@ -208,21 +205,15 @@ module Poly_comm = struct
 
     let padded_array_typ elt ~length ~dummy ~bool =
       let open Snarky_backendless.Typ in
-      let typ = array ~length (tuple2 bool elt) in
-      { typ with
-        store =
-          (fun a ->
-            let a = Array.map a ~f:(fun x -> (true, x)) in
-            let n = Array.length a in
-            if n > length then failwithf "Expected %d <= %d" n length () ;
-            typ.store
-              (Array.append a (Array.create ~len:(length - n) (false, dummy))))
-      ; read =
-          (fun a ->
-            let open Snarky_backendless.Typ_monads.Read.Let_syntax in
-            let%map a = typ.read a in
-            Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None))
-      }
+      array ~length (tuple2 bool elt)
+      |> transport
+           ~there:(fun a ->
+             let a = Array.map a ~f:(fun x -> (true, x)) in
+             let n = Array.length a in
+             if n > length then failwithf "Expected %d <= %d" n length () ;
+             Array.append a (Array.create ~len:(length - n) (false, dummy)))
+           ~back:(fun a ->
+             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None))
 
     let typ (type f g g_var bool_var)
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length

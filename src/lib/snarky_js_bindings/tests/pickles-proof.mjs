@@ -2,7 +2,7 @@
 
 import snarkyjs from "./snarkyjs.js";
 await snarkyjs.snarky_ready;
-let { Circuit, Field, picklesCompile } = snarkyjs;
+let { Circuit, Field, Pickles } = snarkyjs;
 
 export { picklesProof };
 
@@ -19,13 +19,16 @@ async function picklesProof() {
   let rule = createDummyRule("dummy", main, witnessTypes);
 
   console.log("compile...");
+  let start = Date.now();
   let compiled = compile([rule]);
   let { provers, verify } = compiled;
+  let time = Date.now() - start;
+  console.log(`compiled proof system in ${(time / 1000).toFixed(2)} sec`);
 
   console.log("prove...");
-  let start = Date.now();
+  start = Date.now();
   let { statement, proof } = await prove(provers[0], main, witnesses);
-  let time = Date.now() - start;
+  time = Date.now() - start;
   console.log(`created recursive proof in ${(time / 1000).toFixed(2)} sec`);
 
   console.log("verify...");
@@ -39,7 +42,7 @@ let mainContext = undefined;
 
 function compile(rules) {
   mainContext = {};
-  let output = picklesCompile(rules);
+  let output = Pickles.compile(rules);
   mainContext = undefined;
   return output;
 }

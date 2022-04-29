@@ -8,7 +8,7 @@ type invalid =
   | `Invalid_proof
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
-[@@deriving bin_io_unversioned]
+[@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_string (invalid : invalid) =
   let keys_to_string keys =
@@ -45,14 +45,12 @@ let check :
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
-              ~protocol_state_predicate_hash:
-                (Zkapp_precondition.Protocol_state.digest
-                   fee_payer.body.protocol_state_precondition)
-              ~memo_hash:(Signed_command_memo.hash memo)
           in
           let full_tx_commitment =
-            Parties.Transaction_commitment.with_fee_payer tx_commitment
-              ~fee_payer_hash:(Party.digest (Party.of_fee_payer fee_payer))
+            Parties.Transaction_commitment.create_complete tx_commitment
+              ~memo_hash:(Signed_command_memo.hash memo)
+              ~fee_payer_hash:
+                (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
           in
           let check_signature s pk msg =
             match Signature_lib.Public_key.decompress pk with
@@ -98,7 +96,7 @@ let check :
                     | Some vk ->
                         let stmt =
                           { Zkapp_statement.Poly.transaction = commitment
-                          ; at_party
+                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
                         Some (vk, stmt, pi) ))
@@ -107,7 +105,7 @@ let check :
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =
-                  List.map parties_with_hashes_list ~f:(fun ((p, _), _) -> p)
+                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
               ; memo
               }
           in

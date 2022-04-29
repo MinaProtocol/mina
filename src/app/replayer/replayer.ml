@@ -634,6 +634,12 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
         ({ body; authorization } : Party.t))
   in
   let memo = Mina_base.Signed_command_memo.dummy in
+  let other_parties =
+    Parties.Call_forest.of_parties_list other_parties
+      ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+    |> Parties.Call_forest.accumulate_hashes
+         ~hash_party:Parties.Digest.Party.create
+  in
   return ({ fee_payer; other_parties; memo } : Parties.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
