@@ -79,7 +79,7 @@ CREATE TYPE user_command_status AS ENUM ('applied', 'failed');
 
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
-, type           user_command_type   NOT NULL
+, typ            user_command_type   NOT NULL
 , fee_payer_id   int                 NOT NULL REFERENCES account_identifiers(id)
 , source_id      int                 NOT NULL REFERENCES account_identifiers(id)
 , receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
@@ -95,11 +95,11 @@ CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_tra
 
 CREATE TABLE internal_commands
 ( id          serial                PRIMARY KEY
-, type        internal_command_type NOT NULL
+, typ         internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES account_identifiers(id)
 , fee         bigint                NOT NULL
 , hash        text                  NOT NULL
-, UNIQUE (hash,type)
+, UNIQUE (hash,typ)
 );
 
 /* block state hashes mentioned in voting_for fields */

@@ -230,8 +230,8 @@ let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
    The optional `tannot` function maps column names to type annotations.
    No type annotation is included if `tannot` returns an empty string. *)
 let insert_into_cols ~(returning : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) (cols : string list) :
-    string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
+    : string =
   let values =
     List.map cols ~f:(fun col ->
         match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot)
@@ -260,7 +260,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       Conn.find
         ( Caqti_request.find (snd cols) (snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-             (fst cols) )
+             ~cols:(fst cols) () )
         value
 
 let query ~f pool =

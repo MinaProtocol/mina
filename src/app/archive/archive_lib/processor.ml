@@ -839,7 +839,7 @@ module Zkapp_account_precondition = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~table_name ~returning:"id"
-                Fields.names))
+                ~cols:Fields.names ()))
           { kind; precondition_account_id; nonce }
 
   let load (module Conn : CONNECTION) id =
@@ -1640,7 +1640,7 @@ module User_command = struct
       ; memo : string
       ; hash : string
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -1657,21 +1657,19 @@ module User_command = struct
           ; string
           ]
 
+    let table_name = "user_commands"
+
     let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
         =
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-           "SELECT id FROM user_commands WHERE hash = ?")
+           (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()))
         (Transaction_hash.to_base58_check transaction_hash)
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
         (Caqti_request.find Caqti_type.int typ
-           {sql| SELECT type,fee_payer_id,source_id,receiver_id,
-                 nonce,amount,fee,valid_until,memo,hash
-                 FROM user_commands
-                 WHERE id = ?
-           |sql})
+           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
         id
 
     type balance_public_key_ids =
@@ -1732,11 +1730,10 @@ module User_command = struct
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, nonce, amount, fee,
-                      valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id |sql})
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "typ" -> Some "user_command_type" | _ -> None)
+                  ~cols:Fields.names ()))
             { typ =
                 ( match via with
                 | `Ident ->
@@ -1791,12 +1788,10 @@ module User_command = struct
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, nonce, amount, fee,
-                      valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id
-         |sql})
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "typ" -> Some "user_command_type" | _ -> None)
+                  ~cols:Fields.names ()))
             { typ = user_cmd.typ
             ; fee_payer_id
             ; source_id
@@ -1903,39 +1898,37 @@ end
 
 module Internal_command = struct
   type t = { typ : string; receiver_id : int; fee : int64; hash : string }
+  [@@deriving hlist, fields]
 
   let typ =
-    let encode t = Ok (t.typ, t.receiver_id, t.fee, t.hash) in
-    let decode (typ, receiver_id, fee, hash) =
-      Ok { typ; receiver_id; fee; hash }
-    in
-    let rep = Caqti_type.(tup4 string int int64 string) in
-    Caqti_type.custom ~encode ~decode rep
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; int; int64; string ]
 
-  let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-      ~(typ : string) =
+  let table_name = "internal_commands"
+
+  let find_opt (module Conn : CONNECTION)
+      ~(transaction_hash : Transaction_hash.t) ~(typ : string) =
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = \
-          $2::internal_command_type")
+         (Mina_caqti.select_cols ~select:"id" ~table_name
+            ~tannot:(function
+              | "typ" -> Some "internal_command_type" | _ -> None)
+            ~cols:[ "hash"; "typ" ] ()))
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT type,receiver_id,fee,hash
-               FROM internal_commands
-               WHERE id = ?
-         |sql})
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
       id
 
   let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
       (internal_cmd : Extensional.Internal_command.t) =
     let open Deferred.Result.Let_syntax in
     match%bind
-      find
+      find_opt
         (module Conn)
         ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
     with
@@ -1949,11 +1942,10 @@ module Internal_command = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?)
-                   RETURNING id
-             |sql})
+             (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                ~tannot:(function
+                  | "typ" -> Some "internal_command_type" | _ -> None)
+                ~cols:Fields.names ()))
           { typ = internal_cmd.typ
           ; receiver_id
           ; fee =
@@ -2002,7 +1994,7 @@ module Fee_transfer = struct
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
     match%bind
-      Internal_command.find
+      Internal_command.find_opt
         (module Conn)
         ~transaction_hash ~typ:(Kind.to_string kind)
     with
@@ -2022,7 +2014,7 @@ module Fee_transfer = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, hash)
+                    (typ, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql})
@@ -2052,7 +2044,9 @@ module Coinbase = struct
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_coinbase t in
     match%bind
-      Internal_command.find (module Conn) ~transaction_hash ~typ:coinbase_typ
+      Internal_command.find_opt
+        (module Conn)
+        ~transaction_hash ~typ:coinbase_typ
     with
     | Some internal_command_id ->
         return internal_command_id
@@ -2068,7 +2062,7 @@ module Coinbase = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, hash)
+                    (typ, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
              |sql})
@@ -2078,92 +2072,6 @@ module Coinbase = struct
               |> Unsigned.UInt64.to_int64
           ; hash = transaction_hash |> Transaction_hash.to_base58_check
           }
-end
-
-module Find_nonce = struct
-  let sql_template public_keys_sql_list =
-    (* using a string containing the comma-delimited public keys list as an SQL parameter results
-       in syntax errors, so we inline that list into the query
-    *)
-    sprintf
-      {sql|
-SELECT t.pk_id, MAX(pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
-(
-WITH RECURSIVE pending_chain_nonce AS (
-
-               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                FROM blocks b
-                WHERE id = $1
-                LIMIT 1)
-
-                UNION ALL
-
-                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
-
-                FROM blocks b
-                INNER JOIN pending_chain_nonce
-                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
-                AND pending_chain_nonce.chain_status <> 'canonical'
-
-               )
-
-              /* Slot and balance are NULL here */
-              SELECT pks.id AS pk_id,pks.value AS pk,full_chain.height,cmds.nonce
-
-              FROM (SELECT
-                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-                    FROM pending_chain_nonce
-
-                    UNION ALL
-
-                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                    FROM blocks b
-                    WHERE chain_status = 'canonical') AS full_chain
-
-              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
-              INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
-              INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
-
-              WHERE pks.value IN (%s)
-              AND busc.user_command_id = cmds.id
-
-              ORDER BY (full_chain.height, busc.sequence_no) DESC
-            ) t
-            GROUP BY t.pk_id LIMIT $2
-    |sql}
-      public_keys_sql_list
-
-  type t =
-    { public_key_id : int; public_key : string; height : int; nonce : int64 }
-  [@@deriving hlist]
-
-  let typ =
-    let open Mina_caqti.Type_spec in
-    let spec = Caqti_type.[ int; string; int; int64 ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
-
-  let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
-    if List.is_empty public_keys then
-      (* SQL query would fail, because `IN ()` is invalid syntax *)
-      return @@ Ok []
-    else
-      let public_keys_sql_list =
-        public_keys
-        |> List.map ~f:(fun pk ->
-               sprintf "'%s'"
-                 (Signature_lib.Public_key.Compressed.to_base58_check pk))
-        |> String.concat ~sep:","
-      in
-      Conn.collect_list
-        (Caqti_request.collect
-           Caqti_type.(tup2 int int)
-           typ
-           (sql_template public_keys_sql_list))
-        (parent_id, List.length public_keys)
 end
 
 module Block_and_internal_command = struct
@@ -2775,7 +2683,7 @@ module Block = struct
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
                     | "chain_status" -> Some "chain_status_type" | _ -> None)
-                  Fields.names))
+                  ~cols:Fields.names ()))
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash =
