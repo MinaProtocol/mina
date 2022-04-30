@@ -39,6 +39,7 @@
    signature_lib
    snark_keys_header
    snark_params
+   sponge
    tuple_lib
    with_hash
    ;; js-specific libraries ;;

@@ -55,6 +55,8 @@ module Engine = struct
         ; nonce : Mina_numbers.Account_nonce.t
         }
 
+      val graphql_uri : t -> string
+
       val send_payment :
            logger:Logger.t
         -> t
