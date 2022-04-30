@@ -252,7 +252,7 @@ module Make0
                              with type staged_ledger := Staged_ledger.t) =
 struct
   type verification_failure =
-    | Command_failure of Indexed_pool.Command_error.t
+    | Command_failure of Diff_versioned.Diff_error.t
     | Invalid_failure of Verifier.invalid
   [@@deriving to_yojson]
 
@@ -1173,10 +1173,6 @@ struct
               let%map diffs' =
                 Deferred.List.map by_sender ~how:`Parallel
                   ~f:(fun (signer, cs) ->
-                    let signer_lock =
-                      Hashtbl.find_or_add t.sender_mutex signer
-                        ~default:Mutex.create
-                    in
                     let account =
                       Option.bind
                         (Base_ledger.location_of_account ledger signer)
@@ -1192,14 +1188,18 @@ struct
                                 , [ ("account_id", Account_id.to_yojson signer)
                                   ] ) )
                         in
-                        Ok
-                          ( []
-                          , List.map cs ~f:(fun c ->
-                                let uc = User_command.of_verifiable c in
-                                (uc, Diff_error.Fee_payer_account_not_found))
-                          , Indexed_pool.get_sender_local_state t.pool signer
-                          , Indexed_pool.Update.empty )
+                        add_failure
+                          (Command_failure
+                             Diff_error.Fee_payer_account_not_found) ;
+                        Error `Invalid_command
                     | Some account ->
+                        let signer_lock =
+                          Hashtbl.find_or_add t.sender_mutex signer
+                            ~default:Mutex.create
+                        in
+                        (*This lock is released in apply function unless
+                          there's an error that causes all the transactions from
+                          this signer to be discarded*)
                         let%bind () = Mutex.acquire signer_lock in
                         let rec go sender_local_state u_acc acc
                             (rejected : Rejected.t) = function
@@ -1307,7 +1307,10 @@ struct
                                           ~is_sender_local uc e
                                       with
                                       | `Reject ->
-                                          add_failure (Command_failure e) ;
+                                          add_failure
+                                            (Command_failure
+                                               (diff_error_of_indexed_pool_error
+                                                  e)) ;
                                           Mutex.release signer_lock ;
                                           return (Error `Invalid_command)
                                       | `Ignore ->
@@ -1356,8 +1359,7 @@ struct
                     List.map errs ~f:(fun err ->
                         match err with
                         | Command_failure cmd_err ->
-                            Yojson.Safe.to_string
-                              (Indexed_pool.Command_error.to_yojson cmd_err)
+                            Yojson.Safe.to_string (Diff_error.to_yojson cmd_err)
                         | Invalid_failure invalid ->
                             Verifier.invalid_to_string invalid)
                     |> String.concat ~sep:", "
@@ -1388,6 +1390,11 @@ struct
                   in
                   Ok { diffs with data } )
 
+      (** The function checks proofs and signatures in the diffs and applies
+      valid diffs to the local sender state (sequence of transactions from the
+      pool) for each sender/fee-payer. The local sender state is then included
+      in the verified diff returned by this function which will be committed to
+      the transaction pool in the apply function*)
       let verify (t : pool) (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
         verify' ~allow_failures_for_tests:false t diffs

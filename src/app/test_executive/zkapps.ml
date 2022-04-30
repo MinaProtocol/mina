@@ -430,7 +430,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section "Send a zkApp transaction to update permissions"
+      section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
@@ -444,13 +444,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
         (wait_for_zkapp parties_create_account)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
         (wait_for_zkapp parties_update_permissions)
@@ -479,7 +479,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger permissions do not match update permissions") )))
     in
     let%bind () =
-      section "Send a zkapp with an insufficient fee"
+      section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node parties_insufficient_fee
            "at least one user command had an insufficient fee")
     in
@@ -489,12 +489,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
-      section "Send a zkapp with an invalid proof"
+      section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger node parties_invalid_proof
            "Verification_failed")
     in
     let%bind () =
-      section "Send a zkapp with an insufficient replace fee"
+      section_hard "Send a zkapp with an insufficient replace fee"
         (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
            "Insufficient_replace_fee")
     in
@@ -505,21 +505,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for_zkapp parties_update_all)
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid nonce"
+      section_hard "Send a zkApp transaction with an invalid nonce"
         (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid signature"
+      section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
            "Verification_failed")
     in
     let%bind () =
-      section "Send a zkApp transaction with a nonexistent fee payer"
+      section_hard "Send a zkApp transaction with a nonexistent fee payer"
         (send_invalid_zkapp ~logger node parties_nonexistent_fee_payer
-           "Accoun_not_found")
+           "Fee_payer_account_not_found")
     in
     let%bind () =
-      section "Verify zkApp transaction updates in ledger"
+      section_hard "Verify zkApp transaction updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
                ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
@@ -545,7 +545,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible") )))
     in
     let%bind () =
-      section "Wait for proof to be emitted"
+      section_hard "Wait for proof to be emitted"
         (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
     in
     return ()
