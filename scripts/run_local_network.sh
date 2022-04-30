@@ -9,7 +9,6 @@ trap "killall background" EXIT
 # Constants
 
 MINA=_build/default/src/app/cli/src/mina.exe
-ARCHIVE=_build/default/src/app/archive/archive.exe
 LOGPROC=_build/default/src/app/logproc/logproc.exe
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
@@ -23,8 +22,6 @@ TRANSACTION_FREQUENCY=5
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
-
-ARCHIVE_PORT=3086
 
 # ================================================
 # Inputs (set to default values)
@@ -70,7 +67,7 @@ generate-keypair() {
 }
 
 # Execute a daemon, exposing all 5 ports in
-# sequence starting with provided base port.
+# sequence starting with provided bas port.
 exec-daemon() {
   base_port=$1
   shift
@@ -103,28 +100,12 @@ exec-daemon() {
     $@
 }
 
-exec-archive() {
-  echo $ARCHIVE run \
-       -postgres-uri postgres://postgres@localhost:5432/archive_local_network \
-       -config-file $config \
-       -server-port $ARCHIVE_PORT
-  exec $ARCHIVE run \
-       -postgres-uri postgres://postgres@localhost:5432/archive_local_network \
-       -config-file $config \
-       -server-port $ARCHIVE_PORT
-}
-
 # Spawn a node in the background.
 # Configures node directory and logs.
 spawn-node() {
   folder=$1
   shift
   exec-daemon $@ -config-directory $folder &> $folder/log.txt &
-}
-
-spawn-archive() {
-  folder=$1
-  exec-archive &> $folder/log-archive.txt &
 }
 
 # ================================================
@@ -168,7 +149,7 @@ fi
 
 if [ ! -d "$ledgerfolder" ]; then
   echo "making ledger"
-
+  
   mkdir $ledgerfolder
 
   clean-dir $ledgerfolder/offline_whale_keys
@@ -221,7 +202,7 @@ snark_worker_pubkey=$(cat $ledgerfolder/snark_worker_keys/snark_worker_account.p
 # Update Timestamp
 
 config=$ledgerfolder/daemon.json
-jq "{genesis: {genesis_state_timestamp:\"$(date -u +"%Y-%m-%dT%H:%M:%S.%6NZ")\"}, ledger:.}" \
+jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S.%6NZ")\"}, ledger:.}" \
   < $ledgerfolder/genesis_ledger.json \
   > $config
 
@@ -235,8 +216,7 @@ clean-dir $nodesfolder
 
 mkdir $nodesfolder/seed
 
-spawn-archive $nodesfolder/seed
-spawn-node $nodesfolder/seed 3000 -seed -discovery-keypair $SEED_PEER_KEY -archive-address $ARCHIVE_PORT
+spawn-node $nodesfolder/seed 3000 -seed -discovery-keypair $SEED_PEER_KEY
 seed_pid=$!
 
 echo 'waiting for seed to go up...'
@@ -254,7 +234,7 @@ for i in $(seq 1 $whales); do
   folder=$nodesfolder/whale_$i
   keyfile=$ledgerfolder/online_whale_keys/online_whale_account_$i
   mkdir $folder
-  spawn-node $folder $(($WHALE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags -archive-address $ARCHIVE_PORT
+  spawn-node $folder $(($WHALE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   whale_pids[${i}]=$!
 done
 
@@ -264,7 +244,7 @@ for i in $(seq 1 $fish); do
   folder=$nodesfolder/fish_$i
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_$i
   mkdir $folder
-  spawn-node $folder $(($FISH_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags -archive-address $ARCHIVE_PORT
+  spawn-node $folder $(($FISH_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   fish_pids[${i}]=$!
 done
 
@@ -273,7 +253,7 @@ done
 for i in $(seq 1 $nodes); do
   folder=$nodesfolder/node_$i
   mkdir $folder
-  spawn-node $folder $(($NODE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -archive-address $ARCHIVE_PORT
+  spawn-node $folder $(($NODE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID
   node_pids[${i}]=$!
 done
 

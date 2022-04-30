@@ -37,6 +37,16 @@ module Call_type = struct
     end
   end]
 
+  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+
+  let of_string = function
+    | "call" ->
+        Call
+    | "delegate_call" ->
+        Delegate_call
+    | s ->
+        failwithf "Invalid call type: %s" s ()
+
   let quickcheck_generator =
     Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
       | false ->
@@ -898,6 +908,7 @@ module Body = struct
         ; protocol_state_precondition
         ; account_precondition
         ; use_full_commitment = _
+        ; caller = _
         } =
       t
     in
@@ -924,6 +935,7 @@ module Body = struct
     ; protocol_state_precondition
     ; account_precondition
     ; use_full_commitment = ()
+    ; caller = ()
     }
 
   module Checked = struct

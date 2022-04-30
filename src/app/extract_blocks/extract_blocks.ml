@@ -291,13 +291,12 @@ let fill_in_zkapp_commands pool block_state_hash =
           query_db ~f:(fun db ->
               Processor.Zkapp_fee_payers.load db zkapp_cmd.zkapp_fee_payer_id)
         in
-        let%map body = Load_data.get_party_body ~pool body_id in
-        Party.Body.to_fee_payer_exn body
+        Load_data.get_fee_payer_body ~pool body_id
       in
       let%bind other_parties =
         Deferred.List.map
           (Array.to_list zkapp_cmd.zkapp_other_parties_ids)
-          ~f:(Load_data.get_party_body ~pool)
+          ~f:(Load_data.get_other_party_body ~pool)
       in
       let memo = zkapp_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = zkapp_cmd.hash |> Transaction_hash.of_base58_check_exn in

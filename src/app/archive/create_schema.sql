@@ -113,14 +113,10 @@ CREATE INDEX idx_voting_for_value ON voting_for(value);
 /* import supporting Zkapp-related tables */
 \ir zkapp_tables.sql
 
-CREATE TABLE zkapp_fee_payers
-( id                       serial           PRIMARY KEY
-, body_id                  int              NOT NULL REFERENCES zkapp_party_body(id)
-);
-
 /* zkapp_other_parties_ids refers to a list of ids in zkapp_party.
    The values in zkapp_other_parties_ids are unenforced foreign keys
-   that reference zkapp_party_body(id), and not NULL. */
+   that reference zkapp_party_body(id), and not NULL.
+*/
 CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
 , zkapp_fee_payer_id                    int            NOT NULL REFERENCES zkapp_fee_payers(id)

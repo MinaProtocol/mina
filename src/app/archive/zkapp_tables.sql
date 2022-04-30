@@ -228,27 +228,49 @@ CREATE TABLE zkapp_precondition_protocol_state
 
 /* events_ids and sequence_events_ids indicate a list of ids in
    zkapp_state_data_array.
-
-   N.B.: this table represents both fee payers and non-fee payers
 */
-CREATE TABLE zkapp_party_body
-( id                                    serial     PRIMARY KEY
-, account_identifier_id                 int        NOT NULL REFERENCES account_identifiers(id)
-, update_id                             int        NOT NULL REFERENCES zkapp_updates(id)
-, balance_change                        bigint     NOT NULL
-, increment_nonce                       boolean    NOT NULL
-, events_id                             int        NOT NULL REFERENCES zkapp_events(id)
-, sequence_events_id                    int        NOT NULL REFERENCES zkapp_events(id)
-, call_data_id                          int        NOT NULL REFERENCES zkapp_state_data(id)
-, call_depth                            int        NOT NULL
-, zkapp_precondition_protocol_state_id  int        NOT NULL REFERENCES zkapp_precondition_protocol_state(id)
-, zkapp_account_precondition_id         int        NOT NULL REFERENCES zkapp_account_precondition(id)
-, use_full_commitment                   boolean    NOT NULL
+CREATE TABLE zkapp_fee_payer_body
+( id                                    serial    PRIMARY KEY
+, account_identifier_id                 int       NOT NULL REFERENCES account_identifiers(id)
+, update_id                             int       NOT NULL REFERENCES zkapp_updates(id)
+, balance_change                        bigint    NOT NULL
+, events_id                             int       NOT NULL REFERENCES zkapp_events(id)
+, sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
+, call_data_id                          int       NOT NULL REFERENCES zkapp_state_data(id)
+, call_depth                            int       NOT NULL
+, zkapp_precondition_protocol_state_id  int       NOT NULL REFERENCES zkapp_precondition_protocol_state(id)
+, zkapp_account_precondition            bigint    NOT NULL
 );
 
-CREATE TABLE zkapp_party
+CREATE TABLE zkapp_fee_payers
+( id                       serial           PRIMARY KEY
+, body_id                  int              NOT NULL REFERENCES zkapp_fee_payer_body(id)
+);
+
+CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
+
+/* events_ids and sequence_events_ids indicate a list of ids in
+   zkapp_state_data_array.
+*/
+CREATE TABLE zkapp_other_party_body
+( id                                    serial          PRIMARY KEY
+, account_identifier_id                 int             NOT NULL  REFERENCES account_identifiers(id)
+, update_id                             int             NOT NULL  REFERENCES zkapp_updates(id)
+, balance_change                        bigint          NOT NULL
+, increment_nonce                       boolean         NOT NULL
+, events_id                             int             NOT NULL  REFERENCES zkapp_events(id)
+, sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
+, call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
+, call_depth                            int             NOT NULL
+, zkapp_precondition_protocol_state_id  int             NOT NULL  REFERENCES zkapp_precondition_protocol_state(id)
+, zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
+, use_full_commitment                   boolean         NOT NULL
+, caller                                call_type_type  NOT NULL
+);
+
+CREATE TABLE zkapp_other_party
 ( id                       serial                          PRIMARY KEY
-, body_id                  int                             NOT NULL REFERENCES zkapp_party_body(id)
+, body_id                  int                             NOT NULL REFERENCES zkapp_other_party_body(id)
 , authorization_kind       zkapp_authorization_kind_type   NOT NULL
 );
 
