@@ -424,7 +424,6 @@ let load_events pool id =
   List.map fields_list ~f:Array.of_list
 
 let get_fee_payer_body ~pool body_id =
-  let open Zkapp_basic in
   let query_db = Mina_caqti.query pool in
   let%bind { account_identifier_id
            ; update_id
