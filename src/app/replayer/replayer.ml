@@ -619,28 +619,20 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
   in
   (* use dummy authorizations, memo *)
   let%bind (fee_payer : Party.Fee_payer.t) =
-    let%bind (body : Party.Body.Fee_payer.t) =
-      let%map raw_body =
-        Archive_lib.Load_data.get_party_body ~pool fee_payer_body_id
-      in
-      Party.Body.to_fee_payer_exn raw_body
+    let%map (body : Party.Body.Fee_payer.t) =
+      Archive_lib.Load_data.get_fee_payer_body ~pool fee_payer_body_id
     in
-    return ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
+    ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
-  let%bind (other_parties : Party.t list) =
+  let%bind (other_parties : Party.Wire.t list) =
     Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
-        let%map body = Archive_lib.Load_data.get_party_body ~pool id in
+        let%map body = Archive_lib.Load_data.get_other_party_body ~pool id in
         let authorization = Control.None_given in
-        ({ body; authorization } : Party.t))
+        ({ body; authorization } : Party.Wire.t))
   in
   let memo = Mina_base.Signed_command_memo.dummy in
-  let other_parties =
-    Parties.Call_forest.of_parties_list other_parties
-      ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
-    |> Parties.Call_forest.accumulate_hashes
-         ~hash_party:Parties.Digest.Party.create
-  in
-  return ({ fee_payer; other_parties; memo } : Parties.t)
+  let parties = Parties.of_wire { fee_payer; other_parties; memo } in
+  return (parties : Parties.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
   [%log info]
