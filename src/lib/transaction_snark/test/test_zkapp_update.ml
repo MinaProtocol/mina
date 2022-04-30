@@ -252,7 +252,7 @@ module Make (Input : Input_intf) = struct
           ; account_precondition = None
           }
         in
-        U.test_snapp_update ~expected_failure:(Some failure_expected)
+        U.test_snapp_update ~expected_failure:failure_expected
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
@@ -292,7 +292,7 @@ module Make (Input : Input_intf) = struct
               ~vk ~ledger snapp_pk ;
             (*Ledger.apply_transaction should be successful if fee payer update
               is successful*)
-            U.test_snapp_update ~expected_failure:(Some failure_expected)
+            U.test_snapp_update ~expected_failure:failure_expected
               ~snapp_permissions:
                 (U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~snapp_prover test_spec ~init_ledger ~snapp_pk))
