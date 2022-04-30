@@ -91,6 +91,8 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key (* ; aux_account_balance *)
+        ; work_delay
+        ; transaction_capacity
         } =
       test_config
     in
@@ -184,9 +186,9 @@ module Network_config = struct
       { Runtime_config.Proof_keys.level = Some proof_level
       ; sub_windows_per_window = None
       ; ledger_depth = None
-      ; work_delay = None
-      ; block_window_duration_ms = None
-      ; transaction_capacity = None
+      ; work_delay
+      ; block_window_duration_ms = Some 120000
+      ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
@@ -209,9 +211,7 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof =
-          None
-          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base = Accounts (bp_accounts @ extra_accounts)

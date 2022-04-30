@@ -49,10 +49,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
-    ; num_snark_workers =
-        3
-        (* this test doesn't need snark workers, however turning it on in this test just to make sure the snark workers function within integration tests *)
+    ; num_snark_workers = 4
+    ; snark_worker_fee = "0.0001"
+    ; work_delay = Some 1
+    ; transaction_capacity =
+        Some Runtime_config.Proof_keys.Transaction_capacity.small
     }
+
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
 
   let run network t =
     let open Network in
@@ -341,46 +354,78 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
     in
-    section "unable to send payment from timed account using illiquid tokens"
-      (let amount = Currency.Amount.of_int 25_000_000_000_000 in
-       let receiver = untimed_node_b in
+    let%bind () =
+      section "unable to send payment from timed account using illiquid tokens"
+        (let amount = Currency.Amount.of_int 25_000_000_000_000 in
+         let receiver = untimed_node_b in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = timed_node_c in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind { total_balance = timed_node_c_total; _ } =
+           Network.Node.must_get_account_data ~logger timed_node_c
+             ~public_key:sender_pub_key
+         in
+         [%log info] "timed_node_c total balance: %s"
+           (Currency.Balance.to_formatted_string timed_node_c_total) ;
+         [%log info]
+           "Attempting to send txn from timed_node_c to untimed_node_a for \
+            amount of %s"
+           (Currency.Amount.to_formatted_string amount) ;
+         (* TODO: refactor this using new [expect] dsl when it's available *)
+         let open Deferred.Let_syntax in
+         match%bind
+           Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
+             ~amount ~fee
+         with
+         | Ok _ ->
+             Malleable_error.soft_error_string ~value:()
+               "Payment succeeded, but expected it to fail because of a \
+                minimum balance violation"
+         | Error error ->
+             (* expect GraphQL error due to insufficient funds *)
+             let err_str = Error.to_string_mach error in
+             let err_str_lowercase = String.lowercase err_str in
+             if
+               String.is_substring ~substring:"insufficient_funds"
+                 err_str_lowercase
+             then (
+               [%log info] "Got expected insufficient funds error from GraphQL" ;
+               Malleable_error.return () )
+             else (
+               [%log error]
+                 "Payment failed in GraphQL, but for unexpected reason: %s"
+                 err_str ;
+               Malleable_error.soft_error_format ~value:()
+                 "Payment failed for unexpected reason: %s" err_str ))
+    in
+    section
+      "send out a bunch more txns to fill up the snark ledger, then wait for \
+       proofs to be emitted"
+      (let receiver = untimed_node_a in
        let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = timed_node_c in
+       let sender = untimed_node_b in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind { total_balance = timed_node_c_total; _ } =
-         Network.Node.must_get_account_data ~logger timed_node_c
-           ~public_key:sender_pub_key
+       let%bind () =
+         (*
+            To fill up a `small` transaction capacity with work delay of 1, 
+            there needs to be 12 total txns sent.
+
+            Calculation is as follows:
+            Max number trees in the scan state is
+              `(transaction_capacity_log+1) * (work_delay+1)`
+            and for 2^2 transaction capacity and work delay 1 it is 
+              `(2+1)*(1+1)=6`.
+            Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
+            In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
+            Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
+
+            2 successful txn are sent in the prior course of this test,
+            so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
+         repeat_seq ~n:10 ~f:(fun () ->
+             Network.Node.must_send_payment ~logger sender ~sender_pub_key
+               ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+             >>| ignore)
        in
-       [%log info] "timed_node_c total balance: %s"
-         (Currency.Balance.to_formatted_string timed_node_c_total) ;
-       [%log info]
-         "Attempting to send txn from timed_node_c to untimed_node_a for \
-          amount of %s"
-         (Currency.Amount.to_formatted_string amount) ;
-       (* TODO: refactor this using new [expect] dsl when it's available *)
-       let open Deferred.Let_syntax in
-       match%bind
-         Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
-           ~amount ~fee
-       with
-       | Ok _ ->
-           Malleable_error.soft_error_string ~value:()
-             "Payment succeeded, but expected it to fail because of a minimum \
-              balance violation"
-       | Error error ->
-           (* expect GraphQL error due to insufficient funds *)
-           let err_str = Error.to_string_mach error in
-           let err_str_lowercase = String.lowercase err_str in
-           if
-             String.is_substring ~substring:"insufficient_funds"
-               err_str_lowercase
-           then (
-             [%log info] "Got expected insufficient funds error from GraphQL" ;
-             Malleable_error.return () )
-           else (
-             [%log error]
-               "Payment failed in GraphQL, but for unexpected reason: %s"
-               err_str ;
-             Malleable_error.soft_error_format ~value:()
-               "Payment failed for unexpected reason: %s" err_str ))
+       wait_for t
+         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
 end

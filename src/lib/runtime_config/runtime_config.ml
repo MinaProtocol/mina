@@ -643,6 +643,8 @@ module Proof_keys = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
+
+    let small : t = Log_2 2
   end
 
   type t =
