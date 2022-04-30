@@ -1420,11 +1420,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* The first party must succeed. *)
     Bool.(assert_ (not (is_start' &&& overflowed))) ;
+    let local_state = { local_state with excess = new_local_fee_excess } in
     let local_state =
-      { local_state with
-        excess = new_local_fee_excess
-      ; success = Bool.(local_state.success &&& not overflowed)
-      }
+      Local_state.add_check local_state Local_excess_overflow
+        (Bool.not overflowed)
     in
 
     (* If a's token ID differs from that in the local state, then
@@ -1490,9 +1489,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
     let local_state =
-      { local_state with
-        success = Bool.(local_state.success &&& not global_excess_update_failed)
-      }
+      Local_state.add_check local_state Global_excess_overflow
+        Bool.(not global_excess_update_failed)
     in
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
