@@ -51,9 +51,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
-    ; work_delay = Some 1
-    ; transaction_capacity =
-        Some Runtime_config.Proof_keys.Transaction_capacity.small
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   (* Call [f] [n] times in sequence *)
