@@ -285,7 +285,7 @@ let fee_transfer_tbl : (Fee_transfer_key.t, Coinbase_fee_transfer.t) Hashtbl.t =
 
 let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
     =
-  match internal_cmd.type_ with
+  match internal_cmd.typ with
   | "fee_transfer_via_coinbase" ->
       let%map receiver_acct_id =
         Load_data.account_identifier_of_id pool internal_cmd.receiver_id
@@ -314,7 +314,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
-    cmd.type_ cmd.global_slot_since_genesis cmd.sequence_no
+    cmd.typ cmd.global_slot_since_genesis cmd.sequence_no
     cmd.secondary_sequence_no ;
   let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let%bind receiver_account_id = account_identifier_of_id cmd.receiver_id in
@@ -331,7 +331,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
     |> Error.raise
   in
   let open Ledger in
-  match cmd.type_ with
+  match cmd.typ with
   | "fee_transfer" -> (
       let fee_token = Account_id.token_id receiver_account_id in
       let receiver_pk = Account_id.public_key receiver_account_id in
@@ -383,7 +383,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       (* the actual application is in the "coinbase" case *)
       Deferred.unit
   | _ ->
-      failwithf "Unknown internal command \"%s\"" cmd.type_ ()
+      failwithf "Unknown internal command \"%s\"" cmd.typ ()
 
 let apply_combined_fee_transfer ~logger ~pool ~ledger
     (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
@@ -391,8 +391,8 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
     cmd1.sequence_no ;
   let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let fee_transfer_of_cmd (cmd : Sql.Internal_command.t) =
-    if not (String.equal cmd.type_ "fee_transfer") then
-      failwithf "Expected fee transfer, got: %s" cmd.type_ () ;
+    if not (String.equal cmd.typ "fee_transfer") then
+      failwithf "Expected fee transfer, got: %s" cmd.typ () ;
     let%map receiver_account_identifier =
       account_identifier_of_id cmd.receiver_id
     in
@@ -430,7 +430,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
 
 module User_command_helpers = struct
   let body_of_sql_user_cmd pool
-      ({ type_; source_id; receiver_id; amount; global_slot_since_genesis; _ } :
+      ({ typ; source_id; receiver_id; amount; global_slot_since_genesis; _ } :
         Sql.User_command.t) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
@@ -444,7 +444,7 @@ module User_command_helpers = struct
         ~f:(Fn.compose Currency.Amount.of_uint64 Unsigned.UInt64.of_int64)
     in
     (* possibilities from user_command_type enum in SQL schema *)
-    match type_ with
+    match typ with
     | "payment" ->
         if Option.is_none amount then
           failwithf "Payment at global slot since genesis %Ld has NULL amount"
@@ -456,14 +456,14 @@ module User_command_helpers = struct
           (Stake_delegation.Set_delegate
              { delegator = source_pk; new_delegate = receiver_pk })
     | _ ->
-        failwithf "Invalid user command type: %s" type_ ()
+        failwithf "Invalid user command type: %s" typ ()
 end
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
-    cmd.type_ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
+    cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
   let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let%bind body = User_command_helpers.body_of_sql_user_cmd pool cmd in
   let%bind fee_payer_account_id = account_identifier_of_id cmd.fee_payer_id in
@@ -863,7 +863,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             in
             let cmp = [%compare: int64 * int * int] (tuple ic1) (tuple ic2) in
             if cmp = 0 then
-              match (ic1.type_, ic2.type_) with
+              match (ic1.typ, ic2.typ) with
               | "coinbase", "fee_transfer_via_coinbase" ->
                   -1
               | "fee_transfer_via_coinbase", "coinbase" ->
@@ -1101,8 +1101,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             when Int64.equal ic.global_slot_since_genesis
                    ic2.global_slot_since_genesis
                  && Int.equal ic.sequence_no ic2.sequence_no
-                 && String.equal ic.type_ "fee_transfer"
-                 && String.equal ic.type_ ic2.type_ ->
+                 && String.equal ic.typ "fee_transfer"
+                 && String.equal ic.typ ic2.typ ->
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
