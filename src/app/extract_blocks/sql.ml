@@ -1,4 +1,4 @@
-(* sql.ml -- (Postgresql) SQL queries for extract blocks app *)
+(* sql.ml -- (Postgresql) SQL queries for extract_blocks app *)
 
 module Subchain = struct
   let make_sql ~join_condition =
@@ -6,13 +6,13 @@ module Subchain = struct
       {sql| WITH RECURSIVE chain AS (
 
               SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
+                     next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
               FROM blocks b WHERE b.state_hash = $1
 
               UNION ALL
 
               SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
+                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,b.timestamp,b.chain_status
               FROM blocks b
 
               INNER JOIN chain
@@ -21,7 +21,7 @@ module Subchain = struct
            )
 
            SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
+                  next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
            FROM chain
       |sql}
       join_condition
@@ -50,7 +50,7 @@ module Subchain = struct
   let query_all =
     Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
       {sql| SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                   next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
+                   next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
             FROM blocks
       |sql}
 
@@ -109,11 +109,8 @@ module Blocks_and_internal_commands = struct
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[ int; int; int; option int64; int ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int; option int64; int ]
 
   let query =
     Caqti_request.collect Caqti_type.int typ

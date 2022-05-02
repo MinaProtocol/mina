@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -90,7 +91,7 @@ module Network_config = struct
         ; num_archive_nodes
         ; log_precomputed_blocks
         ; snark_worker_fee
-        ; snark_worker_public_key (* ; aux_account_balance *)
+        ; snark_worker_public_key
         ; work_delay
         ; transaction_capacity
         } =
@@ -110,7 +111,9 @@ module Network_config = struct
     let bp_keypairs, extra_keypairs =
       List.split_n
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1)
         num_block_producers
     in
     if List.length bp_keypairs < num_block_producers then
@@ -169,6 +172,25 @@ module Network_config = struct
                   ; vesting_increment = t.vesting_increment
                   }
           in
+          (* an account may be used for snapp transactions, so add
+             permissions
+          *)
+          let (permissions
+                : Runtime_config.Accounts.Single.Permissions.t option) =
+            Some
+              { edit_state = None
+              ; send = None
+              ; receive = None
+              ; set_delegate = None
+              ; set_permissions = None
+              ; set_verification_key = None
+              ; set_zkapp_uri = None
+              ; edit_sequence_state = None
+              ; set_token_symbol = None
+              ; increment_nonce = None
+              ; set_voting_for = None
+              }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
             pk = Some (Public_key.Compressed.to_string pk)
@@ -178,6 +200,7 @@ module Network_config = struct
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
+          ; permissions
           })
     in
     (* DAEMON CONFIG *)
@@ -201,7 +224,11 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; transaction_expiry_hr = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -243,8 +270,15 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
+    in
+    let mina_archive_schema_aux_files =
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
+      ]
     in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
@@ -280,6 +314,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee

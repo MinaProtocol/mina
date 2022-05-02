@@ -36,7 +36,7 @@ module type Scalar_intf = sig
 end
 
 module type Shifted_intf = sig
-  type (_, _) checked
+  type _ checked
 
   type boolean_var
 
@@ -46,16 +46,16 @@ module type Shifted_intf = sig
 
   val zero : t
 
-  val add : t -> curve_var -> (t, _) checked
+  val add : t -> curve_var -> t checked
 
   (* This is only safe if the result is guaranteed to not be zero. *)
 
-  val unshift_nonzero : t -> (curve_var, _) checked
+  val unshift_nonzero : t -> curve_var checked
 
-  val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+  val if_ : boolean_var -> then_:t -> else_:t -> t checked
 
   module Assert : sig
-    val equal : t -> t -> (unit, _) checked
+    val equal : t -> t -> unit checked
   end
 end
 
@@ -73,13 +73,13 @@ module type Weierstrass_checked_intf = sig
   module Shifted : sig
     module type S =
       Shifted_intf
-        with type ('a, 'b) checked := ('a, 'b) Checked.t
+        with type 'a checked := 'a Checked.t
          and type curve_var := t
          and type boolean_var := Boolean.var
 
     type 'a m = (module S with type t = 'a)
 
-    val create : unit -> ((module S), _) Checked.t
+    val create : unit -> (module S) Checked.t
   end
 
   val negate : t -> t
@@ -87,11 +87,11 @@ module type Weierstrass_checked_intf = sig
   val constant : unchecked -> t
 
   val add_unsafe :
-    t -> t -> ([ `I_thought_about_this_very_carefully of t ], _) Checked.t
+    t -> t -> [ `I_thought_about_this_very_carefully of t ] Checked.t
 
-  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+  val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
-  val double : t -> (t, _) Checked.t
+  val double : t -> t Checked.t
 
   val if_value : Boolean.var -> then_:unchecked -> else_:unchecked -> t
 
@@ -100,21 +100,21 @@ module type Weierstrass_checked_intf = sig
     -> t
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
-    -> ('s, _) Checked.t
+    -> 's Checked.t
 
   val scale_known :
        's Shifted.m
     -> unchecked
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
-    -> ('s, _) Checked.t
+    -> 's Checked.t
 
-  val sum : 's Shifted.m -> t list -> init:'s -> ('s, _) Checked.t
+  val sum : 's Shifted.m -> t list -> init:'s -> 's Checked.t
 
   module Assert : sig
-    val on_curve : t -> (unit, _) Checked.t
+    val on_curve : t -> unit Checked.t
 
-    val equal : t -> t -> (unit, _) Checked.t
+    val equal : t -> t -> unit Checked.t
   end
 end
 
@@ -141,8 +141,7 @@ module Make_weierstrass_checked
       val scale : t -> Scalar.t -> t
     end)
     (Params : Params_intf with type field := F.Unchecked.t) (Override : sig
-      val add :
-        (F.t * F.t -> F.t * F.t -> (F.t * F.t, _) F.Impl.Checked.t) option
+      val add : (F.t * F.t -> F.t * F.t -> (F.t * F.t) F.Impl.Checked.t) option
     end) :
   Weierstrass_checked_intf
     with module Impl := F.Impl
@@ -160,12 +159,12 @@ module Make_weierstrass_checked
     assert_square y (x3 + ax + constant Params.b)
 
   let typ : (t, Curve.t) Typ.t =
-    let unchecked =
+    let (Typ unchecked) =
       Typ.transport
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    { unchecked with check = assert_on_curve }
+    Typ { unchecked with check = assert_on_curve }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
@@ -239,7 +238,7 @@ module Make_weierstrass_checked
   module Shifted = struct
     module type S =
       Shifted_intf
-        with type ('a, 'b) checked := ('a, 'b) Checked.t
+        with type 'a checked := 'a Checked.t
          and type curve_var := t
          and type boolean_var := Boolean.var
 
@@ -265,7 +264,7 @@ module Make_weierstrass_checked
       end
     end
 
-    let create () : ((module S), _) Checked.t =
+    let create () : (module S) Checked.t =
       let%map shift =
         exists typ ~compute:As_prover.(map (return ()) ~f:Curve.random)
       in
@@ -327,7 +326,7 @@ module Make_weierstrass_checked
   let%snarkydef scale (type shifted)
       (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
-      (shifted, _) Checked.t =
+      shifted Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
     let open Let_syntax in
     let rec go i bs0 acc pt =

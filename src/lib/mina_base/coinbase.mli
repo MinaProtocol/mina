@@ -1,5 +1,5 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_import
 module Fee_transfer = Coinbase_fee_transfer
 
 module Stable : sig

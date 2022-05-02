@@ -1,0 +1,13 @@
+(library
+ (name key_gen)
+ (public_name key_gen)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (libraries core_kernel signature_lib base))
+
+(rule
+ (targets sample_keypairs.ml sample_keypairs.json)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))

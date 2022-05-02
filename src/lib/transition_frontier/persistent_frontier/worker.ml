@@ -8,9 +8,10 @@ open Frontier_base
 type input = Diff.Lite.E.t list
 
 type create_args =
-  { db: Database.t
-  ; logger: Logger.t
-  ; persistent_root_instance: Persistent_root.Instance.t }
+  { db : Database.t
+  ; logger : Logger.t
+  ; persistent_root_instance : Persistent_root.Instance.t
+  }
 
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
@@ -20,23 +21,24 @@ module Worker = struct
   type nonrec input = input
 
   type t =
-    { db: Database.t
-    ; logger: Logger.t
-    ; persistent_root_instance: Persistent_root.Instance.t }
+    { db : Database.t
+    ; logger : Logger.t
+    ; persistent_root_instance : Persistent_root.Instance.t
+    }
 
   type nonrec create_args = create_args
 
   type output = unit
 
   (* worker assumes database has already been checked and initialized *)
-  let create ({db; logger; persistent_root_instance} : create_args) : t =
-    {db; logger; persistent_root_instance}
+  let create ({ db; logger; persistent_root_instance } : create_args) : t =
+    { db; logger; persistent_root_instance }
 
   (* nothing to close *)
   let close _ = Deferred.unit
 
   type apply_diff_error =
-    [`Apply_diff of [`New_node | `Root_transitioned | `Best_tip_changed]]
+    [ `Apply_diff of [ `New_node | `Root_transitioned | `Best_tip_changed ] ]
 
   type apply_diff_error_internal =
     [ `Not_found of
@@ -65,12 +67,12 @@ module Worker = struct
       Result.map_error result ~f:(fun err ->
           [%log' error t.logger] "error applying %s diff: %s" diff_type_name
             (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type )
+          `Apply_diff diff_type)
     in
     match diff with
     | New_node (Lite transition) -> (
         let r =
-          ( Database.add t.db ~transition:(External_transition.Validated.Stable.V1.to_latest transition)
+          ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
         in
         match r with
@@ -84,13 +86,15 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (External_transition.Validated.Stable.V1.state_hash transition)) )
-                ; ("parent", `String (State_hash.to_base58_check h)) ] ;
+                         (External_transition.Validated.state_hashes transition)
+                           .state_hash) )
+                ; ("parent", `String (State_hash.to_base58_check h))
+                ] ;
             Ok ()
         | _ ->
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
-    | Root_transitioned {new_root; garbage= Lite garbage; just_emitted_a_proof}
-      ->
+    | Root_transitioned
+        { new_root; garbage = Lite garbage; just_emitted_a_proof } ->
         if just_emitted_a_proof then (
           [%log' info t.logger] "Dequeued a snarked ledger" ;
           Persistent_root.Instance.dequeue_snarked_ledger
@@ -129,9 +133,9 @@ module Worker = struct
          * other tasks in between diff applications.
          * If implemented otherwise, all diffs would be
          * applied during the same scheduler cycle.
-         *)
+      *)
       deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-          Deferred.return (handle_diff t diff) )
+          Deferred.return (handle_diff t diff))
     with
     | Ok () ->
         ()

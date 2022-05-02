@@ -15,4 +15,4 @@ let tick = ro "fp" Tick.Field.size_in_bits Tick.Field.of_bits
 
 let chal = ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
 
-let scalar_chal () = Scalar_challenge.Scalar_challenge (chal ())
+let scalar_chal () = Scalar_challenge.create (chal ())

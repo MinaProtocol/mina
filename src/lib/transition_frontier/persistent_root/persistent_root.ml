@@ -1,20 +1,21 @@
 open Core
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Frontier_base
-module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
-  {state_hash= genesis_state_hash}
+  { state_hash = genesis_state_hash }
 
 let with_file ?size filename access_level ~f =
   let open Unix in
   let shared, mode =
     match access_level with
     | `Read ->
-        (false, [O_RDONLY])
+        (false, [ O_RDONLY ])
     | `Write ->
-        (true, [O_RDWR; O_TRUNC; O_CREAT])
+        (true, [ O_RDWR; O_TRUNC; O_CREAT ])
   in
   let fd = Unix.openfile filename ~mode in
   let buf_size =
@@ -52,18 +53,20 @@ end
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
-    { snarked_ledger: Ledger.Db.t
-    ; potential_snarked_ledgers: string Queue.t
-    ; factory: Factory_type.t }
+    { snarked_ledger : Ledger.Db.t
+    ; potential_snarked_ledgers : string Queue.t
+    ; factory : Factory_type.t
+    }
 end =
   Instance_type
 
 and Factory_type : sig
   type t =
-    { directory: string
-    ; logger: Logger.t
-    ; mutable instance: Instance_type.t option
-    ; ledger_depth: int }
+    { directory : string
+    ; logger : Logger.t
+    ; mutable instance : Instance_type.t option
+    ; ledger_depth : int
+    }
 end =
   Factory_type
 
@@ -74,8 +77,7 @@ module Instance = struct
   type t = Instance_type.t
 
   let potential_snarked_ledgers_to_yojson queue =
-    `List
-      (List.map (Queue.to_list queue) ~f:(fun filename -> `String filename))
+    `List (List.map (Queue.to_list queue) ~f:(fun filename -> `String filename))
 
   let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json |> List.map ~f:Yojson.Safe.Util.to_string
@@ -116,7 +118,7 @@ module Instance = struct
         ~directory_name:(Locations.snarked_ledger factory.directory)
         ()
     in
-    {snarked_ledger; potential_snarked_ledgers= Queue.create (); factory}
+    { snarked_ledger; potential_snarked_ledgers = Queue.create (); factory }
 
   (** When we load from disk,
       1. Check the potential_snarked_ledgers to see if any one of these
@@ -141,7 +143,10 @@ module Instance = struct
             @@ Ledger.Db.merkle_root potential_snarked_ledger
           in
           [%log debug]
-            ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson potential_snarked_ledger_hash)]
+            ~metadata:
+              [ ( "potential_snarked_ledger_hash"
+                , Frozen_ledger_hash.to_yojson potential_snarked_ledger_hash )
+              ]
             "loaded potential_snarked_ledger from disk" ;
           if
             Frozen_ledger_hash.equal potential_snarked_ledger_hash
@@ -149,8 +154,7 @@ module Instance = struct
           then (
             let snarked_ledger =
               Ledger.Db.create ~depth:factory.ledger_depth
-                ~directory_name:
-                  (Locations.tmp_snarked_ledger factory.directory)
+                ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
                 ()
             in
             match
@@ -174,17 +178,17 @@ module Instance = struct
                 File_system.rmrf
                   (Locations.potential_snarked_ledgers factory.directory) ;
                 [%log' error factory.logger]
-                  ~metadata:[("error", `String (Error.to_string_hum e))]
+                  ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
                   "Ledger_transfer failed" ;
                 Stop None )
           else (
             Ledger.Db.close potential_snarked_ledger ;
-            Continue None ) )
+            Continue None ))
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers ~f:File_system.rmrf ;
           File_system.rmrf
             (Locations.potential_snarked_ledgers factory.directory) ;
-          None )
+          None)
     in
     match snarked_ledger with
     | None ->
@@ -203,21 +207,26 @@ module Instance = struct
         then
           Ok
             { snarked_ledger
-            ; potential_snarked_ledgers= Queue.create ()
-            ; factory }
+            ; potential_snarked_ledgers = Queue.create ()
+            ; factory
+            }
         else (
           Ledger.Db.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
-        Ok {snarked_ledger; potential_snarked_ledgers= Queue.create (); factory}
+        Ok
+          { snarked_ledger
+          ; potential_snarked_ledgers = Queue.create ()
+          ; factory
+          }
 
   (* TODO: encapsulate functionality of snarked ledger *)
-  let snarked_ledger {snarked_ledger; _} = snarked_ledger
+  let snarked_ledger { snarked_ledger; _ } = snarked_ledger
 
   let set_root_identifier t new_root_identifier =
     [%log' trace t.factory.logger]
       ~metadata:
-        [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
+        [ ("root_identifier", Root_identifier.to_yojson new_root_identifier) ]
       "Setting persistent root identifier" ;
     let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
     with_file (Locations.root_identifier t.factory.directory) `Write ~size
@@ -225,12 +234,12 @@ module Instance = struct
         ignore
           ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
               new_root_identifier
-            : int ) )
+            : int ))
 
   (* defaults to genesis *)
   let load_root_identifier t =
     let file = Locations.root_identifier t.factory.directory in
-    match Unix.access file [`Exists; `Read] with
+    match Unix.access file [ `Exists; `Read ] with
     | Error _ ->
         None
     | Ok () ->
@@ -240,17 +249,18 @@ module Instance = struct
             in
             [%log' trace t.factory.logger]
               ~metadata:
-                [("root_identifier", Root_identifier.to_yojson root_identifier)]
+                [ ("root_identifier", Root_identifier.to_yojson root_identifier)
+                ]
               "Loaded persistent root identifier" ;
-            Some root_identifier )
+            Some root_identifier)
 
-  let set_root_state_hash t state_hash = set_root_identifier t {state_hash}
+  let set_root_state_hash t state_hash = set_root_identifier t { state_hash }
 end
 
 type t = Factory_type.t
 
 let create ~logger ~directory ~ledger_depth =
-  {directory; logger; instance= None; ledger_depth}
+  { directory; logger; instance = None; ledger_depth }
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;
@@ -284,4 +294,5 @@ let reset_to_genesis_exn t ~precomputed_values =
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
-             ((Precomputed_values.genesis_state_hashes precomputed_values).state_hash)) )
+             (Precomputed_values.genesis_state_hashes precomputed_values)
+               .state_hash))

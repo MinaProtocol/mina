@@ -14,6 +14,8 @@
    sexplib0
    base.caml
    ;; local libraries
+   fields_derivers.graphql
+   fields_derivers
    bitstring_lib
    pickles
    snark_params
@@ -27,6 +29,8 @@
    random_oracle
    base58_check
    snarky.intf
+   fields_derivers.zkapps
+   fields_derivers.json
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

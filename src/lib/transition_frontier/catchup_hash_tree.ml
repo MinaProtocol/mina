@@ -14,7 +14,7 @@ module Node = struct
       let to_yojson (t : t) =
         `List
           (List.map (Hash_set.to_list t) ~f:(fun x ->
-               `String (Catchup_job_id.to_string x) ))
+               `String (Catchup_job_id.to_string x)))
     end
 
     type t = Have_breadcrumb | Part_of_catchups of Ids.t
@@ -22,10 +22,10 @@ module Node = struct
   end
 
   type t =
-    { parent: State_hash.t
-    ; state: State.t
+    { parent : State_hash.t
+    ; state : State.t
           (* If a node has a breadcrumb, then all of its ancestors have
-   breadcrumbs as well. *)
+             breadcrumbs as well. *)
     }
   [@@deriving to_yojson]
 end
@@ -42,7 +42,7 @@ module State_hash_table = struct
   let to_yojson f t : Yojson.Safe.t =
     `Assoc
       (List.map (State_hash.Table.to_alist t) ~f:(fun (h, x) ->
-           (State_hash.to_base58_check h, f x) ))
+           (State_hash.to_base58_check h, f x)))
 end
 
 module State_hash_hash_set = struct
@@ -60,11 +60,12 @@ module State_hash_set = struct
 end
 
 type t =
-  { nodes: Node.t State_hash_table.t
-  ; tips: State_hash_hash_set.t
-  ; children: State_hash_set.t State_hash_table.t
-  ; mutable root: State_hash.t
-  ; logger: L.t }
+  { nodes : Node.t State_hash_table.t
+  ; tips : State_hash_hash_set.t
+  ; children : State_hash_set.t State_hash_table.t
+  ; mutable root : State_hash.t
+  ; logger : L.t
+  }
 [@@deriving to_yojson]
 
 let max_catchup_chain_length t =
@@ -73,30 +74,31 @@ let max_catchup_chain_length t =
     | Have_breadcrumb ->
         acc
     | Part_of_catchups _ -> (
-      match Hashtbl.find t.nodes node.parent with
-      | None ->
-          (* This node is a root. *)
-          acc
-      | Some parent ->
-          missing_length (acc + 1) parent )
+        match Hashtbl.find t.nodes node.parent with
+        | None ->
+            (* This node is a root. *)
+            acc
+        | Some parent ->
+            missing_length (acc + 1) parent )
   in
   Hash_set.fold t.tips ~init:0 ~f:(fun acc tip ->
-      Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)) )
+      Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)))
 
 let create ~root =
   let root_hash = Breadcrumb.state_hash root in
   let parent = Breadcrumb.parent_hash root in
   let nodes =
     State_hash.Table.of_alist_exn
-      [(root_hash, {Node.parent; state= Have_breadcrumb})]
+      [ (root_hash, { Node.parent; state = Have_breadcrumb }) ]
   in
-  { root= root_hash
-  ; tips= State_hash.Hash_set.create ()
-  ; children=
+  { root = root_hash
+  ; tips = State_hash.Hash_set.create ()
+  ; children =
       State_hash.Table.of_alist_exn
-        [(parent, State_hash.Set.singleton root_hash)]
+        [ (parent, State_hash.Set.singleton root_hash) ]
   ; nodes
-  ; logger= Logger.create () }
+  ; logger = Logger.create ()
+  }
 
 let check_for_parent t h ~parent:p ~check_has_breadcrumb =
   match Hashtbl.find t.nodes p with
@@ -105,7 +107,8 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
         ~metadata:
           [ ("parent", State_hash.to_yojson p)
           ; ("hash", State_hash.to_yojson h)
-          ; ("tree", to_yojson t) ]
+          ; ("tree", to_yojson t)
+          ]
         "hash tree invariant broken: $parent not found in $tree for $hash"
   | Some x ->
       if check_has_breadcrumb && not (Node.State.equal x.state Have_breadcrumb)
@@ -114,7 +117,8 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
           ~metadata:
             [ ("parent", State_hash.to_yojson p)
             ; ("hash", State_hash.to_yojson h)
-            ; ("tree", to_yojson t) ]
+            ; ("tree", to_yojson t)
+            ]
           "hash tree invariant broken: expected $parent to have breadcrumb \
            (child is $hash) in $tree"
       else ()
@@ -124,7 +128,7 @@ let add_child t h ~parent =
     | None ->
         State_hash.Set.singleton h
     | Some s ->
-        Set.add s h )
+        Set.add s h)
 
 let add t h ~parent ~job =
   if Hashtbl.mem t.nodes h then
@@ -140,7 +144,8 @@ let add t h ~parent ~job =
     Hash_set.remove t.tips parent ;
     Hashtbl.set t.nodes ~key:h
       ~data:
-        {parent; state= Part_of_catchups (Catchup_job_id.Hash_set.create ())} )
+        { parent; state = Part_of_catchups (Catchup_job_id.Hash_set.create ()) }
+    )
 
 let breadcrumb_added (t : t) b =
   let h = Breadcrumb.state_hash b in
@@ -150,9 +155,9 @@ let breadcrumb_added (t : t) b =
     | None ->
         (* New child *)
         add_child t h ~parent ;
-        {parent; state= Have_breadcrumb}
+        { parent; state = Have_breadcrumb }
     | Some x ->
-        {x with state= Have_breadcrumb} ) ;
+        { x with state = Have_breadcrumb }) ;
   Hash_set.remove t.tips h
 
 let remove_node t h =
@@ -160,13 +165,13 @@ let remove_node t h =
   match Hashtbl.find_and_remove t.nodes h with
   | None ->
       ()
-  | Some {parent; _} ->
+  | Some { parent; _ } ->
       Hashtbl.change t.children parent ~f:(function
         | None ->
             None
         | Some s ->
             let s' = Set.remove s h in
-            if Set.is_empty s' then None else Some s' )
+            if Set.is_empty s' then None else Some s')
 
 (* Remove everything not reachable from the root *)
 let prune t =
@@ -186,9 +191,9 @@ let prune t =
         in
         go stack
   in
-  go [t.root] ;
+  go [ t.root ] ;
   List.iter (Hashtbl.keys t.nodes) ~f:(fun h ->
-      if not (Hash_set.mem keep h) then remove_node t h )
+      if not (Hash_set.mem keep h) then remove_node t h)
 
 let catchup_failed t job =
   let to_remove =
@@ -198,7 +203,7 @@ let catchup_failed t job =
             acc
         | Part_of_catchups s ->
             Hash_set.remove s job ;
-            if Hash_set.is_empty s then key :: acc else acc )
+            if Hash_set.is_empty s then key :: acc else acc)
   in
   List.iter to_remove ~f:(remove_node t)
 
@@ -206,20 +211,20 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
   List.iter ds ~f:(function
     | E (New_node (Full b)) ->
         breadcrumb_added t b
-    | E (Root_transitioned {new_root; garbage= Full hs; _}) ->
+    | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
         let h = (Root_data.Limited.hashes new_root).state_hash in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
               [%log' debug t.logger]
                 ~metadata:
-                  [("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
+                  [ ("hash", State_hash.to_yojson h); ("tree", to_yojson t) ]
                 "hash $tree invariant broken: new root $hash not present. \
                  Diffs may have been applied out of order" ;
               None
           | Some x ->
               t.root <- h ;
-              Some {x with state= Have_breadcrumb} ) ;
+              Some { x with state = Have_breadcrumb }) ;
         prune t
     | E (Best_tip_changed _) ->
-        () )
+        ())

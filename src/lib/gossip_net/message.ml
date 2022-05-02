@@ -28,19 +28,19 @@ end
 include Master.T
 include Versioned_rpc.Both_convert.One_way.Make (Master)
 
-module V1 = struct
+module V2 = struct
   module T = struct
     type msg =
-      | New_state of External_transition.Raw.Stable.V1.t
-      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V1.t
-      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V1.t
+      | New_state of External_transition.Raw.Stable.V2.t
+      | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V2.t
+      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V2.t
     [@@deriving bin_io, sexp, version { rpc }]
 
-    type state_msg = External_transition.Raw.Stable.V1.t
+    type state_msg = External_transition.Raw.Stable.V2.t
 
-    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V1.t
+    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V2.t
 
-    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V1.t
+    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V2.t
 
     let callee_model_of_msg msg =
       match msg with
@@ -72,7 +72,7 @@ module V1 = struct
         "transaction pool diff"
 end
 
-module Latest = V1
+module Latest = V2
 
 [%%define_locally Latest.(summary)]
 
