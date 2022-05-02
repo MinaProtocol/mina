@@ -99,8 +99,8 @@ let generate_random_keypair t = Keypair.generate_random t.helper
 module Pubsub = struct
   type 'a subscription = 'a Subscription.t
 
-  let subscribe_raw t topic ~handle_and_validate_incoming_message ~encode
-      ~decode ~on_decode_failure =
+  let subscribe_raw t topic ~handle_and_validate_incoming_message
+      ~logger_metadata ~encode ~decode ~on_decode_failure =
     let open Deferred.Or_error.Let_syntax in
     (* Linear scan over all subscriptions. Should generally be small, probably not a problem. *)
     let topic_subscription_already_exists =
@@ -112,16 +112,17 @@ module Pubsub = struct
       Deferred.Or_error.errorf "already subscribed to topic %s" topic
     else
       let%map sub =
-        Subscription.subscribe ~helper:t.helper ~topic ~encode ~decode
-          ~on_decode_failure ~validator:handle_and_validate_incoming_message
+        Subscription.subscribe ~helper:t.helper ~topic ~logger_metadata ~encode
+          ~decode ~on_decode_failure
+          ~validator:handle_and_validate_incoming_message
       in
       Hashtbl.add_exn t.subscriptions ~key:(Subscription.id sub)
         ~data:(Subscription.E sub) ;
       sub
 
-  let subscribe_encode t topic ~handle_and_validate_incoming_message ~bin_prot
-      ~on_decode_failure =
-    subscribe_raw
+  let subscribe_encode t topic ~logger_metadata
+      ~handle_and_validate_incoming_message ~bin_prot ~on_decode_failure =
+    subscribe_raw ~logger_metadata
       ~decode:(fun msg_str ->
         let b = Bigstring.of_string msg_str in
         Bigstring.read_bin_prot b bin_prot.Bin_prot.Type_class.reader
@@ -133,8 +134,8 @@ module Pubsub = struct
       ~handle_and_validate_incoming_message ~on_decode_failure t topic
 
   let subscribe =
-    subscribe_raw ~encode:Fn.id ~decode:Or_error.return
-      ~on_decode_failure:`Ignore
+    subscribe_raw ~logger_metadata:(Fn.const []) ~encode:Fn.id
+      ~decode:Or_error.return ~on_decode_failure:`Ignore
 
   let unsubscribe t = Subscription.unsubscribe ~helper:t.helper
 
@@ -371,9 +372,10 @@ let handle_push_message t push_message =
                      Subscription.handle_and_validate sub ~validation_expiration
                        ~sender ~data))
                 (function
-                  | `Validation_timeout ->
+                  | `Validation_timeout metadata ->
                       [%log' warn t.logger]
                         "validation callback timed out before we could respond"
+                        ~metadata
                   | `Decoding_error e ->
                       [%log' error t.logger]
                         "failed to decode message published on subscription \

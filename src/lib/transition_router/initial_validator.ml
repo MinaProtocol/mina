@@ -267,6 +267,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 Envelope.Incoming.data transition_env
                 |> With_hash.of_data ~hash_data:External_transition.state_hashes
               in
+              [%log warn] "initial validating block with $state_hash"
+                ~metadata:
+                  [ ( "state_hash"
+                    , State_hash.to_yojson
+                      @@ State_hash.With_state_hashes.state_hash
+                           transition_with_hash )
+                  ] ;
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
                 transition_with_hash ;

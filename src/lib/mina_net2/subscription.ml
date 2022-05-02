@@ -7,6 +7,7 @@ type 'a t =
   { topic : string
   ; id : Id.t
   ; mutable closed : bool
+  ; logger_metadata : 'a -> (string * Yojson.Safe.t) list
   ; validator :
       'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
   ; encode : 'a -> string
@@ -21,7 +22,8 @@ let id { id; _ } = id
 
 let topic { topic; _ } = topic
 
-let subscribe ~helper ~topic ~encode ~decode ~on_decode_failure ~validator =
+let subscribe ~helper ~topic ~logger_metadata ~encode ~decode ~on_decode_failure
+    ~validator =
   let open Deferred.Or_error.Let_syntax in
   let subscription_id = Id.create () in
   let%map _ =
@@ -32,6 +34,7 @@ let subscribe ~helper ~topic ~encode ~decode ~on_decode_failure ~validator =
   { topic
   ; id = subscription_id
   ; closed = false
+  ; logger_metadata
   ; encode
   ; on_decode_failure
   ; decode
@@ -73,7 +76,7 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
       | Some `Ignore ->
           `Validation_result Ignore
       | None ->
-          `Validation_timeout )
+          `Validation_timeout (sub.logger_metadata data) )
   | Error e ->
       ( match sub.on_decode_failure with
       | `Ignore ->

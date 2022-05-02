@@ -101,6 +101,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     (State_hash.With_state_hashes.state_hash t, With_hash.data t)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
+  [%log warn] "processing block with $state_hash" ~metadata ;
   Deferred.map ~f:(Fn.const ())
     (let open Deferred.Result.Let_syntax in
     let%bind mostly_validated_transition =

@@ -42,6 +42,16 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
          , `Overflow
              (Drop_head
                 (fun (`Block head, `Valid_cb vc) ->
+                  [%log warn]
+                    "dropped a block in primary transition pipe with \
+                     $state_hash"
+                    ~metadata:
+                      [ ( "state_hash"
+                        , Mina_base.State_hash.to_yojson
+                          @@ Mina_base.State_hash.With_state_hashes.state_hash
+                          @@ fst @@ Network_peer.Envelope.Incoming.data
+                          @@ Cache_lib.Cached.peek head )
+                      ] ;
                   Mina_metrics.(
                     Counter.inc_one
                       Pipe.Drop_on_overflow

@@ -226,6 +226,7 @@ module Pubsub : sig
   val subscribe_encode :
        t
     -> string
+    -> logger_metadata:('a -> (string * Yojson.Safe.t) list)
     -> handle_and_validate_incoming_message:
          ('a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t

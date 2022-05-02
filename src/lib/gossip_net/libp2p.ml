@@ -422,24 +422,26 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               Mina_transition.External_transition.Raw.Stable.Latest.bin_t
             in
             let unit_f _ = Deferred.unit in
-            let publish_v1_impl push_impl bin_prot topic =
+            let publish_v1_impl push_impl logger_metadata bin_prot topic =
               match config.pubsub_v1 with
               | RW ->
-                  subscribe ~fn:push_impl topic bin_prot >>| Pubsub.publish net2
+                  subscribe ~logger_metadata ~fn:push_impl topic bin_prot
+                  >>| Pubsub.publish net2
               | RO ->
-                  subscribe ~fn:push_impl topic bin_prot >>| fun _ -> unit_f
+                  subscribe ~logger_metadata ~fn:push_impl topic bin_prot
+                  >>| fun _ -> unit_f
               | _ ->
                   Deferred.Or_error.return unit_f
             in
             let%bind publish_v1_tx =
               publish_v1_impl
                 (Sinks.Tx_sink.push sink_tx)
-                tx_bin_prot v1_topic_tx
+                (Fn.const []) tx_bin_prot v1_topic_tx
             in
             let%bind publish_v1_snark_work =
               publish_v1_impl
                 (Sinks.Snark_sink.push sink_snark_work)
-                snark_bin_prot v1_topic_snark_work
+                (Fn.const []) snark_bin_prot v1_topic_snark_work
             in
             let%bind publish_v1_block =
               publish_v1_impl
@@ -450,6 +452,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                            ~f:Mina_transition.External_transition.decompose env)
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ))
+                (* double hashing is bad :( *)
+                  (fun block ->
+                  [ ( "state_hash"
+                    , Mina_base.State_hash.to_yojson
+                      @@ Mina_base.State_hash.With_state_hashes.state_hash
+                      @@ Mina_transition.Block.wrap_with_hash
+                      @@ Mina_transition.External_transition.decompose block )
+                  ])
                 block_bin_prot v1_topic_block
               >>| Fn.flip Fn.compose Mina_transition.External_transition.compose
             in
@@ -465,6 +475,17 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             in
             let subscribe_v0_impl =
               subscribe
+                ~logger_metadata:(function
+                  | Message.Latest.T.New_state block ->
+                      [ ( "state_hash"
+                        , Mina_base.State_hash.to_yojson
+                          @@ Mina_base.State_hash.With_state_hashes.state_hash
+                          @@ Mina_transition.Block.wrap_with_hash
+                          @@ Mina_transition.External_transition.decompose block
+                        )
+                      ]
+                  | _ ->
+                      [])
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->

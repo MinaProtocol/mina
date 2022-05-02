@@ -14,6 +14,7 @@ val topic : 'a t -> string
 val subscribe :
      helper:Libp2p_helper.t
   -> topic:string
+  -> logger_metadata:('a -> (string * Yojson.Safe.t) list)
   -> encode:('a -> string)
   -> decode:(string -> 'a Or_error.t)
   -> on_decode_failure:
@@ -30,7 +31,7 @@ val handle_and_validate :
   -> sender:Peer.t
   -> data:string
   -> [ `Validation_result of Libp2p_ipc.validation_result
-     | `Validation_timeout
+     | `Validation_timeout of (string * Yojson.Safe.t) list
      | `Decoding_error of Error.t ]
      Deferred.t
 
