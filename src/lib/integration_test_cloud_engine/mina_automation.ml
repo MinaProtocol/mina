@@ -93,6 +93,7 @@ module Network_config = struct
         ; snark_worker_public_key (* ; aux_account_balance *)
         ; work_delay
         ; transaction_capacity
+        ; block_window_duration_ms
         } =
       test_config
     in
@@ -187,7 +188,7 @@ module Network_config = struct
       ; sub_windows_per_window = None
       ; ledger_depth = None
       ; work_delay
-      ; block_window_duration_ms = Some 120000
+      ; block_window_duration_ms = Some block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None

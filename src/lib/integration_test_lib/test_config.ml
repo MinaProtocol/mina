@@ -37,6 +37,7 @@ type t =
   ; work_delay : int option
   ; transaction_capacity :
       Runtime_config.Proof_keys.Transaction_capacity.t option
+  ; block_window_duration_ms : int
   }
 
 let default =
@@ -58,4 +59,5 @@ let default =
        Signature_lib.Public_key.Compressed.to_string pk)
   ; work_delay = None
   ; transaction_capacity = None
+  ; block_window_duration_ms = 120000
   }
