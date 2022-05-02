@@ -52,25 +52,6 @@ let get_amount_bounds pool amount_id =
   in
   Or_ignore.of_option amount_opt
 
-let get_length_bounds pool id =
-  let open Zkapp_basic in
-  let query_db = Mina_caqti.query pool in
-  let%map bl_db_opt =
-    Option.value_map id ~default:(return None) ~f:(fun id ->
-        let%map ts =
-          query_db ~f:(fun db -> Processor.Zkapp_length_bounds.load db id)
-        in
-        Some ts)
-  in
-  let bl_opt =
-    Option.map bl_db_opt ~f:(fun { length_lower_bound; length_upper_bound } ->
-        let lower = Unsigned.UInt32.of_int64 length_lower_bound in
-        let upper = Unsigned.UInt32.of_int64 length_upper_bound in
-        ( { lower; upper }
-          : Unsigned.UInt32.t Zkapp_precondition.Closed_interval.t ))
-  in
-  Or_ignore.of_option bl_opt
-
 let get_global_slot_bounds pool id =
   let open Zkapp_basic in
   let query_db = Mina_caqti.query pool in
