@@ -1371,27 +1371,6 @@ module Circuit = struct
       Js.t
   end
 
-  module Promise : sig
-    type _ t
-
-    val return : 'a -> 'a t
-
-    val map : 'a t -> f:('a -> 'b) -> 'b t
-  end = struct
-    (* type 'a t = < then_: 'b. ('a -> 'b) Js.callback -> 'b t Js.meth > Js.t *)
-    type 'a t = < > Js.t
-
-    let constr = Obj.magic Js.Unsafe.global ##. Promise
-
-    let return (type a) (x : a) : a t =
-      new%js constr
-        (Js.wrap_callback (fun resolve ->
-             Js.Unsafe.(fun_call resolve [| inject x |])))
-
-    let map (type a b) (t : a t) ~(f : a -> b) : b t =
-      (Js.Unsafe.coerce t)##then_ (Js.wrap_callback (fun (x : a) -> f x))
-  end
-
   let main_and_input (type w p) (c : (w, p) Circuit_main.t) =
     let main ?(w : w option) (public : p) () =
       let w : w =
@@ -1455,21 +1434,8 @@ module Circuit = struct
           res
       end
     in
-    let module Run_and_check_deferred = Impl.Run_and_check_deferred (Promise) in
-    let call (type b) (f : (unit -> b) Js.callback) =
-      Js.Unsafe.(fun_call f [||])
-    in
-    (* TODO this hasn't been working reliably, reconsider how we should enable async circuits *)
+
     circuit##.runAndCheck :=
-      Js.wrap_callback
-        (fun (type a)
-             (f : (unit -> (unit -> a) Js.callback Promise.t) Js.callback) :
-             a Promise.t ->
-          Run_and_check_deferred.run_and_check (fun () ->
-              let g : (unit -> a) Js.callback Promise.t = call f in
-              Promise.map g ~f:(fun (p : (unit -> a) Js.callback) () -> call p))
-          |> Promise.map ~f:Or_error.ok_exn) ;
-    circuit##.runAndCheckSync :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
           Impl.run_and_check (fun () -> f) |> Or_error.ok_exn) ;
 
