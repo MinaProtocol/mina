@@ -3081,12 +3081,16 @@ module Ledger = struct
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
 
-  let apply_parties_transaction l (txn : Parties.t) =
+  let apply_parties_transaction l (txn : Parties.t)
+      (account_creation_fee : string) =
     check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
       T.apply_parties_unchecked ~state_view:dummy_state_view
-        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+        ~constraint_constants:
+          { Genesis_constants.Constraint_constants.compiled with
+            account_creation_fee = Currency.Fee.of_string account_creation_fee
+          }
         ledger txn
     in
     let applied, _ = Or_error.ok_exn applied_exn in
@@ -3105,14 +3109,16 @@ module Ledger = struct
     in
     Js.array @@ Array.of_list account_list
 
-  let apply_js_transaction l (p : parties) =
-    apply_parties_transaction l (parties p)
+  let apply_js_transaction l (p : parties)
+      (account_creation_fee : Js.js_string Js.t) =
+    apply_parties_transaction l (parties p) (Js.to_string account_creation_fee)
 
-  let apply_json_transaction l (tx_json : Js.js_string Js.t) =
+  let apply_json_transaction l (tx_json : Js.js_string Js.t)
+      (account_creation_fee : Js.js_string Js.t) =
     let txn =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn
+    apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
   let () =
     let static_method name f =
@@ -3162,11 +3168,7 @@ module Ledger = struct
     let parties_to_graphql ps =
       parties ps |> !((deriver ())#to_json) |> yojson_to_gql |> Js.string
     in
-    static_method "partiesToGraphQL" parties_to_graphql ;
-    static_method "accountCreationFee" (fun () ->
-        Currency.Fee.to_int
-          Genesis_constants.Constraint_constants.compiled.account_creation_fee) ;
-    ()
+    static_method "partiesToGraphQL" parties_to_graphql
 end
 
 let export () =
