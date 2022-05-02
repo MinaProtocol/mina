@@ -1066,3 +1066,98 @@ let gen_parties_from ?(succeed = true)
       fee_payer = fee_payer_with_valid_signature
     ; other_parties = other_parties_with_valid_signatures
     }
+
+let gen_invalid_protocol_state_precondition
+    (psv : Zkapp_precondition.Protocol_state.View.t) :
+    Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let open Zkapp_precondition.Closed_interval in
+  let%bind protocol_state_precondition = gen_protocol_state_precondition psv in
+  let%bind lower = Bool.quickcheck_generator in
+  match%bind
+    Quickcheck.Generator.of_list
+      [ `Timestamp
+      ; `Blockchain_length
+      ; `Min_window_density
+      ; `Total_currency
+      ; `Global_slot_since_hard_fork
+      ; `Global_slot_since_genesis
+      ]
+  with
+  | `Timestamp ->
+      let%map timestamp =
+        let%map epsilon =
+          Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
+        in
+        if lower || Block_time.(psv.timestamp > add zero epsilon) then
+          { lower = Block_time.zero
+          ; upper = Block_time.sub psv.timestamp epsilon
+          }
+        else
+          { lower = Block_time.add psv.timestamp epsilon
+          ; upper = Block_time.max_value
+          }
+      in
+      { protocol_state_precondition with
+        timestamp = Zkapp_basic.Or_ignore.Check timestamp
+      }
+  | `Blockchain_length ->
+      let open Mina_numbers in
+      let%map blockchain_length =
+        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Length.(psv.blockchain_length > epsilon) then
+          { lower = Length.zero
+          ; upper =
+              Length.sub psv.blockchain_length epsilon
+              |> Option.value ~default:Length.zero
+          }
+        else
+          { lower = Length.add psv.blockchain_length epsilon
+          ; upper = Length.max_value
+          }
+      in
+      { protocol_state_precondition with
+        blockchain_length = Zkapp_basic.Or_ignore.Check blockchain_length
+      }
+  | `Min_window_density ->
+      let open Mina_numbers in
+      let%map min_window_density =
+        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Length.(psv.min_window_density > epsilon) then
+          { lower = Length.zero
+          ; upper =
+              Length.sub psv.min_window_density epsilon
+              |> Option.value ~default:Length.zero
+          }
+        else
+          { lower = Length.add psv.blockchain_length epsilon
+          ; upper = Length.max_value
+          }
+      in
+      { protocol_state_precondition with
+        min_window_density = Zkapp_basic.Or_ignore.Check min_window_density
+      }
+  | `Total_currency ->
+      let open Currency in
+      let%map total_currency =
+        let%map epsilon =
+          Amount.(gen_incl (of_int 1_000) (of_int 1_000_000_000))
+        in
+        if lower || Amount.(psv.total_currency > epsilon) then
+          { lower = Amount.zero
+          ; upper =
+              Amount.sub psv.total_currency epsilon
+              |> Option.value ~default:Amount.zero
+          }
+        else
+          { lower =
+              Amount.add psv.total_currency epsilon
+              |> Option.value ~default:Amount.max_int
+          ; upper = Amount.max_int
+          }
+      in
+      { protocol_state_precondition with
+        total_currency = Zkapp_basic.Or_ignore.Check total_currency
+      }
+  | _ ->
+      failwith "..."
