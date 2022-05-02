@@ -209,8 +209,8 @@ module Network_config = struct
       { Runtime_config.Proof_keys.level = Some proof_level
       ; sub_windows_per_window = None
       ; ledger_depth = None
-      ; block_window_duration_ms = None
       ; work_delay
+      ; block_window_duration_ms = Some 120000
       ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
@@ -238,7 +238,7 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof = Some proof_config
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base = Accounts (bp_accounts @ extra_accounts)

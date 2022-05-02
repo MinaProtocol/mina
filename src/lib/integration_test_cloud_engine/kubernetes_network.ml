@@ -486,6 +486,8 @@ module Node = struct
     ; set_voting_for = to_auth_required account_permissions#setVotingFor
     }
 
+  let graphql_uri node = Graphql.ingress_uri node |> Uri.to_string
+
   let get_account_permissions ~logger t ~account_id =
     let open Deferred.Or_error in
     let open Let_syntax in
