@@ -16,8 +16,7 @@ import {
 
 await isReady;
 const zkappTargetBalance = 10_000_000_000;
-const accountCreationFee = 1_000_000_000;
-const initialBalance = zkappTargetBalance + accountCreationFee;
+const initialBalance = zkappTargetBalance;
 const transactionFee = 10_000_000;
 const initialState = Field(1);
 
