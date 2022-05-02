@@ -11,8 +11,7 @@ import {
   isReady,
   shutdown,
   Mina,
-  signJsonTransaction,
-  Perm,
+  signFeePayer,
   call,
   Permissions,
 } from "snarkyjs";
@@ -30,12 +29,16 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
+  deploy(args) {
+    super.deploy(args);
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
       ...Permissions.default(),
-      editState: Perm.proofOrSignature(),
+      editState: Permissions.proofOrSignature(),
     });
+  }
+
+  initialize() {
     this.x.set(initialState);
   }
 
@@ -45,7 +48,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethodArguments(SimpleZkapp, { initialize: [], update: [Field] });
 
 // setup mock mina
 let Local = Mina.LocalBlockchain();
@@ -58,7 +61,10 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
+let { verificationKey, provers, verify } = await compile(
+  SimpleZkapp,
+  zkappAddress
+);
 toc();
 
 tic("create deploy transaction");
@@ -66,9 +72,8 @@ let partiesJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
   initialBalance,
-  initialBalanceFundingAccountKey: sender.privateKey,
-  shouldSignFeePayer: true,
   feePayerKey: sender.privateKey,
+  shouldSignFeePayer: true,
   transactionFee,
 });
 toc();
@@ -77,7 +82,27 @@ tic("apply deploy transaction");
 Local.applyJsonTransaction(partiesJsonDeploy);
 toc();
 
-// check that deploy txn was applied
+tic("create initialize transaction (with proof)");
+let partiesJsonInitialize = await call(
+  SimpleZkapp,
+  zkappAddress,
+  "initialize",
+  [],
+  provers,
+  verify
+);
+partiesJsonInitialize = await signFeePayer(
+  partiesJsonInitialize,
+  sender.privateKey,
+  { transactionFee }
+);
+toc();
+
+tic("apply initialize transaction");
+Local.applyJsonTransaction(partiesJsonInitialize);
+toc();
+
+// check that deploy and initialize txns were applied
 let zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
 zkappState.assertEquals(1);
 console.log("got initial state: " + zkappState);
@@ -90,11 +115,9 @@ let partiesJsonUpdate = await callUnproved(
   [Field(3)],
   zkappKey
 );
-partiesJsonUpdate = await signJsonTransaction(
-  partiesJsonUpdate,
-  sender.privateKey,
-  { transactionFee }
-);
+partiesJsonUpdate = await signFeePayer(partiesJsonUpdate, sender.privateKey, {
+  transactionFee,
+});
 toc();
 
 tic("apply update transaction (no proof)");
@@ -112,9 +135,10 @@ let partiesJsonUpdateWithProof = await call(
   zkappAddress,
   "update",
   [Field(5)],
-  provers
+  provers,
+  verify
 );
-partiesJsonUpdateWithProof = await signJsonTransaction(
+partiesJsonUpdateWithProof = await signFeePayer(
   partiesJsonUpdateWithProof,
   sender.privateKey,
   { transactionFee }
