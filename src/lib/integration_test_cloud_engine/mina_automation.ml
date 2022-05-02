@@ -89,7 +89,7 @@ module Network_config = struct
         ; num_archive_nodes
         ; log_precomputed_blocks
         ; snark_worker_fee
-        ; snark_worker_public_key (* ; aux_account_balance *)
+        ; snark_worker_public_key
         ; proof_config
         } =
       test_config
