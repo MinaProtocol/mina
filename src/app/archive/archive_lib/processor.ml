@@ -1468,7 +1468,12 @@ module Zkapp_other_party_body = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       ~tannot:(function
-        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None)
+        | "events_ids" | "sequence_events_ids" ->
+            Some "int[]"
+        | "caller" ->
+            Some "call_type_type"
+        | _ ->
+            None)
       (module Conn)
       value
 
