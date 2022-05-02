@@ -1502,7 +1502,7 @@ module User_command = struct
       in
       let%bind zkapp_other_parties_ids =
         Mina_caqti.deferred_result_list_map
-          (Parties.Call_forest.to_parties_list ps.other_parties)
+          (Parties.other_parties_list ps)
           ~f:(Zkapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
