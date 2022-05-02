@@ -90,12 +90,25 @@ module Token = struct
             ~select:"owner_public_key_id,owner_token_id" ~cols:[ "value" ] ()))
       (Token_id.to_string token_id)
 
+  let add_default (module Conn : CONNECTION) =
+    let open Deferred.Result.Let_syntax in
+    match%bind find_opt (module Conn) Token_id.default with
+    | Some id ->
+        return id
+    | None ->
+        Conn.find
+          (Caqti_request.find Caqti_type.string Caqti_type.int
+             (sprintf "INSERT INTO %s (value) VALUES (?) RETURNING id"
+                table_name))
+          Token_id.(to_string default)
+
   let add_if_doesn't_exist (module Conn : CONNECTION) ~owner token_id =
     let open Deferred.Result.Let_syntax in
     match owner with
     | None ->
         assert (Token_id.(equal default) token_id) ;
-        (* the db creation SQL adds the default token
+        (* the default token is added on startup by
+           add_default, above
 
            we wouldn't want to try to insert it here,
            because `select_insert_into_cols` would break
@@ -3516,6 +3529,19 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         in
         ())
 
+let add_default_token ~logger pool =
+  [%log info] "Adding default token to archive database" ;
+  match%bind
+    (Caqti_async.Pool.use (fun (module Conn : CONNECTION) ->
+         Token.add_default (module Conn)))
+      pool
+  with
+  | Ok _id ->
+      Deferred.unit
+  | Error err ->
+      failwithf "Could not add default token, error: %s" (Caqti_error.show err)
+        ()
+
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
   match runtime_config_opt with
@@ -3637,6 +3663,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      let%bind () = add_default_token ~logger pool in
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;

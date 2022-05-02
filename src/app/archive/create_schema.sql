@@ -35,11 +35,6 @@ CREATE TABLE tokens
 , owner_token_id       int               REFERENCES tokens(id)
 );
 
-/* insert default token, whose value is obtained via
-   the OCaml code `Token_id.(to_string default)`
-*/
-INSERT INTO tokens (value) VALUES ('wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf');
-
 CREATE TABLE token_symbols
 ( id          serial PRIMARY KEY
 , value text  NOT NULL

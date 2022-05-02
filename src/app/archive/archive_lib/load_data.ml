@@ -862,7 +862,11 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             : Mina_base.Zkapp_account.t ))
   in
   (* TODO: the URI will be moved to the zkApp, no longer in the account *)
-  let zkapp_uri = "https://dummy_uri.com" in
+  let%bind zkapp_uri =
+    Option.value_map zkapp_db ~default:(return "https://dummy.com")
+      ~f:(fun zkapp ->
+        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id))
+  in
   (* TODO: token permissions is going away *)
   let account =
     ( { public_key
