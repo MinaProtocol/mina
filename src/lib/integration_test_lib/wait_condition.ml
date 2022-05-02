@@ -150,4 +150,20 @@ struct
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
+
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
+    }
 end
