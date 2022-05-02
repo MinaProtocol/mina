@@ -2909,14 +2909,16 @@ module Ledger = struct
         ledger txn
     in
     let applied, _ = Or_error.ok_exn applied_exn in
-    let T.Transaction_applied.Parties_applied.{ accounts; command } = applied in
+    let T.Transaction_applied.Parties_applied.{ accounts; command; _ } =
+      applied
+    in
     let () =
       match command.status with
-      | Applied (_aux_data, _balance) ->
+      | Applied ->
           ()
-      | Failed (failure, _balance) ->
+      | Failed failures ->
           raise_error
-            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failure
+            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failures
             |> Yojson.Safe.to_string )
     in
     let account_list =
