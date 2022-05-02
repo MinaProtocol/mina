@@ -7,7 +7,7 @@ module Length = Mina_numbers.Length
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('length, 'time, 'timespan) t =
         { k : 'length
         ; delta : 'length
@@ -16,7 +16,6 @@ module Poly = struct
         ; sub_windows_per_window : 'length
         ; slots_per_epoch : 'length (* The first slot after the grace period. *)
         ; grace_period_end : 'length
-        ; epoch_size : 'length
         ; checkpoint_window_slots_per_year : 'length
         ; checkpoint_window_size_in_slots : 'length
         ; block_window_duration_ms : 'timespan
@@ -32,12 +31,12 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Length.Stable.V1.t
       , Block_time.Stable.V1.t
       , Block_time.Span.Stable.V1.t )
-      Poly.Stable.V1.t
+      Poly.Stable.V2.t
     [@@deriving equal, ord, hash, sexp, to_yojson]
 
     let to_latest = Fn.id
@@ -45,10 +44,7 @@ module Stable = struct
 end]
 
 type var =
-  ( Length.Checked.t
-  , Block_time.Unpacked.var
-  , Block_time.Span.Unpacked.var )
-  Poly.t
+  (Length.Checked.t, Block_time.Checked.t, Block_time.Span.Checked.t) Poly.t
 
 module type M_intf = sig
   type t
@@ -130,53 +126,55 @@ module Constants_UInt32 :
   let min = UInt32.min
 end
 
+module N =
+  Mina_numbers.Nat.Make_checked
+    (Unsigned_extended.UInt64)
+    (Snark_bits.Bits.UInt64)
+
 module Constants_checked :
   M_intf
     with type length = Length.Checked.t
-     and type time = Block_time.Unpacked.var
-     and type timespan = Block_time.Span.Unpacked.var = struct
-  open Snarky_integer
-
-  type t = field Integer.t
+     and type time = Block_time.Checked.t
+     and type timespan = Block_time.Span.Checked.t = struct
+  type t = N.var
 
   type length = Length.Checked.t
 
-  type time = Block_time.Unpacked.var
+  type time = Block_time.Checked.t
 
-  type timespan = Block_time.Span.Unpacked.var
+  type timespan = Block_time.Span.Checked.t
 
   type bool_type = Boolean.var
 
-  let constant c = Integer.constant ~m (Bignum_bigint.of_int c)
+  let constant c = N.Unsafe.of_field (Field.Var.constant (Field.of_int c))
 
   let zero = constant 0
 
   let one = constant 1
 
-  let of_length = Length.Checked.to_integer
+  let of_length = Fn.compose N.Unsafe.of_field Length.Checked.to_field
 
-  let to_length = Length.Checked.Unsafe.of_integer
+  let to_length = Fn.compose Length.Checked.Unsafe.of_field N.to_field
 
-  let of_time = Fn.compose (Integer.of_bits ~m) Block_time.Unpacked.var_to_bits
+  let of_time : Block_time.Checked.t -> t =
+    Fn.compose N.Unsafe.of_field Block_time.Checked.to_field
 
-  let to_time =
-    Fn.compose Block_time.Unpacked.var_of_bits
-      (Integer.to_bits ~m ~length:Block_time.Unpacked.size_in_bits)
+  let to_time : t -> Block_time.Checked.t =
+    Fn.compose Block_time.Checked.Unsafe.of_field N.to_field
 
-  let of_timespan =
-    Fn.compose (Integer.of_bits ~m) Block_time.Span.Unpacked.var_to_bits
+  let of_timespan : timespan -> t =
+    Fn.compose N.Unsafe.of_field Block_time.Span.Checked.to_field
 
-  let to_timespan =
-    Fn.compose Block_time.Span.Unpacked.var_of_bits
-      (Integer.to_bits ~length:Block_time.Span.Unpacked.size_in_bits ~m)
+  let to_timespan : t -> timespan =
+    Fn.compose Block_time.Span.Checked.Unsafe.of_field N.to_field
 
-  let ( / ) (t : t) (t' : t) = Integer.div_mod ~m t t' |> fst
+  let ( / ) (t : t) (t' : t) = Run.run_checked (N.div_mod t t') |> fst
 
-  let ( * ) = Integer.mul ~m
+  let ( * ) x y = Run.run_checked (N.mul x y)
 
-  let ( + ) = Integer.add ~m
+  let ( + ) x y = Run.run_checked (N.add x y)
 
-  let min = Integer.min ~m
+  let min x y = Run.run_checked (N.min x y)
 end
 
 let create' (type a b c)
@@ -253,7 +251,6 @@ let create' (type a b c)
     ; slots_per_epoch = to_length slots_per_epoch
     ; grace_period_end = to_length grace_period_end
     ; slot_duration_ms = to_timespan Slot.duration_ms
-    ; epoch_size = to_length Epoch.size
     ; epoch_duration = to_timespan Epoch.duration
     ; checkpoint_window_slots_per_year = to_length zero
     ; checkpoint_window_size_in_slots = to_length zero
@@ -323,12 +320,11 @@ let data_spec =
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
-    ; Length.Checked.typ
-    ; Block_time.Span.Unpacked.typ
-    ; Block_time.Span.Unpacked.typ
-    ; Block_time.Span.Unpacked.typ
-    ; Block_time.Span.Unpacked.typ
-    ; Block_time.Unpacked.typ
+    ; Block_time.Span.Checked.typ
+    ; Block_time.Span.Checked.typ
+    ; Block_time.Span.Checked.typ
+    ; Block_time.Span.Checked.typ
+    ; Block_time.Checked.typ
     ]
 
 let typ =
@@ -337,11 +333,9 @@ let typ =
     ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : t) =
-  let u = Length.to_bits in
-  let s = Block_time.Span.Bits.to_bits in
-  Random_oracle.Input.bitstrings
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     (Array.concat
-       [ Array.map ~f:u
+       [ Array.map ~f:Length.to_input
            [| t.k
             ; t.delta
             ; t.slots_per_sub_window
@@ -349,17 +343,16 @@ let to_input (t : t) =
             ; t.sub_windows_per_window
             ; t.slots_per_epoch
             ; t.grace_period_end
-            ; t.epoch_size
             ; t.checkpoint_window_slots_per_year
             ; t.checkpoint_window_size_in_slots
            |]
-       ; Array.map ~f:s
+       ; Array.map ~f:Block_time.Span.to_input
            [| t.block_window_duration_ms
             ; t.slot_duration_ms
             ; t.epoch_duration
             ; t.delta_duration
            |]
-       ; [| Block_time.Bits.to_bits t.genesis_state_timestamp |]
+       ; [| Block_time.to_input t.genesis_state_timestamp |]
        ])
 
 let gc_parameters (constants : t) =
@@ -368,8 +361,8 @@ let gc_parameters (constants : t) =
   let delay = Block_time.Span.to_ms constants.delta_duration |> of_int64 in
   let gc_width = delay * of_int 2 in
   (* epoch, slot components of gc_width *)
-  let gc_width_epoch = gc_width / constants.epoch_size in
-  let gc_width_slot = gc_width mod constants.epoch_size in
+  let gc_width_epoch = gc_width / constants.slots_per_epoch in
+  let gc_width_slot = gc_width mod constants.slots_per_epoch in
   let gc_interval = gc_width in
   ( `Acceptable_network_delay delay
   , `Gc_width gc_width
@@ -378,53 +371,32 @@ let gc_parameters (constants : t) =
   , `Gc_interval gc_interval )
 
 module Checked = struct
-  let to_input (var : var) =
-    let l = Bitstring_lib.Bitstring.Lsb_first.to_list in
-    let u = Length.Checked.to_bits in
-    let s = Block_time.Span.Unpacked.var_to_bits in
-    let%map k = u var.k
-    and delta = u var.delta
-    and slots_per_sub_window = u var.slots_per_sub_window
-    and slots_per_window = u var.slots_per_window
-    and sub_windows_per_window = u var.sub_windows_per_window
-    and slots_per_epoch = u var.slots_per_epoch
-    and grace_period_end = u var.grace_period_end
-    and epoch_size = u var.epoch_size
-    and checkpoint_window_slots_per_year =
-      u var.checkpoint_window_slots_per_year
-    and checkpoint_window_size_in_slots =
-      u var.checkpoint_window_size_in_slots
-    in
-    let block_window_duration_ms = s var.block_window_duration_ms in
-    let slot_duration_ms = s var.slot_duration_ms in
-    let epoch_duration = s var.epoch_duration in
-    let delta_duration = s var.delta_duration in
-    let genesis_state_timestamp =
-      Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
-    in
-    Random_oracle.Input.bitstrings
-      (Array.map ~f:l
-         [| k
-          ; delta
-          ; slots_per_sub_window
-          ; slots_per_window
-          ; sub_windows_per_window
-          ; slots_per_epoch
-          ; grace_period_end
-          ; epoch_size
-          ; checkpoint_window_slots_per_year
-          ; checkpoint_window_size_in_slots
-          ; block_window_duration_ms
-          ; slot_duration_ms
-          ; epoch_duration
-          ; delta_duration
-          ; genesis_state_timestamp
-         |])
+  let to_input (t : var) =
+    Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+      (Array.concat
+         [ Array.map ~f:Length.Checked.to_input
+             [| t.k
+              ; t.delta
+              ; t.slots_per_sub_window
+              ; t.slots_per_window
+              ; t.sub_windows_per_window
+              ; t.slots_per_epoch
+              ; t.grace_period_end
+              ; t.checkpoint_window_slots_per_year
+              ; t.checkpoint_window_size_in_slots
+             |]
+         ; Array.map ~f:Block_time.Span.Checked.to_input
+             [| t.block_window_duration_ms
+              ; t.slot_duration_ms
+              ; t.epoch_duration
+              ; t.delta_duration
+             |]
+         ; [| Block_time.Checked.to_input t.genesis_state_timestamp |]
+         ])
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :
-      (var, _) Checked.t =
-    let open Snarky_integer in
+      var Checked.t =
     let%bind constants =
       make_checked (fun () ->
           create'
@@ -432,26 +404,26 @@ module Checked = struct
             ~constraint_constants ~protocol_constants)
     in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
-      let constant c = Integer.constant ~m (Bignum_bigint.of_int c) in
+      let constant c =
+        N.Unsafe.of_field (Field.Var.constant (Field.of_int c))
+      in
       let per_year = constant 12 in
       let slot_duration_ms =
-        Integer.of_bits ~m
-          (Block_time.Span.Unpacked.var_to_bits constants.slot_duration_ms)
+        N.Unsafe.of_field
+          (Block_time.Span.Checked.to_field constants.slot_duration_ms)
       in
-      let slots_per_year =
+      let%bind slots_per_year, _ =
         let one_year_ms =
           constant (Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int)
         in
-        fst (Integer.div_mod ~m one_year_ms slot_duration_ms)
+        N.div_mod one_year_ms slot_duration_ms
       in
       let%map size_in_slots =
-        let size_in_slots, rem = Integer.div_mod ~m slots_per_year per_year in
-        let%map () =
-          Boolean.Assert.is_true (Integer.equal ~m rem (constant 0))
-        in
+        let%bind size_in_slots, rem = N.div_mod slots_per_year per_year in
+        let%map () = N.Assert.equal rem (constant 0) in
         size_in_slots
       in
-      let to_length = Length.Checked.Unsafe.of_integer in
+      let to_length = Fn.compose Length.Checked.Unsafe.of_field N.to_field in
       (to_length slots_per_year, to_length size_in_slots)
     in
     { constants with

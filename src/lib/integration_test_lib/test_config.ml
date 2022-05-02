@@ -63,7 +63,7 @@ let default =
   ; log_precomputed_blocks = false
   ; snark_worker_fee = "0.025"
   ; snark_worker_public_key =
-      (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
+      (let pk, _ = (Lazy.force Key_gen.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
   ; proof_config = proof_config_default
   }

@@ -7,18 +7,19 @@ open Common
 let wrap_domains = Common.wrap_domains
 
 let evals =
-  let e =
-    Dlog_plonk_types.Evals.map
-      (Commitment_lengths.of_domains ~max_degree:Max_degree.wrap wrap_domains)
-      ~f:(fun len -> Array.create ~len Backend.Tock.Field.one)
+  let open Plonk_types in
+  let e () =
+    Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
+        Array.create n (Ro.tock ()))
   in
-  let ex = (e, Backend.Tock.Field.zero) in
-  (ex, ex)
+  let ex () =
+    { All_evals.With_public_input.evals = e (); public_input = Ro.tock () }
+  in
+  { All_evals.ft_eval1 = Ro.tock (); evals = (ex (), ex ()) }
 
 let evals_combined =
-  Tuple_lib.Double.map evals ~f:(fun (e, _x) ->
-      Dlog_plonk_types.Evals.map e
-        ~f:(Array.reduce_exn ~f:Backend.Tock.Field.( + )))
+  Plonk_types.All_evals.map evals ~f1:Fn.id
+    ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
 
 module Ipa = struct
   module Wrap = struct

@@ -1,6 +1,8 @@
 open Core_kernel
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_transition
 open Frontier_base
 open Network_peer

@@ -169,8 +169,6 @@ let%test "public key compressed roundtrip odd" =
 let%test "public key compressed roundtrip even" =
   pk_compressed_roundtrip_test hex_key_even ()
 
-[%%ifndef consensus_mechanism]
-
 (* for running tests from JS *)
 
 let unit_tests =
@@ -186,5 +184,3 @@ let run_unit_tests () =
   List.iter unit_tests ~f:(fun (name, test) ->
       printf "Running %s test\n%!" name ;
       assert (test ()))
-
-[%%endif]

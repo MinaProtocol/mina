@@ -15,9 +15,9 @@ module type S = sig
 
   val zero : t
 
-  val xor : t -> t -> (t, _) Checked.t
+  val xor : t -> t -> t Checked.t
 
-  val sum : t list -> (t, _) Checked.t
+  val sum : t list -> t Checked.t
 
   val rotr : t -> int -> t
 

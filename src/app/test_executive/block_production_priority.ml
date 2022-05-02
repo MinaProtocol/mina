@@ -84,8 +84,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender_keys =
            List.map ~f:snd
            @@ List.drop
-                ( Array.to_list @@ Lazy.force
-                @@ Mina_base.Sample_keypairs.keypairs )
+                (Array.to_list @@ Lazy.force @@ Key_gen.Sample_keypairs.keypairs)
                 (num_senders + 2)
          in
          let num_sender_keys = List.length sender_keys in

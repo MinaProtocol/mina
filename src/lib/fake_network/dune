@@ -37,9 +37,12 @@
    mina_transition
    coda_genesis_proof
    transition_chain_prover
+   mina_ledger
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
    data_hash_lib
-   marlin_plonk_bindings_pasta_fp
-   pasta
    transition_handler
    network_pool
    )
