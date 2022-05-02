@@ -1,6 +1,27 @@
 (library
  (name extensions)
  (public_name transition_frontier_extensions)
- (libraries transition_frontier_base transition_frontier_full_frontier async_kernel core_kernel mina_base mina_ledger pipe_lib)
+ (libraries
+   ;;opam libraries
+   base.caml
+   async_kernel
+   core_kernel
+   sexplib0
+   result
+   base.base_internalhash_types
+   ;;local libraries
+   with_hash
+   mina_transition
+   transaction_snark_work
+   data_hash_lib
+   pipe_lib
+   mina_base
+   transition_frontier_base
+   transition_frontier_full_frontier
+   mina_ledger
+   logger
+   mina_state
+   staged_ledger
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version)))

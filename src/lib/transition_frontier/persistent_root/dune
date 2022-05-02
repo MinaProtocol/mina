@@ -1,6 +1,22 @@
 (library
  (name persistent_root)
  (public_name transition_frontier_persistent_root)
- (libraries core_kernel mina_base mina_ledger transition_frontier_base)
+ (libraries
+   ;;opam libraries
+   core_kernel.uuid
+   core_kernel
+   core
+   core.uuid
+   base.caml
+   ;;local libraries
+   precomputed_values
+   file_system
+   merkle_ledger
+   transition_frontier_base
+   mina_base
+   mina_ledger
+   logger
+   data_hash_lib
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version)))

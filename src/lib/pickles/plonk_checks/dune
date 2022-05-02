@@ -4,13 +4,20 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
-   composition_types
-   pickles_base
-
-   kimchi_backend
+   ;; opam libraries
+   sexplib0
+   ppxlib.ast
+   core_kernel
+   ocaml-migrate-parsetree
+   base.base_internalhash_types
+   ;; local libraries
    pickles_types
+   pickles_base
+   pickles.composition_types
+   kimchi_backend
    snarky.backendless
-   core_kernel))
+   tuple_lib
+ ))
 
 (rule
  (targets scalars.ml)

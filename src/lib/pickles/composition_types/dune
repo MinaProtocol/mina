@@ -5,9 +5,19 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries
-   limb_vector
-   kimchi_backend
-   pickles_types
-   pickles_base
+   ;; opam libraries
+   sexplib0
+   bin_prot.shape
+   core_kernel
+   base.caml
+   ;; local libraries
+   kimchi_backend.pasta
    snarky.backendless
-   core_kernel))
+   pickles_types
+   pickles.limb_vector
+   kimchi_backend
+   pickles_base
+   pickles.backend
+   kimchi_backend.common
+ )
+)

@@ -5,7 +5,16 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
  (libraries
-   backend
-   pickles_types
+   ;; opam libraries
+   bin_prot.shape
+   ppx_inline_test.config
+   sexplib0
+   core_kernel
+   base.caml
+   result
+   ;; local libraries
    snarky.backendless
-   core_kernel))
+   pickles.backend
+   pickles_types
+   kimchi_backend.pasta
+))

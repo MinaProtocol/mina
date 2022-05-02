@@ -49,18 +49,19 @@ module T = struct
                 External_transition.Validated.protocol_state
                   (transition oldest_root)
             ; hash =
-                External_transition.Validated.state_hash
+                External_transition.Validated.state_hashes
                   (transition oldest_root)
             }
+        |> List.map ~f:(fun s -> State_hash.With_state_hashes.(state_hash s, s))
         |> State_hash.Map.of_alist_exn
       in
       t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
     assert (
       [%equal: [ `Ok | `Key_already_present ]] `Ok
         (Queue.enqueue_back t.history
-           (External_transition.Validated.state_hash
+           (External_transition.Validated.state_hashes
               (transition t.current_root))
-           t.current_root) ) ;
+             .state_hash t.current_root) ) ;
     t.current_root <- new_root
 
   let handle_diffs root_history frontier diffs_with_mutants =
@@ -69,7 +70,8 @@ module T = struct
       List.exists diffs_with_mutants ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | E (Root_transitioned { new_root; _ }, _) ->
-            Full_frontier.find_exn frontier (Root_data.Limited.hash new_root)
+            Full_frontier.find_exn frontier
+              (Root_data.Limited.hashes new_root).state_hash
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
         | E _ ->
@@ -105,7 +107,10 @@ let protocol_states_for_scan_state
               (External_transition.Validated.protocol_state (transition data))
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
-            State_hash.Map.find protocol_states_for_root_scan_state hash
+            let%map.Option state_with_hash =
+              State_hash.Map.find protocol_states_for_root_scan_state hash
+            in
+            With_hash.data state_with_hash
       in
       match res with None -> Stop None | Some state -> Continue (state :: acc))
 

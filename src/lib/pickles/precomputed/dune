@@ -2,8 +2,13 @@
  (name precomputed)
  (public_name pickles.precomputed)
  (libraries
+   ;; opam libraries
    core_kernel
-   kimchi_backend)
+   ;; local libraries
+   pickles_types
+   kimchi_backend
+   kimchi_backend.pasta
+ )
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))

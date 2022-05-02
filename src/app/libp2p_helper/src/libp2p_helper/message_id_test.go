@@ -11,7 +11,7 @@ import (
 
 // This file contains test for the use of message id function
 
-func TestPubsubMsgIdFun(t *testing.T) {
+func testPubsubMsgIdFun(t *testing.T, topic string) {
 	newProtocol := "/mina/97"
 	var mask uint32 = upcallDropAllMask ^ (1 << IncomingStreamChan) ^ (1 << GossipReceivedChan)
 	errChan := make(chan error, 3)
@@ -42,12 +42,11 @@ func TestPubsubMsgIdFun(t *testing.T) {
 	gossipSubp.D = 4
 	gossipSubp.Dlo = 2
 	gossipSubp.Dhi = 6
-	require.NoError(t, configurePubsub(alice, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(bob, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(carol, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(alice, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(bob, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(carol, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
 
 	// Subscribe to the topic
-	topic := "test"
 	testSubscribeDo(t, alice, topic, 21, 58)
 	testSubscribeDo(t, bob, topic, 21, 58)
 	testSubscribeDo(t, carol, topic, 21, 58)
@@ -74,4 +73,12 @@ loop:
 		n++
 	}
 	require.Equal(t, 1, n)
+}
+
+func TestPubsubMsgIdFun(t *testing.T) {
+	testPubsubMsgIdFun(t, "test")
+}
+
+func TestPubsubMsgIdFunLongTopic(t *testing.T) {
+	testPubsubMsgIdFun(t, "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789")
 }

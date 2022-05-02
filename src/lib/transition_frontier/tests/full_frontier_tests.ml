@@ -69,7 +69,8 @@ let%test_module "Full_frontier tests" =
           ~genesis_epoch_data:precomputed_values.genesis_epoch_data
           ~epoch_ledger_location ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (With_hash.hash precomputed_values.protocol_state_with_hash)
+            (State_hash.With_state_hashes.state_hash
+               precomputed_values.protocol_state_with_hashes)
       in
       let root_ledger =
         Or_error.ok_exn

@@ -1,7 +1,13 @@
 (library
  (name mina_base_util)
  (public_name mina_base.util)
- (libraries snark_params)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
+   snark_params
+   bignum_bigint
+)
  (preprocessor_deps ../../../config.mlh)
  (preprocess (pps
     ppx_version

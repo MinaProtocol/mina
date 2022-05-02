@@ -372,7 +372,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace "worker_main" (fun () ->
+      O1trace.thread "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
@@ -407,7 +407,7 @@ module T = struct
               ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
-                (With_hash.hash precomputed_values.protocol_state_with_hash)
+                precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -427,12 +427,15 @@ module T = struct
               ; direct_peers = []
               ; min_connections = 20
               ; max_connections = 50
+              ; pubsub_v1 = N
+              ; pubsub_v0 = RW
               ; validation_queue_size = 150
               ; peer_exchange = true
               ; mina_peer_exchange = true
               ; keypair = Some libp2p_keypair
               ; all_peers_seen_metric = false
               ; known_private_ip_nets = []
+              ; time_controller
               }
           in
           let net_config =
@@ -444,6 +447,7 @@ module T = struct
             ; genesis_ledger_hash =
                 Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
+            ; consensus_constants = precomputed_values.consensus_constants
             ; log_gossip_heard =
                 { snark_pool_diff = true
                 ; transaction_pool_diff = true
@@ -494,7 +498,8 @@ module T = struct
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~child_pids:pids ~top_logger:logger coda_ref ;
+            ~child_pids:pids ~top_logger:logger ~node_error_url:None
+            ~contact_info:None coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
@@ -527,16 +532,9 @@ module T = struct
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
               let sender_pk = pk_of_sk sender_sk in
-              User_command_input.create ~fee ~fee_token:Token_id.default
-                ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
-                ~valid_until:None
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk
-                     ; receiver_pk
-                     ; token_id = Token_id.default
-                     ; amount
-                     })
+              User_command_input.create ~fee ~fee_payer_pk:sender_pk
+                ~signer:sender_pk ~memo ~valid_until:None
+                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))
@@ -580,7 +578,7 @@ module T = struct
                      External_transition.Validated.parent_hash t
                    in
                    let state_hash =
-                     External_transition.Validated.state_hash t
+                     (External_transition.Validated.state_hashes t).state_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in

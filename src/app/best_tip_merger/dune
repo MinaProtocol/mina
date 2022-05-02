@@ -4,14 +4,33 @@
   (public_name best_tip_merger)
   (modes native)
   (libraries
-    async
-    core_kernel
-    logger
-    logger.file_system
-    ppx_deriving_yojson.runtime
-    lib
-    cli_lib
-    yojson
+   ;; opam libraries
+   async_kernel
+   stdio
+   base.caml
+   yojson
+   lib
+   core_kernel
+   async
+   ppx_deriving_yojson.runtime
+   core
+   sexplib0
+   result
+   base.base_internalhash_types
+   async_unix
+   ;; local libraries
+   visualization
+   mina_numbers
+   mina_state
+   transition_frontier_extensions
+   mina_base
+   logger.file_system
+   logger
+   cli_lib
+   transition_frontier
+   data_hash_lib
+   rose_tree
+   consensus
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

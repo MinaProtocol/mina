@@ -1,8 +1,40 @@
 (library
  (name verifier)
  (public_name verifier)
- (libraries precomputed_values core_kernel async_kernel rpc_parallel mina_base mina_state
-            blockchain_snark memory_stats snark_params ledger_proof logger child_processes logger.file_system)
+ (libraries
+   ;; opam libraries
+   base.caml
+   async
+   core_kernel
+   async_kernel
+   rpc_parallel
+   sexplib0
+   base
+   bin_prot.shape
+   core
+   async_unix
+   ;; local libraries
+   kimchi_backend
+   logger.file_system
+   error_json
+   transaction_snark
+   random_oracle_input
+   child_processes
+   logger
+   ledger_proof
+   snark_params
+   memory_stats
+   blockchain_snark
+   mina_base
+   mina_state
+   pickles
+   genesis_constants
+   signature_lib
+   pickles.backend
+   random_oracle
+   o1trace
+   mina_base.import
+   kimchi_backend.pasta)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_version ppx_compare ppx_hash ppx_coda ppx_version ppx_here ppx_bin_prot ppx_let
                   ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv)))

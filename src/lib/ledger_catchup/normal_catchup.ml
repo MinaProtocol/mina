@@ -317,7 +317,9 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
 let verify_against_hashes transitions hashes =
   List.length transitions = List.length hashes
   && List.for_all2_exn transitions hashes ~f:(fun transition hash ->
-         State_hash.equal (External_transition.state_hash transition) hash)
+         State_hash.equal
+           (State_hash.With_state_hashes.state_hash transition)
+           hash)
 
 let rec partition size = function
   | [] ->
@@ -426,7 +428,13 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                       ; ("peer", Peer.to_yojson peer)
                       ]
                     "downloaded $n blocks from $peer" ;
-                  if not @@ verify_against_hashes transitions hashes then (
+                  let hashed_transitions =
+                    List.map transitions
+                      ~f:
+                        (With_hash.of_data
+                           ~hash_data:External_transition.state_hashes)
+                  in
+                  if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
                       sprintf
                         !"Peer %{sexp:Network_peer.Peer.t} returned a list \
@@ -440,14 +448,8 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     Deferred.Or_error.error_string error_msg )
                   else
                     Deferred.Or_error.return
-                    @@ List.map2_exn hashes transitions
-                         ~f:(fun hash transition ->
-                           let transition_with_hash =
-                             With_hash.of_data transition
-                               ~hash_data:(Fn.const hash)
-                           in
-                           Envelope.Incoming.wrap_peer
-                             ~data:transition_with_hash ~sender:peer))
+                    @@ List.map hashed_transitions ~f:(fun data ->
+                           Envelope.Incoming.wrap_peer ~data ~sender:peer))
             in
             Hash_set.remove busy peer ;
             match res with
@@ -468,8 +470,8 @@ let verify_transitions_and_build_breadcrumbs ~logger
     let%bind tvs =
       let open Deferred.Let_syntax in
       let genesis_state_hash =
-        Precomputed_values.genesis_state_with_hash precomputed_values
-        |> With_hash.hash
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+        |> State_hash.With_state_hashes.state_hash
       in
       match%bind
         External_transition.validate_proofs ~verifier ~genesis_state_hash
@@ -619,207 +621,209 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
           "If normal catchup is running, the frontier should have a hash tree, \
            got a full one."
   in
-  don't_wait_for
-    (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-       ~f:(fun (target_hash, subtrees) ->
-         let job =
-           Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
-         in
-         let notify_hash_tree_of_failure () =
-           Transition_frontier.(Catchup_hash_tree.catchup_failed hash_tree job)
-         in
-         don't_wait_for
-           (let start_time = Core.Time.now () in
-            [%log info] "Catch up to $target_hash"
-              ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ] ;
-            let%bind () = Catchup_jobs.incr () in
-            let blockchain_length_of_target_hash =
-              let blockchain_length_of_dangling_block =
-                List.hd_exn subtrees |> Rose_tree.root |> Cached.peek
-                |> Envelope.Incoming.data
-                |> External_transition.Initial_validated.blockchain_length
-              in
-              Unsigned.UInt32.pred blockchain_length_of_dangling_block
-            in
-            let subtree_peers =
-              List.fold subtrees ~init:[] ~f:(fun acc_outer tree ->
-                  let cacheds = Rose_tree.flatten tree in
-                  let cached_peers =
-                    List.fold cacheds ~init:[] ~f:(fun acc_inner cached ->
-                        let envelope = Cached.peek cached in
-                        match Envelope.Incoming.sender envelope with
-                        | Local ->
-                            acc_inner
-                        | Remote peer ->
-                            peer :: acc_inner)
-                  in
-                  cached_peers @ acc_outer)
-              |> List.dedup_and_sort ~compare:Peer.compare
-            in
-            match%bind
-              let open Deferred.Or_error.Let_syntax in
-              let%bind preferred_peer, hashes_of_missing_transitions =
-                (* try peers from subtrees first *)
-                let open Deferred.Let_syntax in
-                match%bind
-                  download_state_hashes ~hash_tree ~logger ~trust_system
-                    ~network ~frontier ~peers:subtree_peers ~target_hash ~job
-                    ~blockchain_length_of_target_hash
-                with
-                | Ok (peer, hashes) ->
-                    return (Ok (peer, hashes))
-                | Error errors -> (
-                    [%log info]
-                      "Could not download state hashes using peers from \
-                       subtrees; trying again with random peers"
-                      ~metadata:
-                        [ ( "errors"
-                          , `List
-                              (List.map errors ~f:(fun err ->
-                                   `String (display_error err))) )
-                        ] ;
-                    let%bind random_peers =
-                      Mina_networking.peers network >>| List.permute
-                    in
-                    match%bind
-                      download_state_hashes ~hash_tree ~logger ~trust_system
-                        ~network ~frontier ~peers:random_peers ~target_hash ~job
-                        ~blockchain_length_of_target_hash
-                    with
-                    | Ok (peer, hashes) ->
-                        return (Ok (peer, hashes))
-                    | Error errors ->
-                        [%log info]
-                          "Could not download state hashes using random peers"
-                          ~metadata:
-                            [ ( "errors"
-                              , `List
-                                  (List.map errors ~f:(fun err ->
-                                       `String (display_error err))) )
-                            ] ;
-                        if contains_no_common_ancestor errors then
-                          List.iter subtrees ~f:(fun subtree ->
-                              let transition =
-                                Rose_tree.root subtree |> Cached.peek
-                                |> Envelope.Incoming.data
-                              in
-                              let children_transitions =
-                                List.concat_map
-                                  (Rose_tree.children subtree)
-                                  ~f:Rose_tree.flatten
-                              in
-                              let children_state_hashes =
-                                List.map children_transitions
-                                  ~f:(fun cached_transition ->
-                                    Cached.peek cached_transition
-                                    |> Envelope.Incoming.data
-                                    |> External_transition.Initial_validated
+  O1trace.background_thread "perform_normal_catchup" (fun () ->
+      Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+        ~f:(fun (target_hash, subtrees) ->
+          let job =
+            Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
+          in
+          let notify_hash_tree_of_failure () =
+            Transition_frontier.(Catchup_hash_tree.catchup_failed hash_tree job)
+          in
+          don't_wait_for
+            (let start_time = Core.Time.now () in
+             [%log info] "Catch up to $target_hash"
+               ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ] ;
+             let%bind () = Catchup_jobs.incr () in
+             let blockchain_length_of_target_hash =
+               let blockchain_length_of_dangling_block =
+                 List.hd_exn subtrees |> Rose_tree.root |> Cached.peek
+                 |> Envelope.Incoming.data
+                 |> External_transition.Initial_validated.blockchain_length
+               in
+               Unsigned.UInt32.pred blockchain_length_of_dangling_block
+             in
+             let subtree_peers =
+               List.fold subtrees ~init:[] ~f:(fun acc_outer tree ->
+                   let cacheds = Rose_tree.flatten tree in
+                   let cached_peers =
+                     List.fold cacheds ~init:[] ~f:(fun acc_inner cached ->
+                         let envelope = Cached.peek cached in
+                         match Envelope.Incoming.sender envelope with
+                         | Local ->
+                             acc_inner
+                         | Remote peer ->
+                             peer :: acc_inner)
+                   in
+                   cached_peers @ acc_outer)
+               |> List.dedup_and_sort ~compare:Peer.compare
+             in
+             match%bind
+               let open Deferred.Or_error.Let_syntax in
+               let%bind preferred_peer, hashes_of_missing_transitions =
+                 (* try peers from subtrees first *)
+                 let open Deferred.Let_syntax in
+                 match%bind
+                   download_state_hashes ~hash_tree ~logger ~trust_system
+                     ~network ~frontier ~peers:subtree_peers ~target_hash ~job
+                     ~blockchain_length_of_target_hash
+                 with
+                 | Ok (peer, hashes) ->
+                     return (Ok (peer, hashes))
+                 | Error errors -> (
+                     [%log info]
+                       "Could not download state hashes using peers from \
+                        subtrees; trying again with random peers"
+                       ~metadata:
+                         [ ( "errors"
+                           , `List
+                               (List.map errors ~f:(fun err ->
+                                    `String (display_error err))) )
+                         ] ;
+                     let%bind random_peers =
+                       Mina_networking.peers network >>| List.permute
+                     in
+                     match%bind
+                       download_state_hashes ~hash_tree ~logger ~trust_system
+                         ~network ~frontier ~peers:random_peers ~target_hash
+                         ~job ~blockchain_length_of_target_hash
+                     with
+                     | Ok (peer, hashes) ->
+                         return (Ok (peer, hashes))
+                     | Error errors ->
+                         [%log info]
+                           "Could not download state hashes using random peers"
+                           ~metadata:
+                             [ ( "errors"
+                               , `List
+                                   (List.map errors ~f:(fun err ->
+                                        `String (display_error err))) )
+                             ] ;
+                         if contains_no_common_ancestor errors then
+                           List.iter subtrees ~f:(fun subtree ->
+                               let transition =
+                                 Rose_tree.root subtree |> Cached.peek
+                                 |> Envelope.Incoming.data
+                               in
+                               let children_transitions =
+                                 List.concat_map
+                                   (Rose_tree.children subtree)
+                                   ~f:Rose_tree.flatten
+                               in
+                               let children_state_hashes =
+                                 List.map children_transitions
+                                   ~f:(fun cached_transition ->
+                                     ( Cached.peek cached_transition
+                                     |> Envelope.Incoming.data
+                                     |> External_transition.Initial_validated
+                                        .state_hashes )
                                        .state_hash)
-                              in
-                              [%log error]
-                                ~metadata:
-                                  [ ( "state_hashes_of_children"
-                                    , `List
-                                        (List.map children_state_hashes
-                                           ~f:State_hash.to_yojson) )
-                                  ; ( "state_hash"
-                                    , State_hash.to_yojson
-                                      @@ External_transition.Initial_validated
-                                         .state_hash transition )
-                                  ; ( "reason"
-                                    , `String
-                                        "no common ancestor with our \
-                                         transition frontier" )
-                                  ; ( "protocol_state"
-                                    , External_transition.Initial_validated
-                                      .protocol_state transition
-                                      |> Mina_state.Protocol_state
-                                         .value_to_yojson )
-                                  ]
-                                "Validation error: external transition with \
-                                 state hash $state_hash and its children were \
-                                 rejected for reason $reason" ;
-                              Mina_metrics.(
-                                Counter.inc Rejected_blocks.no_common_ancestor
-                                  ( Float.of_int
-                                  @@ (1 + List.length children_transitions) ))) ;
-                        return
-                          (Error (Error.of_list @@ List.map errors ~f:to_error))
-                    )
-              in
-              let num_of_missing_transitions =
-                List.length hashes_of_missing_transitions
-              in
-              [%log debug]
-                ~metadata:
-                  [ ( "hashes_of_missing_transitions"
-                    , `List
-                        (List.map hashes_of_missing_transitions
-                           ~f:State_hash.to_yojson) )
-                  ]
-                !"Number of missing transitions is %d"
-                num_of_missing_transitions ;
-              let%bind transitions =
-                if num_of_missing_transitions <= 0 then
-                  Deferred.Or_error.return []
-                else
-                  download_transitions ~logger ~trust_system ~network
-                    ~preferred_peer ~hashes_of_missing_transitions ~target_hash
-              in
-              [%log debug]
-                ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
-                "Download transitions complete" ;
-              verify_transitions_and_build_breadcrumbs ~logger
-                ~precomputed_values ~trust_system ~verifier ~frontier
-                ~unprocessed_transition_cache ~transitions ~target_hash
-                ~subtrees
-            with
-            | Ok trees_of_breadcrumbs ->
-                [%log trace]
-                  ~metadata:
-                    [ ( "hashes of transitions"
-                      , `List
-                          (List.map trees_of_breadcrumbs ~f:(fun tree ->
-                               Rose_tree.to_yojson
-                                 (fun breadcrumb ->
-                                   Cached.peek breadcrumb
-                                   |> Transition_frontier.Breadcrumb.state_hash
-                                   |> State_hash.to_yojson)
-                                 tree)) )
-                    ]
-                  "about to write to the catchup breadcrumbs pipe" ;
-                if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-                  [%log trace]
-                    "catchup breadcrumbs pipe was closed; attempt to write to \
-                     closed pipe" ;
-                  notify_hash_tree_of_failure () ;
-                  garbage_collect_subtrees ~logger
-                    ~subtrees:trees_of_breadcrumbs ;
-                  Mina_metrics.(
-                    Gauge.set Transition_frontier_controller.catchup_time_ms
-                      Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                  Catchup_jobs.decr () )
-                else
-                  let ivar = Ivar.create () in
-                  Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                    (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
-                  let%bind () = Ivar.read ivar in
-                  Mina_metrics.(
-                    Gauge.set Transition_frontier_controller.catchup_time_ms
-                      Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                  Catchup_jobs.decr ()
-            | Error e ->
-                [%log warn]
-                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                  "Catchup process failed -- unable to receive valid data from \
-                   peers or transition frontier progressed faster than catchup \
-                   data received. See error for details: $error" ;
-                notify_hash_tree_of_failure () ;
-                garbage_collect_subtrees ~logger ~subtrees ;
-                Mina_metrics.(
-                  Gauge.set Transition_frontier_controller.catchup_time_ms
-                    Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                Catchup_jobs.decr ())))
+                               in
+                               [%log error]
+                                 ~metadata:
+                                   [ ( "state_hashes_of_children"
+                                     , `List
+                                         (List.map children_state_hashes
+                                            ~f:State_hash.to_yojson) )
+                                   ; ( "state_hash"
+                                     , State_hash.to_yojson
+                                         (External_transition.Initial_validated
+                                          .state_hashes transition)
+                                           .state_hash )
+                                   ; ( "reason"
+                                     , `String
+                                         "no common ancestor with our \
+                                          transition frontier" )
+                                   ; ( "protocol_state"
+                                     , External_transition.Initial_validated
+                                       .protocol_state transition
+                                       |> Mina_state.Protocol_state
+                                          .value_to_yojson )
+                                   ]
+                                 "Validation error: external transition with \
+                                  state hash $state_hash and its children were \
+                                  rejected for reason $reason" ;
+                               Mina_metrics.(
+                                 Counter.inc Rejected_blocks.no_common_ancestor
+                                   ( Float.of_int
+                                   @@ (1 + List.length children_transitions) ))) ;
+                         return
+                           (Error (Error.of_list @@ List.map errors ~f:to_error))
+                     )
+               in
+               let num_of_missing_transitions =
+                 List.length hashes_of_missing_transitions
+               in
+               [%log debug]
+                 ~metadata:
+                   [ ( "hashes_of_missing_transitions"
+                     , `List
+                         (List.map hashes_of_missing_transitions
+                            ~f:State_hash.to_yojson) )
+                   ]
+                 !"Number of missing transitions is %d"
+                 num_of_missing_transitions ;
+               let%bind transitions =
+                 if num_of_missing_transitions <= 0 then
+                   Deferred.Or_error.return []
+                 else
+                   download_transitions ~logger ~trust_system ~network
+                     ~preferred_peer ~hashes_of_missing_transitions ~target_hash
+               in
+               [%log debug]
+                 ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
+                 "Download transitions complete" ;
+               verify_transitions_and_build_breadcrumbs ~logger
+                 ~precomputed_values ~trust_system ~verifier ~frontier
+                 ~unprocessed_transition_cache ~transitions ~target_hash
+                 ~subtrees
+             with
+             | Ok trees_of_breadcrumbs ->
+                 [%log trace]
+                   ~metadata:
+                     [ ( "hashes of transitions"
+                       , `List
+                           (List.map trees_of_breadcrumbs ~f:(fun tree ->
+                                Rose_tree.to_yojson
+                                  (fun breadcrumb ->
+                                    Cached.peek breadcrumb
+                                    |> Transition_frontier.Breadcrumb.state_hash
+                                    |> State_hash.to_yojson)
+                                  tree)) )
+                     ]
+                   "about to write to the catchup breadcrumbs pipe" ;
+                 if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+                   [%log trace]
+                     "catchup breadcrumbs pipe was closed; attempt to write to \
+                      closed pipe" ;
+                   notify_hash_tree_of_failure () ;
+                   garbage_collect_subtrees ~logger
+                     ~subtrees:trees_of_breadcrumbs ;
+                   Mina_metrics.(
+                     Gauge.set Transition_frontier_controller.catchup_time_ms
+                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                   Catchup_jobs.decr () )
+                 else
+                   let ivar = Ivar.create () in
+                   Strict_pipe.Writer.write catchup_breadcrumbs_writer
+                     (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
+                   let%bind () = Ivar.read ivar in
+                   Mina_metrics.(
+                     Gauge.set Transition_frontier_controller.catchup_time_ms
+                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                   Catchup_jobs.decr ()
+             | Error e ->
+                 [%log warn]
+                   ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                   "Catchup process failed -- unable to receive valid data \
+                    from peers or transition frontier progressed faster than \
+                    catchup data received. See error for details: $error" ;
+                 notify_hash_tree_of_failure () ;
+                 garbage_collect_subtrees ~logger ~subtrees ;
+                 Mina_metrics.(
+                   Gauge.set Transition_frontier_controller.catchup_time_ms
+                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                 Catchup_jobs.decr ())))
 
 (* Unit tests *)
 

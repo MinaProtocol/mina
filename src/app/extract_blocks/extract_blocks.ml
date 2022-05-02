@@ -3,6 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
+open Mina_transaction
 open Signature_lib
 open Archive_lib
 
@@ -99,9 +100,6 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let total_currency =
     Unsigned.UInt64.of_int64 block.total_currency |> Currency.Amount.of_uint64
   in
-  let next_available_token =
-    Unsigned.UInt64.of_int64 block.next_available_token |> Token_id.of_uint64
-  in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
@@ -123,7 +121,6 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; next_epoch_data
     ; min_window_density
     ; total_currency
-    ; next_available_token
     ; ledger_hash
     ; height
     ; global_slot_since_hard_fork
@@ -171,12 +168,8 @@ let fill_in_user_commands pool block_state_hash =
       let%bind fee_payer = pk_of_id ~item:"fee payer" user_cmd.fee_payer_id in
       let%bind source = pk_of_id ~item:"source" user_cmd.source_id in
       let%bind receiver = pk_of_id ~item:"receiver" user_cmd.receiver_id in
-      let fee_token =
-        user_cmd.fee_token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-      in
-      let token =
-        user_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-      in
+      let fee_token = user_cmd.fee_token |> Token_id.of_string in
+      let token = user_cmd.token |> Token_id.of_string in
       let nonce = user_cmd.nonce |> Account.Nonce.of_int in
       let amount =
         Option.map user_cmd.amount ~f:(fun amt ->
@@ -228,10 +221,6 @@ let fill_in_user_commands pool block_state_hash =
         balance_of_id_opt block_user_cmd.receiver_balance_id
           ~item:"receiver balance"
       in
-      let created_token =
-        Option.map block_user_cmd.created_token ~f:(fun tok ->
-            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64)
-      in
       return
         { Extensional.User_command.sequence_no
         ; typ
@@ -253,7 +242,7 @@ let fill_in_user_commands pool block_state_hash =
         ; fee_payer_balance
         ; receiver_account_creation_fee_paid
         ; receiver_balance
-        ; created_token
+        ; created_token = None (* TODO: remove dummy *)
         })
 
 let fill_in_internal_commands pool block_state_hash =
@@ -301,9 +290,7 @@ let fill_in_internal_commands pool block_state_hash =
       let fee =
         internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
-      let token =
-        internal_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
-      in
+      let token = internal_cmd.token |> Token_id.of_string in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let receiver_account_creation_fee_paid =
         Option.map receiver_account_creation_fee_paid ~f:(fun fee ->

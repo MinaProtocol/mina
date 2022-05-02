@@ -2,8 +2,29 @@
  (name libp2p_ipc)
  (public_name libp2p_ipc)
  (flags -w -53)
- (libraries async core capnp pipe_lib network_peer)
- (preprocess (pps ppx_version ppx_let))
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   result
+   base.base_internalhash_types
+   base
+   async
+   core
+   capnp
+   stdint
+   core_kernel
+   async_unix
+   ppx_sexp_conv.runtime-lib
+   ppx_hash.runtime-lib
+   async_kernel
+   ppx_inline_test.config
+   ;; local libraries
+   blake2
+   pipe_lib
+   network_peer
+   o1trace
+ )
+ (preprocess (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx)))
 
 (rule

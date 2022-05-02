@@ -247,6 +247,8 @@ module Time = struct
 
   let of_uint64 : UInt64.t -> t = of_span_since_epoch
 
+  let to_uint64 : t -> UInt64.t = to_span_since_epoch
+
   let to_string = Fn.compose Int64.to_string to_int64
 
   [%%if time_offsets]

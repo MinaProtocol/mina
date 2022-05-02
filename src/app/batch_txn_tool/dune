@@ -1,5 +1,27 @@
 (executable
  (name batch_txn_tool)
- (libraries signature_lib core mina_base graphql_lib secrets core_kernel)
+ (libraries
+   ;; opam libraries
+   async.async_command
+   integers
+   base
+   uri
+   core_kernel
+   core
+   async
+   async_kernel
+   yojson
+   async_unix
+   ;; local libraries
+   currency
+   mina_base.import
+   graphql_lib
+   signature_lib
+   mina_base
+   secrets
+   mina_numbers
+   snark_params
+   unsigned_extended
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version graphql_ppx ppx_let)))

@@ -30,7 +30,7 @@ module Checked = struct
     T.Checked.Unsafe.of_field (Mina_numbers.Length.Checked.to_field x)
 
   let of_global_slot ~(constants : Constants.var) (s : Global_slot.Checked.t) :
-      (t, _) Checked.t =
+      t Checked.t =
     let%map q, _ =
       T.Checked.div_mod
         (Global_slot.slot_number s)
@@ -39,13 +39,13 @@ module Checked = struct
     q
 
   let sub_window ~(constants : Constants.var) (t : t) :
-      (Sub_window.Checked.t, _) Checked.t =
+      Sub_window.Checked.t Checked.t =
     let%map _, shift =
       T.Checked.div_mod t (of_length constants.sub_windows_per_window)
     in
     Sub_window.Checked.Unsafe.of_field (T.Checked.to_field shift)
 
-  let succ (t : t) : (t, _) Checked.t = T.Checked.succ t
+  let succ (t : t) : t Checked.t = T.Checked.succ t
 
   let equal = T.Checked.equal
 

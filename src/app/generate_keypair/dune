@@ -3,7 +3,7 @@
  (name generate_keypair)
  (public_name generate_keypair)
  (modes native)
- (libraries cli_lib async core_kernel mina_version)
+ (libraries cli_lib async core_kernel mina_version async_unix)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_sexp_conv ppx_optcomp))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))

@@ -1,6 +1,37 @@
 (library
  (name full_frontier)
  (public_name transition_frontier_full_frontier)
- (libraries transition_frontier_base transition_frontier_persistent_root consensus core_kernel mina_base mina_ledger mina_state mina_transition staged_ledger)
+ (libraries
+   ;;opam libraries
+   integers
+   core
+   base.caml
+   core_kernel
+   sexplib0
+   base.base_internalhash_types
+   stdio
+   ;;local libraries
+   unsigned_extended
+   o1trace
+   visualization
+   mina_metrics
+   block_time
+   logger
+   staged_ledger
+   mina_state
+   mina_base
+   transition_frontier_persistent_root
+   transition_frontier_base
+   consensus
+   mina_ledger
+   mina_transition
+   data_hash_lib
+   precomputed_values
+   with_hash
+   non_empty_list
+   staged_ledger_diff
+   mina_numbers
+   debug_assert
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

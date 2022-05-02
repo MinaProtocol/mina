@@ -46,21 +46,33 @@ let main ~archive_uri () =
       let missing_blocks =
         List.filter missing_blocks_raw ~f:(fun (_, _, height, _) -> height <> 1)
       in
-      if List.is_empty missing_blocks then
-        [%log info] "There are no missing blocks in the archive db"
-      else (
-        add_error missing_blocks_error ;
-        List.iter missing_blocks
-          ~f:(fun (block_id, state_hash, height, parent_hash) ->
-            if height > 1 then
-              [%log info] "Block has no parent in archive db"
-                ~metadata:
-                  [ ("block_id", `Int block_id)
-                  ; ("state_hash", `String state_hash)
-                  ; ("height", `Int height)
-                  ; ("parent_hash", `String parent_hash)
-                  ; ("parent_height", `Int (height - 1))
-                  ]) ) ;
+      let%bind () =
+        if List.is_empty missing_blocks then
+          return @@ [%log info] "There are no missing blocks in the archive db"
+        else (
+          add_error missing_blocks_error ;
+          Deferred.List.iter missing_blocks
+            ~f:(fun (block_id, state_hash, height, parent_hash) ->
+              match%map
+                Caqti_async.Pool.use
+                  (fun db -> Sql.Missing_blocks_gap.run db height)
+                  pool
+              with
+              | Ok gap_size ->
+                  [%log info] "Block has no parent in archive db"
+                    ~metadata:
+                      [ ("block_id", `Int block_id)
+                      ; ("state_hash", `String state_hash)
+                      ; ("height", `Int height)
+                      ; ("parent_hash", `String parent_hash)
+                      ; ("parent_height", `Int (height - 1))
+                      ; ("missing_blocks_gap", `Int gap_size)
+                      ]
+              | Error msg ->
+                  [%log error] "Error getting missing blocks gap"
+                    ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
+                  Core_kernel.exit 1) )
+      in
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
         match%bind

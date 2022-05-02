@@ -1,5 +1,23 @@
 (executable
  (name run_snark_worker)
- (libraries snark_worker key_gen)
+ (libraries
+   ;; opam libraries 
+   base.caml
+   base
+   async
+   core_kernel
+   core
+   async.async_command
+   async_unix
+   async_kernel
+   ;; local libraries
+   mina_base
+   currency
+   key_gen
+   snark_worker
+   mina_base.import
+   genesis_constants
+   signature_lib
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_let ppx_custom_printf ppx_version)))

@@ -84,20 +84,20 @@ func initNodes(t *testing.T, numNodes int, upcallMask uint32) ([]testNode, []con
 	return nodes, cancels
 }
 
-func iteratePrevNextPeers(t *testing.T, nodes []testNode, f func(node testNode, prev, next peer.AddrInfo)) {
+func iteratePrevNextPeers(t *testing.T, nodes []testNode, f func(node testNode, ni int, prev, next peer.AddrInfo)) {
 	numNodes := len(nodes)
 	for ni, node := range nodes {
 		prevInfos, err := addrInfos(nodes[(ni-1+numNodes)%numNodes].node.P2p.Host)
 		require.NoError(t, err)
 		nextInfos, err := addrInfos(nodes[(ni+1)%numNodes].node.P2p.Host)
 		require.NoError(t, err)
-		f(node, prevInfos[0], nextInfos[0])
+		f(node, ni, prevInfos[0], nextInfos[0])
 	}
 
 }
 
 func connectRingTopology(t *testing.T, nodes []testNode, protect bool) {
-	iteratePrevNextPeers(t, nodes, func(node testNode, prev, next peer.AddrInfo) {
+	iteratePrevNextPeers(t, nodes, func(node testNode, _ int, prev, next peer.AddrInfo) {
 		testAddPeerImplDo(t, node.node, next, true)
 		// to ensure connectivity is not lost
 		if protect {
@@ -107,16 +107,20 @@ func connectRingTopology(t *testing.T, nodes []testNode, protect bool) {
 	})
 }
 
-func testBroadcast(t *testing.T, iterationIx int, nodes []testNode, senderIx int, timeout time.Duration) {
-	nodes[senderIx].node.P2p.Logger.Infof("Sending broadcast message")
-	msg := []byte(fmt.Sprintf("broadcast message %d", iterationIx))
-	testPublishDo(t, nodes[senderIx].node, "test", msg, 102)
+func testBroadcast(t *testing.T, nodes []testNode, sender *app, timeout time.Duration, topic string, msg []byte) {
+	sender.P2p.Logger.Infof("Sending broadcast message")
+	testPublishDo(t, sender, topic, msg, 102)
 	ctx, cancelF := context.WithTimeout(context.Background(), timeout)
 	defer cancelF()
-	counter := int32(len(nodes) - 1)
+	counter := int32(len(nodes))
 	grError := make(chan error)
-	for i, n := range nodes {
-		if i == senderIx {
+	for _, n := range nodes {
+		if n.node.P2p.Me == sender.P2p.Me {
+			nc := atomic.AddInt32(&counter, -1)
+			n.node.P2p.Logger.Infof("Skipping sender: %d remained", nc)
+			if nc == 0 {
+				cancelF()
+			}
 			continue
 		}
 		go func(n testNode) {
@@ -129,7 +133,7 @@ func testBroadcast(t *testing.T, iterationIx int, nodes []testNode, senderIx int
 						return err
 					}
 					if !bytes.Equal(bs, msg) {
-						return fmt.Errorf("Unexpected gossip: %v", bs)
+						return fmt.Errorf("Unexpected gossip on %s: %s", n.node.P2p.Me.Pretty(), string(bs))
 					}
 					vid, err := gr.ValidationId()
 					if err != nil {
@@ -153,6 +157,7 @@ func testBroadcast(t *testing.T, iterationIx int, nodes []testNode, senderIx int
 					return
 				}
 				nc := atomic.AddInt32(&counter, -1)
+				n.node.P2p.Logger.Infof("Received broadcast message: %d remained", nc)
 				if nc == 0 {
 					cancelF()
 				}
@@ -358,8 +363,8 @@ func TestBroadcastInNotFullConnectedNetwork(t *testing.T) {
 	gossipSubp.D = PUBSUB_D
 	gossipSubp.Dlo = PUBSUB_Dlo
 	gossipSubp.Dhi = PUBSUB_Dhi
-	iteratePrevNextPeers(t, nodes, func(n testNode, prev, next peer.AddrInfo) {
-		configurePubsub(n.node, 100, []peer.AddrInfo{next, prev},
+	iteratePrevNextPeers(t, nodes, func(n testNode, _ int, prev, next peer.AddrInfo) {
+		configurePubsub(n.node, 100, []peer.AddrInfo{next, prev}, nil,
 			pubsub.WithGossipSubParams(gossipSubp))
 		testSubscribeDo(t, n.node, "test", 0, 101)
 	})
@@ -378,6 +383,123 @@ func TestBroadcastInNotFullConnectedNetwork(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		time.Sleep(11 * time.Second)
 		trimConnections(nodes)
-		testBroadcast(t, i, nodes, r.Intn(len(nodes)), 2*time.Minute)
+		msg := []byte(fmt.Sprintf("msg %d", i))
+		testBroadcast(t, nodes, nodes[r.Intn(len(nodes))].node, 2*time.Minute, "test", msg)
+	}
+}
+
+func TestTwoTopicLevels(t *testing.T) {
+	levels := topicLevelConf{
+		"old/a": topicLevelEntry{1, 1},
+		"new/b": topicLevelEntry{2, 2},
+		"new/c": topicLevelEntry{2, 2},
+		"old/d": topicLevelEntry{1, 2}, // topic that is available on both levels
+	}
+	oldN := 5  // number of old nodes
+	newN := 13 // number of new nodes
+	// `nodes`: <`oldN` old nodes><`len(nodes)-newN-oldN` regular nodes><`newN` new nodes>
+	// we have the following node topology:
+	// 	* regular nodes listen to both "new/b" and "old/a" topics and may connect to any topic
+	//	* old nodes listen to "old/a" and may connect only to regular and old nodes
+	//	* new nodes listen to both topics and may connect only to regular and new nodes
+	//  * each regular node is connected to at least one old node
+	//  * nodes are connected in a ring topology (except for link between last new and first old node, which is omitted)
+	//  (i.e. each old node has each new node banned and vice versa)
+	nodes, _ := initNodes(t, 30, upcallDropAllMask^(1<<GossipReceivedChan))
+	// seds := []string{}
+	// for ni, n := range nodes {
+	// 	pid := n.node.P2p.Me.String()
+	// 	seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
+	// }
+	// fmt.Println(strings.Join(seds, " | "))
+	newIds := make([]string, 0, newN)
+	for _, n := range nodes[len(nodes)-newN:] {
+		newIds = append(newIds, n.node.P2p.Me.String())
+	}
+	for _, n := range nodes[:oldN] {
+		// ban all new nodes
+		setGatingConfigImpl(t, n.node, nil, nil, nil, newIds)
+	}
+	gossipSubp := pubsub.DefaultGossipSubParams()
+	gossipSubp.D = PUBSUB_D
+	gossipSubp.Dlo = PUBSUB_Dlo
+	gossipSubp.Dhi = PUBSUB_Dhi
+	getNodeAddr := func(ni int) peer.AddrInfo {
+		addr, err := addrInfos(nodes[ni].node.P2p.Host)
+		require.NoError(t, err)
+		return addr[0]
+	}
+	iteratePrevNextPeers(t, nodes, func(n testNode, ni int, prev, next peer.AddrInfo) {
+		lvls := levels
+		peers := []peer.AddrInfo{next, prev}
+		if ni == len(nodes)-1 {
+			peers = []peer.AddrInfo{prev}
+		} else if ni == 0 {
+			peers = []peer.AddrInfo{next}
+		}
+		if ni < oldN {
+			lvls = nil
+			for otherNodeI := ni + oldN; otherNodeI < len(nodes)-newN; otherNodeI += oldN {
+				peers = append(peers, getNodeAddr(otherNodeI))
+			}
+		} else if ni < len(nodes)-newN {
+			peers = append(peers, getNodeAddr(ni%oldN))
+		}
+		configurePubsub(n.node, 100, peers, lvls, pubsub.WithGossipSubParams(gossipSubp))
+		if ni >= oldN {
+			testSubscribeDo(t, n.node, "new/b", 1, 101)
+		}
+		testSubscribeDo(t, n.node, "old/a", 0, 101)
+		testSubscribeDo(t, n.node, "old/d", 2, 101)
+	})
+	iteratePrevNextPeers(t, nodes, func(node testNode, ni int, prev, next peer.AddrInfo) {
+		if ni < len(nodes)-1 {
+			testAddPeerImplDo(t, node.node, next, true)
+		}
+		if ni >= oldN && ni < len(nodes)-newN {
+			testAddPeerImplDo(t, node.node, getNodeAddr(ni%oldN), true)
+		}
+	})
+	beginAdvertisingOnNodes(t, nodes)
+	time.Sleep(11 * time.Second) // wait for network topology to stabilize
+	trimConnections(nodes)
+	r := rand.New(rand.NewSource(0))
+	for i := 0; i < 10; i++ {
+		t.Logf("Attempt %d: trim connections", i)
+		time.Sleep(11 * time.Second)
+		trimConnections(nodes)
+		t.Logf("Attempt %d: message a", i)
+		sender1 := nodes[r.Intn(len(nodes)-newN)].node
+		testBroadcast(t, nodes[:len(nodes)-newN], sender1, 2*time.Minute, "old/a", []byte(fmt.Sprintf("a %d", i)))
+		// Check that new nodes received no gossip
+		for _, n := range nodes[len(nodes)-newN:] {
+			select {
+			case gr, h := <-n.trap.GossipReceived:
+				if h {
+					bs, _ := gr.Data()
+					subId, _ := gr.SubscriptionId()
+					t.Fatal("unexpected gossip", string(bs), subId.Id(), n.node.P2p.Me.String())
+				}
+			default:
+			}
+		}
+		t.Logf("Attempt %d: message b", i)
+		sender2 := nodes[r.Intn(len(nodes))].node
+		testBroadcast(t, nodes[oldN:], sender2, 2*time.Minute, "new/b", []byte(fmt.Sprintf("b %d", i)))
+		// Check that old nodes received no gossip
+		for _, n := range nodes[:oldN] {
+			select {
+			case gr, h := <-n.trap.GossipReceived:
+				if h {
+					bs, _ := gr.Data()
+					subId, _ := gr.SubscriptionId()
+					t.Fatal("unexpected gossip", string(bs), subId.Id(), n.node.P2p.Me.String())
+				}
+			default:
+			}
+		}
+		t.Logf("Attempt %d: message c", i)
+		sender3 := nodes[r.Intn(len(nodes))].node
+		testBroadcast(t, nodes, sender3, 2*time.Minute, "old/d", []byte(fmt.Sprintf("c %d", i)))
 	}
 }

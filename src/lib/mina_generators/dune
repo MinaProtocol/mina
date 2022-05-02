@@ -3,4 +3,31 @@
  (public_name mina_generators)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_let ppx_version))
- (libraries mina_base mina_ledger core base_quickcheck quickcheck_lib signature_lib random_oracle mina_compile_config with_hash))
+ (libraries
+   ;; opam libraries
+   yojson
+   core_kernel
+   base_quickcheck
+   core
+   base
+   ;; local libraries
+   sgn
+   pickles_types
+   pickles
+   data_hash_lib
+   kimchi_backend.pasta
+   mina_numbers
+   mina_compile_config
+   signature_lib
+   mina_ledger
+   mina_base
+   random_oracle
+   with_hash
+   mina_base.import
+   block_time
+   currency
+   kimchi_backend
+   pickles.backend
+   random_oracle_input
+   snark_params
+))

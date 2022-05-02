@@ -1,7 +1,44 @@
 (library
  (name prover)
  (public_name prover)
- (libraries async core rpc_parallel mina_base mina_state mina_transition blockchain_snark memory_stats precomputed_values child_processes logger.file_system)
+ (libraries
+   ;; opam libraries
+   base64
+   async_unix
+   rpc_parallel
+   core
+   async
+   async_kernel
+   core_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   ;; local libraries
+   with_hash
+   coda_genesis_ledger
+   mina_metrics
+   error_json
+   pickles_types
+   snarky.backendless
+   snark_params
+   pickles
+   sgn
+   currency
+   child_processes
+   memory_stats
+   blockchain_snark
+   mina_transition
+   mina_state
+   mina_base
+   logger
+   genesis_constants
+   ledger_proof
+   consensus
+   coda_genesis_proof
+   transaction_snark
+   logger.file_system
+   data_hash_lib
+ )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane)))

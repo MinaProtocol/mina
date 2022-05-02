@@ -2,7 +2,6 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
-open O1trace
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
@@ -105,18 +104,11 @@ module type S = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> expiry_ns:Time_ns.Span.t
-    -> incoming_diffs:
-         ( Resource_pool.Diff.t Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( Resource_pool.Diff.t
-         * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
-            -> unit) )
-         Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
-    -> t Deferred.t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -274,106 +266,88 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
-        trace_recurring "handle_new_best_tip_ledger" (fun () ->
-            Throttle.enqueue t.snark_table_lock (fun () ->
-                let%map _ =
-                  let open Interruptible.Deferred_let_syntax in
-                  Interruptible.force
-                    (let%bind.Interruptible () =
-                       Interruptible.lift (Deferred.return ())
-                         (Base_ledger.detached_signal ledger)
-                     in
-                     let%bind prover_account_ids =
-                       trace_recurring
-                         "generate account ids of provers in snark table"
-                         (fun () ->
-                           let account_ids =
-                             t.snark_tables.all |> Statement_table.data
-                             |> List.map
-                                  ~f:(fun
-                                       { Priced_proof.fee = { prover; _ }; _ }
-                                     -> prover)
-                             |> List.dedup_and_sort
-                                  ~compare:Public_key.Compressed.compare
-                             |> List.map ~f:(fun prover ->
-                                    ( prover
-                                    , Account_id.create prover Token_id.default
-                                    ))
-                             |> Public_key.Compressed.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_ids))
-                     in
-                     (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                     let%bind prover_account_locations =
-                       trace_recurring
-                         "lookup prover account locations in best tip ledger"
-                         (fun () ->
-                           let account_locations =
-                             prover_account_ids |> Map.data
-                             |> Base_ledger.location_of_account_batch ledger
-                             |> Account_id.Map.of_alist_exn
-                           in
-                           Deferred.map (Scheduler.yield ())
-                             ~f:(Fn.const account_locations))
-                     in
-                     let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                     let%map () =
-                       trace_recurring
-                         "filter snark table based on best tip ledger"
-                         (fun () ->
-                           let open Deferred.Let_syntax in
-                           Statement_table.fold ~init:Deferred.unit
-                             t.snark_tables.all
-                             ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc
-                                ->
-                               let%bind () = acc in
-                               let%map () = yield () in
-                               let prover_account_exists =
-                                 prover
-                                 |> Map.find_exn prover_account_ids
-                                 |> Map.find_exn prover_account_locations
-                                 |> Option.is_some
-                               in
-                               let keep =
-                                 fee_is_sufficient t ~fee
-                                   ~account_exists:prover_account_exists
-                               in
-                               if not keep then (
-                                 Hashtbl.remove t.snark_tables.all key ;
-                                 Hashtbl.remove t.snark_tables.rebroadcastable
-                                   key )))
-                     in
-                     ())
-                in
-                ()))
+        Throttle.enqueue t.snark_table_lock (fun () ->
+            let%map _ =
+              let open Interruptible.Deferred_let_syntax in
+              Interruptible.force
+                (let%bind.Interruptible () =
+                   Interruptible.lift (Deferred.return ())
+                     (Base_ledger.detached_signal ledger)
+                 in
+                 let%bind prover_account_ids =
+                   let account_ids =
+                     t.snark_tables.all |> Statement_table.data
+                     |> List.map
+                          ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
+                            prover)
+                     |> List.dedup_and_sort
+                          ~compare:Public_key.Compressed.compare
+                     |> List.map ~f:(fun prover ->
+                            (prover, Account_id.create prover Token_id.default))
+                     |> Public_key.Compressed.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ()) ~f:(Fn.const account_ids)
+                 in
+                 (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+                 let%bind prover_account_locations =
+                   let account_locations =
+                     prover_account_ids |> Map.data
+                     |> Base_ledger.location_of_account_batch ledger
+                     |> Account_id.Map.of_alist_exn
+                   in
+                   Deferred.map (Scheduler.yield ())
+                     ~f:(Fn.const account_locations)
+                 in
+                 let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
+                 let%map () =
+                   let open Deferred.Let_syntax in
+                   Statement_table.fold ~init:Deferred.unit t.snark_tables.all
+                     ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc ->
+                       let%bind () = acc in
+                       let%map () = yield () in
+                       let prover_account_exists =
+                         prover
+                         |> Map.find_exn prover_account_ids
+                         |> Map.find_exn prover_account_locations
+                         |> Option.is_some
+                       in
+                       let keep =
+                         fee_is_sufficient t ~fee
+                           ~account_exists:prover_account_exists
+                       in
+                       if not keep then (
+                         Hashtbl.remove t.snark_tables.all key ;
+                         Hashtbl.remove t.snark_tables.rebroadcastable key ))
+                 in
+                 ())
+            in
+            ())
 
       let handle_new_refcount_table t
           ({ removed; refcount_table; best_tip_table } :
             Extensions.Snark_pool_refcount.view) =
-        trace_recurring "handle_new_refcount_table" (fun () ->
-            t.ref_table <- Some refcount_table ;
-            t.best_tip_table <- Some best_tip_table ;
-            t.removed_counter <- t.removed_counter + removed ;
-            if t.removed_counter >= removed_breadcrumb_wait then (
-              t.removed_counter <- 0 ;
-              Statement_table.filter_keys_inplace t.snark_tables.all
-                ~f:(fun k ->
-                  let keep = work_is_referenced t k in
-                  if not keep then
-                    Hashtbl.remove t.snark_tables.rebroadcastable k ;
-                  keep) ;
-              Mina_metrics.(
-                Gauge.set Snark_work.snark_pool_size
-                  (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ) ;
-            Deferred.unit)
+        t.ref_table <- Some refcount_table ;
+        t.best_tip_table <- Some best_tip_table ;
+        t.removed_counter <- t.removed_counter + removed ;
+        if t.removed_counter >= removed_breadcrumb_wait then (
+          t.removed_counter <- 0 ;
+          Statement_table.filter_keys_inplace t.snark_tables.all ~f:(fun k ->
+              let keep = work_is_referenced t k in
+              if not keep then Hashtbl.remove t.snark_tables.rebroadcastable k ;
+              keep) ;
+          Mina_metrics.(
+            Gauge.set Snark_work.snark_pool_size
+              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
 
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
-            handle_new_best_tip_ledger t ledger
+            O1trace.thread "apply_new_best_tip_ledger_to_snark_pool" (fun () ->
+                handle_new_best_tip_ledger t ledger)
         | `New_refcount_table refcount_table ->
-            handle_new_refcount_table t refcount_table
+            O1trace.sync_thread "apply_refcount_table_to_snark_pool" (fun () ->
+                handle_new_refcount_table t refcount_table) ;
+            Deferred.unit
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
@@ -673,8 +647,8 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
-      ~frontier_broadcast_pipe =
+      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
+      ~on_remote_push =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -683,7 +657,7 @@ struct
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
     in
-    let%map res =
+    let%map pool, r_sink, l_sink =
       match%map
         Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
           Snark_tables.Serializable.Stable.Latest.bin_reader_t
@@ -693,20 +667,20 @@ struct
             Resource_pool.of_serializable snark_table ~constraint_constants
               ~config ~logger ~frontier_broadcast_pipe
           in
-          let network_pool =
+          let res =
             of_resource_pool_and_diffs pool ~logger ~constraint_constants
-              ~incoming_diffs ~local_diffs ~tf_diffs:tf_diff_reader
+              ~tf_diffs:tf_diff_reader ~log_gossip_heard ~on_remote_push
           in
           Resource_pool.listen_to_frontier_broadcast_pipe
             frontier_broadcast_pipe pool ~tf_diff_writer ;
-          network_pool
+          res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~expiry_ns ~incoming_diffs ~local_diffs
-            ~frontier_broadcast_pipe
+            ~time_controller ~expiry_ns ~frontier_broadcast_pipe
+            ~log_gossip_heard ~on_remote_push
     in
-    store_periodically (resource_pool res) ;
-    res
+    store_periodically (resource_pool pool) ;
+    (pool, r_sink, l_sink)
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -827,34 +801,26 @@ let%test_module "random set test" =
       in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
-      let incoming_diff_r, _incoming_diff_w =
-        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      let open Deferred.Let_syntax in
+      let mock_pool, _r_sink, _l_sink =
+        Mock_snark_pool.create ~config ~logger ~constraint_constants
+          ~consensus_constants ~time_controller ~expiry_ns
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+        (* |>  *)
       in
-      let local_diff_r, _local_diff_w =
-        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      let pool = Mock_snark_pool.resource_pool mock_pool in
+      (*Statements should be referenced before work for those can be included*)
+      let%bind () =
+        Mocks.Transition_frontier.refer_statements tf
+          (List.unzip sample_solved_work |> fst)
       in
-      let res =
-        let open Deferred.Let_syntax in
-        let resource_pool =
-          Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller ~expiry_ns
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-            ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
-          |> Mock_snark_pool.resource_pool
-        in
-        (*Statements should be referenced before work for those can be included*)
-        let%bind () =
-          Mocks.Transition_frontier.refer_statements tf
-            (List.unzip sample_solved_work |> fst)
-        in
-        let%map () =
-          Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
-              let%map res = apply_diff resource_pool work fee in
-              assert (Result.is_ok res))
-        in
-        (resource_pool, tf)
+      let%map () =
+        Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
+            let%map res = apply_diff pool work fee in
+            assert (Result.is_ok res))
       in
-      res
+      (pool, tf)
 
     let%test_unit "serialization" =
       let t, _tf =
@@ -1010,20 +976,14 @@ let%test_module "random set test" =
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let pool_reader, _pool_writer =
-            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-          in
-          let local_reader, _local_writer =
-            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-          in
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
           in
-          let network_pool =
+          let network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~expiry_ns
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader ~logger
+              ~consensus_constants ~time_controller ~expiry_ns ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let priced_proof =
             { Priced_proof.proof =
@@ -1085,36 +1045,30 @@ let%test_module "random set test" =
                   } )
           in
           let verify_unsolved_work () =
-            let pool_reader, pool_writer =
-              Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-            in
-            let local_reader, local_writer =
-              Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-            in
             (*incomming diffs*)
+            let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+            let frontier_broadcast_pipe_r, _ =
+              Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
+            in
+            let network_pool, remote_sink, local_sink =
+              Mock_snark_pool.create ~logger ~config ~constraint_constants
+                ~consensus_constants ~time_controller ~expiry_ns
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+            in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
                    ( Envelope.Incoming.local work
                    , Mina_net2.Validation_callback.create_without_expiration ()
                    ))
             |> List.iter ~f:(fun diff ->
-                   Strict_pipe.Writer.write pool_writer diff
+                   Mock_snark_pool.Remote_sink.push remote_sink diff
                    |> Deferred.don't_wait_for) ;
             (* locally generated diffs *)
             List.map (List.drop works per_reader) ~f:create_work
             |> List.iter ~f:(fun diff ->
-                   Strict_pipe.Writer.write local_writer (diff, Fn.const ())
+                   Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
                    |> Deferred.don't_wait_for) ;
-            let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-            let frontier_broadcast_pipe_r, _ =
-              Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
-            in
-            let network_pool =
-              Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller ~expiry_ns
-                ~incoming_diffs:pool_reader ~local_diffs:local_reader
-                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-            in
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
                  ~f:(fun work_command ->
@@ -1136,12 +1090,6 @@ let%test_module "random set test" =
           verify_unsolved_work ())
 
     let%test_unit "rebroadcast behavior" =
-      let pool_reader, _pool_writer =
-        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-      in
-      let local_reader, _local_writer =
-        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
-      in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create (Some tf) in
       let stmt1, stmt2, stmt3, stmt4 =
@@ -1186,11 +1134,11 @@ let%test_module "random set test" =
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          let network_pool =
+          let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~expiry_ns ~incoming_diffs:pool_reader ~local_diffs:local_reader
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =

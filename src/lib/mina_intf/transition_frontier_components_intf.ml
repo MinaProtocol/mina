@@ -158,7 +158,7 @@ module type Best_tip_prover_intf = sig
   val prove :
        logger:Logger.t
     -> transition_frontier
-    -> ( (External_transition.t, State_hash.t) With_hash.t
+    -> ( External_transition.t State_hash.With_state_hashes.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
        option
@@ -185,7 +185,7 @@ module type Consensus_best_tip_prover_intf = sig
        logger:Logger.t
     -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
-    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
+    -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -197,7 +197,7 @@ module type Consensus_best_tip_prover_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
+    -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -304,21 +304,20 @@ module type Transition_frontier_controller_intf = sig
 end
 
 module type Initial_validator_intf = sig
-  type external_transition
+  type block
 
-  type external_transition_with_initial_validation
+  type block_with_initial_validation
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> transition_reader:
-         ( [ `Transition of external_transition Envelope.Incoming.t ]
+         ( [ `Transition of block Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
          Strict_pipe.Reader.t
     -> valid_transition_writer:
-         ( [ `Transition of
-             external_transition_with_initial_validation Envelope.Incoming.t ]
+         ( [ `Transition of block_with_initial_validation Envelope.Incoming.t ]
            * [ `Time_received of Block_time.t ]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
@@ -364,8 +363,10 @@ module type Transition_router_intf = sig
          * External_transition.Initial_validated.t Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
+    -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of External_transition.Validated.t ]
-       * [ `Source of [ `Gossip | `Catchup | `Internal ] ] )
+       * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
+       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t
        * unit Ivar.t
 end

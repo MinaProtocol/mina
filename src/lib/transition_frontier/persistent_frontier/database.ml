@@ -4,6 +4,8 @@ open Mina_base
 open Mina_transition
 open Frontier_base
 
+(* TODO: cache state body hashes in db to avoid re-hashing on load (#10293) *)
+
 (* TODO: bundle together with other writes by sharing batch requests between
  * function calls in this module (#3738) *)
 
@@ -22,7 +24,7 @@ open Result.Let_syntax
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
-let version = 1
+let version = 2
 
 module Schema = struct
   module Keys = struct
@@ -44,12 +46,14 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.t -> External_transition.t t
-    | Arcs : State_hash.t -> State_hash.t list t
-    | Root : Root_data.Minimal.t t
-    | Best_tip : State_hash.t t
+    | Transition :
+        State_hash.Stable.V1.t
+        -> External_transition.Raw.Stable.V2.t t
+    | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
+    | Root : Root_data.Minimal.Stable.V2.t t
+    | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.value list t
+        : Mina_state.Protocol_state.Value.Stable.V2.t list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -69,7 +73,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.Latest.t]
+        [%bin_type_class: External_transition.Raw.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -276,9 +280,10 @@ let check t ~genesis_state_hash =
       in
       let%bind () = check_version () in
       let%bind root_hash, root_transition = check_base () in
+      let root_block = External_transition.decompose root_transition in
       let%bind () =
         let persisted_genesis_state_hash =
-          External_transition.protocol_state root_transition
+          External_transition.protocol_state root_block
           |> Mina_state.Protocol_state.genesis_state_hash
         in
         if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
@@ -286,15 +291,17 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      External_transition.blockchain_state root_transition
+      External_transition.blockchain_state root_block
       |> Mina_state.Blockchain_state.snarked_ledger_hash)
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
 
 let initialize t ~root_data =
   let open Root_data.Limited in
-  let { With_hash.hash = root_state_hash; data = root_transition }, _ =
-    External_transition.Validated.erase (transition root_data)
+  let root_state_hash, root_transition =
+    let t, _ = External_transition.Validated.erase (transition root_data) in
+    ( State_hash.With_state_hashes.state_hash t
+    , State_hash.With_state_hashes.data t )
   in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
@@ -306,12 +313,15 @@ let initialize t ~root_data =
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.unzip (protocol_states root_data) |> snd))
+        ~data:(protocol_states root_data |> List.map ~f:With_hash.data))
 
-let add t ~transition =
-  let parent_hash = External_transition.Validated.parent_hash transition in
-  let { With_hash.hash; data = raw_transition }, _ =
-    External_transition.Validated.erase transition
+let add t ~transition:(transition, _validation) =
+  let hash = State_hash.With_state_hashes.state_hash transition in
+  let raw_transition =
+    External_transition.compose (With_hash.data transition)
+  in
+  let parent_hash =
+    External_transition.parent_hash (With_hash.data transition)
   in
   let%bind () =
     Result.ok_if_true
@@ -330,7 +340,7 @@ let move_root t ~new_root ~garbage =
   let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition (hash new_root)))
+      (mem t.db ~key:(Transition (hashes new_root).state_hash))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
@@ -341,7 +351,7 @@ let move_root t ~new_root ~garbage =
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:snd (protocol_states new_root)) ;
+        ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
       List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node
@@ -358,7 +368,7 @@ let get_transition t hash =
   in
   (* this transition was read from the database, so it must have been validated already *)
   let (`I_swear_this_is_safe_see_my_comment validated_transition) =
-    External_transition.Validated.create_unsafe transition
+    External_transition.(Validated.create_unsafe @@ decompose transition)
   in
   validated_transition
 

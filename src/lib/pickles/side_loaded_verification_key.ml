@@ -179,6 +179,7 @@ module R = struct
   module Stable = struct
     module V2 = struct
       type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -190,7 +191,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving hash]
 
       let to_latest = Fn.id
 
@@ -207,37 +208,55 @@ module Stable = struct
         let d = Common.wrap_domains.h in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
-        let wrap_vk : Impls.Wrap.Verification_key.t =
-          { domain =
-              { log_size_of_group = log2_size
-              ; group_gen = Backend.Tock.Field.domain_generator log2_size
-              }
-          ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-          ; max_quot_size
-          ; srs = Backend.Tock.Keypair.load_urs ()
-          ; evals =
-              (let g (x, y) =
-                 { Kimchi.Protocol.unshifted =
-                     [| Kimchi.Foundations.Finite (x, y) |]
-                 ; shifted = None
-                 }
-               in
-               { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
-               ; coefficients_comm =
-                   Array.map ~f:g (Vector.to_array c.coefficients_comm)
-               ; generic_comm = g c.generic_comm
-               ; mul_comm = g c.mul_comm
-               ; psm_comm = g c.psm_comm
-               ; emul_comm = g c.emul_comm
-               ; complete_add_comm = g c.complete_add_comm
-               ; endomul_scalar_comm = g c.endomul_scalar_comm
-               ; chacha_comm = None
-               })
-          ; shifts = Common.tock_shifts ~log2_size
-          ; lookup_index = None
-          }
+        (* we only compute the wrap_vk if the srs can be loaded *)
+        let srs =
+          try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None
         in
-        { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some wrap_vk }
+        let wrap_vk =
+          Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
+              { domain =
+                  { log_size_of_group = log2_size
+                  ; group_gen = Backend.Tock.Field.domain_generator log2_size
+                  }
+              ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; max_quot_size
+              ; srs
+              ; evals =
+                  (let g (x, y) =
+                     { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
+                     ; shifted = None
+                     }
+                   in
+                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+                   ; coefficients_comm =
+                       Array.map ~f:g (Vector.to_array c.coefficients_comm)
+                   ; generic_comm = g c.generic_comm
+                   ; mul_comm = g c.mul_comm
+                   ; psm_comm = g c.psm_comm
+                   ; emul_comm = g c.emul_comm
+                   ; complete_add_comm = g c.complete_add_comm
+                   ; endomul_scalar_comm = g c.endomul_scalar_comm
+                   ; chacha_comm = None
+                   })
+              ; shifts = Common.tock_shifts ~log2_size
+              ; lookup_index = None
+              })
+        in
+        { Poly.step_data; max_width; wrap_index = c; wrap_vk }
+
+      (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
+
+      let sexp_of_t t = R.sexp_of_t (to_repr t)
+
+      let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
+
+      let to_yojson t = R.to_yojson (to_repr t)
+
+      let of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
+
+      let equal x y = R.equal (to_repr x) (to_repr y)
+
+      let compare x y = R.compare (to_repr x) (to_repr y)
 
       include Binable.Of_binable
                 (R.Stable.V2)
@@ -256,16 +275,24 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_base58_check, of_base58_check, of_base58_check_exn)]
+Stable.Latest.
+  ( to_base58_check
+  , of_base58_check
+  , of_base58_check_exn
+  , sexp_of_t
+  , t_of_sexp
+  , to_yojson
+  , of_yojson
+  , equal
+  , compare )]
 
 let dummy : t =
   { step_data = At_most.[]
   ; max_width = Width.zero
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
-       { sigma_comm = Vector.init Dlog_plonk_types.Permuts.n ~f:(fun _ -> g)
-       ; coefficients_comm =
-           Vector.init Dlog_plonk_types.Columns.n ~f:(fun _ -> g)
+       { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
+       ; coefficients_comm = Vector.init Plonk_types.Columns.n ~f:(fun _ -> g)
        ; generic_comm = g
        ; psm_comm = g
        ; complete_add_comm = g

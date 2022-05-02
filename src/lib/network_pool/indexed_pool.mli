@@ -6,6 +6,7 @@
 open Core
 
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 
 module Command_error : sig
@@ -23,10 +24,11 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
+        [ `Valid_until of Mina_numbers.Global_slot.t
+        | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
-    | Unwanted_fee_token of Token_id.t
-    | Invalid_transaction
+    | Unwanted_fee_token of Mina_base.Token_id.t
+    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   val grounds_for_diff_rejection : t -> bool

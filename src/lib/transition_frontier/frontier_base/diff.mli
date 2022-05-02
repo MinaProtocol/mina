@@ -22,9 +22,14 @@ type lite = Lite
  *  transition frontier and the persistent transition frontier.
  *)
 module Node : sig
-  type _ t =
-    | Full : Breadcrumb.t -> full t
-    | Lite : External_transition.Validated.t -> lite t
+  [%%versioned:
+  module Stable : sig
+    module V3 : sig
+      type 'a t =
+        | Full : Breadcrumb.t -> full t
+        | Lite : External_transition.Validated.Stable.V3.t -> lite t
+    end
+  end]
 end
 
 module Node_list : sig
@@ -69,7 +74,7 @@ module Root_transition : sig
   module Lite : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V4 : sig
         type t = lite root_transition
       end
     end]

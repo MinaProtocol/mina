@@ -59,7 +59,6 @@ let non_pc_registers_equal_var t1 t2 =
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
           acc)
-        ~next_available_token:(f !Token_id.Checked.equal)
         ~local_state:(fun acc f ->
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc)
       |> Impl.Boolean.all)
@@ -69,8 +68,7 @@ let non_pc_registers_equal t1 t2 =
   let f eq field = eq (F.get field t1) (F.get field t2) in
   Registers.Fields.for_all
     ~ledger:(f Frozen_ledger_hash.equal)
-    ~pending_coinbase_stack:(f Unit.equal)
-    ~next_available_token:(f Token_id.equal) ~local_state:(f Local_state.equal)
+    ~pending_coinbase_stack:(f Unit.equal) ~local_state:(f Local_state.equal)
 
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
@@ -98,7 +96,7 @@ let%snarkydef step ~(logger : Logger.t)
     Hlist.HlistId.
       [ previous_state_hash
       ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t)
-      ] new_state_hash : (_, _) Tick.Checked.t =
+      ] new_state_hash : _ Tick.Checked.t =
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
@@ -298,7 +296,8 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
     (Fn.flip handle (wrap_handler handler w)
        (let%bind prev =
           exists State_hash.typ
-            ~compute:(As_prover.return (Protocol_state.hash w.prev_state))
+            ~compute:
+              (As_prover.return (Protocol_state.hashes w.prev_state).state_hash)
         and curr =
           exists State_hash.typ ~compute:(As_prover.return new_state_hash)
         and txn_snark =
@@ -307,7 +306,6 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
         in
         step ~proof_level ~constraint_constants ~logger:(Logger.create ())
           [ prev; txn_snark ] curr))
-    ()
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
@@ -344,7 +342,7 @@ module Statement = struct
   type t = Protocol_state.Value.t
 
   let to_field_elements (t : t) : Tick.Field.t array =
-    [| Protocol_state.hash t |]
+    [| (Protocol_state.hashes t).state_hash |]
 end
 
 module Statement_var = struct
@@ -354,8 +352,9 @@ module Statement_var = struct
 end
 
 let typ =
-  Typ.transport State_hash.typ ~there:Protocol_state.hash ~back:(fun _ ->
-      failwith "cannot unhash")
+  Typ.transport State_hash.typ
+    ~there:(fun t -> (Protocol_state.hashes t).state_hash)
+    ~back:(fun _ -> failwith "cannot unhash")
 
 type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
@@ -376,7 +375,7 @@ module type S = sig
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
        , N2.n * (N2.n * unit)
-       , N1.n * (N6.n * unit)
+       , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
        , Proof.t Async.Deferred.t )
        Pickles.Prover.t

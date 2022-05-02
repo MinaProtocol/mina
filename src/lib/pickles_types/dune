@@ -12,4 +12,15 @@
    h_list.ppx))
  (instrumentation
   (backend bisect_ppx))
- (libraries snarky.backendless core_kernel))
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   sexplib0
+   result
+   core_kernel
+   base.caml
+   bin_prot.shape
+   ;; local libraries
+   snarky.backendless
+   tuple_lib
+))

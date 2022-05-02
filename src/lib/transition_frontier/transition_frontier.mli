@@ -132,7 +132,9 @@ module For_tests : sig
          Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
-         * (Mina_base.State_hash.t * Mina_state.Protocol_state.value) list )
+         * Mina_state.Protocol_state.value
+           Mina_base.State_hash.With_state_hashes.t
+           list )
          Quickcheck.Generator.t
     -> max_length:int
     -> size:int
@@ -150,7 +152,9 @@ module For_tests : sig
          Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
-         * (Mina_base.State_hash.t * Mina_state.Protocol_state.value) list )
+         * Mina_state.Protocol_state.value
+           Mina_base.State_hash.With_state_hashes.t
+           list )
          Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int

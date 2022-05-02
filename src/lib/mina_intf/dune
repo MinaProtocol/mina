@@ -1,8 +1,31 @@
 (library
  (public_name mina_intf)
  (name mina_intf)
- (libraries core async_kernel currency truth gadt_lib
-            signature_lib cache_lib mina_base mina_ledger mina_state snark_work_lib
-            proof_carrying_data mina_incremental blockchain_snark transaction_snark mina_transition)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core
+   core_kernel
+   sexplib0
+   ;; local libraries
+   mina_net2
+   staged_ledger
+   consensus
+   precomputed_values
+   genesis_constants
+   mina_transition
+   proof_carrying_data
+   cache_lib
+   mina_base
+   mina_state
+   pipe_lib
+   network_peer
+   logger
+   trust_system
+   block_time
+   verifier
+   rose_tree
+   mina_ledger
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

@@ -1,18 +1,16 @@
 open Core_kernel
 open Mina_base
 include Sparse_ledger_base
+module GS = Global_state
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger)
-    ~next_available_token:(Ledger.next_available_token ledger)
-    (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
   Ledger.Any_ledger.M.foldi ledger
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
@@ -54,7 +52,6 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
-         ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
@@ -81,3 +78,38 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
         ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash))
+
+module T = Mina_transaction_logic.Make (L)
+
+let apply_parties_unchecked_with_states ~constraint_constants ~state_view
+    ~fee_excess ledger c =
+  let open T in
+  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
+    (ref ledger) c ~init:[]
+    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
+      ( { GS.ledger = !ledger; fee_excess; protocol_state }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc)
+  |> Result.map ~f:(fun (party_applied, states) ->
+         (* We perform a [List.rev] here to ensure that the states are in order
+            wrt. the parties that generated the states.
+         *)
+         (party_applied, List.rev states))
+
+let apply_transaction_logic f t x =
+  let open Or_error.Let_syntax in
+  let t' = ref t in
+  let%map app = f t' x in
+  (!t', app)
+
+let apply_user_command ~constraint_constants ~txn_global_slot =
+  apply_transaction_logic
+    (T.apply_user_command ~constraint_constants ~txn_global_slot)
+
+let apply_transaction' ~constraint_constants ~txn_state_view l t =
+  O1trace.sync_thread "apply_transaction" (fun () ->
+      T.apply_transaction ~constraint_constants ~txn_state_view l t)
+
+let apply_transaction ~constraint_constants ~txn_state_view =
+  apply_transaction_logic
+    (apply_transaction' ~constraint_constants ~txn_state_view)

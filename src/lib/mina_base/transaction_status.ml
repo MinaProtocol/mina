@@ -9,7 +9,7 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Predicate [@value 1]
         | Source_not_present
@@ -19,24 +19,26 @@ module Failure = struct
         | Source_insufficient_balance
         | Source_minimum_balance_violation
         | Receiver_already_exists
-        | Not_token_owner
-        | Mismatched_token_permissions
+        | Token_owner_not_caller
         | Overflow
-        | Signed_command_on_snapp_account
-        | Snapp_account_not_present
+        | Signed_command_on_zkapp_account
+        | Zkapp_account_not_present
         | Update_not_permitted_balance
         | Update_not_permitted_timing_existing_account
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
         | Update_not_permitted_sequence_state
-        | Update_not_permitted_snapp_uri
+        | Update_not_permitted_zkapp_uri
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
         | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
+        | Fee_payer_must_be_signed
+        | Account_precondition_unsatisfied
+        | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
       [@@deriving sexp, yojson, equal, compare, enum, hash]
@@ -44,6 +46,34 @@ module Failure = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Collection = struct
+    type display = (int * t list) list [@@deriving to_yojson, sexp]
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Stable.V2.t list list
+        [@@deriving equal, compare, yojson, sexp, hash]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_display t =
+      let _, display =
+        List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
+            if List.is_empty bucket then (index + 1, acc)
+            else (index + 1, (index, bucket) :: acc))
+      in
+      display
+
+    let empty = []
+
+    let of_single_failure f : t = [ [ f ] ]
+
+    let is_empty : t -> bool = Fn.compose List.is_empty List.concat
+  end
 
   type failure = t
 
@@ -78,16 +108,14 @@ module Failure = struct
         "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
-    | Not_token_owner ->
-        "Not_token_owner"
-    | Mismatched_token_permissions ->
-        "Mismatched_token_permissions"
+    | Token_owner_not_caller ->
+        "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
-    | Signed_command_on_snapp_account ->
-        "Signed_command_on_snapp_account"
-    | Snapp_account_not_present ->
-        "Snapp_account_not_present"
+    | Signed_command_on_zkapp_account ->
+        "Signed_command_on_zkapp_account"
+    | Zkapp_account_not_present ->
+        "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
     | Update_not_permitted_timing_existing_account ->
@@ -100,8 +128,8 @@ module Failure = struct
         "Update_not_permitted_verification_key"
     | Update_not_permitted_sequence_state ->
         "Update_not_permitted_sequence_state"
-    | Update_not_permitted_snapp_uri ->
-        "Update_not_permitted_snapp_uri"
+    | Update_not_permitted_zkapp_uri ->
+        "Update_not_permitted_zkapp_uri"
     | Update_not_permitted_token_symbol ->
         "Update_not_permitted_token_symbol"
     | Update_not_permitted_permissions ->
@@ -114,6 +142,12 @@ module Failure = struct
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
+    | Fee_payer_must_be_signed ->
+        "Fee_payer_must_be_signed"
+    | Account_precondition_unsatisfied ->
+        "Account_precondition_unsatisfied"
+    | Protocol_state_precondition_unsatisfied ->
+        "Protocol_state_precondition_unsatisfied"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -136,16 +170,14 @@ module Failure = struct
         Ok Source_minimum_balance_violation
     | "Receiver_already_exists" ->
         Ok Receiver_already_exists
-    | "Not_token_owner" ->
-        Ok Not_token_owner
-    | "Mismatched_token_permissions" ->
-        Ok Mismatched_token_permissions
+    | "Token_owner_not_caller" ->
+        Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
-    | "Signed_command_on_snapp_account" ->
-        Ok Signed_command_on_snapp_account
-    | "Snapp_account_not_present" ->
-        Ok Snapp_account_not_present
+    | "Signed_command_on_zkapp_account" ->
+        Ok Signed_command_on_zkapp_account
+    | "Zkapp_account_not_present" ->
+        Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
     | "Update_not_permitted_timing_existing_account" ->
@@ -158,8 +190,8 @@ module Failure = struct
         Ok Update_not_permitted_verification_key
     | "Update_not_permitted_sequence_state" ->
         Ok Update_not_permitted_sequence_state
-    | "Update_not_permitted_snapp_uri" ->
-        Ok Update_not_permitted_snapp_uri
+    | "Update_not_permitted_zkapp_uri" ->
+        Ok Update_not_permitted_zkapp_uri
     | "Update_not_permitted_token_symbol" ->
         Ok Update_not_permitted_token_symbol
     | "Update_not_permitted_permissions" ->
@@ -172,6 +204,12 @@ module Failure = struct
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Fee_payer_must_be_signed" ->
+        Ok Fee_payer_must_be_signed
+    | "Account_precondition_unsatisfied" ->
+        Ok Account_precondition_unsatisfied
+    | "Protocol_state_precondition_unsatisfied" ->
+        Ok Protocol_state_precondition_unsatisfied
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -206,15 +244,14 @@ module Failure = struct
         "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
-    | Not_token_owner ->
-        "The source account does not own the token"
-    | Mismatched_token_permissions ->
-        "The permissions for this token do not match those in the command"
+    | Token_owner_not_caller ->
+        "A party used a non-default token but its caller was not the token \
+         owner"
     | Overflow ->
         "The resulting balance is too large to store"
-    | Signed_command_on_snapp_account ->
+    | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
-    | Snapp_account_not_present ->
+    | Zkapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
@@ -233,7 +270,7 @@ module Failure = struct
     | Update_not_permitted_sequence_state ->
         "The authentication for an account didn't allow the requested update \
          to its sequence state"
-    | Update_not_permitted_snapp_uri ->
+    | Update_not_permitted_zkapp_uri ->
         "The authentication for an account didn't allow the requested update \
          to its snapp URI"
     | Update_not_permitted_token_symbol ->
@@ -253,6 +290,12 @@ module Failure = struct
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
+    | Fee_payer_must_be_signed ->
+        "Fee payer party must have a valid signature"
+    | Account_precondition_unsatisfied ->
+        "The party's account precondition unsatisfied"
+    | Protocol_state_precondition_unsatisfied ->
+        "The party's protocol state precondition unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
@@ -379,13 +422,12 @@ end
 module Auxiliary_data = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
         ; receiver_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
-        ; created_token : Token_id.Stable.V1.t option
         }
       [@@deriving sexp, yojson, equal, compare]
 
@@ -396,16 +438,15 @@ module Auxiliary_data = struct
   let empty =
     { fee_payer_account_creation_fee_paid = None
     ; receiver_account_creation_fee_paid = None
-    ; created_token = None
     }
 end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
+      | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V1.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

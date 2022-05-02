@@ -15,9 +15,8 @@ module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
         { block :
-            ( External_transition.Stable.Latest.t
-            , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t
+            External_transition.Raw.Stable.Latest.t
+            State_hash.With_state_hashes.Stable.Latest.t
         ; sender_receipt_chains_from_parent_ledger :
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
@@ -70,7 +69,9 @@ module Builder = struct
                (sender, receipt_chain_hash)))
     in
     Transition_frontier.Breadcrumb_added
-      { block; sender_receipt_chains_from_parent_ledger }
+      { block = With_hash.map ~f:External_transition.compose block
+      ; sender_receipt_chains_from_parent_ledger
+      }
 
   let user_commands user_commands =
     Transaction_pool { Transaction_pool.added = user_commands; removed = [] }

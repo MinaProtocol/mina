@@ -18,7 +18,7 @@ type t =
     Pickles_types.Vector.t
   , Field.t
   , Boolean.var )
-  Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+  Types.Step.Proof_state.Per_proof.In_circuit.t
 
 module Plonk_checks = struct
   include Plonk_checks
@@ -35,11 +35,11 @@ module Constant = struct
       Vector.t
     , Digest.Constant.t
     , bool )
-    Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+    Types.Step.Proof_state.Per_proof.In_circuit.t
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
-  let dummy : t =
+  let dummy () : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
     let alpha = scalar_chal () in
@@ -47,9 +47,7 @@ module Constant = struct
     let gamma = chal () in
     let zeta = scalar_chal () in
     let chals :
-        _
-        Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.t
-        =
+        _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
       { alpha = Common.Ipa.Wrap.endo_to_field alpha
       ; beta = Challenge.Constant.to_tock_field beta
       ; gamma = Challenge.Constant.to_tock_field gamma

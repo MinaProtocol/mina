@@ -1,6 +1,20 @@
 (library
  (name network_peer)
  (public_name network_peer)
- (libraries core async async_kernel async_rpc_kernel mina_metrics)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   async.async_rpc
+   async_rpc_kernel
+   core_kernel
+   bin_prot.shape
+   sexplib0
+   base.caml
+   base.base_internalhash_types
+   result
+   async_kernel
+   mina_metrics
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_compare ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

@@ -52,6 +52,7 @@ module Network_config = struct
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
+    ; mina_archive_schema_aux_files : string list
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
@@ -60,8 +61,9 @@ module Network_config = struct
 
   type t =
     { mina_automation_location : string
-    ; debug_arg : bool
-    ; keypairs : Network_keypair.t list
+    ; debug_arg : bool (* ; keypairs : Network_keypair.t list *)
+    ; block_producer_keypairs : Network_keypair.t list
+    ; extra_genesis_keypairs : Network_keypair.t list
     ; constants : Test_config.constants
     ; terraform : terraform_config
     }
@@ -84,11 +86,14 @@ module Network_config = struct
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
+        ; extra_genesis_accounts
         ; num_snark_workers
         ; num_archive_nodes
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
+        ; work_delay
+        ; transaction_capacity
         } =
       test_config
     in
@@ -103,18 +108,56 @@ module Network_config = struct
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
-    let block_producer_keypairs, runtime_accounts =
-      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-      let keypairs =
-        List.drop
-          (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-          1
-      in
-      if num_block_producers > List.length keypairs then
-        failwith
-          "not enough sample keypairs for specified number of block producers" ;
-      let f index ({ Test_config.Block_producer.balance; timing }, (pk, sk)) =
-        let runtime_account =
+    let bp_keypairs, extra_keypairs =
+      List.split_n
+        (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1)
+        num_block_producers
+    in
+    if List.length bp_keypairs < num_block_producers then
+      failwith
+        "not enough sample keypairs for specified number of block producers" ;
+    assert (List.length bp_keypairs >= num_block_producers) ;
+    if List.length bp_keypairs < num_block_producers then
+      failwith
+        "not enough sample keypairs for specified number of extra keypairs" ;
+    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+    let extra_keypairs_cut =
+      List.take extra_keypairs (List.length extra_genesis_accounts)
+    in
+    let extra_accounts =
+      List.map (List.zip_exn extra_genesis_accounts extra_keypairs_cut)
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, sk)) ->
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
+                      t.initial_minimum_balance
+                  ; cliff_time = t.cliff_time
+                  ; cliff_amount = t.cliff_amount
+                  ; vesting_period = t.vesting_period
+                  ; vesting_increment = t.vesting_increment
+                  }
+          in
+          let default = Runtime_config.Accounts.Single.default in
+          { default with
+            pk = Some (Public_key.Compressed.to_string pk)
+          ; sk = Some (Private_key.to_base58_check sk)
+          ; balance =
+              Balance.of_formatted_string balance
+              (* delegation currently unsupported *)
+          ; delegate = None
+          ; timing
+          })
+    in
+    let bp_accounts =
+      List.map (List.zip_exn block_producers bp_keypairs)
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
           let timing =
             match timing with
             | Account.Timing.Untimed ->
@@ -135,14 +178,13 @@ module Network_config = struct
           let (permissions
                 : Runtime_config.Accounts.Single.Permissions.t option) =
             Some
-              { stake = false
-              ; edit_state = None
+              { edit_state = None
               ; send = None
               ; receive = None
               ; set_delegate = None
               ; set_permissions = None
               ; set_verification_key = None
-              ; set_snapp_uri = None
+              ; set_zkapp_uri = None
               ; edit_sequence_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
@@ -159,21 +201,7 @@ module Network_config = struct
           ; delegate = None
           ; timing
           ; permissions
-          }
-        in
-        let secret_name = "test-keypair-" ^ Int.to_string index in
-        let keypair =
-          { Keypair.public_key = Public_key.decompress_exn pk
-          ; private_key = sk
-          }
-        in
-        ( Network_keypair.create_network_keypair ~keypair ~secret_name
-        , runtime_account )
-      in
-      List.mapi ~f
-        (List.zip_exn block_producers
-           (List.take keypairs (List.length block_producers)))
-      |> List.unzip
+          })
     in
     (* DAEMON CONFIG *)
     let proof_config =
@@ -181,9 +209,9 @@ module Network_config = struct
       { Runtime_config.Proof_keys.level = Some proof_level
       ; sub_windows_per_window = None
       ; ledger_depth = None
-      ; work_delay = None
-      ; block_window_duration_ms = None
-      ; transaction_capacity = None
+      ; work_delay
+      ; block_window_duration_ms = Some 120000
+      ; transaction_capacity
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
@@ -210,12 +238,10 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof =
-          None
-          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
-            { base = Accounts runtime_accounts
+            { base = Accounts (bp_accounts @ extra_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -244,13 +270,32 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_schema = "create_schema.sql" in
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
+    let mina_archive_schema_aux_files =
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
+      ]
+    in
+    let mk_net_keypair index (pk, sk) =
+      let secret_name = "test-keypair-" ^ Int.to_string index in
+      let keypair =
+        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
+      in
+      Network_keypair.create_network_keypair ~keypair ~secret_name
+    in
+    let extra_genesis_net_keypairs =
+      List.mapi extra_keypairs_cut ~f:mk_net_keypair
+    in
+    let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; keypairs = block_producer_keypairs
+    ; block_producer_keypairs = bp_net_keypairs
+    ; extra_genesis_keypairs = extra_genesis_net_keypairs
     ; constants
     ; terraform =
         { cluster_name
@@ -265,10 +310,11 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs =
-            List.mapi block_producer_keypairs ~f:block_producer_config
+            List.mapi bp_net_keypairs ~f:block_producer_config
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
+        ; mina_archive_schema_aux_files
         ; snark_worker_replicas = num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
@@ -341,8 +387,9 @@ module Network_manager = struct
     ; snark_worker_workloads : Kubernetes_network.Workload.t list
     ; archive_workloads : Kubernetes_network.Workload.t list
     ; workloads_by_id : Kubernetes_network.Workload.t String.Map.t
-    ; mutable deployed : bool
-    ; keypairs : Keypair.t list
+    ; mutable deployed : bool (* ; keypairs : Keypair.t list *)
+    ; block_producer_keypairs : Keypair.t list
+    ; extra_genesis_keypairs : Keypair.t list
     }
 
   let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
@@ -476,8 +523,12 @@ module Network_manager = struct
       ; archive_workloads
       ; workloads_by_id
       ; deployed = false
-      ; keypairs =
-          List.map network_config.keypairs ~f:(fun { keypair; _ } -> keypair)
+      ; block_producer_keypairs =
+          List.map network_config.block_producer_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
+      ; extra_genesis_keypairs =
+          List.map network_config.extra_genesis_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
       }
     in
     [%log info] "Initializing terraform" ;
@@ -533,7 +584,8 @@ module Network_manager = struct
       ; archive_nodes
       ; nodes_by_pod_id
       ; testnet_log_filter = t.testnet_log_filter
-      ; keypairs = t.keypairs
+      ; block_producer_keypairs = t.block_producer_keypairs
+      ; extra_genesis_keypairs = t.extra_genesis_keypairs
       }
     in
     let nodes_to_string =

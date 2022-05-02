@@ -101,7 +101,7 @@ let Config =
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
-      , if : Optional B/If
+      , `if` : Optional B/If
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -113,15 +113,16 @@ let Config =
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
-    , if = None B/If
+    , `if` = None B/If
     }
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { XLarge = toMap { size = "xlarge" },
-          Large = toMap { size = "large" },
-          Medium = toMap { size = "medium" },
-          Small = toMap { size = "small" }
+  merge { XLarge = toMap { size = "generic" },
+          Large = toMap { size = "generic" },
+          Medium = toMap { size = "generic" },
+          Small = toMap { size = "generic" },
+          Integration = toMap { size = "integration" }
         }
         target
 
@@ -185,11 +186,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     c.retries)
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
-              manual = None B/Manual
+              manual = Some (B/Manual.Manual/Type {
+                allowed = Some True,
+                permit_on_passed = Some True,
+                reason = None Text
+              })
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
-    if = c.if,
+    `if` = c.`if`,
     plugins =
       let dockerPart =
         Optional/toList

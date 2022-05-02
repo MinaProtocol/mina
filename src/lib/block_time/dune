@@ -4,7 +4,30 @@
  (library_flags -linkall)
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
- (libraries core_kernel mina_numbers snark_params snark_bits unsigned_extended timeout_lib)
+ (libraries
+   ;; opam libraries
+   integers
+   base.caml
+   bin_prot.shape
+   sexplib0
+   async_kernel
+   core_kernel
+   base
+   base.base_internalhash_types
+   ;; local libraries
+   bitstring_lib
+   pickles
+   unsigned_extended
+   snark_params
+   mina_numbers
+   logger
+   snark_bits
+   timeout_lib
+   crypto_params
+   snarky.backendless
+   random_oracle_input
+   random_oracle
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_hash ppx_let
                   ppx_coda ppx_version ppx_deriving_yojson ppx_bin_prot ppx_compare ppx_sexp_conv ppx_compare ppx_optcomp

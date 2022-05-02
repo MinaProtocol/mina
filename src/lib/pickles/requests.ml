@@ -19,9 +19,7 @@ module Wrap = struct
 
     type _ t +=
       | Evals :
-          ( ( Field.Constant.t
-            , Field.Constant.t array )
-            Dlog_plonk_types.All_evals.t
+          ( (Field.Constant.t, Field.Constant.t array) Plonk_types.All_evals.t
           , max_branching )
           Vector.t
           t
@@ -37,17 +35,17 @@ module Wrap = struct
                 Vector.t
               , Digest.Constant.t
               , bool )
-              Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+              Types.Step.Proof_state.Per_proof.In_circuit.t
             , max_branching )
             Vector.t
           , Digest.Constant.t )
-          Types.Pairing_based.Proof_state.t
+          Types.Step.Proof_state.t
           t
-      | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
+      | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
       | Openings_proof :
           ( Tock.Inner_curve.Affine.t
           , Tick.Field.t )
-          Dlog_plonk_types.Openings.Bulletproof.t
+          Plonk_types.Openings.Bulletproof.t
           t
   end
 
@@ -69,8 +67,7 @@ module Wrap = struct
 
       type _ t +=
         | Evals :
-            (Tock.Field.t, Tock.Field.t array) Dlog_plonk_types.All_evals.t vec
-            t
+            (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t vec t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
             max_local_max_branchings H1.T(Challenges_vector.Constant).t t
@@ -84,17 +81,17 @@ module Wrap = struct
                   Vector.t
                 , Digest.Constant.t
                 , bool )
-                Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+                Types.Step.Proof_state.Per_proof.In_circuit.t
               , max_branching )
               Vector.t
             , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.t
+            Types.Step.Proof_state.t
             t
-        | Messages : Tock.Inner_curve.Affine.t Dlog_plonk_types.Messages.t t
+        | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
         | Openings_proof :
             ( Tock.Inner_curve.Affine.t
             , Tick.Field.t )
-            Dlog_plonk_types.Openings.Bulletproof.t
+            Plonk_types.Openings.Bulletproof.t
             t
     end in
     (module R)

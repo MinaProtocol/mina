@@ -20,8 +20,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
-        Map.add_exn acc
-          ~key:(Protocol_state.hash protocol_state)
+        Map.add_exn acc ~key:(Protocol_state.hashes protocol_state).state_hash
           ~data:protocol_state)
   in
   let get_state hash =
@@ -246,8 +245,8 @@ module Instance = struct
           { transition = root_transition
           ; staged_ledger = root_staged_ledger
           ; protocol_states =
-              (*TODO: store the hashes as well?*)
-              List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
+              List.map protocol_states
+                ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           }
         ~root_ledger:
           (Mina_ledger.Ledger.Any_ledger.cast
@@ -350,7 +349,8 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-          @@ External_transition.Validated.state_hash root_transition )
+          @@ (External_transition.Validated.state_hashes root_transition)
+               .state_hash )
       ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in

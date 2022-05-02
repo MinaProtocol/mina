@@ -294,4 +294,5 @@ let reset_to_genesis_exn t ~precomputed_values =
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
-             (Precomputed_values.genesis_state_hash precomputed_values)))
+             (Precomputed_values.genesis_state_hashes precomputed_values)
+               .state_hash))

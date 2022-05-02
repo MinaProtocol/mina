@@ -26,12 +26,7 @@ end
 
 module type Blockchain_state = sig
   module Poly : sig
-    type ( 'staged_ledger_hash
-         , 'snarked_ledger_hash
-         , 'token_id
-         , 'local_state
-         , 'time )
-         t
+    type ('staged_ledger_hash, 'snarked_ledger_hash, 'local_state, 'time) t
     [@@deriving sexp]
   end
 
@@ -39,8 +34,7 @@ module type Blockchain_state = sig
     type t =
       ( Staged_ledger_hash.t
       , Frozen_ledger_hash.t
-      , Token_id.t
-      , Parties_logic.Local_state.Value.t
+      , Mina_transaction_logic.Parties_logic.Local_state.Value.t
       , Block_time.t )
       Poly.t
     [@@deriving sexp]
@@ -49,23 +43,20 @@ module type Blockchain_state = sig
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
-    , Token_id.var
-    , Parties_logic.Local_state.Checked.t
+    , Mina_transaction_logic.Parties_logic.Local_state.Checked.t
     , Block_time.Checked.t )
     Poly.t
 
   val staged_ledger_hash :
-    ('staged_ledger_hash, _, _, _, _) Poly.t -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
   val genesis_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val snarked_next_available_token : (_, _, 'token_id, _, _) Poly.t -> 'token_id
-
-  val timestamp : (_, _, _, _, 'time) Poly.t -> 'time
+  val timestamp : (_, _, _, 'time) Poly.t -> 'time
 end
 
 module type Protocol_state = sig
@@ -210,8 +201,7 @@ module type State_hooks = sig
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var
-       , _ )
+    -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
 
   val genesis_winner : Public_key.Compressed.t * Private_key.t
@@ -222,7 +212,7 @@ module type State_hooks = sig
       -> constants:Constants.t
       -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:
-               (protocol_state, Mina_base.State_hash.t) With_hash.t
+               protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
@@ -540,7 +530,7 @@ module type S = sig
 
       val is_genesis_state : Value.t -> bool
 
-      val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
+      val is_genesis_state_var : var -> Boolean.var Checked.t
 
       val supercharge_coinbase_var : var -> Boolean.var
 
@@ -653,8 +643,10 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> select_status
 
@@ -689,8 +681,10 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> bool
 

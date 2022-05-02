@@ -2,7 +2,29 @@
  (name trust_system)
  (public_name trust_system)
  (library_flags (-linkall))
- (libraries run_in_thread core_kernel async_kernel network_peer key_value_database rocksdb logger pipe_lib mina_metrics ppx_version.runtime)
+ (libraries
+   ;; opam libraries
+   sexplib0
+   core
+   ppx_inline_test.config
+   base.caml
+   ppx_version.runtime
+   async_kernel
+   core_kernel
+   bin_prot.shape
+   base
+   result
+   async
+   async_unix
+   ;; local libraries
+   mina_metrics
+   rocksdb
+   pipe_lib
+   logger
+   key_value_database
+   network_peer
+   run_in_thread
+ )
  (inline_tests)
  (preprocess
   (pps

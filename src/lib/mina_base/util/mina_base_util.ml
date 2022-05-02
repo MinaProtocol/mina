@@ -18,7 +18,7 @@ let split_last_exn =
 
 let two_to_the i = Bignum_bigint.(pow (of_int 2) (of_int i))
 
-let todo_snapps = `Needs_some_work_for_snapps_on_mainnet
+let todo_zkapps = `Needs_some_work_for_zkapps_on_mainnet
 
 let todo_separate_fee = `Update_when_we_add_a_separate_fee
 

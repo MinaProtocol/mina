@@ -229,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  best_tip_transition.hash))
+                  (State_hash.With_state_hashes.state_hash best_tip_transition)))
       in
       verified_witness
   end

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+open Mina_transaction
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -59,7 +60,7 @@ module Inputs = struct
     ( Transaction_witness.Parties_segment_witness.t
     * Transaction_snark.Parties_segment.Basic.t
     * Transaction_snark.Statement.With_sok.t
-    * (int * Snapp_statement.t) option )
+    * (int * Zkapp_statement.t) option )
     list
   [@@deriving sexp, to_yojson]
 
@@ -108,9 +109,19 @@ module Inputs = struct
                                   ~constraint_constants:M.constraint_constants
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
-                                  ~pending_coinbase_init_stack:w.init_stack
-                                  (`Sparse_ledger w.ledger) [ parties ]
-                                |> List.rev)
+                                  (`Sparse_ledger w.ledger)
+                                  [ ( `Pending_coinbase_init_stack w.init_stack
+                                    , `Pending_coinbase_of_statement
+                                        { Transaction_snark
+                                          .Pending_coinbase_stack_state
+                                          .source =
+                                            input.source.pending_coinbase_stack
+                                        ; target =
+                                            input.target.pending_coinbase_stack
+                                        }
+                                    , parties )
+                                  ]
+                                |> fst |> List.rev)
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for parties : \

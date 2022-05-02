@@ -21,9 +21,11 @@ let add (t : t) ~parent new_child =
           List.mem children new_child ~equal:(fun e1 e2 ->
               State_hash.equal
                 ( Envelope.Incoming.data e1
-                |> External_transition.Initial_validated.state_hash )
+                |> External_transition.Initial_validated.state_hashes )
+                  .state_hash
                 ( Envelope.Incoming.data e2
-                |> External_transition.Initial_validated.state_hash ))
+                |> External_transition.Initial_validated.state_hashes )
+                  .state_hash)
         then children
         else new_child :: children)
 

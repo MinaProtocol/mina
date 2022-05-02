@@ -1,7 +1,7 @@
 (library
  (public_name run_in_thread.native)
  (name run_in_thread_native)
- (libraries async)
+ (libraries async async_unix)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (implements run_in_thread))

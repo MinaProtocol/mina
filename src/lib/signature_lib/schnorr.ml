@@ -38,10 +38,10 @@ module type Message_intf = sig
 
   type curve_scalar_var
 
-  type (_, _) checked
+  type _ checked
 
   val hash_checked :
-    var -> public_key:curve_var -> r:field_var -> (curve_scalar_var, _) checked
+    var -> public_key:curve_var -> r:field_var -> curve_scalar_var checked
 
   [%%endif]
 end
@@ -66,7 +66,7 @@ module type S = sig
       Snarky_curves.Shifted_intf
         with type curve_var := curve_var
          and type boolean_var := Boolean.var
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type 'a checked := 'a Checked.t
   end
 
   module Message :
@@ -74,7 +74,7 @@ module type S = sig
       with type boolean_var := Boolean.var
        and type curve_scalar := curve_scalar
        and type curve_scalar_var := curve_scalar_var
-       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type 'a checked := 'a Checked.t
        and type curve := curve
        and type curve_var := curve_var
        and type field := Field.t
@@ -99,21 +99,21 @@ module type S = sig
   end
 
   module Checked : sig
-    val compress : curve_var -> (Boolean.var list, _) Checked.t
+    val compress : curve_var -> Boolean.var list Checked.t
 
     val verifies :
          (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
-      -> (Boolean.var, _) Checked.t
+      -> Boolean.var Checked.t
 
     val assert_verifies :
          (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
-      -> (unit, _) Checked.t
+      -> unit Checked.t
   end
 
   val compress : curve -> bool list
@@ -184,7 +184,7 @@ module Make
                   and type curve_var := Curve.var
                   and type field := Impl.Field.t
                   and type field_var := Impl.Field.Var.t
-                  and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+                  and type 'a checked := 'a Impl.Checked.t) :
   S
     with module Impl := Impl
      and type curve := Curve.t
@@ -541,13 +541,13 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash = make_hash ~init:Hash_prefix_states.signature
+    let hash = make_hash ~init:Hash_prefix_states.signature_legacy
 
     let hash_for_mainnet =
-      make_hash ~init:Hash_prefix_states.signature_for_mainnet
+      make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
 
     let hash_for_testnet =
-      make_hash ~init:Hash_prefix_states.signature_for_testnet
+      make_hash ~init:Hash_prefix_states.signature_for_testnet_legacy
 
     [%%ifdef consensus_mechanism]
 
@@ -561,7 +561,7 @@ module Message = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
-          hash ~init:Hash_prefix_states.signature (pack_input input)
+          hash ~init:Hash_prefix_states.signature_legacy (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list)
 
@@ -654,93 +654,49 @@ let gen_chunked =
 
 (* Use for reading only. *)
 let legacy_message_typ () : (Message.Legacy.var, Message.Legacy.t) Tick.Typ.t =
+  let to_hlist { Random_oracle.Input.Legacy.field_elements; bitstrings } =
+    H_list.[ field_elements; bitstrings ]
+  in
+  let of_hlist ([ field_elements; bitstrings ] : (unit, _) H_list.t) =
+    { Random_oracle.Input.Legacy.field_elements; bitstrings }
+  in
   let open Tick.Typ in
-  { alloc = Alloc.return (Random_oracle.Input.Legacy.field_elements [||])
-  ; store =
-      Store.Let_syntax.(
-        fun { Random_oracle.Input.Legacy.field_elements; bitstrings } ->
-          let%bind field_elements =
-            Store.all @@ Array.to_list
-            @@ Array.map ~f:(store Tick.Field.typ) field_elements
-          in
-          let%map bitstrings =
-            Store.all @@ Array.to_list
-            @@ Array.map bitstrings ~f:(fun l ->
-                   Store.all @@ List.map ~f:(store Tick.Boolean.typ) l)
-          in
-          { Random_oracle.Input.Legacy.field_elements =
-              Array.of_list field_elements
-          ; bitstrings = Array.of_list bitstrings
-          })
-  ; read =
-      Read.Let_syntax.(
-        fun { Random_oracle.Input.Legacy.field_elements; bitstrings } ->
-          let%bind field_elements =
-            Read.all @@ Array.to_list
-            @@ Array.map ~f:(read Tick.Field.typ) field_elements
-          in
-          let%map bitstrings =
-            Read.all @@ Array.to_list
-            @@ Array.map bitstrings ~f:(fun l ->
-                   Read.all @@ List.map ~f:(read Tick.Boolean.typ) l)
-          in
-          { Random_oracle.Input.Legacy.field_elements =
-              Array.of_list field_elements
-          ; bitstrings = Array.of_list bitstrings
-          })
-  ; check = (fun _ -> Tick.Checked.return ())
-  }
+  of_hlistable
+    [ array ~length:0 Tick.Field.typ
+    ; array ~length:0 (list ~length:0 Tick.Boolean.typ)
+    ]
+    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    ~value_of_hlist:of_hlist
 
 (* Use for reading only. *)
 let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
     =
   let open Tick.Typ in
-  { alloc = Alloc.return (Random_oracle.Input.Chunked.field_elements [||])
-  ; store =
-      Store.Let_syntax.(
-        fun { Random_oracle.Input.Chunked.field_elements; packeds } ->
-          let%bind field_elements =
-            Store.all @@ Array.to_list
-            @@ Array.map ~f:(store Tick.Field.typ) field_elements
-          in
-          let packeds2 =
-            Array.init (Array.length packeds) ~f:(fun _ ->
-                (Tick.Field.Var.constant Tick.Field.zero, 0))
-          in
-          let%map () =
-            Array.foldi packeds ~init:(Store.return ())
-              ~f:(fun i acc (fld, len) ->
-                let%bind () = acc in
-                let%map x = store Tick.Field.typ fld in
-                packeds2.(i) <- (x, len))
-          in
-          { Random_oracle.Input.Chunked.field_elements =
-              Array.of_list field_elements
-          ; packeds = packeds2
-          })
-  ; read =
-      Read.Let_syntax.(
-        fun { Random_oracle.Input.Chunked.field_elements; packeds } ->
-          let%bind field_elements =
-            Read.all @@ Array.to_list
-            @@ Array.map ~f:(read Tick.Field.typ) field_elements
-          in
-          let packeds2 =
-            Array.init (Array.length packeds) ~f:(fun _ -> (Tick.Field.zero, 0))
-          in
-          let%map () =
-            Array.foldi packeds ~init:(Read.return ())
-              ~f:(fun i acc (fld, len) ->
-                let%bind () = acc in
-                let%map x = read Tick.Field.typ fld in
-                packeds2.(i) <- (x, len))
-          in
-          { Random_oracle.Input.Chunked.field_elements =
-              Array.of_list field_elements
-          ; packeds = packeds2
-          })
-  ; check = (fun _ -> Tick.Checked.return ())
-  }
+  let const_typ =
+    Typ
+      { check = (fun _ -> Tick.Checked.return ())
+      ; var_to_fields = (fun t -> ([||], t))
+      ; var_of_fields = (fun (_, t) -> t)
+      ; value_to_fields = (fun t -> ([||], t))
+      ; value_of_fields = (fun (_, t) -> t)
+      ; size_in_field_elements = 0
+      ; constraint_system_auxiliary =
+          (fun () ->
+            failwith "Cannot create constant in constraint-system mode")
+      }
+  in
+  let to_hlist { Random_oracle.Input.Chunked.field_elements; packeds } =
+    H_list.[ field_elements; packeds ]
+  in
+  let of_hlist ([ field_elements; packeds ] : (unit, _) H_list.t) =
+    { Random_oracle.Input.Chunked.field_elements; packeds }
+  in
+  of_hlistable
+    [ array ~length:0 Tick.Field.typ
+    ; array ~length:0 (Tick.Field.typ * const_typ)
+    ]
+    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    ~value_of_hlist:of_hlist
 
 let%test_unit "schnorr checked + unchecked" =
   Quickcheck.test ~trials:5 gen_legacy ~f:(fun (pk, msg) ->

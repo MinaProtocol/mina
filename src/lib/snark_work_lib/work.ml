@@ -17,42 +17,6 @@ module Single = struct
               * 'ledger_proof
         [@@deriving sexp, to_yojson]
       end
-
-      module V1 = struct
-        type ('transition, 'witness, 'ledger_proof) t =
-          | Transition of
-              Transaction_snark.Statement.Stable.V1.t * 'transition * 'witness
-          | Merge of
-              Transaction_snark.Statement.Stable.V1.t
-              * 'ledger_proof
-              * 'ledger_proof
-        [@@deriving sexp, to_yojson]
-
-        (*
-
-        let to_latest transition_latest witness_latest ledger_proof_latest =
-          function
-          | Transition (stmt, transition, witness) ->
-              Transition
-                (stmt, transition_latest transition, witness_latest witness)
-          | Merge (stmt, proof1, proof2) ->
-              Merge
-                (stmt, ledger_proof_latest proof1, ledger_proof_latest proof2)
-
-        let of_latest transition_latest witness_latest ledger_proof_latest =
-          function
-          | Transition (stmt, transition, witness) ->
-              let open Result.Let_syntax in
-              let%map transition = transition_latest transition
-              and witness = witness_latest witness in
-              Transition (stmt, transition, witness)
-          | Merge (stmt, proof1, proof2) ->
-              let open Result.Let_syntax in
-              let%map proof1 = ledger_proof_latest proof1
-              and proof2 = ledger_proof_latest proof2 in
-              Merge (stmt, proof1, proof2)
-*)
-      end
     end]
 
     type ('witness, 'ledger_proof) t =

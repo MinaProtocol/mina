@@ -74,11 +74,11 @@ module type S_checked = sig
 
   val zero : t
 
-  val succ : t -> (t, _) Checked.t
+  val succ : t -> t Checked.t
 
-  val add : t -> t -> (t, _) Checked.t
+  val add : t -> t -> t Checked.t
 
-  val mul : t -> t -> (t, _) Checked.t
+  val mul : t -> t -> t Checked.t
 
   (** [sub_or_zero x y] computes [x - y].
 
@@ -87,43 +87,43 @@ module type S_checked = sig
     - If the argument to [`Underflow] is false, [x >= y] and the returned
       integer value is equal to [x - y]
   *)
-  val sub_or_zero : t -> t -> ([ `Underflow of Boolean.var ] * t, _) Checked.t
+  val sub_or_zero : t -> t -> ([ `Underflow of Boolean.var ] * t) Checked.t
 
   (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
-  val sub : t -> t -> (t, _) Checked.t
+  val sub : t -> t -> t Checked.t
 
-  val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
+  val is_succ : pred:t -> succ:t -> Boolean.var Checked.t
 
-  val min : t -> t -> (t, _) Checked.t
+  val min : t -> t -> t Checked.t
 
   val to_input : t -> Field.Var.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy :
-    t -> ((_, Boolean.var) Random_oracle.Legacy.Input.t, _) Checked.t
+    t -> (_, Boolean.var) Random_oracle.Legacy.Input.t Checked.t
 
-  val succ_if : t -> Boolean.var -> (t, _) Checked.t
+  val succ_if : t -> Boolean.var -> t Checked.t
 
-  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+  val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
   (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
-  val equal : t -> t -> (Boolean.var, _) Checked.t
+  val equal : t -> t -> Boolean.var Checked.t
 
-  val div_mod : t -> t -> (t * t, _) Checked.t
+  val div_mod : t -> t -> (t * t) Checked.t
 
-  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( = ) : t -> t -> Boolean.var Checked.t
 
-  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( < ) : t -> t -> Boolean.var Checked.t
 
-  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( > ) : t -> t -> Boolean.var Checked.t
 
-  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( <= ) : t -> t -> Boolean.var Checked.t
 
-  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+  val ( >= ) : t -> t -> Boolean.var Checked.t
 
   module Assert : sig
-    val equal : t -> t -> (unit, _) Checked.t
+    val equal : t -> t -> unit Checked.t
   end
 
   val to_field : t -> Field.Var.t

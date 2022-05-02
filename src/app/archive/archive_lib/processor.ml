@@ -5,6 +5,7 @@ open Async
 open Core
 open Caqti_async
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_transition
 open Pipe_lib
@@ -46,8 +47,8 @@ module Public_key = struct
           public_key
 end
 
-module Snapp_state_data = struct
-  let table_name = "snapp_state_data"
+module Zkapp_state_data = struct
+  let table_name = "zkapp_state_data"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fp : Pickles.Backend.Tick.Field.t) =
@@ -64,15 +65,15 @@ module Snapp_state_data = struct
       id
 end
 
-module Snapp_state_data_array = struct
-  let table_name = "snapp_state_data_array"
+module Zkapp_state_data_array = struct
+  let table_name = "zkapp_state_data_array"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
-        ~f:(Snapp_state_data.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -89,8 +90,8 @@ module Snapp_state_data_array = struct
       id
 end
 
-module Snapp_states = struct
-  let table_name = "snapp_states"
+module Zkapp_states = struct
+  let table_name = "zkapp_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t option, 'n) Vector.vec) =
@@ -99,7 +100,7 @@ module Snapp_states = struct
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:
           ( Mina_caqti.add_if_some
-          @@ Snapp_state_data.add_if_doesn't_exist (module Conn) )
+          @@ Zkapp_state_data.add_if_doesn't_exist (module Conn) )
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -116,7 +117,7 @@ module Snapp_states = struct
       id
 end
 
-module Snapp_verification_keys = struct
+module Zkapp_verification_keys = struct
   type t = { verification_key : string; hash : string }
   [@@deriving fields, hlist]
 
@@ -124,7 +125,7 @@ module Snapp_verification_keys = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ string; string ]
 
-  let table_name = "snapp_verification_keys"
+  let table_name = "zkapp_verification_keys"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (vk :
@@ -151,7 +152,7 @@ module Snapp_verification_keys = struct
       id
 end
 
-module Snapp_permissions = struct
+module Zkapp_permissions = struct
   let auth_required_typ =
     let encode = function
       | Permissions.Auth_required.None ->
@@ -179,17 +180,16 @@ module Snapp_permissions = struct
       | s ->
           Result.Error (sprintf "Failed to decode: \"%s\"" s)
     in
-    Caqti_type.enum ~encode ~decode "snapp_auth_required_type"
+    Caqti_type.enum ~encode ~decode "zkapp_auth_required_type"
 
   type t =
-    { stake : bool
-    ; edit_state : Permissions.Auth_required.t
+    { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
-    ; set_snapp_uri : Permissions.Auth_required.t
+    ; set_zkapp_uri : Permissions.Auth_required.t
     ; edit_sequence_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
@@ -199,33 +199,30 @@ module Snapp_permissions = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ bool
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ; auth_required_typ
-        ]
+      [ auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ]
 
-  let table_name = "snapp_permissions"
+  let table_name = "zkapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
     let value =
-      { stake = perms.stake
-      ; edit_state = perms.edit_state
+      { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key
-      ; set_snapp_uri = perms.set_snapp_uri
+      ; set_zkapp_uri = perms.set_zkapp_uri
       ; edit_sequence_state = perms.edit_sequence_state
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
@@ -244,7 +241,7 @@ module Snapp_permissions = struct
       id
 end
 
-module Snapp_timing_info = struct
+module Zkapp_timing_info = struct
   type t =
     { initial_minimum_balance : int64
     ; cliff_time : int64
@@ -258,7 +255,7 @@ module Snapp_timing_info = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64; int64; int64; int64 ]
 
-  let table_name = "snapp_timing_info"
+  let table_name = "zkapp_timing_info"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timing_info : Party.Update.Timing_info.t) =
@@ -298,13 +295,13 @@ module Snapp_timing_info = struct
       id
 end
 
-module Snapp_updates = struct
+module Zkapp_updates = struct
   type t =
     { app_state_id : int
     ; delegate_id : int option
     ; verification_key_id : int option
     ; permissions_id : int option
-    ; snapp_uri : string option
+    ; zkapp_uri : string option
     ; token_symbol : string option
     ; timing_id : int option
     ; voting_for : string option
@@ -324,47 +321,47 @@ module Snapp_updates = struct
         ; option string
         ]
 
-  let table_name = "snapp_updates"
+  let table_name = "zkapp_updates"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (update : Party.Update.t)
       =
     let open Deferred.Result.Let_syntax in
     let%bind app_state_id =
-      Vector.map ~f:Snapp_basic.Set_or_keep.to_option update.app_state
-      |> Snapp_states.add_if_doesn't_exist (module Conn)
+      Vector.map ~f:Zkapp_basic.Set_or_keep.to_option update.app_state
+      |> Zkapp_states.add_if_doesn't_exist (module Conn)
     in
     let%bind delegate_id =
-      Mina_caqti.add_if_snapp_set
+      Mina_caqti.add_if_zkapp_set
         (Public_key.add_if_doesn't_exist (module Conn))
         update.delegate
     in
     let%bind verification_key_id =
-      Mina_caqti.add_if_snapp_set
-        (Snapp_verification_keys.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_set
+        (Zkapp_verification_keys.add_if_doesn't_exist (module Conn))
         update.verification_key
     in
     let%bind permissions_id =
-      Mina_caqti.add_if_snapp_set
-        (Snapp_permissions.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_set
+        (Zkapp_permissions.add_if_doesn't_exist (module Conn))
         update.permissions
     in
     let%bind timing_id =
-      Mina_caqti.add_if_snapp_set
-        (Snapp_timing_info.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_set
+        (Zkapp_timing_info.add_if_doesn't_exist (module Conn))
         update.timing
     in
-    let snapp_uri = Snapp_basic.Set_or_keep.to_option update.snapp_uri in
-    let token_symbol = Snapp_basic.Set_or_keep.to_option update.token_symbol in
+    let zkapp_uri = Zkapp_basic.Set_or_keep.to_option update.zkapp_uri in
+    let token_symbol = Zkapp_basic.Set_or_keep.to_option update.token_symbol in
     let voting_for =
       Option.map ~f:State_hash.to_base58_check
-        (Snapp_basic.Set_or_keep.to_option update.voting_for)
+        (Zkapp_basic.Set_or_keep.to_option update.voting_for)
     in
     let value =
       { app_state_id
       ; delegate_id
       ; verification_key_id
       ; permissions_id
-      ; snapp_uri
+      ; zkapp_uri
       ; token_symbol
       ; timing_id
       ; voting_for
@@ -382,7 +379,7 @@ module Snapp_updates = struct
       id
 end
 
-module Snapp_balance_bounds = struct
+module Zkapp_balance_bounds = struct
   type t = { balance_lower_bound : int64; balance_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -390,11 +387,11 @@ module Snapp_balance_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_balance_bounds"
+  let table_name = "zkapp_balance_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (balance_bounds :
-        Currency.Balance.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Currency.Balance.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let balance_lower_bound =
       balance_bounds.lower |> Currency.Balance.to_uint64
       |> Unsigned.UInt64.to_int64
@@ -416,7 +413,7 @@ module Snapp_balance_bounds = struct
       id
 end
 
-module Snapp_nonce_bounds = struct
+module Zkapp_nonce_bounds = struct
   type t = { nonce_lower_bound : int64; nonce_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -424,12 +421,12 @@ module Snapp_nonce_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_nonce_bounds"
+  let table_name = "zkapp_nonce_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (nonce_bounds :
-        Mina_numbers.Account_nonce.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
+        Mina_numbers.Account_nonce.t
+        Mina_base.Zkapp_precondition.Closed_interval.t) =
     let nonce_lower_bound = Unsigned.UInt32.to_int64 nonce_bounds.lower in
     let nonce_upper_bound = Unsigned.UInt32.to_int64 nonce_bounds.upper in
     let value = { nonce_lower_bound; nonce_upper_bound } in
@@ -445,7 +442,7 @@ module Snapp_nonce_bounds = struct
       id
 end
 
-module Snapp_account = struct
+module Zkapp_account = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
@@ -471,45 +468,45 @@ module Snapp_account = struct
         ; option bool
         ]
 
-  let table_name = "snapp_account"
+  let table_name = "zkapp_account"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (acct : Snapp_predicate.Account.t) =
+      (acct : Zkapp_precondition.Account.t) =
     let open Deferred.Result.Let_syntax in
     let%bind balance_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_balance_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_balance_bounds.add_if_doesn't_exist (module Conn))
         acct.balance
     in
     let%bind nonce_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_nonce_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_nonce_bounds.add_if_doesn't_exist (module Conn))
         acct.nonce
     in
     let%bind public_key_id =
-      Mina_caqti.add_if_snapp_check
+      Mina_caqti.add_if_zkapp_check
         (Public_key.add_if_doesn't_exist (module Conn))
         acct.public_key
     in
     let%bind delegate_id =
-      Mina_caqti.add_if_snapp_check
+      Mina_caqti.add_if_zkapp_check
         (Public_key.add_if_doesn't_exist (module Conn))
         acct.delegate
     in
     let%bind state_id =
-      Vector.map ~f:Snapp_basic.Or_ignore.to_option acct.state
-      |> Snapp_states.add_if_doesn't_exist (module Conn)
+      Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
+      |> Zkapp_states.add_if_doesn't_exist (module Conn)
     in
     let%bind sequence_state_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_state_data.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_state_data.add_if_doesn't_exist (module Conn))
         acct.sequence_state
     in
     let receipt_chain_hash =
-      Snapp_basic.Or_ignore.to_option acct.receipt_chain_hash
+      Zkapp_basic.Or_ignore.to_option acct.receipt_chain_hash
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
-    let proved_state = Snapp_basic.Or_ignore.to_option acct.proved_state in
+    let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
     let value =
       { balance_id
       ; nonce_id
@@ -533,55 +530,56 @@ module Snapp_account = struct
       id
 end
 
-module Snapp_predicate = struct
+module Zkapp_account_precondition = struct
   type t =
-    { kind : Party.Predicate.Tag.t
+    { kind : Party.Account_precondition.Tag.t
     ; account_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
 
-  let snapp_predicate_kind_typ =
+  let zkapp_account_precondition_kind_typ =
     let encode = function
-      | Party.Predicate.Tag.Full ->
+      | Party.Account_precondition.Tag.Full ->
           "full"
-      | Party.Predicate.Tag.Nonce ->
+      | Party.Account_precondition.Tag.Nonce ->
           "nonce"
-      | Party.Predicate.Tag.Accept ->
+      | Party.Account_precondition.Tag.Accept ->
           "accept"
     in
     let decode = function
       | "full" ->
-          Result.return Party.Predicate.Tag.Full
+          Result.return Party.Account_precondition.Tag.Full
       | "nonce" ->
-          Result.return Party.Predicate.Tag.Nonce
+          Result.return Party.Account_precondition.Tag.Nonce
       | "accept" ->
-          Result.return Party.Predicate.Tag.Accept
+          Result.return Party.Account_precondition.Tag.Accept
       | _ ->
-          Result.failf "Failed to decode snapp_predicate_kind_typ"
+          Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
     in
-    Caqti_type.enum "snapp_predicate_type" ~encode ~decode
+    Caqti_type.enum "zkapp_account_precondition_type" ~encode ~decode
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ snapp_predicate_kind_typ; option int; option int64 ]
+      Caqti_type.
+        [ zkapp_account_precondition_kind_typ; option int; option int64 ]
 
-  let table_name = "snapp_predicate"
+  let table_name = "zkapp_account_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (predicate : Party.Predicate.t) =
+      (account_precondition : Party.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
     let%bind account_id =
-      match predicate with
-      | Party.Predicate.Full acct ->
-          Snapp_account.add_if_doesn't_exist (module Conn) acct >>| Option.some
+      match account_precondition with
+      | Party.Account_precondition.Full acct ->
+          Zkapp_account.add_if_doesn't_exist (module Conn) acct >>| Option.some
       | _ ->
           return None
     in
-    let kind = Party.Predicate.tag predicate in
+    let kind = Party.Account_precondition.tag account_precondition in
     let nonce =
-      match predicate with
-      | Party.Predicate.Nonce nonce ->
+      match account_precondition with
+      | Party.Account_precondition.Nonce nonce ->
           Option.some @@ Unsigned.UInt32.to_int64 nonce
       | _ ->
           None
@@ -599,25 +597,21 @@ module Snapp_predicate = struct
       id
 end
 
-module Snapp_token_id_bounds = struct
-  type t = { token_id_lower_bound : int64; token_id_upper_bound : int64 }
+module Zkapp_token_id_bounds = struct
+  type t = { token_id_lower_bound : string; token_id_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
-  let table_name = "snapp_token_id_bounds"
+  let table_name = "zkapp_token_id_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (token_id_bounds : Token_id.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
-    let token_id_lower_bound =
-      token_id_bounds.lower |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-    in
-    let token_id_upper_bound =
-      token_id_bounds.upper |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-    in
+      (token_id_bounds :
+        Token_id.t Mina_base.Zkapp_precondition.Closed_interval.t) =
+    let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
+    let token_id_upper_bound = token_id_bounds.upper |> Token_id.to_string in
     let value = { token_id_lower_bound; token_id_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -631,7 +625,7 @@ module Snapp_token_id_bounds = struct
       id
 end
 
-module Snapp_timestamp_bounds = struct
+module Zkapp_timestamp_bounds = struct
   type t = { timestamp_lower_bound : int64; timestamp_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -639,11 +633,11 @@ module Snapp_timestamp_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_timestamp_bounds"
+  let table_name = "zkapp_timestamp_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timestamp_bounds :
-        Block_time.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let timestamp_lower_bound = Block_time.to_int64 timestamp_bounds.lower in
     let timestamp_upper_bound = Block_time.to_int64 timestamp_bounds.upper in
     let value = { timestamp_lower_bound; timestamp_upper_bound } in
@@ -659,7 +653,7 @@ module Snapp_timestamp_bounds = struct
       id
 end
 
-module Snapp_length_bounds = struct
+module Zkapp_length_bounds = struct
   type t = { length_lower_bound : int64; length_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -667,11 +661,11 @@ module Snapp_length_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_length_bounds"
+  let table_name = "zkapp_length_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (length_bounds :
-        Unsigned.uint32 Mina_base.Snapp_predicate.Closed_interval.t) =
+        Unsigned.uint32 Mina_base.Zkapp_precondition.Closed_interval.t) =
     let length_lower_bound = Unsigned.UInt32.to_int64 length_bounds.lower in
     let length_upper_bound = Unsigned.UInt32.to_int64 length_bounds.upper in
     let value = { length_lower_bound; length_upper_bound } in
@@ -687,7 +681,7 @@ module Snapp_length_bounds = struct
       id
 end
 
-module Snapp_amount_bounds = struct
+module Zkapp_amount_bounds = struct
   type t = { amount_lower_bound : int64; amount_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -695,11 +689,11 @@ module Snapp_amount_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_amount_bounds"
+  let table_name = "zkapp_amount_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (amount_bounds :
-        Currency.Amount.t Mina_base.Snapp_predicate.Closed_interval.t) =
+        Currency.Amount.t Mina_base.Zkapp_precondition.Closed_interval.t) =
     let amount_lower_bound =
       Currency.Amount.to_uint64 amount_bounds.lower |> Unsigned.UInt64.to_int64
     in
@@ -719,7 +713,7 @@ module Snapp_amount_bounds = struct
       id
 end
 
-module Snapp_global_slot_bounds = struct
+module Zkapp_global_slot_bounds = struct
   type t = { global_slot_lower_bound : int64; global_slot_upper_bound : int64 }
   [@@deriving fields, hlist]
 
@@ -727,12 +721,12 @@ module Snapp_global_slot_bounds = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int64; int64 ]
 
-  let table_name = "snapp_global_slot_bounds"
+  let table_name = "zkapp_global_slot_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (global_slot_bounds :
-        Mina_numbers.Global_slot.t Mina_base.Snapp_predicate.Closed_interval.t)
-      =
+        Mina_numbers.Global_slot.t
+        Mina_base.Zkapp_precondition.Closed_interval.t) =
     let global_slot_lower_bound =
       Mina_numbers.Global_slot.to_uint32 global_slot_bounds.lower
       |> Unsigned.UInt32.to_int64
@@ -757,7 +751,7 @@ end
 module Timing_info = struct
   type t =
     { public_key_id : int
-    ; token : int64
+    ; token : string
     ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
@@ -769,7 +763,7 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; string; int64; int64; int64; int64; int64; int64 ]
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -819,9 +813,7 @@ module Timing_info = struct
         return id
     | None ->
         let values =
-          let token =
-            Token_id.to_uint64 (Account.token acc) |> Unsigned.UInt64.to_int64
-          in
+          let token = Token_id.to_string (Account.token acc) in
           match acc.timing with
           | Timed timing ->
               { public_key_id
@@ -890,7 +882,7 @@ module Snarked_ledger_hash = struct
       id
 end
 
-module Snapp_epoch_ledger = struct
+module Zkapp_epoch_ledger = struct
   type t = { hash_id : int option; total_currency_id : int option }
   [@@deriving fields, hlist]
 
@@ -898,19 +890,19 @@ module Snapp_epoch_ledger = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ option int; option int ]
 
-  let table_name = "snapp_epoch_ledger"
+  let table_name = "zkapp_epoch_ledger"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (epoch_ledger : _ Epoch_ledger.Poly.t) =
     let open Deferred.Result.Let_syntax in
     let%bind hash_id =
-      Mina_caqti.add_if_snapp_check
+      Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         epoch_ledger.hash
     in
     let%bind total_currency_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_amount_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         epoch_ledger.total_currency
     in
     let value = { hash_id; total_currency_id } in
@@ -926,7 +918,7 @@ module Snapp_epoch_ledger = struct
       id
 end
 
-module Snapp_epoch_data = struct
+module Zkapp_epoch_data = struct
   type t =
     { epoch_ledger_id : int
     ; epoch_seed : string option
@@ -941,29 +933,29 @@ module Snapp_epoch_data = struct
       Caqti_type.
         [ int; option string; option string; option string; option int ]
 
-  let table_name = "snapp_epoch_data"
+  let table_name = "zkapp_epoch_data"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (epoch_data : Mina_base.Snapp_predicate.Protocol_state.Epoch_data.t) =
+      (epoch_data : Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.t) =
     let open Deferred.Result.Let_syntax in
     let%bind epoch_ledger_id =
-      Snapp_epoch_ledger.add_if_doesn't_exist (module Conn) epoch_data.ledger
+      Zkapp_epoch_ledger.add_if_doesn't_exist (module Conn) epoch_data.ledger
     in
     let%bind epoch_length_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_length_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         epoch_data.epoch_length
     in
     let epoch_seed =
-      Snapp_basic.Or_ignore.to_option epoch_data.seed
+      Zkapp_basic.Or_ignore.to_option epoch_data.seed
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let start_checkpoint =
-      Snapp_basic.Or_ignore.to_option epoch_data.start_checkpoint
+      Zkapp_basic.Or_ignore.to_option epoch_data.start_checkpoint
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let lock_checkpoint =
-      Snapp_basic.Or_ignore.to_option epoch_data.lock_checkpoint
+      Zkapp_basic.Or_ignore.to_option epoch_data.lock_checkpoint
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let value =
@@ -986,10 +978,9 @@ module Snapp_epoch_data = struct
       id
 end
 
-module Snapp_predicate_protocol_states = struct
+module Zkapp_protocol_state_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
-    ; snarked_next_available_token_id : int option
     ; timestamp_id : int option
     ; blockchain_length_id : int option
     ; min_window_density_id : int option
@@ -1011,65 +1002,58 @@ module Snapp_predicate_protocol_states = struct
         ; option int
         ; option int
         ; option int
-        ; option int
         ; int
         ; int
         ]
 
-  let table_name = "snapp_predicate_protocol_states"
+  let table_name = "zkapp_protocol_state_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (ps : Mina_base.Snapp_predicate.Protocol_state.t) =
+      (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
     let open Deferred.Result.Let_syntax in
     let%bind snarked_ledger_hash_id =
-      Mina_caqti.add_if_snapp_check
+      Mina_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
     in
-    let%bind snarked_next_available_token_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_token_id_bounds.add_if_doesn't_exist (module Conn))
-        ps.snarked_next_available_token
-    in
     let%bind timestamp_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_timestamp_bounds.add_if_doesn't_exist (module Conn))
         ps.timestamp
     in
     let%bind blockchain_length_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_length_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         ps.blockchain_length
     in
     let%bind min_window_density_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_length_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         ps.min_window_density
     in
     let%bind total_currency_id =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_amount_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
     let%bind curr_global_slot_since_hard_fork =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
         ps.global_slot_since_hard_fork
     in
     let%bind global_slot_since_genesis =
-      Mina_caqti.add_if_snapp_check
-        (Snapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
         ps.global_slot_since_genesis
     in
     let%bind staking_epoch_data_id =
-      Snapp_epoch_data.add_if_doesn't_exist (module Conn) ps.staking_epoch_data
+      Zkapp_epoch_data.add_if_doesn't_exist (module Conn) ps.staking_epoch_data
     in
     let%bind next_epoch_data_id =
-      Snapp_epoch_data.add_if_doesn't_exist (module Conn) ps.next_epoch_data
+      Zkapp_epoch_data.add_if_doesn't_exist (module Conn) ps.next_epoch_data
     in
     let value =
       { snarked_ledger_hash_id
-      ; snarked_next_available_token_id
       ; timestamp_id
       ; blockchain_length_id
       ; min_window_density_id
@@ -1092,19 +1076,21 @@ module Snapp_predicate_protocol_states = struct
       id
 end
 
-module Snapp_party_body = struct
+module Zkapp_party_body = struct
   type t =
     { public_key_id : int
     ; update_id : int
-    ; token_id : int64
+    ; token_id : string
     ; balance_change : int64
     ; increment_nonce : bool
     ; events_ids : int array
     ; sequence_events_ids : int array
     ; call_data_id : int
     ; call_depth : int
-    ; snapp_predicate_protocol_state_id : int
+    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
+    ; caller : string
     }
   [@@deriving fields, hlist]
 
@@ -1113,7 +1099,7 @@ module Snapp_party_body = struct
       Caqti_type.
         [ int
         ; int
-        ; int64
+        ; string
         ; int64
         ; bool
         ; Mina_caqti.array_int_typ
@@ -1121,10 +1107,12 @@ module Snapp_party_body = struct
         ; int
         ; int
         ; int
+        ; int
         ; bool
+        ; string
         ]
 
-  let table_name = "snapp_party_body"
+  let table_name = "zkapp_party_body"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.t) =
     let open Deferred.Result.Let_syntax in
@@ -1132,30 +1120,33 @@ module Snapp_party_body = struct
       Public_key.add_if_doesn't_exist (module Conn) body.public_key
     in
     let%bind update_id =
-      Snapp_updates.add_if_doesn't_exist (module Conn) body.update
+      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_ids =
       Mina_caqti.deferred_result_list_map body.events
-        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     let%bind sequence_events_ids =
       Mina_caqti.deferred_result_list_map body.sequence_events
-        ~f:(Snapp_state_data_array.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     let%bind call_data_id =
-      Snapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
+      Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind snapp_predicate_protocol_state_id =
-      Snapp_predicate_protocol_states.add_if_doesn't_exist
+    let%bind zkapp_protocol_state_precondition_id =
+      Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
-        body.protocol_state
+        body.protocol_state_precondition
     in
-    let token_id =
-      Unsigned.UInt64.to_int64 @@ Token_id.to_uint64 body.token_id
+    let%bind zkapp_account_precondition_id =
+      Zkapp_account_precondition.add_if_doesn't_exist
+        (module Conn)
+        body.account_precondition
     in
+    let token_id = Token_id.to_string body.token_id in
     let balance_change =
       let magnitude =
         Currency.Amount.to_uint64 body.balance_change.magnitude
@@ -1169,6 +1160,7 @@ module Snapp_party_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
+    let caller = Token_id.to_string body.caller in
     let value =
       { public_key_id
       ; update_id
@@ -1179,8 +1171,10 @@ module Snapp_party_body = struct
       ; sequence_events_ids
       ; call_data_id
       ; call_depth
-      ; snapp_predicate_protocol_state_id
+      ; zkapp_protocol_state_precondition_id
+      ; zkapp_account_precondition_id
       ; use_full_commitment
+      ; caller
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1197,9 +1191,8 @@ module Snapp_party_body = struct
       id
 end
 
-module Snapp_party = struct
-  type t =
-    { body_id : int; predicate_id : int; authorization_kind : Control.Tag.t }
+module Zkapp_party = struct
+  type t = { body_id : int; authorization_kind : Control.Tag.t }
   [@@deriving fields, hlist]
 
   let authorization_kind_typ =
@@ -1221,24 +1214,21 @@ module Snapp_party = struct
       | _ ->
           Result.failf "Failed to decode authorization_kind_typ"
     in
-    Caqti_type.enum "snapp_authorization_kind_type" ~encode ~decode
+    Caqti_type.enum "zkapp_authorization_kind_type" ~encode ~decode
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; authorization_kind_typ ]
+      Caqti_type.[ int; authorization_kind_typ ]
 
-  let table_name = "snapp_party"
+  let table_name = "zkapp_party"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Snapp_party_body.add_if_doesn't_exist (module Conn) party.data.body
-    in
-    let%bind predicate_id =
-      Snapp_predicate.add_if_doesn't_exist (module Conn) party.data.predicate
+      Zkapp_party_body.add_if_doesn't_exist (module Conn) party.body
     in
     let authorization_kind = Control.tag party.authorization in
-    let value = { body_id; predicate_id; authorization_kind } in
+    let value = { body_id; authorization_kind } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1251,25 +1241,22 @@ module Snapp_party = struct
       id
 end
 
-module Snapp_fee_payers = struct
-  type t = { body_id : int; nonce : int64 } [@@deriving fields, hlist]
+module Zkapp_fee_payers = struct
+  type t = { body_id : int } [@@deriving fields, hlist]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64 ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
 
-  let table_name = "snapp_fee_payers"
+  let table_name = "zkapp_fee_payers"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      (fp : Party.Predicated.Fee_payer.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (fp : Party.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Snapp_party_body.add_if_doesn't_exist
+      Zkapp_party_body.add_if_doesn't_exist
         (module Conn)
         (Party.Body.of_fee_payer fp.body)
     in
-    let nonce = fp.predicate |> Unsigned.UInt32.to_int64 in
-    let value = { body_id; nonce } in
+    let value = { body_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1364,8 +1351,8 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; fee_token : int64
-      ; token : int64
+      ; fee_token : string
+      ; token : string
       ; nonce : int
       ; amount : int64 option
       ; fee : int64
@@ -1382,8 +1369,8 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; int64
-          ; int64
+          ; string
+          ; string
           ; int
           ; option int64
           ; int64
@@ -1466,16 +1453,12 @@ module User_command = struct
                 | `Ident ->
                     Signed_command.tag_string t
                 | `Parties ->
-                    "snapp" )
+                    "zkapp" )
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; fee_token =
-                Signed_command.fee_token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
-            ; token =
-                Signed_command.token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int64
+            ; fee_token = Signed_command.fee_token t |> Token_id.to_string
+            ; token = Signed_command.token t |> Token_id.to_string
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount =
                 Signed_command.amount t
@@ -1492,10 +1475,10 @@ module User_command = struct
             }
   end
 
-  module Snapp_command = struct
+  module Zkapp_command = struct
     type t =
-      { snapp_fee_payer_id : int
-      ; snapp_other_parties_ids : int array
+      { zkapp_fee_payer_id : int
+      ; zkapp_other_parties_ids : int array
       ; hash : string
       }
     [@@deriving fields, hlist]
@@ -1508,29 +1491,30 @@ module User_command = struct
         ~(transaction_hash : Transaction_hash.t) =
       Conn.find_opt
         ( Caqti_request.find_opt Caqti_type.string Caqti_type.int
-        @@ Mina_caqti.select_cols ~select:"id" ~table_name:"snapp_commands"
+        @@ Mina_caqti.select_cols ~select:"id" ~table_name:"zkapp_commands"
              [ "hash" ] )
         (Transaction_hash.to_base58_check transaction_hash)
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
-      let%bind snapp_fee_payer_id =
-        Snapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer.data
+      let%bind zkapp_fee_payer_id =
+        Zkapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer
       in
-      let%bind snapp_other_parties_ids =
-        Mina_caqti.deferred_result_list_map ps.other_parties
-          ~f:(Snapp_party.add_if_doesn't_exist (module Conn))
+      let%bind zkapp_other_parties_ids =
+        Mina_caqti.deferred_result_list_map
+          (Parties.Call_forest.to_parties_list ps.other_parties)
+          ~f:(Zkapp_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
       let hash =
         Transaction_hash.hash_command (Parties ps)
         |> Transaction_hash.to_base58_check
       in
-      let value = { snapp_fee_payer_id; snapp_other_parties_ids; hash } in
+      let value = { zkapp_fee_payer_id; zkapp_other_parties_ids; hash } in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name:"snapp_commands" ~cols:(Fields.names, typ)
+        ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
         ~tannot:(function
-          | "snapp_other_parties_ids" -> Some "int[]" | _ -> None)
+          | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None)
         (module Conn)
         value
   end
@@ -1540,8 +1524,8 @@ module User_command = struct
     | Signed_command c ->
         c
     | Parties _ ->
-        let `Needs_some_work_for_snapps_on_mainnet =
-          Mina_base.Util.todo_snapps
+        let `Needs_some_work_for_zkapps_on_mainnet =
+          Mina_base.Util.todo_zkapps
         in
         failwith "TODO"
 
@@ -1553,7 +1537,7 @@ module User_command = struct
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t) sc
     | Parties ps ->
-        Snapp_command.add_if_doesn't_exist conn ps
+        Zkapp_command.add_if_doesn't_exist conn ps
 
   let find conn ~(transaction_hash : Transaction_hash.t) =
     let open Deferred.Result.Let_syntax in
@@ -1561,13 +1545,13 @@ module User_command = struct
       Signed_command.find conn ~transaction_hash
       >>| Option.map ~f:(fun id -> `Signed_command_id id)
     in
-    let%map snapp_command_id =
-      Snapp_command.find_opt conn ~transaction_hash
-      >>| Option.map ~f:(fun id -> `Snapp_command_id id)
+    let%map zkapp_command_id =
+      Zkapp_command.find_opt conn ~transaction_hash
+      >>| Option.map ~f:(fun id -> `Zkapp_command_id id)
     in
-    Option.first_some signed_command_id snapp_command_id
+    Option.first_some signed_command_id zkapp_command_id
 
-  (* meant to work with either a signed command, or a snapp *)
+  (* meant to work with either a signed command, or a zkapp *)
   let add_extensional (module Conn : CONNECTION)
       (user_cmd : Extensional.User_command.t) =
     let amount_opt_to_int64_opt amt_opt =
@@ -1596,9 +1580,8 @@ module User_command = struct
       ; fee_payer_id
       ; source_id
       ; receiver_id
-      ; fee_token =
-          user_cmd.fee_token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
-      ; token = user_cmd.token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      ; fee_token = user_cmd.fee_token |> Token_id.to_string
+      ; token = user_cmd.token |> Token_id.to_string
       ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
       ; amount = user_cmd.amount |> amount_opt_to_int64_opt
       ; fee =
@@ -1621,8 +1604,8 @@ module User_command = struct
         add_extensional (module Conn) user_cmd
     | Some (`Signed_command_id user_cmd_id) ->
         return user_cmd_id
-    | Some (`Snapp_command_id _user_cmd_id) ->
-        failwith "Unexpected snapp command"
+    | Some (`Zkapp_command_id _user_cmd_id) ->
+        failwith "Unexpected zkapp command"
 end
 
 module Internal_command = struct
@@ -1630,7 +1613,7 @@ module Internal_command = struct
     { typ : string
     ; receiver_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; hash : string
     }
 
@@ -1639,7 +1622,7 @@ module Internal_command = struct
     let decode ((typ, receiver_id, fee, token), hash) =
       Ok { typ; receiver_id; fee; token; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -1687,9 +1670,7 @@ module Internal_command = struct
           ; fee =
               internal_cmd.fee |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token =
-              internal_cmd.token |> Token_id.to_uint64
-              |> Unsigned.UInt64.to_int64
+          ; token = internal_cmd.token |> Token_id.to_string
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1709,7 +1690,7 @@ module Fee_transfer = struct
     { kind : Kind.t
     ; receiver_id : int
     ; fee : int64
-    ; token : int64
+    ; token : string
     ; hash : string
     }
 
@@ -1731,7 +1712,7 @@ module Fee_transfer = struct
       in
       Ok { kind; receiver_id; fee; token; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -1763,7 +1744,7 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token = Token_id.to_string t.fee_token |> Int64.of_string
+          ; token = Token_id.to_string t.fee_token
           ; hash = transaction_hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1776,16 +1757,13 @@ module Coinbase = struct
   let typ =
     let encode t =
       Ok
-        ( ( coinbase_typ
-          , t.receiver_id
-          , t.amount
-          , Token_id.(to_string default) |> Int64.of_string )
+        ( (coinbase_typ, t.receiver_id, t.amount, Token_id.(to_string default))
         , t.hash )
     in
     let decode ((_, receiver_id, amount, _), hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -2085,7 +2063,7 @@ module Block_and_signed_command = struct
     ; failure_reason : string option
     ; fee_payer_account_creation_fee_paid : int64 option
     ; receiver_account_creation_fee_paid : int64 option
-    ; created_token : int64 option
+    ; created_token : string option
     ; fee_payer_balance_id : int
     ; source_balance_id : int option
     ; receiver_balance_id : int option
@@ -2102,7 +2080,7 @@ module Block_and_signed_command = struct
         ; option string
         ; option int64
         ; option int64
-        ; option int64
+        ; option string
         ; int
         ; option int
         ; option int
@@ -2125,8 +2103,7 @@ module Block_and_signed_command = struct
       Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
     in
     let created_token =
-      Option.map created_token ~f:(fun tid ->
-          Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid))
+      Option.map created_token ~f:(fun tid -> Token_id.to_string tid)
     in
     Conn.exec
       (Caqti_request.exec typ
@@ -2174,17 +2151,22 @@ module Block_and_signed_command = struct
       | Applied
           ( { fee_payer_account_creation_fee_paid
             ; receiver_account_creation_fee_paid
-            ; created_token
             }
           , balances ) ->
           ( "applied"
           , None
           , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token
+          , None
           , balances )
-      | Failed (failure, balances) ->
-          ("failed", Some failure, None, None, None, balances)
+      | Failed (failures, balances) ->
+          (*TODO: change schema to include list of failures when/after refactoring for balance changes*)
+          ( "failed"
+          , Some (List.concat failures |> List.hd_exn)
+          , None
+          , None
+          , None
+          , balances )
     in
     let pk_of_id id =
       let%map pk_str = Public_key.find_by_id (module Conn) id in
@@ -2304,7 +2286,6 @@ module Block = struct
     ; next_epoch_data_id : int
     ; min_window_density : int64
     ; total_currency : int64
-    ; next_available_token : int64
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
@@ -2325,7 +2306,6 @@ module Block = struct
         ; int
         ; int
         ; int
-        ; int64
         ; int64
         ; int64
         ; string
@@ -2441,10 +2421,10 @@ module Block = struct
                {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
                |sql})
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -2464,10 +2444,6 @@ module Block = struct
                 Protocol_state.consensus_state protocol_state
                 |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.registers |> Registers.next_available_token
-                |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
             ; ledger_hash =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
@@ -2533,7 +2509,7 @@ module Block = struct
             ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
             function
             | { Mina_base.With_status.status
-              ; data = Mina_base.Transaction.Command command
+              ; data = Transaction.Command command
               } ->
                 let user_command =
                   { Mina_base.With_status.status; data = command }
@@ -2735,7 +2711,8 @@ module Block = struct
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
-      ({ data = t; hash } : (External_transition.t, State_hash.t) With_hash.t) =
+      ({ data = t; hash = { state_hash = hash; _ } } :
+        External_transition.t State_hash.With_state_hashes.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:(External_transition.protocol_state t)
       ~staged_ledger_diff:(External_transition.staged_ledger_diff t)
@@ -2745,7 +2722,7 @@ module Block = struct
       (t : External_transition.Precomputed_block.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
-      ~hash:(Protocol_state.hash t.protocol_state)
+      ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
@@ -2851,10 +2828,10 @@ module Block = struct
                       creator_id, block_winner_id,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
-                      min_window_density, total_currency, next_available_token,
+                      min_window_density, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql})
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -2870,9 +2847,6 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; total_currency =
                 block.total_currency |> Currency.Amount.to_uint64
-                |> Unsigned.UInt64.to_int64
-            ; next_available_token =
-                block.next_available_token |> Token_id.to_uint64
                 |> Unsigned.UInt64.to_int64
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
@@ -3289,8 +3263,9 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hash)
+      ( block.External_transition.Precomputed_block.protocol_state
+      |> Protocol_state.hashes )
+        .state_hash)
 
 let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
@@ -3300,14 +3275,17 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added { block; _ }) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
-        let hash block = With_hash.hash block in
+        let hash = State_hash.With_state_hashes.state_hash in
         match%map
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool block
+          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool
+            (With_hash.map ~f:External_transition.decompose block)
         with
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                [ ( "block"
+                  , State_hash.With_state_hashes.state_hash block
+                    |> State_hash.to_yojson )
                 ; ("error", `String (Caqti_error.show e))
                 ]
               "Failed to archive block: $block, see $error"
@@ -3476,8 +3454,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 "Precomputed block $block could not be archived: $error"
                 ~metadata:
                   [ ( "block"
-                    , Protocol_state.hash precomputed_block.protocol_state
-                      |> State_hash.to_yojson )
+                    , (Protocol_state.hashes precomputed_block.protocol_state)
+                        .state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
           | Ok () ->

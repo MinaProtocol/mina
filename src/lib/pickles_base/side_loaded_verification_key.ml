@@ -154,6 +154,7 @@ module Repr = struct
         ; max_width : Width.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -170,9 +171,9 @@ module Poly = struct
             Max_branches_vec.Stable.V1.t
         ; max_width : Width.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
-        ; wrap_vk : 'vk option [@compare.ignore] [@equal.ignore]
+        ; wrap_vk : 'vk option
         }
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving hash]
     end
   end]
 end

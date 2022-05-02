@@ -565,7 +565,7 @@ module Genesis_proof = struct
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
-    let protocol_state_with_hash =
+    let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
@@ -577,7 +577,7 @@ module Genesis_proof = struct
     ; genesis_ledger = ledger
     ; genesis_epoch_data
     ; consensus_constants
-    ; protocol_state_with_hash
+    ; protocol_state_with_hashes
     ; constraint_system_digests = None
     ; genesis_constants
     }
@@ -593,7 +593,7 @@ module Genesis_proof = struct
              ; proof_level = inputs.proof_level
              ; blockchain_proof_system_id = None
              ; constraint_system_digests = None
-             ; protocol_state_with_hash = inputs.protocol_state_with_hash
+             ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
              ; genesis_constants = inputs.genesis_constants
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
@@ -634,7 +634,10 @@ module Genesis_proof = struct
           (None, Pickles.Verification_key.Id.dummy ())
     in
     let base_hash =
-      Base_hash.create ~id ~state_hash:inputs.protocol_state_with_hash.hash
+      Base_hash.create ~id
+        ~state_hash:
+          (State_hash.With_state_hashes.state_hash
+             inputs.protocol_state_with_hashes)
     in
     let use_precomputed_values base_hash =
       match Precomputed_values.compiled with
@@ -646,7 +649,9 @@ module Genesis_proof = struct
           | Some proof_data ->
               let compiled_base_hash =
                 Base_hash.create ~id:proof_data.blockchain_proof_system_id
-                  ~state_hash:compiled.protocol_state_with_hash.hash
+                  ~state_hash:
+                    (State_hash.With_state_hashes.state_hash
+                       compiled.protocol_state_with_hashes)
               in
               Base_hash.equal base_hash compiled_base_hash
           | None ->
@@ -692,7 +697,8 @@ module Genesis_proof = struct
                   ; genesis_ledger = inputs.genesis_ledger
                   ; genesis_epoch_data = inputs.genesis_epoch_data
                   ; consensus_constants = inputs.consensus_constants
-                  ; protocol_state_with_hash = inputs.protocol_state_with_hash
+                  ; protocol_state_with_hashes =
+                      inputs.protocol_state_with_hashes
                   ; constraint_system_digests
                   ; proof_data =
                       Some { blockchain_proof_system_id; genesis_proof }
@@ -718,7 +724,9 @@ module Genesis_proof = struct
         let proof_data = Option.value_exn compiled.proof_data in
         let compiled_base_hash =
           Base_hash.create ~id:proof_data.blockchain_proof_system_id
-            ~state_hash:compiled.protocol_state_with_hash.hash
+            ~state_hash:
+              (State_hash.With_state_hashes.state_hash
+                 compiled.protocol_state_with_hashes)
         in
         [%log info]
           "Base hash $computed_hash matches compile-time $compiled_hash, using \
@@ -736,7 +744,7 @@ module Genesis_proof = struct
           ; genesis_ledger = inputs.genesis_ledger
           ; genesis_epoch_data = inputs.genesis_epoch_data
           ; consensus_constants = inputs.consensus_constants
-          ; protocol_state_with_hash = inputs.protocol_state_with_hash
+          ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
           ; constraint_system_digests = compiled.constraint_system_digests
           ; proof_data = Some proof_data
           }

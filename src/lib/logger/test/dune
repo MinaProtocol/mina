@@ -1,6 +1,15 @@
 (library
  (name logger_test)
- (libraries core async logger logger_file_system)
+ (libraries
+   ;; opam libraries 
+   ppx_inline_test.config
+   core
+   async
+   core_kernel
+   ;; local libraries
+   logger
+   logger.file_system
+ )
  (inline_tests)
  (preprocess
   (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))

@@ -73,9 +73,9 @@ module Ledger_inner = struct
 
         let balance Account.Poly.{ balance; _ } = balance
 
-        let token Account.Poly.{ token_id; _ } = token_id
-
         let empty = Account.empty
+
+        let token = Account.Poly.token_id
 
         let token_owner ({ token_permissions; _ } : t) =
           match token_permissions with
@@ -362,7 +362,11 @@ module Ledger_inner = struct
 end
 
 include Ledger_inner
-include Transaction_logic.Make (Ledger_inner)
+include Mina_transaction_logic.Make (Ledger_inner)
+
+let apply_transaction ~constraint_constants ~txn_state_view l t =
+  O1trace.sync_thread "apply_transaction" (fun () ->
+      apply_transaction ~constraint_constants ~txn_state_view l t)
 
 type init_state =
   ( Signature_lib.Keypair.t
@@ -416,8 +420,13 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       create_new_account_exn t account_id account')
 
 let%test_unit "parties payment test" =
-  let open Transaction_logic.For_tests in
+  let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_int 1
+    }
+  in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
       let ts2 : Parties.t list =
@@ -445,7 +454,7 @@ let%test_unit "parties payment test" =
               let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
               (* TODO: Hack. The nonces are inconsistent between the 2
                  versions. See the comment in
-                 [Transaction_logic.For_tests.party_send] for more info.
+                 [Mina_transaction_logic.For_tests.party_send] for more info.
               *)
               L.iteri l1 ~f:(fun index account ->
                   L.set_at_index_exn l1 index

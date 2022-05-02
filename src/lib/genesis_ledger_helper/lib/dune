@@ -1,6 +1,34 @@
 (library
  (name genesis_ledger_helper_lib)
  (public_name genesis_ledger_helper.lib)
- (libraries genesis_constants runtime_config genesis_proof mina_base core key_cache.native)
+ (libraries
+   ;; opam libraries
+   splittable_random
+   integers
+   core_kernel
+   core
+   sexplib0
+   base64
+   ;; local libraries
+   mina_base.import
+   random_oracle
+   data_hash_lib
+   pickles
+   pickles_types
+   unsigned_extended
+   key_cache.native
+   mina_base
+   coda_runtime_config
+   genesis_constants
+   coda_genesis_proof
+   signature_lib
+   mina_numbers
+   with_hash
+   currency
+   pickles.backend
+   logger
+   snark_params
+   kimchi_backend.pasta
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))

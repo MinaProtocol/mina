@@ -56,7 +56,8 @@ module Make (Inputs : Inputs_intf) :
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
     in
-    (External_transition.Validated.state_hash first_transition, merkle_list)
+    ( (External_transition.Validated.state_hashes first_transition).state_hash
+    , merkle_list )
 end
 
 include Make (struct

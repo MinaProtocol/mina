@@ -4,7 +4,9 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries
-   kimchi_backend
-   pickles_types
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
    snarky.backendless
-   core_kernel))
+   pickles_types
+))

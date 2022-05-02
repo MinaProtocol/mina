@@ -27,9 +27,9 @@ let sample_block_sexp =
         (registers
           ((ledger
           22336620733341347240280105727380801754115112664781960672802684772048600612014)
-           (pending_coinbase_stack ()) (next_available_token 2)
+           (pending_coinbase_stack ())
            (local_state
-            ((parties
+            ((stack_frame
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (call_stack
               0x0000000000000000000000000000000000000000000000000000000000000000)
@@ -37,7 +37,9 @@ let sample_block_sexp =
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (full_transaction_commitment
               0x0000000000000000000000000000000000000000000000000000000000000000)
-             (token_id 1) (excess 0) (ledger 0) (success true) (failure_status ())))))
+             (token_id
+              0x0000000000000000000000000000000000000000000000000000000000000001)
+             (excess 0) (ledger 0) (success true) (failure_status_tbl ())))))
        (timestamp 1600251660000)))
      (consensus_state
       ((blockchain_length 2) (epoch_count 0) (min_window_density 77)
@@ -85,7 +87,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 0) (valid_until 4294967295)
@@ -97,7 +99,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (15148852602056536305606321833561751865758170932957327844035492077110848040022
@@ -105,7 +107,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999900000000))
             (source_balance (65999900000000))
             (receiver_balance (65999900000000))))))
@@ -113,7 +115,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 1) (valid_until 4294967295)
@@ -125,7 +127,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (21296773880145368583657075560910330276224190485644805963647646346804731999179
@@ -133,7 +135,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999800000000))
             (source_balance (65999800000000))
             (receiver_balance (65999800000000))))))
@@ -141,7 +143,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 2) (valid_until 4294967295)
@@ -153,7 +155,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1041397931393789271111647778766861571986190012051164668958553125246878000952
@@ -161,7 +163,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999700000000))
             (source_balance (65999700000000))
             (receiver_balance (65999700000000))))))
@@ -169,7 +171,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 3) (valid_until 4294967295)
@@ -181,7 +183,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22825793449803117875221233400313697933669852575537564150313617936425706469410
@@ -189,7 +191,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999600000000))
             (source_balance (65999600000000))
             (receiver_balance (65999600000000))))))
@@ -197,7 +199,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 4) (valid_until 4294967295)
@@ -209,7 +211,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (19617421163204107936580378678530343650820161112408803739743476521952269460717
@@ -217,7 +219,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999500000000))
             (source_balance (65999500000000))
             (receiver_balance (65999500000000))))))
@@ -225,7 +227,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 5) (valid_until 4294967295)
@@ -237,7 +239,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5653642519293713437982586181562563122698084776502891480185931824851560129446
@@ -245,7 +247,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999400000000))
             (source_balance (65999400000000))
             (receiver_balance (65999400000000))))))
@@ -253,7 +255,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 6) (valid_until 4294967295)
@@ -265,7 +267,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (27585475091195216183462224661956909374682245367802124071179852901234789954181
@@ -273,7 +275,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999300000000))
             (source_balance (65999300000000))
             (receiver_balance (65999300000000))))))
@@ -281,7 +283,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 7) (valid_until 4294967295)
@@ -293,7 +295,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23499345839846259547006582042880552079062542503948325189390955695658455428646
@@ -301,7 +303,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999200000000))
             (source_balance (65999200000000))
             (receiver_balance (65999200000000))))))
@@ -309,7 +311,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 8) (valid_until 4294967295)
@@ -321,7 +323,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (15073531850648043981236168369142207279376757687637287293576402574202265000786
@@ -329,7 +331,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999100000000))
             (source_balance (65999100000000))
             (receiver_balance (65999100000000))))))
@@ -337,7 +339,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 9) (valid_until 4294967295)
@@ -349,7 +351,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (19277589626041645261776912340180041799947882482188533611096995835557679516596
@@ -357,7 +359,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65999000000000))
             (source_balance (65999000000000))
             (receiver_balance (65999000000000))))))
@@ -365,7 +367,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 10) (valid_until 4294967295)
@@ -377,7 +379,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14262848110259168634835598026920602761060022875075950459771778554275835857967
@@ -385,7 +387,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998900000000))
             (source_balance (65998900000000))
             (receiver_balance (65998900000000))))))
@@ -393,7 +395,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 11) (valid_until 4294967295)
@@ -405,7 +407,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (9585035157013880546444220645556050226599394337375597614623413739211068268544
@@ -413,7 +415,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998800000000))
             (source_balance (65998800000000))
             (receiver_balance (65998800000000))))))
@@ -421,7 +423,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 12) (valid_until 4294967295)
@@ -433,7 +435,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24170599221038672019894196462961140517465030663309432235986461903967874096007
@@ -441,7 +443,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998700000000))
             (source_balance (65998700000000))
             (receiver_balance (65998700000000))))))
@@ -449,7 +451,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 13) (valid_until 4294967295)
@@ -461,7 +463,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24905900470986532694643015947897989910620762910752780801165458193954698959850
@@ -469,7 +471,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998600000000))
             (source_balance (65998600000000))
             (receiver_balance (65998600000000))))))
@@ -477,7 +479,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 14) (valid_until 4294967295)
@@ -489,7 +491,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22759818851403773569448273650782824747699827555338238163385545001118317594561
@@ -497,7 +499,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998500000000))
             (source_balance (65998500000000))
             (receiver_balance (65998500000000))))))
@@ -505,7 +507,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 15) (valid_until 4294967295)
@@ -517,7 +519,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22588266679417930235160347762796586722140945447077432624183147084120122702247
@@ -525,7 +527,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998400000000))
             (source_balance (65998400000000))
             (receiver_balance (65998400000000))))))
@@ -533,7 +535,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 16) (valid_until 4294967295)
@@ -545,7 +547,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (17785614997861055316668304305209053601447449043399936360232793416552002945385
@@ -553,7 +555,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998300000000))
             (source_balance (65998300000000))
             (receiver_balance (65998300000000))))))
@@ -561,7 +563,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 17) (valid_until 4294967295)
@@ -573,7 +575,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (28518565153286851788712348369977005582572075553283215141213677689142988505712
@@ -581,7 +583,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998200000000))
             (source_balance (65998200000000))
             (receiver_balance (65998200000000))))))
@@ -589,7 +591,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 18) (valid_until 4294967295)
@@ -601,7 +603,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23820453014076640985767760750161372062528339301810154662862912941408513484830
@@ -609,7 +611,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998100000000))
             (source_balance (65998100000000))
             (receiver_balance (65998100000000))))))
@@ -617,7 +619,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 19) (valid_until 4294967295)
@@ -629,7 +631,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (15088226356757331547896857861902189487793052749781415271485481961723544055468
@@ -637,7 +639,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65998000000000))
             (source_balance (65998000000000))
             (receiver_balance (65998000000000))))))
@@ -645,7 +647,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 20) (valid_until 4294967295)
@@ -657,7 +659,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25170507869042315077253596884859743441108641643661826059728696568392179393422
@@ -665,7 +667,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997900000000))
             (source_balance (65997900000000))
             (receiver_balance (65997900000000))))))
@@ -673,7 +675,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 21) (valid_until 4294967295)
@@ -685,7 +687,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24542786668959347965391698158150841139340540132152737939469931236687390639148
@@ -693,7 +695,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997800000000))
             (source_balance (65997800000000))
             (receiver_balance (65997800000000))))))
@@ -701,7 +703,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 22) (valid_until 4294967295)
@@ -713,7 +715,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (18133250384776666836218030074678562141144059171611713794423132304842072666771
@@ -721,7 +723,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997700000000))
             (source_balance (65997700000000))
             (receiver_balance (65997700000000))))))
@@ -729,7 +731,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 23) (valid_until 4294967295)
@@ -741,7 +743,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14221790450953854036781844942467719679740560394325266781827530792140040394087
@@ -749,7 +751,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997600000000))
             (source_balance (65997600000000))
             (receiver_balance (65997600000000))))))
@@ -757,7 +759,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 24) (valid_until 4294967295)
@@ -769,7 +771,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23201882831860268677752693552150573664088478210379301157315251348353526616475
@@ -777,7 +779,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997500000000))
             (source_balance (65997500000000))
             (receiver_balance (65997500000000))))))
@@ -785,7 +787,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 25) (valid_until 4294967295)
@@ -797,7 +799,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (27558263320932750630801225217275872057626779883370216021538344691167134474735
@@ -805,7 +807,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997400000000))
             (source_balance (65997400000000))
             (receiver_balance (65997400000000))))))
@@ -813,7 +815,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 26) (valid_until 4294967295)
@@ -825,7 +827,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5322527437992037524370157309327230894327284832788793530565446099630290821741
@@ -833,7 +835,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997300000000))
             (source_balance (65997300000000))
             (receiver_balance (65997300000000))))))
@@ -841,7 +843,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 27) (valid_until 4294967295)
@@ -853,7 +855,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5555838456655770568998564058350177846904611669402653070728414203683681238135
@@ -861,7 +863,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997200000000))
             (source_balance (65997200000000))
             (receiver_balance (65997200000000))))))
@@ -869,7 +871,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 28) (valid_until 4294967295)
@@ -881,7 +883,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1456392393226523823109988550462554739800423266543887069518754258272713489890
@@ -889,7 +891,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997100000000))
             (source_balance (65997100000000))
             (receiver_balance (65997100000000))))))
@@ -897,7 +899,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 29) (valid_until 4294967295)
@@ -909,7 +911,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (4050358237575738962462661034889425042105772755569549283696796911217715047583
@@ -917,7 +919,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65997000000000))
             (source_balance (65997000000000))
             (receiver_balance (65997000000000))))))
@@ -925,7 +927,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 30) (valid_until 4294967295)
@@ -937,7 +939,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (550456816646259305856267818391435629054357346454034002580106175204592650242
@@ -945,7 +947,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996900000000))
             (source_balance (65996900000000))
             (receiver_balance (65996900000000))))))
@@ -953,7 +955,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 31) (valid_until 4294967295)
@@ -965,7 +967,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (9625042139316040364607352959599651780362956140604544893578231175310668276930
@@ -973,7 +975,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996800000000))
             (source_balance (65996800000000))
             (receiver_balance (65996800000000))))))
@@ -981,7 +983,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 32) (valid_until 4294967295)
@@ -993,7 +995,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (26137148231380034123226087257489499939667826771727977959144473349759170426068
@@ -1001,7 +1003,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996700000000))
             (source_balance (65996700000000))
             (receiver_balance (65996700000000))))))
@@ -1009,7 +1011,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 33) (valid_until 4294967295)
@@ -1021,7 +1023,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (26408610943617675332313703518053811941078766145852877785244625984578553606121
@@ -1029,7 +1031,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996600000000))
             (source_balance (65996600000000))
             (receiver_balance (65996600000000))))))
@@ -1037,7 +1039,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 34) (valid_until 4294967295)
@@ -1049,7 +1051,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22709150659200828072131833530810893671371710136917992829585551794781634426645
@@ -1057,7 +1059,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996500000000))
             (source_balance (65996500000000))
             (receiver_balance (65996500000000))))))
@@ -1065,7 +1067,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 35) (valid_until 4294967295)
@@ -1077,7 +1079,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24600548272945350626340255041830616014983899240737164565093123851880722675096
@@ -1085,7 +1087,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996400000000))
             (source_balance (65996400000000))
             (receiver_balance (65996400000000))))))
@@ -1093,7 +1095,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 36) (valid_until 4294967295)
@@ -1105,7 +1107,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (6858133809414240111930651989932188017050671675283333176063062113285594186379
@@ -1113,7 +1115,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996300000000))
             (source_balance (65996300000000))
             (receiver_balance (65996300000000))))))
@@ -1121,7 +1123,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 37) (valid_until 4294967295)
@@ -1133,7 +1135,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (16641858431646153912565405056536185756167156005979952181661823357433561885939
@@ -1141,7 +1143,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996200000000))
             (source_balance (65996200000000))
             (receiver_balance (65996200000000))))))
@@ -1149,7 +1151,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 38) (valid_until 4294967295)
@@ -1161,7 +1163,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23804346504522459375298385267449962925195144926614858211619496014321949932448
@@ -1169,7 +1171,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996100000000))
             (source_balance (65996100000000))
             (receiver_balance (65996100000000))))))
@@ -1177,7 +1179,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 39) (valid_until 4294967295)
@@ -1189,7 +1191,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (10408248107284383301162882389068924025063891614542847830783415736424161177885
@@ -1197,7 +1199,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65996000000000))
             (source_balance (65996000000000))
             (receiver_balance (65996000000000))))))
@@ -1205,7 +1207,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 40) (valid_until 4294967295)
@@ -1217,7 +1219,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22401831822588918402526226343376538473240528419799918851921545931091538321749
@@ -1225,7 +1227,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995900000000))
             (source_balance (65995900000000))
             (receiver_balance (65995900000000))))))
@@ -1233,7 +1235,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 41) (valid_until 4294967295)
@@ -1245,7 +1247,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1008141214918187701471604077449188416041652430504376010059758158381506716596
@@ -1253,7 +1255,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995800000000))
             (source_balance (65995800000000))
             (receiver_balance (65995800000000))))))
@@ -1261,7 +1263,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 42) (valid_until 4294967295)
@@ -1273,7 +1275,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20537213480399476660186612946787578528280615717838483035130603923762033430918
@@ -1281,7 +1283,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995700000000))
             (source_balance (65995700000000))
             (receiver_balance (65995700000000))))))
@@ -1289,7 +1291,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 43) (valid_until 4294967295)
@@ -1301,7 +1303,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1261819040146787581233989211162347375175672367676542994905338328924974202682
@@ -1309,7 +1311,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995600000000))
             (source_balance (65995600000000))
             (receiver_balance (65995600000000))))))
@@ -1317,7 +1319,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 44) (valid_until 4294967295)
@@ -1329,7 +1331,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1227974885205161738889880856189471833993206556300977673572446428275302935235
@@ -1337,7 +1339,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995500000000))
             (source_balance (65995500000000))
             (receiver_balance (65995500000000))))))
@@ -1345,7 +1347,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 45) (valid_until 4294967295)
@@ -1357,7 +1359,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (7736647590930888923201790989978696140990586763170630879098161655167409426300
@@ -1365,7 +1367,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995400000000))
             (source_balance (65995400000000))
             (receiver_balance (65995400000000))))))
@@ -1373,7 +1375,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 46) (valid_until 4294967295)
@@ -1385,7 +1387,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25739824628301268600860076331156393991574401740567515271220279014788239584948
@@ -1393,7 +1395,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995300000000))
             (source_balance (65995300000000))
             (receiver_balance (65995300000000))))))
@@ -1401,7 +1403,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 47) (valid_until 4294967295)
@@ -1413,7 +1415,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (16101742179703327425352688293207736795524555530875358764104779280754955405495
@@ -1421,7 +1423,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995200000000))
             (source_balance (65995200000000))
             (receiver_balance (65995200000000))))))
@@ -1429,7 +1431,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 48) (valid_until 4294967295)
@@ -1441,7 +1443,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25062921228311812181044757382008957669640880532437613238631721297593332129643
@@ -1449,7 +1451,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995100000000))
             (source_balance (65995100000000))
             (receiver_balance (65995100000000))))))
@@ -1457,7 +1459,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 49) (valid_until 4294967295)
@@ -1469,7 +1471,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (3828085936728841990724264369107468947552600836341261887516011187782524800512
@@ -1477,7 +1479,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65995000000000))
             (source_balance (65995000000000))
             (receiver_balance (65995000000000))))))
@@ -1485,7 +1487,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 50) (valid_until 4294967295)
@@ -1497,7 +1499,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (28592077815523089051747332411781429919111248303931100253040089969378396836180
@@ -1505,7 +1507,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994900000000))
             (source_balance (65994900000000))
             (receiver_balance (65994900000000))))))
@@ -1513,7 +1515,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 51) (valid_until 4294967295)
@@ -1525,7 +1527,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (12568363166107840995756893872405150209182290170470803057053812603938370296742
@@ -1533,7 +1535,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994800000000))
             (source_balance (65994800000000))
             (receiver_balance (65994800000000))))))
@@ -1541,7 +1543,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 52) (valid_until 4294967295)
@@ -1553,7 +1555,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (10729721834104063257736335962817164223381793102908005171822093908011852916342
@@ -1561,7 +1563,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994700000000))
             (source_balance (65994700000000))
             (receiver_balance (65994700000000))))))
@@ -1569,7 +1571,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 53) (valid_until 4294967295)
@@ -1581,7 +1583,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (27241702694184867065981169078487075799897526418646305971522035741799146667930
@@ -1589,7 +1591,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994600000000))
             (source_balance (65994600000000))
             (receiver_balance (65994600000000))))))
@@ -1597,7 +1599,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 54) (valid_until 4294967295)
@@ -1609,7 +1611,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (21183941460910482206105115350027264930481302313350264709760474729503527924394
@@ -1617,7 +1619,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994500000000))
             (source_balance (65994500000000))
             (receiver_balance (65994500000000))))))
@@ -1625,7 +1627,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 55) (valid_until 4294967295)
@@ -1637,7 +1639,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20881572680751951383336610494373972102082836789309691655971845676443514623698
@@ -1645,7 +1647,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994400000000))
             (source_balance (65994400000000))
             (receiver_balance (65994400000000))))))
@@ -1653,7 +1655,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 56) (valid_until 4294967295)
@@ -1665,7 +1667,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25219062429037880193229135973659325723221201185101812917241218005570347001829
@@ -1673,7 +1675,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994300000000))
             (source_balance (65994300000000))
             (receiver_balance (65994300000000))))))
@@ -1681,7 +1683,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 57) (valid_until 4294967295)
@@ -1693,7 +1695,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (16292221814433647038904632771575174144297394216540891194643524729786539484592
@@ -1701,7 +1703,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994200000000))
             (source_balance (65994200000000))
             (receiver_balance (65994200000000))))))
@@ -1709,7 +1711,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 58) (valid_until 4294967295)
@@ -1721,7 +1723,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (6324856762817483840915610520698695059986201964103674063342335185117099785167
@@ -1729,7 +1731,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994100000000))
             (source_balance (65994100000000))
             (receiver_balance (65994100000000))))))
@@ -1737,7 +1739,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 59) (valid_until 4294967295)
@@ -1749,7 +1751,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (27206676804907753902182749226978682874860407590816563632374590102194647454330
@@ -1757,7 +1759,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65994000000000))
             (source_balance (65994000000000))
             (receiver_balance (65994000000000))))))
@@ -1765,7 +1767,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 60) (valid_until 4294967295)
@@ -1777,7 +1779,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5545489643903516040266039085050337041081645317297906030222543667637524804172
@@ -1785,7 +1787,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993900000000))
             (source_balance (65993900000000))
             (receiver_balance (65993900000000))))))
@@ -1793,7 +1795,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 61) (valid_until 4294967295)
@@ -1805,7 +1807,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (531989775591815328986568052316552913491302259743585456128605024002488225390
@@ -1813,7 +1815,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993800000000))
             (source_balance (65993800000000))
             (receiver_balance (65993800000000))))))
@@ -1821,7 +1823,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 62) (valid_until 4294967295)
@@ -1833,7 +1835,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (11280363474498642759107247209037048243360008289891355099179640336474867225830
@@ -1841,7 +1843,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993700000000))
             (source_balance (65993700000000))
             (receiver_balance (65993700000000))))))
@@ -1849,7 +1851,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 63) (valid_until 4294967295)
@@ -1861,7 +1863,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (11059416074512029289058477016972888445775943739016117120256373654991535838791
@@ -1869,7 +1871,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993600000000))
             (source_balance (65993600000000))
             (receiver_balance (65993600000000))))))
@@ -1877,7 +1879,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 64) (valid_until 4294967295)
@@ -1889,7 +1891,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (10197625735916536840816880966182917383608699407078237155152297906479092337682
@@ -1897,7 +1899,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993500000000))
             (source_balance (65993500000000))
             (receiver_balance (65993500000000))))))
@@ -1905,7 +1907,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 65) (valid_until 4294967295)
@@ -1917,7 +1919,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (18912848600239774224933974622484698119425558837088942195252648429794832797627
@@ -1925,7 +1927,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993400000000))
             (source_balance (65993400000000))
             (receiver_balance (65993400000000))))))
@@ -1933,7 +1935,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 66) (valid_until 4294967295)
@@ -1945,7 +1947,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (9391679276000261880323558387560730796594409660092632217920069622973861824434
@@ -1953,7 +1955,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993300000000))
             (source_balance (65993300000000))
             (receiver_balance (65993300000000))))))
@@ -1961,7 +1963,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 67) (valid_until 4294967295)
@@ -1973,7 +1975,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20709757743913125596514116054655151357292727586858194003714031130171972440312
@@ -1981,7 +1983,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993200000000))
             (source_balance (65993200000000))
             (receiver_balance (65993200000000))))))
@@ -1989,7 +1991,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 68) (valid_until 4294967295)
@@ -2001,7 +2003,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (12601574132716735039951120240113311859266869717151047685193793078119653581315
@@ -2009,7 +2011,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993100000000))
             (source_balance (65993100000000))
             (receiver_balance (65993100000000))))))
@@ -2017,7 +2019,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 69) (valid_until 4294967295)
@@ -2029,7 +2031,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (26728503632399493818975968248837479092682546445432625420368309432833896250229
@@ -2037,7 +2039,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65993000000000))
             (source_balance (65993000000000))
             (receiver_balance (65993000000000))))))
@@ -2045,7 +2047,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 70) (valid_until 4294967295)
@@ -2057,7 +2059,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22501604709931536708959926544295830725689071589614490577922782127251154357719
@@ -2065,7 +2067,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992900000000))
             (source_balance (65992900000000))
             (receiver_balance (65992900000000))))))
@@ -2073,7 +2075,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 71) (valid_until 4294967295)
@@ -2085,7 +2087,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23279641379672484891757641228232104961470657550233105584989204956148341383513
@@ -2093,7 +2095,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992800000000))
             (source_balance (65992800000000))
             (receiver_balance (65992800000000))))))
@@ -2101,7 +2103,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 72) (valid_until 4294967295)
@@ -2113,7 +2115,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (3065050119279626449895047979374346235132308281020028375486882411482335314072
@@ -2121,7 +2123,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992700000000))
             (source_balance (65992700000000))
             (receiver_balance (65992700000000))))))
@@ -2129,7 +2131,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 73) (valid_until 4294967295)
@@ -2141,7 +2143,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23424568285355610980711829232234566172838272792785682799132175085105179033983
@@ -2149,7 +2151,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992600000000))
             (source_balance (65992600000000))
             (receiver_balance (65992600000000))))))
@@ -2157,7 +2159,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 74) (valid_until 4294967295)
@@ -2169,7 +2171,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (370291182301484409912933996031117056644833139111058070953552564702927565800
@@ -2177,7 +2179,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992500000000))
             (source_balance (65992500000000))
             (receiver_balance (65992500000000))))))
@@ -2185,7 +2187,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 75) (valid_until 4294967295)
@@ -2197,7 +2199,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (28527466892024641782018001062456822755117276169105841794973738620762909085509
@@ -2205,7 +2207,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992400000000))
             (source_balance (65992400000000))
             (receiver_balance (65992400000000))))))
@@ -2213,7 +2215,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 76) (valid_until 4294967295)
@@ -2225,7 +2227,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (11193826787168000841046686057629972803732041979704164772753501246546892312656
@@ -2233,7 +2235,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992300000000))
             (source_balance (65992300000000))
             (receiver_balance (65992300000000))))))
@@ -2241,7 +2243,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 77) (valid_until 4294967295)
@@ -2253,7 +2255,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5578160279883463068189207958822846884274957347488383087476930904334605032219
@@ -2261,7 +2263,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992200000000))
             (source_balance (65992200000000))
             (receiver_balance (65992200000000))))))
@@ -2269,7 +2271,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 78) (valid_until 4294967295)
@@ -2281,7 +2283,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24210983810816574895545109590830346181327522429189159948967651776847330963188
@@ -2289,7 +2291,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992100000000))
             (source_balance (65992100000000))
             (receiver_balance (65992100000000))))))
@@ -2297,7 +2299,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 79) (valid_until 4294967295)
@@ -2309,7 +2311,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20296436166891737098142439645068627729850940212384955040089087915262919505892
@@ -2317,7 +2319,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65992000000000))
             (source_balance (65992000000000))
             (receiver_balance (65992000000000))))))
@@ -2325,7 +2327,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 80) (valid_until 4294967295)
@@ -2337,7 +2339,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25355627616148301542375689826364172343372568423711352691077032299058393075853
@@ -2345,7 +2347,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991900000000))
             (source_balance (65991900000000))
             (receiver_balance (65991900000000))))))
@@ -2353,7 +2355,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 81) (valid_until 4294967295)
@@ -2365,7 +2367,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (13607158253658773130101091247369553451128774382465353790987577655056159929334
@@ -2373,7 +2375,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991800000000))
             (source_balance (65991800000000))
             (receiver_balance (65991800000000))))))
@@ -2381,7 +2383,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 82) (valid_until 4294967295)
@@ -2393,7 +2395,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14690680356621237170126262791470962722256507874820720212042769580109294256876
@@ -2401,7 +2403,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991700000000))
             (source_balance (65991700000000))
             (receiver_balance (65991700000000))))))
@@ -2409,7 +2411,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 83) (valid_until 4294967295)
@@ -2421,7 +2423,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (26532289536924782322022173858406474443458611875888649238891497037633280431157
@@ -2429,7 +2431,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991600000000))
             (source_balance (65991600000000))
             (receiver_balance (65991600000000))))))
@@ -2437,7 +2439,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 84) (valid_until 4294967295)
@@ -2449,7 +2451,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24782923530972802012748095654081406659870366378740894172511804421825205027954
@@ -2457,7 +2459,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991500000000))
             (source_balance (65991500000000))
             (receiver_balance (65991500000000))))))
@@ -2465,7 +2467,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 85) (valid_until 4294967295)
@@ -2477,7 +2479,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (17456253507611891184665415561511870948970698481901156934649266478997065483846
@@ -2485,7 +2487,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991400000000))
             (source_balance (65991400000000))
             (receiver_balance (65991400000000))))))
@@ -2493,7 +2495,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 86) (valid_until 4294967295)
@@ -2505,7 +2507,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24125268707243299671080940864470606172696457350174601499967723200526536060609
@@ -2513,7 +2515,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991300000000))
             (source_balance (65991300000000))
             (receiver_balance (65991300000000))))))
@@ -2521,7 +2523,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 87) (valid_until 4294967295)
@@ -2533,7 +2535,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20571243918208271738977408243533651175065152924416313463498780329915666089546
@@ -2541,7 +2543,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991200000000))
             (source_balance (65991200000000))
             (receiver_balance (65991200000000))))))
@@ -2549,7 +2551,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 88) (valid_until 4294967295)
@@ -2561,7 +2563,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (13336614134867389203150999405686328435644637248236333660082680223502942973720
@@ -2569,7 +2571,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991100000000))
             (source_balance (65991100000000))
             (receiver_balance (65991100000000))))))
@@ -2577,7 +2579,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 89) (valid_until 4294967295)
@@ -2589,7 +2591,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24863176654447897588068413093304932556864592670565337457449151095365834587941
@@ -2597,7 +2599,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65991000000000))
             (source_balance (65991000000000))
             (receiver_balance (65991000000000))))))
@@ -2605,7 +2607,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 90) (valid_until 4294967295)
@@ -2617,7 +2619,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14506117312861412804208640780301270426706318263007512622548988801685688862526
@@ -2625,7 +2627,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990900000000))
             (source_balance (65990900000000))
             (receiver_balance (65990900000000))))))
@@ -2633,7 +2635,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 91) (valid_until 4294967295)
@@ -2645,7 +2647,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (11687111155289215367742317957998167697385678195100264227960754104415794543450
@@ -2653,7 +2655,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990800000000))
             (source_balance (65990800000000))
             (receiver_balance (65990800000000))))))
@@ -2661,7 +2663,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 92) (valid_until 4294967295)
@@ -2673,7 +2675,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22757524622959086099293828316531980100940959626923847783612963242691935842524
@@ -2681,7 +2683,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990700000000))
             (source_balance (65990700000000))
             (receiver_balance (65990700000000))))))
@@ -2689,7 +2691,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 93) (valid_until 4294967295)
@@ -2701,7 +2703,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24244544811380604575762022451877148629038958946166438412475556684913961876044
@@ -2709,7 +2711,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990600000000))
             (source_balance (65990600000000))
             (receiver_balance (65990600000000))))))
@@ -2717,7 +2719,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 94) (valid_until 4294967295)
@@ -2729,7 +2731,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (24324355829984777956045872928537577811896046276111269586151821713501738611235
@@ -2737,7 +2739,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990500000000))
             (source_balance (65990500000000))
             (receiver_balance (65990500000000))))))
@@ -2745,7 +2747,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 95) (valid_until 4294967295)
@@ -2757,7 +2759,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1516362284886241106642930904016387040444655126621009256860306592644062767339
@@ -2765,7 +2767,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990400000000))
             (source_balance (65990400000000))
             (receiver_balance (65990400000000))))))
@@ -2773,7 +2775,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 96) (valid_until 4294967295)
@@ -2785,7 +2787,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (15692780116258537466245250161501091693364812049777965671573606231994039757305
@@ -2793,7 +2795,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990300000000))
             (source_balance (65990300000000))
             (receiver_balance (65990300000000))))))
@@ -2801,7 +2803,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 97) (valid_until 4294967295)
@@ -2813,7 +2815,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (2821305580082531478142618792169911072815617595566657261275223893333036181100
@@ -2821,7 +2823,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990200000000))
             (source_balance (65990200000000))
             (receiver_balance (65990200000000))))))
@@ -2829,7 +2831,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 98) (valid_until 4294967295)
@@ -2841,7 +2843,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (8068564586627459229269925694057862609926464210486522940774788012541535535006
@@ -2849,7 +2851,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990100000000))
             (source_balance (65990100000000))
             (receiver_balance (65990100000000))))))
@@ -2857,7 +2859,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 99) (valid_until 4294967295)
@@ -2869,7 +2871,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (13880583098229538315003707174237678886676076182751581225467450008839453564826
@@ -2877,7 +2879,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65990000000000))
             (source_balance (65990000000000))
             (receiver_balance (65990000000000))))))
@@ -2885,7 +2887,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 100) (valid_until 4294967295)
@@ -2897,7 +2899,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14547360238997223698474554451308881475243680493049224744853460777133961966636
@@ -2905,7 +2907,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989900000000))
             (source_balance (65989900000000))
             (receiver_balance (65989900000000))))))
@@ -2913,7 +2915,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 101) (valid_until 4294967295)
@@ -2925,7 +2927,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22765129152851355632923867439457880773009233652097163956108334426275226433043
@@ -2933,7 +2935,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989800000000))
             (source_balance (65989800000000))
             (receiver_balance (65989800000000))))))
@@ -2941,7 +2943,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 102) (valid_until 4294967295)
@@ -2953,7 +2955,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (9121307656106459806988715355433504763921074990494367007712835573691716243968
@@ -2961,7 +2963,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989700000000))
             (source_balance (65989700000000))
             (receiver_balance (65989700000000))))))
@@ -2969,7 +2971,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 103) (valid_until 4294967295)
@@ -2981,7 +2983,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (19901819965423724388597673140873543630627767715320696370646985573749405292027
@@ -2989,7 +2991,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989600000000))
             (source_balance (65989600000000))
             (receiver_balance (65989600000000))))))
@@ -2997,7 +2999,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 104) (valid_until 4294967295)
@@ -3009,7 +3011,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14523376613019279510579171661198985662202438465276598523927357263157948779991
@@ -3017,7 +3019,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989500000000))
             (source_balance (65989500000000))
             (receiver_balance (65989500000000))))))
@@ -3025,7 +3027,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 105) (valid_until 4294967295)
@@ -3037,7 +3039,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (5859632094428181978465623263856381180613455474274124123622786966730198867555
@@ -3045,7 +3047,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989400000000))
             (source_balance (65989400000000))
             (receiver_balance (65989400000000))))))
@@ -3053,7 +3055,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 106) (valid_until 4294967295)
@@ -3065,7 +3067,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25196354747405059816871837468844825177130666367412017054370617758198430910021
@@ -3073,7 +3075,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989300000000))
             (source_balance (65989300000000))
             (receiver_balance (65989300000000))))))
@@ -3081,7 +3083,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 107) (valid_until 4294967295)
@@ -3093,7 +3095,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (4317725910904084527593071758655191321923022876098455854115167201040211649121
@@ -3101,7 +3103,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989200000000))
             (source_balance (65989200000000))
             (receiver_balance (65989200000000))))))
@@ -3109,7 +3111,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 108) (valid_until 4294967295)
@@ -3121,7 +3123,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (802705985051353523064823751620129037796270534155499381017009436885284821577
@@ -3129,7 +3131,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989100000000))
             (source_balance (65989100000000))
             (receiver_balance (65989100000000))))))
@@ -3137,7 +3139,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 109) (valid_until 4294967295)
@@ -3149,7 +3151,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (28797057825472642770268304620487546953528430010849513949306405724444112095638
@@ -3157,7 +3159,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65989000000000))
             (source_balance (65989000000000))
             (receiver_balance (65989000000000))))))
@@ -3165,7 +3167,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 110) (valid_until 4294967295)
@@ -3177,7 +3179,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23287520429714942097366995522590134907031040290995859520081191103590286809981
@@ -3185,7 +3187,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988900000000))
             (source_balance (65988900000000))
             (receiver_balance (65988900000000))))))
@@ -3193,7 +3195,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 111) (valid_until 4294967295)
@@ -3205,7 +3207,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (16972546285921210228607814186250400317365184987484443662167235822145862319446
@@ -3213,7 +3215,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988800000000))
             (source_balance (65988800000000))
             (receiver_balance (65988800000000))))))
@@ -3221,7 +3223,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 112) (valid_until 4294967295)
@@ -3233,7 +3235,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14061916097551693999279696432071678001269635017339217774439491933054466390252
@@ -3241,7 +3243,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988700000000))
             (source_balance (65988700000000))
             (receiver_balance (65988700000000))))))
@@ -3249,7 +3251,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 113) (valid_until 4294967295)
@@ -3261,7 +3263,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (23115530681350638912516937773952973952796794789249113502492756085700742761234
@@ -3269,7 +3271,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988600000000))
             (source_balance (65988600000000))
             (receiver_balance (65988600000000))))))
@@ -3277,7 +3279,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 114) (valid_until 4294967295)
@@ -3289,7 +3291,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (10658396383497011573061922020727768451319863468774173806222037531240946782811
@@ -3297,7 +3299,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988500000000))
             (source_balance (65988500000000))
             (receiver_balance (65988500000000))))))
@@ -3305,7 +3307,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 115) (valid_until 4294967295)
@@ -3317,7 +3319,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (27455357129262117828062911263558807487354284937766590992089053649300441853796
@@ -3325,7 +3327,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988400000000))
             (source_balance (65988400000000))
             (receiver_balance (65988400000000))))))
@@ -3333,7 +3335,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 116) (valid_until 4294967295)
@@ -3345,7 +3347,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (20208833894809506813811804227754344221024909831231280398121268742065759263212
@@ -3353,7 +3355,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988300000000))
             (source_balance (65988300000000))
             (receiver_balance (65988300000000))))))
@@ -3361,7 +3363,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 117) (valid_until 4294967295)
@@ -3373,7 +3375,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (22073182595895802686283919992351782616141735466012486316270547621279082495901
@@ -3381,7 +3383,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988200000000))
             (source_balance (65988200000000))
             (receiver_balance (65988200000000))))))
@@ -3389,7 +3391,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 118) (valid_until 4294967295)
@@ -3401,7 +3403,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (7370935996275704684873250345774214043298745873246056963849833161566443856732
@@ -3409,7 +3411,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988100000000))
             (source_balance (65988100000000))
             (receiver_balance (65988100000000))))))
@@ -3417,7 +3419,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 119) (valid_until 4294967295)
@@ -3429,7 +3431,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (6152438605172952946956112816599001200792317317051152657089204796095585998231
@@ -3437,7 +3439,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65988000000000))
             (source_balance (65988000000000))
             (receiver_balance (65988000000000))))))
@@ -3445,7 +3447,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 120) (valid_until 4294967295)
@@ -3457,7 +3459,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (1082213554441801998036169082669797914364821073565707232075694088291287092793
@@ -3465,7 +3467,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987900000000))
             (source_balance (65987900000000))
             (receiver_balance (65987900000000))))))
@@ -3473,7 +3475,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 121) (valid_until 4294967295)
@@ -3485,7 +3487,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (14090813856403891494927712676646212140189882455655963840079467972350034203397
@@ -3493,7 +3495,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987800000000))
             (source_balance (65987800000000))
             (receiver_balance (65987800000000))))))
@@ -3501,7 +3503,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 122) (valid_until 4294967295)
@@ -3513,7 +3515,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (6138155562031537647376961812202823145341573707150368602093395785911856355865
@@ -3521,7 +3523,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987700000000))
             (source_balance (65987700000000))
             (receiver_balance (65987700000000))))))
@@ -3529,7 +3531,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 123) (valid_until 4294967295)
@@ -3541,7 +3543,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (18528425101423650980321405976906351913560812750458123860334792072234306919685
@@ -3549,7 +3551,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987600000000))
             (source_balance (65987600000000))
             (receiver_balance (65987600000000))))))
@@ -3557,7 +3559,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 124) (valid_until 4294967295)
@@ -3569,7 +3571,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (25794804343596133623631470180568689472043910360972834820252384523111732312115
@@ -3577,7 +3579,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987500000000))
             (source_balance (65987500000000))
             (receiver_balance (65987500000000))))))
@@ -3585,7 +3587,7 @@ let sample_block_sexp =
           (Signed_command
            ((payload
              ((common
-               ((fee 100000000) (fee_token 1)
+               ((fee 100000000)
                 (fee_payer_pk
                  B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                 (nonce 125) (valid_until 4294967295)
@@ -3597,7 +3599,7 @@ let sample_block_sexp =
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
                  (receiver_pk
                   B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
-                 (token_id 1) (amount 0))))))
+                 (amount 0))))))
             (signer B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg)
             (signature
              (28013911400919387873646549028019842537766351955430504579909720258857460407245
@@ -3605,7 +3607,7 @@ let sample_block_sexp =
          (status
           (Applied
            ((fee_payer_account_creation_fee_paid ())
-            (receiver_account_creation_fee_paid ()) (created_token ()))
+            (receiver_account_creation_fee_paid ()))
            ((fee_payer_balance (65987400000000))
             (source_balance (65987400000000))
             (receiver_balance (65987400000000))))))))
@@ -3646,8 +3648,8 @@ let sample_block_json =
         },
         "genesis_ledger_hash":
           "jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco",
-        "registers":{"ledger":"jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco","pending_coinbase_stack":null,"next_available_token":"2","local_state":{"parties":"0x0000000000000000000000000000000000000000000000000000000000000000","call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","token_id":"1","excess":"0","ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,
-        "failure_status": null}},
+        "registers":{"ledger":"jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco","pending_coinbase_stack":null,"local_state":{"call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","stack_frame":"0x0000000000000000000000000000000000000000000000000000000000000000","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","excess":"0","ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,
+        "failure_status_tbl": []}},
         "timestamp": "1600251660000"
       },
       "consensus_state": {
@@ -3717,7 +3719,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "0",
@@ -3732,7 +3733,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3747,8 +3747,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999900000000",
@@ -3764,7 +3763,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "1",
@@ -3779,7 +3777,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3794,8 +3791,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999800000000",
@@ -3811,7 +3807,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "2",
@@ -3826,7 +3821,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3841,8 +3835,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999700000000",
@@ -3858,7 +3851,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "3",
@@ -3873,7 +3865,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3888,8 +3879,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999600000000",
@@ -3905,7 +3895,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "4",
@@ -3920,7 +3909,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3935,8 +3923,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999500000000",
@@ -3952,7 +3939,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "5",
@@ -3967,7 +3953,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -3982,8 +3967,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999400000000",
@@ -3999,7 +3983,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "6",
@@ -4014,7 +3997,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4029,8 +4011,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999300000000",
@@ -4046,7 +4027,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "7",
@@ -4061,7 +4041,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4076,8 +4055,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999200000000",
@@ -4093,7 +4071,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "8",
@@ -4108,7 +4085,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4123,8 +4099,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999100000000",
@@ -4140,7 +4115,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "9",
@@ -4155,7 +4129,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4170,8 +4143,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65999000000000",
@@ -4187,7 +4159,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "10",
@@ -4202,7 +4173,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4217,8 +4187,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998900000000",
@@ -4234,7 +4203,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "11",
@@ -4249,7 +4217,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4264,8 +4231,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998800000000",
@@ -4281,7 +4247,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "12",
@@ -4296,7 +4261,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4311,8 +4275,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998700000000",
@@ -4328,7 +4291,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "13",
@@ -4343,7 +4305,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4358,8 +4319,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998600000000",
@@ -4375,7 +4335,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "14",
@@ -4390,7 +4349,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4405,8 +4363,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998500000000",
@@ -4422,7 +4379,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "15",
@@ -4437,7 +4393,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4452,8 +4407,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998400000000",
@@ -4469,7 +4423,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "16",
@@ -4484,7 +4437,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4499,8 +4451,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998300000000",
@@ -4516,7 +4467,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "17",
@@ -4531,7 +4481,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4546,8 +4495,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998200000000",
@@ -4563,7 +4511,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "18",
@@ -4578,7 +4525,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4593,8 +4539,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998100000000",
@@ -4610,7 +4555,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "19",
@@ -4625,7 +4569,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4640,8 +4583,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65998000000000",
@@ -4657,7 +4599,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "20",
@@ -4672,7 +4613,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4687,8 +4627,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997900000000",
@@ -4704,7 +4643,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "21",
@@ -4719,7 +4657,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4734,8 +4671,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997800000000",
@@ -4751,7 +4687,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "22",
@@ -4766,7 +4701,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4781,8 +4715,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997700000000",
@@ -4798,7 +4731,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "23",
@@ -4813,7 +4745,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4828,8 +4759,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997600000000",
@@ -4845,7 +4775,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "24",
@@ -4860,7 +4789,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4875,8 +4803,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997500000000",
@@ -4892,7 +4819,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "25",
@@ -4907,7 +4833,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4922,8 +4847,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997400000000",
@@ -4939,7 +4863,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "26",
@@ -4954,7 +4877,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -4969,8 +4891,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997300000000",
@@ -4986,7 +4907,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "27",
@@ -5001,7 +4921,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5016,8 +4935,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997200000000",
@@ -5033,7 +4951,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "28",
@@ -5048,7 +4965,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5063,8 +4979,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997100000000",
@@ -5080,7 +4995,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "29",
@@ -5095,7 +5009,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5110,8 +5023,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65997000000000",
@@ -5127,7 +5039,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "30",
@@ -5142,7 +5053,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5157,8 +5067,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996900000000",
@@ -5174,7 +5083,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "31",
@@ -5189,7 +5097,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5204,8 +5111,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996800000000",
@@ -5221,7 +5127,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "32",
@@ -5236,7 +5141,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5251,8 +5155,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996700000000",
@@ -5268,7 +5171,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "33",
@@ -5283,7 +5185,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5298,8 +5199,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996600000000",
@@ -5315,7 +5215,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "34",
@@ -5330,7 +5229,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5345,8 +5243,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996500000000",
@@ -5362,7 +5259,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "35",
@@ -5377,7 +5273,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5392,8 +5287,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996400000000",
@@ -5409,7 +5303,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "36",
@@ -5424,7 +5317,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5439,8 +5331,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996300000000",
@@ -5456,7 +5347,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "37",
@@ -5471,7 +5361,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5486,8 +5375,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996200000000",
@@ -5503,7 +5391,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "38",
@@ -5518,7 +5405,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5533,8 +5419,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996100000000",
@@ -5550,7 +5435,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "39",
@@ -5565,7 +5449,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5580,8 +5463,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65996000000000",
@@ -5597,7 +5479,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "40",
@@ -5612,7 +5493,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5627,8 +5507,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995900000000",
@@ -5644,7 +5523,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "41",
@@ -5659,7 +5537,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5674,8 +5551,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995800000000",
@@ -5691,7 +5567,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "42",
@@ -5706,7 +5581,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5721,8 +5595,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995700000000",
@@ -5738,7 +5611,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "43",
@@ -5753,7 +5625,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5768,8 +5639,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995600000000",
@@ -5785,7 +5655,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "44",
@@ -5800,7 +5669,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5815,8 +5683,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995500000000",
@@ -5832,7 +5699,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "45",
@@ -5847,7 +5713,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5862,8 +5727,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995400000000",
@@ -5879,7 +5743,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "46",
@@ -5894,7 +5757,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5909,8 +5771,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995300000000",
@@ -5926,7 +5787,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "47",
@@ -5941,7 +5801,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -5956,8 +5815,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995200000000",
@@ -5973,7 +5831,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "48",
@@ -5988,7 +5845,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6003,8 +5859,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995100000000",
@@ -6020,7 +5875,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "49",
@@ -6035,7 +5889,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6050,8 +5903,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65995000000000",
@@ -6067,7 +5919,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "50",
@@ -6082,7 +5933,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6097,8 +5947,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994900000000",
@@ -6114,7 +5963,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "51",
@@ -6129,7 +5977,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6144,8 +5991,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994800000000",
@@ -6161,7 +6007,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "52",
@@ -6176,7 +6021,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6191,8 +6035,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994700000000",
@@ -6208,7 +6051,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "53",
@@ -6223,7 +6065,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6238,8 +6079,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994600000000",
@@ -6255,7 +6095,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "54",
@@ -6270,7 +6109,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6285,8 +6123,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994500000000",
@@ -6302,7 +6139,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "55",
@@ -6317,7 +6153,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6332,8 +6167,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994400000000",
@@ -6349,7 +6183,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "56",
@@ -6364,7 +6197,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6379,8 +6211,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994300000000",
@@ -6396,7 +6227,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "57",
@@ -6411,7 +6241,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6426,8 +6255,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994200000000",
@@ -6443,7 +6271,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "58",
@@ -6458,7 +6285,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6473,8 +6299,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994100000000",
@@ -6490,7 +6315,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "59",
@@ -6505,7 +6329,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6520,8 +6343,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65994000000000",
@@ -6537,7 +6359,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "60",
@@ -6552,7 +6373,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6567,8 +6387,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993900000000",
@@ -6584,7 +6403,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "61",
@@ -6599,7 +6417,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6614,8 +6431,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993800000000",
@@ -6631,7 +6447,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "62",
@@ -6646,7 +6461,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6661,8 +6475,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993700000000",
@@ -6678,7 +6491,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "63",
@@ -6693,7 +6505,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6708,8 +6519,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993600000000",
@@ -6725,7 +6535,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "64",
@@ -6740,7 +6549,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6755,8 +6563,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993500000000",
@@ -6772,7 +6579,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "65",
@@ -6787,7 +6593,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6802,8 +6607,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993400000000",
@@ -6819,7 +6623,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "66",
@@ -6834,7 +6637,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6849,8 +6651,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993300000000",
@@ -6866,7 +6667,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "67",
@@ -6881,7 +6681,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6896,8 +6695,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993200000000",
@@ -6913,7 +6711,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "68",
@@ -6928,7 +6725,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6943,8 +6739,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993100000000",
@@ -6960,7 +6755,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "69",
@@ -6975,7 +6769,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -6990,8 +6783,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65993000000000",
@@ -7007,7 +6799,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "70",
@@ -7022,7 +6813,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7037,8 +6827,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992900000000",
@@ -7054,7 +6843,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "71",
@@ -7069,7 +6857,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7084,8 +6871,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992800000000",
@@ -7101,7 +6887,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "72",
@@ -7116,7 +6901,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7131,8 +6915,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992700000000",
@@ -7148,7 +6931,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "73",
@@ -7163,7 +6945,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7178,8 +6959,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992600000000",
@@ -7195,7 +6975,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "74",
@@ -7210,7 +6989,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7225,8 +7003,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992500000000",
@@ -7242,7 +7019,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "75",
@@ -7257,7 +7033,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7272,8 +7047,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992400000000",
@@ -7289,7 +7063,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "76",
@@ -7304,7 +7077,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7319,8 +7091,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992300000000",
@@ -7336,7 +7107,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "77",
@@ -7351,7 +7121,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7366,8 +7135,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992200000000",
@@ -7383,7 +7151,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "78",
@@ -7398,7 +7165,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7413,8 +7179,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992100000000",
@@ -7430,7 +7195,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "79",
@@ -7445,7 +7209,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7460,8 +7223,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65992000000000",
@@ -7477,7 +7239,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "80",
@@ -7492,7 +7253,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7507,8 +7267,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991900000000",
@@ -7524,7 +7283,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "81",
@@ -7539,7 +7297,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7554,8 +7311,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991800000000",
@@ -7571,7 +7327,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "82",
@@ -7586,7 +7341,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7601,8 +7355,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991700000000",
@@ -7618,7 +7371,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "83",
@@ -7633,7 +7385,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7648,8 +7399,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991600000000",
@@ -7665,7 +7415,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "84",
@@ -7680,7 +7429,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7695,8 +7443,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991500000000",
@@ -7712,7 +7459,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "85",
@@ -7727,7 +7473,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7742,8 +7487,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991400000000",
@@ -7759,7 +7503,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "86",
@@ -7774,7 +7517,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7789,8 +7531,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991300000000",
@@ -7806,7 +7547,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "87",
@@ -7821,7 +7561,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7836,8 +7575,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991200000000",
@@ -7853,7 +7591,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "88",
@@ -7868,7 +7605,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7883,8 +7619,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991100000000",
@@ -7900,7 +7635,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "89",
@@ -7915,7 +7649,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7930,8 +7663,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65991000000000",
@@ -7947,7 +7679,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "90",
@@ -7962,7 +7693,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -7977,8 +7707,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990900000000",
@@ -7994,7 +7723,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "91",
@@ -8009,7 +7737,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8024,8 +7751,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990800000000",
@@ -8041,7 +7767,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "92",
@@ -8056,7 +7781,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8071,8 +7795,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990700000000",
@@ -8088,7 +7811,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "93",
@@ -8103,7 +7825,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8118,8 +7839,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990600000000",
@@ -8135,7 +7855,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "94",
@@ -8150,7 +7869,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8165,8 +7883,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990500000000",
@@ -8182,7 +7899,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "95",
@@ -8197,7 +7913,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8212,8 +7927,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990400000000",
@@ -8229,7 +7943,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "96",
@@ -8244,7 +7957,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8259,8 +7971,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990300000000",
@@ -8276,7 +7987,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "97",
@@ -8291,7 +8001,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8306,8 +8015,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990200000000",
@@ -8323,7 +8031,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "98",
@@ -8338,7 +8045,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8353,8 +8059,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990100000000",
@@ -8370,7 +8075,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "99",
@@ -8385,7 +8089,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8400,8 +8103,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65990000000000",
@@ -8417,7 +8119,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "100",
@@ -8432,7 +8133,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8447,8 +8147,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989900000000",
@@ -8464,7 +8163,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "101",
@@ -8479,7 +8177,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8494,8 +8191,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989800000000",
@@ -8511,7 +8207,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "102",
@@ -8526,7 +8221,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8541,8 +8235,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989700000000",
@@ -8558,7 +8251,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "103",
@@ -8573,7 +8265,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8588,8 +8279,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989600000000",
@@ -8605,7 +8295,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "104",
@@ -8620,7 +8309,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8635,8 +8323,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989500000000",
@@ -8652,7 +8339,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "105",
@@ -8667,7 +8353,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8682,8 +8367,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989400000000",
@@ -8699,7 +8383,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "106",
@@ -8714,7 +8397,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8729,8 +8411,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989300000000",
@@ -8746,7 +8427,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "107",
@@ -8761,7 +8441,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8776,8 +8455,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989200000000",
@@ -8793,7 +8471,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "108",
@@ -8808,7 +8485,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8823,8 +8499,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989100000000",
@@ -8840,7 +8515,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "109",
@@ -8855,7 +8529,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8870,8 +8543,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65989000000000",
@@ -8887,7 +8559,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "110",
@@ -8902,7 +8573,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8917,8 +8587,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988900000000",
@@ -8934,7 +8603,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "111",
@@ -8949,7 +8617,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -8964,8 +8631,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988800000000",
@@ -8981,7 +8647,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "112",
@@ -8996,7 +8661,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9011,8 +8675,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988700000000",
@@ -9028,7 +8691,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "113",
@@ -9043,7 +8705,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9058,8 +8719,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988600000000",
@@ -9075,7 +8735,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "114",
@@ -9090,7 +8749,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9105,8 +8763,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988500000000",
@@ -9122,7 +8779,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "115",
@@ -9137,7 +8793,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9152,8 +8807,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988400000000",
@@ -9169,7 +8823,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "116",
@@ -9184,7 +8837,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9199,8 +8851,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988300000000",
@@ -9216,7 +8867,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "117",
@@ -9231,7 +8881,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9246,8 +8895,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988200000000",
@@ -9263,7 +8911,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "118",
@@ -9278,7 +8925,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9293,8 +8939,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988100000000",
@@ -9310,7 +8955,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "119",
@@ -9325,7 +8969,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9340,8 +8983,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65988000000000",
@@ -9357,7 +8999,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "120",
@@ -9372,7 +9013,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9387,8 +9027,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987900000000",
@@ -9404,7 +9043,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "121",
@@ -9419,7 +9057,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9434,8 +9071,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987800000000",
@@ -9451,7 +9087,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "122",
@@ -9466,7 +9101,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9481,8 +9115,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987700000000",
@@ -9498,7 +9131,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "123",
@@ -9513,7 +9145,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9528,8 +9159,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987600000000",
@@ -9545,7 +9175,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "124",
@@ -9560,7 +9189,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9575,8 +9203,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987500000000",
@@ -9592,7 +9219,6 @@ let sample_block_json =
                 "payload": {
                   "common": {
                     "fee": "0.1",
-                    "fee_token": "1",
                     "fee_payer_pk":
                       "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                     "nonce": "125",
@@ -9607,7 +9233,6 @@ let sample_block_json =
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "receiver_pk":
                         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
-                      "token_id": "1",
                       "amount": "0"
                     }
                   ]
@@ -9622,8 +9247,7 @@ let sample_block_json =
               "Applied",
               {
                 "fee_payer_account_creation_fee_paid": null,
-                "receiver_account_creation_fee_paid": null,
-                "created_token": null
+                "receiver_account_creation_fee_paid": null
               },
               {
                 "fee_payer_balance": "65987400000000",

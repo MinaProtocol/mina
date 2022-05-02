@@ -1,7 +1,17 @@
 (library
  (name snark_keys_header)
  (public_name snark_keys_header)
- (libraries core_kernel integers)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   sexplib0
+   base
+   core_kernel
+   integers
+   base.caml
+   result
+   stdio
+ )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_deriving_yojson ppx_sexp_conv ppx_inline_test ppx_let ppx_deriving.ord ppx_compare)))

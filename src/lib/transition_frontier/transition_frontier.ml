@@ -142,7 +142,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   ; extensions
   ; closed = Ivar.create ()
   ; genesis_state_hash =
-      Precomputed_values.genesis_state_hash precomputed_values
+      (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   }
 
 let rec load_with_max_length :
@@ -206,7 +206,9 @@ let rec load_with_max_length :
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
         ~root_data:(genesis_root_data ~precomputed_values)
-        ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
+        ~genesis_state_hash:
+          (State_hash.With_state_hashes.state_hash
+             precomputed_values.protocol_state_with_hashes)
     in
     Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
     let genesis_ledger_hash =
@@ -220,7 +222,9 @@ let rec load_with_max_length :
   in
   match
     Persistent_frontier.Instance.check_database
-      ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
+      ~genesis_state_hash:
+        (State_hash.With_state_hashes.state_hash
+           precomputed_values.protocol_state_with_hashes)
       persistent_frontier_instance
   with
   | Error `Not_initialized ->
@@ -241,7 +245,8 @@ let rec load_with_max_length :
             , State_hash.to_yojson persisted_genesis_state_hash )
           ; ( "precomputed_state_hash"
             , State_hash.to_yojson
-                precomputed_values.protocol_state_with_hash.hash )
+                (State_hash.With_state_hashes.state_hash
+                   precomputed_values.protocol_state_with_hashes) )
           ] ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
@@ -366,17 +371,17 @@ let add_breadcrumb_exn t breadcrumb =
       ]
     "POST: ($state_hash, $n)" ;
   let user_cmds = Breadcrumb.commands breadcrumb in
-  if not (List.is_empty user_cmds) then
-    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
-       command or snapp command
-    *)
-    [%str_log' trace t.logger] Added_breadcrumb_user_commands
-      ~metadata:
-        [ ( "user_commands"
-          , `List
-              (List.map user_cmds
-                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
-        ] ;
+  (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+     command or snapp command
+  *)
+  [%str_log' trace t.logger] Added_breadcrumb_user_commands
+    ~metadata:
+      [ ( "user_commands"
+        , `List
+            (List.map user_cmds
+               ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
+      ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
+      ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
@@ -529,7 +534,7 @@ module For_tests = struct
                           ~depth:constraint_constants.pending_coinbase_depth ()
                      )
                    ~snarked_ledger:genesis_ledger
-                   ~snarked_local_state:Mina_state.Local_state.empty
+                   ~snarked_local_state:(Mina_state.Local_state.empty ())
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)))
         in
         Breadcrumb.create ~validated_transition:genesis_transition
@@ -620,7 +625,8 @@ module For_tests = struct
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
              ~genesis_state_hash:
-               (With_hash.hash precomputed_values.protocol_state_with_hash))
+               (State_hash.With_state_hashes.state_hash
+                  precomputed_values.protocol_state_with_hashes))
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
@@ -650,11 +656,13 @@ module For_tests = struct
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
-          ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash) ;
+          ~genesis_state_hash:
+            (State_hash.With_state_hashes.state_hash
+               precomputed_values.protocol_state_with_hashes)) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
+        let transition, _ = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
-          (External_transition.Validated.state_hash
-             (Root_data.Limited.transition root_data)) ;
+          (State_hash.With_state_hashes.state_hash transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance)) ;

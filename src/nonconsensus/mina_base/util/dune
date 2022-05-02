@@ -1,7 +1,7 @@
 (library
  (public_name mina_base_nonconsensus.util)
  (name mina_base_util)
- (libraries snark_params_nonconsensus)
+ (libraries snark_params_nonconsensus core_kernel bignum_bigint)
  (preprocess (pps
     ppx_version
     ppx_optcomp))

@@ -12,14 +12,6 @@ module Statement = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-        [@@deriving hash, sexp, compare]
-
-        let to_latest (t : t) : V2.t =
-          One_or_two.map t ~f:Transaction_snark.Statement.Stable.V1.to_latest
-      end
     end]
   end
 
@@ -36,17 +28,6 @@ module Statement = struct
       type _unused = unit constraint t = Arg.Stable.V2.t
 
       include Hashable.Make_binable (Arg.Stable.V2)
-    end
-
-    module V1 = struct
-      type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-      [@@deriving equal, compare, hash, sexp, yojson]
-
-      let to_latest = Arg.Stable.V1.to_latest
-
-      type _unused = unit constraint t = Arg.Stable.V1.t
-
-      include Hashable.Make_binable (Arg.Stable.V1)
     end
   end]
 
@@ -80,23 +61,6 @@ module Info = struct
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        { statements : Statement.Stable.V1.t
-        ; work_ids : int One_or_two.Stable.V1.t
-        ; fee : Fee.Stable.V1.t
-        ; prover : Public_key.Compressed.Stable.V1.t
-        }
-      [@@deriving compare, sexp, to_yojson]
-
-      let to_latest (t : t) : V2.t =
-        { statements = Statement.Stable.V1.to_latest t.statements
-        ; work_ids = t.work_ids
-        ; fee = t.fee
-        ; prover = t.prover
-        }
     end
   end]
 

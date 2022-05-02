@@ -28,11 +28,11 @@ let account = create "CodaAccount"
 
 let side_loaded_vk = create "CodaSideLoadedVk"
 
-let snapp_account = create "CodaSnappAccount"
+let zkapp_account = create "CodaZkappAccount"
 
-let snapp_payload = create "CodaSnappPayload"
+let zkapp_payload = create "CodaZkappPayload"
 
-let snapp_body = create "CodaSnappBody"
+let zkapp_body = create "CodaZkappBody"
 
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
@@ -50,7 +50,7 @@ let signature_mainnet = create "MinaSignatureMainnet"
 
 let receipt_chain_user_command = create "CodaReceiptUC"
 
-let receipt_chain_snapp = create "CodaReceiptSnapp"
+let receipt_chain_zkapp = create "CodaReceiptZkapp"
 
 let epoch_seed = create "CodaEpochSeed"
 
@@ -75,13 +75,15 @@ let checkpoint_list = create "CodaCheckpoints"
 
 let bowe_gabizon_hash = create "CodaTockBGHash"
 
-let snapp_predicate = create "CodaSnappPred"
+let zkapp_precondition = create "CodaZkappPred"
 
-let snapp_predicate_account = create "CodaSnappPredAcct"
+(*for Zkapp_precondition.Account.t*)
+let zkapp_precondition_account = create "CodaZkappPredAcct"
 
-let snapp_predicate_protocol_state = create "CodaSnappPredPS"
+let zkapp_precondition_protocol_state = create "CodaZkappPredPS"
 
-let party_predicate = create "MinaPartyPredicate"
+(*for Party.Account_precondition.t*)
+let party_account_precondition = create "MinaPartyAccountPred"
 
 let party = create "MinaParty"
 
@@ -89,16 +91,20 @@ let party_cons = create "MinaPartyCons"
 
 let party_node = create "MinaPartyNode"
 
-let party_with_protocol_state_predicate = create "MinaPartyStatePred"
+let party_stack_frame = create "MinaPartyStckFrm"
 
-let snapp_uri = create "MinaSnappUri"
+let party_stack_frame_cons = create "MinaPartyStckFrmCons"
 
-let snapp_event = create "MinaSnappEvent"
+let zkapp_uri = create "MinaZkappUri"
 
-let snapp_events = create "MinaSnappEvents"
+let zkapp_event = create "MinaZkappEvent"
 
-let snapp_sequence_events = create "MinaSnappSeqEvents"
+let zkapp_events = create "MinaZkappEvents"
 
-let snapp_memo = create "MinaSnappMemo"
+let zkapp_sequence_events = create "MinaZkappSeqEvents"
 
-let snapp_test = create "MinaSnappTest"
+let zkapp_memo = create "MinaZkappMemo"
+
+let zkapp_test = create "MinaZkappTest"
+
+let derive_token_id = create "MinaDeriveTokenId"

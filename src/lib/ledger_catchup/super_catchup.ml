@@ -145,7 +145,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
   let state_hash =
     External_transition.Validation.forget_validation_with_hash
       transition_with_hash
-    |> With_hash.hash |> State_hash.to_yojson
+    |> State_hash.With_state_hashes.state_hash |> State_hash.to_yojson
   in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
@@ -379,7 +379,8 @@ module Downloader = struct
               type t = External_transition.t
 
               let key (t : t) =
-                External_transition.(state_hash t, blockchain_length t)
+                External_transition.
+                  ((state_hashes t).state_hash, blockchain_length t)
             end)
             (struct
               type t = (State_hash.t * Length.t) option
@@ -483,12 +484,16 @@ module Initial_validate_batcher = struct
       (fun xs ->
         let input = function `Partially_validated x | `Init x -> x in
         let genesis_state_hash =
-          Precomputed_values.genesis_state_with_hash precomputed_values
-          |> With_hash.hash
+          Precomputed_values.genesis_state_with_hashes precomputed_values
+          |> State_hash.With_state_hashes.state_hash
         in
         List.map xs ~f:(fun x ->
-            External_transition.Validation.wrap
-              (Envelope.Incoming.data (input x)))
+            input x |> Envelope.Incoming.data
+            |> With_hash.map_hash ~f:(fun state_hash ->
+                   { State_hash.State_hashes.state_hash
+                   ; state_body_hash = None
+                   })
+            |> External_transition.Validation.wrap)
         |> External_transition.validate_proofs ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
@@ -648,7 +653,7 @@ let create_node ~downloader t x =
         let t = (Cached.peek b).Envelope.Incoming.data in
         let open External_transition.Initial_validated in
         ( Node.State.To_verify b
-        , state_hash t
+        , (state_hashes t).state_hash
         , blockchain_length t
         , parent_hash t
         , Ivar.create () )
@@ -670,8 +675,8 @@ let create_node ~downloader t x =
 let set_state t node s = set_state t node s ; write_graph t
 
 let pick ~constants
-    (x : (Mina_state.Protocol_state.Value.t, State_hash.t) With_hash.t)
-    (y : _ With_hash.t) =
+    (x : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t)
+    (y : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t) =
   let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
   match
     Consensus.Hooks.select ~constants ~existing:(f x) ~candidate:(f y)
@@ -1051,8 +1056,8 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
            ~f:
-             (Option.map ~f:(fun (x : _ With_hash.t) ->
-                  ( x.hash
+             (Option.map ~f:(fun x ->
+                  ( State_hash.With_state_hashes.state_hash x
                   , Mina_state.Protocol_state.consensus_state x.data
                     |> Consensus.Data.Consensus_state.blockchain_length ))))
       ~knowledge
@@ -1073,200 +1078,216 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
-  Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-    ~f:(fun (target_parent_hash, forest) ->
-      (* whenever anything comes through the catchup_job_reader, this anonymous function is called. `target_parent_hash` is actually the parent of all the trees in `forest`, is in other words if one expands `target_parent_hash` and combines it with `forest` them one actually obtains a single tree. *)
-      don't_wait_for
-        (let prev_ctx = Broadcast_pipe.Reader.peek best_tip_r in
-         let ctx = combine prev_ctx (pre_context forest) in
-         let eq x y =
-           let f = Option.map ~f:With_hash.hash in
-           Option.equal State_hash.equal (f x) (f y)
-         in
-         if eq prev_ctx ctx then Deferred.unit
-         else Broadcast_pipe.Writer.write best_tip_w ctx) ;
-      don't_wait_for
-        ( (* primary super_catchup business logic begins here, in this second `don't_wait_for` *)
-          [%log debug]
-            ~metadata:
-              [ ( "target_parent_hash"
-                , State_body_hash.to_yojson target_parent_hash )
-              ]
-            "Catchup job started with $target_parent_hash " ;
-          let state_hashes =
-            let target_length =
-              let len =
-                forest_pick forest |> Cached.peek |> Envelope.Incoming.data
-                |> External_transition.Initial_validated.blockchain_length
-              in
-              Option.value_exn (Length.sub len (Length.of_int 1))
-            in
-            let blockchain_length_of_target_hash =
-              let blockchain_length_of_dangling_block =
-                List.hd_exn forest |> Rose_tree.root |> Cached.peek
-                |> Envelope.Incoming.data
-                |> External_transition.Initial_validated.blockchain_length
-              in
-              Unsigned.UInt32.pred blockchain_length_of_dangling_block
-            in
-            (* check if the target_parent_hash's own parent is a part of the transition frontier, or not *)
-            match
-              List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
-                ~f:(fun c ->
-                  let h =
-                    External_transition.Initial_validated.state_hash
-                      (Cached.peek c).data
-                  in
-                  ( match (Cached.peek c).sender with
-                  | Local ->
-                      ()
-                  | Remote peer ->
-                      Downloader.add_knowledge downloader peer
-                        [ (target_parent_hash, target_length) ] ) ;
-                  let open Option.Let_syntax in
-                  let%bind { proof = path, root; data } = Best_tip_lru.get h in
-                  let%bind p =
-                    Transition_chain_verifier.verify
-                      ~target_hash:
-                        (External_transition.Initial_validated.state_hash data)
-                      ~transition_chain_proof:
-                        (External_transition.state_hash root, path)
-                  in
-                  Result.ok
-                    (try_to_connect_hash_chain t p ~frontier
-                       ~blockchain_length_of_target_hash))
-            with
-            | None ->
-                (* if the target_parent_hash's own parent is not a part of the transition frontier, then the entire chain of blocks connecting some node in the
-                   transition frontier to target_parent_hash needs to be downloaded *)
-                let preferred_peers =
-                  List.fold (List.concat_map ~f:Rose_tree.flatten forest)
-                    ~init:Peer.Set.empty ~f:(fun acc c ->
-                      match (Cached.peek c).sender with
-                      | Local ->
-                          acc
-                      | Remote peer ->
-                          Peer.Set.add acc peer)
-                in
-                download_state_hashes t ~logger ~trust_system ~network ~frontier
-                  ~downloader ~target_length ~target_hash:target_parent_hash
-                  ~blockchain_length_of_target_hash ~preferred_peers
-            | Some res ->
-                [%log debug] "Succeeded in using cache." ;
-                Deferred.Result.return res
-          in
-          match%map state_hashes with
-          | Error errors ->
+  O1trace.thread "handle_super_catchup_jobs" (fun () ->
+      Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+        ~f:(fun (target_parent_hash, forest) ->
+          (* whenever anything comes through the catchup_job_reader, this anonymous function is called. `target_parent_hash` is actually the parent of all the trees in `forest`, is in other words if one expands `target_parent_hash` and combines it with `forest` them one actually obtains a single tree. *)
+          don't_wait_for
+            (let prev_ctx = Broadcast_pipe.Reader.peek best_tip_r in
+             let ctx = combine prev_ctx (pre_context forest) in
+             let eq x y =
+               let f = Option.map ~f:State_hash.With_state_hashes.state_hash in
+               Option.equal State_hash.equal (f x) (f y)
+             in
+             if eq prev_ctx ctx then Deferred.unit
+             else Broadcast_pipe.Writer.write best_tip_w ctx) ;
+          don't_wait_for
+            ( (* primary super_catchup business logic begins here, in this second `don't_wait_for` *)
               [%log debug]
                 ~metadata:
-                  [ ("target_hash", State_hash.to_yojson target_parent_hash) ]
-                "Failed to download state hashes for $target_hash" ;
-              if contains_no_common_ancestor errors then
-                List.iter forest ~f:(fun subtree ->
-                    let transition =
-                      Rose_tree.root subtree |> Cached.peek
-                      |> Envelope.Incoming.data
-                    in
-                    let children_transitions =
-                      List.concat_map
-                        (Rose_tree.children subtree)
-                        ~f:Rose_tree.flatten
-                    in
-                    let children_state_hashes =
-                      List.map children_transitions ~f:(fun cached_transition ->
-                          Cached.peek cached_transition
-                          |> Envelope.Incoming.data
-                          |> External_transition.Initial_validated.state_hash)
-                    in
-                    [%log error]
-                      ~metadata:
-                        [ ( "state_hashes_of_children"
-                          , `List
-                              (List.map children_state_hashes
-                                 ~f:State_hash.to_yojson) )
-                        ; ( "state_hash"
-                          , State_hash.to_yojson
-                            @@ External_transition.Initial_validated.state_hash
-                                 transition )
-                        ; ( "reason"
-                          , `String
-                              "no common ancestor with our transition frontier"
-                          )
-                        ; ( "protocol_state"
-                          , External_transition.Initial_validated.protocol_state
-                              transition
-                            |> Mina_state.Protocol_state.value_to_yojson )
-                        ]
-                      "Validation error: external transition with state hash \
-                       $state_hash and its children were rejected for reason \
-                       $reason" ;
-                    Mina_metrics.(
-                      Counter.inc Rejected_blocks.no_common_ancestor
-                        (Float.of_int @@ (1 + List.length children_transitions)))) ;
-              List.iter forest ~f:(fun subtree ->
-                  Rose_tree.iter subtree ~f:(fun cached ->
-                      ( Cached.invalidate_with_failure cached
-                        : External_transition.Initial_validated.t
-                          Envelope.Incoming.t )
-                      |> ignore))
-          | Ok (root, state_hashes) ->
-              [%log' debug t.logger]
-                ~metadata:
-                  [ ("downloader", Downloader.to_yojson downloader)
-                  ; ( "node_states"
-                    , let s = Node.State.Enum.Table.create () in
-                      Hashtbl.iter t.nodes ~f:(fun node ->
-                          Hashtbl.incr s (Node.State.enum node.state)) ;
-                      `List
-                        (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                             `List [ Node.State.Enum.to_yojson k; `Int v ])) )
+                  [ ( "target_parent_hash"
+                    , State_body_hash.to_yojson target_parent_hash )
                   ]
-                "before entering state machine.  node_states: $node_states" ;
-              let root =
-                match root with
-                | `Breadcrumb root ->
-                    (* If we hit this case we should probably remove the parent from the
-                        table and prune, although in theory that should be handled by
-                       the frontier calling [Full_catchup_tree.apply_diffs]. *)
-                    create_node ~downloader t (`Root root)
-                | `Node node ->
-                    (* TODO: Log what is going on with transition frontier. *)
-                    node
+                "Catchup job started with $target_parent_hash " ;
+              let state_hashes =
+                let target_length =
+                  let len =
+                    forest_pick forest |> Cached.peek |> Envelope.Incoming.data
+                    |> External_transition.Initial_validated.blockchain_length
+                  in
+                  Option.value_exn (Length.sub len (Length.of_int 1))
+                in
+                let blockchain_length_of_target_hash =
+                  let blockchain_length_of_dangling_block =
+                    List.hd_exn forest |> Rose_tree.root |> Cached.peek
+                    |> Envelope.Incoming.data
+                    |> External_transition.Initial_validated.blockchain_length
+                  in
+                  Unsigned.UInt32.pred blockchain_length_of_dangling_block
+                in
+                (* check if the target_parent_hash's own parent is a part of the transition frontier, or not *)
+                match
+                  List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
+                    ~f:(fun c ->
+                      let h =
+                        (External_transition.Initial_validated.state_hashes
+                           (Cached.peek c).data)
+                          .state_hash
+                      in
+                      ( match (Cached.peek c).sender with
+                      | Local ->
+                          ()
+                      | Remote peer ->
+                          Downloader.add_knowledge downloader peer
+                            [ (target_parent_hash, target_length) ] ) ;
+                      let open Option.Let_syntax in
+                      let%bind { proof = path, root; data } =
+                        Best_tip_lru.get h
+                      in
+                      let%bind p =
+                        Transition_chain_verifier.verify
+                          ~target_hash:
+                            (External_transition.Initial_validated.state_hashes
+                               data)
+                              .state_hash
+                          ~transition_chain_proof:
+                            ( (External_transition.state_hashes root).state_hash
+                            , path )
+                      in
+                      Result.ok
+                        (try_to_connect_hash_chain t p ~frontier
+                           ~blockchain_length_of_target_hash))
+                with
+                | None ->
+                    (* if the target_parent_hash's own parent is not a part of the transition frontier, then the entire chain of blocks connecting some node in the
+                       transition frontier to target_parent_hash needs to be downloaded *)
+                    let preferred_peers =
+                      List.fold (List.concat_map ~f:Rose_tree.flatten forest)
+                        ~init:Peer.Set.empty ~f:(fun acc c ->
+                          match (Cached.peek c).sender with
+                          | Local ->
+                              acc
+                          | Remote peer ->
+                              Peer.Set.add acc peer)
+                    in
+                    download_state_hashes t ~logger ~trust_system ~network
+                      ~frontier ~downloader ~target_length
+                      ~target_hash:target_parent_hash
+                      ~blockchain_length_of_target_hash ~preferred_peers
+                | Some res ->
+                    [%log debug] "Succeeded in using cache." ;
+                    Deferred.Result.return res
               in
-              [%log debug]
-                ~metadata:[ ("n", `Int (List.length state_hashes)) ]
-                "Adding $n nodes" ;
-              (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
-              List.iter forest
-                ~f:
-                  (Rose_tree.iter ~f:(fun c ->
-                       let node =
-                         create_node ~downloader t (`Initial_validated c)
-                       in
-                       don't_wait_for
-                         ( ( run_state_machine node
-                             : (unit, [ `Finished ]) Deferred.Result.t )
-                         >>| ignore ))) ;
-              ignore
-                ( List.fold state_hashes
-                    ~init:(root.state_hash, root.blockchain_length)
-                    ~f:(fun (parent, l) h ->
-                      let l = Length.succ l in
-                      ( if not (Hashtbl.mem t.nodes h) then
-                        let node =
-                          create_node t ~downloader (`Hash (h, l, parent))
+              match%map state_hashes with
+              | Error errors ->
+                  [%log debug]
+                    ~metadata:
+                      [ ("target_hash", State_hash.to_yojson target_parent_hash)
+                      ]
+                    "Failed to download state hashes for $target_hash" ;
+                  if contains_no_common_ancestor errors then
+                    List.iter forest ~f:(fun subtree ->
+                        let transition =
+                          Rose_tree.root subtree |> Cached.peek
+                          |> Envelope.Incoming.data
                         in
-                        don't_wait_for (run_state_machine node >>| ignore) ) ;
-                      (h, l))
-                  : State_hash.t * Length.t ) ))
+                        let children_transitions =
+                          List.concat_map
+                            (Rose_tree.children subtree)
+                            ~f:Rose_tree.flatten
+                        in
+                        let children_state_hashes =
+                          List.map children_transitions
+                            ~f:(fun cached_transition ->
+                              ( Cached.peek cached_transition
+                              |> Envelope.Incoming.data
+                              |> External_transition.Initial_validated
+                                 .state_hashes )
+                                .state_hash)
+                        in
+                        [%log error]
+                          ~metadata:
+                            [ ( "state_hashes_of_children"
+                              , `List
+                                  (List.map children_state_hashes
+                                     ~f:State_hash.to_yojson) )
+                            ; ( "state_hash"
+                              , State_hash.to_yojson
+                                  (External_transition.Initial_validated
+                                   .state_hashes transition)
+                                    .state_hash )
+                            ; ( "reason"
+                              , `String
+                                  "no common ancestor with our transition \
+                                   frontier" )
+                            ; ( "protocol_state"
+                              , External_transition.Initial_validated
+                                .protocol_state transition
+                                |> Mina_state.Protocol_state.value_to_yojson )
+                            ]
+                          "Validation error: external transition with state \
+                           hash $state_hash and its children were rejected for \
+                           reason $reason" ;
+                        Mina_metrics.(
+                          Counter.inc Rejected_blocks.no_common_ancestor
+                            ( Float.of_int
+                            @@ (1 + List.length children_transitions) ))) ;
+                  List.iter forest ~f:(fun subtree ->
+                      Rose_tree.iter subtree ~f:(fun cached ->
+                          ( Cached.invalidate_with_failure cached
+                            : External_transition.Initial_validated.t
+                              Envelope.Incoming.t )
+                          |> ignore))
+              | Ok (root, state_hashes) ->
+                  [%log' debug t.logger]
+                    ~metadata:
+                      [ ("downloader", Downloader.to_yojson downloader)
+                      ; ( "node_states"
+                        , let s = Node.State.Enum.Table.create () in
+                          Hashtbl.iter t.nodes ~f:(fun node ->
+                              Hashtbl.incr s (Node.State.enum node.state)) ;
+                          `List
+                            (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
+                                 `List [ Node.State.Enum.to_yojson k; `Int v ]))
+                        )
+                      ]
+                    "before entering state machine.  node_states: $node_states" ;
+                  let root =
+                    match root with
+                    | `Breadcrumb root ->
+                        (* If we hit this case we should probably remove the parent from the
+                            table and prune, although in theory that should be handled by
+                           the frontier calling [Full_catchup_tree.apply_diffs]. *)
+                        create_node ~downloader t (`Root root)
+                    | `Node node ->
+                        (* TODO: Log what is going on with transition frontier. *)
+                        node
+                  in
+                  [%log debug]
+                    ~metadata:[ ("n", `Int (List.length state_hashes)) ]
+                    "Adding $n nodes" ;
+                  (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
+                  List.iter forest
+                    ~f:
+                      (Rose_tree.iter ~f:(fun c ->
+                           let node =
+                             create_node ~downloader t (`Initial_validated c)
+                           in
+                           ignore
+                             ( run_state_machine node
+                               : (unit, [ `Finished ]) Deferred.Result.t ))) ;
+                  ignore
+                    ( List.fold state_hashes
+                        ~init:(root.state_hash, root.blockchain_length)
+                        ~f:(fun (parent, l) h ->
+                          let l = Length.succ l in
+                          ( if not (Hashtbl.mem t.nodes h) then
+                            let node =
+                              create_node t ~downloader (`Hash (h, l, parent))
+                            in
+                            don't_wait_for (run_state_machine node >>| ignore)
+                          ) ;
+                          (h, l))
+                      : State_hash.t * Length.t ) )))
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
-  run_catchup ~logger ~trust_system ~verifier ~network ~frontier
-    ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
-    ~catchup_breadcrumbs_writer ~build_func:Transition_frontier.Breadcrumb.build
-  |> don't_wait_for
+  O1trace.background_thread "perform_super_catchup" (fun () ->
+      run_catchup ~logger ~trust_system ~verifier ~network ~frontier
+        ~catchup_job_reader ~precomputed_values ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer
+        ~build_func:Transition_frontier.Breadcrumb.build)
 
 (* Unit tests *)
 
