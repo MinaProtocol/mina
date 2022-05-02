@@ -11,7 +11,7 @@ import {
   call,
   isReady,
   shutdown,
-  Permissions,
+  signFeePayer,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
@@ -28,8 +28,8 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
-    this.self.update.permissions.setValue(Permissions.default());
+  deploy(args) {
+    super.deploy(args);
     this.x.set(initialState);
   }
 
@@ -79,32 +79,62 @@ let feePayerAddress = client.derivePublicKey(feePayerKey);
 // sign deploy txn
 tic("sign deploy transaction");
 let feePayerNonce = 0;
-let feePayerDeploy = {
-  feePayer: feePayerAddress,
-  fee: `${transactionFee}`,
-  nonce: feePayerNonce,
-};
 let signedDeploy = client.signTransaction(
-  { parties: JSON.parse(partiesJsonDeploy), feePayer: feePayerDeploy },
+  {
+    parties: JSON.parse(partiesJsonDeploy),
+    feePayer: {
+      feePayer: feePayerAddress,
+      fee: `${transactionFee}`,
+      nonce: feePayerNonce,
+    },
+  },
   feePayerKey
 );
 toc();
+
+// check that signature matches with the one snarkyjs creates on the same transaction
+tic("sign deploy transaction (snarkyjs, for consistency check)");
+let signedDeploySnarkyJs = await signFeePayer(partiesJsonDeploy, feePayerKey, {
+  transactionFee,
+  feePayerNonce,
+});
+if (
+  JSON.parse(signedDeploySnarkyJs).feePayer.authorization !==
+  JSON.parse(signedDeploy.data.parties).feePayer.authorization
+)
+  throw Error("Inconsistent fee payer signature");
+toc();
+
+feePayerNonce++;
 
 // sign update txn
 tic("sign update transaction");
-let feePayerUpdate = {
-  feePayer: feePayerAddress,
-  fee: `${transactionFee}`,
-  nonce: feePayerNonce++,
-};
 let signedUpdate = client.signTransaction(
-  { parties: JSON.parse(partiesJsonUpdate), feePayer: feePayerUpdate },
+  {
+    parties: JSON.parse(partiesJsonUpdate),
+    feePayer: {
+      feePayer: feePayerAddress,
+      fee: `${transactionFee}`,
+      nonce: feePayerNonce,
+    },
+  },
   feePayerKey
 );
 toc();
 
+// check that signature matches with the one snarkyjs creates on the same transaction
+tic("sign update transaction (snarkyjs, for consistency check)");
+let signedUpdateSnarkyJs = await signFeePayer(partiesJsonUpdate, feePayerKey, {
+  transactionFee,
+  feePayerNonce,
+});
+if (
+  JSON.parse(signedUpdateSnarkyJs).feePayer.authorization !==
+  JSON.parse(signedUpdate.data.parties).feePayer.authorization
+)
+  throw Error("Inconsistent fee payer signature");
+toc();
+
 console.log("success! created and signed two transactions.");
-console.log(signedDeploy.data.parties);
-console.log(signedUpdate.data.parties);
 
 shutdown();

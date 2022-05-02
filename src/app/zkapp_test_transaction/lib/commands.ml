@@ -125,6 +125,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     ; fee = Currency.Fee.of_int 10000000000 (*1 Mina*)
     ; receiver
     ; amount = Currency.Amount.of_int 10000000000 (*10 Mina*)
+    ; receiver_is_new = false
     }
   in
   let consensus_constants =

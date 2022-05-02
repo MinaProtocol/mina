@@ -466,9 +466,13 @@ module type Account_intf = sig
 
   type timing
 
+  type token_id
+
   val timing : t -> timing
 
-  val set_timing : timing -> t -> t
+  val set_timing : t -> timing -> t
+
+  val set_token_id : t -> token_id -> t
 
   type balance
 
@@ -644,6 +648,7 @@ module type Inputs_intf = sig
        and type public_key := Public_key.t
        and type nonce := Nonce.t
        and type state_hash := State_hash.t
+       and type token_id := Token_id.t
 
   module Events : Events_intf with type bool := Bool.t and type field := Field.t
 
@@ -784,10 +789,16 @@ module Make (Inputs : Inputs_intf) = struct
     , Opt.or_default ~if_:Call_stack.if_ ~default:(Call_stack.empty ())
         next_call_stack )
 
+  type get_next_party_result =
+    { party : Party.t
+    ; new_call_stack : Call_stack.t
+    ; new_frame : Stack_frame.t
+    }
+
   let get_next_party (current_forest : Stack_frame.t)
       (* The stack for the most recent snapp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
-      =
+      : get_next_party_result =
     (* If the current stack is complete, 'return' to the previous
        partially-completed one.
     *)
@@ -854,7 +865,7 @@ module Make (Inputs : Inputs_intf) = struct
                (Call_stack.push remainder_of_current_forest_frame
                   ~onto:call_stack))
     in
-    let new_current_forest =
+    let new_frame =
       Stack_frame.if_ party_forest_empty
         ~then_:
           (Stack_frame.if_ remainder_of_current_forest_empty
@@ -868,7 +879,7 @@ module Make (Inputs : Inputs_intf) = struct
            and caller_caller = party_caller in
            Stack_frame.make ~calls:party_forest ~caller ~caller_caller)
     in
-    (party, new_current_forest, new_call_stack)
+    { party; new_frame; new_call_stack }
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
@@ -932,7 +943,7 @@ module Make (Inputs : Inputs_intf) = struct
         | `No ->
             (local_state.stack_frame, local_state.call_stack)
       in
-      let party, remaining, call_stack =
+      let { party; new_frame = remaining; new_call_stack = call_stack } =
         with_label ~label:"get next party" (fun () ->
             (* TODO: Make the stack frame hashed inside of the local state *)
             get_next_party to_pop call_stack)
@@ -1060,6 +1071,7 @@ module Make (Inputs : Inputs_intf) = struct
       Inputs.Ledger.check_account (Party.public_key party)
         (Party.token_id party) (a, inclusion_proof)
     in
+    let a = Account.set_token_id a (Party.token_id party) in
     let party_token = Party.token_id party in
     let party_token_is_default = Token_id.(equal default) party_token in
     (* Set account timing for new accounts, if specified. *)
@@ -1076,7 +1088,7 @@ module Make (Inputs : Inputs_intf) = struct
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
       assert_ Global_slot.(vesting_period > zero) ;
-      let a = Account.set_timing timing a in
+      let a = Account.set_timing a timing in
       (a, local_state)
     in
     (* Apply balance change. *)
@@ -1089,18 +1101,25 @@ module Make (Inputs : Inputs_intf) = struct
       let local_state =
         Local_state.add_check local_state Overflow (Bool.not failed1)
       in
-      let fee =
-        Amount.of_constant_fee constraint_constants.account_creation_fee
-      in
-      let balance_when_new, `Underflow failed2 =
-        Balance.sub_amount_flagged balance fee
-      in
       let local_state =
-        Local_state.add_check local_state Amount_insufficient_to_create_account
-          Bool.(not (account_is_new &&& failed2))
-      in
-      let balance =
-        Balance.if_ account_is_new ~then_:balance_when_new ~else_:balance
+        (* Conditionally subtract account creation fee from fee excess *)
+        let account_creation_fee =
+          Amount.of_constant_fee constraint_constants.account_creation_fee
+        in
+        let excess_minus_creation_fee, `Overflow excess_update_failed =
+          Amount.add_signed_flagged local_state.excess
+            Amount.Signed.(negate (of_unsigned account_creation_fee))
+        in
+        let local_state =
+          Local_state.add_check local_state
+            Amount_insufficient_to_create_account
+            Bool.(not (account_is_new &&& excess_update_failed))
+        in
+        { local_state with
+          excess =
+            Amount.if_ account_is_new ~then_:excess_minus_creation_fee
+              ~else_:local_state.excess
+        }
       in
       let is_receiver = Amount.Signed.is_pos balance_change in
       let local_state =
@@ -1137,7 +1156,7 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Source_minimum_balance_violation
           (Bool.not invalid_timing)
       in
-      let a = Account.set_timing timing a in
+      let a = Account.set_timing a timing in
       (a, local_state)
     in
     (* Transform into a snapp account.
@@ -1315,7 +1334,7 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_delegate
           Bool.(
             Set_or_keep.is_keep delegate
-            ||| has_permission &&& party_token_is_default)
+            ||| (has_permission &&& party_token_is_default))
       in
       let delegate =
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
@@ -1405,16 +1424,17 @@ module Make (Inputs : Inputs_intf) = struct
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
+      (* We only allow the default token for fees. *)
+      assert_ curr_is_default ;
       Bool.(
         assert_
           ( (not is_start')
           ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
-      assert_ curr_is_default ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.add_signed_flagged local_state.excess local_delta
       in
       ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
-          ~else_:Amount.zero
+          ~else_:local_state.excess
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
         `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in

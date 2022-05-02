@@ -10,6 +10,12 @@ let dependsOn = [
     { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
     { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
 ]
+let dependsOnJs = [
+    { name = "TestnetIntegrationTests", key = "build-test-executive" },
+    { name = "TestnetIntegrationTests", key = "build-js-tests" },
+    { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
+    { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
+]
 
 in Pipeline.build Pipeline.Config::{
   spec =
@@ -25,6 +31,7 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     TestExecutive.build "integration_tests",
+    TestExecutive.buildJs "integration_tests",
     TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
@@ -33,6 +40,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "archive-node" dependsOn,
     TestExecutive.execute "opt-block-prod" dependsOn,
     TestExecutive.execute "zkapps" dependsOn,
-    TestExecutive.execute "zkapps-timing" dependsOn
+    TestExecutive.execute "zkapps-timing" dependsOn,
+    TestExecutive.executeWithJs "snarkyjs" dependsOnJs
   ]
 }

@@ -101,7 +101,7 @@ let check :
                         in
                         Some (vk, stmt, pi) ))
           in
-          let v =
+          let v : User_command.Valid.t =
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =

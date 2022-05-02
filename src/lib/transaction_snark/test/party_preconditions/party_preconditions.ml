@@ -289,7 +289,14 @@ let%test_module "Protocol state precondition tests" =
                         { public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
-                        ; balance_change = Amount.Signed.of_unsigned amount
+                        ; balance_change =
+                            Amount.(
+                              Signed.of_unsigned
+                                (Option.value_exn
+                                   (sub amount
+                                      (of_fee
+                                         constraint_constants
+                                           .account_creation_fee))))
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []

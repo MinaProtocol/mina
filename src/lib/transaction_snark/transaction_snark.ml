@@ -957,7 +957,8 @@ module Base = struct
 
     let implied_root account incl =
       let open Impl in
-      List.foldi incl ~init:(With_hash.hash account)
+      List.foldi incl
+        ~init:(Lazy.force (With_hash.hash account))
         ~f:(fun height acc (b, h) ->
           let l = Field.if_ b ~then_:h ~else_:acc
           and r = Field.if_ b ~then_:acc ~else_:h in
@@ -1113,7 +1114,7 @@ module Base = struct
       end
 
       module Account = struct
-        type t = (Account.Checked.Unhashed.t, Field.t) With_hash.t
+        type t = (Account.Checked.Unhashed.t, Field.t Lazy.t) With_hash.t
 
         module Permissions = struct
           type controller = Permissions.Auth_required.Checked.t
@@ -1154,23 +1155,27 @@ module Base = struct
           let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
         end
 
-        let account_with_hash (account : Account.Checked.Unhashed.t) =
+        let account_with_hash (account : Account.Checked.Unhashed.t) : t =
           With_hash.of_data account ~hash_data:(fun a ->
-              let a =
-                { a with
-                  zkapp =
-                    ( Zkapp_account.Checked.digest a.zkapp
-                    , As_prover.Ref.create (fun () -> None) )
-                }
-              in
-              run_checked (Account.Checked.digest a))
+              lazy
+                (let a =
+                   { a with
+                     zkapp =
+                       ( Zkapp_account.Checked.digest a.zkapp
+                       , As_prover.Ref.create (fun () -> None) )
+                   }
+                 in
+                 run_checked (Account.Checked.digest a)))
 
         type timing = Account_timing.var
 
         let timing (account : t) : timing = account.data.timing
 
-        let set_timing (timing : timing) (account : t) : t =
+        let set_timing (account : t) (timing : timing) : t =
           { account with data = { account.data with timing } }
+
+        let set_token_id (account : t) (token_id : Token_id.Checked.t) : t =
+          account_with_hash { account.data with token_id }
 
         let balance (a : t) : Balance.t = a.data.balance
 
@@ -1690,7 +1695,7 @@ module Base = struct
 
           type inclusion_proof = (Boolean.var * Field.t) list
 
-          let if_ b ~then_:(xt, rt) ~else_:(xe, re) =
+          let if_ b ~then_:((xt, rt) : t) ~else_:((xe, re) : t) =
             ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
             , V.if_ b ~then_:rt ~else_:re )
 
@@ -1707,7 +1712,7 @@ module Base = struct
               (read Signature_lib.Public_key.Compressed.typ body.public_key)
               (read Mina_base.Token_id.typ body.token_id)
 
-          let get_account { party; _ } (_root, ledger) =
+          let get_account { party; _ } ((_root, ledger) : t) =
             let idx = V.map ledger ~f:(fun l -> idx l (body_id party.data)) in
             let account =
               exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
@@ -1731,7 +1736,8 @@ module Base = struct
             in
             (account, incl)
 
-          let set_account (_root, ledger) (a, incl) =
+          let set_account ((_root, ledger) : t) ((a, incl) : Account.t * _) : t
+              =
             ( implied_root a incl |> Ledger_hash.var_of_hash_packed
             , V.map ledger
                 ~f:
@@ -1743,7 +1749,7 @@ module Base = struct
                       let idx = idx ledger (Mina_base.Account.identifier a) in
                       Sparse_ledger.set_exn ledger idx a) )
 
-          let check_inclusion (root, _) (account, incl) =
+          let check_inclusion ((root, _) : t) (account, incl) =
             with_label __LOC__ (fun () ->
                 Field.Assert.equal
                   (implied_root account incl)
@@ -4338,11 +4344,11 @@ module For_tests = struct
       let zeroing_allotment =
         if new_zkapp_account then
           (* value doesn't matter when num_keypairs = 0 *)
-          if num_keypairs <= 1 then amount
+          if num_keypairs = 0 then amount
           else
             let otherwise_allotted =
               Option.value_exn
-                (Currency.Amount.scale account_creation_fee (num_keypairs - 1))
+                (Currency.Amount.scale account_creation_fee num_keypairs)
             in
             Option.value_exn (Currency.Amount.sub amount otherwise_allotted)
         else Currency.Amount.zero
@@ -4352,9 +4358,8 @@ module For_tests = struct
             Signature_lib.Public_key.compress zkapp_account_keypair.public_key
           in
           let delta =
-            if new_zkapp_account then
-              if ndx = 0 then Amount.Signed.(of_unsigned zeroing_allotment)
-              else Amount.Signed.(of_unsigned account_creation_fee)
+            if new_zkapp_account && ndx = 0 then
+              Amount.Signed.(of_unsigned zeroing_allotment)
             else Amount.Signed.zero
           in
           ( { body =
@@ -4494,7 +4499,7 @@ module For_tests = struct
           ( { body = snapp_party.body; authorization = Signature signature }
             : Party.Wire.t ))
     in
-    let other_parties = [ Option.value_exn sender_party ] @ snapp_parties in
+    let other_parties = Option.to_list sender_party @ snapp_parties in
     let parties : Parties.t =
       Parties.of_wire { fee_payer; other_parties; memo }
     in
@@ -4633,6 +4638,7 @@ module For_tests = struct
     let { Mina_transaction_logic.For_tests.Transaction_spec.fee
         ; sender = sender, sender_nonce
         ; receiver = _
+        ; receiver_is_new = _
         ; amount
         } =
       spec
