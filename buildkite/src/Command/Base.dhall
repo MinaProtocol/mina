@@ -121,7 +121,8 @@ let targetToAgent = \(target : Size) ->
   merge { XLarge = toMap { size = "generic" },
           Large = toMap { size = "generic" },
           Medium = toMap { size = "generic" },
-          Small = toMap { size = "generic" }
+          Small = toMap { size = "generic" },
+          Integration = toMap { size = "integration" }
         }
         target
 
