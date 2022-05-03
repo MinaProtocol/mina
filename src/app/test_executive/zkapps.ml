@@ -265,7 +265,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { p.fee_payer with
             body =
               { p.fee_payer.body with
-                account_precondition = Mina_base.Account.Nonce.of_int 42
+                nonce = Mina_base.Account.Nonce.of_int 42
               }
           }
       }
@@ -276,7 +276,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { body =
               { p.fee_payer.body with
-                account_precondition = Mina_base.Account.Nonce.of_int 2
+                nonce = Mina_base.Account.Nonce.of_int 2
               }
           ; authorization = Mina_base.Signature.dummy
           }
