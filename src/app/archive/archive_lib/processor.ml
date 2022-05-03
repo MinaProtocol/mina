@@ -82,7 +82,8 @@ module Token = struct
   let find_opt (module Conn : CONNECTION) =
     make_finder Conn.find_opt Caqti_request.find_opt
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~owner token_id =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      ~(owner : Account_id.t option) token_id =
     let open Deferred.Result.Let_syntax in
     let value = Token_id.(to_string token_id) in
     match owner with
@@ -112,17 +113,19 @@ module Token = struct
                  (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                     ~cols:[ "value" ] ()))
               value )
-    | Some (owner_pk, owner_tid) ->
+    | Some acct_id ->
         assert (not @@ Token_id.(equal default) token_id) ;
         (* we can only add this token if its owner exists
            that means if we add several tokens in a block,
            we must add them in topologically sorted order
         *)
         let%bind owner_public_key_id =
+          let owner_pk = Account_id.public_key acct_id in
           let%map id = Public_key.add_if_doesn't_exist (module Conn) owner_pk in
           Some id
         in
         let%bind owner_token_id =
+          let owner_tid = Account_id.token_id acct_id in
           let%map id = find (module Conn) owner_tid in
           Some id
         in
