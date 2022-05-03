@@ -447,18 +447,12 @@ let%test_unit "tokens test" =
       { body =
           { update = Party.Update.noop
           ; public_key = pk
-          ; token_id = ()
-          ; balance_change = Currency.Fee.of_int 7
-          ; increment_nonce = ()
+          ; fee = Currency.Fee.of_int 7
           ; events = []
           ; sequence_events = []
-          ; call_data = Pickles.Impls.Step.Field.Constant.zero
-          ; call_depth = 0
           ; protocol_state_precondition =
               Zkapp_precondition.Protocol_state.accept
-          ; use_full_commitment = ()
-          ; account_precondition = nonce
-          ; caller = ()
+          ; nonce
           }
       ; authorization = Signature.dummy
       }

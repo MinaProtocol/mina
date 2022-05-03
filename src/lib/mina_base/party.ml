@@ -713,19 +713,13 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : unit [@skip]
           ; update : Update.Stable.V1.t
-          ; balance_change : Fee.Stable.V1.t
-          ; increment_nonce : unit [@skip]
+          ; fee : Fee.Stable.V1.t
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; call_depth : int
           ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Stable.V1.t
-          ; account_precondition : Account_nonce.Stable.V1.t
-          ; use_full_commitment : unit [@skip]
-          ; caller : unit [@skip]
+          ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
@@ -735,18 +729,12 @@ module Body = struct
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; token_id = ()
       ; update = Update.dummy
-      ; balance_change = Fee.zero
-      ; increment_nonce = ()
+      ; fee = Fee.zero
       ; events = []
       ; sequence_events = []
-      ; call_data = Field.zero
-      ; call_depth = 0
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; account_precondition = Account_nonce.zero
-      ; use_full_commitment = ()
-      ; caller = ()
+      ; nonce = Account_nonce.zero
       }
 
     let deriver obj =
@@ -756,14 +744,12 @@ module Body = struct
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
-      let unit = ( !. ) ~skip_data:() skip in
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~token_id:unit ~balance_change:!.fee ~increment_nonce:unit
+        ~fee:!.fee
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
-        ~call_data:!.field ~call_depth:!.int
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
-        ~account_precondition:!.uint32 ~use_full_commitment:unit ~caller:unit
+        ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
@@ -778,16 +764,14 @@ module Body = struct
     ; token_id = Token_id.default
     ; update = t.update
     ; balance_change =
-        { Signed_poly.sgn = Sgn.Neg
-        ; magnitude = Amount.of_fee t.balance_change
-        }
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
     ; events = t.events
     ; sequence_events = t.sequence_events
-    ; call_data = t.call_data
-    ; call_depth = t.call_depth
+    ; call_data = Field.zero
+    ; call_depth = 0
     ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account_precondition.Nonce t.account_precondition
+    ; account_precondition = Account_precondition.Nonce t.nonce
     ; use_full_commitment = true
     ; caller = Token_id.default
     }
