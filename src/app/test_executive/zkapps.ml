@@ -275,9 +275,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { body =
-              { p.fee_payer.body with
-                nonce = Mina_base.Account.Nonce.of_int 2
-              }
+              { p.fee_payer.body with nonce = Mina_base.Account.Nonce.of_int 2 }
           ; authorization = Mina_base.Signature.dummy
           }
       }
