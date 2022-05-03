@@ -1322,6 +1322,7 @@ module Precomputed_block = struct
           Frozen_ledger_hash.t * Frozen_ledger_hash.t list
       ; accounts_accessed : (int * Account.t) list
       ; accounts_created : (Account_id.t * Currency.Fee.t) list
+            (* TODO : list of token ids and owners created *)
       }
     [@@deriving sexp, yojson]
   end

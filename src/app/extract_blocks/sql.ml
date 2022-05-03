@@ -48,42 +48,18 @@ module Subchain = struct
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
   let query_all =
+    let open Core_kernel in
+    let comma_fields =
+      String.concat Archive_lib.Processor.Block.Fields.names ~sep:","
+    in
     Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
-      {sql| SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                   next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
-            FROM blocks
-      |sql}
+      (sprintf "SELECT %s FROM blocks" comma_fields)
 
   let all_blocks (module Conn : Caqti_async.CONNECTION) =
     Conn.collect_list query_all ()
 end
 
 (* Archive_lib.Processor does not have the queries given here *)
-
-module Public_key = struct
-  let query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
-      "SELECT value from public_keys WHERE id = ?"
-
-  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
-end
-
-module Snarked_ledger_hashes = struct
-  let query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
-      "SELECT value from snarked_ledger_hashes WHERE id = ?"
-
-  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
-end
-
-module Epoch_data = struct
-  let query =
-    Caqti_request.find Caqti_type.int
-      Caqti_type.(tup2 string int)
-      "SELECT seed,ledger_hash_id from epoch_data WHERE id = ?"
-
-  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
-end
 
 module Blocks_and_user_commands = struct
   let query =
@@ -114,8 +90,21 @@ module Blocks_and_internal_commands = struct
     Caqti_request.collect Caqti_type.int typ
       {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no
             FROM (blocks_internal_commands
-              INNER JOIN blocks
-              ON blocks.id = blocks_internal_commands.block_id)
+            INNER JOIN blocks
+            ON blocks.id = blocks_internal_commands.block_id)
+            WHERE block_id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end
+
+module Blocks_and_zkapp_commands = struct
+  let query =
+    Caqti_request.collect Caqti_type.int
+      Caqti_type.(tup2 int int)
+      {sql| SELECT zkapp_command_id, sequence_no
+            FROM blocks_zkapp_commands
             WHERE block_id = ?
       |sql}
 

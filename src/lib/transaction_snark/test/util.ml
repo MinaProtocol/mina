@@ -184,7 +184,7 @@ let check_parties_with_merges_exn ?expected_failure
       ( match applied.varying with
       | Command (Parties { command; _ }) -> (
           match command.status with
-          | Applied _ -> (
+          | Applied -> (
               match expected_failure with
               | Some failure ->
                   failwith
@@ -195,7 +195,7 @@ let check_parties_with_merges_exn ?expected_failure
                        failure)
               | None ->
                   () )
-          | Failed (failure_tbl, _) -> (
+          | Failed failure_tbl -> (
               match expected_failure with
               | None ->
                   failwith
