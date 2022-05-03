@@ -17,22 +17,22 @@ spec:
         app: {{.Values.name}}-watchdog
         testnet: {{$.Values.testnetName}}
         role: watchdog
-        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        version: {{trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-"}}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{.Values.ports.metrics | quote}}
         prometheus.io/path: '/metrics'
     spec:
       containers:
-      - name: watchdog
-        resources:
+        - name: watchdog
+          resources:
           requests:
             memory: {{.Values.watchdog.memory}}
             cpu: {{.Values.watchdog.cpu}}
         image: {{.Values.watchdog.image}}
         command: ["python3"]
-        args: 
-        - "-u" 
+        args:
+        - "-u"
         - "/code/watchdog.py"
         env:
           - name: "RESTART_EVERY_MINS"
