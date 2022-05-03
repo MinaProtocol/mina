@@ -82,54 +82,54 @@ module Token = struct
   let find_opt (module Conn : CONNECTION) =
     make_finder Conn.find_opt Caqti_request.find_opt
 
-  let find_owner (module Conn : CONNECTION) token_id =
-    Conn.find
-      (Caqti_request.find Caqti_type.string
-         Caqti_type.(tup2 int int)
-         (Mina_caqti.select_cols ~table_name
-            ~select:"owner_public_key_id,owner_token_id" ~cols:[ "value" ] ()))
-      (Token_id.to_string token_id)
-
-  let add_default (module Conn : CONNECTION) =
-    let open Deferred.Result.Let_syntax in
-    match%bind find_opt (module Conn) Token_id.default with
-    | Some id ->
-        return id
-    | None ->
-        Conn.find
-          (Caqti_request.find Caqti_type.string Caqti_type.int
-             (sprintf "INSERT INTO %s (value) VALUES (?) RETURNING id"
-                table_name))
-          Token_id.(to_string default)
-
   let add_if_doesn't_exist (module Conn : CONNECTION) ~owner token_id =
     let open Deferred.Result.Let_syntax in
+    let value = Token_id.(to_string token_id) in
     match owner with
-    | None ->
-        assert (Token_id.(equal default) token_id) ;
-        (* the default token is added on startup by
-           add_default, above
-
-           we wouldn't want to try to insert it here,
-           because `select_insert_into_cols` would break
-           on the NULL columns for the owner
+    | None -> (
+        (* we can't use `select_insert_into_cols` for this
+           case, because that doesn't work with NULLable
+           columns
         *)
-        find (module Conn) token_id
-    | Some owner_tid ->
+        assert (Token_id.(equal default) token_id) ;
+        match%bind
+          Conn.find_opt
+            (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+               (sprintf
+                  {sql| SELECT id FROM %s
+                        WHERE value = $1
+                        AND owner_public_key_id IS NULL
+                        AND owner_token_id IS NULL
+                  |sql}
+                  table_name))
+            value
+        with
+        | Some id ->
+            return id
+        | None ->
+            Conn.find
+              (Caqti_request.find Caqti_type.string Caqti_type.int
+                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                    ~cols:[ "value" ] ()))
+              value )
+    | Some (owner_pk, owner_tid) ->
         assert (not @@ Token_id.(equal default) token_id) ;
-        let value = Token_id.to_string token_id in
-        let%bind owner_public_key_id, owner_token_id =
-          (* we can only add this token if its owner exists *)
-          let%map owner_pk_id, owner_token_id =
-            find_owner (module Conn) owner_tid
-          in
-          (Some owner_pk_id, Some owner_token_id)
+        (* we can only add this token if its owner exists
+           that means if we add several tokens in a block,
+           we must add them in topologically sorted order
+        *)
+        let%bind owner_public_key_id =
+          let%map id = Public_key.add_if_doesn't_exist (module Conn) owner_pk in
+          Some id
         in
-        let t = { value; owner_public_key_id; owner_token_id } in
+        let%bind owner_token_id =
+          let%map id = find (module Conn) owner_tid in
+          Some id
+        in
         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
           ~table_name ~cols:(Fields.names, typ)
           (module Conn)
-          t
+          { value; owner_public_key_id; owner_token_id }
 end
 
 module Voting_for = struct
@@ -3529,19 +3529,6 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         in
         ())
 
-let add_default_token ~logger pool =
-  [%log info] "Adding default token to archive database" ;
-  match%bind
-    (Caqti_async.Pool.use (fun (module Conn : CONNECTION) ->
-         Token.add_default (module Conn)))
-      pool
-  with
-  | Ok _id ->
-      Deferred.unit
-  | Error err ->
-      failwithf "Could not add default token, error: %s" (Caqti_error.show err)
-        ()
-
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
   match runtime_config_opt with
@@ -3663,7 +3650,6 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () = add_default_token ~logger pool in
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;
