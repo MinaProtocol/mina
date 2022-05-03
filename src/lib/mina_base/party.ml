@@ -614,69 +614,8 @@ module Account_precondition = struct
 end
 
 module Body = struct
-  module Poly
-      (Public_key : Type)
-      (Token_id : Type)
-      (Update : Type)
-      (Amount : Type)
-      (Events : Type)
-      (Call_data : Type)
-      (Int : Type)
-      (Bool : Type)
-      (Protocol_state : Type)
-      (Account_precondition : Type)
-      (Caller : Type) =
-  struct
-    (** Body component of a party *)
-    type t =
-      { public_key : Public_key.t
-      ; token_id : Token_id.t
-      ; update : Update.t
-      ; balance_change : Amount.t
-      ; increment_nonce : Bool.t
-      ; events : Events.t
-      ; sequence_events : Events.t
-      ; call_data : Call_data.t
-      ; call_depth : Int.t
-      ; protocol_state_precondition : Protocol_state.t
-      ; account_precondition : Account_precondition.t
-      ; use_full_commitment : Bool.t
-      ; caller : Caller.t
-      }
-  end
-
   (* Why isn't this derived automatically? *)
   let hash_fold_array f init x = Array.fold ~init ~f x
-
-  module Int = struct
-    include Int
-
-    type t = int [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Bool = struct
-    include Bool
-
-    type t = bool [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Unit = struct
-    include Unit
-
-    type t = unit [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Amount_sgn_signed_poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-        [@@deriving sexp, equal, hash, compare, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
 
   module Events' = struct
     [%%versioned
@@ -695,21 +634,11 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-              Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
-                (Update.Stable.V1)
-                (Amount_sgn_signed_poly.Stable.V1)
-                (Events'.Stable.V1)
-                (Pickles.Backend.Tick.Field.Stable.V1)
-                (Int)
-                (Bool)
-                (Zkapp_precondition.Protocol_state.Stable.V1)
-                (Account_precondition.Stable.V1)
-                (Call_type.Stable.V1)
-              .t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V1.t
           ; update : Update.Stable.V1.t
-          ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
@@ -732,22 +661,11 @@ module Body = struct
   module Stable = struct
     module V1 = struct
       type t =
-            Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
-              (Update.Stable.V1)
-              (Amount_sgn_signed_poly.Stable.V1)
-              (Events'.Stable.V1)
-              (Pickles.Backend.Tick.Field.Stable.V1)
-              (Int)
-              (Bool)
-              (Zkapp_precondition.Protocol_state.Stable.V1)
-              (Account_precondition.Stable.V1)
-              (Token_id.Stable.V1)
-            .t
-            (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; update : Update.Stable.V1.t
-        ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+        ; balance_change :
+            (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
         ; sequence_events : Events'.Stable.V1.t
@@ -794,17 +712,6 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-              Poly(Public_key.Compressed.Stable.V1)(Unit)(Update.Stable.V1)
-                (Fee.Stable.V1)
-                (Events'.Stable.V1)
-                (Pickles.Backend.Tick.Field.Stable.V1)
-                (Int)
-                (Unit)
-                (Zkapp_precondition.Protocol_state.Stable.V1)
-                (Account_nonce.Stable.V1)
-                (Unit)
-              .t
-              (* Opaque to txn logic *) =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : unit [@skip]
           ; update : Update.Stable.V1.t
@@ -898,17 +805,6 @@ module Body = struct
     end
 
     type t =
-          Poly(Type_of_var(Public_key.Compressed))(Token_id.Checked)
-            (Update.Checked)
-            (Type_of_var(Amount.Signed))
-            (Type_of_var(Events))
-            (Field.Var)
-            (Int_as_prover_ref)
-            (Type_of_var(Boolean))
-            (Zkapp_precondition.Protocol_state.Checked)
-            (Account_precondition.Checked)
-            (Token_id.Checked)
-          .t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; update : Update.Checked.t
@@ -1097,16 +993,12 @@ module Body = struct
   end
 end
 
-module Poly (Body : Type) (Auth : Type) = struct
-  type t = { body : Body.t; authorization : Auth.t }
-end
-
 module T = struct
   module Wire = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Poly(Body.Wire.Stable.V1)(Control.Stable.V2).t =
+        type t =
           { body : Body.Wire.Stable.V1.t; authorization : Control.Stable.V2.t }
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -1119,8 +1011,7 @@ module T = struct
   module Stable = struct
     module V1 = struct
       (** A party to a zkApp transaction *)
-      type t = Poly(Body.Stable.V1)(Control.Stable.V2).t =
-        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
+      type t = { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
