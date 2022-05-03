@@ -11,8 +11,7 @@ import {
   isReady,
   shutdown,
   Mina,
-  signJsonTransaction,
-  Perm,
+  signFeePayer,
   Permissions,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
@@ -30,11 +29,12 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
+  deploy(args) {
+    super.deploy(args);
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
     this.self.update.permissions.setValue({
       ...Permissions.default(),
-      editState: Perm.proofOrSignature(),
+      editState: Permissions.proofOrSignature(),
     });
     this.x.set(initialState);
   }
@@ -59,7 +59,7 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  () => compile(SimpleZkapp, zkappAddress).verificationKey
+  async () => (await compile(SimpleZkapp, zkappAddress)).verificationKey
 );
 toc();
 
@@ -68,9 +68,8 @@ let partiesJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
   initialBalance,
-  initialBalanceFundingAccountKey: sender.privateKey,
-  shouldSignFeePayer: true,
   feePayerKey: sender.privateKey,
+  shouldSignFeePayer: true,
   transactionFee,
 });
 toc();
@@ -92,11 +91,9 @@ let partiesJsonUpdate = await callUnproved(
   [Field(3)],
   zkappKey
 );
-partiesJsonUpdate = await signJsonTransaction(
-  partiesJsonUpdate,
-  sender.privateKey,
-  { transactionFee }
-);
+partiesJsonUpdate = await signFeePayer(partiesJsonUpdate, sender.privateKey, {
+  transactionFee,
+});
 toc();
 
 tic("apply update transaction (no proof)");

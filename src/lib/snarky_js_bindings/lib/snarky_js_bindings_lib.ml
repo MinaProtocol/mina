@@ -232,6 +232,9 @@ let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
 
 let of_js_field (x : field_class Js.t) : Field.t = x##.value
 
+let to_js_field_unchecked x : field_class Js.t =
+  x |> Field.constant |> to_js_field
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -1019,6 +1022,22 @@ let array_map2 t1 t2 ~f =
   array_iter2 t1 t2 ~f:(fun x1 x2 -> res##push (f x1 x2) |> ignore) ;
   res
 
+module Poseidon_sponge_checked =
+  Sponge.Make_sponge (Pickles.Step_main_inputs.Sponge.Permutation)
+module Poseidon_sponge =
+  Sponge.Make_sponge (Sponge.Poseidon (Pickles.Tick_field_sponge.Inputs))
+
+let sponge_params_checked =
+  Sponge.Params.(
+    map pasta_p_kimchi ~f:(Fn.compose Field.constant Field.Constant.of_string))
+
+let sponge_params =
+  Sponge.Params.(map pasta_p_kimchi ~f:Field.Constant.of_string)
+
+type sponge =
+  | Checked of Poseidon_sponge_checked.t
+  | Unchecked of Poseidon_sponge.t
+
 let to_unchecked (x : Field.t) =
   match x with Constant y -> y | y -> Impl.As_prover.read_var y
 
@@ -1032,6 +1051,27 @@ let poseidon =
           Random_oracle.hash (Array.map ~f:to_unchecked input) |> Field.constant
       in
       to_js_field digest
+
+    (* returns a "sponge" that stays opaque to JS *)
+    method spongeCreate () : sponge =
+      if Impl.in_checked_computation () then
+        Checked
+          (Poseidon_sponge_checked.create ?init:None sponge_params_checked)
+      else Unchecked (Poseidon_sponge.create ?init:None sponge_params)
+
+    method spongeAbsorb (sponge : sponge) field : unit =
+      match sponge with
+      | Checked s ->
+          Poseidon_sponge_checked.absorb s (of_js_field field)
+      | Unchecked s ->
+          Poseidon_sponge.absorb s (to_unchecked @@ of_js_field field)
+
+    method spongeSqueeze (sponge : sponge) =
+      match sponge with
+      | Checked s ->
+          Poseidon_sponge_checked.squeeze s |> to_js_field
+      | Unchecked s ->
+          Poseidon_sponge.squeeze s |> Field.constant |> to_js_field
   end
 
 class type verification_key_class =
@@ -1567,6 +1607,12 @@ module Zkapp_statement = struct
     type t = Field.Constant.t zkapp_statement
 
     let to_field_elements = zkapp_statement_to_fields
+
+    let to_js ({ transaction; at_party } : t) =
+      to_js
+        { transaction = Field.constant transaction
+        ; at_party = Field.constant at_party
+        }
   end
 end
 
@@ -1579,7 +1625,7 @@ let zkapp_statement_typ =
     ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let dummy_constraints =
-  let module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas in
+  let module Inner_curve = Kimchi_pasta.Pasta.Pallas in
   let module Step_main_inputs = Pickles.Step_main_inputs in
   let inner_curve_typ : (Field.t * Field.t, Inner_curve.t) Typ.t =
     Typ.transport Step_main_inputs.Inner_curve.typ
@@ -1648,18 +1694,51 @@ type proof = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
 module Statement_with_proof =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
+let nat_modules_list : (module Pickles_types.Nat.Intf) list =
+  let open Pickles_types.Nat in
+  [ (module N0)
+  ; (module N1)
+  ; (module N2)
+  ; (module N3)
+  ; (module N4)
+  ; (module N5)
+  ; (module N6)
+  ; (module N7)
+  ; (module N8)
+  ; (module N9)
+  ; (module N10)
+  ; (module N11)
+  ; (module N12)
+  ; (module N13)
+  ; (module N14)
+  ; (module N15)
+  ; (module N16)
+  ; (module N17)
+  ; (module N18)
+  ; (module N19)
+  ; (module N20)
+  ]
+
+let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
+  List.nth_exn nat_modules_list i
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
+  let branches = List.length choices + 1 in
   let choices ~self =
-    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ] |> Obj.magic
+    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ]
   in
+  let (module Branches) = nat_module branches in
+  (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices
+    Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
-      ~branches:(module Pickles_types.Nat.N2)
-      ~max_branching:(module Pickles_types.Nat.N2)
+      ~branches:(module Branches)
+      ~max_branching:
+        (module Pickles_types.Nat.N2)
+        (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name:"smart-contract"
       ~constraint_constants:
         (* TODO these are dummy values *)
@@ -1872,7 +1951,10 @@ module Ledger = struct
     ; authorization : Party_authorization.t Js.prop >
     Js.t
 
-  type fee_payer_party = < body : fee_payer_party_body Js.prop > Js.t
+  type fee_payer_party =
+    < body : fee_payer_party_body Js.prop
+    ; authorization : Party_authorization.t Js.prop >
+    Js.t
 
   type parties =
     < feePayer : fee_payer_party Js.prop
@@ -2353,10 +2435,22 @@ module Ledger = struct
     | s ->
         failwithf "bad authorization type: %s" s ()
 
+  let fee_payer_authorization (a : Party_authorization.t) :
+      Mina_base.Signature.t =
+    match Js.to_string a##.kind with
+    | "none" ->
+        Mina_base.Signature.dummy
+    | "signature" ->
+        let signature : Js.js_string Js.t = Obj.magic a##.value in
+        Mina_base.Signature.of_base58_check_exn (Js.to_string signature)
+    | s ->
+        failwithf "bad authorization type: %s" s ()
+
   let parties (parties : parties) : Parties.t =
     { fee_payer =
         { body = fee_payer_party_body parties##.feePayer
-        ; authorization = Mina_base.Signature.dummy
+        ; authorization =
+            fee_payer_authorization parties##.feePayer##.authorization
         }
     ; other_parties =
         Js.to_array parties##.otherParties
@@ -2713,6 +2807,14 @@ module Ledger = struct
 
     let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
 
+    let signature (sg : Signature_lib.Schnorr.Chunked.Signature.t) =
+      let r, s = sg in
+      object%js
+        val r = to_js_field_unchecked r
+
+        val s = to_js_scalar s
+      end
+
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
@@ -2761,7 +2863,6 @@ module Ledger = struct
       Field.t -> Parties.Digest.Forest.Checked.t =
     Obj.magic
 
-  (* TODO memo hash *)
   let hash_transaction other_parties_hash =
     let other_parties_hash =
       other_parties_hash |> of_js_field |> to_unchecked
@@ -2779,12 +2880,13 @@ module Ledger = struct
 
   type party_index = Fee_payer | Other_party of int
 
-  let tx_commitment ({ fee_payer; other_parties; _ } as tx : Parties.t)
+  let transaction_commitment
+      ({ fee_payer; other_parties; memo } as tx : Parties.t)
       (party_index : party_index) =
     let commitment = Parties.commitment tx in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment
-        ~memo_hash:Field.Constant.zero
+        ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
         ~fee_payer_hash:
           (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
     in
@@ -2799,6 +2901,39 @@ module Ledger = struct
     in
     if use_full_commitment then full_commitment else commitment
 
+  let transaction_commitments (tx_json : Js.js_string Js.t) =
+    let tx =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    let commitment = Parties.commitment tx in
+    let full_commitment =
+      Parties.Transaction_commitment.create_complete commitment
+        ~memo_hash:(Mina_base.Signed_command_memo.hash tx.memo)
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer tx.fee_payer))
+    in
+    object%js
+      val commitment = to_js_field_unchecked commitment
+
+      val fullCommitment = to_js_field_unchecked full_commitment
+    end
+
+  let transaction_statement (tx_json : Js.js_string Js.t) (party_index : int) =
+    let tx =
+      Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
+    in
+    let at_party =
+      let ps = List.drop tx.other_parties party_index in
+      (Parties.Call_forest.hash ps :> Impl.field)
+    in
+    let transaction = transaction_commitment tx (Other_party party_index) in
+    Zkapp_statement.Constant.to_js { transaction; at_party }
+
+  let sign_field_element (x : js_field) (key : private_key) =
+    Signature_lib.Schnorr.Chunked.sign (private_key key)
+      (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
+    |> Mina_base.Signature.to_base58_check |> Js.string
+
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
     let tx =
@@ -2806,7 +2941,8 @@ module Ledger = struct
     in
     let signature =
       Signature_lib.Schnorr.Chunked.sign (private_key key)
-        (Random_oracle.Input.Chunked.field (tx_commitment tx party_index))
+        (Random_oracle.Input.Chunked.field
+           (transaction_commitment tx party_index))
     in
     ( match party_index with
     | Fee_payer ->
@@ -2824,6 +2960,50 @@ module Ledger = struct
   let sign_fee_payer tx_json key = sign_party tx_json key Fee_payer
 
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
+
+  let check_party_signatures parties =
+    let ({ fee_payer; other_parties; memo } : Parties.t) = parties in
+    let tx_commitment = Parties.commitment parties in
+    let full_tx_commitment =
+      Parties.Transaction_commitment.create_complete tx_commitment
+        ~memo_hash:(Mina_base.Signed_command_memo.hash memo)
+        ~fee_payer_hash:
+          (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+    in
+    let key_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
+    let check_signature who s pk msg =
+      match Signature_lib.Public_key.decompress pk with
+      | None ->
+          failwith
+            (sprintf "Check signature: Invalid key on %s: %s" who
+               (key_to_string pk))
+      | Some pk_ ->
+          if
+            not
+              (Signature_lib.Schnorr.Chunked.verify s
+                 (Kimchi_pasta.Pasta.Pallas.of_affine pk_)
+                 (Random_oracle_input.Chunked.field msg))
+          then
+            failwith
+              (sprintf "Check signature: Invalid signature on %s for key %s" who
+                 (key_to_string pk))
+          else ()
+    in
+
+    check_signature "fee payer" fee_payer.authorization
+      fee_payer.body.public_key full_tx_commitment ;
+    List.iteri (Parties.Call_forest.to_parties_list other_parties)
+      ~f:(fun i p ->
+        let commitment =
+          if p.body.use_full_commitment then full_tx_commitment
+          else tx_commitment
+        in
+        match p.authorization with
+        | Signature s ->
+            check_signature (sprintf "party %d" i) s p.body.public_key
+              commitment
+        | Proof _ | None_given ->
+            ())
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
@@ -2901,11 +3081,16 @@ module Ledger = struct
   let parties_to_json ps =
     parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
 
-  let apply_parties_transaction l (txn : Parties.t) =
+  let apply_parties_transaction l (txn : Parties.t)
+      (account_creation_fee : string) =
+    check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
       T.apply_parties_unchecked ~state_view:dummy_state_view
-        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+        ~constraint_constants:
+          { Genesis_constants.Constraint_constants.compiled with
+            account_creation_fee = Currency.Fee.of_string account_creation_fee
+          }
         ledger txn
     in
     let applied, _ = Or_error.ok_exn applied_exn in
@@ -2926,14 +3111,16 @@ module Ledger = struct
     in
     Js.array @@ Array.of_list account_list
 
-  let apply_js_transaction l (p : parties) =
-    apply_parties_transaction l (parties p)
+  let apply_js_transaction l (p : parties)
+      (account_creation_fee : Js.js_string Js.t) =
+    apply_parties_transaction l (parties p) (Js.to_string account_creation_fee)
 
-  let apply_json_transaction l (tx_json : Js.js_string Js.t) =
+  let apply_json_transaction l (tx_json : Js.js_string Js.t)
+      (account_creation_fee : Js.js_string Js.t) =
     let txn =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn
+    apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
   let () =
     let static_method name f =
@@ -2952,6 +3139,9 @@ module Ledger = struct
     static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
+    static_method "transactionCommitments" transaction_commitments ;
+    static_method "transactionStatement" transaction_statement ;
+    static_method "signFieldElement" sign_field_element ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
     static_method "publicKeyToString" public_key_to_string ;
@@ -2980,8 +3170,7 @@ module Ledger = struct
     let parties_to_graphql ps =
       parties ps |> !((deriver ())#to_json) |> yojson_to_gql |> Js.string
     in
-    static_method "partiesToGraphQL" parties_to_graphql ;
-    ()
+    static_method "partiesToGraphQL" parties_to_graphql
 end
 
 let export () =
