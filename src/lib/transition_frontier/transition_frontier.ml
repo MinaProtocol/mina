@@ -380,6 +380,8 @@ let add_breadcrumb_exn t breadcrumb =
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
+  [%log' warn t.logger] "notifying persistent frontier of diff applications from applying $state_hash"
+    ~metadata:[("state_hash", State_hash.to_yojson @@ Breadcrumb.state_hash breadcrumb)] ;
   let%bind sync_result =
     (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
@@ -392,6 +394,8 @@ let add_breadcrumb_exn t breadcrumb =
             running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
+  [%log' warn t.logger] "finished notifying persistent frontier of diff applications from applying $state_hash"
+    ~metadata:[("state_hash", State_hash.to_yojson @@ Breadcrumb.state_hash breadcrumb)] ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs_with_mutants
 
 (* proxy full frontier functions *)

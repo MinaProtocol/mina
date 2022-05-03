@@ -74,6 +74,12 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       in
       Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
+  [%log warn] "writing $state_hash to processed transition pipe"
+    ~metadata:
+      [ ( "state_hash"
+        , State_hash.to_yojson @@ State_hash.With_state_hashes.state_hash
+          @@ fst transition )
+      ] ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source, `Valid_cb valid_cb) ;
   Catchup_scheduler.notify catchup_scheduler

@@ -108,9 +108,21 @@ let await_exn cb =
   match%map await cb with None -> failwith "timeout" | Some result -> result
 
 let fire_if_not_already_fired cb result =
+  let logger = Logger.create () in
+  [%log warn] "firing a validation callback with $result"
+    ~metadata:
+      [ ( "result"
+        , `String
+            ( match result with
+            | `Accept ->
+                "Accept"
+            | `Reject ->
+                "Reject"
+            | `Ignore ->
+                "Ignore" ) )
+      ] ;
   if not (is_expired cb) then (
-    if Ivar.is_full cb.signal then
-      [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+    if Ivar.is_full cb.signal then [%log error] "Ivar.fill bug is here!" ;
     Ivar.fill cb.signal result )
 
 let set_message_type t x = t.message_type <- x
