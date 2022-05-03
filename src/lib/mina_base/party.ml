@@ -556,7 +556,6 @@ module Account_precondition = struct
       Full
         { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
-        ; public_key = Check Public_key.Compressed.empty
         }
     in
     let module Fd = Fields_derivers_zkapps.Derivers in

@@ -11,14 +11,7 @@ module Ledger = Mina_ledger.Ledger
 let gen_account_precondition_from_account ?(succeed = true) account =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
-  let { Account.Poly.public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; zkapp
-      ; _
-      } =
+  let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
     account
   in
   (* choose constructor *)
@@ -72,7 +65,6 @@ let gen_account_precondition_from_account ?(succeed = true) account =
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
       let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
-      let public_key = Or_ignore.Check public_key in
       let%bind delegate =
         match delegate with
         | None ->
@@ -112,7 +104,6 @@ let gen_account_precondition_from_account ?(succeed = true) account =
         { Zkapp_precondition.Account.Poly.balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state
