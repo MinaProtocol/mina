@@ -1435,8 +1435,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
           ~else_:local_state.excess
-      , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
-        `Overflow (Bool.( &&& ) party_token_is_default overflow) )
+      , `Overflow overflow )
     in
     (* The first party must succeed. *)
     Bool.(assert_ (not (is_start' &&& overflowed))) ;
