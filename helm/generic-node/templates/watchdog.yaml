@@ -1,0 +1,72 @@
+---
+{{if .Values.watchdog.enabled}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{.Values.name}}-watchdog
+  labels:
+    app: {{.Values.name}}-watchdog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{.Values.name}}-watchdog
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}-watchdog
+        testnet: {{$.Values.testnetName}}
+        role: watchdog
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{.Values.ports.metrics | quote}}
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: watchdog
+        resources:
+          requests:
+            memory: {{.Values.watchdog.memory}}
+            cpu: {{.Values.watchdog.cpu}}
+        image: {{.Values.watchdog.image}}
+        command: ["python3"]
+        args: 
+        - "-u" 
+        - "/code/watchdog.py"
+        env:
+          - name: "RESTART_EVERY_MINS"
+            value: {{.Values.restartEveryMins | quote}}
+          - name: "RESTART_NODES"
+            value: {{.Values.restartNodes | quote}}
+          - name: "METRICS_PORT"
+            value: {{.Values.ports.metrics | quote}}
+          - name: "SEED_PEERS_URL"
+            value: {{$.Values.seedPeersURL | quote}}
+          - name: "GOOGLE_APPLICATION_CREDENTIALS"
+            value: "/gcloud/keyfile.json"
+          {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+          - name: "CHECK_GCLOUD_STORAGE_BUCKET"
+            value: "true"
+          {{- end }}
+        ports:
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{.Values.ports.metrics}}
+        imagePullPolicy: Always
+        volumeMounts:
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+      volumes:
+      {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+---

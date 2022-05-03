@@ -78,6 +78,15 @@ rosetta:
   pg_conn: 'postgres://postgresql:5432'
   graphql_host: 'http://127.0.0.1'
 
+watchdog:
+  enabled: false
+  image: gcr.io/o1labs-192920/watchdog:0.3.7
+  memory: 512m
+  cpu: 1.0
+restartEveryMins: ""
+restartNodes: ""
+seedPeersURL: ""
+
 libp2p:
   seed:
     enabled: true
@@ -116,7 +125,3 @@ healthcheck:
 
 nodeSelector:
   preemptible: true
-
-restartEveryMins: ""
-restartNodes: ""
-seedPeersURL: ""
