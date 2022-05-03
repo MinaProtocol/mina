@@ -79,7 +79,7 @@ rosetta:
   graphql_host: 'http://127.0.0.1'
 
 watchdog:
-  enabled: false
+  enabled: true
   image: gcr.io/o1labs-192920/watchdog:0.3.7
   memory: 512m
   cpu: 1.0
