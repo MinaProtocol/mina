@@ -1483,8 +1483,7 @@ module Make (Inputs : Inputs_intf) = struct
     let update_global_state =
       Bool.(update_local_excess &&& local_state.success)
     in
-    let global_state, global_excess_update_failed, update_global_state, overflow
-        =
+    let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in
       let res, `Overflow overflow =
         Amount.Signed.add_flagged amt
@@ -1499,8 +1498,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       ( Global_state.set_fee_excess global_state new_amt
       , global_excess_update_failed
-      , update_global_state
-      , overflow )
+      , update_global_state )
     in
     let local_state =
       { local_state with
@@ -1512,7 +1510,7 @@ module Make (Inputs : Inputs_intf) = struct
     Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
     let local_state =
       Local_state.add_check local_state Global_excess_overflow
-        Bool.(not overflow)
+        Bool.(not global_excess_update_failed)
     in
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
