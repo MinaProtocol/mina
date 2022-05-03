@@ -1370,6 +1370,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let if_ = Parties.value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
+
+        let is_neg (t : t) = Sgn.equal t.sgn Neg
       end
 
       let zero = zero

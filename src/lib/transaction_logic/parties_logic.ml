@@ -69,6 +69,8 @@ module type Amount_intf = sig
 
     val is_pos : t -> bool
 
+    val is_neg : t -> bool
+
     val negate : t -> t
 
     val add_flagged : t -> t -> t * [ `Overflow of bool ]
@@ -279,6 +281,8 @@ module type Party_intf = sig
   val use_full_commitment : t -> bool
 
   val increment_nonce : t -> bool
+
+  val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
        commitment:transaction_commitment
@@ -1091,6 +1095,9 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_timing a timing in
       (a, local_state)
     in
+    let account_creation_fee =
+      Amount.of_constant_fee constraint_constants.account_creation_fee
+    in
     (* Apply balance change. *)
     let a, local_state =
       let balance_change = Party.balance_change party in
@@ -1103,9 +1110,6 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let local_state =
         (* Conditionally subtract account creation fee from fee excess *)
-        let account_creation_fee =
-          Amount.of_constant_fee constraint_constants.account_creation_fee
-        in
         let excess_minus_creation_fee, `Overflow excess_update_failed =
           Amount.add_signed_flagged local_state.excess
             Amount.Signed.(negate (of_unsigned account_creation_fee))
@@ -1405,22 +1409,43 @@ module Make (Inputs : Inputs_intf) = struct
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
+    let implicit_account_creation_fee =
+      Party.implicit_account_creation_fee party
+    in
+    (* Check the token for implicit account creation fee payment. *)
+    let local_state =
+      Local_state.add_check local_state Cannot_pay_creation_fee_in_token
+        Bool.((not implicit_account_creation_fee) ||| party_token_is_default)
+    in
+    (* Compute the change to the account balance. *)
+    let local_state, local_delta =
+      let local_delta = Amount.Signed.negate (Party.balance_change party) in
+      let local_delta_for_creation, `Overflow creation_overflow =
+        let open Amount.Signed in
+        add_flagged local_delta (of_unsigned account_creation_fee)
+      in
+      let pay_creation_fee =
+        Bool.(account_is_new &&& implicit_account_creation_fee)
+      in
+      let creation_overflow = Bool.(pay_creation_fee &&& creation_overflow) in
+      let local_delta =
+        Amount.Signed.if_ pay_creation_fee ~then_:local_delta_for_creation
+          ~else_:local_delta
+      in
+      let local_state =
+        Local_state.add_check local_state Amount_insufficient_to_create_account
+          Bool.(
+            not
+              ( pay_creation_fee
+              &&& (creation_overflow ||| Amount.Signed.is_neg local_delta) ))
+      in
+      (local_state, local_delta)
+    in
     (* The first party must succeed. *)
     Bool.(
       assert_with_failure_status_tbl
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
-    let local_delta =
-      (* NOTE: It is *not* correct to use the actual change in balance here.
-         Indeed, if the account creation fee is paid, using that amount would
-         be equivalent to paying it out to the block producer.
-         In the case of a failure that prevents any updates from being applied,
-         every other party in this transaction will also fail, and the excess
-         will never be promoted to the global excess, so this amount is
-         irrelevant.
-      *)
-      Amount.Signed.negate (Party.balance_change party)
-    in
     let new_local_fee_excess, `Overflow overflowed =
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in

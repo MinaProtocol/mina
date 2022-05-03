@@ -112,6 +112,7 @@ module Party_under_construction = struct
     ; update = Update.to_parties_update t.update
     ; balance_change = { magnitude = Amount.zero; sgn = Pos }
     ; increment_nonce = false
+    ; implicit_account_creation_fee = true
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
@@ -320,6 +321,7 @@ module Party_under_construction = struct
       ; balance_change =
           var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
       ; increment_nonce = Boolean.false_
+      ; implicit_account_creation_fee = Boolean.true_
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero

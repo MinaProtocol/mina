@@ -200,6 +200,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
                 ; increment_nonce = true
+                ; implicit_account_creation_fee = true
                 ; events = []
                 ; sequence_events = []
                 ; call_data = Field.zero
@@ -224,6 +225,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
+                ; implicit_account_creation_fee = true
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
                 ; account_precondition = Full Zkapp_precondition.Account.accept

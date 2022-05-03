@@ -1573,6 +1573,10 @@ module Base = struct
             Sgn.Checked.is_pos
               (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
+          let is_neg (t : t) =
+            Sgn.Checked.is_neg
+              (run_checked (Currency.Amount.Signed.Checked.sgn t))
+
           let negate = Amount.Signed.Checked.negate
 
           let of_unsigned = Amount.Signed.Checked.of_unsigned
@@ -1801,6 +1805,9 @@ module Base = struct
           let use_full_commitment (t : t) = t.party.data.use_full_commitment
 
           let increment_nonce (t : t) = t.party.data.increment_nonce
+
+          let implicit_account_creation_fee (t : t) =
+            t.party.data.implicit_account_creation_fee
 
           let check_authorization ~commitment
               ~at_party:({ hash = at_party; _ } : Parties.t)

@@ -65,6 +65,7 @@ let%test_module "Zkapp payments tests" =
                   ; balance_change =
                       Amount.Signed.(of_unsigned receiver_amount |> negate)
                   ; increment_nonce = true
+                  ; implicit_account_creation_fee = true
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
@@ -83,6 +84,7 @@ let%test_module "Zkapp payments tests" =
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
                   ; increment_nonce = false
+                  ; implicit_account_creation_fee = true
                   ; events = []
                   ; sequence_events = []
                   ; call_data = Field.zero
