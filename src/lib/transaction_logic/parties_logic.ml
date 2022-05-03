@@ -1405,11 +1405,6 @@ module Make (Inputs : Inputs_intf) = struct
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
-    (* The first party must succeed. *)
-    Bool.(
-      assert_with_failure_status_tbl
-        ((not is_start') ||| local_state.success)
-        local_state.failure_status_tbl) ;
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
@@ -1438,8 +1433,6 @@ module Make (Inputs : Inputs_intf) = struct
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
         `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
-    (* The first party must succeed. *)
-    Bool.(assert_ (not (is_start' &&& overflowed))) ;
     let local_state =
       { local_state with
         excess = new_local_fee_excess
@@ -1508,12 +1501,16 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.excess
       }
     in
-    Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
     let local_state =
       { local_state with
         success = Bool.(local_state.success &&& not global_excess_update_failed)
       }
     in
+    (* The first party must succeed. *)
+    Bool.(
+      assert_with_failure_status_tbl
+        ((not is_start') ||| local_state.success)
+        local_state.failure_status_tbl) ;
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger
