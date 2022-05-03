@@ -4309,6 +4309,7 @@ module For_tests = struct
               Nonce (Account.Nonce.succ sender_nonce)
             else Nonce sender_nonce )
         ; use_full_commitment = false
+        ; implicit_account_creation_fee = true
         ; caller = Call
         }
       in
@@ -4370,6 +4371,7 @@ module For_tests = struct
                 ; account_precondition =
                     Option.value ~default:Accept account_precondition
                 ; use_full_commitment = true
+                ; implicit_account_creation_fee = true
                 ; caller = Call
                 }
             ; authorization =
@@ -4392,6 +4394,7 @@ module For_tests = struct
               ; protocol_state_precondition
               ; account_precondition = Accept
               ; use_full_commitment = false
+              ; implicit_account_creation_fee = true
               ; caller = Call
               }
           ; authorization = Control.None_given
@@ -4692,6 +4695,7 @@ module For_tests = struct
           ; protocol_state_precondition = protocol_state_predicate
           ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
           ; use_full_commitment = false
+          ; implicit_account_creation_fee = true
           ; caller = Call
           }
       ; authorization = Signature Signature.dummy
@@ -4710,6 +4714,7 @@ module For_tests = struct
           ; call_depth = 0
           ; protocol_state_precondition = protocol_state_predicate
           ; use_full_commitment = false
+          ; implicit_account_creation_fee = true
           ; caller = Call
           ; account_precondition = Full Zkapp_precondition.Account.accept
           }

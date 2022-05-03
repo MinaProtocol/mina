@@ -494,6 +494,7 @@ let%test_unit "tokens test" =
       ; call_depth = 0
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
       ; use_full_commitment = true
+      ; implicit_account_creation_fee = true
       ; account_precondition = Accept
       ; caller
       }

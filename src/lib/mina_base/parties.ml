@@ -13,6 +13,7 @@ let add_caller' (p : Party.Body.Wire.t) caller : Party.Body.t =
   ; protocol_state_precondition = p.protocol_state_precondition
   ; account_precondition = p.account_precondition
   ; use_full_commitment = p.use_full_commitment
+  ; implicit_account_creation_fee = p.implicit_account_creation_fee
   ; caller
   }
 

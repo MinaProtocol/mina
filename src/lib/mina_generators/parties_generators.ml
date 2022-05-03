@@ -441,6 +441,7 @@ module Party_body_components = struct
     ; protocol_state_precondition = t.protocol_state_precondition
     ; account_precondition = t.account_precondition
     ; use_full_commitment = t.use_full_commitment
+    ; implicit_account_creation_fee = not Token_id.(equal default t.token_id)
     ; caller = t.caller
     }
 end

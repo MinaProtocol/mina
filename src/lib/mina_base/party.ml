@@ -648,6 +648,7 @@ module Body = struct
               Zkapp_precondition.Protocol_state.Stable.V1.t
           ; account_precondition : Account_precondition.Stable.V1.t
           ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
           ; caller : Call_type.Stable.V1.t
           }
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -675,6 +676,7 @@ module Body = struct
             Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account_precondition : Account_precondition.Stable.V1.t
         ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
         ; caller : Token_id.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -696,6 +698,7 @@ module Body = struct
     ; protocol_state_precondition = p.protocol_state_precondition
     ; account_precondition = p.account_precondition
     ; use_full_commitment = p.use_full_commitment
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; caller
     }
 
@@ -773,6 +776,7 @@ module Body = struct
     ; protocol_state_precondition = t.protocol_state_precondition
     ; account_precondition = Account_precondition.Nonce t.nonce
     ; use_full_commitment = true
+    ; implicit_account_creation_fee = true
     ; caller = Token_id.default
     }
 
@@ -802,6 +806,7 @@ module Body = struct
           Zkapp_precondition.Protocol_state.Checked.t
       ; account_precondition : Account_precondition.Checked.t
       ; use_full_commitment : Boolean.var
+      ; implicit_account_creation_fee : Boolean.var
       ; caller : Token_id.Checked.t
       }
     [@@deriving annot, hlist, fields]
@@ -819,6 +824,7 @@ module Body = struct
          ; protocol_state_precondition
          ; account_precondition
          ; use_full_commitment
+         ; implicit_account_creation_fee
          ; caller
          } :
           t) =
@@ -839,6 +845,8 @@ module Body = struct
             (Account_precondition.Checked.digest account_precondition)
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
+        ; Random_oracle_input.Chunked.packed
+            ((implicit_account_creation_fee :> Field.Var.t), 1)
         ; Token_id.Checked.to_input caller
         ]
 
@@ -861,6 +869,7 @@ module Body = struct
       ; Zkapp_precondition.Protocol_state.typ
       ; Account_precondition.typ ()
       ; Impl.Boolean.typ
+      ; Impl.Boolean.typ
       ; Token_id.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -879,6 +888,7 @@ module Body = struct
     ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
     ; account_precondition = Account_precondition.Accept
     ; use_full_commitment = false
+    ; implicit_account_creation_fee = true
     ; caller = Token_id.default
     }
 
@@ -924,7 +934,8 @@ module Body = struct
       ~call_data:!.field ~call_depth:!.int
       ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool ~caller:!.token_id_deriver
+      ~use_full_commitment:!.bool ~implicit_account_creation_fee:!.bool
+      ~caller:!.token_id_deriver
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -946,6 +957,7 @@ module Body = struct
        ; protocol_state_precondition
        ; account_precondition
        ; use_full_commitment
+       ; implicit_account_creation_fee
        ; caller
        } :
         t) =
@@ -962,6 +974,8 @@ module Body = struct
       ; Random_oracle_input.Chunked.field
           (Account_precondition.digest account_precondition)
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
+      ; Random_oracle_input.Chunked.packed
+          (field_of_bool implicit_account_creation_fee, 1)
       ; Token_id.to_input caller
       ]
 
@@ -1092,5 +1106,8 @@ let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 let token_id (t : t) : Token_id.t = t.body.token_id
 
 let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+
+let implicit_account_creation_fee (t : t) : bool =
+  t.body.implicit_account_creation_fee
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce

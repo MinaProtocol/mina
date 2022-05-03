@@ -1921,7 +1921,8 @@ module Ledger = struct
     ; protocolState : protocol_state_predicate Js.prop
     ; accountPrecondition : Account_precondition.t Js.prop
     ; useFullCommitment : js_bool Js.prop
-    ; incrementNonce : js_bool Js.prop >
+    ; incrementNonce : js_bool Js.prop
+    ; implicitAccountCreationFee : js_bool Js.prop >
     Js.t
 
   type fee_payer_party_body =
@@ -2343,6 +2344,7 @@ module Ledger = struct
     ; call_depth = b##.depth
     ; increment_nonce = bool b##.incrementNonce
     ; use_full_commitment = bool b##.useFullCommitment
+    ; implicit_account_creation_fee = bool b##.implicitAccountCreationFee
     ; protocol_state_precondition = protocol_state b##.protocolState
     ; account_precondition = predicate b##.accountPrecondition
     ; caller = (* TODO *)
@@ -2709,6 +2711,7 @@ module Ledger = struct
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition = predicate b##.accountPrecondition
       ; caller = (*TODO*) Token_id.Checked.constant Token_id.default
+      ; implicit_account_creation_fee = bool b##.implicitAccountCreationFee
       }
 
     let fee_payer_body (b : fee_payer_party_body) : Party.Body.Checked.t =
@@ -2755,6 +2758,7 @@ module Ledger = struct
       ; call_depth = As_prover.Ref.create (fun () -> b##.depth)
       ; increment_nonce = bool b##.incrementNonce
       ; use_full_commitment = bool b##.useFullCommitment
+      ; implicit_account_creation_fee = Boolean.true_
       ; protocol_state_precondition = protocol_state b##.protocolState
       ; account_precondition
       ; caller = (*TODO*) Token_id.Checked.constant Token_id.default

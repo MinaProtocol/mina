@@ -2434,6 +2434,7 @@ module For_tests = struct
                 ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
                 ; caller = Call
                 ; use_full_commitment
+                ; implicit_account_creation_fee = true
                 }
             ; authorization = None_given
             }
@@ -2459,6 +2460,7 @@ module For_tests = struct
                 ; account_precondition = Accept
                 ; caller = Call
                 ; use_full_commitment = false
+                ; implicit_account_creation_fee = true
                 }
             ; authorization = None_given
             }

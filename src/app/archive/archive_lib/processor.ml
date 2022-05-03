@@ -1090,6 +1090,7 @@ module Zkapp_party_body = struct
     ; zkapp_protocol_state_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
+    ; implicit_account_creation_fee : bool
     ; caller : string
     }
   [@@deriving fields, hlist]
@@ -1108,6 +1109,7 @@ module Zkapp_party_body = struct
         ; int
         ; int
         ; int
+        ; bool
         ; bool
         ; string
         ]
@@ -1160,6 +1162,7 @@ module Zkapp_party_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
+    let implicit_account_creation_fee = body.implicit_account_creation_fee in
     let caller = Token_id.to_string body.caller in
     let value =
       { public_key_id
@@ -1174,6 +1177,7 @@ module Zkapp_party_body = struct
       ; zkapp_protocol_state_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
+      ; implicit_account_creation_fee
       ; caller
       }
     in
