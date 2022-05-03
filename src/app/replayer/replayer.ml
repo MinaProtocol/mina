@@ -1459,7 +1459,7 @@ module Snapp_helpers = struct
   *)
   let fee_payer_body_of_id ~pool body_id =
     let%map body = party_body_of_id ~pool body_id in
-    let balance_change =
+    let fee =
       match body.balance_change with
       | { magnitude; sgn = Sgn.Pos } ->
           Currency.Amount.to_uint64 magnitude |> Currency.Fee.of_uint64
@@ -1481,17 +1481,11 @@ module Snapp_helpers = struct
     in
     ( { public_key = body.public_key
       ; update = body.update
-      ; token_id = ()
-      ; balance_change
-      ; increment_nonce = ()
+      ; fee
       ; events = body.events
       ; sequence_events = body.sequence_events
-      ; call_data = body.call_data
-      ; call_depth = body.call_depth
       ; protocol_state_precondition = body.protocol_state_precondition
-      ; account_precondition = fee_payer_account_precondition
-      ; use_full_commitment = ()
-      ; caller = ()
+      ; nonce = fee_payer_account_precondition
       }
       : Party.Body.Fee_payer.t )
 end
