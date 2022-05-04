@@ -191,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
                (Logger.extend logger
                   [ ("selection_context", `String "Root.prove") ])
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
+               (With_hash.map ~f:Mina_block.consensus_state
                   best_tip_with_witness.data)
              ~candidate:seen_consensus_state)
           `Keep
@@ -216,8 +216,7 @@ module Make (Inputs : Inputs_intf) :
                (Logger.extend logger
                   [ ("selection_context", `String "Root.verify") ])
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_transition)
+               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
              ~candidate)
           `Keep
       in

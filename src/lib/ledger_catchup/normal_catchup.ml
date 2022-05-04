@@ -123,12 +123,12 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
               ( "Invalid current or proposed protocol version in catchup block"
               , [ ( "current_protocol_version"
                   , `String
-                      ( External_transition.current_protocol_version transition
+                      ( Header.current_protocol_version (Block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "proposed_protocol_version"
                   , `String
-                      ( External_transition.proposed_protocol_version_opt
-                          transition
+                      ( Header.proposed_protocol_version_opt
+                          (Block.header transition)
                       |> Option.value_map ~default:"<None>"
                            ~f:Protocol_version.to_string ) )
                 ] ) )
@@ -144,7 +144,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
                  daemon protocol version"
               , [ ( "block_current_protocol_version"
                   , `String
-                      ( External_transition.current_protocol_version transition
+                      ( Header.current_protocol_version (Block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(get_current () |> to_string) )
@@ -429,7 +429,9 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     List.map transitions
                       ~f:
                         (With_hash.of_data
-                           ~hash_data:External_transition.state_hashes)
+                           ~hash_data:
+                             (Fn.compose Mina_state.Protocol_state.hashes
+                                (Fn.compose Header.protocol_state Block.header)))
                   in
                   if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
@@ -544,7 +546,8 @@ let verify_transitions_and_build_breadcrumbs ~logger
             List.hd_exn transitions |> Envelope.Incoming.data |> With_hash.data
           in
           let initial_state_hash =
-            External_transition.parent_hash oldest_missing_transition
+            oldest_missing_transition |> Block.header |> Header.protocol_state
+            |> Mina_state.Protocol_state.previous_state_hash
           in
           Deferred.Or_error.return (acc, initial_state_hash))
   in

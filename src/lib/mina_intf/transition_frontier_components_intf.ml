@@ -157,8 +157,8 @@ module type Best_tip_prover_intf = sig
   val prove :
        logger:Logger.t
     -> transition_frontier
-    -> ( External_transition.t State_hash.With_state_hashes.t
-       , State_body_hash.t list * External_transition.t )
+    -> ( Mina_block.t State_hash.With_state_hashes.t
+       , State_body_hash.t list * Mina_block.t )
        Proof_carrying_data.t
        option
 
@@ -166,8 +166,8 @@ module type Best_tip_prover_intf = sig
        verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> ( External_transition.t
-       , State_body_hash.t list * External_transition.t )
+    -> ( Mina_block.t
+       , State_body_hash.t list * Mina_block.t )
        Proof_carrying_data.t
     -> ( [ `Root of Mina_block.initial_valid_block ]
        * [ `Best_tip of Mina_block.initial_valid_block ] )
@@ -185,8 +185,8 @@ module type Consensus_best_tip_prover_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( External_transition.t
-       , State_body_hash.t list * External_transition.t )
+    -> ( Mina_block.t
+       , State_body_hash.t list * Mina_block.t )
        Proof_carrying_data.t
        option
 
@@ -197,8 +197,8 @@ module type Consensus_best_tip_prover_intf = sig
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( External_transition.t
-       , State_body_hash.t list * External_transition.t )
+    -> ( Mina_block.t
+       , State_body_hash.t list * Mina_block.t )
        Proof_carrying_data.t
     -> ( [ `Root of Mina_block.initial_valid_block ]
        * [ `Best_tip of Mina_block.initial_valid_block ] )
@@ -228,7 +228,7 @@ module type Sync_handler_intf = sig
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t list
-    -> External_transition.t list option
+    -> Mina_block.t list option
 
   val best_tip_path : frontier:transition_frontier -> State_hash.t list
 
@@ -300,30 +300,6 @@ module type Transition_frontier_controller_intf = sig
     -> Mina_block.Validated.t Strict_pipe.Reader.t
 end
 
-module type Initial_validator_intf = sig
-  type block
-
-  type block_with_initial_validation
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> transition_reader:
-         ( [ `Transition of block Envelope.Incoming.t ]
-         * [ `Time_received of Block_time.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
-         Strict_pipe.Reader.t
-    -> valid_transition_writer:
-         ( [ `Transition of block_with_initial_validation Envelope.Incoming.t ]
-           * [ `Time_received of Block_time.t ]
-         , Strict_pipe.crash Strict_pipe.buffered
-         , unit )
-         Strict_pipe.Writer.t
-    -> genesis_state_hash:State_hash.t
-    -> genesis_constants:Genesis_constants.t
-    -> unit
-end
-
 module type Transition_router_intf = sig
   type transition_frontier
 
@@ -350,7 +326,7 @@ module type Transition_router_intf = sig
          transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
          * transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of External_transition.t Envelope.Incoming.t ]
+         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t

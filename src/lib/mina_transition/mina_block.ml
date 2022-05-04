@@ -5,8 +5,7 @@ module Body = Body
 module Body_reference = Body_reference
 module Header = Header
 module Validation = Validation
-
-(* module Precomputed = Precomputed *)
+module Precomputed = Precomputed_block
 
 type fully_invalid_block = Validation.fully_invalid_with_block
 
@@ -144,5 +143,9 @@ let blockchain_length block =
   block |> Block.header |> Header.protocol_state
   |> Mina_state.Protocol_state.consensus_state
   |> Consensus.Data.Consensus_state.blockchain_length
+
+let consensus_state =
+  Fn.compose Protocol_state.consensus_state
+    (Fn.compose Header.protocol_state Block.header)
 
 include Block

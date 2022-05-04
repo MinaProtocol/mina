@@ -233,6 +233,28 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
 
+let transactions ~constraint_constants t =
+  let open Staged_ledger.Pre_diff_info in
+  let consensus_state =
+    Mina_state.Protocol_state.consensus_state @@ Header.protocol_state
+    @@ Block.header t
+  in
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
+  in
+  match
+    get_transactions ~constraint_constants ~coinbase_receiver
+      ~supercharge_coinbase
+      (Body.staged_ledger_diff @@ Block.body t)
+  with
+  | Ok transactions ->
+      transactions
+  | Error e ->
+      Core.Error.raise (Error.to_error e)
+
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
     ~snark_work_fee =
@@ -255,7 +277,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
       let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
-          (External_transition.transactions
+          (transactions
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled best_tip_block)
       then (

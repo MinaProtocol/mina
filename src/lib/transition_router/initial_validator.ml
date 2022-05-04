@@ -53,10 +53,10 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     | `Invalid_proof ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
-          , External_transition.protocol_state transition
+          , Header.protocol_state (Block.header transition)
             |> Protocol_state.value_to_yojson )
         ; ( "proof"
-          , External_transition.protocol_state_proof transition
+          , Header.protocol_state_proof @@ Block.header transition
             |> Proof.to_yojson )
         ]
     | `Invalid_delta_block_chain_proof ->
@@ -87,7 +87,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~metadata:
       ( ( "protocol_state"
         , Protocol_state.Value.to_yojson
-            (External_transition.protocol_state transition) )
+            (Header.protocol_state (Block.header transition)) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
@@ -195,12 +195,10 @@ module Duplicate_block_detector = struct
       State_hash.With_state_hashes.state_hash external_transition_with_hash
     in
     let open Consensus.Data.Consensus_state in
-    let consensus_state =
-      External_transition.consensus_state external_transition
-    in
+    let consensus_state = Mina_block.consensus_state external_transition in
     let consensus_time = consensus_time consensus_state in
     let block_producer =
-      External_transition.block_producer external_transition
+      Consensus.Data.Consensus_state.block_creator consensus_state
     in
     let block = Blocks.{ consensus_time; block_producer } in
     (* try table GC *)
@@ -256,16 +254,17 @@ let run ~logger ~trust_system ~verifier ~transition_reader
           if Ivar.is_full initialization_finish_signal then (
             let blockchain_length =
               Envelope.Incoming.data transition_env
-              |> External_transition.consensus_state
-              |> Consensus.Data.Consensus_state.blockchain_length
-              |> Mina_numbers.Length.to_int
+              |> Mina_block.blockchain_length |> Mina_numbers.Length.to_int
             in
             Mina_metrics.Transition_frontier
             .update_max_unvalidated_blocklength_observed blockchain_length ;
             ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
               let transition_with_hash =
                 Envelope.Incoming.data transition_env
-                |> With_hash.of_data ~hash_data:External_transition.state_hashes
+                |> With_hash.of_data
+                     ~hash_data:
+                       (Fn.compose Protocol_state.hashes
+                          (Fn.compose Header.protocol_state Block.header))
               in
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
@@ -328,7 +327,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
             | Error () ->
                 let state_hash =
                   ( Envelope.Incoming.data transition_env
-                  |> External_transition.state_hashes )
+                  |> Block.header |> Header.protocol_state
+                  |> Protocol_state.hashes )
                     .state_hash
                 in
                 let metadata =

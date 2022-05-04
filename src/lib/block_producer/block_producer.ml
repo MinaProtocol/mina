@@ -309,7 +309,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           Some (protocol_state, internal_transition, witness))
 
 module Precomputed_block = struct
-  type t = External_transition.Precomputed_block.t =
+  type t = Precomputed_block.t =
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
@@ -318,9 +318,9 @@ module Precomputed_block = struct
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     }
 
-  let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
+  let sexp_of_t = Precomputed_block.sexp_of_t
 
-  let t_of_sexp = External_transition.Precomputed_block.t_of_sexp
+  let t_of_sexp = Precomputed_block.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
@@ -621,14 +621,13 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
               "Producing new block with parent $breadcrumb%!" ;
             let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
-              External_transition.protocol_state
-                (With_hash.data previous_transition)
+              Header.protocol_state
+              @@ Block.header (With_hash.data previous_transition)
             in
             let%bind previous_protocol_state_proof =
               if
                 Consensus.Data.Consensus_state.is_genesis_state
-                  (External_transition.consensus_state
-                     (With_hash.data previous_transition))
+                  (Protocol_state.consensus_state previous_protocol_state)
                 && Option.is_none precomputed_values.proof_data
               then (
                 match%bind
@@ -646,8 +645,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 )
               else
                 return
-                  (External_transition.protocol_state_proof
-                     (With_hash.data previous_transition))
+                  ( Header.protocol_state_proof
+                  @@ Block.header (With_hash.data previous_transition) )
             in
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
@@ -683,7 +682,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
-                           (With_hash.map ~f:External_transition.consensus_state
+                           (With_hash.map ~f:Mina_block.consensus_state
                               previous_transition)
                          ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
@@ -1188,14 +1187,14 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           "Emitting precomputed block with parent $breadcrumb%!" ;
         let previous_transition = Breadcrumb.block_with_hash crumb in
         let previous_protocol_state =
-          External_transition.protocol_state
-            (With_hash.data previous_transition)
+          Header.protocol_state
+          @@ Block.header (With_hash.data previous_transition)
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select ~constants:consensus_constants
                  ~existing:
-                   (With_hash.map ~f:External_transition.consensus_state
+                   (With_hash.map ~f:Mina_block.consensus_state
                       previous_transition)
                  ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take

@@ -1368,8 +1368,7 @@ let replay_blocks logger =
                fun line ->
                  match
                    Yojson.Safe.from_string line
-                   |> Mina_transition.External_transition.Precomputed_block
-                      .of_yojson
+                   |> Mina_transition.Precomputed_block.of_yojson
                  with
                  | Ok block ->
                      block
@@ -1378,8 +1377,7 @@ let replay_blocks logger =
            | Some "sexp" ->
                fun line ->
                  Sexp.of_string_conv_exn line
-                   Mina_transition.External_transition.Precomputed_block
-                   .t_of_sexp
+                   Mina_transition.Precomputed_block.t_of_sexp
            | _ ->
                failwith "Expected one of 'json', 'sexp' for -format flag"
          in

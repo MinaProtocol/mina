@@ -1578,9 +1578,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
               (* Use the precomputed block proof encoding, for consistency. *)
-              Some
-                (Mina_transition.External_transition.Precomputed_block.Proof
-                 .to_bin_string proof))
+              Some (Mina_transition.Precomputed_block.Proof.to_bin_string proof))
         ])
 
   let block :
@@ -1965,7 +1963,7 @@ module Types = struct
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
         ~coerce:(fun json ->
           let json = to_yojson json in
-          Mina_transition.External_transition.Precomputed_block.of_yojson json)
+          Mina_transition.Precomputed_block.of_yojson json)
 
     let extensional_block =
       scalar "ExtensionalBlock" ~doc:"Block encoded in extensional block format"

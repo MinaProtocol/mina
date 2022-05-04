@@ -23,7 +23,7 @@ let is_transition_for_bootstrap ~logger
   in
   let new_consensus_state =
     Validation.block_with_hash new_transition
-    |> With_hash.map ~f:External_transition.consensus_state
+    |> With_hash.map ~f:Mina_block.consensus_state
   in
   let constants = precomputed_values.consensus_constants in
   match
@@ -167,8 +167,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (External_transition.blockchain_length peer_best_tip.data)
-                  )
+                      (Mina_block.blockchain_length peer_best_tip.data) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
@@ -213,7 +212,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
             let f x =
               Validation.block_with_hash x
-              |> With_hash.map ~f:External_transition.consensus_state
+              |> With_hash.map ~f:Mina_block.consensus_state
             in
             match
               Consensus.Hooks.select
@@ -566,10 +565,10 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                     ~constants:precomputed_values.consensus_constants
                     ~existing:
                       ( Validation.block_with_hash current_transition
-                      |> With_hash.map ~f:External_transition.consensus_state )
+                      |> With_hash.map ~f:Mina_block.consensus_state )
                     ~candidate:
                       ( Validation.block_with_hash incoming_transition
-                      |> With_hash.map ~f:External_transition.consensus_state )
+                      |> With_hash.map ~f:Mina_block.consensus_state )
                     ~logger)
              then
                (* TODO: do we need to push valid_cb? *)

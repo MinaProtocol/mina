@@ -82,8 +82,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   Transition_frontier.Breadcrumb.state_hash parent
                 in
                 let actual_parent_hash =
-                  transition_with_hash |> With_hash.data
-                  |> External_transition.parent_hash
+                  transition_with_hash |> With_hash.data |> Block.header
+                  |> Header.protocol_state
+                  |> Mina_state.Protocol_state.previous_state_hash
                 in
                 let%bind () =
                   Deferred.return

@@ -167,7 +167,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
       Protocol_state.previous_state_hash
-        (External_transition.protocol_state transition)
+        (Header.protocol_state @@ Block.header transition)
     in
     let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
     let%bind breadcrumb =

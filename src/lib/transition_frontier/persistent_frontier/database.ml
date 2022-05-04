@@ -287,7 +287,10 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      External_transition.blockchain_state root_block
+      root_block
+      |> Block.header
+      |> Header.protocol_state
+      |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
@@ -313,7 +316,7 @@ let initialize t ~root_data =
 let add t ~transition:(transition, _validation) =
   let hash = State_hash.With_state_hashes.state_hash transition in
   let raw_transition = External_transition.compose (With_hash.data transition) in
-  let parent_hash = External_transition.parent_hash (With_hash.data transition) in
+  let parent_hash = With_hash.data transition |> Block.header |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))

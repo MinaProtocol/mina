@@ -7,7 +7,7 @@ open Network_peer
 module Master = struct
   module T = struct
     type msg =
-      | New_state of External_transition.t
+      | New_state of Mina_block.t
       | Snark_pool_diff of Snark_pool.Resource_pool.Diff.t
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
     [@@deriving sexp, to_yojson]

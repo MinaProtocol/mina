@@ -123,7 +123,10 @@ module Make (Inputs : Inputs_intf) :
     let genesis_state_hash =
       State_hash.With_state_hashes.state_hash genesis_protocol_state
     in
-    let root_state_hash = (External_transition.state_hashes root).state_hash in
+    let state_hashes block =
+      Block.header block |> Header.protocol_state |> Protocol_state.hashes
+    in
+    let root_state_hash = (state_hashes root).state_hash in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =
       Deferred.return
@@ -136,10 +139,10 @@ module Make (Inputs : Inputs_intf) :
            (Int.equal max_length merkle_list_length || root_is_genesis))
     in
     let best_tip_with_hash =
-      With_hash.of_data best_tip ~hash_data:External_transition.state_hashes
+      With_hash.of_data best_tip ~hash_data:state_hashes
     in
     let root_transition_with_hash =
-      With_hash.of_data root ~hash_data:External_transition.state_hashes
+      With_hash.of_data root ~hash_data:state_hashes
     in
     let%bind (_ : State_hash.t Non_empty_list.t) =
       Deferred.return
