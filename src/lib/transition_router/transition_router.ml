@@ -64,14 +64,14 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
       , transition_frontier_controller_writer ) =
     let name = "transition frontier controller pipe" in
     create_bufferred_pipe ~name
-      ~f:(fun (`Block block, `Valid_cb valid_cb) ->
+      ~f:(fun (`Block block, valid_cb) ->
         Mina_metrics.(
           Counter.inc_one
             Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
         Mina_block.handle_dropped_transition
           ( With_hash.hash @@ Validation.block_with_hash
           @@ Network_peer.Envelope.Incoming.data block )
-          ?valid_cb ~pipe_name:name ~logger)
+          ~valid_cb ~pipe_name:name ~logger)
       ()
   in
   transition_reader_ref := transition_frontier_controller_reader ;
@@ -106,13 +106,13 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
     create_bufferred_pipe ~name
-      ~f:(fun (`Block head, `Valid_cb valid_cb) ->
+      ~f:(fun (`Block head, valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
         Mina_transition.Mina_block.handle_dropped_transition
           ( With_hash.hash @@ Validation.block_with_hash
           @@ Network_peer.Envelope.Incoming.data head )
-          ~pipe_name:name ~logger ?valid_cb)
+          ~pipe_name:name ~logger ~valid_cb)
       ()
   in
   transition_reader_ref := bootstrap_controller_reader ;
@@ -125,7 +125,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   producer_transition_writer_ref := producer_transition_writer ;
   Option.iter best_seen_transition ~f:(fun block ->
       Strict_pipe.Writer.write bootstrap_controller_writer
-        (`Block block, `Valid_cb None)) ;
+        (`Block block, `No_valid_cb "in boostrap")) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   upon
     (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
@@ -477,25 +477,23 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_bufferred_pipe ~name
-      ~f:
-        (fun (`Transition (head : Mina_block.Validated.t), _, `Valid_cb valid_cb)
-             ->
+      ~f:(fun (`Transition (head : Mina_block.Validated.t), _, valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
         Mina_transition.Mina_block.handle_dropped_transition
           (Mina_block.Validated.forget head |> With_hash.hash)
-          ~pipe_name:name ~logger ?valid_cb)
+          ~pipe_name:name ~logger ~valid_cb)
       ()
   in
   let transition_reader, transition_writer =
     let name = "transition pipe" in
     create_bufferred_pipe ~name
-      ~f:(fun (`Block block, `Valid_cb valid_cb) ->
+      ~f:(fun (`Block block, valid_cb) ->
         Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
         Mina_transition.Mina_block.handle_dropped_transition
           ( Network_peer.Envelope.Incoming.data block
           |> Validation.block_with_hash |> With_hash.hash )
-          ?valid_cb ~pipe_name:name ~logger)
+          ~valid_cb ~pipe_name:name ~logger)
       ()
   in
   let transition_reader_ref = ref transition_reader in
@@ -517,7 +515,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
         let name = "valid transitions" in
         create_bufferred_pipe ~name
           ~f:(fun head ->
-            let `Block block, `Valid_cb valid_cb = head in
+            let `Block block, valid_cb = head in
             Mina_metrics.(
               Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
             Mina_transition.Mina_block.handle_dropped_transition
@@ -617,5 +615,5 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                       Deferred.unit
                 in
                 Strict_pipe.Writer.write !transition_writer_ref
-                  (`Block enveloped_transition, `Valid_cb (Some vc)))) ;
+                  (`Block enveloped_transition, `Valid_cb vc))) ;
   (verified_transition_reader, initialization_finish_signal)

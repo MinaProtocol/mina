@@ -127,15 +127,17 @@ end = struct
   let body t = t |> forget |> With_hash.data |> Block.body
 end
 
-let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
+let handle_dropped_transition ?pipe_name ~valid_cb ~logger block =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
     ~metadata:
       [ ("state_hash", State_hash.(to_yojson (State_hashes.state_hash block)))
       ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
       ] ;
-  Option.iter
-    ~f:(Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired `Reject)
-    valid_cb
+  match valid_cb with
+  | `Valid_cb cb ->
+      Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject
+  | `No_valid_cb _ ->
+      ()
 
 let blockchain_length block =
   block |> Block.header |> Header.protocol_state

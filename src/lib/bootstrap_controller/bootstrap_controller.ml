@@ -229,11 +229,11 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                                (block :
                                  Validation.initial_valid_with_block
                                  Envelope.Incoming.t)
-                           , `Valid_cb valid_cb ) ->
+                           , valid_cb ) ->
                         Mina_metrics.(
                           Counter.inc_one
                             Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
-                        Mina_block.handle_dropped_transition ?valid_cb
+                        Mina_block.handle_dropped_transition ~valid_cb
                           ( With_hash.hash @@ Validation.block_with_hash
                           @@ Envelope.Incoming.data block )
                           ~pipe_name:sync_ledger_pipe ~logger)) ))
@@ -856,7 +856,7 @@ let%test_module "Bootstrap_controller tests" =
               ~sender:(Envelope.Sender.Remote peer_net.peer)
           in
           Pipe_lib.Strict_pipe.Writer.write transition_writer
-            (`Block block, `Valid_cb None) ;
+            (`Block block, `No_valid_cb "test") ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap

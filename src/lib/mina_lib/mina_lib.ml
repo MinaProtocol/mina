@@ -1800,18 +1800,21 @@ let create ?wallets (config : Config.t) =
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
-                ~f:(fun
-                     (`Transition transition, `Source source, `Valid_cb valid_cb)
-                   ->
+                ~f:(fun (`Transition transition, `Source source, valid_cb) ->
                   [%log' warn config.logger]
-                    "read valid transition $state_hash (with cb \
-                     $valid_cb_exists)"
+                    "read valid transition $state_hash (with cb $valid_cb)"
                     ~metadata:
                       [ ( "state_hash"
                         , State_hash.to_yojson
                           @@ State_hash.With_state_hashes.state_hash
                           @@ fst transition )
-                      ; ("valid_cb_exists", `Bool (Option.is_some valid_cb))
+                      ; ( "valid_cb"
+                        , `String
+                            ( match valid_cb with
+                            | `Valid_cb _ ->
+                                "validation cb exists"
+                            | `No_valid_cb reason ->
+                                "no validation cb: " ^ reason ) )
                       ] ;
                   let hash =
                     Mina_block.Validated.forget transition
@@ -1834,7 +1837,7 @@ let create ?wallets (config : Config.t) =
                   with
                   | Ok () -> (
                       match source with
-                      | `Gossip ->
+                      | `Gossip -> (
                           [%str_log' info config.logger]
                             ~metadata:
                               [ ( "external_transition"
@@ -1842,31 +1845,31 @@ let create ?wallets (config : Config.t) =
                               ]
                             (Rebroadcast_transition { state_hash = hash }) ;
                           (*send callback to libp2p to forward the gossiped transition*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept)
-                            valid_cb
-                      | `Internal ->
+                          match valid_cb with
+                          | `Valid_cb cb ->
+                              Mina_net2.Validation_callback
+                              .fire_if_not_already_fired cb `Accept
+                          | `No_valid_cb _ ->
+                              () )
+                      | `Internal -> (
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
                           don't_wait_for
                             (Mina_networking.broadcast_state net
                                (Mina_block.Validated.forget transition)) ;
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept)
-                            valid_cb
-                      | `Catchup ->
+                          match valid_cb with
+                          | `Valid_cb cb ->
+                              Mina_net2.Validation_callback
+                              .fire_if_not_already_fired cb `Accept
+                          | `No_valid_cb _ ->
+                              () )
+                      | `Catchup -> (
                           (*Noop for directly downloaded transitions*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept)
-                            valid_cb )
+                          match valid_cb with
+                          | `Valid_cb cb ->
+                              Mina_net2.Validation_callback
+                              .fire_if_not_already_fired cb `Accept
+                          | `No_valid_cb _ ->
+                              () ) )
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
@@ -1882,12 +1885,12 @@ let create ?wallets (config : Config.t) =
                         ; ("timing", timing_error_json)
                         ]
                       in
-                      Option.iter
-                        ~f:
-                          (Fn.flip
-                             Mina_net2.Validation_callback
-                             .fire_if_not_already_fired `Reject)
-                        valid_cb ;
+                      ( match valid_cb with
+                      | `Valid_cb cb ->
+                          Mina_net2.Validation_callback
+                          .fire_if_not_already_fired cb `Reject
+                      | `No_valid_cb _ ->
+                          () ) ;
                       match source with
                       | `Catchup ->
                           ()

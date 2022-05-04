@@ -363,7 +363,8 @@ module type Transition_router_intf = sig
     -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       * [ `Valid_cb of Mina_net2.Validation_callback.t
+         | `No_valid_cb of string ] )
        Strict_pipe.Reader.t
        * unit Ivar.t
 end

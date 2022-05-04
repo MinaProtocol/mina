@@ -13,7 +13,8 @@ val run :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:
        ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       * [ `Valid_cb of Mina_net2.Validation_callback.t
+         | `No_valid_cb of string ] )
        Strict_pipe.Reader.t
   -> best_seen_transition:
        Mina_block.initial_valid_block Envelope.Incoming.t option

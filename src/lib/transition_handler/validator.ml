@@ -55,14 +55,14 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
            ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
+         * [ `Valid_cb of Mina_net2.Validation_callback.t
+           | `No_valid_cb of string ]
        , drop_head buffered
        , unit )
        Writer.t) ~unprocessed_transition_cache =
   let module Lru = Core_extended_cache.Lru in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Reader.iter transition_reader
-        ~f:(fun (`Block transition_env, `Valid_cb vc) ->
+      Reader.iter transition_reader ~f:(fun (`Block transition_env, vc) ->
           let transition_with_hash, _ = Envelope.Incoming.data transition_env in
           let transition_hash =
             State_hash.With_state_hashes.state_hash transition_with_hash
@@ -94,8 +94,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                 (Core_kernel.Time.diff
                    Block_time.(now time_controller |> to_time)
                    transition_time) ;
-              Writer.write valid_transition_writer
-                (`Block cached_transition, `Valid_cb vc)
+              Writer.write valid_transition_writer (`Block cached_transition, vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Sent_old_gossip

@@ -81,7 +81,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           @@ fst transition )
       ] ;
   Writer.write processed_transition_writer
-    (`Transition transition, `Source source, `Valid_cb valid_cb) ;
+    (`Transition transition, `Source source, valid_cb) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(Mina_block.Validated.state_hash transition)
 
@@ -214,7 +214,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
            ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       * [ `Valid_cb of Mina_net2.Validation_callback.t
+         | `No_valid_cb of string ] )
        Reader.t)
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t)
@@ -289,7 +290,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                * we're catching up *)
                             ~f:
                               (add_and_finalize ~logger ~only_if_present:true
-                                 ~source:`Catchup ~valid_cb:None))
+                                 ~source:`Catchup
+                                 ~valid_cb:(`No_valid_cb "from catchup")))
                     with
                   | Ok () ->
                       ()
@@ -330,7 +332,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   let%map () =
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
-                        ~source:`Internal breadcrumb ~valid_cb:None
+                        ~source:`Internal breadcrumb
+                        ~valid_cb:(`No_valid_cb "locally produced")
                     with
                     | Ok () ->
                         ()
@@ -348,8 +351,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   Mina_metrics.(
                     Gauge.dec_one
                       Transition_frontier_controller.transitions_being_processed)
-              | `Partially_valid_transition
-                  (`Block transition, `Valid_cb valid_cb) ->
+              | `Partially_valid_transition (`Block transition, valid_cb) ->
                   process_transition ~transition ~valid_cb)))
 
 let%test_module "Transition_handler.Processor tests" =
@@ -434,7 +436,7 @@ let%test_module "Transition_handler.Processor tests" =
                       |> Unprocessed_transition_cache.register_exn cache
                     in
                     Strict_pipe.Writer.write valid_transition_writer
-                      (`Block b, `Valid_cb None)) ;
+                      (`Block b, `No_valid_cb "test")) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)
