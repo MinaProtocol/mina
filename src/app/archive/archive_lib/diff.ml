@@ -45,8 +45,7 @@ type t =
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
-  let breadcrumb_added ~logger ~(precomputed_values : Precomputed_values.t)
-      breadcrumb =
+  let breadcrumb_added ~(precomputed_values : Precomputed_values.t) breadcrumb =
     let ((block, _) as validated_block) =
       Breadcrumb.validated_transition breadcrumb
     in
@@ -77,21 +76,13 @@ module Builder = struct
         External_transition.Validated.account_ids_accessed validated_block
       in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
-          try
-            let index =
-              Mina_ledger.Ledger.index_of_account_exn ledger acct_id
-            in
-            let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-            Some (index, account)
-          with exn ->
-            [%log error]
-              "When building Breadcrumb_added RPC message, exception when \
-               finding account id in staged ledger"
-              ~metadata:
-                [ ("account_id", Account_id.to_yojson acct_id)
-                ; ("exception", `String (Exn.to_string exn))
-                ] ;
-            None)
+          (* an accessed account may not be the ledger *)
+          let%bind.Option index =
+            Option.try_with (fun () ->
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id)
+          in
+          let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+          Some (index, account))
     in
     let accounts_created =
       let account_creation_fee =

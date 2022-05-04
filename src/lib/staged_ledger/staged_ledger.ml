@@ -1946,15 +1946,18 @@ module T = struct
   let latest_block_accounts_created t ~previous_block_state_hash =
     let scan_state = scan_state t in
     (* filter leaves by state hash from previous block *)
-    let base_jobs =
-      Scan_state.base_jobs_on_latest_tree scan_state
-      @ Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state
-      |> List.filter ~f:(fun { state_hash = leaf_block_hash, _; _ } ->
-             State_hash.equal leaf_block_hash previous_block_state_hash)
-    in
     let block_transactions_applied =
-      List.map base_jobs ~f:(fun { transaction_with_info; _ } ->
-          transaction_with_info.varying)
+      let f
+          ({ state_hash = leaf_block_hash, _; transaction_with_info; _ } :
+            Scan_state.Transaction_with_witness.t) =
+        if State_hash.equal leaf_block_hash previous_block_state_hash then
+          Some transaction_with_info.varying
+        else None
+      in
+      List.filter_map (Scan_state.base_jobs_on_latest_tree scan_state) ~f
+      @ List.filter_map
+          (Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state)
+          ~f
     in
     List.map block_transactions_applied ~f:(function
       | Command (Signed_command cmd) -> (

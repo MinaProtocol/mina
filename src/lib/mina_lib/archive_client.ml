@@ -70,8 +70,8 @@ let transfer ~logger ~precomputed_values ~archive_location
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
           let diff =
-            Archive_lib.Diff.Builder.breadcrumb_added ~logger
-              ~precomputed_values breadcrumb
+            Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+              breadcrumb
           in
           match%map dispatch archive_location (Transition_frontier diff) with
           | Ok () ->

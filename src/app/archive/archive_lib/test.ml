@@ -233,13 +233,11 @@ let%test_module "Archive node unit tests" =
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None
           in
-          let logger = Logger.null () in
           let diffs =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added ~logger ~precomputed_values
-                     breadcrumb))
+                  (Diff.Builder.breadcrumb_added ~precomputed_values breadcrumb))
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
