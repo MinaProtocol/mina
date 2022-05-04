@@ -224,7 +224,6 @@ module Poly = struct
     module V2 = struct
       type ( 'pk
            , 'id
-           , 'token_permissions
            , 'token_symbol
            , 'amount
            , 'nonce
@@ -238,7 +237,6 @@ module Poly = struct
            t =
         { public_key : 'pk
         ; token_id : 'id
-        ; token_permissions : 'token_permissions
         ; token_symbol : 'token_symbol
         ; balance : 'amount
         ; nonce : 'nonce
@@ -253,34 +251,6 @@ module Poly = struct
       [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'snapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
     end
   end]
 end
@@ -312,7 +282,6 @@ module Binable_arg = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
         , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
@@ -387,7 +356,6 @@ let identifier ({ public_key; token_id; _ } : t) =
 type value =
   ( Public_key.Compressed.t
   , Token_id.t
-  , Token_permissions.t
   , Token_symbol.t
   , Balance.t
   , Nonce.t
@@ -412,7 +380,6 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -471,7 +438,6 @@ let to_input (t : t) =
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
-    ~token_permissions:(f Token_permissions.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
@@ -492,7 +458,6 @@ let crypto_hash t =
 type var =
   ( Public_key.Compressed.var
   , Token_id.Checked.t
-  , Token_permissions.var
   , Token_symbol.var
   , Balance.var
   , Nonce.Checked.t
@@ -514,7 +479,6 @@ let typ' zkapp =
     Data_spec.
       [ Public_key.Compressed.typ
       ; Token_id.typ
-      ; Token_permissions.typ
       ; Token_symbol.typ
       ; Balance.typ
       ; Nonce.typ
@@ -550,7 +514,6 @@ let typ : (var, value) Typ.t =
 let var_of_t
     ({ public_key
      ; token_id
-     ; token_permissions
      ; token_symbol
      ; balance
      ; nonce
@@ -565,7 +528,6 @@ let var_of_t
       value) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
   ; token_id = Token_id.Checked.constant token_id
-  ; token_permissions = Token_permissions.var_of_t token_permissions
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
@@ -583,7 +545,6 @@ module Checked = struct
     type t =
       ( Public_key.Compressed.var
       , Token_id.Checked.t
-      , Token_permissions.var
       , Token_symbol.var
       , Balance.var
       , Nonce.Checked.t
@@ -613,7 +574,6 @@ module Checked = struct
          ~public_key:(f Public_key.Compressed.Checked.to_input)
          ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
-         ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
          ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
          ~delegate:(f Public_key.Compressed.Checked.to_input)
@@ -692,7 +652,6 @@ let digest = crypto_hash
 let empty =
   { Poly.public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -718,7 +677,6 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
@@ -748,7 +706,6 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
-      ; token_permissions = Token_permissions.default
       ; token_symbol = Token_symbol.default
       ; balance
       ; nonce = Nonce.zero

@@ -25,6 +25,5 @@ module Zkapp_state = Zkapp_state
 module Stake_delegation = Stake_delegation
 module State_hash = State_hash
 module Token_id = Token_id
-module Token_permissions = Token_permissions
 module Transaction_union_payload = Transaction_union_payload
 module Transaction_union_tag = Transaction_union_tag

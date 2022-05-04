@@ -27,13 +27,6 @@ module Account = struct
   let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
   let token Mina_base.Account.Poly.{ token_id; _ } = token_id
-
-  let token_owner Mina_base.Account.Poly.{ token_permissions; _ } =
-    match token_permissions with
-    | Mina_base.Token_permissions.Token_owned _ ->
-        true
-    | Not_owned _ ->
-        false
 end
 
 module Receipt = Mina_base.Receipt

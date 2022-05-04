@@ -459,7 +459,6 @@ module Base : sig
     -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
     -> account:
          ( 'b
-         , 'c
          , 'd
          , 'e
          , Currency.Balance.var
