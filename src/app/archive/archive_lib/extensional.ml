@@ -2,6 +2,7 @@
 
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 
 (* the tables in the archive db uses foreign keys to refer to other
@@ -76,10 +77,10 @@ module Block = struct
     ; creator : Public_key.Compressed.Stable.Latest.t
     ; block_winner : Public_key.Compressed.Stable.Latest.t
     ; snarked_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; staking_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; staking_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; next_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; next_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
+    ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; min_window_density : Mina_numbers.Length.Stable.Latest.t
+    ; total_currency : Currency.Amount.Stable.Latest.t
     ; ledger_hash : Ledger_hash.Stable.Latest.t
     ; height : Unsigned_extended.UInt32.Stable.Latest.t
     ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.Latest.t

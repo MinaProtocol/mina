@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Signature_lib
 
@@ -68,7 +69,7 @@ module type External_transition_base_intf = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V1 : sig
+      module V2 : sig
         type nonrec t = t [@@deriving sexp]
       end
     end]
@@ -106,18 +107,16 @@ module type S = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V1 : sig
+      module V2 : sig
         type nonrec t = t =
           { scheduled_time : Block_time.Stable.V1.t
-          ; protocol_state : Protocol_state.Value.Stable.V1.t
-          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-          ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+          ; protocol_state : Protocol_state.Value.Stable.V2.t
+          ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+          ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
           }
-
-        val to_latest : t -> t
       end
     end]
 
@@ -316,19 +315,8 @@ module type S = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V2 : sig
+      module V3 : sig
         type nonrec t = t [@@deriving compare, equal, sexp, to_yojson]
-      end
-
-      module V1 : sig
-        type t = (Block.t, State_hash.t) With_hash.t * Validation.fully_valid
-        [@@deriving compare, equal, sexp, to_yojson]
-
-        val to_latest : t -> V2.t
-
-        val of_v2 : V2.t -> t
-
-        val state_hash : t -> State_hash.t
       end
     end]
 

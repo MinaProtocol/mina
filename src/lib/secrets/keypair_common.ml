@@ -9,8 +9,6 @@ module Make_terminal_stdin (KP : sig
 
   val env : string
 
-  val env_deprecated : string option
-
   val read :
        privkey_path:string
     -> password:Secret_file.password
@@ -34,26 +32,15 @@ struct
   let read_exn ?(should_prompt_user = true) ?(should_reask = true) ~which path =
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
-      match (Sys.getenv env, Option.bind env_deprecated ~f:Sys.getenv) with
-      | Some password, _ ->
+      match Sys.getenv env with
+      | Some password ->
           (* this function is only called from client commands that can prompt for
              a password, so printing a message, rather than a formatted log, is OK
           *)
           printf "Using %s private-key password from environment variable %s\n"
             which env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
-      | None, Some password ->
-          (* this function is only called from client commands that can prompt for
-             a password, so printing a message, rather than a formatted log, is OK
-          *)
-          printf
-            "Using %s private-key password from deprecated environment \
-             variable %s\n"
-            which
-            (Option.value_exn env_deprecated) ;
-          printf "Please use environment variable %s instead\n" env ;
-          read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
-      | None, None ->
+      | None ->
           if should_prompt_user then
             let read_file () =
               read_privkey
@@ -72,12 +59,7 @@ struct
                   Deferred.Result.fail exn
             in
             if should_reask then read_until_correct () else read_file ()
-          else
-            let checked_envs =
-              env
-              :: Option.value_map env_deprecated ~f:(fun x -> [ x ]) ~default:[]
-            in
-            Deferred.Result.fail (`Password_not_in_environment checked_envs)
+          else Deferred.Result.fail (`Password_not_in_environment [ env ])
     in
     match result with
     | Ok result ->
