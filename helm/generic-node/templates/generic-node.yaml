@@ -269,6 +269,7 @@ spec:
           - key: pub
             path: key.pub
       {{- end }}
+  {{- if .Values.features.persistence.enabled}}
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -280,5 +281,5 @@ spec:
       resources:
         requests:
           storage: {{.Values.features.persistence.size}}
-{{- end}}
+  {{- end}}
 ---

@@ -17,15 +17,15 @@ spec:
         app: {{.Values.name}}-watchdog
         testnet: {{$.Values.testnetName}}
         role: watchdog
-        version: {{trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-"}}
+        version: {{trunc 6 (split ":" $.Values.watchdog.image)._1 | trimSuffix "-"}}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{.Values.ports.metrics | quote}}
         prometheus.io/path: '/metrics'
     spec:
       containers:
-        - name: watchdog
-          resources:
+      - name: watchdog
+        resources:
           requests:
             memory: {{.Values.watchdog.memory}}
             cpu: {{.Values.watchdog.cpu}}
@@ -69,4 +69,4 @@ spec:
           - key: keyfile
             path: keyfile.json
       {{- end }}
----
+{{- end}}

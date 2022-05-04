@@ -53,7 +53,7 @@ daemon:
   seedPeers: []
 
 persistence:
-  enabled: true
+  enabled: false
 
 coordinator:
   enablesd: false
@@ -70,7 +70,7 @@ archive:
   pg_conn: 'postgres://postgresql:5432'
 
 rosetta:
-  enabled: false
+  enabled: true
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
