@@ -116,7 +116,7 @@ let apply_parties ledger parties =
       |> Or_error.ok_exn) ;
   final_ledger
 
-let trivial_snapp =
+let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 

@@ -7,7 +7,7 @@ open Mina_base
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -377,7 +377,7 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
