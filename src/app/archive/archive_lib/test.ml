@@ -25,7 +25,10 @@ let%test_module "Archive node unit tests" =
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let archive_uri =
-      Uri.of_string (Option.value (Sys.getenv "MINA_TEST_POSTGRES") ~default:"postgres://admin:codarules@localhost:5432/archiver")
+      Uri.of_string
+        (Option.value
+           (Sys.getenv "MINA_TEST_POSTGRES")
+           ~default:"postgres://admin:codarules@localhost:5432/archiver")
 
     let conn_lazy =
       lazy
