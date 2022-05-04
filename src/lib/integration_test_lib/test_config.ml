@@ -25,7 +25,6 @@ type t =
   ; delta : int
   ; slots_per_epoch : int
   ; slots_per_sub_window : int
-  ; proof_level : Runtime_config.Proof_keys.Level.t
   ; txpool_max_size : int
   ; block_producers : Wallet.t list
   ; extra_genesis_accounts : Wallet.t list
@@ -34,9 +33,20 @@ type t =
   ; log_precomputed_blocks : bool
   ; snark_worker_fee : string
   ; snark_worker_public_key : string
-  ; work_delay : int option
-  ; transaction_capacity :
-      Runtime_config.Proof_keys.Transaction_capacity.t option
+  ; proof_config : Runtime_config.Proof_keys.t
+  }
+
+let proof_config_default : Runtime_config.Proof_keys.t =
+  { level = Some Full
+  ; sub_windows_per_window = None
+  ; ledger_depth = None
+  ; work_delay = None
+  ; block_window_duration_ms = Some 120000
+  ; transaction_capacity = None
+  ; coinbase_amount = None
+  ; supercharged_coinbase_factor = None
+  ; account_creation_fee = None
+  ; fork = None
   }
 
 let default =
@@ -45,7 +55,6 @@ let default =
   ; slots_per_epoch = 3 * 8 * 20
   ; slots_per_sub_window = 2
   ; delta = 0
-  ; proof_level = Full
   ; txpool_max_size = 3000
   ; block_producers = []
   ; extra_genesis_accounts = []
@@ -56,6 +65,5 @@ let default =
   ; snark_worker_public_key =
       (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
        Signature_lib.Public_key.Compressed.to_string pk)
-  ; work_delay = None
-  ; transaction_capacity = None
+  ; proof_config = proof_config_default
   }
