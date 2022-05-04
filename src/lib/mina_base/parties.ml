@@ -634,7 +634,6 @@ module Wire = struct
 
   let check_depths (t : t) =
     try
-      assert (t.fee_payer.body.call_depth = 0) ;
       let (_ : int) =
         List.fold ~init:0 t.other_parties ~f:(fun depth party ->
             let new_depth = party.body.call_depth in
@@ -721,12 +720,11 @@ let parties (t : t) : _ Call_forest.t =
   in
   Call_forest.cons fee_payer t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.body.balance_change
+let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let nonce (t : t) : Account.Nonce.t =
-  (fee_payer_party t).body.account_precondition
+let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
 
 let fee_token (_t : t) = Token_id.default
 

@@ -182,18 +182,12 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             { Party.Fee_payer.body =
                 { public_key = sender_pk
                 ; update = Party.Update.noop
-                ; token_id = ()
-                ; balance_change = Amount.to_fee fee
+                ; fee = Amount.to_fee fee
                 ; events = []
                 ; sequence_events = []
-                ; call_data = Field.zero
-                ; call_depth = 0
-                ; increment_nonce = ()
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = sender_nonce
-                ; use_full_commitment = ()
-                ; caller = ()
+                ; nonce = sender_nonce
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
