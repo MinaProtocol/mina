@@ -1397,7 +1397,7 @@ module Zkapp_other_party_body = struct
     ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_precondition_protocol_state_id : int
+    ; zkapp_protocol_state_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; caller : string
@@ -1434,7 +1434,7 @@ module Zkapp_other_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_precondition_protocol_state_id =
+    let%bind zkapp_protocol_state_precondition_id =
       Zkapp_precondition_protocol_state.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
@@ -1467,7 +1467,7 @@ module Zkapp_other_party_body = struct
       ; sequence_events_id
       ; call_data_id
       ; call_depth
-      ; zkapp_precondition_protocol_state_id
+      ; zkapp_protocol_state_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; caller

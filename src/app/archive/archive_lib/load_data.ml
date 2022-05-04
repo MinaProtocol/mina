@@ -455,7 +455,7 @@ let get_other_party_body ~pool body_id =
            ; sequence_events_id
            ; call_data_id
            ; call_depth
-           ; zkapp_precondition_protocol_state_id
+           ; zkapp_protocol_state_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
            ; caller
@@ -483,7 +483,7 @@ let get_other_party_body ~pool body_id =
     Zkapp_basic.F.of_string field_str
   in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_precondition_protocol_state_id
+    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
   in
   let%bind account_precondition =
     let%bind ({ kind; precondition_account_id; nonce }

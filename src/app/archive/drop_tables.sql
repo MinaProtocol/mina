@@ -46,7 +46,7 @@ DROP TYPE call_type_type;
 
 DROP TABLE zkapp_updates;
 
-DROP TABLE zkapp_precondition_protocol_state;
+DROP TABLE zkapp_protocol_state_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
