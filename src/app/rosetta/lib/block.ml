@@ -790,7 +790,18 @@ module Specific = struct
                       { Transaction.transaction_identifier=
                           {Transaction_identifier.hash= info.hash}
                       ; operations= User_command_info.to_operations' info
-                      ; metadata= None } )
+                      ; metadata= Option.bind info.memo ~f:(fun base58_check ->
+                        try
+                          let memo =
+                            let open Mina_base.Signed_command_memo in
+                            base58_check |> of_base58_check_exn |> to_string_hum
+                          in
+                          if String.is_empty memo then
+                            None
+                          else
+                            Some (`Assoc [("memo", `String memo)])
+                        with
+                        | _ -> None) } )
             ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end

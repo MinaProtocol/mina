@@ -1,4 +1,4 @@
-(* user_command_memo.ml *)
+(* signed_command_memo.ml *)
 
 [%%import "/src/config.mlh"]
 
@@ -23,23 +23,24 @@ module Stable = struct
       let version_byte = Base58_check.Version_bytes.user_command_memo
     end)
 
-    let to_string (memo : t) : string = Base58_check.encode memo
+    let to_base58_check (memo : t) : string = Base58_check.encode memo
 
-    let of_string (s : string) : t = Base58_check.decode_exn s
+    let of_base58_check_exn (s : string) : t = Base58_check.decode_exn s
 
     module T = struct
       type nonrec t = t
 
-      let to_string = to_string
+      let to_string = to_base58_check
 
-      let of_string = of_string
+      let of_string = of_base58_check_exn
     end
 
     include Codable.Make_of_string (T)
   end
 end]
 
-[%%define_locally Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
+[%%define_locally
+Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
 exception Too_long_user_memo_input
 
@@ -72,6 +73,8 @@ let max_input_length = digest_length
 let tag (memo : t) = memo.[tag_index]
 
 let length memo = Char.to_int memo.[length_index]
+
+let is_bytes memo = Char.equal (tag memo) bytes_tag
 
 let is_digest memo = Char.equal (tag memo) digest_tag
 
@@ -178,6 +181,25 @@ let fold_bits t =
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
+
+let to_plaintext (memo : t) : string Or_error.t =
+  if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+  else Error (Error.of_string "Memo does not contain text bytes")
+
+let to_digest (memo : t) : string Or_error.t =
+  if is_digest memo then Ok (String.sub memo ~pos:2 ~len:digest_length)
+  else Error (Error.of_string "Memo does not contain a digest")
+
+let to_string_hum (memo : t) =
+  match to_plaintext memo with
+  | Ok text ->
+      text
+  | Error _ -> (
+      match to_digest memo with
+      | Ok digest ->
+          sprintf "0x%s" (Hex.encode digest)
+      | Error _ ->
+          "(Invalid memo, neither text nor a digest)" )
 
 [%%ifdef consensus_mechanism]
 
