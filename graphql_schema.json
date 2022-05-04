@@ -2750,14 +2750,6 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
@@ -2825,12 +2817,6 @@
             },
             {
               "name": "receiptChainHash",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "publicKey",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
@@ -6862,14 +6848,6 @@
             },
             {
               "name": "receiptChainHash",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "publicKey",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },

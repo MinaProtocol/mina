@@ -447,7 +447,6 @@ module Zkapp_account = struct
     { balance_id : int option
     ; nonce_id : int option
     ; receipt_chain_hash : string option
-    ; public_key_id : int option
     ; delegate_id : int option
     ; state_id : int
     ; sequence_state_id : int option
@@ -461,7 +460,6 @@ module Zkapp_account = struct
         [ option int
         ; option int
         ; option string
-        ; option int
         ; option int
         ; int
         ; option int
@@ -482,11 +480,6 @@ module Zkapp_account = struct
       Mina_caqti.add_if_zkapp_check
         (Zkapp_nonce_bounds.add_if_doesn't_exist (module Conn))
         acct.nonce
-    in
-    let%bind public_key_id =
-      Mina_caqti.add_if_zkapp_check
-        (Public_key.add_if_doesn't_exist (module Conn))
-        acct.public_key
     in
     let%bind delegate_id =
       Mina_caqti.add_if_zkapp_check
@@ -511,7 +504,6 @@ module Zkapp_account = struct
       { balance_id
       ; nonce_id
       ; receipt_chain_hash
-      ; public_key_id
       ; delegate_id
       ; state_id
       ; sequence_state_id
