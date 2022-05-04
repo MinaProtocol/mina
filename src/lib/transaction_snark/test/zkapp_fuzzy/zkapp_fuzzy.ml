@@ -41,6 +41,8 @@ let%test_module "Zkapp fuzzy tests" =
       in
       (ledger, fee_payer_keypairs, keymap)
 
+    let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
+
     let%test_unit "generate 10 parties from 5 fee payers and apply them" =
       let num_of_fee_payers = 5 in
       let trials = 10 in
@@ -53,7 +55,7 @@ let%test_module "Zkapp fuzzy tests" =
               (Mina_generators.Parties_generators.gen_parties_from
                  ~protocol_state_view:U.genesis_state_view
                  ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-                 ~keymap ~ledger ())
+                 ~keymap ~ledger ~vk ~prover ())
               ~f:(fun parties ->
                 Async.Thread_safe.block_on_async_exn (fun () ->
                     U.check_parties_with_merges_exn ledger [ parties ]))
@@ -75,7 +77,7 @@ let%test_module "Zkapp fuzzy tests" =
               (Mina_generators.Parties_generators.gen_parties_from
                  ~protocol_state_view:U.genesis_state_view
                  ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-                 ~keymap ~ledger ())
+                 ~keymap ~ledger ~vk ~prover ())
               ~f:(fun parties ->
                 Async.Thread_safe.block_on_async_exn (fun () ->
                     U.check_parties_with_merges_exn ledger [ parties ]))

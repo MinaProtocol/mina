@@ -20,7 +20,7 @@ module T = U.T
 module Make (Input : Input_intf) = struct
   open Input
 
-  let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+  let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
   let memo = Signed_command_memo.create_from_string_exn test_description
 

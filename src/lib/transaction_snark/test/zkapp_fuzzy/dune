@@ -32,6 +32,9 @@
    transaction_snark_tests
    test_util
    mina_transaction_logic
+   with_hash
+   random_oracle
+   sexplib0
    )
   (library_flags -linkall)
   (inline_tests)
