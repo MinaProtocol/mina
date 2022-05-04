@@ -312,8 +312,9 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
           | Ok a ->
               Pipe.write_without_pushback_if_open event_writer a
           | Error e ->
-              [%log warn] "Error parsing log $error"
-                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
+              [%log error] "Error parsing log $error"
+                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+              failwith "failed to parse a log; refusing to continue" ) ;
           Deferred.unit)
     in
     let%bind () = after (Time.Span.of_ms 10000.0) in
