@@ -148,7 +148,7 @@ type raw = Digest of string | Bytes of string
 
 let to_raw_exn memo =
   let tag = tag memo in
-  if Char.equal tag digest_tag then Digest (to_string memo)
+  if Char.equal tag digest_tag then Digest (to_base58_check memo)
   else if Char.equal tag bytes_tag then
     let len = length memo in
     Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
@@ -163,7 +163,7 @@ let to_raw_bytes_exn memo =
 
 let of_raw_exn = function
   | Digest base58_check ->
-      of_string base58_check
+      of_base58_check_exn base58_check
   | Bytes str ->
       create_from_string_exn str
 
