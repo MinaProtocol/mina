@@ -24,7 +24,6 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
-
 # Dependencies
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \

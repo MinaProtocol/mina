@@ -6,16 +6,15 @@
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/CODE_OF_CONDUCT.md @imeckler @emberian
+/CODE_OF_CONDUCT.md @imeckler
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
 /LICENSE @imeckler
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 
-/src/external/ @emberian @bkase @psteckler @imeckler @mrmr1993
+/src/external/ @bkase @psteckler @imeckler @mrmr1993
 
 /src/app/archive @MinaProtocol/product-eng-reviewers
-/src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers

@@ -180,7 +180,9 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       -- apt-get update race condition error
                       Retry::{ exit_status = +100, limit = Some 2 },
                       -- Git checkout error
-                      Retry::{ exit_status = +128, limit = Some 2 }
+                      Retry::{ exit_status = +128, limit = Some 2 },
+                      -- Unknown error with >1MB of logs, potentially Pre-empted nodes
+                      Retry::{ exit_status = +255, limit = Some 2 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries)

@@ -31,7 +31,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 USER root
 
 # OS package dependencies
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
 # afaict this is the last python dependency of any kind in CI
 RUN apt-get update --yes \
   && apt-get install --yes \
@@ -63,10 +62,19 @@ RUN apt-get update --yes \
     postgresql-contrib \
     perl \
     pkg-config \
-    python3-sexpdata \
     rubygems \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
+
+# -- Debian Bullseye python dependencies (largely installed above from apt)
+# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
+# but debian stretch does not have this package, so only install in bullseye
+RUN test "$deb_codename" = "bullseye" \
+      && apt-get update --yes \
+      && apt-get install --yes --no-install-recommends \
+          python3-sexpdata \
+      && rm -rf /var/lib/apt/lists/* \
+      || exit 0
 
 # --- deb-s3 tool
 # tweag version, with lock only on manifest upload
