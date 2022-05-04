@@ -21,6 +21,8 @@ module Failure = struct
         | Receiver_already_exists
         | Token_owner_not_caller
         | Overflow
+        | Global_excess_overflow
+        | Local_excess_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -112,6 +114,10 @@ module Failure = struct
         "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
+    | Global_excess_overflow ->
+        "Global_excess_overflow"
+    | Local_excess_overflow ->
+        "Local_excess_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -174,6 +180,10 @@ module Failure = struct
         Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
+    | "Global_excess_overflow" ->
+        Ok Global_excess_overflow
+    | "Local_excess_overflow" ->
+        Ok Local_excess_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -249,6 +259,10 @@ module Failure = struct
          owner"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Global_excess_overflow ->
+        "The resulting global fee excess is too large to store"
+    | Local_excess_overflow ->
+        "The resulting local fee excess is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
