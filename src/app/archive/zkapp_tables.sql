@@ -134,7 +134,6 @@ CREATE TABLE zkapp_precondition_accounts
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
 , receipt_chain_hash       text
-, public_key_id            int                    REFERENCES public_keys(id)
 , delegate_id              int                    REFERENCES public_keys(id)
 , state_id                 int        NOT NULL    REFERENCES zkapp_states(id)
 , sequence_state_id        int                    REFERENCES zkapp_state_data(id)

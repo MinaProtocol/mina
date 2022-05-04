@@ -17,7 +17,6 @@ module Party_under_construction = struct
         { balance = Ignore
         ; nonce = Ignore
         ; receipt_chain_hash = Ignore
-        ; public_key = Ignore
         ; delegate = Ignore
         ; state =
             [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
@@ -187,7 +186,6 @@ module Party_under_construction = struct
                { balance = Ignore
                ; nonce = Ignore
                ; receipt_chain_hash = Ignore
-               ; public_key = Ignore
                ; delegate = Ignore
                ; state =
                    [ Ignore

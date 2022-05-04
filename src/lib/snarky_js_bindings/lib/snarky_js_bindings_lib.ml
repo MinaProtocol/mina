@@ -2213,7 +2213,6 @@ module Ledger = struct
                    (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
                    p##.nonce)
           ; receipt_chain_hash = or_ignore field p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
@@ -2396,7 +2395,6 @@ module Ledger = struct
                    (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
                    p##.nonce)
           ; receipt_chain_hash = or_ignore field p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
@@ -2613,7 +2611,6 @@ module Ledger = struct
       ; nonce = numeric nonce max_interval_uint32
       ; receipt_chain_hash =
           ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
-      ; public_key = ignore pk_dummy
       ; delegate = ignore pk_dummy
       ; state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
@@ -2640,7 +2637,6 @@ module Ledger = struct
                 (* TODO: assumes constant *)
                 (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
                 p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n

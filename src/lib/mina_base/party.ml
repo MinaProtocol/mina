@@ -566,7 +566,7 @@ module Account_precondition = struct
       Full
         { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
-        ; public_key = Check Public_key.Compressed.empty
+        ; delegate = Check Public_key.Compressed.empty
         }
     in
     let module Fd = Fields_derivers_zkapps.Derivers in
@@ -583,7 +583,7 @@ module Account_precondition = struct
       ( {json|{
           balance: null,
           nonce: {lower: "34928", upper: "34928"},
-          receiptChainHash: null, publicKey: null, delegate: null,
+          receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
           sequenceState: null, provedState: null
         }|json}

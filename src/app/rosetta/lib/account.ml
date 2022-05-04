@@ -29,14 +29,36 @@ module Balance_info = struct
            [@@deriving yojson]
 end
 
+
 module Sql = struct
   module Balance_from_last_relevant_command = struct
+    let max_txns =
+      Int.pow 2 Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
 
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 (option int64))
-        {sql| WITH RECURSIVE pending_chain AS (
+        Caqti_type.(tup4 int64 int64 int64 (option int64))
+        (sprintf
+        {sql|
+SELECT DISTINCT
+  combo.pk_id, -- this is only used as a slug to combine the rows but ignored in the OCaml
+  MAX(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
+  MAX(combo.balance) AS balance,
+  MAX(combo.nonce) AS nonce
+FROM (
+  /* There are two large recursive subqueries here. One for balance, and the
+   * other for nonce.
+   *
+   * These are separate subqueries because there is a quirk where a transaction
+   * can be received and sent in the same block and the latest nonce is not
+   * quite stored properly. To work around that, we are going to query _almost_
+   * the same thing but take the MAX nonce among the most recent 255 entries
+   * (should cover the full block space).
+   *
+   * TODO: Properly fix this by adjusting the archive writing process to always pull the latest nonce _inclusive_ of the current block when writing the data into the tables. */
+(
+  WITH RECURSIVE pending_chain AS (
 
                (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
 
@@ -56,7 +78,7 @@ module Sql = struct
 
                )
 
-              SELECT full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,bal.nonce
+              SELECT pks.id AS pk_id,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL as nonce
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -77,7 +99,61 @@ module Sql = struct
 
               ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
               LIMIT 1
-        |sql}
+            )
+UNION ALL
+(
+  WITH RECURSIVE pending_chain_nonce AS (
+
+               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                FROM blocks b
+                WHERE height = (select MAX(height) from blocks)
+                ORDER BY timestamp ASC, state_hash ASC
+                LIMIT 1)
+
+                UNION ALL
+
+                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
+
+                FROM blocks b
+                INNER JOIN pending_chain_nonce
+                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
+                AND pending_chain_nonce.chain_status <> 'canonical'
+
+               )
+
+              /* Take the maximum of all the nonces within the latest few
+               * entries (maybe within the same block). Take zeros for the
+               * columns we want to cover by the other half of the query. */
+              SELECT DISTINCT nonces.pk_id, 0 as block_global_slot_since_genesis, 0 as balance, MAX(nonces.nonce)
+              FROM (
+              SELECT pks.id AS pk_id, bal.nonce AS nonce
+
+              FROM (SELECT
+                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+                    FROM pending_chain_nonce
+
+                    UNION ALL
+
+                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
+
+                    FROM blocks b
+                    WHERE chain_status = 'canonical') AS full_chain
+
+              INNER JOIN balances bal ON full_chain.id = bal.block_id
+              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+
+              WHERE pks.value = $1
+              AND full_chain.height <= $2
+
+              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+              /* Get the latest 255 to make sure we get all the entries from a block (potentially) */
+              LIMIT %d
+              ) AS nonces GROUP BY nonces.pk_id
+            )
+          )
+AS combo GROUP BY combo.pk_id
+|sql} max_txns)
 
     let query_pending_fallback =
       Caqti_request.find_opt
@@ -201,20 +277,53 @@ AS combo GROUP BY combo.pk_id
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 (option int64))
-        {sql| SELECT b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,bal.nonce
+        Caqti_type.(tup4 int64 int64 int64 (option int64))
+        (sprintf
+        {sql|
+SELECT DISTINCT
+  combo.pk_id, -- this is only used as a slug to combine the rows but ignored in the OCaml
+  MAX(combo.block_global_slot_since_genesis) AS block_global_slot_since_genesis,
+  MAX(combo.balance) AS balance,
+  MAX(combo.nonce) AS nonce
+FROM (
+  /* There are two large subqueries here. One for balance, and the other for
+   * nonce. These exist for similar to the pending queries, see comments there.
+   */
+  (
+                SELECT pks.id AS pk_id, b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,NULL AS nonce
 
-              FROM blocks b
-              INNER JOIN balances bal ON b.id = bal.block_id
-              INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+                FROM blocks b
+                INNER JOIN balances bal ON b.id = bal.block_id
+                INNER JOIN public_keys pks ON bal.public_key_id = pks.id
 
-              WHERE pks.value = $1
-              AND b.height <= $2
-              AND b.chain_status = 'canonical'
+                WHERE pks.value = $1
+                AND b.height <= $2
+                AND b.chain_status = 'canonical'
 
-              ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
-              LIMIT 1
-      |sql}
+                ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+                LIMIT 1
+  )
+  UNION ALL
+  (
+                SELECT DISTINCT nonces.pk_id as pk_id, 0 as block_global_slot_since_genesis, 0 as balance, MAX(nonces.nonce)
+                FROM (
+                  SELECT pks.id AS pk_id, bal.nonce AS nonce
+
+                  FROM blocks b
+                  INNER JOIN balances bal ON b.id = bal.block_id
+                  INNER JOIN public_keys pks ON bal.public_key_id = pks.id
+
+                  WHERE pks.value = $1
+                  AND b.height <= $2
+                  AND b.chain_status = 'canonical'
+
+                  ORDER BY (bal.block_height, bal.block_sequence_no, bal.block_secondary_sequence_no) DESC
+                  LIMIT %d
+                ) AS nonces GROUP BY nonces.pk_id
+  )
+)
+AS combo GROUP BY combo.pk_id
+|sql} max_txns)
 
     let query_canonical_fallback =
       Caqti_request.find_opt
@@ -264,17 +373,22 @@ AS combo GROUP BY combo.pk_id
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
       if has_canonical_height then (
         match%bind Conn.find_opt query_canonical (address, requested_block_height) with
-        | Some ((_,_,Some _) as result) -> return @@ Some result
-        | Some (_,_,None)
+        | Some ((_pk,slot,balance,Some nonce)) ->
+            return @@ Some (slot, balance, Some nonce)
+        | Some (_,_,_,None)
         | None ->
-          Conn.find_opt query_canonical_fallback (address, requested_block_height))
+          let%map result = Conn.find_opt query_canonical_fallback (address, requested_block_height) in
+          (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
+          Option.map result ~f:(fun (slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
       else (
         match%bind Conn.find_opt query_pending (address, requested_block_height) with
-        | Some ((_,_,Some _) as result) -> return @@ Some result
-        | Some (_,_,None)
+        | Some ((_pk,slot,balance,Some nonce)) ->
+            return @@ Some (slot, balance, Some nonce)
+        | Some (_,_,_,None)
         | None ->
           let%map result = Conn.find_opt query_pending_fallback (address, requested_block_height) in
-          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,nonce)))
+          (* The nonce is returned from this user-command, so we need to add one from here to get the current nonce in the account. *)
+          Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
   end
 
   (* TODO: either address will have to include a token id, or we pass the
@@ -363,9 +477,7 @@ AS combo GROUP BY combo.pk_id
           Deferred.Result.return (0L, UInt64.zero)
         | Some (_, last_relevant_command_balance, Some nonce), None ->
           (* This account has no special vesting, so just use its last known
-           * balance from the command. The nonce is returned from this
-           * user-command, so we need to add one from here to get the current
--          * nonce in the account. *)
+           * balance from the command.*)
           Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
         | Some (_, last_relevant_command_balance, None), None ->
           (* Could not get a nonce, return 0 *)
