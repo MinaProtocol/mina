@@ -1,8 +1,7 @@
 open Core_kernel
 open Mina_base
 
-type t =
-  Block.t State_hash.With_state_hashes.t * State_hash.t Non_empty_list.t
+type t = Block.t State_hash.With_state_hashes.t * State_hash.t Non_empty_list.t
 [@@deriving sexp, equal]
 
 let to_yojson (block_with_hashes, _) =

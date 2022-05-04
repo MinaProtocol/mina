@@ -1654,8 +1654,7 @@ module Block = struct
       ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
       ~hash
 
-  let add_from_precomputed conn ~constraint_constants
-      (t : Precomputed.t) =
+  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
@@ -2203,9 +2202,7 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      ( block.Precomputed.protocol_state
-      |> Protocol_state.hashes )
-        .state_hash)
+      (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash)
 
 let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
