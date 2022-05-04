@@ -1,6 +1,7 @@
 open Core
 open Async
 open Integration_test_lib
+open Mina_base
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -90,13 +91,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let zkapp_account_ids =
       List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
-          Mina_base.Account_id.create
+          Account_id.create
             (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
-            Mina_base.Token_id.default)
+            Token_id.default)
     in
     let%bind parties_create_account =
       (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
-      let open Mina_base in
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -127,7 +127,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred parties_update_permissions, permissions_updated =
       (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
-      let open Mina_base in
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
@@ -177,7 +176,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                       , parties_update_all
                       , parties_insufficient_replace_fee
                       , parties_insufficient_fee ) =
-      let open Mina_base in
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -266,10 +264,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                nonce = Mina_base.Account.Nonce.of_int 42
-              }
+            body = { p.fee_payer.body with nonce = Account.Nonce.of_int 42 }
           }
       }
     in
@@ -277,28 +272,52 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let p = parties_update_all in
       { p with
         fee_payer =
-          { body =
-              { p.fee_payer.body with nonce = Mina_base.Account.Nonce.of_int 2 }
-          ; authorization = Mina_base.Signature.dummy
+          { body = { p.fee_payer.body with nonce = Account.Nonce.of_int 2 }
+          ; authorization = Signature.dummy
           }
       }
     in
     let parties_invalid_proof =
       let p = parties_update_all in
-      Mina_base.Parties.
+      Parties.
         { p with
           other_parties =
             Call_forest.map p.other_parties ~f:(fun other_p ->
-                match other_p.Mina_base.Party.authorization with
+                match other_p.Party.authorization with
                 | Proof _ ->
                     { other_p with
                       authorization =
-                        Mina_base.(
-                          Control.Proof Mina_base.Proof.blockchain_dummy)
+                        Control.Proof Mina_base.Proof.blockchain_dummy
                     }
                 | _ ->
                     other_p)
         }
+    in
+    let%bind.Deferred parties_nonexistent_fee_payer =
+      let new_kp = Signature_lib.Keypair.create () in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Non-existent account"
+      in
+      let fee = Currency.Fee.of_int 10_000_000 in
+      let spec : Transaction_snark.For_tests.Spec.t =
+        { sender = (new_kp, Account.Nonce.zero)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = zkapp_keypairs
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = Party.Update.dummy
+        ; current_auth = Permissions.Auth_required.None
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
+        }
+      in
+      Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
     let with_timeout =
       let soft_slots = 4 in
@@ -308,15 +327,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
-      | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
+      | Zkapp_basic.Set_or_keep.Keep, _ ->
           true
-      | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
+      | Set v1, Zkapp_basic.Set_or_keep.Set v2 ->
           equal v1 v2
       | Set _, Keep ->
           false
     in
-    let compatible_updates ~(ledger_update : Mina_base.Party.Update.t)
-        ~(requested_update : Mina_base.Party.Update.t) : bool =
+    let compatible_updates ~(ledger_update : Party.Update.t)
+        ~(requested_update : Party.Update.t) : bool =
       (* the "update" in the ledger is derived from the account
 
          if the requested update has `Set` for a field, we
@@ -352,7 +371,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let permissions_compat =
         compatible requested_update.permissions ledger_update.permissions
-          ~equal:Mina_base.Permissions.equal
+          ~equal:Permissions.equal
       in
       let zkapp_uris_compat =
         compatible requested_update.zkapp_uri ledger_update.zkapp_uri
@@ -364,11 +383,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let timings_compat =
         compatible requested_update.timing ledger_update.timing
-          ~equal:Mina_base.Party.Update.Timing_info.equal
+          ~equal:Party.Update.Timing_info.equal
       in
       let voting_fors_compat =
         compatible requested_update.voting_for ledger_update.voting_for
-          ~equal:Mina_base.State_hash.equal
+          ~equal:State_hash.equal
       in
       List.for_all
         [ app_states_compat
@@ -395,7 +414,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_account)
     in
     let%bind () =
-      section "Send a zkApp transaction to update permissions"
+      section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
     in
     let%bind () =
@@ -409,13 +428,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
         (wait_for_zkapp parties_create_account)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
         (wait_for_zkapp parties_update_permissions)
@@ -424,31 +443,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Verify that updated permissions are in ledger accounts"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
-               ~metadata:
-                 [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+               ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_permissions =
                get_account_permissions ~logger node account_id
              in
-             if
-               Mina_base.Permissions.equal ledger_permissions
-                 permissions_updated
-             then (
+             if Permissions.equal ledger_permissions permissions_updated then (
                [%log info] "Ledger, updated permissions are equal" ;
                return () )
              else (
                [%log error] "Ledger, updated permissions differ"
                  ~metadata:
                    [ ( "ledger_permissions"
-                     , Mina_base.Permissions.to_yojson ledger_permissions )
+                     , Permissions.to_yojson ledger_permissions )
                    ; ( "updated_permissions"
-                     , Mina_base.Permissions.to_yojson permissions_updated )
+                     , Permissions.to_yojson permissions_updated )
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
                     "Ledger permissions do not match update permissions") )))
     in
     let%bind () =
-      section "Send a zkapp with an insufficient fee"
+      section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node parties_insufficient_fee
            "at least one user command had an insufficient fee")
     in
@@ -458,12 +473,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
-      section "Send a zkapp with an invalid proof"
+      section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger node parties_invalid_proof
            "Verification_failed")
     in
     let%bind () =
-      section "Send a zkapp with an insufficient replace fee"
+      section_hard "Send a zkapp with an insufficient replace fee"
         (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
            "Insufficient_replace_fee")
     in
@@ -474,20 +489,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for_zkapp parties_update_all)
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid nonce"
+      section_hard "Send a zkApp transaction with an invalid nonce"
         (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid signature"
+      section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
            "Verification_failed")
     in
     let%bind () =
-      section "Verify zkApp transaction updates in ledger"
+      section_hard "Send a zkApp transaction with a nonexistent fee payer"
+        (send_invalid_zkapp ~logger node parties_nonexistent_fee_payer
+           "Fee_payer_account_not_found")
+    in
+    let%bind () =
+      section_hard "Verify zkApp transaction updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
-               ~metadata:
-                 [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+               ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_update =
                get_account_update ~logger node account_id
              in
@@ -501,17 +520,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                [%log error]
                  "Ledger update and requested update are incompatible"
                  ~metadata:
-                   [ ( "ledger_update"
-                     , Mina_base.Party.Update.to_yojson ledger_update )
+                   [ ("ledger_update", Party.Update.to_yojson ledger_update)
                    ; ( "requested_update"
-                     , Mina_base.Party.Update.to_yojson zkapp_update_all )
+                     , Party.Update.to_yojson zkapp_update_all )
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
                     "Ledger update and requested update are incompatible") )))
     in
     let%bind () =
-      section "Wait for proof to be emitted"
+      section_hard "Wait for proof to be emitted"
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
     in
