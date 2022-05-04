@@ -235,7 +235,7 @@ CREATE TABLE zkapp_fee_payer_body
 , fee                                   bigint    NOT NULL
 , events_id                             int       NOT NULL REFERENCES zkapp_events(id)
 , sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
-, zkapp_precondition_protocol_state_id  int       NOT NULL REFERENCES zkapp_precondition_protocol_state(id)
+, zkapp_protocol_state_precondition_id  int       NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
 , nonce                                 bigint    NOT NULL
 );
 
