@@ -1260,7 +1260,7 @@ module Zkapp_epoch_data = struct
       id
 end
 
-module Zkapp_precondition_protocol_state = struct
+module Zkapp_protocol_state_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
     ; timestamp_id : int option
@@ -1288,7 +1288,7 @@ module Zkapp_precondition_protocol_state = struct
         ; int
         ]
 
-  let table_name = "zkapp_precondition_protocol_state"
+  let table_name = "zkapp_protocol_state_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1435,7 +1435,7 @@ module Zkapp_other_party_body = struct
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
     let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_precondition_protocol_state.add_if_doesn't_exist
+      Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in
@@ -1581,7 +1581,7 @@ module Zkapp_fee_payer_body = struct
       Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
     let%bind zkapp_precondition_protocol_state_id =
-      Zkapp_precondition_protocol_state.add_if_doesn't_exist
+      Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in

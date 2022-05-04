@@ -327,9 +327,9 @@ let protocol_state_precondition_of_id pool id =
             ; staking_epoch_data_id
             ; next_epoch_data_id
             }
-             : Processor.Zkapp_precondition_protocol_state.t) =
+             : Processor.Zkapp_protocol_state_precondition.t) =
     query_db ~f:(fun db ->
-        Processor.Zkapp_precondition_protocol_state.load db id)
+        Processor.Zkapp_protocol_state_precondition.load db id)
   in
   let%bind snarked_ledger_hash =
     let%map hash_opt =
