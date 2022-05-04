@@ -411,7 +411,7 @@ let get_fee_payer_body ~pool body_id =
            ; fee
            ; events_id
            ; sequence_events_id
-           ; zkapp_precondition_protocol_state_id
+           ; zkapp_protocol_state_precondition_id
            ; nonce
            } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
@@ -427,7 +427,7 @@ let get_fee_payer_body ~pool body_id =
   let%bind events = load_events pool events_id in
   let%bind sequence_events = load_events pool sequence_events_id in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_precondition_protocol_state_id
+    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
   in
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32

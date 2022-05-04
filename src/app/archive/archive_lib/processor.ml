@@ -1549,7 +1549,7 @@ module Zkapp_fee_payer_body = struct
     ; fee : int64
     ; events_id : int
     ; sequence_events_id : int
-    ; zkapp_precondition_protocol_state_id : int
+    ; zkapp_protocol_state_precondition_id : int
     ; nonce : int64
     }
   [@@deriving fields, hlist]
@@ -1580,7 +1580,7 @@ module Zkapp_fee_payer_body = struct
     let%bind sequence_events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
-    let%bind zkapp_precondition_protocol_state_id =
+    let%bind zkapp_protocol_state_precondition_id =
       Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
@@ -1596,7 +1596,7 @@ module Zkapp_fee_payer_body = struct
       ; fee
       ; events_id
       ; sequence_events_id
-      ; zkapp_precondition_protocol_state_id
+      ; zkapp_protocol_state_precondition_id
       ; nonce
       }
     in
