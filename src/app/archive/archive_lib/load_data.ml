@@ -522,7 +522,6 @@ let get_other_party_body ~pool body_id =
         let%bind { balance_id
                  ; nonce_id
                  ; receipt_chain_hash
-                 ; public_key_id
                  ; delegate_id
                  ; state_id
                  ; sequence_state_id
@@ -579,7 +578,6 @@ let get_other_party_body ~pool body_id =
           in
           Or_ignore.of_option pk_opt
         in
-        let%bind public_key = get_pk public_key_id in
         let%bind delegate = get_pk delegate_id in
         let%bind state =
           let%bind field_ids =
@@ -613,7 +611,6 @@ let get_other_party_body ~pool body_id =
              { balance
              ; nonce
              ; receipt_chain_hash
-             ; public_key
              ; delegate
              ; state
              ; sequence_state
