@@ -1,5 +1,5 @@
-(library
-  (name zkapp_fuzzy_tests)
+(executable
+  (name zkapp_fuzzy)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -36,8 +36,7 @@
    random_oracle
    sexplib0
    )
-  (library_flags -linkall)
-  (inline_tests)
+  (link_flags (-linkall))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))
