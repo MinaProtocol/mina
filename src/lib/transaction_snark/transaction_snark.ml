@@ -622,8 +622,6 @@ module Base = struct
             then false
             else
               match payload.body.tag with
-              | Create_account | Mint_tokens ->
-                  assert false
               | Payment | Stake_delegation ->
                   (* TODO(#4554): Hook account_precondition evaluation in here once
                      implemented.
@@ -746,9 +744,7 @@ module Base = struct
               ; source_insufficient_balance
               ; source_minimum_balance_violation
               ; source_bad_timing
-              }
-          | Mint_tokens | Create_account ->
-              assert false )
+              } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
         (txn : Transaction_union.var) =

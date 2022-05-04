@@ -10,13 +10,7 @@ open Snark_params.Tick
 
 [%%endif]
 
-type t =
-  | Payment
-  | Stake_delegation
-  | Create_account
-  | Mint_tokens
-  | Fee_transfer
-  | Coinbase
+type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, equal, sexp]
 
 val to_string : t -> string

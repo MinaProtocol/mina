@@ -61,8 +61,6 @@ module Body = struct
             (Amount.zero, max_amount_without_overflow)
         | Stake_delegation ->
             (Amount.zero, Amount.zero)
-        | Create_account ->
-            (Amount.zero, Amount.zero)
         | Fee_transfer ->
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
@@ -70,8 +68,6 @@ module Body = struct
                amount - fee should be defined. In other words,
                amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
-        | Mint_tokens ->
-            (Amount.zero, Amount.max_int)
       in
       Amount.gen_incl min max
     and token_locked =
@@ -80,13 +76,9 @@ module Body = struct
           return false
       | Stake_delegation ->
           return false
-      | Create_account ->
-          Quickcheck.Generator.bool
       | Fee_transfer ->
           return false
       | Coinbase ->
-          return false
-      | Mint_tokens ->
           return false
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
@@ -96,10 +88,6 @@ module Body = struct
           Token_id.gen
       | Stake_delegation ->
           return Token_id.default
-      | Create_account ->
-          Token_id.gen
-      | Mint_tokens ->
-          Token_id.gen
       | Fee_transfer ->
           return Token_id.default
       | Coinbase ->
@@ -319,7 +307,7 @@ let excess (payload : t) : Amount.Signed.t =
   let fee = payload.common.fee in
   let amount = payload.body.amount in
   match tag with
-  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+  | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
       Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
@@ -330,7 +318,7 @@ let excess (payload : t) : Amount.Signed.t =
 
 let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
-  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+  | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
       Fee_excess.of_single (Token_id.default, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
@@ -347,5 +335,5 @@ let supply_increase (payload : payload) =
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Create_account | Mint_tokens | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer ->
       Amount.zero
