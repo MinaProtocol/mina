@@ -1,7 +1,6 @@
 open Core_kernel
 open Mina_base
-open Currency
-open Signature_lib
+open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
@@ -122,94 +121,55 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  type command_type = Send_payment | Send_delegation
-
-  let command_type_to_string command_type =
-    match command_type with
-    | Send_payment ->
-        "Send Payment"
-    | Send_delegation ->
-        "Send Delegation"
-
-  let signed_command_to_be_included_in_frontier ~sender_pub_key
-      ~receiver_pub_key ~amount ~nonce ~command_type
+  let signed_command_to_be_included_in_frontier ~txn_hash
       ~(node_included_in : [ `Any_node | `Node of Node.t ]) =
-    let command_matches_payment cmd =
-      let open User_command in
-      match cmd with
-      | Signed_command signed_cmd -> (
-          let open Signature_lib in
-          let payload = Signed_command.payload signed_cmd in
-          let body = payload |> Signed_command_payload.body in
-          match body with
-          | Payment { source_pk; receiver_pk; amount = paid_amt }
-            when Public_key.Compressed.equal source_pk sender_pub_key
-                 && Public_key.Compressed.equal receiver_pk receiver_pub_key
-                 && Currency.Amount.equal paid_amt amount
-                 && Mina_numbers.Account_nonce.equal nonce
-                      (Signed_command_payload.nonce payload) -> (
-              match command_type with Send_payment -> true | _ -> false )
-          | Stake_delegation dl -> (
-              match dl with
-              | Set_delegate
-                  { delegator : Public_key.Compressed.t
-                  ; new_delegate : Public_key.Compressed.t
-                  }
-                when Public_key.Compressed.equal delegator sender_pub_key
-                     && Public_key.Compressed.equal new_delegate
-                          receiver_pub_key -> (
-                  match command_type with Send_delegation -> true | _ -> false )
-              | _ ->
-                  false )
-          | _ ->
-              false )
-      | Parties _ ->
-          false
-    in
-    let check () node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let check_helper (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-        let payment_opt =
-          List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-              cmd_with_status.With_status.data |> User_command.forget_check
-              |> command_matches_payment)
-        in
-        match payment_opt with
-        | Some cmd_with_status ->
-            let actual_status = cmd_with_status.With_status.status in
-            let was_applied =
-              match actual_status with
-              | Transaction_status.Applied _ ->
-                  true
-              | _ ->
-                  false
-            in
-            if was_applied then Predicate_passed
-            else
-              Predicate_failure
-                (Error.createf "Unexpected status in matching payment: %s"
-                   ( Transaction_status.to_yojson actual_status
-                   |> Yojson.Safe.to_string ))
-        | None ->
-            Predicate_continuation ()
+    let check () state =
+      let blocks_with_txn_set_opt =
+        Map.find state.blocks_including_txn txn_hash
       in
-      match node_included_in with
-      | `Any_node ->
-          check_helper breadcrumb_added
-      | `Node n ->
-          if String.equal (Node.id node) (Node.id n) then
-            check_helper breadcrumb_added
-          else Predicate_continuation ()
+      match blocks_with_txn_set_opt with
+      | None ->
+          Predicate_continuation ()
+      | Some blocks_with_txn_set -> (
+          match node_included_in with
+          | `Any_node ->
+              Predicate_passed
+          | `Node n ->
+              let blocks_seen_by_n =
+                Map.find state.blocks_seen_by_node (Node.id n)
+                |> Option.value ~default:State_hash.Set.empty
+              in
+              let intersection =
+                State_hash.Set.inter blocks_with_txn_set blocks_seen_by_n
+              in
+              if State_hash.Set.is_empty intersection then
+                Predicate_continuation ()
+              else Predicate_passed )
     in
+
     let soft_timeout_in_slots = 8 in
     { description =
-        Printf.sprintf "signed command of type %s from %s to %s of amount %s"
-          (command_type_to_string command_type)
-          (Public_key.Compressed.to_string sender_pub_key)
-          (Public_key.Compressed.to_string receiver_pub_key)
-          (Amount.to_string amount)
-    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+        Printf.sprintf "signed command with hash %s"
+          (Transaction_hash.to_base58_check txn_hash)
+    ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
     }
 
   let snapp_to_be_included_in_frontier ~has_failures ~parties =
@@ -247,13 +207,21 @@ struct
           Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
+    let is_first = ref true in
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
-          (Public_key.Compressed.to_base58_check
-             parties.fee_payer.data.body.public_key)
-          ( List.map parties.other_parties ~f:(fun party ->
-                Public_key.Compressed.to_base58_check party.data.body.public_key)
-          |> String.concat ~sep:", " )
+          (Signature_lib.Public_key.Compressed.to_base58_check
+             parties.fee_payer.body.public_key)
+          (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
+             ~f:(fun acc party ->
+               let str =
+                 Signature_lib.Public_key.Compressed.to_base58_check
+                   party.body.public_key
+               in
+               if !is_first then (
+                 is_first := false ;
+                 str )
+               else acc ^ ", " ^ str))
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

@@ -126,7 +126,8 @@ module Body = struct
 
   let consensus_state { Poly.consensus_state; _ } = consensus_state
 
-  let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
+  let view_checked (t : var) : Zkapp_precondition.Protocol_state.View.Checked.t
+      =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger
@@ -148,7 +149,7 @@ module Body = struct
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
 
-  let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
+  let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger

@@ -1,0 +1,22 @@
+(library
+ (name random_oracle_permutation_external)
+ (public_name random_oracle.permutation.external)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_inline_test ppx_assert))
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   base
+   core_kernel
+   ;; local libraries
+   sponge
+   pickles
+   pickles.backend
+   kimchi_bindings.pasta_fp_poseidon
+   kimchi_bindings
+   kimchi_backend
+   kimchi_backend.common
+   kimchi_backend.pasta
+ )
+ (implements random_oracle.permutation))

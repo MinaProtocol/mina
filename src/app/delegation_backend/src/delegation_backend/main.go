@@ -1,14 +1,15 @@
 package main
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	. "delegation_backend"
+	"net/http"
+	"time"
+
+	"cloud.google.com/go/storage"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/api/option"
 	sheets "google.golang.org/api/sheets/v4"
-	"net/http"
-	"time"
 )
 
 func main() {
@@ -26,13 +27,16 @@ func main() {
 
 	app := new(App)
 	app.Log = log
+	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+		_, _ = rw.Write([]byte("delegation backend service"))
+	})
 	http.Handle("/v1/submit", app.NewSubmitH())
 	client, err1 := storage.NewClient(ctx)
 	if err1 != nil {
 		log.Fatalf("Error creating Cloud client: %v", err1)
 		return
 	}
-	gctx := GoogleContext{client.Bucket(CLOUD_BUCKET_NAME), ctx, log}
+	gctx := GoogleContext{Bucket: client.Bucket(CloudBucketName()), Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
 		gctx.GoogleStorageSave(objs)
 	}

@@ -159,12 +159,12 @@ module Make_weierstrass_checked
     assert_square y (x3 + ax + constant Params.b)
 
   let typ : (t, Curve.t) Typ.t =
-    let unchecked =
+    let (Typ unchecked) =
       Typ.transport
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    { unchecked with check = assert_on_curve }
+    Typ { unchecked with check = assert_on_curve }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 

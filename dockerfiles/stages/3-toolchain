@@ -8,6 +8,7 @@ ARG deb_codename=focal
 
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
+ARG DEBS3_VERSION=0.11.6
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
@@ -69,9 +70,9 @@ RUN apt-get update --yes \
 
 # --- deb-s3 tool
 # tweag version, with lock only on manifest upload
-RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/0.11.4/deb-s3-0.11.4.gem \
-    && gem install deb-s3-0.11.4.gem \
-    && rm -f deb-s3-0.11.4.gem
+RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+    && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
+    && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
 RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \

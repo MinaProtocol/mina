@@ -19,9 +19,10 @@ module Failure = struct
         | Source_insufficient_balance
         | Source_minimum_balance_violation
         | Receiver_already_exists
-        | Not_token_owner
-        | Mismatched_token_permissions
+        | Token_owner_not_caller
         | Overflow
+        | Global_excess_overflow
+        | Local_excess_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -37,6 +38,7 @@ module Failure = struct
         | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
+        | Fee_payer_must_be_signed
         | Account_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
@@ -48,7 +50,7 @@ module Failure = struct
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson]
+    type display = (int * t list) list [@@deriving to_yojson, sexp]
 
     [%%versioned
     module Stable = struct
@@ -108,12 +110,14 @@ module Failure = struct
         "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
-    | Not_token_owner ->
-        "Not_token_owner"
-    | Mismatched_token_permissions ->
-        "Mismatched_token_permissions"
+    | Token_owner_not_caller ->
+        "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
+    | Global_excess_overflow ->
+        "Global_excess_overflow"
+    | Local_excess_overflow ->
+        "Local_excess_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -144,6 +148,8 @@ module Failure = struct
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
+    | Fee_payer_must_be_signed ->
+        "Fee_payer_must_be_signed"
     | Account_precondition_unsatisfied ->
         "Account_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
@@ -170,12 +176,14 @@ module Failure = struct
         Ok Source_minimum_balance_violation
     | "Receiver_already_exists" ->
         Ok Receiver_already_exists
-    | "Not_token_owner" ->
-        Ok Not_token_owner
-    | "Mismatched_token_permissions" ->
-        Ok Mismatched_token_permissions
+    | "Token_owner_not_caller" ->
+        Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
+    | "Global_excess_overflow" ->
+        Ok Global_excess_overflow
+    | "Local_excess_overflow" ->
+        Ok Local_excess_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -206,6 +214,8 @@ module Failure = struct
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Fee_payer_must_be_signed" ->
+        Ok Fee_payer_must_be_signed
     | "Account_precondition_unsatisfied" ->
         Ok Account_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
@@ -244,12 +254,15 @@ module Failure = struct
         "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
-    | Not_token_owner ->
-        "The source account does not own the token"
-    | Mismatched_token_permissions ->
-        "The permissions for this token do not match those in the command"
+    | Token_owner_not_caller ->
+        "A party used a non-default token but its caller was not the token \
+         owner"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Global_excess_overflow ->
+        "The resulting global fee excess is too large to store"
+    | Local_excess_overflow ->
+        "The resulting local fee excess is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
@@ -291,6 +304,8 @@ module Failure = struct
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
+    | Fee_payer_must_be_signed ->
+        "Fee payer party must have a valid signature"
     | Account_precondition_unsatisfied ->
         "The party's account precondition unsatisfied"
     | Protocol_state_precondition_unsatisfied ->

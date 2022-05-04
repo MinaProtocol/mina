@@ -8,6 +8,7 @@
    integers
    sexplib0
    yojson
+   ppx_deriving_yojson.runtime
    ;; local libraries ;;
    mina_base
    mina_base.import
@@ -33,10 +34,12 @@
    mina_transaction
    mina_transaction_logic
    random_oracle
+   random_oracle_input
    sgn
    signature_lib
    snark_keys_header
    snark_params
+   sponge
    tuple_lib
    with_hash
    ;; js-specific libraries ;;

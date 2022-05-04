@@ -225,8 +225,8 @@ func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block,
 				break
 			}
 			if len(links) != schema.LinkCount(ix) {
-				malformed[root_] = fmt.Errorf("unexpected link count for block %s of root %s: %d != %d (fullLinkBlocks: %d, ix: %d)",
-					id, codanet.BlockHashToCidSuffix(root_), len(links), schema.LinkCount(ix), schema.fullLinkBlocks, ix)
+				malformed[root_] = fmt.Errorf("unexpected link count for block %s of root %s: %d != %d (numFullBranchBlocks: %d, ix: %d)",
+					id, codanet.BlockHashToCidSuffix(root_), len(links), schema.LinkCount(ix), schema.numFullBranchBlocks, ix)
 				break
 			}
 			fstChildId := di.FirstChildId(ix)

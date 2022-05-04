@@ -6,7 +6,7 @@ open Mina_base
 open Mina_state
 open Blockchain_snark
 
-type invalid = Common.invalid [@@deriving bin_io_unversioned]
+type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_string = Common.invalid_to_string
 
@@ -31,6 +31,8 @@ module Worker_state = struct
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool Deferred.t
+
+    val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
   end
 
   (* bin_io required by rpc_parallel *)
@@ -110,6 +112,9 @@ module Worker_state = struct
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
+
+             let get_blockchain_verification_key () =
+               Lazy.force B.Proof.verification_key
            end in
           (module M : S))
     | Check | None ->
@@ -135,6 +140,24 @@ module Worker_state = struct
              let verify_blockchain_snarks _ = Deferred.return true
 
              let verify_transaction_snarks _ = Deferred.return true
+
+             let vk =
+               lazy
+                 (let module T = Transaction_snark.Make (struct
+                    let constraint_constants = constraint_constants
+
+                    let proof_level = proof_level
+                  end) in
+                 let module B = Blockchain_snark_state.Make (struct
+                   let tag = T.tag
+
+                   let constraint_constants = constraint_constants
+
+                   let proof_level = proof_level
+                 end) in
+                 Lazy.force B.Proof.verification_key)
+
+             let get_blockchain_verification_key () = Lazy.force vk
            end : S )
 
   let get = Fn.id
@@ -160,6 +183,8 @@ module Worker = struct
             | invalid ]
             list )
           F.t
+      ; get_blockchain_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
       }
 
     module Worker_state = Worker_state
@@ -190,6 +215,10 @@ module Worker = struct
       let verify_commands (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
         M.verify_commands ts
+
+      let get_blockchain_verification_key (w : Worker_state.t) () =
+        let (module M) = Worker_state.get w in
+        Deferred.return (M.get_blockchain_verification_key ())
 
       let functions =
         let f (i, o, f) =
@@ -223,6 +252,11 @@ module Worker = struct
                   | invalid ]
                   list]
               , verify_commands )
+        ; get_blockchain_verification_key =
+            f
+              ( [%bin_type_class: unit]
+              , [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+              , get_blockchain_verification_key )
         }
 
       let init_worker_state
@@ -482,4 +516,12 @@ let verify_commands { worker; logger } ts =
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
+
+let get_blockchain_verification_key { worker; logger } =
+  O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
+      with_retry ~logger (fun () ->
+          let%bind { connection; _ } = Ivar.read !worker in
+          Worker.Connection.run connection
+            ~f:Worker.functions.get_blockchain_verification_key ~arg:()
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))

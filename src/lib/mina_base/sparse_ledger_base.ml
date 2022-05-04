@@ -34,7 +34,7 @@ module Global_state = struct
   type t =
     { ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
-    ; protocol_state : Snapp_predicate.Protocol_state.View.t
+    ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     }
   [@@deriving sexp, to_yojson]
 end

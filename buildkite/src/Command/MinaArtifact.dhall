@@ -105,8 +105,8 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep rosettaSpec,
 
-        -- Snapp test transaction image
-        let snappTestTxnSpec = DockerImage.ReleaseSpec::{
+        -- ZkApp test transaction image
+        let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
@@ -115,7 +115,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep snappTestTxnSpec
+        DockerImage.generateStep zkappTestTxnSpec
 
       ]
     }

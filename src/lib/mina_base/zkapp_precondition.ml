@@ -82,6 +82,7 @@ module Numeric = struct
       ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
       ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
+      ; eq_checked : 'var -> 'var -> Boolean.var
       }
 
     let run f x y = Impl.run_checked (f x y)
@@ -94,6 +95,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -106,6 +108,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -118,6 +121,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -130,6 +134,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -142,6 +147,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -153,6 +159,7 @@ module Numeric = struct
         { equal
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; zero
         ; max_value
         ; typ = Checked.typ
@@ -256,6 +263,14 @@ module Numeric = struct
     let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
           Boolean.all [ lower <= x; x <= upper ])
+
+    let is_constant { eq_checked = ( = ); _ } (t : 'a t) =
+      let is_constant ({ lower; upper } : _ Closed_interval.t) =
+        lower = upper
+      in
+      Or_ignore.Checked.map t ~f_implicit:is_constant
+        ~f_explicit:(fun { is_some; data } ->
+          Boolean.( &&& ) is_some (is_constant data))
   end
 
   let typ { equal = eq; zero; max_value; typ; _ } =
@@ -270,6 +285,9 @@ module Numeric = struct
     | Check { lower; upper } ->
         if compare lower x <= 0 && compare x upper <= 0 then Ok ()
         else Or_error.errorf "Bounds check failed: %s" label
+
+  let is_constant { equal = ( = ); _ } (t : 'a t) =
+    match t with Ignore -> false | Check { lower; upper } -> lower = upper
 end
 
 module Eq_data = struct
@@ -379,7 +397,7 @@ module Eq_data = struct
 
     let public_key () =
       Public_key.Compressed.
-        { default = Lazy.force invalid_public_key
+        { default = invalid_public_key
         ; to_input
         ; to_input_checked = Checked.to_input
         ; equal_checked = run Checked.equal
@@ -406,7 +424,7 @@ module Eq_data = struct
   let check_checked { Tc.equal_checked; _ } (t : 'a Checked.t) (x : 'a) =
     Checked.check t ~f:(equal_checked x)
 
-  let check ~label { Tc.equal; _ } (t : 'a t) (x : 'a) =
+  let check ?(label = "") { Tc.equal; _ } (t : 'a t) (x : 'a) =
     match t with
     | Ignore ->
         Ok ()
@@ -431,7 +449,7 @@ end
 module Leaf_typs = struct
   let public_key () =
     Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:(Lazy.force invalid_public_key) typ)
+      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 
@@ -591,7 +609,7 @@ module Account = struct
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish "AccountPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "AccountPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
@@ -634,7 +652,8 @@ module Account = struct
 
   let digest t =
     Random_oracle.(
-      hash ~init:Hash_prefix.snapp_predicate_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix.zkapp_precondition_account
+        (pack_input (to_input t)))
 
   module Checked = struct
     type t =
@@ -720,11 +739,12 @@ module Account = struct
 
     let check_snapp t a = Boolean.all (snapp t a)
 
-    let check t a = Boolean.all (nonsnapp t a @ snapp t a.snapp)
+    let check t a = Boolean.all (nonsnapp t a @ snapp t a.zkapp)
 
     let digest (t : t) =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.snapp_predicate_account (pack_input (to_input t)))
+        hash ~init:Hash_prefix.zkapp_precondition_account
+          (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, Stable.Latest.t) Typ.t =
@@ -776,13 +796,13 @@ module Account = struct
         check ~label:"public_key" (Tc.public_key ()) public_key a.public_key)
     in
     let%bind () =
-      match a.snapp with
+      match a.zkapp with
       | None ->
           return ()
-      | Some snapp ->
+      | Some zkapp ->
           let%bind (_ : int) =
             List.fold_result ~init:0
-              Vector.(to_list (zip state snapp.app_state))
+              Vector.(to_list (zip state zkapp.app_state))
               ~f:(fun i (c, v) ->
                 let%map () =
                   Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
@@ -792,11 +812,11 @@ module Account = struct
           let%bind () =
             Eq_data.(
               check ~label:"proved_state" Tc.boolean proved_state
-                snapp.proved_state)
+                zkapp.proved_state)
           in
           if
             Option.is_some
-            @@ List.find (Vector.to_list snapp.sequence_state) ~f:(fun state ->
+            @@ List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
                    Eq_data.(
                      check
                        (Lazy.force Tc.sequence_state)
@@ -844,7 +864,7 @@ module Protocol_state = struct
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.Numeric.Derivers.amount
-        |> finish "EpochLedgerPredicate"
+        |> finish "EpochLedgerPrecondition"
              ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
       let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
@@ -853,7 +873,8 @@ module Protocol_state = struct
         ~start_checkpoint:!.(Or_ignore.deriver field)
         ~lock_checkpoint:!.(Or_ignore.deriver field)
         ~epoch_length:!.Numeric.Derivers.length
-      |> finish "EpochDataPredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+      |> finish "EpochDataPrecondition"
+           ~t_toplevel_annots:Poly.t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let f = Or_ignore.Check Field.one in
@@ -1020,7 +1041,8 @@ module Protocol_state = struct
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
-    |> finish "ProtocolStatePredicate" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "ProtocolStatePrecondition"
+         ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -1094,7 +1116,7 @@ module Protocol_state = struct
 
   let digest t =
     Random_oracle.(
-      hash ~init:Hash_prefix.snapp_predicate_protocol_state
+      hash ~init:Hash_prefix.zkapp_precondition_protocol_state
         (pack_input (to_input t)))
 
   module View = struct
@@ -1182,7 +1204,7 @@ module Protocol_state = struct
 
     let digest t =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.snapp_predicate_protocol_state
+        hash ~init:Hash_prefix.zkapp_precondition_protocol_state
           (pack_input (to_input t)))
 
     let check
@@ -1274,17 +1296,30 @@ module Protocol_state = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
+  let epoch_data : Epoch_data.t =
+    { ledger = { hash = Ignore; total_currency = Ignore }
+    ; seed = Ignore
+    ; start_checkpoint = Ignore
+    ; lock_checkpoint = Ignore
+    ; epoch_length = Ignore
+    }
+
   let accept : t =
-    let epoch_data : Epoch_data.t =
-      { ledger = { hash = Ignore; total_currency = Ignore }
-      ; seed = Ignore
-      ; start_checkpoint = Ignore
-      ; lock_checkpoint = Ignore
-      ; epoch_length = Ignore
-      }
-    in
     { snarked_ledger_hash = Ignore
     ; timestamp = Ignore
+    ; blockchain_length = Ignore
+    ; min_window_density = Ignore
+    ; last_vrf_output = ()
+    ; total_currency = Ignore
+    ; global_slot_since_hard_fork = Ignore
+    ; global_slot_since_genesis = Ignore
+    ; staking_epoch_data = epoch_data
+    ; next_epoch_data = epoch_data
+    }
+
+  let valid_until time : t =
+    { snarked_ledger_hash = Ignore
+    ; timestamp = Check time
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()
@@ -1390,7 +1425,7 @@ module Account_type = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = User | Snapp | None | Any
+      type t = User | Zkapp | None | Any
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -1406,16 +1441,16 @@ module Account_type = struct
     | None, _ ->
         Or_error.error_string "expected account_type = None"
     | Some a, User ->
-        assert_ (Option.is_none a.snapp) "expected account_type = User"
-    | Some a, Snapp ->
-        assert_ (Option.is_some a.snapp) "expected account_type = Snapp"
+        assert_ (Option.is_none a.zkapp) "expected account_type = User"
+    | Some a, Zkapp ->
+        assert_ (Option.is_some a.zkapp) "expected account_type = Zkapp"
     | Some _, None ->
         Or_error.error_string "no second account allowed"
 
   let to_bits = function
     | User ->
         [ true; false ]
-    | Snapp ->
+    | Zkapp ->
         [ false; true ]
     | None ->
         [ false; false ]
@@ -1423,12 +1458,12 @@ module Account_type = struct
         [ true; true ]
 
   let of_bits = function
-    | [ user; snapp ] -> (
-        match (user, snapp) with
+    | [ user; zkapp ] -> (
+        match (user, zkapp) with
         | true, false ->
             User
         | false, true ->
-            Snapp
+            Zkapp
         | false, false ->
             None
         | true, true ->
@@ -1442,28 +1477,28 @@ module Account_type = struct
       (Array.of_list_map (to_bits x) ~f:(fun b -> packed (field_of_bool b, 1)))
 
   module Checked = struct
-    type t = { user : Boolean.var; snapp : Boolean.var } [@@deriving hlist]
+    type t = { user : Boolean.var; zkapp : Boolean.var } [@@deriving hlist]
 
-    let to_input { user; snapp } =
+    let to_input { user; zkapp } =
       let open Random_oracle_input.Chunked in
       Array.reduce_exn ~f:append
-        (Array.map [| user; snapp |] ~f:(fun b ->
+        (Array.map [| user; zkapp |] ~f:(fun b ->
              packed ((b :> Field.Var.t), 1)))
 
     let constant =
       let open Boolean in
       function
       | User ->
-          { user = true_; snapp = false_ }
-      | Snapp ->
-          { user = false_; snapp = true_ }
+          { user = true_; zkapp = false_ }
+      | Zkapp ->
+          { user = false_; zkapp = true_ }
       | None ->
-          { user = false_; snapp = false_ }
+          { user = false_; zkapp = false_ }
       | Any ->
-          { user = true_; snapp = true_ }
+          { user = true_; zkapp = true_ }
 
     (* TODO: Write a unit test for these. *)
-    let snapp_allowed t = t.snapp
+    let snapp_allowed t = t.zkapp
 
     let user_allowed t = t.user
   end
@@ -1476,18 +1511,18 @@ module Account_type = struct
       ~value_to_hlist:(function
         | User ->
             [ true; false ]
-        | Snapp ->
+        | Zkapp ->
             [ false; true ]
         | None ->
             [ false; false ]
         | Any ->
             [ true; true ])
-      ~value_of_hlist:(fun [ user; snapp ] ->
-        match (user, snapp) with
+      ~value_of_hlist:(fun [ user; zkapp ] ->
+        match (user, zkapp) with
         | true, false ->
             User
         | false, true ->
-            Snapp
+            Zkapp
         | false, false ->
             None
         | true, true ->
@@ -1647,7 +1682,7 @@ let to_input
 
 let digest t =
   Random_oracle.(
-    hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
+    hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
 
 let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
     ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
@@ -1656,7 +1691,7 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
   let%bind () =
-    Eq_data.(check (Tc.public_key ())) ~label:"fee_payer" fee_payer fee_payer_pk
+    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
   in
   let%bind () =
     let check (s : Account_state.t) (a : _ option) =
@@ -1673,15 +1708,15 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
         return ()
     | Some other_account -> (
         let%bind () = Account.check other.predicate other_account in
-        match other_account.snapp with
+        match other_account.zkapp with
         | None ->
             assert_
               ([%equal: _ Or_ignore.t] other.account_vk Ignore)
               "other_account_vk must be ignore for user account"
-        | Some snapp ->
+        | Some zkapp ->
             Hash.(check ~label:"other_account_vk" Tc.field)
               other.account_vk
-              (Option.value_map ~f:With_hash.hash snapp.verification_key
+              (Option.value_map ~f:With_hash.hash zkapp.verification_key
                  ~default:Field.zero) )
   in
   return ()
@@ -1713,7 +1748,7 @@ module Checked = struct
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
+      hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =

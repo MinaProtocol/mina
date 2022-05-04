@@ -210,19 +210,19 @@ val apply_coinbase :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
 val apply_parties_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
-     * ( ( (Party.t, unit) Parties.Call_forest.t
-         , (Party.t, unit) Parties.Call_forest.t list
+     * ( ( Stack_frame.value
+         , Stack_frame.value list
          , Token_id.t
          , Currency.Amount.t
          , t
@@ -247,7 +247,7 @@ val has_locked_tokens :
 
 val merkle_root_after_parties_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Parties.Valid.t
   -> Ledger_hash.t

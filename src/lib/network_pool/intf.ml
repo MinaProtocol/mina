@@ -301,7 +301,7 @@ module type Transaction_pool_diff_intf = sig
   module Diff_error : sig
     type t =
       | Insufficient_replace_fee
-      | Invalid_signature
+      | Verification_failed
       | Duplicate
       | Sender_account_does_not_exist
       | Invalid_nonce
@@ -312,6 +312,7 @@ module type Transaction_pool_diff_intf = sig
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string

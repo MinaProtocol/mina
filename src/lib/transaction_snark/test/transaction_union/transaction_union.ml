@@ -253,7 +253,7 @@ let%test_module "Transaction union tests" =
             in
             (state_body, state_body_hash)
       in
-      let txn_state_view : Snapp_predicate.Protocol_state.View.t =
+      let txn_state_view : Zkapp_precondition.Protocol_state.View.t =
         Mina_state.Protocol_state.Body.view state_body
       in
       let mentioned_keys, pending_coinbase_stack_target =
