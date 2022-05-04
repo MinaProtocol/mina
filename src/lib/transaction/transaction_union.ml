@@ -61,7 +61,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               ; token_id = Token_id.default
               ; amount
               ; tag = Tag.Coinbase
-              ; token_locked = false
               }
           }
       ; signer = Public_key.decompress_exn other_pk
@@ -86,7 +85,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; token_id
                 ; amount = Amount.of_fee fee1
                 ; tag = Tag.Fee_transfer
-                ; token_locked = false
                 }
             }
         ; signer = Public_key.decompress_exn pk2

@@ -2304,18 +2304,6 @@ module Base = struct
       make_checked (fun () ->
           Token_id.(Checked.equal token (Checked.constant default)))
     in
-    let%bind () =
-      Checked.all_unit
-        [ [%with_label
-            "Token_locked value is compatible with the transaction kind"]
-            (Boolean.Assert.any [ Boolean.not payload.body.token_locked ])
-        ; [%with_label "Token_locked cannot be used with the default token"]
-            (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked
-               ; Boolean.not token_default
-               ])
-        ]
-    in
     let%bind () = Boolean.Assert.is_true token_default in
     let%bind () =
       [%with_label "Validate tokens"]
@@ -2761,8 +2749,7 @@ module Base = struct
                Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
                  ~else_:account.token_permissions.token_owner
              and token_locked =
-               Boolean.if_ is_empty_and_writeable
-                 ~then_:payload.body.token_locked
+               Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
                  ~else_:account.token_permissions.token_locked
              in
              { Account.Poly.balance

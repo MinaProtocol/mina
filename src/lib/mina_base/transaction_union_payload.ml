@@ -21,7 +21,6 @@ module Body = struct
     ; receiver_pk : 'public_key
     ; token_id : 'token_id
     ; amount : 'amount
-    ; token_locked : 'bool
     }
   [@@deriving sexp, hlist]
 
@@ -36,7 +35,6 @@ module Body = struct
         ; receiver_pk
         ; token_id = Token_id.default
         ; amount
-        ; token_locked = false
         }
     | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
         { tag = Tag.Stake_delegation
@@ -44,7 +42,6 @@ module Body = struct
         ; receiver_pk = new_delegate
         ; token_id = Token_id.default
         ; amount = Currency.Amount.zero
-        ; token_locked = false
         }
 
   let gen ~fee =
@@ -70,16 +67,6 @@ module Body = struct
             (Amount.of_fee fee, Amount.max_int)
       in
       Amount.gen_incl min max
-    and token_locked =
-      match tag with
-      | Payment ->
-          return false
-      | Stake_delegation ->
-          return false
-      | Fee_transfer ->
-          return false
-      | Coinbase ->
-          return false
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
     and token_id =
@@ -93,7 +80,7 @@ module Body = struct
       | Coinbase ->
           return Token_id.default
     in
-    { tag; source_pk; receiver_pk; token_id; amount; token_locked }
+    { tag; source_pk; receiver_pk; token_id; amount }
 
   [%%ifdef consensus_mechanism]
 
@@ -112,7 +99,6 @@ module Body = struct
       ; Public_key.Compressed.typ
       ; Token_id.typ
       ; Currency.Amount.typ
-      ; Boolean.typ
       ]
 
   let typ =
@@ -120,19 +106,15 @@ module Body = struct
       ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
-    let constant
-        ({ tag; source_pk; receiver_pk; token_id; amount; token_locked } : t) :
-        var =
+    let constant ({ tag; source_pk; receiver_pk; token_id; amount } : t) : var =
       { tag = Tag.unpacked_of_t tag
       ; source_pk = Public_key.Compressed.var_of_t source_pk
       ; receiver_pk = Public_key.Compressed.var_of_t receiver_pk
       ; token_id = Token_id.Checked.constant token_id
       ; amount = Currency.Amount.var_of_t amount
-      ; token_locked = Boolean.var_of_value token_locked
       }
 
-    let to_input_legacy
-        { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+    let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
       let%map amount = Currency.Amount.var_to_input_legacy amount
       and () =
         make_checked (fun () ->
@@ -146,14 +128,13 @@ module Body = struct
          ; Public_key.Compressed.Checked.to_input_legacy receiver_pk
          ; token_id
          ; amount
-         ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+         ; Random_oracle.Input.Legacy.bitstring [ Boolean.false_ ]
         |]
   end
 
   [%%endif]
 
-  let to_input_legacy
-      { tag; source_pk; receiver_pk; token_id; amount; token_locked } =
+  let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
     assert (Token_id.equal token_id Token_id.default) ;
     Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
       [| Tag.to_input_legacy tag
@@ -161,7 +142,7 @@ module Body = struct
        ; Public_key.Compressed.to_input_legacy receiver_pk
        ; Signed_command_payload.Legacy_token_id.default
        ; Currency.Amount.to_input_legacy amount
-       ; Random_oracle.Input.Legacy.bitstring [ token_locked ]
+       ; Random_oracle.Input.Legacy.bitstring [ false ]
       |]
 end
 
