@@ -1805,13 +1805,17 @@ let create ?wallets (config : Config.t) =
                    ->
                   [%log' warn config.logger]
                     "read valid transition $state_hash (with cb \
-                     $valid_cb_exists)"
+                     $valid_cb_exists) from $source"
                     ~metadata:
                       [ ( "state_hash"
                         , State_hash.to_yojson
                           @@ State_hash.With_state_hashes.state_hash
                           @@ fst transition )
                       ; ("valid_cb_exists", `Bool (Option.is_some valid_cb))
+                      ; ("source", `String (match source with
+                        | `Gossip -> "gossip"
+                        | `Catchup -> "catchup"
+                        | `Internal -> "internal"  ))
                       ] ;
                   let hash =
                     Mina_block.Validated.forget transition
