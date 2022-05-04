@@ -1,6 +1,3 @@
-open Core_kernel
-
-module type External_transition_base_intf = sig
   module Raw : sig
     type t [@@deriving sexp]
 
@@ -13,14 +10,10 @@ module type External_transition_base_intf = sig
       end
     end]
   end
-end
 
-module type S = sig
-  include External_transition_base_intf
+  val compose : Block.t -> Raw.t
 
-  val compose : Mina_block.t -> Raw.t
-
-  val decompose : Raw.t -> Mina_block.t
+  val decompose : Raw.t -> Block.t
 
   module Validated : sig
     [%%versioned:
@@ -42,8 +35,7 @@ module type S = sig
 
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
-    val lift : Mina_block.Validated.t -> t
+    val lift : Validated_block.t -> t
 
-    val lower : t -> Mina_block.Validated.t
+    val lower : t -> Validated_block.t
   end
-end

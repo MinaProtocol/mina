@@ -28,16 +28,15 @@ type peer_state =
          , Marlin_plonk_bindings_pasta_fp.t )
          With_hash.t
          Envelope.Incoming.t
-      -> ( Mina_transition.Mina_block.t
-         , State_body_hash.t list * Mina_transition.Mina_block.t )
+      -> ( Mina_block.t
+         , State_body_hash.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
   ; get_best_tip :
          unit Envelope.Incoming.t
-      -> ( Mina_transition.Mina_block.t
-         , Marlin_plonk_bindings_pasta_fp.t list * Mina_transition.Mina_block.t
-         )
+      -> ( Mina_block.t
+         , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -56,7 +55,7 @@ type peer_state =
          Deferred.t
   ; get_transition_chain :
          Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-      -> Mina_transition.Mina_block.t list option Deferred.t
+      -> Mina_block.t list option Deferred.t
   }
 
 type peer_network =
@@ -110,16 +109,15 @@ module Generator : sig
              , Marlin_plonk_bindings_pasta_fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.Mina_block.t
-             , State_body_hash.t list * Mina_transition.Mina_block.t )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.Mina_block.t
-             , Marlin_plonk_bindings_pasta_fp.t list
-               * Mina_transition.Mina_block.t )
+          -> ( Mina_block.t
+             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
@@ -140,7 +138,7 @@ module Generator : sig
              Deferred.t)
     -> ?get_transition_chain:
          (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-          -> Mina_transition.Mina_block.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t)
     -> peer_config
 
   val fresh_peer : peer_config
@@ -166,16 +164,15 @@ module Generator : sig
              , Marlin_plonk_bindings_pasta_fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.Mina_block.t
-             , State_body_hash.t list * Mina_transition.Mina_block.t )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.Mina_block.t
-             , Marlin_plonk_bindings_pasta_fp.t list
-               * Mina_transition.Mina_block.t )
+          -> ( Mina_block.t
+             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
@@ -196,7 +193,7 @@ module Generator : sig
              Deferred.t)
     -> ?get_transition_chain:
          (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-          -> Mina_transition.Mina_block.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t)
     -> peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config

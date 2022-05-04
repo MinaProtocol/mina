@@ -1,6 +1,5 @@
 open Mina_base
 open Core
-open Mina_transition
 open Network_peer
 
 (* Cache represents a graph. The key is a State_hash, which is the node in
@@ -19,7 +18,8 @@ let add (t : t) ~parent new_child =
         if
           List.mem children new_child ~equal:(fun e1 e2 ->
               let state_hash e =
-                Envelope.Incoming.data e |> Validation.block_with_hash
+                Envelope.Incoming.data e
+                |> Mina_block.Validation.block_with_hash
                 |> State_hash.With_state_hashes.state_hash
               in
               State_hash.equal (state_hash e1) (state_hash e2))

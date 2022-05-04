@@ -2,7 +2,7 @@ open Mina_base
 open Core
 open Async
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
@@ -82,7 +82,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   Transition_frontier.Breadcrumb.state_hash parent
                 in
                 let actual_parent_hash =
-                  transition_with_hash |> With_hash.data |> Block.header
+                  transition_with_hash |> With_hash.data |> Mina_block.header
                   |> Header.protocol_state
                   |> Mina_state.Protocol_state.previous_state_hash
                 in

@@ -19,7 +19,7 @@
    with_hash
    mina_base
    mina_state
-   mina_transition
+   mina_block
    signature_lib
    mina_numbers
  )

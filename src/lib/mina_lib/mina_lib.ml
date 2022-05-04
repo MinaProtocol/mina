@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Strict_pipe
 open Signature_lib

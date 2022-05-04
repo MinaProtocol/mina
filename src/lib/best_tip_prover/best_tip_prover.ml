@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 open Mina_state
 open Async_kernel
-open Mina_transition
+open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -124,7 +124,7 @@ module Make (Inputs : Inputs_intf) :
       State_hash.With_state_hashes.state_hash genesis_protocol_state
     in
     let state_hashes block =
-      Block.header block |> Header.protocol_state |> Protocol_state.hashes
+      Mina_block.header block |> Header.protocol_state |> Protocol_state.hashes
     in
     let root_state_hash = (state_hashes root).state_hash in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in

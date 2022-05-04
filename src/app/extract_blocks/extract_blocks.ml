@@ -14,7 +14,7 @@ let query_db pool ~f ~item =
       failwithf "Error getting %s from db, error: %s" item
         (Caqti_error.show msg) ()
 
-let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
+let fill_in_block pool (block : Archive_lib.Processor.Mina_block.t) :
     Extensional.Block.t Deferred.t =
   let query_db ~item ~f = query_db pool ~item ~f in
   let state_hash = State_hash.of_base58_check_exn block.state_hash in

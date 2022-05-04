@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)
 

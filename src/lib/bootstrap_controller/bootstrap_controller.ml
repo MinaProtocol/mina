@@ -5,7 +5,6 @@ open Async
 open Mina_base
 open Mina_state
 open Pipe_lib.Strict_pipe
-open Mina_transition
 open Network_peer
 
 type Structured_log_events.t += Bootstrap_complete
@@ -164,7 +163,8 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
         Envelope.Incoming.data incoming_transition
       in
       let previous_state_hash =
-        With_hash.data transition |> Block.header |> Header.protocol_state
+        With_hash.data transition |> Mina_block.header
+        |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
       let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
@@ -228,14 +228,15 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                    (Drop_head
                       (fun ( `Block
                                (block :
-                                 Validation.initial_valid_with_block
+                                 Mina_block.Validation.initial_valid_with_block
                                  Envelope.Incoming.t)
                            , `Valid_cb valid_cb ) ->
                         Mina_metrics.(
                           Counter.inc_one
                             Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
                         Mina_block.handle_dropped_transition ?valid_cb
-                          ( With_hash.hash @@ Validation.block_with_hash
+                          ( With_hash.hash
+                          @@ Mina_block.Validation.block_with_hash
                           @@ Envelope.Incoming.data block )
                           ~pipe_name:sync_ledger_pipe ~logger)) ))
         in
@@ -244,8 +245,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
              ~f:Fn.id) ;
         let initial_root_transition =
           initial_root_transition |> Mina_block.Validated.remember
-          |> Validation.reset_frontier_dependencies_validation
-          |> Validation.reset_staged_ledger_diff_validation
+          |> Mina_block.Validation.reset_frontier_dependencies_validation
+          |> Mina_block.Validation.reset_staged_ledger_diff_validation
         in
         let t =
           { network
@@ -331,9 +332,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                    $received_staged_ledger_hash" ;
                 let%bind new_root =
                   t.current_root
-                  |> Validation.skip_frontier_dependencies_validation
+                  |> Mina_block.Validation.skip_frontier_dependencies_validation
                        `This_block_belongs_to_a_detached_subtree
-                  |> Validation.validate_staged_ledger_hash
+                  |> Mina_block.Validation.validate_staged_ledger_hash
                        (`Staged_ledger_already_materialized
                          received_staged_ledger_hash)
                   |> Result.map_error ~f:(fun _ ->
@@ -460,7 +461,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             let best_seen_block_with_hash, _ = t.best_seen_transition in
             let consensus_state =
               With_hash.data best_seen_block_with_hash
-              |> Block.header |> Header.protocol_state
+              |> Mina_block.header |> Mina_block.Header.protocol_state
               |> Protocol_state.consensus_state
             in
             (* Synchronize consensus local state if necessary *)
@@ -529,8 +530,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
                   Transition_frontier.Root_data.Limited.create
                     ~transition:
-                      ( External_transition.Validated.lift
-                      @@ Mina_block.Validated.lift new_root )
+                      Mina_block.(
+                        External_transition.Validated.lift
+                        @@ Validated.lift new_root)
                     ~scan_state ~pending_coinbase ~protocol_states
                 in
                 let%bind () =
@@ -590,7 +592,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~f:(fun incoming_transition ->
                       let transition =
                         Envelope.Incoming.data incoming_transition
-                        |> Validation.block_with_hash
+                        |> Mina_block.Validation.block_with_hash
                       in
                       Consensus.Hooks.equal_select_status `Take
                       @@ Consensus.Hooks.select ~constants:t.consensus_constants
@@ -607,7 +609,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~compare:
                       (Comparable.lift
                          ~f:
-                           (Fn.compose Validation.block_with_hash
+                           (Fn.compose Mina_block.Validation.block_with_hash
                               Envelope.Incoming.data)
                          (external_transition_compare t.consensus_constants))
                 in
@@ -663,8 +665,8 @@ let%test_module "Bootstrap_controller tests" =
     let downcast_transition ~sender transition =
       let transition =
         transition |> Mina_block.Validated.remember
-        |> Validation.reset_frontier_dependencies_validation
-        |> Validation.reset_staged_ledger_diff_validation
+        |> Mina_block.Validation.reset_frontier_dependencies_validation
+        |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition
         ~sender:(Envelope.Sender.Remote sender)
@@ -675,8 +677,9 @@ let%test_module "Bootstrap_controller tests" =
 
     let make_non_running_bootstrap ~genesis_root ~network =
       let transition =
-        genesis_root |> Validation.reset_frontier_dependencies_validation
-        |> Validation.reset_staged_ledger_diff_validation
+        genesis_root
+        |> Mina_block.Validation.reset_frontier_dependencies_validation
+        |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
       { logger
       ; consensus_constants =
@@ -749,7 +752,7 @@ let%test_module "Bootstrap_controller tests" =
           let expected_transitions =
             List.map branch
               ~f:
-                (Fn.compose Validation.block_with_hash
+                (Fn.compose Mina_block.Validation.block_with_hash
                    (Fn.compose Mina_block.Validated.remember
                       Transition_frontier.Breadcrumb.validated_transition))
           in
@@ -757,7 +760,7 @@ let%test_module "Bootstrap_controller tests" =
             Transition_cache.data transition_graph
             |> List.map
                  ~f:
-                   (Fn.compose Validation.block_with_hash
+                   (Fn.compose Mina_block.Validation.block_with_hash
                       Envelope.Incoming.data)
           in
           let module E = struct
@@ -848,8 +851,8 @@ let%test_module "Bootstrap_controller tests" =
                 ( Transition_frontier.best_tip peer_net.state.frontier
                 |> Transition_frontier.Breadcrumb.validated_transition
                 |> Mina_block.Validated.remember
-                |> Validation.reset_frontier_dependencies_validation
-                |> Validation.reset_staged_ledger_diff_validation )
+                |> Mina_block.Validation.reset_frontier_dependencies_validation
+                |> Mina_block.Validation.reset_staged_ledger_diff_validation )
               ~sender:(Envelope.Sender.Remote peer_net.peer)
           in
           Pipe_lib.Strict_pipe.Writer.write transition_writer

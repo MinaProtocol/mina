@@ -1,6 +1,6 @@
 open Async
 open Core_kernel
-open Mina_transition
+open Mina_block
 open Network_pool
 open Network_peer
 
@@ -12,7 +12,7 @@ module Master = struct
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
     [@@deriving sexp, to_yojson]
 
-    type state_msg = Block.t
+    type state_msg = Mina_block.t
 
     type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
 

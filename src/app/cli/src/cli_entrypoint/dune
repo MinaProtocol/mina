@@ -24,7 +24,7 @@
    verifier
    ledger_proof
    snark_worker
-   mina_transition
+   mina_block
    pipe_lib
    gossip_net
    data_hash_lib

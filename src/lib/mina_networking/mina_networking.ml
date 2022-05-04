@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Network_peer
 open Network_pool
 open Pipe_lib
@@ -1034,7 +1034,7 @@ type protocol_version_status =
   { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
 let protocol_version_status t =
-  let header = Block.header t in
+  let header = Mina_block.header t in
   let valid_current =
     Protocol_version.is_valid (Header.current_protocol_version header)
   in
@@ -1122,7 +1122,7 @@ let create (config : Config.t) ~sinks
                   , `String
                       (Protocol_version.to_string
                          (Header.current_protocol_version
-                            (Block.header external_transition))) )
+                            (Mina_block.header external_transition))) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1142,7 +1142,7 @@ let create (config : Config.t) ~sinks
                       (Protocol_version.to_string
                          (Option.value_exn
                             (Header.proposed_protocol_version_opt
-                               (Block.header external_transition)))) )
+                               (Mina_block.header external_transition)))) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1161,7 +1161,7 @@ let create (config : Config.t) ~sinks
                   , `String
                       (Protocol_version.to_string
                          (Header.current_protocol_version
-                            (Block.header external_transition))) )
+                            (Mina_block.header external_transition))) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string @@ get_current ()) )
                 ] ) )

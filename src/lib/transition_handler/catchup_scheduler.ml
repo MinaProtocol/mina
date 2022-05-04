@@ -17,7 +17,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Network_peer
 
 type t =
@@ -122,16 +122,16 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions
-    ( Block.header transition |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash )
+    ( Mina_block.header transition
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash )
 
 let mem_parent_hash t parent_hash =
   Hashtbl.mem t.collected_transitions parent_hash
 
 let has_timeout t transition =
   Hashtbl.mem t.parent_root_timeouts
-    ( Block.header transition |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash )
+    ( Mina_block.header transition
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash )
 
 let has_timeout_parent_hash t parent_hash =
   Hashtbl.mem t.parent_root_timeouts parent_hash
@@ -186,7 +186,7 @@ let watch t ~timeout_duration ~cached_transition =
   let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
   let parent_hash =
     With_hash.data transition_with_hash
-    |> Block.header |> Header.protocol_state
+    |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let make_timeout duration =

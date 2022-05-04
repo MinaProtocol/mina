@@ -22,7 +22,7 @@
    logger
    error_json
    trust_system
-   mina_transition
+   mina_block
    mina_state
    transition_frontier_persistent_frontier
    mina_networking

@@ -1578,7 +1578,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
               (* Use the precomputed block proof encoding, for consistency. *)
-              Some (Mina_transition.Precomputed_block.Proof.to_bin_string proof))
+              Some (Mina_block.Precomputed.Proof.to_bin_string proof))
         ])
 
   let block :
@@ -1963,7 +1963,7 @@ module Types = struct
       scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
         ~coerce:(fun json ->
           let json = to_yojson json in
-          Mina_transition.Precomputed_block.of_yojson json)
+          Mina_block.Precomputed.of_yojson json)
 
     let extensional_block =
       scalar "ExtensionalBlock" ~doc:"Block encoded in extensional block format"
@@ -3713,7 +3713,7 @@ module Queries = struct
     let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
     let block = Transition_frontier.Breadcrumb.block breadcrumb in
     let transactions =
-      Mina_transition.Block.transactions
+      Mina_block.transactions
         ~constraint_constants:
           (Mina_lib.config coda).precomputed_values.constraint_constants block
     in
@@ -3808,9 +3808,9 @@ module Queries = struct
                   Transition_frontier.Breadcrumb.validated_transition bc
                 in
                 let block_height =
-                  Mina_transition.(
-                    Mina_block.blockchain_length @@ With_hash.data
-                    @@ Mina_block.Validated.forget validated_transition)
+                  Mina_block.(
+                    blockchain_length @@ With_hash.data
+                    @@ Validated.forget validated_transition)
                 in
                 Unsigned.UInt32.equal block_height height_uint32)
             |> Result.of_option

@@ -1,6 +1,5 @@
 open Network_peer
 open Mina_base
-open Mina_transition
 
 type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }

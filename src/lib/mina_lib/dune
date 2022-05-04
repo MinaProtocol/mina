@@ -68,7 +68,7 @@
    cli_lib
    signature_lib
    mina_base
-   mina_transition
+   mina_block
    transition_frontier_extensions
    block_time
    error_json

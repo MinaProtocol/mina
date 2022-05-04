@@ -28,7 +28,7 @@ module T = struct
   end
 
   let breadcrumb_commands = Fn.compose
-    Mina_transition.Mina_block.Validated.valid_commands Breadcrumb.validated_transition
+    Mina_block.Validated.valid_commands Breadcrumb.validated_transition
   let create ~logger frontier =
     let best_tip_diff_logger =
       Logger.create ~id:Logger.Logger_id.best_tip_diff ()

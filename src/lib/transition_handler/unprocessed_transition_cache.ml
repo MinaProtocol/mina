@@ -5,7 +5,6 @@
 
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Network_peer
 
 module Name = struct

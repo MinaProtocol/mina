@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_transition
+open Mina_block
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader

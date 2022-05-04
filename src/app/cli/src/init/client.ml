@@ -2141,7 +2141,7 @@ let archive_blocks =
              ~graphql_make:Graphql_queries.Archive_precomputed_block.make
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
-             ~block_to_yojson:Mina_transition.Precomputed_block.to_yojson
+             ~block_to_yojson:Mina_block.Precomputed.to_yojson
          in
          let send_extensional_block =
            make_send_block
@@ -2164,7 +2164,7 @@ let archive_blocks =
                let open Deferred.Or_error.Let_syntax in
                if precomputed_flag then
                  let%bind precomputed_block =
-                   Mina_transition.Precomputed_block.of_yojson block_json
+                   Mina_block.Precomputed.of_yojson block_json
                    |> Result.map_error ~f:(fun err ->
                           Error.tag_arg (Error.of_string err)
                             "Could not parse JSON as a precomputed block from \

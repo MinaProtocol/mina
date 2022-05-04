@@ -14,7 +14,7 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -167,7 +167,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
       Protocol_state.previous_state_hash
-        (Header.protocol_state @@ Block.header transition)
+        (Header.protocol_state @@ Mina_block.header transition)
     in
     let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
     let%bind breadcrumb =

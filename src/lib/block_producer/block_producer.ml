@@ -3,7 +3,7 @@ open Async
 open Pipe_lib
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
@@ -308,8 +308,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           in
           Some (protocol_state, internal_transition, witness))
 
-module Precomputed_block = struct
-  type t = Precomputed_block.t =
+module Precomputed = struct
+  type t = Precomputed.t =
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
@@ -318,9 +318,9 @@ module Precomputed_block = struct
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     }
 
-  let sexp_of_t = Precomputed_block.sexp_of_t
+  let sexp_of_t = Precomputed.sexp_of_t
 
-  let t_of_sexp = Precomputed_block.t_of_sexp
+  let t_of_sexp = Precomputed.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
@@ -622,7 +622,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
             let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
               Header.protocol_state
-              @@ Block.header (With_hash.data previous_transition)
+              @@ Mina_block.header (With_hash.data previous_transition)
             in
             let%bind previous_protocol_state_proof =
               if
@@ -646,7 +646,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
               else
                 return
                   ( Header.protocol_state_proof
-                  @@ Block.header (With_hash.data previous_transition) )
+                  @@ Mina_block.header (With_hash.data previous_transition) )
             in
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
@@ -741,7 +741,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         { With_hash.hash = protocol_state_hashes
                         ; data =
                             (let body = Body.create staged_ledger_diff in
-                             Block.create ~body
+                             Mina_block.create ~body
                                ~header:
                                  (Header.create
                                     ~body_reference:
@@ -1159,7 +1159,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
   let start = Block_time.now time_controller in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let produce
-      { Precomputed_block.scheduled_time
+      { Precomputed.scheduled_time
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
@@ -1188,7 +1188,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         let previous_transition = Breadcrumb.block_with_hash crumb in
         let previous_protocol_state =
           Header.protocol_state
-          @@ Block.header (With_hash.data previous_transition)
+          @@ Mina_block.header (With_hash.data previous_transition)
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
@@ -1224,7 +1224,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               { With_hash.hash = protocol_state_hashes
               ; data =
                   (let body = Body.create staged_ledger_diff in
-                   Block.create ~body
+                   Mina_block.create ~body
                      ~header:
                        (Header.create
                           ~body_reference:(Body_reference.of_body body)
@@ -1341,7 +1341,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             let new_time_offset =
               Time.diff (Time.now ())
                 (Block_time.to_time
-                   precomputed_block.Precomputed_block.scheduled_time)
+                   precomputed_block.Precomputed.scheduled_time)
             in
             [%log info]
               "Changing time offset from $old_time_offset to $new_time_offset"

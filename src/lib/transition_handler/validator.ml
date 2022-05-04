@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 let validate_transition ~consensus_constants ~logger ~frontier
@@ -83,9 +83,9 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                         ] ) )
               in
               let transition_time =
-                Block.header transition |> Header.protocol_state
-                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-                |> Block_time.to_time
+                Mina_block.header transition
+                |> Header.protocol_state |> Protocol_state.blockchain_state
+                |> Blockchain_state.timestamp |> Block_time.to_time
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
@@ -109,7 +109,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ("reason", `String "not selected over current root")
                   ; ( "protocol_state"
-                    , Header.protocol_state (Block.header transition)
+                    , Header.protocol_state (Mina_block.header transition)
                       |> Protocol_state.value_to_yojson )
                   ]
                 "Validation error: external transition with state hash \

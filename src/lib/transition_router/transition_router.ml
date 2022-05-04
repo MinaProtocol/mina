@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 open Mina_numbers
 
@@ -109,7 +109,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ~f:(fun (`Block head, `Valid_cb valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           ( With_hash.hash @@ Validation.block_with_hash
           @@ Network_peer.Envelope.Incoming.data head )
           ~pipe_name:name ~logger ?valid_cb)
@@ -481,7 +481,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
              ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           (Mina_block.Validated.forget head |> With_hash.hash)
           ~pipe_name:name ~logger ?valid_cb)
       ()
@@ -491,7 +491,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     create_bufferred_pipe ~name
       ~f:(fun (`Block block, `Valid_cb valid_cb) ->
         Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           ( Network_peer.Envelope.Incoming.data block
           |> Validation.block_with_hash |> With_hash.hash )
           ?valid_cb ~pipe_name:name ~logger)
@@ -519,7 +519,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
             let `Block block, `Valid_cb valid_cb = head in
             Mina_metrics.(
               Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
-            Mina_transition.Mina_block.handle_dropped_transition
+            Mina_block.handle_dropped_transition
               ( Network_peer.Envelope.Incoming.data block
               |> Validation.block_with_hash |> With_hash.hash )
               ~valid_cb ~pipe_name:name ~logger)

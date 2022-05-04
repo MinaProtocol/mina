@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_transition
 
 type elt =
   ( Mina_block.initial_valid_block

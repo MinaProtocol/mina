@@ -177,16 +177,16 @@ module Validated = struct
 
   let lift validated_block =
     let transition =
-      validated_block |> Mina_block.Validated.forget |> With_hash.map ~f:compose
+      validated_block |> Validated_block.forget |> With_hash.map ~f:compose
     in
     let delta_block_chain_proof =
-      Mina_block.Validated.delta_block_chain_proof validated_block
+      Validated_block.delta_block_chain_proof validated_block
     in
     (transition, delta_block_chain_proof)
 
   let lower (transition, delta_block_chain_proof) =
     let block = With_hash.map transition ~f:decompose in
-    Mina_block.Validated.unsafe_of_trusted_block ~delta_block_chain_proof
+    Validated_block.unsafe_of_trusted_block ~delta_block_chain_proof
       (`This_block_is_trusted_to_be_safe block)
 end
 

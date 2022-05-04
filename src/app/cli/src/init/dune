@@ -56,7 +56,7 @@
    node_status
    o1trace_webkit_event
    mina_user_error
-   mina_transition
+   mina_block
    mina_lib
    mina_base
    cli_lib

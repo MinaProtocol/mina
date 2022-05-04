@@ -44,7 +44,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           in
           let in_breadcrumb breadcrumb =
             breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
-            |> Mina_transition.Mina_block.Validated.valid_commands
+            |> Mina_block.Validated.valid_commands
             |> List.exists ~f:(fun { data = cmd'; _ } ->
                    match cmd' with
                    | Snapp_command _ ->

@@ -6,7 +6,7 @@ open Unsigned
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Snark_params
 open Blockchain_snark
 open Consensus
@@ -383,7 +383,7 @@ let propose_block_onto_chain ~logger ~keys
     Global_slot.start_time ~constants:consensus_constants proposal_slot
   in
   let previous_protocol_state =
-    Header.protocol_state @@ Block.header previous_transition
+    Header.protocol_state @@ Mina_block.header previous_transition
   in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -393,7 +393,7 @@ let propose_block_onto_chain ~logger ~keys
     |> Blockchain_state.snarked_ledger_hash
   in
   let previous_protocol_state_proof =
-    Header.protocol_state_proof @@ Block.header previous_transition
+    Header.protocol_state_proof @@ Mina_block.header previous_transition
   in
   (* TODO: insert random txns into the pool every block *)
   let transactions_by_fee = Sequence.empty in

@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Signature_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 type validation_error =
@@ -53,10 +53,10 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     | `Invalid_proof ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
-          , Header.protocol_state (Block.header transition)
+          , Header.protocol_state (Mina_block.header transition)
             |> Protocol_state.value_to_yojson )
         ; ( "proof"
-          , Header.protocol_state_proof @@ Block.header transition
+          , Header.protocol_state_proof @@ Mina_block.header transition
             |> Proof.to_yojson )
         ]
     | `Invalid_delta_block_chain_proof ->
@@ -87,7 +87,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~metadata:
       ( ( "protocol_state"
         , Protocol_state.Value.to_yojson
-            (Header.protocol_state (Block.header transition)) )
+            (Header.protocol_state (Mina_block.header transition)) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
@@ -264,7 +264,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 |> With_hash.of_data
                      ~hash_data:
                        (Fn.compose Protocol_state.hashes
-                          (Fn.compose Header.protocol_state Block.header))
+                          (Fn.compose Header.protocol_state Mina_block.header))
               in
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
@@ -327,7 +327,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
             | Error () ->
                 let state_hash =
                   ( Envelope.Incoming.data transition_env
-                  |> Block.header |> Header.protocol_state
+                  |> Mina_block.header |> Header.protocol_state
                   |> Protocol_state.hashes )
                     .state_hash
                 in

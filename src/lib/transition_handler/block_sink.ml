@@ -4,7 +4,6 @@ open Async
 open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
-open Mina_transition
 
 type stream_msg =
   [ `Transition of Mina_block.t Envelope.Incoming.t ]
@@ -70,17 +69,19 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
            Block_time.(now time_controller |> to_time)
-           ( Block.header state |> Header.protocol_state
-           |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-           |> Block_time.to_time )) ;
+           Mina_block.(
+             header state |> Header.protocol_state
+             |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+             |> Block_time.to_time)) ;
       Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
       if log_gossip_heard then
         [%str_log info]
           ~metadata:[ ("external_transition", Mina_block.to_yojson state) ]
           (Block_received
              { state_hash =
-                 ( Block.header state |> Header.protocol_state
-                 |> Protocol_state.hashes )
+                 Mina_block.(
+                   header state |> Header.protocol_state
+                   |> Protocol_state.hashes)
                    .state_hash
              ; sender = Envelope.Incoming.sender e
              }) ;
@@ -107,8 +108,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       in
       let tn_production_consensus_time =
         Consensus.Data.Consensus_state.consensus_time
-        @@ Protocol_state.consensus_state @@ Header.protocol_state
-        @@ Block.header (Envelope.Incoming.data e)
+        @@ Protocol_state.consensus_state @@ Mina_block.Header.protocol_state
+        @@ Mina_block.header (Envelope.Incoming.data e)
       in
       let tn_production_slot =
         lift_consensus_time tn_production_consensus_time
