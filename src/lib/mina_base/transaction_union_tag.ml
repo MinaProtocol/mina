@@ -70,8 +70,6 @@ module Unpacked = struct
     type 'bool t =
       { is_payment : 'bool
       ; is_stake_delegation : 'bool
-      ; is_create_account : 'bool
-      ; is_mint_tokens : 'bool
       ; is_fee_transfer : 'bool
       ; is_coinbase : 'bool
       ; is_user_command : 'bool
@@ -82,7 +80,7 @@ module Unpacked = struct
 
     let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
       Typ.of_hlistable
-        [ bool; bool; bool; bool; bool; bool; bool ]
+        [ bool; bool; bool; bool; bool ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -95,8 +93,6 @@ module Unpacked = struct
   let empty : t =
     { is_payment = false
     ; is_stake_delegation = false
-    ; is_create_account = false
-    ; is_mint_tokens = false
     ; is_fee_transfer = false
     ; is_coinbase = false
     ; is_user_command = false
@@ -149,8 +145,6 @@ module Unpacked = struct
   let to_bits_var
       ({ is_payment
        ; is_stake_delegation
-       ; is_create_account = _
-       ; is_mint_tokens = _
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command = _
@@ -186,8 +180,6 @@ module Unpacked = struct
         check =
           (fun ( { is_payment
                  ; is_stake_delegation
-                 ; is_create_account
-                 ; is_mint_tokens
                  ; is_fee_transfer
                  ; is_coinbase
                  ; is_user_command
@@ -199,8 +191,6 @@ module Unpacked = struct
                 (Boolean.Assert.exactly_one
                    [ is_payment
                    ; is_stake_delegation
-                   ; is_create_account
-                   ; is_mint_tokens
                    ; is_fee_transfer
                    ; is_coinbase
                    ])
@@ -213,8 +203,6 @@ module Unpacked = struct
   let constant
       ({ is_payment
        ; is_stake_delegation
-       ; is_create_account
-       ; is_mint_tokens
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command
@@ -222,8 +210,6 @@ module Unpacked = struct
         t) : var =
     { is_payment = Boolean.var_of_value is_payment
     ; is_stake_delegation = Boolean.var_of_value is_stake_delegation
-    ; is_create_account = Boolean.var_of_value is_create_account
-    ; is_mint_tokens = Boolean.var_of_value is_mint_tokens
     ; is_fee_transfer = Boolean.var_of_value is_fee_transfer
     ; is_coinbase = Boolean.var_of_value is_coinbase
     ; is_user_command = Boolean.var_of_value is_user_command
@@ -234,9 +220,9 @@ module Unpacked = struct
   let is_stake_delegation ({ is_stake_delegation; _ } : var) =
     is_stake_delegation
 
-  let is_create_account ({ is_create_account; _ } : var) = is_create_account
+  let is_create_account (_ : var) = Boolean.false_
 
-  let is_mint_tokens ({ is_mint_tokens; _ } : var) = is_mint_tokens
+  let is_mint_tokens (_ : var) = Boolean.false_
 
   let is_fee_transfer ({ is_fee_transfer; _ } : var) = is_fee_transfer
 
