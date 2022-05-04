@@ -93,7 +93,7 @@ let fee_payer =
   { Party.Fee_payer.body =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
-      ; balance_change = Currency.Fee.(of_int 100)
+      ; fee = Currency.Fee.(of_int 100)
       ; protocol_state_precondition
       }
   ; authorization = Signature.dummy

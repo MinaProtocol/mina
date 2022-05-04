@@ -306,18 +306,12 @@ let%test_module "multisig_account" =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = fee
-                    ; increment_nonce = ()
+                    ; fee
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = ()
-                    ; account_precondition = sender_nonce
-                    ; caller = ()
+                    ; nonce = sender_nonce
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy

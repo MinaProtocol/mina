@@ -48,18 +48,12 @@ let%test_module "Zkapp payments tests" =
                     ; timing = Keep
                     ; voting_for = Keep
                     }
-                ; token_id = ()
-                ; balance_change = Fee.of_int full_amount
-                ; increment_nonce = ()
+                ; fee = Fee.of_int full_amount
                 ; events = []
                 ; sequence_events = []
-                ; call_data = Field.zero
-                ; call_depth = 0
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
-                ; use_full_commitment = ()
-                ; account_precondition = acct1.account.nonce
-                ; caller = ()
+                ; nonce = acct1.account.nonce
                 }
             ; authorization = Signature.dummy
             }
