@@ -1108,21 +1108,31 @@ let gen_parties_from ?(succeed = true)
 let gen_invalid_protocol_state_precondition
     (psv : Zkapp_precondition.Protocol_state.View.t) :
     Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
+  let module Tamperable = struct
+    type t =
+      | Timestamp
+      | Blockchain_length
+      | Min_window_density
+      | Total_currency
+      | Global_slot_since_hard_fork
+      | Global_slot_since_genesis
+  end in
   let open Quickcheck.Let_syntax in
   let open Zkapp_precondition.Closed_interval in
   let%bind protocol_state_precondition = gen_protocol_state_precondition psv in
   let%bind lower = Bool.quickcheck_generator in
   match%bind
     Quickcheck.Generator.of_list
-      [ `Timestamp
-      ; `Blockchain_length
-      ; `Min_window_density
-      ; `Total_currency
-      ; `Global_slot_since_hard_fork
-      ; `Global_slot_since_genesis
-      ]
+      ( [ Timestamp
+        ; Blockchain_length
+        ; Min_window_density
+        ; Total_currency
+        ; Global_slot_since_hard_fork
+        ; Global_slot_since_genesis
+        ]
+        : Tamperable.t list )
   with
-  | `Timestamp ->
+  | Timestamp ->
       let%map timestamp =
         let%map epsilon =
           Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
@@ -1139,7 +1149,7 @@ let gen_invalid_protocol_state_precondition
       { protocol_state_precondition with
         timestamp = Zkapp_basic.Or_ignore.Check timestamp
       }
-  | `Blockchain_length ->
+  | Blockchain_length ->
       let open Mina_numbers in
       let%map blockchain_length =
         let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
@@ -1157,7 +1167,7 @@ let gen_invalid_protocol_state_precondition
       { protocol_state_precondition with
         blockchain_length = Zkapp_basic.Or_ignore.Check blockchain_length
       }
-  | `Min_window_density ->
+  | Min_window_density ->
       let open Mina_numbers in
       let%map min_window_density =
         let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
@@ -1175,7 +1185,7 @@ let gen_invalid_protocol_state_precondition
       { protocol_state_precondition with
         min_window_density = Zkapp_basic.Or_ignore.Check min_window_density
       }
-  | `Total_currency ->
+  | Total_currency ->
       let open Currency in
       let%map total_currency =
         let%map epsilon =
@@ -1197,5 +1207,41 @@ let gen_invalid_protocol_state_precondition
       { protocol_state_precondition with
         total_currency = Zkapp_basic.Or_ignore.Check total_currency
       }
-  | _ ->
-      failwith "..."
+  | Global_slot_since_hard_fork ->
+      let open Mina_numbers in
+      let%map global_slot_since_hard_fork =
+        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Global_slot.(psv.global_slot_since_hard_fork > epsilon) then
+          { lower = Global_slot.zero
+          ; upper =
+              Global_slot.sub psv.global_slot_since_hard_fork epsilon
+              |> Option.value ~default:Global_slot.zero
+          }
+        else
+          { lower = Global_slot.add psv.global_slot_since_hard_fork epsilon
+          ; upper = Global_slot.max_value
+          }
+      in
+      { protocol_state_precondition with
+        global_slot_since_hard_fork =
+          Zkapp_basic.Or_ignore.Check global_slot_since_hard_fork
+      }
+  | Global_slot_since_genesis ->
+      let open Mina_numbers in
+      let%map global_slot_since_genesis =
+        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Global_slot.(psv.global_slot_since_genesis > epsilon) then
+          { lower = Global_slot.zero
+          ; upper =
+              Global_slot.sub psv.global_slot_since_genesis epsilon
+              |> Option.value ~default:Global_slot.zero
+          }
+        else
+          { lower = Global_slot.add psv.global_slot_since_genesis epsilon
+          ; upper = Global_slot.max_value
+          }
+      in
+      { protocol_state_precondition with
+        global_slot_since_genesis =
+          Zkapp_basic.Or_ignore.Check global_slot_since_genesis
+      }
