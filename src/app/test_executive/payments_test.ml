@@ -53,7 +53,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
-          work_delay = Some 1
+          level = Some Full
+        ; block_window_duration_ms = Some 120000
+        ; work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         }
