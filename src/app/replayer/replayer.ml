@@ -1377,9 +1377,6 @@ module Snapp_helpers = struct
                   let%map pk = pk_of_pk_id pool pk_id in
                   Zkapp_basic.Or_ignore.Check pk)
             in
-            let%bind public_key =
-              pk_check_or_ignore_of_id zkapp_account_data.public_key_id
-            in
             let%bind delegate =
               pk_check_or_ignore_of_id zkapp_account_data.delegate_id
             in
@@ -1414,7 +1411,6 @@ module Snapp_helpers = struct
               ( { balance
                 ; nonce
                 ; receipt_chain_hash
-                ; public_key
                 ; delegate
                 ; state
                 ; sequence_state
