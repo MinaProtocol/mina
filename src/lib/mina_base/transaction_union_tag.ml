@@ -220,10 +220,6 @@ module Unpacked = struct
   let is_stake_delegation ({ is_stake_delegation; _ } : var) =
     is_stake_delegation
 
-  let is_create_account (_ : var) = Boolean.false_
-
-  let is_mint_tokens (_ : var) = Boolean.false_
-
   let is_fee_transfer ({ is_fee_transfer; _ } : var) = is_fee_transfer
 
   let is_coinbase ({ is_coinbase; _ } : var) = is_coinbase

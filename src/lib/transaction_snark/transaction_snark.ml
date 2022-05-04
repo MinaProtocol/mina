@@ -2289,12 +2289,8 @@ module Base = struct
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
-    let is_mint_tokens = Transaction_union.Tag.Unpacked.is_mint_tokens tag in
     let is_stake_delegation =
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
-    in
-    let is_create_account =
-      Transaction_union.Tag.Unpacked.is_create_account tag
     in
     let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
@@ -2312,8 +2308,7 @@ module Base = struct
       Checked.all_unit
         [ [%with_label
             "Token_locked value is compatible with the transaction kind"]
-            (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked; is_create_account ])
+            (Boolean.Assert.any [ Boolean.not payload.body.token_locked ])
         ; [%with_label "Token_locked cannot be used with the default token"]
             (Boolean.Assert.any
                [ Boolean.not payload.body.token_locked
@@ -2343,7 +2338,6 @@ module Base = struct
                  Assert.any
                    [ is_payment
                    ; is_stake_delegation
-                   ; is_create_account
                    ; is_fee_transfer
                    ; is_coinbase
                    ])
@@ -2453,10 +2447,6 @@ module Base = struct
       [%with_label "A failing user command is a user command"]
         Boolean.(Assert.any [ is_user_command; not user_command_fails ])
     in
-    let predicate_deferred =
-      (* Account_precondition check is to be performed later if this is true. *)
-      is_create_account
-    in
     let%bind predicate_result =
       let%bind is_own_account =
         Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
@@ -2470,9 +2460,7 @@ module Base = struct
     in
     let%bind () =
       [%with_label "Check account_precondition failure against predicted"]
-        (let%bind predicate_failed =
-           Boolean.((not predicate_result) &&& not predicate_deferred)
-         in
+        (let predicate_failed = Boolean.not predicate_result in
          assert_r1cs
            (predicate_failed :> Field.Var.t)
            (is_user_command :> Field.Var.t)
@@ -2536,15 +2524,12 @@ module Base = struct
                *)
                Boolean.(is_empty_and_writeable &&& not is_zero_fee)
              in
-             let%bind should_pay_to_create =
+             let should_pay_to_create =
                (* Coinbases and fee transfers may create, or we may be creating
                   a new token account. These are mutually exclusive, so we can
                   encode this as a boolean.
                *)
-               let%bind is_create_account =
-                 Boolean.(is_create_account &&& not user_command_fails)
-               in
-               Boolean.(is_empty_and_writeable ||| is_create_account)
+               is_empty_and_writeable
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
@@ -2631,9 +2616,7 @@ module Base = struct
       *)
       [%with_label "Compute receiver increase"]
         (let%bind base_amount =
-           let%bind zero_transfer =
-             Boolean.any [ is_stake_delegation; is_create_account ]
-           in
+           let zero_transfer = is_stake_delegation in
            Amount.Checked.if_ zero_transfer
              ~then_:(Amount.var_of_t Amount.zero)
              ~else_:payload.body.amount
@@ -2661,9 +2644,7 @@ module Base = struct
                 - the first receiver for a fee transfer
              *)
              let%bind is_empty_failure =
-               let%bind must_not_be_empty =
-                 Boolean.(is_stake_delegation ||| is_mint_tokens)
-               in
+               let must_not_be_empty = is_stake_delegation in
                Boolean.(is_empty_and_writeable &&& must_not_be_empty)
              in
              let%bind () =
@@ -2677,9 +2658,7 @@ module Base = struct
                @@ Field.Var.(
                     sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
              in
-             let%bind should_pay_to_create =
-               Boolean.(is_empty_and_writeable &&& not is_create_account)
-             in
+             let should_pay_to_create = is_empty_and_writeable in
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]

@@ -49,10 +49,6 @@ module Unpacked : sig
 
   val is_stake_delegation : var -> Boolean.var
 
-  val is_create_account : var -> Boolean.var
-
-  val is_mint_tokens : var -> Boolean.var
-
   val is_fee_transfer : var -> Boolean.var
 
   val is_coinbase : var -> Boolean.var
