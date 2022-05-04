@@ -1433,11 +1433,10 @@ module Make (Inputs : Inputs_intf) = struct
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
         `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
+    let local_state = { local_state with excess = new_local_fee_excess } in
     let local_state =
-      { local_state with
-        excess = new_local_fee_excess
-      ; success = Bool.(local_state.success &&& not overflowed)
-      }
+      Local_state.add_check local_state Local_excess_overflow
+        (Bool.not overflowed)
     in
 
     (* If a's token ID differs from that in the local state, then
@@ -1466,16 +1465,16 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.full_transaction_commitment
       }
     in
-    let update_local_excess = Bool.(is_start' ||| is_last_party) in
-    let update_global_state =
-      Bool.(update_local_excess &&& local_state.success)
-    in
     let valid_fee_excess =
       let delta_settled = Amount.equal local_state.excess Amount.zero in
       Bool.((not is_last_party) ||| delta_settled)
     in
     let local_state =
       Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
+    in
+    let update_local_excess = Bool.(is_start' ||| is_last_party) in
+    let update_global_state =
+      Bool.(update_local_excess &&& local_state.success)
     in
     let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in
@@ -1502,9 +1501,8 @@ module Make (Inputs : Inputs_intf) = struct
       }
     in
     let local_state =
-      { local_state with
-        success = Bool.(local_state.success &&& not global_excess_update_failed)
-      }
+      Local_state.add_check local_state Global_excess_overflow
+        Bool.(not global_excess_update_failed)
     in
     (* The first party must succeed. *)
     Bool.(
