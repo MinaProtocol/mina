@@ -517,7 +517,7 @@ module Base = struct
     type 'bool t =
       { predicate_failed : 'bool (* All *)
       ; source_not_present : 'bool (* All *)
-      ; receiver_not_present : 'bool (* Delegate, Mint_tokens *)
+      ; receiver_not_present : 'bool (* Delegate *)
       ; amount_insufficient_to_create : 'bool (* Payment only *)
       ; token_cannot_create : 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance : 'bool (* Payment only *)
@@ -2493,8 +2493,6 @@ module Base = struct
              (* this account is:
                 - the fee-payer for payments
                 - the fee-payer for stake delegation
-                - the fee-payer for account creation
-                - the fee-payer for token minting
                 - the fee-receiver for a coinbase
                 - the second receiver for a fee transfer
              *)
@@ -2609,8 +2607,6 @@ module Base = struct
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
-         - account creation: 0
-         - token minting:    payload.body.amount
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
@@ -2638,8 +2634,6 @@ module Base = struct
              (* this account is:
                 - the receiver for payments
                 - the delegated-to account for stake delegation
-                - the created account for an account creation
-                - the receiver for minted tokens
                 - the receiver for a coinbase
                 - the first receiver for a fee transfer
              *)
@@ -2802,8 +2796,6 @@ module Base = struct
              (* this account is:
                 - the source for payments
                 - the delegator for stake delegation
-                - the token owner for account creation
-                - the token owner for token minting
                 - the fee-receiver for a coinbase
                 - the second receiver for a fee transfer
              *)
@@ -2904,8 +2896,6 @@ module Base = struct
     let%bind fee_excess =
       (* - payments:         payload.common.fee
          - stake delegation: payload.common.fee
-         - account creation: payload.common.fee
-         - token minting:    payload.common.fee
          - coinbase:         0 (fee already paid above)
          - fee transfer:     - payload.body.amount - payload.common.fee
       *)
