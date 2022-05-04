@@ -32,7 +32,7 @@ val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
-val apply_parties : Ledger.t -> Parties.t list -> unit
+val apply_parties : Ledger.t -> Parties.t list -> Sparse_ledger.t
 
 val dummy_rule :
      (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
@@ -49,14 +49,14 @@ val dummy_rule :
     Raises if either the snark generation or application fails
 *)
 val check_parties_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+     ?expected_failure:Mina_base.Transaction_status.Failure.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> Ledger.t
   -> Parties.t list
   -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
-val trivial_snapp :
+val trivial_zkapp :
   ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
   * [> `Prover of
        ( unit
@@ -73,7 +73,7 @@ val gen_snapp_ledger :
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t option
+     ?expected_failure:Mina_base.Transaction_status.Failure.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t

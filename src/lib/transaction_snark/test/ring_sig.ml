@@ -325,4 +325,5 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Zkapp_precondition.Protocol_state.to_yojson protocol_state
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
-          |> fun () -> apply_parties ledger [ parties ]))
+          |> fun () ->
+          ignore (apply_parties ledger [ parties ] : Sparse_ledger.t)))

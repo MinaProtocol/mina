@@ -6,7 +6,7 @@
  (libraries snarky_js_bindings_lib node_backend)
  (link_deps
  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
- ../crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
+ ../crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
  (instrumentation (backend bisect_ppx))
  (forbidden_libraries async core re2 ctypes)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
@@ -19,7 +19,7 @@
  (libraries snarky_js_bindings_lib chrome_backend)
  (link_deps
  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
- ../crypto/kimchi_bindings/js/chrome/plonk_wasm.wasm)
+ ../crypto/kimchi_bindings/js/chrome/plonk_wasm_bg.wasm)
  (instrumentation (backend bisect_ppx))
  (forbidden_libraries async core re2 ctypes)
  (preprocess (pps ppx_version js_of_ocaml-ppx)))

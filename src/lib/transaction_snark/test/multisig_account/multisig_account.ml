@@ -257,6 +257,7 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
+                  ; receiver_is_new = _
                   } =
                 spec
               in
@@ -447,5 +448,5 @@ let%test_module "multisig_account" =
                   }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ]))
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t)))
   end )

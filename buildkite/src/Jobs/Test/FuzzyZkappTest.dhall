@@ -15,7 +15,7 @@ let Size = ../../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
+      commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path}",
       label = "Fuzzy zkapp unit tests",
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,

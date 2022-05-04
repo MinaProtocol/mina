@@ -523,7 +523,7 @@ end
    The type `c` is associated with the `token_id` field, which is `unit` for the
    fee payer, and `Token_id.t` for other parties.
 *)
-let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
+let gen_party_body_components (type a b c d) ?account_id ?balances_tbl ?vk
     ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
     ?available_public_keys ?permissions_auth
     ?(required_balance_change : a option)
@@ -550,7 +550,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
       failwith "Required balance, but not new account"
   | _ ->
       () ) ;
-  let%bind update = Party.Update.gen ?permissions_auth ~zkapp_account () in
+  let%bind update = Party.Update.gen ?permissions_auth ?vk ~zkapp_account () in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -596,15 +596,18 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
             if zkapp_account then
               { account_with_pk with
                 zkapp =
-                  Some
-                    { Zkapp_account.default with
-                      verification_key =
-                        Some
-                          With_hash.
-                            { data = Pickles.Side_loaded.Verification_key.dummy
-                            ; hash = Zkapp_account.dummy_vk_hash ()
-                            }
-                    }
+                  (let vk =
+                     match vk with
+                     | None ->
+                         With_hash.
+                           { data = Pickles.Side_loaded.Verification_key.dummy
+                           ; hash = Zkapp_account.dummy_vk_hash ()
+                           }
+                     | Some vk ->
+                         vk
+                   in
+                   Some
+                     { Zkapp_account.default with verification_key = Some vk })
               }
             else account_with_pk
           in
@@ -754,7 +757,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
 let gen_party_from ?(succeed = true) ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
-    ~available_public_keys ~ledger ~balances_tbl () =
+    ~available_public_keys ~ledger ~balances_tbl ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -772,7 +775,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   in
   let%bind body_components =
     gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
-      ?permissions_auth ?account_id ~available_public_keys
+      ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
@@ -784,7 +787,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   return { Party.Wire.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
+let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
     ?protocol_state_view () : Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen account_id ledger () =
@@ -803,8 +806,8 @@ let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
     Quickcheck.Generator.return account.nonce
   in
   let%map body_components =
-    gen_party_body_components ?permissions_auth ~account_id ~is_fee_payer:true
-      ~increment_nonce:() ~gen_balance_change:gen_fee
+    gen_party_body_components ?permissions_auth ~account_id ?vk
+      ~is_fee_payer:true ~increment_nonce:() ~gen_balance_change:gen_fee
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
@@ -817,11 +820,11 @@ let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
   in
   Party_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ()
-    : Party.Fee_payer.t Quickcheck.Generator.t =
+let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ?vk
+    () : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
+    gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
       ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
@@ -844,7 +847,7 @@ let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
-    ~ledger ?protocol_state_view () =
+    ~ledger ?protocol_state_view ?vk ?prover () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -872,7 +875,7 @@ let gen_parties_from ?(succeed = true)
   in
   let%bind fee_payer =
     gen_fee_payer ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ()
+      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk ()
   in
 
   (* table of public keys to balances, updated when generating each party
@@ -928,7 +931,7 @@ let gen_parties_from ?(succeed = true)
           let required_balance_change = Currency.Amount.Signed.zero in
           gen_party_from ~authorization ~new_account:new_parties
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~required_balance_change ~ledger ~balances_tbl ()
+            ~required_balance_change ~ledger ~balances_tbl ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -940,7 +943,7 @@ let gen_parties_from ?(succeed = true)
           let permissions_auth = Control.Tag.Signature in
           gen_party_from ~account_id ~authorization ~permissions_auth
             ~zkapp_account ~available_public_keys ~succeed ~ledger ~balances_tbl
-            ()
+            ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -990,7 +993,7 @@ let gen_parties_from ?(succeed = true)
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ~authorization ~new_account:true ~available_public_keys
       ~succeed ~ledger ~required_balance_change ?required_balance ~balances_tbl
-      ()
+      ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
@@ -1032,11 +1035,11 @@ let gen_parties_from ?(succeed = true)
     Signature_lib.Schnorr.Chunked.sign sk
       (Random_oracle.Input.Chunked.field commitment)
   in
-  (* replace dummy signatures in other parties *)
+  (* replace dummy signatures and dummy proofs in other parties *)
   let other_parties_with_valid_signatures =
-    Parties.Call_forest.map parties_dummy_signatures.other_parties
-      ~f:(fun ({ body; authorization } : Party.t) ->
-        let authorization_with_valid_signature =
+    Parties.Call_forest.mapi parties_dummy_signatures.other_parties
+      ~f:(fun idx ({ body; authorization } : Party.t) ->
+        let valid_authorization =
           match authorization with
           | Control.Signature _dummy ->
               let pk = body.public_key in
@@ -1056,10 +1059,45 @@ let gen_parties_from ?(succeed = true)
               let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_other_party ~use_full_commitment sk in
               Control.Signature signature
-          | Proof _ | None_given ->
+          | Proof _dummy -> (
+              match prover with
+              | None ->
+                  authorization
+              | Some prover ->
+                  let proof_party =
+                    Parties.Call_forest.hash
+                      (List.drop parties_dummy_signatures.other_parties idx)
+                  in
+                  let txn_stmt : Zkapp_statement.t =
+                    let commitment =
+                      if body.use_full_commitment then full_tx_commitment
+                      else tx_commitment
+                    in
+                    { transaction = commitment
+                    ; at_party = (proof_party :> Snark_params.Tick.Field.t)
+                    }
+                  in
+                  let handler
+                      (Snarky_backendless.Request.With { request; respond }) =
+                    match request with _ -> respond Unhandled
+                  in
+                  let proof =
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        prover ?handler:(Some handler)
+                          ( []
+                            : ( unit
+                              , unit
+                              , unit )
+                              Pickles_types.Hlist.H3.T
+                                (Pickles.Statement_with_proof)
+                              .t )
+                          txn_stmt)
+                  in
+                  Control.Proof proof )
+          | None_given ->
               authorization
         in
-        { Party.body; authorization = authorization_with_valid_signature })
+        { Party.body; authorization = valid_authorization })
   in
   return
     { parties_dummy_signatures with

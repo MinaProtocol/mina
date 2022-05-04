@@ -9,7 +9,7 @@ open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 

@@ -7,7 +7,7 @@ open Mina_base
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -289,7 +289,14 @@ let%test_module "Protocol state precondition tests" =
                         { public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
-                        ; balance_change = Amount.Signed.of_unsigned amount
+                        ; balance_change =
+                            Amount.(
+                              Signed.of_unsigned
+                                (Option.value_exn
+                                   (sub amount
+                                      (of_fee
+                                         constraint_constants
+                                           .account_creation_fee))))
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
@@ -316,16 +323,14 @@ let%test_module "Protocol state precondition tests" =
                   let other_parties_hash = Parties.Call_forest.hash ps in
                   let commitment =
                     Parties.Transaction_commitment.create ~other_parties_hash
-                      ~protocol_state_predicate_hash:
-                        (Zkapp_precondition.Protocol_state.digest
-                           protocol_state_precondition)
-                      ~memo_hash:(Signed_command_memo.hash memo)
+                  in
+                  let memo_hash = Signed_command_memo.hash memo in
+                  let fee_payer_hash =
+                    Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
                   in
                   let full_commitment =
-                    Parties.Transaction_commitment.with_fee_payer commitment
-                      ~fee_payer_hash:
-                        (Parties.Digest.Party.create
-                           (Party.of_fee_payer fee_payer))
+                    Parties.Transaction_commitment.create_complete commitment
+                      ~memo_hash ~fee_payer_hash
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
@@ -364,16 +369,15 @@ let%test_module "Protocol state precondition tests" =
                     init_ledger ledger ;
                   U.check_parties_with_merges_exn
                     ~expected_failure:
-                      (Some
-                         Transaction_status.Failure
-                         .Protocol_state_precondition_unsatisfied) ~state_body
+                      Transaction_status.Failure
+                      .Protocol_state_precondition_unsatisfied ~state_body
                     ledger
                     [ parties_with_valid_fee_payer ])))
   end )
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -613,9 +617,8 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   U.check_parties_with_merges_exn
                     ~expected_failure:
-                      (Some
-                         Transaction_status.Failure
-                         .Account_precondition_unsatisfied) ~state_body ledger
+                      Transaction_status.Failure
+                      .Account_precondition_unsatisfied ~state_body ledger
                     [ parties ])))
 
     let%test_unit "invalid account predicate in fee payer" =
@@ -712,14 +715,14 @@ let%test_module "Account precondition tests" =
               let other_parties_hash = Parties.Call_forest.hash ps in
               let commitment =
                 Parties.Transaction_commitment.create ~other_parties_hash
-                  ~protocol_state_predicate_hash:
-                    Zkapp_precondition.Protocol_state.(digest accept)
-                  ~memo_hash:(Signed_command_memo.hash memo)
+              in
+              let memo_hash = Signed_command_memo.hash memo in
+              let fee_payer_hash =
+                Parties.Digest.Party.create (Party.of_fee_payer fee_payer)
               in
               let full_commitment =
-                Parties.Transaction_commitment.with_fee_payer commitment
-                  ~fee_payer_hash:
-                    (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
+                Parties.Transaction_commitment.create_complete commitment
+                  ~memo_hash ~fee_payer_hash
               in
               let fee_payer =
                 let fee_payer_signature_auth =

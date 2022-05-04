@@ -133,7 +133,9 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let parties = party_send (List.hd_exn specs) in
+              let parties =
+                party_send ~constraint_constants (List.hd_exn specs)
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
@@ -148,7 +150,7 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    party_send ~use_full_commitment s)
+                    party_send ~constraint_constants ~use_full_commitment s)
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
@@ -170,12 +172,18 @@ let%test_module "Zkapp payments tests" =
                   let new_receiver =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
+                  let new_receiver_amount =
+                    Option.value_exn
+                      (Amount.sub amount
+                         (Amount.of_fee
+                            constraint_constants.account_creation_fee))
+                  in
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
                     ; fee_payer = None
                     ; receivers =
-                        (new_receiver, amount)
+                        (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
                     ; amount = total_amount
@@ -258,7 +266,7 @@ let%test_module "Zkapp payments tests" =
               let parties =
                 Transaction_snark.For_tests.multiple_transfers test_spec
               in
-              U.apply_parties ledger [ parties ] ;
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ;
               let _, (local_state, _) =
                 Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view:U.genesis_state_view ledger parties
@@ -277,5 +285,5 @@ let%test_module "Zkapp payments tests" =
                   ] ;
               assert (
                 List.equal Transaction_status.Failure.equal failure_status
-                  [ Transaction_status.Failure.Overflow ] )))
+                  [ Transaction_status.Failure.Invalid_fee_excess; Overflow ] )))
   end )

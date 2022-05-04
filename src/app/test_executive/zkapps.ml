@@ -29,9 +29,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
-    ; work_delay = Some 1
-    ; transaction_capacity =
-        Some Runtime_config.Proof_keys.Transaction_capacity.small
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let transactions_sent = ref 0
@@ -39,19 +42,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let send_zkapp ~logger node parties =
     incr transactions_sent ;
     send_zkapp ~logger node parties
-
-  (* An event which fires when [n] ledger proofs have been emitted *)
-  let ledger_proofs_emitted ~logger ~num_proofs =
-    Wait_condition.network_state ~description:"snarked ledger emitted"
-      ~f:(fun network_state ->
-        [%log info] "snarked ledgers generated = %d"
-          network_state.snarked_ledgers_generated ;
-        let module T = struct
-          type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
-        end in
-        network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
-         ~hard_timeout:(Slots 20)
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -524,7 +514,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Wait for proof to be emitted"
-        (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
+        (wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
     in
     return ()
 end
