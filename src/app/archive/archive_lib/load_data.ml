@@ -408,53 +408,38 @@ let get_fee_payer_body ~pool body_id =
   let query_db = Mina_caqti.query pool in
   let%bind { account_identifier_id
            ; update_id
-           ; balance_change
+           ; fee
            ; events_id
            ; sequence_events_id
-           ; call_data_id
-           ; call_depth
            ; zkapp_precondition_protocol_state_id
-           ; zkapp_account_precondition
+           ; nonce
            } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
   let%bind update = update_of_id pool update_id in
-  let balance_change =
+  let fee =
     (* fee payer balance change stored unsigned *)
-    assert (Int64.is_non_negative balance_change) ;
-    balance_change |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
+    assert (Int64.is_non_negative fee) ;
+    fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
   in
   let%bind events = load_events pool events_id in
   let%bind sequence_events = load_events pool sequence_events_id in
-  let%bind call_data =
-    let%map field_str =
-      query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
-    in
-    Zkapp_basic.F.of_string field_str
-  in
   let%bind protocol_state_precondition =
     protocol_state_precondition_of_id pool zkapp_precondition_protocol_state_id
   in
-  let account_precondition =
-    zkapp_account_precondition |> Unsigned.UInt32.of_int64
-    |> Mina_numbers.Account_nonce.of_uint32
+  let nonce =
+    nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
   in
   return
     ( { public_key
-      ; token_id = ()
       ; update
-      ; balance_change
-      ; increment_nonce = ()
+      ; fee
       ; events
       ; sequence_events
-      ; call_data
-      ; call_depth
       ; protocol_state_precondition
-      ; account_precondition
-      ; use_full_commitment = ()
-      ; caller = ()
+      ; nonce
       }
       : Party.Body.Fee_payer.t )
 

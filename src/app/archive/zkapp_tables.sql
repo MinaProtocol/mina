@@ -232,13 +232,11 @@ CREATE TABLE zkapp_fee_payer_body
 ( id                                    serial    PRIMARY KEY
 , account_identifier_id                 int       NOT NULL REFERENCES account_identifiers(id)
 , update_id                             int       NOT NULL REFERENCES zkapp_updates(id)
-, balance_change                        bigint    NOT NULL
+, fee                                   bigint    NOT NULL
 , events_id                             int       NOT NULL REFERENCES zkapp_events(id)
 , sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
-, call_data_id                          int       NOT NULL REFERENCES zkapp_state_data(id)
-, call_depth                            int       NOT NULL
 , zkapp_precondition_protocol_state_id  int       NOT NULL REFERENCES zkapp_precondition_protocol_state(id)
-, zkapp_account_precondition            bigint    NOT NULL
+, nonce                                 bigint    NOT NULL
 );
 
 CREATE TABLE zkapp_fee_payers

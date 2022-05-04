@@ -2351,8 +2351,7 @@ module Ledger = struct
   let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
     { public_key = public_key b##.publicKey
     ; update = update b##.update
-    ; token_id = ()
-    ; balance_change = Currency.Amount.to_fee (int64 b##.delta).magnitude
+    ; fee = Currency.Amount.to_fee (int64 b##.delta).magnitude
     ; events =
         Array.map
           (Js.to_array b##.events)
@@ -2363,14 +2362,9 @@ module Ledger = struct
           (Js.to_array b##.sequenceEvents)
           ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
         |> Array.to_list
-    ; call_data = field b##.callData
-    ; call_depth = b##.depth
-    ; increment_nonce = ()
-    ; use_full_commitment = ()
     ; protocol_state_precondition = protocol_state b##.protocolState
-    ; account_precondition =
+    ; nonce =
         uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
-    ; caller = ()
     }
 
   let predicate (t : Account_precondition.t) : Party.Account_precondition.t =

@@ -1546,19 +1546,17 @@ module Zkapp_fee_payer_body = struct
   type t =
     { account_identifier_id : int
     ; update_id : int
-    ; balance_change : int64
+    ; fee : int64
     ; events_id : int
     ; sequence_events_id : int
-    ; call_data_id : int
-    ; call_depth : int
     ; zkapp_precondition_protocol_state_id : int
-    ; zkapp_account_precondition : int64
+    ; nonce : int64
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int64; int; int; int; int; int; int64 ]
+      Caqti_type.[ int; int; int64; int; int; int; int64 ]
 
   let table_name = "zkapp_fee_payer_body"
 
@@ -1582,33 +1580,24 @@ module Zkapp_fee_payer_body = struct
     let%bind sequence_events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
-    let%bind call_data_id =
-      Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
-    in
     let%bind zkapp_precondition_protocol_state_id =
       Zkapp_precondition_protocol_state.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in
-    let zkapp_account_precondition =
-      body.account_precondition |> Mina_numbers.Account_nonce.to_uint32
+    let nonce =
+      body.nonce |> Mina_numbers.Account_nonce.to_uint32
       |> Unsigned.UInt32.to_int64
     in
-    let balance_change =
-      (* balance change always negative for fee payer, but store unsigned *)
-      Currency.Fee.to_uint64 body.balance_change |> Unsigned.UInt64.to_int64
-    in
-    let call_depth = body.call_depth in
+    let fee = Currency.Fee.to_uint64 body.fee |> Unsigned.UInt64.to_int64 in
     let value =
       { account_identifier_id
       ; update_id
-      ; balance_change
+      ; fee
       ; events_id
       ; sequence_events_id
-      ; call_data_id
-      ; call_depth
       ; zkapp_precondition_protocol_state_id
-      ; zkapp_account_precondition
+      ; nonce
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
