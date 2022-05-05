@@ -1,7 +1,6 @@
 open Core_kernel
 open Mina_base
 open Mina_transaction
-open Mina_transition
 open Signature_lib
 
 module Fee_transfer_type = struct

@@ -7,7 +7,7 @@ open Caqti_async
 open Mina_base
 open Mina_transaction
 open Mina_state
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Signature_lib
 open Pickles_types
@@ -2892,14 +2892,13 @@ module Block = struct
 
   let add_if_doesn't_exist conn ~constraint_constants
       ({ data = t; hash = { state_hash = hash; _ } } :
-        External_transition.t State_hash.With_state_hashes.t) =
+        Mina_block.t State_hash.With_state_hashes.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:(External_transition.protocol_state t)
-      ~staged_ledger_diff:(External_transition.staged_ledger_diff t)
+      ~protocol_state:(Header.protocol_state @@ Mina_block.header t)
+      ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
       ~hash
 
-  let add_from_precomputed conn ~constraint_constants
-      (t : External_transition.Precomputed_block.t) =
+  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
@@ -3446,13 +3445,9 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      ( block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hashes )
-        .state_hash)
-    ~accounts_accessed:
-      block.External_transition.Precomputed_block.accounts_accessed
-    ~accounts_created:
-      block.External_transition.Precomputed_block.accounts_created block
+      (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash)
+    ~accounts_accessed:block.Precomputed.accounts_accessed
+    ~accounts_created:block.Precomputed.accounts_created block
 
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than

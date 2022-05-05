@@ -40,7 +40,7 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
     ; epoch_length
     }
 
-let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
+let fill_in_block pool (block : Archive_lib.Processor.Mina_block.t) :
     Extensional.Block.t Deferred.t =
   let query_db = Mina_caqti.query pool in
   let state_hash = State_hash.of_base58_check_exn block.state_hash in

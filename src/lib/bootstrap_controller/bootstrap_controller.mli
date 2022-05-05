@@ -1,5 +1,4 @@
 open Async_kernel
-open Mina_transition
 open Pipe_lib
 open Network_peer
 

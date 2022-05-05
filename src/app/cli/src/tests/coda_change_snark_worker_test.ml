@@ -1,5 +1,5 @@
 open Core
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Async
 

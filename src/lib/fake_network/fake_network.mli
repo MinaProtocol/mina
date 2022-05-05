@@ -28,15 +28,15 @@ type peer_state =
          , Pasta_bindings.Fp.t )
          With_hash.t
          Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , State_body_hash.t list * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , State_body_hash.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
   ; get_best_tip :
          unit Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , Pasta_bindings.Fp.t list * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , Pasta_bindings.Fp.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -51,7 +51,7 @@ type peer_state =
       -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
   ; get_transition_chain :
          Pasta_bindings.Fp.t list Envelope.Incoming.t
-      -> Mina_transition.External_transition.t list option Deferred.t
+      -> Mina_block.t list option Deferred.t
   }
 
 type peer_network =
@@ -104,17 +104,15 @@ module Generator : sig
              , Pasta_bindings.Fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , State_body_hash.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , Pasta_bindings.Fp.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
@@ -131,7 +129,7 @@ module Generator : sig
           -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t)
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
-          -> Mina_transition.External_transition.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t)
     -> peer_config
 
   val fresh_peer : peer_config
@@ -156,17 +154,15 @@ module Generator : sig
              , Pasta_bindings.Fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , State_body_hash.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , Pasta_bindings.Fp.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t)
@@ -183,7 +179,7 @@ module Generator : sig
           -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t)
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
-          -> Mina_transition.External_transition.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t)
     -> peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config

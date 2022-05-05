@@ -115,8 +115,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           : int )) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
-          let open Mina_transition in
-          let new_block = External_transition.Validated.lower new_block_ext in
+          let new_block =
+            Mina_block.External_transition.Validated.lower new_block_ext
+          in
           let new_block_no_hash =
             Mina_block.Validated.forget new_block |> With_hash.data
           in
@@ -142,7 +143,6 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                       create precomputed block"
                | Some breadcrumb ->
                    let precomputed_block =
-                     let open Mina_transition in
                      lazy
                        (let scheduled_time = Block_time.now time_controller in
                         let precomputed_block =
@@ -156,12 +156,11 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             in
                             With_hash.data block_with_hash
                           in
-                          External_transition.Precomputed_block.of_block ~logger
+                          Mina_block.Precomputed.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
                             block
                         in
-                        External_transition.Precomputed_block.to_yojson
-                          precomputed_block)
+                        Mina_block.Precomputed.to_yojson precomputed_block)
                    in
                    if upload_blocks_to_gcloud then (
                      [%log info] "log" ;
@@ -193,8 +192,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      | Some _, Some network, Some bucket ->
                          let hash_string = State_hash.to_base58_check hash in
                          let height =
-                           Mina_transition.Mina_block.blockchain_length
-                             new_block_no_hash
+                           Mina_block.blockchain_length new_block_no_hash
                            |> Mina_numbers.Length.to_string
                          in
                          let name =
