@@ -257,6 +257,7 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
+                  ; receiver_is_new = _
                   } =
                 spec
               in
@@ -305,18 +306,12 @@ let%test_module "multisig_account" =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = fee
-                    ; increment_nonce = ()
+                    ; fee
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
-                    ; use_full_commitment = ()
-                    ; account_precondition = sender_nonce
-                    ; caller = ()
+                    ; nonce = sender_nonce
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy
@@ -366,7 +361,6 @@ let%test_module "multisig_account" =
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }
               in
-              let protocol_state = Zkapp_precondition.Protocol_state.accept in
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
@@ -376,15 +370,9 @@ let%test_module "multisig_account" =
                 |> Parties.Call_forest.accumulate_hashes_predicated
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
-              let protocol_state_predicate_hash =
-                (*FIXME: is this ok? *)
-                Zkapp_precondition.Protocol_state.digest protocol_state
-              in
               let transaction : Parties.Transaction_commitment.t =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
-                  ~protocol_state_predicate_hash
-                  ~memo_hash:(Signed_command_memo.hash memo)
               in
               let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
@@ -421,7 +409,8 @@ let%test_module "multisig_account" =
               in
               let fee_payer =
                 let txn_comm =
-                  Parties.Transaction_commitment.with_fee_payer transaction
+                  Parties.Transaction_commitment.create_complete transaction
+                    ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:
                       (Parties.Digest.Party.create
                          (Party.of_fee_payer fee_payer))
@@ -453,5 +442,5 @@ let%test_module "multisig_account" =
                   }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ]))
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t)))
   end )

@@ -45,11 +45,11 @@ module T = struct
           t.protocol_states_for_root_scan_state
           ~new_scan_state:(scan_state new_oldest_root)
           ~old_root_state:
-          ( transition oldest_root                                                                                                             
-             |> External_transition.Validated.lower
-             |> Mina_block.Validated.forget                                                                                          
-             |> With_hash.map ~f:(fun block ->                                                                                       
-                 block |> Mina_block.header |> Mina_block.Header.protocol_state) ) 
+            ( transition oldest_root |> External_transition.Validated.lower
+            |> Mina_block.Validated.forget
+            |> With_hash.map ~f:(fun block ->
+                   block |> Mina_block.header
+                   |> Mina_block.Header.protocol_state) )
         |> List.map ~f:(fun s -> State_hash.With_state_hashes.(state_hash s, s))
         |> State_hash.Map.of_alist_exn
       in
@@ -57,9 +57,9 @@ module T = struct
     assert (
       [%equal: [ `Ok | `Key_already_present ]] `Ok
         (Queue.enqueue_back t.history
-            (Mina_block.Validated.state_hash @@
-External_transition.Validated.lower
-              @@ transition t.current_root)
+           ( Mina_block.Validated.state_hash
+           @@ External_transition.Validated.lower @@ transition t.current_root
+           )
            t.current_root) ) ;
     t.current_root <- new_root
 
@@ -103,11 +103,9 @@ let protocol_states_for_scan_state
         match Queue.lookup history hash with
         | Some data ->
             Some
-              ( transition data                                                                                                             
-             |> External_transition.Validated.lower
-             |> Mina_block.Validated.forget                                                                                          
-             |> With_hash.data
-             |>  Mina_block.header |> Mina_block.Header.protocol_state )
+              ( transition data |> External_transition.Validated.lower
+              |> Mina_block.Validated.forget |> With_hash.data
+              |> Mina_block.header |> Mina_block.Header.protocol_state )
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
             let%map.Option state_with_hash =

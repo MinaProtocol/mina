@@ -282,14 +282,14 @@ let check t ~genesis_state_hash =
       let%bind root_hash, root_transition = check_base () in
       let root_block = External_transition.decompose root_transition in
       let root_protocol_state =
-        root_block
-        |> Mina_block.header
-        |> Mina_block.Header.protocol_state
+        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
       in
       let%bind () =
-        let persisted_genesis_state_hash = Mina_state.Protocol_state.genesis_state_hash root_protocol_state in
-        if State_hash.equal persisted_genesis_state_hash genesis_state_hash
-        then Ok ()
+        let persisted_genesis_state_hash =
+          Mina_state.Protocol_state.genesis_state_hash root_protocol_state
+        in
+        if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
+          Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
@@ -301,15 +301,20 @@ let check t ~genesis_state_hash =
 let initialize t ~root_data =
   let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t = Mina_block.Validated.forget (External_transition.Validated.lower @@ transition root_data) in
-    (State_hash.With_state_hashes.state_hash t, State_hash.With_state_hashes.data t)
+    let t =
+      Mina_block.Validated.forget
+        (External_transition.Validated.lower @@ transition root_data)
+    in
+    ( State_hash.With_state_hashes.state_hash t
+    , State_hash.With_state_hashes.data t )
   in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash) ~data:(External_transition.compose root_transition) ;
+      Batch.set batch ~key:(Transition root_state_hash)
+        ~data:(External_transition.compose root_transition) ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
@@ -369,17 +374,20 @@ let get_transition t hash =
   in
   let block =
     let data = External_transition.decompose transition in
-    {With_hash.data; hash={State_hash.State_hashes.state_hash = hash; state_body_hash = None}}
+    { With_hash.data
+    ; hash =
+        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
+    }
   in
   let parent_hash =
-    block
-    |> With_hash.data
-    |> Mina_block.header
+    block |> With_hash.data |> Mina_block.header
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
-  Mina_block.Validated.unsafe_of_trusted_block ~delta_block_chain_proof:(Non_empty_list.singleton parent_hash) (`This_block_is_trusted_to_be_safe block)
+  Mina_block.Validated.unsafe_of_trusted_block
+    ~delta_block_chain_proof:(Non_empty_list.singleton parent_hash)
+    (`This_block_is_trusted_to_be_safe block)
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 

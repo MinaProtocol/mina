@@ -30,8 +30,10 @@ module T = struct
       [@@deriving register_event { msg = "Formed a new best tip" }]
   end
 
-  let breadcrumb_commands = Fn.compose
-    Mina_transition.Mina_block.Validated.valid_commands Breadcrumb.validated_transition
+  let breadcrumb_commands =
+    Fn.compose Mina_transition.Mina_block.Validated.valid_commands
+      Breadcrumb.validated_transition
+
   let create ~logger frontier =
     let best_tip_diff_logger =
       Logger.create ~id:Logger.Logger_id.best_tip_diff ()

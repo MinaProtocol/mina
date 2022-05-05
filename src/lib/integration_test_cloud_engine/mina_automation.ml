@@ -82,7 +82,6 @@ module Network_config = struct
         ; delta
         ; slots_per_epoch
         ; slots_per_sub_window
-        ; proof_level
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
@@ -92,8 +91,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
-        ; work_delay
-        ; transaction_capacity
+        ; proof_config
         } =
       test_config
     in
@@ -204,20 +202,6 @@ module Network_config = struct
           })
     in
     (* DAEMON CONFIG *)
-    let proof_config =
-      (* TODO: lift configuration of these up Test_config.t *)
-      { Runtime_config.Proof_keys.level = Some proof_level
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; block_window_duration_ms = None
-      ; work_delay
-      ; transaction_capacity
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
-      ; fork = None
-      }
-    in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
@@ -238,7 +222,7 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof = Some proof_config
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base = Accounts (bp_accounts @ extra_accounts)

@@ -425,23 +425,24 @@ module Call_forest = struct
         }
         :: ps ->
           let elt =
-            let context =
+            let child_context =
               match call_type p with
               | Delegate_call ->
                   curr_context
               | Call ->
                   { caller = curr_context.self; self = party_id p }
             in
-            { Tree.party = add_caller p context.caller
+            let party_caller = child_context.caller in
+            { Tree.party = add_caller p party_caller
             ; party_digest
-            ; calls = go context calls
+            ; calls = go child_context calls
             }
           in
           { With_stack_hash.elt; stack_hash } :: go curr_context ps
       | [] ->
           []
     in
-    go { caller = null_id; self = null_id } ps
+    go { self = null_id; caller = null_id } ps
 
   let add_callers' (type h1 h2) (ps : (Party.Wire.t, h1, h2) t) :
       (Party.t, h1, h2) t =
@@ -458,9 +459,11 @@ module Call_forest = struct
          party_with_caller -> Party.Call_type.t -> party_without_sender)
       ~(null_id : id) ~(party_caller : party_with_caller -> id) :
       (party_without_sender, h1, h2) t =
-    let rec go parent_caller ps =
+    let rec go ~top_level_party parent_caller ps =
       let call_type_for_party p : Party.Call_type.t =
-        if equal_id parent_caller (party_caller p) then Delegate_call else Call
+        if top_level_party then Call
+        else if equal_id parent_caller (party_caller p) then Delegate_call
+        else Call
       in
       match ps with
       | { With_stack_hash.elt = { Tree.party = p; party_digest; calls }
@@ -471,15 +474,86 @@ module Call_forest = struct
           { With_stack_hash.elt =
               { Tree.party = add_call_type p ty
               ; party_digest
-              ; calls = go (party_caller p) calls
+              ; calls = go ~top_level_party:false (party_caller p) calls
               }
           ; stack_hash
           }
-          :: go parent_caller ps
+          :: go ~top_level_party parent_caller ps
       | [] ->
           []
     in
-    go null_id ps
+    go ~top_level_party:true null_id ps
+
+  let%test_unit "add_callers and remove_callers" =
+    let module P = struct
+      type 'a t = { id : int; caller : 'a } [@@deriving compare, sexp]
+    end in
+    let module With_call_type = struct
+      type tmp = (Party.Call_type.t P.t, unit, unit) t
+      [@@deriving compare, sexp]
+
+      type t = tmp [@@deriving compare, sexp]
+    end in
+    let null_id = -1 in
+    let module With_id = struct
+      type tmp = (int P.t, unit, unit) t [@@deriving compare, sexp]
+
+      type t = tmp [@@deriving compare, sexp]
+    end in
+    let of_tree tree : _ t =
+      [ { With_stack_hash.elt = tree; stack_hash = () } ]
+    in
+    let node id caller calls =
+      { Tree.party = { P.id; caller }
+      ; party_digest = ()
+      ; calls =
+          List.map calls ~f:(fun elt ->
+              { With_stack_hash.elt; stack_hash = () })
+      }
+    in
+    let t : With_call_type.t =
+      let open Party.Call_type in
+      node 0 Call
+        [ node 1 Call
+            [ node 11 Call [ node 111 Call []; node 112 Delegate_call [] ]
+            ; node 12 Delegate_call
+                [ node 121 Call []; node 122 Delegate_call [] ]
+            ]
+        ; node 2 Delegate_call
+            [ node 21 Delegate_call
+                [ node 211 Call []; node 212 Delegate_call [] ]
+            ; node 22 Call [ node 221 Call []; node 222 Delegate_call [] ]
+            ]
+        ]
+      |> of_tree
+    in
+    let expected_output : With_id.t =
+      node 0 null_id
+        [ node 1 0
+            [ node 11 1 [ node 111 11 []; node 112 1 [] ]
+            ; node 12 0 [ node 121 1 []; node 122 0 [] ]
+            ]
+        ; node 2 null_id
+            [ node 21 null_id [ node 211 0 []; node 212 null_id [] ]
+            ; node 22 0 [ node 221 22 []; node 222 0 [] ]
+            ]
+        ]
+      |> of_tree
+    in
+    let open P in
+    [%test_eq: With_id.t]
+      (add_callers t
+         ~call_type:(fun p -> p.caller)
+         ~add_caller:(fun p caller : int P.t -> { p with caller })
+         ~null_id
+         ~party_id:(fun p -> p.id))
+      expected_output ;
+    [%test_eq: With_call_type.t]
+      (remove_callers expected_output ~equal_id:Int.equal
+         ~add_call_type:(fun p call_type -> { p with caller = call_type })
+         ~null_id
+         ~party_caller:(fun p -> p.caller))
+      t
 
   module With_hashes = struct
     [%%versioned
@@ -560,7 +634,6 @@ module Wire = struct
 
   let check_depths (t : t) =
     try
-      assert (t.fee_payer.body.call_depth = 0) ;
       let (_ : int) =
         List.fold ~init:0 t.other_parties ~f:(fun depth party ->
             let new_depth = party.body.call_depth in
@@ -647,17 +720,19 @@ let parties (t : t) : _ Call_forest.t =
   in
   Call_forest.cons fee_payer t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.body.balance_change
+let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let nonce (t : t) : Account.Nonce.t =
-  (fee_payer_party t).body.account_precondition
+let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
 
 let fee_token (_t : t) = Token_id.default
 
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
+
+let other_parties_list (t : t) : Party.t list =
+  Call_forest.fold t.other_parties ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
 let parties_list (t : t) : Party.t list =
   Call_forest.fold t.other_parties
@@ -782,33 +857,23 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
-  let create ~(other_parties_hash : Digest.Forest.t)
-      ~protocol_state_predicate_hash ~memo_hash : t =
-    Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [| protocol_state_predicate_hash
-       ; (other_parties_hash :> Pickles.Impls.Step.Field.Constant.t)
-       ; memo_hash
-      |]
+  let create ~(other_parties_hash : Digest.Forest.t) : t =
+    (other_parties_hash :> t)
 
-  let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.t) =
+  let create_complete (t : t) ~memo_hash ~(fee_payer_hash : Digest.Party.t) =
     Random_oracle.hash ~init:Hash_prefix.party_cons
-      [| (fee_payer_hash :> t); t |]
+      [| memo_hash; (fee_payer_hash :> t); t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
 
-    let create ~(other_parties_hash : Digest.Forest.Checked.t)
-        ~protocol_state_predicate_hash ~memo_hash =
-      Random_oracle.Checked.hash
-        ~init:Hash_prefix.party_with_protocol_state_predicate
-        [| protocol_state_predicate_hash
-         ; (other_parties_hash :> t)
-         ; memo_hash
-        |]
+    let create ~(other_parties_hash : Digest.Forest.Checked.t) =
+      (other_parties_hash :> t)
 
-    let with_fee_payer (t : t) ~(fee_payer_hash : Digest.Party.Checked.t) =
+    let create_complete (t : t) ~memo_hash
+        ~(fee_payer_hash : Digest.Party.Checked.t) =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
-        [| (fee_payer_hash :> t); t |]
+        [| memo_hash; (fee_payer_hash :> t); t |]
   end
 end
 
@@ -816,10 +881,6 @@ let other_parties_hash (t : t) = Call_forest.hash t.other_parties
 
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~other_parties_hash:(other_parties_hash t)
-    ~protocol_state_predicate_hash:
-      (Zkapp_precondition.Protocol_state.digest
-         t.fee_payer.body.protocol_state_precondition)
-    ~memo_hash:(Signed_command_memo.hash t.memo)
 
 (** This module defines weights for each component of a `Parties.t` element. *)
 module Weight = struct

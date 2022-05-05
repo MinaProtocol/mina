@@ -86,7 +86,7 @@ val get_transition :
      t
   -> State_hash.t
   -> ( Mina_block.Validated.t
-     , [> `Not_found of [> `Transition of State_hash.t]] )
+     , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
 
 val get_arcs :

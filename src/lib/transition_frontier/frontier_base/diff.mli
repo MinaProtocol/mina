@@ -34,8 +34,9 @@ end
 
 module Node_list : sig
   type full_node =
-    { transition: Mina_block.Validated.t
-    ; scan_state: Staged_ledger.Scan_state.t }
+    { transition : Mina_block.Validated.t
+    ; scan_state : Staged_ledger.Scan_state.t
+    }
 
   type lite_node = State_hash.Stable.V1.t
 

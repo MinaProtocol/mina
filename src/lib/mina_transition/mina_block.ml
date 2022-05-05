@@ -142,4 +142,14 @@ let blockchain_length block =
   |> Mina_state.Protocol_state.consensus_state
   |> Consensus.Data.Consensus_state.blockchain_length
 
+let account_ids_accessed t =
+  let transactions =
+    Block.transactions
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled t
+  in
+  List.map transactions ~f:(fun { data = txn; _ } ->
+      Mina_transaction.Transaction.accounts_accessed txn)
+  |> List.concat
+  |> List.dedup_and_sort ~compare:Account_id.compare
+
 include Block

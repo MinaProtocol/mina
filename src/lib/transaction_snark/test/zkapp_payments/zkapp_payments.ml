@@ -48,18 +48,12 @@ let%test_module "Zkapp payments tests" =
                     ; timing = Keep
                     ; voting_for = Keep
                     }
-                ; token_id = ()
-                ; balance_change = Fee.of_int full_amount
-                ; increment_nonce = ()
+                ; fee = Fee.of_int full_amount
                 ; events = []
                 ; sequence_events = []
-                ; call_data = Field.zero
-                ; call_depth = 0
                 ; protocol_state_precondition =
                     Zkapp_precondition.Protocol_state.accept
-                ; use_full_commitment = ()
-                ; account_precondition = acct1.account.nonce
-                ; caller = ()
+                ; nonce = acct1.account.nonce
                 }
             ; authorization = Signature.dummy
             }
@@ -133,7 +127,9 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let parties = party_send (List.hd_exn specs) in
+              let parties =
+                party_send ~constraint_constants (List.hd_exn specs)
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               U.apply_parties ledger [ parties ])
           |> fun _ -> ())
@@ -148,7 +144,7 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    party_send ~use_full_commitment s)
+                    party_send ~constraint_constants ~use_full_commitment s)
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
@@ -163,6 +159,80 @@ let%test_module "Zkapp payments tests" =
                   let fee = Fee.of_int 1_000_000 in
                   let amount = Amount.of_int 1_000_000_000 in
                   let spec = List.hd_exn specs in
+                  let receiver_count = 3 in
+                  let total_amount =
+                    Amount.scale amount receiver_count |> Option.value_exn
+                  in
+                  let new_receiver =
+                    Signature_lib.Public_key.compress new_kp.public_key
+                  in
+                  let new_receiver_amount =
+                    Option.value_exn
+                      (Amount.sub amount
+                         (Amount.of_fee
+                            constraint_constants.account_creation_fee))
+                  in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; fee_payer = None
+                    ; receivers =
+                        (new_receiver, new_receiver_amount)
+                        :: ( List.take specs (receiver_count - 1)
+                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                    ; amount = total_amount
+                    ; zkapp_account_keypairs = []
+                    ; memo
+                    ; new_zkapp_account = false
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
+                    }
+                  in
+                  let parties =
+                    Transaction_snark.For_tests.multiple_transfers test_spec
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_parties_with_merges_exn ledger [ parties ])))
+
+    let%test_unit "zkapps payments failed due to insufficient funds" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let fee = Fee.of_int 1_000_000 in
+                  let spec = List.hd_exn specs in
+                  let sender_pk =
+                    (fst spec.sender).public_key
+                    |> Signature_lib.Public_key.compress
+                  in
+                  let sender_id : Account_id.t =
+                    Account_id.create sender_pk Token_id.default
+                  in
+                  let sender_location =
+                    Ledger.location_of_account ledger sender_id
+                    |> Option.value_exn
+                  in
+                  let sender_account =
+                    Ledger.get ledger sender_location |> Option.value_exn
+                  in
+                  let sender_balance = sender_account.balance in
+                  let amount =
+                    Amount.add
+                      Balance.(to_amount sender_balance)
+                      Amount.(of_int 1_000_000)
+                    |> Option.value_exn
+                  in
                   let receiver_count = 3 in
                   let total_amount =
                     Amount.scale amount receiver_count |> Option.value_exn
@@ -187,91 +257,14 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
-
-    let%test_unit "zkapps payments failed due to insufficient funds" =
-      let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:5 U.gen_snapp_ledger
-        ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              let fee = Fee.of_int 1_000_000 in
-              let spec = List.hd_exn specs in
-              let sender_pk =
-                (fst spec.sender).public_key
-                |> Signature_lib.Public_key.compress
-              in
-              let sender_id : Account_id.t =
-                Account_id.create sender_pk Token_id.default
-              in
-              let sender_location =
-                Ledger.location_of_account ledger sender_id |> Option.value_exn
-              in
-              let sender_account =
-                Ledger.get ledger sender_location |> Option.value_exn
-              in
-              let sender_balance = sender_account.balance in
-              let amount =
-                Amount.add
-                  Balance.(to_amount sender_balance)
-                  Amount.(of_int 1_000_000)
-                |> Option.value_exn
-              in
-              let receiver_count = 3 in
-              let total_amount =
-                Amount.scale amount receiver_count |> Option.value_exn
-              in
-              let new_receiver =
-                Signature_lib.Public_key.compress new_kp.public_key
-              in
-              let test_spec : Spec.t =
-                { sender = spec.sender
-                ; fee
-                ; fee_payer = None
-                ; receivers =
-                    (new_receiver, amount)
-                    :: ( List.take specs (receiver_count - 1)
-                       |> List.map ~f:(fun s -> (s.receiver, amount)) )
-                ; amount = total_amount
-                ; zkapp_account_keypairs = []
-                ; memo
-                ; new_zkapp_account = false
-                ; snapp_update = Party.Update.dummy
-                ; current_auth = Permissions.Auth_required.Signature
-                ; call_data = Snark_params.Tick.Field.zero
-                ; events = []
-                ; sequence_events = []
-                }
-              in
-              let parties =
-                Transaction_snark.For_tests.multiple_transfers test_spec
-              in
-              U.apply_parties ledger [ parties ] ;
-              let _, (local_state, _) =
-                Ledger.apply_parties_unchecked ~constraint_constants
-                  ~state_view:U.genesis_state_view ledger parties
-                |> Or_error.ok_exn
-              in
-              let failure_status =
-                local_state.failure_status_tbl |> List.concat
-              in
-              let logger = Logger.create () in
-              [%log info] "failure_status"
-                ~metadata:
-                  [ ( "failure_status"
-                    , `List
-                        (List.map failure_status
-                           ~f:Transaction_status.Failure.to_yojson) )
-                  ] ;
-              assert (
-                List.equal Transaction_status.Failure.equal failure_status
-                  [ Transaction_status.Failure.Overflow ] )))
+                  U.check_parties_with_merges_exn
+                    ~expected_failure:Transaction_status.Failure.Overflow ledger
+                    [ parties ])))
   end )

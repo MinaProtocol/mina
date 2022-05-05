@@ -45,13 +45,10 @@ let check :
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
-              ~protocol_state_predicate_hash:
-                (Zkapp_precondition.Protocol_state.digest
-                   fee_payer.body.protocol_state_precondition)
-              ~memo_hash:(Signed_command_memo.hash memo)
           in
           let full_tx_commitment =
-            Parties.Transaction_commitment.with_fee_payer tx_commitment
+            Parties.Transaction_commitment.create_complete tx_commitment
+              ~memo_hash:(Signed_command_memo.hash memo)
               ~fee_payer_hash:
                 (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
           in
@@ -104,7 +101,7 @@ let check :
                         in
                         Some (vk, stmt, pi) ))
           in
-          let v =
+          let v : User_command.Valid.t =
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =

@@ -424,11 +424,11 @@ let%test_module "account timing check" =
               with
               | Ok txn_applied ->
                   ( match With_status.status txn_applied.common.user_command with
-                  | Applied _ ->
+                  | Applied ->
                       ()
-                  | Failed (failures, _balance_data) ->
+                  | Failed failuress ->
                       failwithf "Transaction failed: %s"
-                        ( List.map (List.concat failures) ~f:(fun failure ->
+                        ( List.map (List.concat failuress) ~f:(fun failure ->
                               Transaction_status.Failure.to_string failure)
                         |> String.concat ~sep:"," )
                         () ) ;
@@ -836,11 +836,11 @@ let%test_module "account timing check" =
             local_state.failure_status_tbl |> List.concat
           in
           match With_status.status parties_undo.command with
-          | Applied _ ->
+          | Applied ->
               failwithf "Expected transaction failure: %s"
                 (Transaction_status.Failure.to_string expected_failure)
                 ()
-          | Failed (failuress, _balances) ->
+          | Failed failuress ->
               let failures = List.concat failuress in
               if
                 not
@@ -910,6 +910,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -978,6 +980,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1056,6 +1060,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1141,6 +1147,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1225,6 +1233,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1298,6 +1308,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1372,6 +1384,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1450,6 +1464,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1522,6 +1538,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec

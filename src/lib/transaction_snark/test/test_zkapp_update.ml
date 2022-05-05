@@ -43,6 +43,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
@@ -67,6 +69,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -95,6 +99,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -123,6 +129,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -150,6 +158,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -178,6 +188,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -206,6 +218,8 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
@@ -234,9 +248,11 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
-        U.test_snapp_update ~expected_failure:(Some failure_expected)
+        U.test_snapp_update ~expected_failure:failure_expected
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
@@ -264,6 +280,8 @@ module Make (Input : Input_intf) = struct
               ; call_data = Snark_params.Tick.Field.zero
               ; events = []
               ; sequence_events = []
+              ; protocol_state_precondition = None
+              ; account_precondition = None
               }
             in
             let snapp_pk = Public_key.compress new_kp.public_key in
@@ -274,7 +292,7 @@ module Make (Input : Input_intf) = struct
               ~vk ~ledger snapp_pk ;
             (*Ledger.apply_transaction should be successful if fee payer update
               is successful*)
-            U.test_snapp_update ~expected_failure:(Some failure_expected)
+            U.test_snapp_update ~expected_failure:failure_expected
               ~snapp_permissions:
                 (U.permissions_from_update snapp_update ~auth:Proof)
               ~vk ~snapp_prover test_spec ~init_ledger ~snapp_pk))

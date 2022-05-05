@@ -99,6 +99,8 @@ module type S = sig
       ; staged_ledger_diff : Staged_ledger_diff.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+      ; accounts_accessed : (int * Account.t) list
+      ; accounts_created : (Account_id.t * Currency.Fee.t) list
       }
     [@@deriving sexp, yojson]
 
@@ -115,12 +117,20 @@ module type S = sig
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
+          ; accounts_accessed : (int * Account.Stable.V2.t) list
+          ; accounts_created :
+              (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
           }
       end
     end]
 
-    val of_external_transition :
-      scheduled_time:Block_time.Time.t -> external_transition -> t
+    val of_block :
+         logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> scheduled_time:Block_time.Time.t
+      -> staged_ledger:Staged_ledger.t
+      -> Block.t
+      -> t
   end
 
   val timestamp : external_transition -> Block_time.t

@@ -314,6 +314,8 @@ module Precomputed_block = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; accounts_accessed : (int * Account.t) list
+    ; accounts_created : (Account_id.t * Currency.Fee.t) list
     }
 
   let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
@@ -1157,12 +1159,18 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
   in
   let start = Block_time.now time_controller in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
+  (* accounts_accessed, accounts_created are unused here
+     those fields are in precomputed blocks to add to the
+     archive db, they're not needed for replaying blocks
+  *)
   let produce
       { Precomputed_block.scheduled_time
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof = delta_block_chain_proof
+      ; accounts_accessed = _
+      ; accounts_created = _
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =

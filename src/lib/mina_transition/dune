@@ -19,6 +19,7 @@
    ;; local libraries
    mina_ledger
    mina_numbers
+   currency
    unsigned_extended
    ledger_proof
    logger
