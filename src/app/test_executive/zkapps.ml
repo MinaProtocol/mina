@@ -264,10 +264,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                account_precondition = Account.Nonce.of_int 42
-              }
+            body = { p.fee_payer.body with nonce = Account.Nonce.of_int 42 }
           }
       }
     in
@@ -275,10 +272,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let p = parties_update_all in
       { p with
         fee_payer =
-          { body =
-              { p.fee_payer.body with
-                account_precondition = Account.Nonce.of_int 2
-              }
+          { body = { p.fee_payer.body with nonce = Account.Nonce.of_int 2 }
           ; authorization = Signature.dummy
           }
       }

@@ -192,7 +192,7 @@ struct
           let actual_status = cmd_with_status.With_status.status in
           let successful =
             match actual_status with
-            | Transaction_status.Applied _ ->
+            | Transaction_status.Applied ->
                 not has_failures
             | Failed _ ->
                 has_failures

@@ -8,6 +8,9 @@ open Mina_base
 type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
 
+type _ Caqti_type.field +=
+  | Array_nullable_string : string option array Caqti_type.field
+
 module Type_spec = struct
   type (_, _) t =
     | [] : (unit, unit) t
@@ -48,28 +51,30 @@ module Type_spec = struct
     Caqti_type.custom ~encode ~decode (to_rep tys)
 end
 
-(* register coding for nullable int arrays.
-   for example, the ocaml int array `[| 0; 1; 2 |]` would be encoded to
-   `'{0, 1, 2}'` for postgresql. There is no need to add the single quotes,
+(* build coding for array type that can be interpreted as a string
+
+   for example, the ocaml string array `[| "foo"; "bar"; "baz" |]` would be encoded to
+   `'{foo, bar, baz}'` for postgresql. There is no need to add the single quotes,
    as caqti does this when using a string representation.
-   type annotations are necessary for int array values in postgresql, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = '{0,1,2,...}'::int[]` *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
+   type annotations are necessary for array values in postgresql, e.g.
+   `SELECT id FROM zkapp_states WHERE element_ids = '{foo,bar,baz,...}'::string[]`
+*)
+
+let make_coding (type a) ~(elem_to_string : a -> string)
+    ~(elem_of_string : string -> a) =
   let encode xs =
-    Array.map xs ~f:(Option.value_map ~f:Int.to_string ~default:"NULL")
+    Array.map xs ~f:(Option.value_map ~f:elem_to_string ~default:"NULL")
     |> String.concat_array ~sep:", "
     |> sprintf "{ %s }" |> Result.return
   in
   let decode s =
     let open Result.Let_syntax in
-    let error = "Failed to decode nullable int array" in
+    let error = "Failed to decode nullable array" in
     let decode_elem = function
       | "NULL" | "null" ->
           return None
       | elem -> (
-          try return @@ Option.some @@ Int.of_string elem
+          try return @@ Option.some @@ elem_of_string elem
           with _ -> Result.fail error )
     in
     String.chop_prefix ~prefix:"{" s
@@ -79,8 +84,18 @@ let () =
     |> Result.of_option ~error
     >>= fun s ->
     String.filter ~f:(Char.( <> ) ' ') s
-    |> String.split ~on:',' |> List.map ~f:decode_elem |> Result.all
-    >>| List.to_array
+    |> String.split ~on:','
+    |> List.filter ~f:(fun s -> not @@ String.is_empty s)
+    |> List.map ~f:decode_elem |> Result.all >>| List.to_array
+  in
+  (encode, decode)
+
+(* register coding for nullable int arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Int.to_string ~elem_of_string:Int.of_string
   in
   let get_coding : type a. _ -> a t -> a coding =
    fun _ -> function
@@ -90,6 +105,22 @@ let () =
         assert false
   in
   define_coding Array_nullable_int { get_coding }
+
+(* register coding for nullable string arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
+  in
+  let get_coding : type a. _ -> a t -> a coding =
+   fun _ -> function
+    | Array_nullable_string ->
+        Coding { rep; encode; decode }
+    | _ ->
+        assert false
+  in
+  define_coding Array_nullable_string { get_coding }
 
 (* this type may require type annotations in queries, eg.
   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
@@ -107,6 +138,23 @@ let array_int_typ : int array Caqti_type.t =
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
+
+(* this type may require type annotations in queries, e.g.
+  `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
+*)
+let array_nullable_string_typ : string option array Caqti_type.t =
+  Caqti_type.field Array_nullable_string
+
+let array_string_typ : string array Caqti_type.t =
+  let open Result.Let_syntax in
+  let encode xs = return @@ Array.map ~f:Option.some xs in
+  let decode xs =
+    Option.all (Array.to_list xs)
+    |> Result.of_option
+         ~error:"Failed to decode string array, encountered NULL value"
+    >>| Array.of_list
+  in
+  Caqti_type.custom array_nullable_string_typ ~encode ~decode
 
 (* process a Caqti query on list of items
    if we were instead to simply map the query over the list,
@@ -149,13 +197,17 @@ let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
 
-(* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...]`
+(* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...] ()`
    creates the string
    `"SELECT s0 FROM t0 WHERE col0 = ? AND col1 = ? AND..."`.
-   The optional `tannot` function maps column names to type annotations. *)
+   The optional `tannot` function maps column names to type annotations.
+
+   N.B. The equalities will not hold if either the column value or the compared
+        value is NULL
+ *)
 let select_cols ~(select : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) (cols : string list) :
-    string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
+    : string =
   List.map cols ~f:(fun col ->
       let annot =
         match tannot col with None -> "" | Some tannot -> "::" ^ tannot
@@ -178,8 +230,8 @@ let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
    The optional `tannot` function maps column names to type annotations.
    No type annotation is included if `tannot` returns an empty string. *)
 let insert_into_cols ~(returning : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) (cols : string list) :
-    string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
+    : string =
   let values =
     List.map cols ~f:(fun col ->
         match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot)
@@ -189,13 +241,17 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+(* N.B.: Do not use if any of the values to be inserted are NULLs
+   See note in `select_cols`
+*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
     ( Caqti_request.find_opt (snd cols) (snd select)
-    @@ select_cols ~select:(fst select) ~table_name ?tannot (fst cols) )
+    @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
+    )
     value
   >>= function
   | Some id ->
@@ -204,7 +260,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       Conn.find
         ( Caqti_request.find (snd cols) (snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-             (fst cols) )
+             ~cols:(fst cols) () )
         value
 
 let query ~f pool =
@@ -213,3 +269,31 @@ let query ~f pool =
       return v
   | Error msg ->
       failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+
+(** functions to retrieve an item from the db, where the input has
+    option type; the resulting option is converted to a suitable type
+*)
+let make_get_opt ~of_option ~f item_opt =
+  let%map res_opt =
+    Option.value_map item_opt ~default:(return None) ~f:(fun item ->
+        match%map f item with
+        | Ok v ->
+            Some v
+        | Error msg ->
+            failwithf "Error querying db, error: %s" (Caqti_error.show msg) ())
+  in
+  of_option res_opt
+
+let get_zkapp_set_or_keep (item_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
+    'res Zkapp_basic.Set_or_keep.t Deferred.t =
+  make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
+
+let get_zkapp_or_ignore (item_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
+    'res Zkapp_basic.Or_ignore.t Deferred.t =
+  make_get_opt item_opt ~of_option:Zkapp_basic.Or_ignore.of_option ~f
+
+let get_opt_item (arg_opt : 'arg option)
+    ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
+  make_get_opt ~of_option:Fn.id ~f arg_opt

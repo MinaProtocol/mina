@@ -3,6 +3,7 @@ open Signature_lib
 open Mina_base
 module U = Transaction_snark_tests.Util
 
+(* add a comment to make git happy *)
 let mk_ledgers_and_fee_payers ~num_of_fee_payers =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())

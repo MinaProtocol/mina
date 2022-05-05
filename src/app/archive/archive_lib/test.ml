@@ -176,7 +176,7 @@ let%test_module "Archive node unit tests" =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
@@ -200,7 +200,7 @@ let%test_module "Archive node unit tests" =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:Processor.Coinbase.coinbase_typ
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
@@ -237,7 +237,7 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb))
+                  (Diff.Builder.breadcrumb_added ~precomputed_values breadcrumb))
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;

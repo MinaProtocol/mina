@@ -4272,7 +4272,7 @@ module For_tests = struct
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
-      let public_key, account_precondition =
+      let public_key, nonce =
         match fee_payer_opt with
         | None ->
             (sender_pk, sender_nonce)
@@ -4283,17 +4283,11 @@ module For_tests = struct
       { body =
           { public_key
           ; update = Party.Update.noop
-          ; token_id = ()
-          ; balance_change = fee
-          ; increment_nonce = ()
+          ; fee
           ; events = []
           ; sequence_events = []
-          ; call_data = Field.zero
-          ; call_depth = 0
           ; protocol_state_precondition
-          ; account_precondition
-          ; use_full_commitment = ()
-          ; caller = ()
+          ; nonce
           }
       ; authorization = Signature.dummy
       }
@@ -4674,17 +4668,11 @@ module For_tests = struct
       { body =
           { public_key = sender_pk
           ; update = Party.Update.noop
-          ; token_id = ()
-          ; balance_change = fee
-          ; increment_nonce = ()
+          ; fee
           ; events = []
           ; sequence_events = []
-          ; call_data = Field.zero
-          ; call_depth = 0
           ; protocol_state_precondition = protocol_state_predicate
-          ; use_full_commitment = ()
-          ; account_precondition = sender_nonce
-          ; caller = ()
+          ; nonce = sender_nonce
           }
           (* Real signature added in below *)
       ; authorization = Signature.dummy
