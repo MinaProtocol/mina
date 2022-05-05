@@ -10,7 +10,7 @@ apt-get update
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-time zone = US Pacific
+# time zone = US Pacific
 /bin/echo -e "12\n10" | apt-get install -y tzdata
 apt-get install -y git postgresql apt-transport-https ca-certificates curl
 
