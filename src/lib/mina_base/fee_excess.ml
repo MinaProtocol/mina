@@ -73,16 +73,30 @@ module Poly = struct
           ]
 
       let of_yojson token_of_yojson fee_of_yojson = function
-        | `List
-            [ `Assoc [ ("token", fee_token_l); ("amount", fee_excess_l) ]
-            ; `Assoc [ ("token", fee_token_r); ("amount", fee_excess_r) ]
-            ] ->
-            let open Result.Let_syntax in
-            let%map fee_token_l = token_of_yojson fee_token_l
-            and fee_excess_l = fee_of_yojson fee_excess_l
-            and fee_token_r = token_of_yojson fee_token_r
-            and fee_excess_r = fee_of_yojson fee_excess_r in
-            { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+        | `List [ `Assoc [ left0; left1 ]; `Assoc [ right0; right1 ] ] -> (
+            (* allow for reversed field order: "be liberal in what you accept" *)
+            let token_and_excess pair0 pair1 =
+              match (pair0, pair1) with
+              | ("token", token), ("amount", excess) ->
+                  Some (token, excess)
+              | ("amount", excess), ("token", token) ->
+                  Some (token, excess)
+              | _ ->
+                  None
+            in
+            let left = token_and_excess left0 left1 in
+            let right = token_and_excess right0 right1 in
+            match (left, right) with
+            | Some (fee_token_l, fee_excess_l), Some (fee_token_r, fee_excess_r)
+              ->
+                let open Result.Let_syntax in
+                let%map fee_token_l = token_of_yojson fee_token_l
+                and fee_excess_l = fee_of_yojson fee_excess_l
+                and fee_token_r = token_of_yojson fee_token_r
+                and fee_excess_r = fee_of_yojson fee_excess_r in
+                { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+            | _ ->
+                Error "Fee_excess.Poly.Stable.V1.t, unexpected JSON field" )
         | _ ->
             Error "Fee_excess.Poly.Stable.V1.t"
     end
