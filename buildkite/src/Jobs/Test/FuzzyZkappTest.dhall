@@ -31,9 +31,8 @@ Pipeline.build
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),          
         S.strictlyStart (S.contains "src/lib/transaction_snark/test/zkapp_fuzzy"),
-        S.exactly "buildkite/scripts/fuzzy-zkapp-test.sh",
         S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall",
-        S.exactly "buildkite/scripts/unit-test" "sh"
+        S.exactly "buildkite/scripts/fuzzy-zkapp-test" "sh"
       ]
 
       in
@@ -44,6 +43,6 @@ Pipeline.build
         name = "FuzzyZkappTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy" Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" Size.Small
     ]
   }
