@@ -526,6 +526,8 @@ module Zkapp_helpers = struct
     | Some state_view ->
         return state_view
     | None ->
+        (* we're on a new block, cached state views won't be used again *)
+        Hashtbl.clear state_view_tbl ;
         let%bind state_view =
           let query_db = Mina_caqti.query pool in
           let%bind parent_id =
