@@ -1,5 +1,5 @@
 (executable
  (name graphql_schema_dump)
- (libraries graphql_parser mina_graphql)
+ (libraries graphql_parser mina_graphql async async_unix graphql-async yojson)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

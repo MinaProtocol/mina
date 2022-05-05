@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Mina_base_util
 
 [%%ifdef consensus_mechanism]
 
@@ -48,13 +49,12 @@ module Ledger_hash = Ledger_hash0
 module Auth_required = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | None
         | Either
         | Proof
         | Signature
-        | Both
         | Impossible (* Both and either can both be subsumed in verification key.
                         It is good to have "Either" as a separate thing to spare the owner from
                         having to make a proof instead of a signature. Both, I'm not sure if there's
@@ -64,6 +64,18 @@ module Auth_required = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* permissions such that [check permission (Proof _)] is true *)
+  let gen_for_proof_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Proof ]
+
+  (* permissions such that [check permission (Signature _)] is true *)
+  let gen_for_signature_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Signature ]
+
+  (* permissions such that [check permission None_given] is true *)
+  let gen_for_none_given_authorization : t Quickcheck.Generator.t =
+    Quickcheck.Generator.return None
 
   (* The encoding is chosen so that it is easy to write this function
 
@@ -108,9 +120,11 @@ module Auth_required = struct
       }
     [@@deriving hlist, fields]
 
-    let to_input t =
+    let to_input ~field_of_bool t =
       let [ x; y; z ] = to_hlist t in
-      Random_oracle.Input.bitstring [ x; y; z ]
+      let bs = [| x; y; z |] in
+      Random_oracle.Input.Chunked.packeds
+        (Array.map bs ~f:(fun b -> (field_of_bool b, 1)))
 
     let map t ~f =
       { constant = f t.constant
@@ -162,11 +176,6 @@ module Auth_required = struct
         ; signature_necessary = false
         ; signature_sufficient = true
         }
-    | Both ->
-        { constant = false
-        ; signature_necessary = true
-        ; signature_sufficient = false
-        }
 
   let decode : bool Encoding.t -> t = function
     | { constant = true; signature_necessary = _; signature_sufficient = false }
@@ -194,10 +203,12 @@ module Auth_required = struct
       ; signature_necessary = true
       ; signature_sufficient = false
       } ->
-        Both
+        failwith
+          "Permissions.decode: Found encoding of Both, but Both is not an \
+           exposed option"
 
   let%test_unit "decode encode" =
-    List.iter [ Impossible; Proof; Signature; Either; Both ] ~f:(fun t ->
+    List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)))
 
   [%%ifdef consensus_mechanism]
@@ -207,7 +218,9 @@ module Auth_required = struct
 
     let if_ = Encoding.if_
 
-    let to_input : t -> _ = Encoding.to_input
+    let to_input : t -> _ =
+      Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t))
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -225,6 +238,20 @@ module Auth_required = struct
       let open Pickles.Impls.Step.Boolean in
       signature_sufficient
       &&& (constant ||| ((not constant) &&& signature_verifies))
+
+    let eval_proof ({ constant; signature_necessary; signature_sufficient } : t)
+        =
+      (* ways authorization can succeed if a proof is present:
+         - None
+           {constant= true; signature_necessary= _; signature_sufficient= true}
+         - Either
+           {constant= false; signature_necessary= false; signature_sufficient= true}
+         - Proof
+           {constant= false; signature_necessary= false; signature_sufficient= false}
+      *)
+      let open Pickles.Impls.Step in
+      let impossible = Boolean.(constant &&& not signature_sufficient) in
+      Boolean.((not signature_necessary) &&& not impossible)
 
     let spec_eval ({ constant; signature_necessary; signature_sufficient } : t)
         ~signature_verifies =
@@ -253,7 +280,7 @@ module Auth_required = struct
 
   [%%endif]
 
-  let to_input x = Encoding.to_input (encode x)
+  let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
   let check (t : t) (c : Control.Tag.t) =
     match (t, c) with
@@ -261,70 +288,106 @@ module Auth_required = struct
         false
     | None, _ ->
         true
-    | Both, Both ->
+    | Proof, Proof ->
         true
-    | Both, (Proof | Signature) ->
-        false
-    | Proof, (Proof | Both) ->
-        true
-    | Signature, (Signature | Both) ->
+    | Signature, Signature ->
         true
     (* The signatures and proofs have already been checked by this point. *)
-    | Either, (Proof | Signature | Both) ->
+    | Either, (Proof | Signature) ->
         true
     | Signature, Proof ->
         false
     | Proof, Signature ->
         false
-    | (Both | Proof | Signature | Either), None_given ->
+    | (Proof | Signature | Either), None_given ->
         false
 end
 
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type ('bool, 'controller) t =
-        { stake : 'bool
-        ; edit_state : 'controller
+    module V2 = struct
+      type 'controller t =
+        { edit_state : 'controller
         ; send : 'controller
         ; receive : 'controller
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
+        ; set_zkapp_uri : 'controller
+        ; edit_sequence_state : 'controller
+        ; set_token_symbol : 'controller
+        ; increment_nonce : 'controller
+        ; set_voting_for : 'controller
         }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
   let to_input controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    Stable.Latest.Fields.fold ~init:[]
-      ~stake:(f (fun x -> Random_oracle.Input.bitstring [ x ]))
-      ~edit_state:(f controller) ~send:(f controller)
-      ~set_delegate:(f controller) ~set_permissions:(f controller)
-      ~set_verification_key:(f controller) ~receive:(f controller)
-    |> List.reduce_exn ~f:Random_oracle.Input.append
+    Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
+      ~send:(f controller) ~set_delegate:(f controller)
+      ~set_permissions:(f controller) ~set_verification_key:(f controller)
+      ~receive:(f controller) ~set_zkapp_uri:(f controller)
+      ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
+      ~increment_nonce:(f controller) ~set_voting_for:(f controller)
+    |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V1.t
+  module V2 = struct
+    type t = Auth_required.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
+let gen ~auth_tag : t Quickcheck.Generator.t =
+  let auth_required_gen =
+    (* for Auth_required permissions p, choose such that [check p authorization] is true *)
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Auth_required.gen_for_proof_authorization
+    | Signature ->
+        Auth_required.gen_for_signature_authorization
+    | None_given ->
+        Auth_required.gen_for_none_given_authorization
+  in
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind edit_state = auth_required_gen in
+  let%bind send = auth_required_gen in
+  let%bind receive = auth_required_gen in
+  let%bind set_delegate = auth_required_gen in
+  let%bind set_permissions = auth_required_gen in
+  let%bind set_verification_key = auth_required_gen in
+  let%bind set_zkapp_uri = auth_required_gen in
+  let%bind edit_sequence_state = auth_required_gen in
+  let%bind set_token_symbol = auth_required_gen in
+  let%bind increment_nonce = auth_required_gen in
+  let%bind set_voting_for = auth_required_gen in
+  return
+    { Poly.edit_state
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key
+    ; set_zkapp_uri
+    ; edit_sequence_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    }
+
 [%%ifdef consensus_mechanism]
 
 module Checked = struct
-  type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
+  type t = Auth_required.Checked.t Poly.Stable.Latest.t
 
-  let to_input x = Poly.to_input Auth_required.Checked.to_input x
-
-  open Pickles.Impls.Step
+  let to_input (x : t) = Poly.to_input Auth_required.Checked.to_input x
 
   let if_ b ~then_ ~else_ =
     let g cond f =
@@ -333,22 +396,28 @@ module Checked = struct
         ~else_:(Core_kernel.Field.get f else_)
     in
     let c = g Auth_required.Checked.if_ in
-    Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
-      ~set_delegate:c ~set_permissions:c ~set_verification_key:c
+    Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
+      ~set_permissions:c ~set_verification_key:c ~set_zkapp_uri:c
+      ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
+      ~set_voting_for:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
     let a f = Auth_required.Checked.constant (get f t) in
-    Poly.Fields.map
-      ~stake:(fun f -> Boolean.var_of_value (get f t))
-      ~edit_state:a ~send:a ~receive:a ~set_delegate:a ~set_permissions:a
-      ~set_verification_key:a
+    Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
+      ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
+      ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
+      ~set_voting_for:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
-    [ Boolean.typ
+    [ Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -361,24 +430,102 @@ let typ =
 
 [%%endif]
 
-let to_input x = Poly.to_input Auth_required.to_input x
+let to_input (x : t) = Poly.to_input Auth_required.to_input x
 
 let user_default : t =
-  { stake = true
-  ; edit_state = Signature
+  { edit_state = Signature
   ; send = Signature
   ; receive = None
   ; set_delegate = Signature
   ; set_permissions = Signature
   ; set_verification_key = Signature
+  ; set_zkapp_uri = Signature
+  ; edit_sequence_state = Signature
+  ; set_token_symbol = Signature
+  ; increment_nonce = Signature
+  ; set_voting_for = Signature
   }
 
 let empty : t =
-  { stake = false
-  ; edit_state = None
+  { edit_state = None
   ; send = None
   ; receive = None
   ; set_delegate = None
   ; set_permissions = None
   ; set_verification_key = None
+  ; set_zkapp_uri = None
+  ; edit_sequence_state = None
+  ; set_token_symbol = None
+  ; increment_nonce = None
+  ; set_voting_for = None
   }
+
+(* deriving-fields-related stuff *)
+let auth_required_to_string = function
+  | Auth_required.Stable.Latest.None ->
+      "None"
+  | Either ->
+      "Either"
+  | Proof ->
+      "Proof"
+  | Signature ->
+      "Signature"
+  | Impossible ->
+      "Impossible"
+
+let auth_required_of_string = function
+  | "None" ->
+      Auth_required.Stable.Latest.None
+  | "Either" ->
+      Either
+  | "Proof" ->
+      Proof
+  | "Signature" ->
+      Signature
+  | "Impossible" ->
+      Impossible
+  | _ ->
+      failwith "auth_required_of_string: unknown variant"
+
+let auth_required =
+  Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
+    ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
+    ~of_string:auth_required_of_string
+
+let deriver obj =
+  let open Fields_derivers_zkapps.Derivers in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
+    ~receive:!.auth_required ~set_delegate:!.auth_required
+    ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
+    ~set_zkapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
+    ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
+    ~set_voting_for:!.auth_required
+  |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
+
+let%test_unit "json roundtrip" =
+  let open Fields_derivers_zkapps.Derivers in
+  let full = o () in
+  let _a = deriver full in
+  [%test_eq: t] user_default (user_default |> to_json full |> of_json full)
+
+let%test_unit "json value" =
+  let open Fields_derivers_zkapps.Derivers in
+  let full = o () in
+  let _a = deriver full in
+  [%test_eq: string]
+    (user_default |> to_json full |> Yojson.Safe.to_string)
+    ( {json|{
+        editState: "Signature",
+        send: "Signature",
+        receive: "None",
+        setDelegate: "Signature",
+        setPermissions: "Signature",
+        setVerificationKey: "Signature",
+        setZkappUri: "Signature",
+        editSequenceState: "Signature",
+        setTokenSymbol: "Signature",
+        incrementNonce: "Signature",
+        setVotingFor: "Signature"
+      }|json}
+    |> Yojson.Safe.from_string |> Yojson.Safe.to_string )

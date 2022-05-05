@@ -1,5 +1,6 @@
 open Core
 open Integration_test_lib
+open Mina_transaction
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -22,56 +23,52 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         List.init n ~f:(fun _ ->
-            { Block_producer.balance = block_producer_balance
-            ; timing = Untimed
-            })
+            { Wallet.balance = block_producer_balance; timing = Untimed })
     }
 
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
       n =
     let open Malleable_error.Let_syntax in
-    let rec go n noncelist =
-      if n = 0 then return noncelist
+    let rec go n hashlist =
+      if n = 0 then return hashlist
       else
-        let%bind nonce =
-          let%map { nonce; _ } =
+        let%bind hash =
+          let%map { hash; _ } =
             Network.Node.must_send_payment ~logger ~sender_pub_key
               ~receiver_pub_key ~amount ~fee node
           in
-          [%log info] "gossip_consistency test: payment #%d sent with nonce %d."
+          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
             n
-            (Unsigned.UInt32.to_int nonce) ;
-          nonce
+            (Transaction_hash.to_base58_check hash) ;
+          hash
         in
-        go (n - 1) (List.append noncelist [ nonce ])
+        go (n - 1) (List.append hashlist [ hash ])
     in
     go n []
 
-  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount
-      ~noncelist n =
+  let wait_for_payments ~logger ~dsl ~hashlist n =
     let open Malleable_error.Let_syntax in
-    let rec go n noncelist =
+    let rec go n hashlist =
       if n = 0 then return ()
       else
         (* confirm payment *)
         let%bind () =
-          let nonce = List.hd_exn noncelist in
+          let hash = List.hd_exn hashlist in
           let%map () =
             wait_for dsl
               (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~sender_pub_key ~receiver_pub_key ~amount ~nonce
-                 ~command_type:Send_payment)
+                 ~txn_hash:hash ~node_included_in:`Any_node)
           in
           [%log info]
-            "gossip_consistency test: payment #%d with nonce %d successfully \
+            "gossip_consistency test: payment #%d with hash %s successfully \
              included in frontier."
             n
-            (Unsigned.UInt32.to_int nonce) ;
+            (Transaction_hash.to_base58_check hash) ;
           ()
         in
-        go (n - 1) (List.tl_exn noncelist)
+        go (n - 1) (List.tl_exn hashlist)
     in
-    go n noncelist
+    go n hashlist
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -93,17 +90,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
-    let%bind noncelist =
+    let%bind hashlist =
       send_payments ~logger ~sender_pub_key ~receiver_pub_key ~node:sender_bp
         ~fee ~amount num_payments
     in
     [%log info]
       "gossip_consistency test: sending payments done. will now wait for \
        payments" ;
-    let%bind () =
-      wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
-        ~noncelist num_payments
-    in
+    let%bind () = wait_for_payments ~logger ~dsl:t ~hashlist num_payments in
     [%log info] "gossip_consistency test: finished waiting for payments" ;
     let gossip_states = (network_state t).gossip_received in
     let num_transactions_seen =
@@ -143,8 +137,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =
       if union = 0 then 1. else Float.of_int inter /. Float.of_int union
-      (* Gossip_state.consistency_ratio Transactions_gossip
-         (Map.data (network_state t).gossip_received) *)
     in
     [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in

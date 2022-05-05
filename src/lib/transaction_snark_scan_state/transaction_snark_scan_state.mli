@@ -1,10 +1,12 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
+module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp]
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -16,10 +18,9 @@ module Transaction_with_witness : sig
   type t =
     { transaction_with_info : Ledger.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
-    ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness : Sparse_ledger.t
+    ; ledger_witness : Mina_ledger.Sparse_ledger.t
     }
   [@@deriving sexp]
 end
@@ -49,9 +50,11 @@ module Make_statement_scanner (Verifier : sig
     -> bool Deferred.Or_error.t
 end) : sig
   val scan_statement :
-       t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -60,13 +63,13 @@ end) : sig
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
-    -> ledger_hash_end:Frozen_ledger_hash.t
-    -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> next_available_token_begin:Token_id.t option
-    -> next_available_token_end:Token_id.t
+    -> registers_begin:Mina_state.Registers.Value.t option
+    -> registers_end:Mina_state.Registers.Value.t
     -> (unit, Error.t) Deferred.Result.t
 end
 
@@ -105,9 +108,11 @@ val free_space : t -> int
 
 val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
-val hash : t -> Staged_ledger_hash.Aux_hash.t
+(* a 0 index means next-to-latest tree *)
+val base_jobs_on_earlier_tree :
+  t -> index:int -> Transaction_with_witness.t list
 
-val target_merkle_root : t -> Frozen_ledger_hash.t option
+val hash : t -> Staged_ledger_hash.Aux_hash.t
 
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t With_status.t list
@@ -161,10 +166,7 @@ val check_required_protocol_states :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t
-     , Transaction_witness.t
-     , Ledger_proof.t )
-     Snark_work_lib.Work.Single.Spec.t
+  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

@@ -6,7 +6,6 @@ open Mina_base
 open Mina_state
 open Signature_lib
 open Pipe_lib
-open O1trace
 open Init
 open Mina_numbers
 
@@ -144,10 +143,13 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; min_connections = 20
           ; max_connections = 50
+          ; pubsub_v1 = N
+          ; pubsub_v0 = RW
           ; validation_queue_size = 150
           ; keypair = None
           ; all_peers_seen_metric = false
           ; known_private_ip_nets = []
+          ; time_controller
           }
       in
       let net_config =
@@ -156,9 +158,10 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; consensus_constants = precomputed_values.consensus_constants
           ; is_seed = true
           ; genesis_ledger_hash =
-              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+              Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; constraint_constants
           ; log_gossip_heard =
               { snark_pool_diff = false
@@ -273,21 +276,15 @@ let run_test () : unit Deferred.t =
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
-        trace_recurring "build_payment" (fun () ->
+        O1trace.sync_thread "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
               Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo ~valid_until:None
-              ~body:
-                (Payment
-                   { source_pk = signer
-                   ; receiver_pk
-                   ; token_id = Token_id.default
-                   ; amount
-                   })
+              ~memo ~valid_until:None
+              ~body:(Payment { source_pk = signer; receiver_pk; amount })
               ~sign_choice:
                 (User_command_input.Sign_choice.Keypair
                    (Keypair.of_private_key_exn sender_sk))

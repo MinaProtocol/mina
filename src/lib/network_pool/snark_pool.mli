@@ -1,6 +1,5 @@
 open Async_kernel
 open Pipe_lib
-open Network_peer
 open Core_kernel
 
 module type S = sig
@@ -45,18 +44,12 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:
-         ( Resource_pool.Diff.t Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( Resource_pool.Diff.t
-         * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
-            -> unit) )
-         Strict_pipe.Reader.t
+    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
-    -> t Deferred.t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -97,11 +90,11 @@ include S with type transition_frontier := Transition_frontier.t
 module Diff_versioned : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, hash]

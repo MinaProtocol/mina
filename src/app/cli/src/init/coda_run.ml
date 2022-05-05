@@ -1,6 +1,5 @@
 open Core
 open Async
-open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
@@ -158,7 +157,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   let mask_file = conf_dir ^/ "registered_masks.dot" in
   (* ledger visualization *)
   [%log debug] "%s" (Visualization_message.success "registered masks" mask_file) ;
-  Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
+  Mina_ledger.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
       [%log warn]
@@ -283,7 +282,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   (* Setup RPC server for client interactions *)
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
-        trace_recurring (Rpc.Rpc.name rpc) (fun () -> f () input))
+        O1trace.thread ("serve_" ^ Rpc.Rpc.name rpc) (fun () -> f () input))
   in
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
@@ -361,9 +360,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 ~f:Or_error.return )
           |> Or_error.map ~f:(function
                | Genesis_epoch_ledger l ->
-                   Mina_base.Ledger.to_list l
+                   Mina_ledger.Ledger.to_list l
                | Ledger_db db ->
-                   Mina_base.Ledger.Db.to_list db)
+                   Mina_ledger.Ledger.Db.to_list db)
           |> Deferred.return)
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
@@ -380,7 +379,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename coda))
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
-        (fun () filename -> return (Mina_base.Ledger.Debug.visualize ~filename))
+        (fun () filename ->
+          return (Mina_ledger.Ledger.Debug.visualize ~filename))
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
@@ -491,16 +491,16 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              server_description port)
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
-      trace_task "full GraphQL server" (fun () ->
+      O1trace.background_thread "serve_graphql" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
             rest_server_port)) ;
-  (*Second graphql server with limited queries exopsed*)
+  (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
-      trace_task "limited GraphQL server" (fun () ->
+      O1trace.background_thread "serve_limited_graphql" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
@@ -512,7 +512,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
   in
-  trace_task "client RPC server" (fun () ->
+  O1trace.background_thread "serve_client_rpcs" (fun () ->
       Deferred.ignore_m
         (Tcp.Server.create
            ~on_handler_error:

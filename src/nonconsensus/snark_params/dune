@@ -2,7 +2,19 @@
  (name snark_params)
  (public_name snark_params_nonconsensus)
  (library_flags -linkall)
- (libraries core_kernel bignum_bigint snarkette)
+ (libraries
+   ;; opam libraries
+   base.caml
+   sexplib0
+   bin_prot.shape
+   core_kernel
+   ppx_inline_test.config
+   base
+   bignum.bigint
+   ;; local libraries
+   bignum_bigint
+   snarkette
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_let ppx_deriving.std ppx_compare ppx_deriving_yojson ppx_hash))

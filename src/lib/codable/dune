@@ -3,7 +3,15 @@
  (public_name codable)
  (library_flags (-linkall))
  (inline_tests)
- (libraries core_kernel ppx_deriving_yojson.runtime yojson base58_check)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ppx_deriving_yojson.runtime
+   yojson
+   result
+   ;; local libraries
+   base58_check
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson))
  (synopsis "Extension of Yojson to make it easy for a type to derive yojson"))

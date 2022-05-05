@@ -3,17 +3,55 @@
  (name replayer)
  (public_name replayer)
  (libraries
+   ;; opam libraries
+   stdio
+   sexplib0
+   result
+   async.async_command
+   async
+   caqti-async
+   core_kernel
+   archive_lib
+   caqti-driver-postgresql
    async_kernel
    core
-   caqti
-   caqti-async
-   caqti-driver-postgresql
-   archive_lib
-   mina_base
-   mina_state
-   genesis_constants
-   genesis_ledger_helper
    yojson
+   caqti
+   base
+   base.base_internalhash_types
+   uri
+   integers
+   async_unix
+   ;; local libraries
+   with_hash
+   snark_params
+   crypto_params
+   pickles_types
+   mina_numbers
+   coda_genesis_ledger
+   currency
+   pickles.backend
+   signature_lib
+   genesis_ledger_helper.lib
+   genesis_ledger_helper
+   mina_state
+   mina_ledger
+   mina_base
+   mina_caqti
+   genesis_constants
+   coda_runtime_config
+   logger
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.common
+   block_time
+   data_hash_lib
+   mina_base.import
+   pickles
+   sgn
+   unsigned_extended
+   random_oracle
+   codable
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

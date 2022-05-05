@@ -14,7 +14,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     { default with
       requires_graphql = true
     ; block_producers =
@@ -44,16 +44,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind delegation_sender_pub_key =
            Util.pub_key_of_node delegation_sender
          in
-         let%bind { nonce; _ } =
+         let%bind { hash; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender
              ~sender_pub_key:delegation_sender_pub_key
              ~receiver_pub_key:delegation_receiver_pub_key ~amount ~fee
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~sender_pub_key:delegation_sender_pub_key
-              ~receiver_pub_key:delegation_receiver_pub_key ~amount ~nonce
-              ~command_type:Send_delegation))
+              ~txn_hash:hash ~node_included_in:`Any_node))
     in
     Malleable_error.return ()
 end

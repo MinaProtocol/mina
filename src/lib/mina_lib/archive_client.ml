@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open O1trace
 
 let dispatch ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
@@ -64,13 +63,16 @@ let dispatch_precomputed_block =
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
 
-let transfer ~logger ~archive_location
+let transfer ~logger ~precomputed_values ~archive_location
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
       Broadcast_pipe.Reader.t) =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-          let diff = Archive_lib.Diff.Builder.breadcrumb_added breadcrumb in
+          let diff =
+            Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+              breadcrumb
+          in
           match%map dispatch archive_location (Transition_frontier diff) with
           | Ok () ->
               ()
@@ -83,10 +85,10 @@ let transfer ~logger ~archive_location
                   ]
                 "Could not send breadcrumb to archive: $error"))
 
-let run ~logger
+let run ~logger ~precomputed_values
     ~(frontier_broadcast_pipe :
        Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
-  trace_task "Daemon sending diffs to archive loop" (fun () ->
+  O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
           (Option.value_map ~default:Deferred.unit
@@ -98,4 +100,5 @@ let run ~logger
                  Transition_frontier.Extensions.get_view_pipe extensions
                    Transition_frontier.Extensions.New_breadcrumbs
                in
-               transfer ~logger ~archive_location breadcrumb_reader)))
+               transfer ~logger ~precomputed_values ~archive_location
+                 breadcrumb_reader)))

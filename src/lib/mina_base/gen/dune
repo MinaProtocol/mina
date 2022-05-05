@@ -1,8 +1,0 @@
-(executable
- (name gen)
- (libraries async crs core digestif snarky.backendless tuple_lib ppxlib
-            crypto_params signature_lib yojson)
- (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot))
- (instrumentation (backend bisect_ppx))
- (modes native))

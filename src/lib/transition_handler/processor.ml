@@ -14,7 +14,6 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open O1trace
 open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
@@ -37,7 +36,7 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
+    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -76,13 +75,14 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer
-    (`Transition transition, `Source source) ;
+    (`Transition transition, `Source source, `Valid_cb valid_cb) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hashes transition).state_hash
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
-    ~transition:cached_initially_validated_transition ~precomputed_values =
+    ~transition:cached_initially_validated_transition ~valid_cb
+    ~precomputed_values =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
@@ -194,14 +194,16 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~precomputed_values))
+         ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb))
 
 let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
-       ( External_transition.Initial_validated.t Envelope.Incoming.t
-       , State_hash.t )
-       Cached.t
+       ( [ `Block of
+           ( External_transition.Initial_validated.t Envelope.Incoming.t
+           , State_hash.t )
+           Cached.t ]
+       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Reader.t)
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t)
@@ -241,8 +243,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
       ~precomputed_values
   in
-  ignore
-    ( Reader.Merge.iter
+  O1trace.background_thread "process_blocks" (fun () ->
+      Reader.Merge.iter
         (* It is fine to skip the cache layer on blocks produced by this node
            * because it is extraordinarily unlikely we would write an internal bug
            * triggering this case, and the external case (where we received an
@@ -262,7 +264,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
-          trace_recurring "transition_handler_processor" (fun () ->
+          O1trace.thread "transition_handler_processor" (fun () ->
               match msg with
               | `Catchup_breadcrumbs
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
@@ -276,7 +278,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                * we're catching up *)
                             ~f:
                               (add_and_finalize ~logger ~only_if_present:true
-                                 ~source:`Catchup))
+                                 ~source:`Catchup ~valid_cb:None))
                     with
                   | Ok () ->
                       ()
@@ -316,7 +318,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   let%map () =
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
-                        ~source:`Internal breadcrumb
+                        ~source:`Internal breadcrumb ~valid_cb:None
                     with
                     | Ok () ->
                         ()
@@ -334,9 +336,9 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   Mina_metrics.(
                     Gauge.dec_one
                       Transition_frontier_controller.transitions_being_processed)
-              | `Partially_valid_transition transition ->
-                  process_transition ~transition))
-      : unit Deferred.t )
+              | `Partially_valid_transition
+                  (`Block transition, `Valid_cb valid_cb) ->
+                  process_transition ~transition ~valid_cb)))
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -414,9 +416,12 @@ let%test_module "Transition_handler.Processor tests" =
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
                   ~processed_transition_writer ~precomputed_values ;
                 List.iter branch ~f:(fun breadcrumb ->
-                    downcast_breadcrumb breadcrumb
-                    |> Unprocessed_transition_cache.register_exn cache
-                    |> Strict_pipe.Writer.write valid_transition_writer) ;
+                    let b =
+                      downcast_breadcrumb breadcrumb
+                      |> Unprocessed_transition_cache.register_exn cache
+                    in
+                    Strict_pipe.Writer.write valid_transition_writer
+                      (`Block b, `Valid_cb None)) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)
@@ -425,7 +430,7 @@ let%test_module "Transition_handler.Processor tests" =
                        ~init:branch
                        ~f:(fun
                             remaining_breadcrumbs
-                            (`Transition newly_added_transition, _)
+                            (`Transition newly_added_transition, _, _)
                           ->
                          Deferred.return
                            ( match remaining_breadcrumbs with

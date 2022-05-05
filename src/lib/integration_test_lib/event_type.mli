@@ -52,6 +52,7 @@ module Block_produced : sig
     ; epoch : int
     ; global_slot : int
     ; snarked_ledger_generated : bool
+    ; state_hash : State_hash.t
     }
 
   include Event_type_intf with type t := t
@@ -70,7 +71,10 @@ module Block_produced : sig
 end
 
 module Breadcrumb_added : sig
-  type t = { user_commands : User_command.Valid.t With_status.t list }
+  type t =
+    { state_hash : State_hash.t
+    ; user_commands : User_command.Valid.t With_status.t list
+    }
 
   include Event_type_intf with type t := t
 end

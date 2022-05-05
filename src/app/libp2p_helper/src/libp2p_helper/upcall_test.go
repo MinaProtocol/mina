@@ -11,7 +11,6 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/require"
 )
 
@@ -182,8 +181,7 @@ func mkAppForUpcallTest(t *testing.T, tag string) (*upcallTrap, *app, uint16, pe
 	appInfos, err := addrInfos(app.P2p.Host)
 	require.NoError(t, err)
 
-	app.P2p.Pubsub, err = pubsub.NewGossipSub(app.Ctx, app.P2p.Host)
-	require.NoError(t, err)
+	require.NoError(t, configurePubsub(app, 32, nil, nil))
 
 	beginAdvertisingSendAndCheck(t, app)
 
@@ -211,13 +209,7 @@ func TestUpcalls(t *testing.T) {
 	errChan := make(chan error, 3)
 	ctx, cancelF := context.WithCancel(context.Background())
 
-	t.Cleanup(func() {
-		cancelF()
-		close(errChan)
-		for err := range errChan {
-			t.Errorf("feedUpcallTrap failed with %s", err)
-		}
-	})
+	handleErrChan(t, errChan, cancelF)
 
 	launchFeedUpcallTrap(alice.P2p.Logger, alice.OutChan, aTrap, errChan, ctx)
 	launchFeedUpcallTrap(bob.P2p.Logger, bob.OutChan, bTrap, errChan, ctx)

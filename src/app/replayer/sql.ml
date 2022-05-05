@@ -12,11 +12,8 @@ module Block_info = struct
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[ int; int64; string; string ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int64; string; string ]
 
   (* find all blocks, working back from block with given state hash *)
   let query =
@@ -50,11 +47,12 @@ let find_command_ids_query s =
   sprintf
     {sql| WITH RECURSIVE chain AS (
 
-            SELECT id,parent_id FROM blocks b WHERE b.state_hash = ?
+            SELECT id,parent_id,global_slot_since_genesis FROM blocks b
+            WHERE b.state_hash = $1
 
             UNION ALL
 
-            SELECT b.id,b.parent_id FROM blocks b
+            SELECT b.id,b.parent_id,b.global_slot_since_genesis FROM blocks b
 
             INNER JOIN chain
 
@@ -66,6 +64,8 @@ let find_command_ids_query s =
           INNER JOIN blocks_%s_commands bc
 
           ON bc.block_id = c.id
+
+          WHERE c.global_slot_since_genesis >= $2
 
      |sql}
     s s
@@ -79,6 +79,15 @@ module Block = struct
 
   let get_state_hash (module Conn : Caqti_async.CONNECTION) id =
     Conn.find state_hash_query id
+
+  let parent_id_query =
+    Caqti_request.find Caqti_type.int Caqti_type.int
+      {sql| SELECT parent_id FROM blocks
+            WHERE id = ?
+      |sql}
+
+  let get_parent_id (module Conn : Caqti_async.CONNECTION) id =
+    Conn.find parent_id_query id
 
   let unparented_query =
     Caqti_request.collect Caqti_type.unit Caqti_type.int
@@ -147,22 +156,22 @@ end
 
 module User_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
       (find_command_ids_query "user")
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
 end
 
 module User_command = struct
   type t =
-    { type_ : string
+    { typ : string
     ; fee_payer_id : int
     ; source_id : int
     ; receiver_id : int
     ; fee : int64
-    ; fee_token : int64
-    ; token : int64
     ; amount : int64 option
     ; valid_until : int64 option
     ; memo : string
@@ -173,24 +182,17 @@ module User_command = struct
     ; txn_global_slot_since_genesis : int64
     ; sequence_no : int
     ; status : string
-    ; created_token : int64 option
-    ; fee_payer_balance : int
-    ; source_balance : int option
-    ; receiver_balance : int option
     }
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
-    let spec =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
         [ string
         ; int
         ; int
         ; int
         ; int64
-        ; int64
-        ; int64
         ; option int64
         ; option int64
         ; string
@@ -201,24 +203,15 @@ module User_command = struct
         ; int64
         ; int
         ; string
-        ; option int64
-        ; int
-        ; option int
-        ; option int
         ]
-    in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,
+      {sql| SELECT typ,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
-                   sequence_no,status,created_token,
-                   fee_payer_balance, source_balance, receiver_balance
+                   sequence_no,status
 
-            FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
+            FROM user_commands AS uc
 
             INNER JOIN blocks_user_commands AS buc
 
@@ -232,71 +225,120 @@ module User_command = struct
 
             ON parent.id = blocks.parent_id
 
+            WHERE uc.id = $1
+
        |sql}
 
   let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
     Conn.collect_list query user_cmd_id
 end
 
+module Zkapp_command_ids = struct
+  let query =
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
+      (find_command_ids_query "zkapp")
+
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
+end
+
+module Zkapp_command = struct
+  type t =
+    { fee_payer_id : int
+    ; other_party_ids : int array
+    ; memo : string
+    ; block_id : int
+    ; global_slot_since_genesis : int64
+    ; txn_global_slot_since_genesis : int64
+    ; sequence_no : int
+    ; hash : string
+    }
+  [@@deriving hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ int
+        ; Mina_caqti.array_int_typ
+        ; string
+        ; int
+        ; int64
+        ; int64
+        ; int
+        ; string
+        ]
+
+  let query =
+    Caqti_request.collect Caqti_type.int typ
+      {sql| SELECT fee_payer_id,other_party_ids,memo,
+                   blocks.id,blocks.global_slot_since_genesis,
+                   parent.global_slot_since_genesis,
+                   sequence_no,hash
+
+            FROM zkapp_commands AS zkc
+
+            INNER JOIN blocks_zkapp_commands AS bzc
+
+            ON zkc.id = bzc.user_command_id
+
+            INNER JOIN blocks
+
+            ON blocks.id = bzc.block_id
+
+            INNER JOIN blocks as parent
+
+            ON parent.id = blocks.parent_id
+
+            WHERE zkc.id = $1
+
+       |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) zkapp_cmd_id =
+    Conn.collect_list query zkapp_cmd_id
+end
+
 module Internal_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Caqti_request.collect
+      Caqti_type.(tup2 string int64)
+      Caqti_type.int
       (find_command_ids_query "internal")
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+    Conn.collect_list query (state_hash, start_slot)
 end
 
 module Internal_command = struct
   type t =
-    { type_ : string
+    { typ : string
     ; receiver_id : int
-    ; receiver_balance : int
     ; fee : int64
-    ; token : int64
     ; block_id : int
     ; block_height : int64
     ; global_slot_since_genesis : int64
     ; txn_global_slot_since_genesis : int64
-    ; receiver_account_creation_fee_paid : int64 option
     ; sequence_no : int
     ; secondary_sequence_no : int
     }
   [@@deriving hlist]
 
   let typ =
-    let open Archive_lib.Processor.Caqti_type_spec in
-    let spec =
-      Caqti_type.
-        [ string
-        ; int
-        ; int
-        ; int64
-        ; int64
-        ; int
-        ; int64
-        ; int64
-        ; int64
-        ; option int64
-        ; int
-        ; int
-        ]
-    in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; int; int64; int; int64; int64; int64; int; int ]
 
   (* the transaction global slot since genesis is taken from the internal command's parent block, mirroring
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT type,receiver_id,receiver_balance,fee,token,
-                   blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
-                   receiver_account_creation_fee_paid,
+      {sql| SELECT typ,receiver_id,fee,
+                   blocks.id,blocks.height,blocks.global_slot_since_genesis,
+                   parent.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
 
-            FROM (SELECT * FROM internal_commands WHERE id = ?) AS ic
+            FROM internal_commands AS ic
 
             INNER JOIN blocks_internal_commands AS bic
 
@@ -309,6 +351,8 @@ module Internal_command = struct
             INNER JOIN blocks as parent
 
             ON parent.id = blocks.parent_id
+
+            WHERE ic.id = $1
 
        |sql}
 
@@ -325,6 +369,16 @@ module Public_key = struct
 
   let run (module Conn : Caqti_async.CONNECTION) pk_id =
     Conn.find_opt query pk_id
+end
+
+module Snarked_ledger_hashes = struct
+  let query =
+    Caqti_request.find Caqti_type.int Caqti_type.string
+      {sql| SELECT value FROM snarked_ledger_hashes
+            WHERE id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
 end
 
 module Epoch_data = struct

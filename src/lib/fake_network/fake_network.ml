@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Gadt_lib
 open Signature_lib
 open Network_peer
@@ -14,21 +15,20 @@ type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; get_staged_ledger_aux_and_pending_coinbases_at_hash :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
       -> ( Staged_ledger.Scan_state.t
-         * Marlin_plonk_bindings_pasta_fp.t
+         * Pasta_bindings.Fp.t
          * Pending_coinbase.t
          * Mina_state.Protocol_state.value list )
          option
          Deferred.t
   ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
   ; answer_sync_ledger_query :
-         (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
-         Envelope.Incoming.t
+         (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
       -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
   ; get_ancestry :
          ( Consensus.Data.Consensus_state.Value.t
-         , Marlin_plonk_bindings_pasta_fp.t )
+         , Pasta_bindings.Fp.t )
          With_hash.t
          Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
@@ -39,8 +39,7 @@ type peer_state =
   ; get_best_tip :
          unit Envelope.Incoming.t
       -> ( Mina_transition.External_transition.t
-         , Marlin_plonk_bindings_pasta_fp.t list
-           * Mina_transition.External_transition.t )
+         , Pasta_bindings.Fp.t list * Mina_transition.External_transition.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -49,16 +48,12 @@ type peer_state =
       -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
          Deferred.t
   ; get_transition_knowledge :
-         unit Envelope.Incoming.t
-      -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t
+      unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
-      -> ( Marlin_plonk_bindings_pasta_fp.t
-         * Marlin_plonk_bindings_pasta_fp.t list )
-         option
-         Deferred.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
+      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
   ; get_transition_chain :
-         Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
+         Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_transition.External_transition.t list option Deferred.t
   }
 
@@ -110,9 +105,10 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
     ; consensus_local_state
     ; is_seed = Vect.is_empty peers
     ; genesis_ledger_hash =
-        Ledger.merkle_root
+        Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
+    ; consensus_constants = precomputed_values.consensus_constants
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -131,6 +127,10 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~sinks:
+                  ( Transition_handler.Block_sink.void
+                  , Network_pool.Transaction_pool.Remote_sink.void
+                  , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   state.get_staged_ledger_aux_and_pending_coinbases_at_hash
                 ~get_some_initial_peers:state.get_some_initial_peers

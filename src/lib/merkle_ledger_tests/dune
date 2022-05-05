@@ -2,7 +2,35 @@
  (name merkle_ledger_tests)
  (public_name merkle_ledger_tests)
  (library_flags -linkall)
- (libraries core merkle_ledger merkle_mask mina_base signature_lib extlib)
+ (libraries
+   ;; opam libraries
+   core
+   extlib
+   sexplib0
+   bin_prot.shape
+   base.base_internalhash_types
+   base.caml
+   core_kernel.uuid
+   core.uuid
+   ppx_inline_test.config
+   result
+   async_kernel
+   core_kernel
+   ;; local libraries
+   merkle_ledger
+   merkle_mask
+   mina_base
+   signature_lib
+   currency
+   base58_check
+   direction
+   codable
+   mina_base_import
+   mina_numbers
+   data_hash_lib
+   key_value_database
+   merkle_address
+)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

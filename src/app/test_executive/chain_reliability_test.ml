@@ -15,13 +15,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     { default with
       requires_graphql = true
     ; block_producers =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
         ]
     ; num_snark_workers = 0
     }
@@ -53,6 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
+                ~soft_timeout:(Network_time_span.Slots 3)
                 ~hard_timeout:
                   (Network_time_span.Literal
                      (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
@@ -68,7 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map all_nodes ~f:(fun node ->
              let%map chain = Network.Node.must_get_best_chain ~logger node in
-             (Node.id node, chain))
+             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain))
        in
        let (chains : string list list) =
          List.map labeled_chains ~f:(fun (_, chain) -> chain)

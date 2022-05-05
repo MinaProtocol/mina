@@ -2,9 +2,20 @@
  (name snark_bits)
  (public_name snark_bits_nonconsensus)
  (library_flags -linkall)
- (libraries fold_lib bitstring_lib core_kernel integers)
+ (libraries
+   ;;opam libraries
+   core_kernel
+   integers
+   base
+   ;;local libraries
+   snarky.backendless
+   fold_lib
+   bitstring_lib
+   tuple_lib
+   snarky.intf
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp ppx_let ppx_compare ppx_inline_test))
+  (pps ppx_version ppx_optcomp ppx_let ppx_compare ppx_inline_test ppx_snarky))
  (instrumentation (backend bisect_ppx))
  (synopsis "Snark parameters"))

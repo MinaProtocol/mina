@@ -9,15 +9,6 @@ open Network_peer
 exception No_initial_peers
 
 type Structured_log_events.t +=
-  | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
-  | Snark_work_received of
-      { work : Snark_pool.Resource_pool.Diff.compact
-      ; sender : Envelope.Sender.t
-      }
-  | Transactions_received of
-      { txns : Transaction_pool.Resource_pool.Diff.t
-      ; sender : Envelope.Sender.t
-      }
   | Gossip_new_state of { state_hash : State_hash.t }
   | Gossip_transaction_pool_diff of
       { txns : Transaction_pool.Resource_pool.Diff.t }
@@ -39,9 +30,9 @@ module Rpcs : sig
   end
 
   module Answer_sync_ledger_query : sig
-    type query = Ledger_hash.t * Sync_ledger.Query.t
+    type query = Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t
 
-    type response = Sync_ledger.Answer.t Core.Or_error.t
+    type response = Mina_ledger.Sync_ledger.Answer.t Core.Or_error.t
   end
 
   module Get_transition_chain : sig
@@ -157,6 +148,8 @@ module Rpcs : sig
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
 end
 
+module Sinks : module type of Sinks
+
 module Gossip_net : Gossip_net.S with module Rpc_intf := Rpcs
 
 module Config : sig
@@ -168,6 +161,7 @@ module Config : sig
     { logger : Logger.t
     ; trust_system : Trust_system.t
     ; time_controller : Block_time.Controller.t
+    ; consensus_constants : Consensus.Constants.t
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -179,13 +173,6 @@ module Config : sig
 end
 
 type t
-
-val states :
-     t
-  -> ( External_transition.t Envelope.Incoming.t
-     * Block_time.t
-     * Mina_net2.Validation_callback.t )
-     Strict_pipe.Reader.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
@@ -202,15 +189,9 @@ val get_peer_node_status :
 val add_peer :
   t -> Network_peer.Peer.t -> is_seed:bool -> unit Deferred.Or_error.t
 
-val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-val fill_first_received_message_signal : t -> unit
-
 val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
 val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-val online_status : t -> [ `Online | `Offline ] Broadcast_pipe.Reader.t
 
 val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 
@@ -262,33 +243,22 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
-val snark_pool_diffs :
-     t
-  -> ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * Mina_net2.Validation_callback.t )
-     Strict_pipe.Reader.t
-
-val transaction_pool_diffs :
-     t
-  -> ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * Mina_net2.Validation_callback.t )
-     Strict_pipe.Reader.t
-
 val broadcast_state :
-  t -> External_transition.t State_hash.With_state_hashes.t -> unit
+  t -> External_transition.t State_hash.With_state_hashes.t -> unit Deferred.t
 
-val broadcast_snark_pool_diff : t -> Snark_pool.Resource_pool.Diff.t -> unit
+val broadcast_snark_pool_diff :
+  t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val broadcast_transaction_pool_diff :
-  t -> Transaction_pool.Resource_pool.Diff.t -> unit
+  t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val glue_sync_ledger :
      t
   -> preferred:Peer.t list
-  -> (Ledger_hash.t * Sync_ledger.Query.t) Linear_pipe.Reader.t
+  -> (Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
-     * Sync_ledger.Query.t
-     * Sync_ledger.Answer.t Envelope.Incoming.t )
+     * Mina_ledger.Sync_ledger.Query.t
+     * Mina_ledger.Sync_ledger.Answer.t Envelope.Incoming.t )
      Linear_pipe.Writer.t
   -> unit
 
@@ -299,7 +269,7 @@ val query_peer :
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
-  -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+  -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
 
 val restart_helper : t -> unit
 
@@ -315,6 +285,7 @@ val ban_notification_reader :
 
 val create :
      Config.t
+  -> sinks:Sinks.t
   -> get_some_initial_peers:
        (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
         -> Rpcs.Get_some_initial_peers.response Deferred.t)

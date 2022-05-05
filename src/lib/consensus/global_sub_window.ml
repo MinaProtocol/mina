@@ -22,40 +22,38 @@ let sub a b = UInt32.sub a b
 let constant a = a
 
 module Checked = struct
-  open Snarky_integer
+  module T = Mina_numbers.Global_slot
 
-  type t = field Integer.t
+  type t = T.Checked.t
+
+  let of_length (x : Mina_numbers.Length.Checked.t) : t =
+    T.Checked.Unsafe.of_field (Mina_numbers.Length.Checked.to_field x)
 
   let of_global_slot ~(constants : Constants.var) (s : Global_slot.Checked.t) :
-      (t, _) Checked.t =
-    make_checked (fun () ->
-        let q, _ =
-          Integer.div_mod ~m
-            (Mina_numbers.Global_slot.Checked.to_integer
-               (Global_slot.slot_number s))
-            (Mina_numbers.Length.Checked.to_integer
-               constants.slots_per_sub_window)
-        in
-        q)
+      t Checked.t =
+    let%map q, _ =
+      T.Checked.div_mod
+        (Global_slot.slot_number s)
+        (of_length constants.slots_per_sub_window)
+    in
+    q
 
   let sub_window ~(constants : Constants.var) (t : t) :
-      (Sub_window.Checked.t, _) Checked.t =
-    make_checked (fun () ->
-        let _, shift =
-          Integer.div_mod ~m t
-            (Mina_numbers.Length.Checked.to_integer
-               constants.sub_windows_per_window)
-        in
-        Sub_window.Checked.Unsafe.of_integer shift)
+      Sub_window.Checked.t Checked.t =
+    let%map _, shift =
+      T.Checked.div_mod t (of_length constants.sub_windows_per_window)
+    in
+    Sub_window.Checked.Unsafe.of_field (T.Checked.to_field shift)
 
-  let succ (t : t) : t = Integer.succ ~m t
+  let succ (t : t) : t Checked.t = T.Checked.succ t
 
-  let equal a b = make_checked (fun () -> Integer.equal ~m a b)
+  let equal = T.Checked.equal
 
   let constant a =
-    Integer.constant ~m @@ Bignum_bigint.of_int @@ UInt32.to_int a
+    T.Checked.Unsafe.of_field @@ Field.Var.constant @@ Field.of_int
+    @@ UInt32.to_int a
 
-  let add a b = Integer.add ~m a (Mina_numbers.Length.Checked.to_integer b)
+  let add a (b : Mina_numbers.Length.Checked.t) = T.Checked.add a (of_length b)
 
-  let ( >= ) a b = make_checked (fun () -> Integer.gte ~m a b)
+  let ( >= ) a b = T.Checked.( >= ) a b
 end

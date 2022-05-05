@@ -4,7 +4,21 @@
  (flags :standard -short-paths)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel snark_params_nonconsensus random_oracle_nonconsensus fold_lib codable ppx_version)
+ (libraries
+   ;;opam libraries
+   ppx_inline_test.config
+   base.caml
+   core_kernel
+   bin_prot.shape
+   base
+   base.base_internalhash_types
+   ;;local libraries
+   base58_check
+   codable
+   random_oracle_input
+   random_oracle_nonconsensus
+   snark_params_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_compare h_list.ppx))

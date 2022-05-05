@@ -16,13 +16,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
+    let open Test_config.Wallet in
     { default with
       requires_graphql = true
     ; block_producers =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "0"; timing = Untimed }
         ]
     ; num_snark_workers = 0
     }
@@ -63,7 +63,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
-         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind _ =
+           wait_for t
+             ( Wait_condition.blocks_to_be_produced 1
+             (* Extend the wait timeout, only 2/3 of stake is online. *)
+             |> Wait_condition.with_timeouts
+                  ~soft_timeout:(Network_time_span.Slots 3)
+                  ~hard_timeout:(Network_time_span.Slots 6) )
+         in
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
