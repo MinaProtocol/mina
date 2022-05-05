@@ -7,7 +7,7 @@ set -eo pipefail
 
 echo "Updating apt, installing packages"
 apt-get update
-Don't prompt for answers during apt-get install
+# Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
 time zone = US Pacific
