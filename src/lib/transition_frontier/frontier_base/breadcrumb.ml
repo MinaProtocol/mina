@@ -354,10 +354,6 @@ module For_tests = struct
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.registers
       in
-      let previous_ledger_hash =
-        previous_protocol_state |> Protocol_state.blockchain_state
-        |> Blockchain_state.snarked_ledger_hash
-      in
       let next_registers =
         Option.value_map ledger_proof_opt
           ~f:(fun (proof, _) ->
@@ -406,8 +402,8 @@ module For_tests = struct
         let header =
           Mina_block.Header.create ~protocol_state
             ~protocol_state_proof:Proof.blockchain_dummy
-            ~delta_block_chain_proof:(previous_ledger_hash, []) ~body_reference
-            ()
+            ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
+            ~body_reference ()
         in
         (* We manually created a validated an block *)
         let block =
@@ -417,8 +413,7 @@ module For_tests = struct
         in
         Mina_block.Validated.unsafe_of_trusted_block
           ~delta_block_chain_proof:
-            ( Non_empty_list.singleton
-            @@ State_hash.State_hashes.state_hash previous_state_hashes )
+            (Non_empty_list.singleton previous_state_hashes.state_hash)
           (`This_block_is_trusted_to_be_safe block)
       in
       let transition_receipt_time = Some (Time.now ()) in
