@@ -2745,6 +2745,17 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
+        let global_slot_since_genesis =
+          consensus_state
+          |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          |> Unsigned.UInt32.to_int64
+        in
+        let chain_status =
+          if Int64.equal global_slot_since_genesis 0L then
+            (* genesis block *)
+            Chain_status.(to_string Canonical)
+          else Chain_status.(to_string Pending)
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -2778,15 +2789,11 @@ module Block = struct
             ; global_slot_since_hard_fork =
                 Consensus.Data.Consensus_state.curr_global_slot consensus_state
                 |> Unsigned.UInt32.to_int64
-            ; global_slot_since_genesis =
-                consensus_state
-                |> Consensus.Data.Consensus_state.global_slot_since_genesis
-                |> Unsigned.UInt32.to_int64
+            ; global_slot_since_genesis
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.timestamp |> Block_time.to_int64
-                (* we don't yet know the chain status for a block we're adding *)
-            ; chain_status = Chain_status.(to_string Pending)
+            ; chain_status
             }
         in
         let%bind _seq_no =
@@ -3097,13 +3104,13 @@ module Block = struct
          typ
          {sql| WITH RECURSIVE chain AS (
               SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
+                     next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp, chain_status
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
               SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
+                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,b.timestamp,b.chain_status
               FROM blocks b
 
               INNER JOIN chain
@@ -3113,7 +3120,7 @@ module Block = struct
            )
 
            SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
+                  next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
            FROM chain ORDER BY height ASC
       |sql})
       (end_block_id, start_block_id)
@@ -3408,8 +3415,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                        $state_hash to archive database"
                       ~metadata:
                         [ ("state_hash", State_hash.to_yojson state_hash)
-                        ; ( "num_accounts_created"
-                          , `Int (List.length accounts_created) )
+                        ; ( "num_accounts_accessed"
+                          , `Int (List.length accounts_accessed) )
                         ] ;
                     match%bind
                       Caqti_async.Pool.use
@@ -3426,12 +3433,14 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                           ~metadata:
                             [ ( "state_hash"
                               , Mina_base.State_hash.to_yojson (hash block) )
+                            ; ( "num_accounts_created"
+                              , `Int (List.length accounts_created) )
                             ] ;
                         Conn.commit ()
                     | Error err ->
                         [%log warn]
-                          "Could not add account creation fees in block with \
-                           state hash $state_hash to archive database: $error"
+                          "Could not add accounts created in block with state \
+                           hash $state_hash to archive database: $error"
                           ~metadata:
                             [ ("state_hash", State_hash.to_yojson state_hash)
                             ; ("error", `String (Caqti_error.show err))
