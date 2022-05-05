@@ -512,6 +512,7 @@ module For_tests = struct
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
+        Protocol_version.(set_current zero) ;
         let genesis_transition =
           Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
         in

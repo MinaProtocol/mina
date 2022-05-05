@@ -252,12 +252,12 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ~prover:(Public_key.compress submitter_keypair.public_key)
       in
       let best_tip = Transition_frontier.best_tip tf in
-      let block = Transition_frontier.Breadcrumb.block best_tip in
+      let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
           (External_transition.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled block)
+               Genesis_constants.Constraint_constants.compiled best_tip_block)
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -321,7 +321,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                        false)
             in
             let staged_ledger_hash =
-              Mina_block.header block |> Mina_block.Header.protocol_state
+              Mina_block.header best_tip_block
+              |> Mina_block.Header.protocol_state
               |> Mina_state.Protocol_state.blockchain_state
               |> Mina_state.Blockchain_state.staged_ledger_hash
             in

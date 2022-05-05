@@ -29,7 +29,7 @@ module Make (Inputs : Inputs_intf) :
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem = Mina_block.Validated.state_hash
+    let to_proof_elem = Mina_block.Validated.state_body_hash
 
     let get_previous ~context transition =
       let parent_hash =

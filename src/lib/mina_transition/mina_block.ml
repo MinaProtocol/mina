@@ -77,7 +77,10 @@ module Validated : sig
 end = struct
   type t =
     Block.t State_hash.With_state_hashes.t * State_hash.t Non_empty_list.t
-  [@@deriving sexp, to_yojson, equal]
+  [@@deriving sexp, equal]
+
+  let to_yojson (block_with_hashes, _) =
+    State_hash.With_state_hashes.to_yojson Block.to_yojson block_with_hashes
 
   let lift (b, v) =
     match v with
