@@ -31,14 +31,6 @@ The short version:
 You can build Mina using Docker. This should work in any dev environment.
 Refer to [/dev](/dev).
 
-### Developer Setup (NixOS/nix)
-
-When using nix package manager, run `scripts/nixos-setup.sh` script to install all of the dependencies.
-
-This script was tested on channel `20.03` but should work well on newer channels too.
-
-Troubleshooting tip: to remove everything and build from scratch, use `rm -Rf ~/.opam _build`.
-
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
