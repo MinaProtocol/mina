@@ -2,7 +2,7 @@ import Client from "mina-signer";
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
@@ -37,7 +37,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
 // parse command line; for local testing, use random keys as fallback
 let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =

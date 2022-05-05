@@ -1,7 +1,7 @@
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
@@ -48,7 +48,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { initialize: [], update: [Field] });
+declareMethods(SimpleZkapp, { initialize: [], update: [Field] });
 
 // setup mock mina
 let Local = Mina.LocalBlockchain();

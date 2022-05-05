@@ -2,7 +2,7 @@ import Client from "mina-signer";
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
@@ -39,7 +39,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
