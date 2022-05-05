@@ -857,7 +857,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
     cmd.type_ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%bind fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
-  let memo = Signed_command_memo.of_string cmd.memo in
+  let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
         Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot)

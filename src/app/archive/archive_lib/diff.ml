@@ -11,16 +11,16 @@ module Transition_frontier = struct
     module V2 = struct
       type t =
         | Breadcrumb_added of
-            { block:
+            { block :
                 ( External_transition.Raw.Stable.V1.t
                 , State_hash.Stable.V1.t )
                 With_hash.Stable.V1.t
-            ; sender_receipt_chains_from_parent_ledger:
+            ; sender_receipt_chains_from_parent_ledger :
                 (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
             }
         | Root_transitioned of
             Transition_frontier.Diff.Root_transition.Lite.Stable.V2.t
-        | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
+        | Bootstrap of { lost_blocks : State_hash.Stable.V1.t list }
 
       let to_latest = Fn.id
     end
@@ -32,8 +32,9 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: User_command.Stable.V1.t list
-        ; removed: User_command.Stable.V1.t list }
+        { added : User_command.Stable.V1.t list
+        ; removed : User_command.Stable.V1.t list
+        }
 
       let to_latest = Fn.id
     end
@@ -53,19 +54,18 @@ end]
 
 module Builder = struct
   let breadcrumb_added breadcrumb =
-    let validated_block =
-      Breadcrumb.validated_transition breadcrumb
+    let validated_block = Breadcrumb.validated_transition breadcrumb in
+    let block =
+      With_hash.map_hash ~f:State_hash.State_hashes.state_hash
+      @@ With_hash.map ~f:External_transition.compose
+      @@ Mina_block.Validated.forget validated_block
     in
-    let block = 
-      With_hash.data @@ Mina_block.Validated.forget validated_block
-    in
-    let hash = Mina_block.Validated.state_hash validated_block in
     let commands = Mina_block.Validated.valid_commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
         commands
-        |> List.map ~f:(fun {data; _} ->
-               User_command.(fee_payer (forget_check data)) )
+        |> List.map ~f:(fun { data; _ } ->
+               User_command.(fee_payer (forget_check data)))
         |> Account_id.Set.of_list
       in
       let ledger =
@@ -78,14 +78,14 @@ module Builder = struct
                let%bind ledger_location =
                  Ledger.location_of_account ledger sender
                in
-               let%map {receipt_chain_hash; _} =
+               let%map { receipt_chain_hash; _ } =
                  Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)) )
+               (sender, receipt_chain_hash)))
     in
     Transition_frontier.Breadcrumb_added
-      {block = {With_hash.hash; data = External_transition.compose block}; sender_receipt_chains_from_parent_ledger}
+      { block; sender_receipt_chains_from_parent_ledger }
 
   let user_commands user_commands =
-    Transaction_pool {Transaction_pool.added= user_commands; removed= []}
+    Transaction_pool { Transaction_pool.added = user_commands; removed = [] }
 end

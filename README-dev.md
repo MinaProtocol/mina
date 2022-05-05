@@ -31,6 +31,14 @@ The short version:
 You can build Mina using Docker. This should work in any dev environment.
 Refer to [/dev](/dev).
 
+### Developer Setup (NixOS/nix)
+
+When using nix package manager, run `scripts/nixos-setup.sh` script to install all of the dependencies.
+
+This script was tested on channel `20.03` but should work well on newer channels too.
+
+Troubleshooting tip: to remove everything and build from scratch, use `rm -Rf ~/.opam _build`.
+
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
@@ -85,6 +93,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - If you use vscode, you might like this extension
 
   - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
+  - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
 
 - If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
 

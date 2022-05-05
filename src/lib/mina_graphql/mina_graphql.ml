@@ -1375,7 +1375,7 @@ module Types = struct
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
-            |> Signed_command_memo.to_string)
+            |> Signed_command_memo.to_base58_check)
       ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))

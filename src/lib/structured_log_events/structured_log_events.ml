@@ -33,7 +33,18 @@ let parse_exn id json_pairs =
             List.filter json_pairs ~f:(fun (field_name, _) ->
                 Set.mem repr.arguments field_name)
           in
-          repr.parse json_pairs
+          match repr.parse json_pairs with
+          | Some t ->
+              Some t
+          | None ->
+              failwithf
+                "parse_exn: parser for id %s found, but failed when applied to \
+                 arguments: %s"
+                id
+                ( List.map json_pairs ~f:(fun (name, json) ->
+                      sprintf "%s = %s" name (Yojson.Safe.to_string json))
+                |> String.concat ~sep:"," )
+                ()
         else None)
   in
   match result with
