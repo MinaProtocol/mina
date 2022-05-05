@@ -47,7 +47,7 @@ trap "cleanup; exit 1" SIGINT
 sleep 5
 
 echo "Populating archive database"
-psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
+pg_restore -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.bin
 
 echo "Building replayer"
 make replayer
