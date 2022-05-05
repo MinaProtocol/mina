@@ -80,6 +80,7 @@ module Diff_versioned = struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | Fee_payer_account_not_found
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -102,6 +103,7 @@ module Diff_versioned = struct
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -129,6 +131,8 @@ module Diff_versioned = struct
           "expired"
       | Overloaded ->
           "overloaded"
+      | Fee_payer_account_not_found ->
+          "fee_payer_account_not_found"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -160,6 +164,8 @@ module Diff_versioned = struct
           "This transaction has expired"
       | Overloaded ->
           "The diff containing this transaction was too large"
+      | Fee_payer_account_not_found ->
+          "Fee payer account was not found in the best tip ledger"
   end
 
   module Rejected = struct
@@ -246,7 +252,7 @@ module Make0
                              with type staged_ledger := Staged_ledger.t) =
 struct
   type verification_failure =
-    | Command_failure of Indexed_pool.Command_error.t
+    | Command_failure of Diff_versioned.Diff_error.t
     | Invalid_failure of Verifier.invalid
   [@@deriving to_yojson]
 
@@ -933,6 +939,7 @@ struct
           | Unwanted_fee_token
           | Expired
           | Overloaded
+          | Fee_payer_account_not_found
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -1166,10 +1173,6 @@ struct
               let%map diffs' =
                 Deferred.List.map by_sender ~how:`Parallel
                   ~f:(fun (signer, cs) ->
-                    let signer_lock =
-                      Hashtbl.find_or_add t.sender_mutex signer
-                        ~default:Mutex.create
-                    in
                     let account =
                       Option.bind
                         (Base_ledger.location_of_account ledger signer)
@@ -1185,8 +1188,18 @@ struct
                                 , [ ("account_id", Account_id.to_yojson signer)
                                   ] ) )
                         in
-                        Error `Account_not_found
+                        add_failure
+                          (Command_failure
+                             Diff_error.Fee_payer_account_not_found) ;
+                        Error `Invalid_command
                     | Some account ->
+                        let signer_lock =
+                          Hashtbl.find_or_add t.sender_mutex signer
+                            ~default:Mutex.create
+                        in
+                        (*This lock is released in apply function unless
+                          there's an error that causes all the transactions from
+                          this signer to be discarded*)
                         let%bind () = Mutex.acquire signer_lock in
                         let rec go sender_local_state u_acc acc
                             (rejected : Rejected.t) = function
@@ -1294,7 +1307,10 @@ struct
                                           ~is_sender_local uc e
                                       with
                                       | `Reject ->
-                                          add_failure (Command_failure e) ;
+                                          add_failure
+                                            (Command_failure
+                                               (diff_error_of_indexed_pool_error
+                                                  e)) ;
                                           Mutex.release signer_lock ;
                                           return (Error `Invalid_command)
                                       | `Ignore ->
@@ -1343,8 +1359,7 @@ struct
                     List.map errs ~f:(fun err ->
                         match err with
                         | Command_failure cmd_err ->
-                            Yojson.Safe.to_string
-                              (Indexed_pool.Command_error.to_yojson cmd_err)
+                            Yojson.Safe.to_string (Diff_error.to_yojson cmd_err)
                         | Invalid_failure invalid ->
                             Verifier.invalid_to_string invalid)
                     |> String.concat ~sep:", "
@@ -1355,6 +1370,9 @@ struct
                   let data =
                     List.filter_map diffs' ~f:(function
                       | Error (`Invalid_command | `Other_command_failed) ->
+                          (* `Invalid_command should be handled in the Error
+                             case above and `Other_command_failed should be
+                             triggered only if there's an `Invalid_command*)
                           assert false
                       | Error `Account_not_found ->
                           (* We can just skip this set of commands *)
@@ -1372,6 +1390,11 @@ struct
                   in
                   Ok { diffs with data } )
 
+      (** The function checks proofs and signatures in the diffs and applies
+      valid diffs to the local sender state (sequence of transactions from the
+      pool) for each sender/fee-payer. The local sender state is then included
+      in the verified diff returned by this function which will be committed to
+      the transaction pool in the apply function*)
       let verify (t : pool) (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
         verify' ~allow_failures_for_tests:false t diffs
@@ -1912,12 +1935,7 @@ let%test_module _ =
     let accepted_commands = Result.map ~f:fst
 
     let mk_with_status (cmd : User_command.Valid.t) =
-      { With_status.data = cmd
-      ; status =
-          Applied
-            ( Transaction_status.Auxiliary_data.empty
-            , Transaction_status.Balance_data.empty )
-      }
+      { With_status.data = cmd; status = Applied }
 
     let verify_and_apply (pool : Test.Resource_pool.t) cs =
       let tm0 = Time.now () in

@@ -716,7 +716,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -792,34 +792,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -836,7 +808,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {
@@ -882,7 +854,7 @@
               "defaultValue": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -952,30 +924,6 @@
               "defaultValue": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "type": {
@@ -990,7 +938,7 @@
               "defaultValue": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2750,14 +2698,6 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
@@ -2825,12 +2765,6 @@
             },
             {
               "name": "receiptChainHash",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "publicKey",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
@@ -6869,14 +6803,6 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
@@ -8216,7 +8142,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -8292,34 +8218,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -8336,7 +8234,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {

@@ -2179,7 +2179,6 @@ module Ledger = struct
                    (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
                    p##.nonce)
           ; receipt_chain_hash = or_ignore field p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
@@ -2318,8 +2317,7 @@ module Ledger = struct
   let fee_payer_body (b : fee_payer_party_body) : Party.Body.Fee_payer.t =
     { public_key = public_key b##.publicKey
     ; update = update b##.update
-    ; token_id = ()
-    ; balance_change = Currency.Amount.to_fee (int64 b##.delta).magnitude
+    ; fee = Currency.Amount.to_fee (int64 b##.delta).magnitude
     ; events =
         Array.map
           (Js.to_array b##.events)
@@ -2330,14 +2328,9 @@ module Ledger = struct
           (Js.to_array b##.sequenceEvents)
           ~f:(fun a -> Array.map (Js.to_array a) ~f:field)
         |> Array.to_list
-    ; call_data = field b##.callData
-    ; call_depth = b##.depth
-    ; increment_nonce = ()
-    ; use_full_commitment = ()
     ; protocol_state_precondition = protocol_state b##.protocolState
-    ; account_precondition =
+    ; nonce =
         uint32 b##.accountPrecondition |> Mina_numbers.Account_nonce.of_uint32
-    ; caller = ()
     }
 
   let predicate (t : Account_precondition.t) : Party.Account_precondition.t =
@@ -2362,7 +2355,6 @@ module Ledger = struct
                    (Fn.compose Mina_numbers.Account_nonce.of_uint32 uint32)
                    p##.nonce)
           ; receipt_chain_hash = or_ignore field p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
@@ -2579,7 +2571,6 @@ module Ledger = struct
       ; nonce = numeric nonce max_interval_uint32
       ; receipt_chain_hash =
           ignore (Mina_base.Receipt.Chain_hash.var_of_hash_packed Field.zero)
-      ; public_key = ignore pk_dummy
       ; delegate = ignore pk_dummy
       ; state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
@@ -2606,7 +2597,6 @@ module Ledger = struct
                 (* TODO: assumes constant *)
                 (Mina_base.Receipt.Chain_hash.var_of_t ^ field_value)
                 p##.receiptChainHash
-          ; public_key = or_ignore public_key p##.publicKey
           ; delegate = or_ignore public_key p##.delegate
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
@@ -3060,14 +3050,16 @@ module Ledger = struct
         ledger txn
     in
     let applied, _ = Or_error.ok_exn applied_exn in
-    let T.Transaction_applied.Parties_applied.{ accounts; command } = applied in
+    let T.Transaction_applied.Parties_applied.{ accounts; command; _ } =
+      applied
+    in
     let () =
       match command.status with
-      | Applied (_aux_data, _balance) ->
+      | Applied ->
           ()
-      | Failed (failure, _balance) ->
+      | Failed failures ->
           raise_error
-            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failure
+            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failures
             |> Yojson.Safe.to_string )
     in
     let account_list =

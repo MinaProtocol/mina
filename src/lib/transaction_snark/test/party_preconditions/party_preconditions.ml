@@ -245,17 +245,11 @@ let%test_module "Protocol state precondition tests" =
                     { Party.Fee_payer.body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
-                        ; token_id = ()
-                        ; balance_change = fee
-                        ; increment_nonce = ()
+                        ; fee
                         ; events = []
                         ; sequence_events = []
-                        ; call_data = Snark_params.Tick.Field.zero
-                        ; call_depth = 0
                         ; protocol_state_precondition
-                        ; account_precondition = sender_nonce
-                        ; use_full_commitment = ()
-                        ; caller = ()
+                        ; nonce = sender_nonce
                         }
                         (*To be updated later*)
                     ; authorization = Signature.dummy
@@ -396,8 +390,7 @@ let%test_module "Account precondition tests" =
       let interval v =
         { Closed_interval.lower = v; Closed_interval.upper = v }
       in
-      let { Mina_base.Account.Poly.public_key
-          ; balance
+      let { Mina_base.Account.Poly.balance
           ; nonce
           ; receipt_chain_hash
           ; delegate
@@ -410,7 +403,6 @@ let%test_module "Account precondition tests" =
         let balance = Or_ignore.Check (interval balance) in
         let nonce = Or_ignore.Check (interval nonce) in
         let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
-        let public_key = Or_ignore.Check public_key in
         let delegate =
           match delegate with
           | None ->
@@ -448,7 +440,6 @@ let%test_module "Account precondition tests" =
         { Zkapp_precondition.Account.Poly.balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state
@@ -641,19 +632,12 @@ let%test_module "Account precondition tests" =
                 { Party.Fee_payer.body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = fee
-                    ; increment_nonce = ()
+                    ; fee
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Account.Nonce.succ sender_nonce (*Invalid nonce*)
-                    ; use_full_commitment = ()
-                    ; caller = ()
+                    ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
                 ; authorization = Signature.dummy

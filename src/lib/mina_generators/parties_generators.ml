@@ -11,14 +11,7 @@ module Ledger = Mina_ledger.Ledger
 let gen_account_precondition_from_account ?(succeed = true) account =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
-  let { Account.Poly.public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; zkapp
-      ; _
-      } =
+  let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
     account
   in
   (* choose constructor *)
@@ -72,7 +65,6 @@ let gen_account_precondition_from_account ?(succeed = true) account =
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
       let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
-      let public_key = Or_ignore.Check public_key in
       let%bind delegate =
         match delegate with
         | None ->
@@ -112,7 +104,6 @@ let gen_account_precondition_from_account ?(succeed = true) account =
         { Zkapp_precondition.Account.Poly.balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state
@@ -421,17 +412,11 @@ module Party_body_components = struct
   let to_fee_payer t : Party.Body.Fee_payer.t =
     { public_key = t.public_key
     ; update = t.update
-    ; token_id = t.token_id
-    ; balance_change = t.balance_change
-    ; increment_nonce = t.increment_nonce
+    ; fee = t.balance_change
     ; events = t.events
     ; sequence_events = t.sequence_events
-    ; call_data = t.call_data
-    ; call_depth = t.call_depth
     ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account.Nonce.zero
-    ; use_full_commitment = t.use_full_commitment
-    ; caller = ()
+    ; nonce = Account.Nonce.zero
     }
 
   let to_typical_party t : Party.Body.Wire.t =
@@ -822,7 +807,7 @@ let gen_parties_from ?(succeed = true)
     let fee_payer_balance =
       (* if we've done things right, all the options here are Some *)
       let fee =
-        fee_payer.body.balance_change |> Currency.Fee.to_uint64
+        fee_payer.body.fee |> Currency.Fee.to_uint64
         |> Currency.Amount.of_uint64
       in
       let ledger_balance =

@@ -184,7 +184,7 @@ let check_parties_with_merges_exn ?expected_failure
       ( match applied.varying with
       | Command (Parties { command; _ }) -> (
           match command.status with
-          | Applied _ -> (
+          | Applied -> (
               match expected_failure with
               | Some failure ->
                   failwith
@@ -195,7 +195,7 @@ let check_parties_with_merges_exn ?expected_failure
                        failure)
               | None ->
                   () )
-          | Failed (failure_tbl, _) -> (
+          | Failed failure_tbl -> (
               match expected_failure with
               | None ->
                   failwith
@@ -207,9 +207,10 @@ let check_parties_with_merges_exn ?expected_failure
                   let failures = List.concat failure_tbl in
                   assert (not (List.is_empty failures)) ;
                   let failed_as_expected =
-                    List.fold failures ~init:true ~f:(fun acc f ->
+                    (*Check that there's at least the expected failure*)
+                    List.fold failures ~init:false ~f:(fun acc f ->
                         acc
-                        && Mina_base.Transaction_status.Failure.(
+                        || Mina_base.Transaction_status.Failure.(
                              equal failure f))
                   in
                   if not failed_as_expected then
